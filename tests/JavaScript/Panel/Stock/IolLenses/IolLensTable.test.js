@@ -12,26 +12,43 @@ import IolLensTable from '@/Pages/Panel/Stock/IolLenses/IolLensTable.vue';
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
     default: {
         props: ['title', 'btnClass'],
-        template: '<div class="dd" :data-title="title" :data-btn-class="btnClass"><span class="dd-trigger"><slot name="trigger" /></span><slot /></div>',
+        template:
+            '<div class="dd" :data-title="title" :data-btn-class="btnClass"><span class="dd-trigger"><slot name="trigger" /></span><slot /></div>',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
         props: ['title', 'icon', 'variant', 'inertiaHref'],
         emits: ['click'],
-        template: '<button type="button" :title="title" :data-href="inertiaHref" :data-variant="variant" @click="$emit(\'click\')" />',
+        template:
+            '<button type="button" :title="title" :data-href="inertiaHref" :data-variant="variant" @click="$emit(\'click\')" />',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_model: 'Modelo', col_manufacturer: 'Fabricante', col_category: 'Tipo', col_diopters: 'Dioptrias',
-    col_price: 'Valor', col_stock: 'Estoque', col_status: 'Status', col_actions: 'Ações',
-    sort_by: 'Ordenar por :column', diopter_range: ':min a :max D', not_informed: 'Não informado',
-    status_active: 'Ativa', status_inactive: 'Inativa', action_movements: 'Movimentações da lente',
-    action_edit: 'Editar', action_activate: 'Ativar', action_deactivate: 'Desativar', action_delete: 'Excluir',
-    more_actions: 'Mais ações', empty_list: 'Nenhuma lente encontrada.',
-    columns_label: 'Colunas', columns_customize: 'Personalizar colunas',
+    col_model: 'Modelo',
+    col_manufacturer: 'Fabricante',
+    col_category: 'Tipo',
+    col_diopters: 'Dioptrias',
+    col_price: 'Valor',
+    col_stock: 'Estoque',
+    col_status: 'Status',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    diopter_range: ':min a :max D',
+    not_informed: 'Não informado',
+    status_active: 'Ativa',
+    status_inactive: 'Inativa',
+    action_movements: 'Movimentações da lente',
+    action_edit: 'Editar',
+    action_activate: 'Ativar',
+    action_deactivate: 'Desativar',
+    action_delete: 'Excluir',
+    more_actions: 'Mais ações',
+    empty_list: 'Nenhuma lente encontrada.',
+    columns_label: 'Colunas',
+    columns_customize: 'Personalizar colunas',
 };
 
 const nbsp = (s) => s.replace(/ /g, ' ');
@@ -43,9 +60,18 @@ afterEach(() => wrapper?.unmount());
 
 function lens(overrides = {}) {
     return {
-        id: 'l1', manufacturer: 'Alcon', model_name: 'AcrySof IQ', category: 'Monofocal',
-        diopter_min: 10, diopter_max: 30, price: 2500.5, image_url: null, active: true,
-        entity_product_id: 'prod-1', stock: { id: 'prod-1', unit_label: 'Unidade', qty_on_hand: 3 }, ...overrides,
+        id: 'l1',
+        manufacturer: 'Alcon',
+        model_name: 'AcrySof IQ',
+        category: 'Monofocal',
+        diopter_min: 10,
+        diopter_max: 30,
+        price: 2500.5,
+        image_url: null,
+        active: true,
+        entity_product_id: 'prod-1',
+        stock: { id: 'prod-1', unit_label: 'Unidade', qty_on_hand: 3 },
+        ...overrides,
     };
 }
 
@@ -68,7 +94,16 @@ describe('IolLensTable', () => {
     it('mostra as colunas na ordem padrão com Status e Ações no fim', () => {
         const w = mountTable();
 
-        expect(headerLabels(w)).toEqual(['Modelo', 'Fabricante', 'Tipo', 'Dioptrias', 'Valor', 'Estoque', 'Status', 'Ações']);
+        expect(headerLabels(w)).toEqual([
+            'Modelo',
+            'Fabricante',
+            'Tipo',
+            'Dioptrias',
+            'Valor',
+            'Estoque',
+            'Status',
+            'Ações',
+        ]);
     });
 
     it('respeita a ordem de colunas salva no navegador', () => {

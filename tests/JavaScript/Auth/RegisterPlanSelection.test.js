@@ -22,7 +22,13 @@ async function mountRegistration(selectedPlanId = 'premium', siteContent = {}) {
             selectedPlanId,
             trialDays: 9,
             routes: { siteHome: '/' },
-            t: { nav: { contact: 'Contato' }, metrics: [], testimonials: { items: [] }, contact: { trust_nps: '' }, ...siteContent },
+            t: {
+                nav: { contact: 'Contato' },
+                metrics: [],
+                testimonials: { items: [] },
+                contact: { trust_nps: '' },
+                ...siteContent,
+            },
             tAuth: { register: { quick_start: 'Começar com o plano', days_free: 'dias grátis' } },
         },
         global: {
@@ -103,7 +109,9 @@ describe('Cadastro — seleção do plano', () => {
 
     it('exibe o impedimento de teste desativado e oferece acesso ao contato', async () => {
         await mountRegistration();
-        axios.post.mockRejectedValueOnce({ response: { data: { errors: { plan_id: ['O cadastro para teste está indisponível.'] } } } });
+        axios.post.mockRejectedValueOnce({
+            response: { data: { errors: { plan_id: ['O cadastro para teste está indisponível.'] } } },
+        });
         await wrapper.get('form').trigger('submit');
         await flushPromises();
         const alert = wrapper.get('[role="alert"]');
@@ -120,8 +128,12 @@ describe('Cadastro — conteúdo público', () => {
         expect(wrapper.find('.reg-hero-metrics').exists()).toBe(false);
         expect(wrapper.find('.reg-testimonial').exists()).toBe(false);
         expect(wrapper.get('.reg-hero-badge').text()).toContain('9 dias grátis');
-        expect(wrapper.findAll('.reg-trust-item span').map(item => item.text())).toEqual(['SSL 256-bit', 'LGPD', 'CFM']);
-        expect(wrapper.findAll('.reg-card-trust-item span').map(item => item.text())).toEqual(['SSL', 'LGPD', 'CFM']);
+        expect(wrapper.findAll('.reg-trust-item span').map((item) => item.text())).toEqual([
+            'SSL 256-bit',
+            'LGPD',
+            'CFM',
+        ]);
+        expect(wrapper.findAll('.reg-card-trust-item span').map((item) => item.text())).toEqual(['SSL', 'LGPD', 'CFM']);
         expect(wrapper.text()).not.toMatch(/500\+|97%|Ricardo Mendes/);
 
         await wrapper.get('.reg-btn-secondary').trigger('click');
@@ -133,8 +145,11 @@ describe('Cadastro — conteúdo público', () => {
 
     it('usa exclusivamente o depoimento e o indicador publicados pelo servidor', async () => {
         const published = {
-            text: 'Relato autorizado recebido do servidor.', name: 'Pessoa do depoimento',
-            role: 'Responsável pela clínica', initials: 'PD', stars: 4,
+            text: 'Relato autorizado recebido do servidor.',
+            name: 'Pessoa do depoimento',
+            role: 'Responsável pela clínica',
+            initials: 'PD',
+            stars: 4,
         };
         await mountRegistration('premium', {
             testimonials: { items: [published, { text: 'Segundo relato publicado.' }], rating: ':stars de 5 estrelas' },
@@ -150,7 +165,11 @@ describe('Cadastro — conteúdo público', () => {
         expect(testimonial.findAll('.ti-star-filled')).toHaveLength(4);
         expect(testimonial.findAll('.ti-star')).toHaveLength(1);
         expect(wrapper.text()).not.toContain('Segundo relato publicado.');
-        expect(wrapper.findAll('.reg-trust-item, .reg-card-trust-item').filter(item => item.text() === 'Satisfação publicada: 92%')).toHaveLength(2);
+        expect(
+            wrapper
+                .findAll('.reg-trust-item, .reg-card-trust-item')
+                .filter((item) => item.text() === 'Satisfação publicada: 92%'),
+        ).toHaveLength(2);
 
         await wrapper.setProps({ t: { testimonials: { items: [] }, contact: { trust_nps: '' } } });
         expect(wrapper.find('.reg-testimonial').exists()).toBe(false);

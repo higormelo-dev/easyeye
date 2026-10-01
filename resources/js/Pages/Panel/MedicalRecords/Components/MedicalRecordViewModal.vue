@@ -8,9 +8,9 @@ import { contactLensSummary } from './contactLens.js';
  * exibindo apenas campos preenchidos. Nenhuma edição — visualização clínica.
  */
 const props = defineProps({
-    open:    { type: Boolean, required: true },
-    record:  { type: Object,  default: null },   // item resumido (tem show_url)
-    t:       { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    record: { type: Object, default: null }, // item resumido (tem show_url)
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
@@ -19,10 +19,16 @@ const data = ref(null);
 const loading = ref(false);
 const errorMsg = ref('');
 
-watch(() => props.open, (val) => {
-    if (val) load();
-    else { data.value = null; errorMsg.value = ''; }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val) load();
+        else {
+            data.value = null;
+            errorMsg.value = '';
+        }
+    },
+);
 
 onMounted(() => {
     if (props.open) load();
@@ -36,7 +42,7 @@ async function load() {
     data.value = null;
     try {
         const res = await fetch(url, {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -50,7 +56,9 @@ async function load() {
     }
 }
 
-function close() { emit('close'); }
+function close() {
+    emit('close');
+}
 
 // ── Montagem das seções (apenas campos preenchidos) ────────────────────────
 const yn = (v) => (v ? (props.t.yes ?? 'Sim') : (props.t.no ?? 'Não'));
@@ -65,9 +73,10 @@ const sections = computed(() => {
     const d = data.value;
     if (!d) return [];
 
-    const rows = (items) => items
-        .map(([label, value]) => ({ label, value }))
-        .filter((x) => x.value !== null && x.value !== undefined && x.value !== '');
+    const rows = (items) =>
+        items
+            .map(([label, value]) => ({ label, value }))
+            .filter((x) => x.value !== null && x.value !== undefined && x.value !== '');
 
     const out = [];
 
@@ -143,9 +152,14 @@ const documentations = computed(() => data.value?.documentations ?? []);
 
 <template>
     <Teleport to="body">
-        <div v-if="open" class="modal fade show d-block" tabindex="-1"
-             style="background: rgba(15,23,42,.55);" @click.self="close">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable" style="max-width: 760px;">
+        <div
+            v-if="open"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(15, 23, 42, 0.55)"
+            @click.self="close"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable" style="max-width: 760px">
                 <div class="modal-content border-0 shadow-lg">
                     <div class="modal-header py-2 border-0">
                         <h6 class="modal-title d-flex align-items-center gap-2 mb-0">
@@ -160,7 +174,10 @@ const documentations = computed(() => data.value?.documentations ?? []);
                         <div v-if="loading" class="text-center text-muted py-5">
                             <i class="fas fa-spinner fa-spin"></i> {{ t.loading ?? 'Carregando…' }}
                         </div>
-                        <div v-else-if="errorMsg" class="alert alert-danger small d-flex justify-content-between align-items-center gap-2">
+                        <div
+                            v-else-if="errorMsg"
+                            class="alert alert-danger small d-flex justify-content-between align-items-center gap-2"
+                        >
                             <span><i class="fas fa-circle-exclamation me-1"></i>{{ errorMsg }}</span>
                             <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" @click="load">
                                 <i class="fas fa-rotate-right me-1"></i>{{ t.reload ?? 'Recarregar' }}
@@ -169,17 +186,29 @@ const documentations = computed(() => data.value?.documentations ?? []);
 
                         <template v-else-if="data">
                             <!-- Cabeçalho -->
-                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 pb-2 mb-3 border-bottom">
+                            <div
+                                class="d-flex flex-wrap justify-content-between align-items-start gap-2 pb-2 mb-3 border-bottom"
+                            >
                                 <div>
                                     <div class="fw-bold">{{ data.created_at_formatted }}</div>
-                                    <div class="small text-muted"><i class="fas fa-user-doctor me-1"></i>{{ data.doctor_name || '—' }}</div>
+                                    <div class="small text-muted">
+                                        <i class="fas fa-user-doctor me-1"></i>{{ data.doctor_name || '—' }}
+                                    </div>
                                 </div>
                                 <div class="d-flex flex-wrap gap-1">
-                                    <span v-if="data.is_signed" class="badge bg-success-subtle text-success border border-success-subtle">
+                                    <span
+                                        v-if="data.is_signed"
+                                        class="badge bg-success-subtle text-success border border-success-subtle"
+                                    >
                                         <i class="fas fa-lock me-1"></i>{{ t.signed ?? 'Assinado' }}
                                         <span v-if="data.signed_at_formatted"> · {{ data.signed_at_formatted }}</span>
                                     </span>
-                                    <a v-if="data.pdf_url" :href="data.pdf_url" target="_blank" class="badge bg-light text-danger border text-decoration-none">
+                                    <a
+                                        v-if="data.pdf_url"
+                                        :href="data.pdf_url"
+                                        target="_blank"
+                                        class="badge bg-light text-danger border text-decoration-none"
+                                    >
                                         <i class="fas fa-file-pdf me-1"></i>PDF
                                     </a>
                                 </div>
@@ -187,58 +216,83 @@ const documentations = computed(() => data.value?.documentations ?? []);
 
                             <!-- Diagnósticos (CID) -->
                             <div v-if="diagnosisCids.length" class="mb-3">
-                                <div class="text-uppercase text-muted fw-semibold mb-1" style="font-size:.7rem;letter-spacing:.04em;">
+                                <div
+                                    class="text-uppercase text-muted fw-semibold mb-1"
+                                    style="font-size: 0.7rem; letter-spacing: 0.04em"
+                                >
                                     <i class="fas fa-notes-medical me-1"></i>{{ t.diagnoses ?? 'Diagnósticos (CID)' }}
                                 </div>
                                 <div class="d-flex flex-wrap gap-1">
-                                    <span v-for="(cid, i) in diagnosisCids" :key="i"
-                                          class="badge bg-info-subtle text-info-emphasis border border-info-subtle">{{ cid }}</span>
+                                    <span
+                                        v-for="(cid, i) in diagnosisCids"
+                                        :key="i"
+                                        class="badge bg-info-subtle text-info-emphasis border border-info-subtle"
+                                        >{{ cid }}</span
+                                    >
                                 </div>
                             </div>
 
                             <!-- Seções clínicas -->
                             <div v-for="sec in sections" :key="sec.title" class="mb-3">
-                                <div class="text-uppercase text-muted fw-semibold mb-1" style="font-size:.7rem;letter-spacing:.04em;">
+                                <div
+                                    class="text-uppercase text-muted fw-semibold mb-1"
+                                    style="font-size: 0.7rem; letter-spacing: 0.04em"
+                                >
                                     <i class="fas me-1" :class="sec.icon"></i>{{ sec.title }}
                                 </div>
                                 <dl class="row gy-1 mb-0 small">
                                     <template v-for="row in sec.rows" :key="row.label">
                                         <dt class="col-sm-4 text-muted fw-normal">{{ row.label }}</dt>
-                                        <dd class="col-sm-8 mb-0" style="white-space: pre-line;">{{ row.value }}</dd>
+                                        <dd class="col-sm-8 mb-0" style="white-space: pre-line">{{ row.value }}</dd>
                                     </template>
                                 </dl>
                             </div>
 
                             <!-- Documentações / laudos -->
                             <div v-if="documentations.length" class="mb-1">
-                                <div class="text-uppercase text-muted fw-semibold mb-1" style="font-size:.7rem;letter-spacing:.04em;">
+                                <div
+                                    class="text-uppercase text-muted fw-semibold mb-1"
+                                    style="font-size: 0.7rem; letter-spacing: 0.04em"
+                                >
                                     <i class="fas fa-file-lines me-1"></i>{{ t.documentations ?? 'Documentações' }}
                                 </div>
                                 <ul class="list-group list-group-flush">
-                                    <li v-for="doc in documentations" :key="doc.id"
-                                        class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center gap-2">
+                                    <li
+                                        v-for="doc in documentations"
+                                        :key="doc.id"
+                                        class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center gap-2"
+                                    >
                                         <div class="min-w-0">
                                             <div class="small fw-semibold text-truncate">
                                                 {{ doc.title || doc.type_label }}
-                                                <span v-if="doc.is_ai" class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle ms-1"
-                                                      :title="doc.ai_workflow_label || 'IA'">
+                                                <span
+                                                    v-if="doc.is_ai"
+                                                    class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle ms-1"
+                                                    :title="doc.ai_workflow_label || 'IA'"
+                                                >
                                                     <i class="fas fa-robot"></i> IA
                                                 </span>
                                             </div>
-                                            <div class="text-muted" style="font-size:.72rem;">
+                                            <div class="text-muted" style="font-size: 0.72rem">
                                                 {{ doc.type_label }} · {{ doc.doctor_name }} · {{ doc.created_at }}
                                             </div>
                                         </div>
-                                        <a v-if="doc.pdf_url" :href="doc.pdf_url" target="_blank"
-                                           class="btn btn-sm btn-outline-secondary flex-shrink-0">
+                                        <a
+                                            v-if="doc.pdf_url"
+                                            :href="doc.pdf_url"
+                                            target="_blank"
+                                            class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                                        >
                                             <i class="fas fa-file-pdf"></i>
                                         </a>
                                     </li>
                                 </ul>
                             </div>
 
-                            <div v-if="!sections.length && !diagnosisCids.length && !documentations.length"
-                                 class="text-center text-muted py-4 small">
+                            <div
+                                v-if="!sections.length && !diagnosisCids.length && !documentations.length"
+                                class="text-center text-muted py-4 small"
+                            >
                                 {{ t.empty_record ?? 'Prontuário sem dados preenchidos.' }}
                             </div>
                         </template>

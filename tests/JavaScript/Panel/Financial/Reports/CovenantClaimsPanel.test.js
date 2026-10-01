@@ -17,20 +17,45 @@ vi.mock('@inertiajs/vue3', () => ({
 const t = {
     claim_status: { submitted: 'Submitted', paid: 'Paid', denied: 'Denied' },
     covenants: {
-        claims_title: ':covenant claims in the period', claims_loading: 'Loading claims…', claims_error: 'Could not load the claims.',
-        claims_retry: 'Try again', claims_empty: 'No claims for this insurer.', claims_close: 'Close',
-        claims_privacy_note: 'Patient shown by code and initials.', col_guide: 'Claim', col_attendance_date: 'Attendance date',
-        col_patient: 'Patient (code · initials)', col_status: 'Status', col_value: 'Amount', col_received: 'Received', col_glosa: 'Denied',
-        view_in_billing: 'View in billing', view_glosas: 'View denials', pagination_label: 'Claims pagination',
-        pagination_previous: 'Previous page', pagination_next: 'Next page', pagination_status: 'Page :current of :last',
-        claims_count_one: ':count claim', claims_count_other: ':count claims',
+        claims_title: ':covenant claims in the period',
+        claims_loading: 'Loading claims…',
+        claims_error: 'Could not load the claims.',
+        claims_retry: 'Try again',
+        claims_empty: 'No claims for this insurer.',
+        claims_close: 'Close',
+        claims_privacy_note: 'Patient shown by code and initials.',
+        col_guide: 'Claim',
+        col_attendance_date: 'Attendance date',
+        col_patient: 'Patient (code · initials)',
+        col_status: 'Status',
+        col_value: 'Amount',
+        col_received: 'Received',
+        col_glosa: 'Denied',
+        view_in_billing: 'View in billing',
+        view_glosas: 'View denials',
+        pagination_label: 'Claims pagination',
+        pagination_previous: 'Previous page',
+        pagination_next: 'Next page',
+        pagination_status: 'Page :current of :last',
+        claims_count_one: ':count claim',
+        claims_count_other: ':count claims',
     },
 };
 
 const ROW = { covenant_id: 'c-uni', covenant: 'UNIMED' };
 
 function claim(id, overrides = {}) {
-    return { id, code: `GUI-${id}`, attendance_date: '2026-09-05', status: 'submitted', patient: 'PAC-0000000001 · J. S.', amount: 100, received: 0, glosa: 0, ...overrides };
+    return {
+        id,
+        code: `GUI-${id}`,
+        attendance_date: '2026-09-05',
+        status: 'submitted',
+        patient: 'PAC-0000000001 · J. S.',
+        amount: 100,
+        received: 0,
+        glosa: 0,
+        ...overrides,
+    };
 }
 
 function page(current, last, total, data) {
@@ -44,7 +69,9 @@ function jsonResponse(status, body) {
 let wrapper;
 
 beforeEach(() => {
-    globalThis.fetch = vi.fn(() => jsonResponse(200, page(1, 1, 1, [claim('1', { status: 'paid', received: 180, glosa: 20, amount: 200 })])));
+    globalThis.fetch = vi.fn(() =>
+        jsonResponse(200, page(1, 1, 1, [claim('1', { status: 'paid', received: 180, glosa: 20, amount: 200 })])),
+    );
 });
 afterEach(() => wrapper?.unmount());
 
@@ -79,7 +106,10 @@ describe('Financial/Reports/CovenantClaimsPanel', () => {
 
         expect(fetch).toHaveBeenCalledWith(
             '/reports/covenants/claims?covenant_id=c-uni&from=2026-09-01&to=2026-09-26&page=1',
-            expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }), credentials: 'same-origin' }),
+            expect.objectContaining({
+                headers: expect.objectContaining({ Accept: 'application/json' }),
+                credentials: 'same-origin',
+            }),
         );
 
         const row = w.find('[data-test="claim-row"]');
@@ -100,7 +130,17 @@ describe('Financial/Reports/CovenantClaimsPanel', () => {
 
     it('paginação: próxima página busca page=2; na última, o foco vai para a região', async () => {
         fetch
-            .mockImplementationOnce(() => jsonResponse(200, page(1, 2, 12, Array.from({ length: 10 }, (_, i) => claim(`a${i}`)))))
+            .mockImplementationOnce(() =>
+                jsonResponse(
+                    200,
+                    page(
+                        1,
+                        2,
+                        12,
+                        Array.from({ length: 10 }, (_, i) => claim(`a${i}`)),
+                    ),
+                ),
+            )
             .mockImplementationOnce(() => jsonResponse(200, page(2, 2, 12, [claim('b1'), claim('b2')])));
 
         const w = mountPanel();
@@ -114,7 +154,9 @@ describe('Financial/Reports/CovenantClaimsPanel', () => {
         await w.find('[data-test="claims-next"]').trigger('click');
         await flushPromises();
 
-        expect(fetch.mock.calls[1][0]).toBe('/reports/covenants/claims?covenant_id=c-uni&from=2026-09-01&to=2026-09-26&page=2');
+        expect(fetch.mock.calls[1][0]).toBe(
+            '/reports/covenants/claims?covenant_id=c-uni&from=2026-09-01&to=2026-09-26&page=2',
+        );
         expect(w.findAll('[data-test="claim-row"]')).toHaveLength(2);
         expect(w.find('[data-test="claims-page-status"]').text()).toBe('Page 2 of 2 · 12 claims');
         expect(w.find('[data-test="claims-next"]').attributes('disabled')).toBeDefined();
@@ -125,8 +167,9 @@ describe('Financial/Reports/CovenantClaimsPanel', () => {
         const w = mountPanel();
         await flushPromises();
 
-        expect(w.find('[data-test="view-billing"]').attributes('href'))
-            .toBe('/_routes/panel.financial.billing.index?tab=claims&covenant_id=c-uni&from=2026-09-01&to=2026-09-26');
+        expect(w.find('[data-test="view-billing"]').attributes('href')).toBe(
+            '/_routes/panel.financial.billing.index?tab=claims&covenant_id=c-uni&from=2026-09-01&to=2026-09-26',
+        );
         expect(w.find('[data-test="view-glosas"]').attributes('href'))
             // Aba "todas": na padrão (pendentes) o período seria ignorado.
             .toBe('/_routes/panel.financial.tiss.glosas.index?tab=all&from=2026-09-01&to=2026-09-26');
@@ -136,7 +179,9 @@ describe('Financial/Reports/CovenantClaimsPanel', () => {
         const w = mountPanel({ row: { covenant_id: '', covenant: 'Sem convênio' } });
         await flushPromises();
 
-        expect(fetch.mock.calls[0][0]).toBe('/reports/covenants/claims?covenant_id=&from=2026-09-01&to=2026-09-26&page=1');
+        expect(fetch.mock.calls[0][0]).toBe(
+            '/reports/covenants/claims?covenant_id=&from=2026-09-01&to=2026-09-26&page=1',
+        );
         expect(w.find('[data-test="view-billing"]').exists()).toBe(false);
         expect(w.find('[data-test="view-glosas"]').exists()).toBe(true);
     });
@@ -171,7 +216,12 @@ describe('Financial/Reports/CovenantClaimsPanel', () => {
     it('troca de período aplicado recomeça da página 1; resposta antiga não sobrescreve a nova', async () => {
         let resolveSlow;
         fetch
-            .mockImplementationOnce(() => new Promise((resolve) => { resolveSlow = resolve; }))
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        resolveSlow = resolve;
+                    }),
+            )
             .mockImplementationOnce(() => jsonResponse(200, page(1, 1, 1, [claim('new')])));
 
         const w = mountPanel();
@@ -181,7 +231,9 @@ describe('Financial/Reports/CovenantClaimsPanel', () => {
         resolveSlow({ ok: true, status: 200, json: () => Promise.resolve(page(1, 1, 1, [claim('old')])) });
         await flushPromises();
 
-        expect(fetch.mock.calls[1][0]).toBe('/reports/covenants/claims?covenant_id=c-uni&from=2026-08-01&to=2026-08-31&page=1');
+        expect(fetch.mock.calls[1][0]).toBe(
+            '/reports/covenants/claims?covenant_id=c-uni&from=2026-08-01&to=2026-08-31&page=1',
+        );
         expect(w.findAll('[data-test="claim-code"]').map((c) => c.text())).toEqual(['GUI-new']);
     });
 

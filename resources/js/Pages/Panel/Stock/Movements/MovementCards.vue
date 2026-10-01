@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useMovementFormat } from './useMovementFormat.js';
 
 /**
@@ -11,9 +11,9 @@ import { useMovementFormat } from './useMovementFormat.js';
  * dados principais e a mesma ação da tabela.
  */
 const props = defineProps({
-    items:   { type: Object, required: true },   // paginator Laravel
+    items: { type: Object, required: true }, // paginator Laravel
     filters: { type: Object, default: () => ({}) },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['filterProduct']);
@@ -53,7 +53,9 @@ function isCurrentProduct(movement) {
                     </div>
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_quantity ?? 'Quantidade' }}:</dt>
-                        <dd class="mb-0 fw-medium" :class="m.direction === 1 ? 'text-success' : 'text-danger'">{{ signedQuantity(m) }}</dd>
+                        <dd class="mb-0 fw-medium" :class="m.direction === 1 ? 'text-success' : 'text-danger'">
+                            {{ signedQuantity(m) }}
+                        </dd>
                     </div>
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_unit_cost ?? 'Custo unit.' }}:</dt>
@@ -77,7 +79,7 @@ function isCurrentProduct(movement) {
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end">
                     <ActionIconButton

@@ -1,9 +1,9 @@
 <script setup>
 defineProps({
-    patients: { type: Array,  default: () => [] },
+    patients: { type: Array, default: () => [] },
     // "Ver todos"/"Ver" só para quem pode abrir Pacientes (regra da rota).
     canOpenPatients: { type: Boolean, default: false },
-    t:        { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 </script>
 
@@ -21,7 +21,7 @@ defineProps({
 
         <div class="card-body p-0">
             <div v-if="patients.length === 0" class="text-center text-muted py-4">
-                <i class="ti ti-users" style="font-size:2rem;display:block;margin-bottom:.5rem;"></i>
+                <i class="ti ti-users" style="font-size: 2rem; display: block; margin-bottom: 0.5rem"></i>
                 {{ t.empty_patients }}
             </div>
 
@@ -38,13 +38,10 @@ defineProps({
                     <tr v-for="p in patients" :key="p.id">
                         <td>
                             <div class="d-flex align-items-center gap-2">
-                                <div
-                                    class="patient-initial"
-                                    :style="{ background: p.color }"
-                                >
+                                <div class="patient-initial" :style="{ background: p.color }">
                                     {{ p.initial }}
                                 </div>
-                                <span class="fw-medium" style="font-size:.875rem;">{{ p.name }}</span>
+                                <span class="fw-medium" style="font-size: 0.875rem">{{ p.name }}</span>
                             </div>
                         </td>
                         <td class="text-muted small d-none d-md-table-cell">{{ p.phone }}</td>

@@ -1,13 +1,13 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
-import AppLayout        from '@/Layouts/AppLayout.vue';
-import PageHeader       from '@/Components/Panel/PageHeader.vue';
-import SearchInput      from '@/Components/Panel/SearchInput.vue';
-import { useViewMode }  from '@/composables/useViewMode.js';
-import { useTrans }     from '@/composables/useTrans.js';
-import ProductTable     from './ProductTable.vue';
-import ProductCards     from './ProductCards.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import { useViewMode } from '@/composables/useViewMode.js';
+import { useTrans } from '@/composables/useTrans.js';
+import ProductTable from './ProductTable.vue';
+import ProductCards from './ProductCards.vue';
 import ProductFormModal from './ProductFormModal.vue';
 
 /**
@@ -20,14 +20,14 @@ import ProductFormModal from './ProductFormModal.vue';
  * Textos vêm de lang/{locale}/stock_products.php (prop `t`).
  */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    items:       { type: Object, required: true },
-    categories:  { type: Array,  default: () => [] },
-    units:       { type: Array,  default: () => [] },
+    breadcrumbs: { type: Array, default: () => [] },
+    items: { type: Object, required: true },
+    categories: { type: Array, default: () => [] },
+    units: { type: Array, default: () => [] },
     // { search, status, category_id, low_stock, expiring_lots, sort, direction } — normalizados no backend
-    filters:     { type: Object, default: () => ({}) },
-    routes:      { type: Object, required: true },
-    t:           { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) },
+    routes: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { tx } = useTrans(() => props.t);
@@ -49,21 +49,21 @@ watch([() => page.props?.flash, flashMessage], () => {
 const pageTitle = computed(() => props.t.page_title ?? 'Produtos');
 
 // ── Busca (debounce) + filtros + ordenação — um preserva os outros ──────────
-const search       = ref(props.filters?.search ?? '');
-const status       = ref(props.filters?.status ?? 'all');
-const categoryId   = ref(props.filters?.category_id ?? '');
-const lowStock     = ref(!!props.filters?.low_stock);
+const search = ref(props.filters?.search ?? '');
+const status = ref(props.filters?.status ?? 'all');
+const categoryId = ref(props.filters?.category_id ?? '');
+const lowStock = ref(!!props.filters?.low_stock);
 const expiringLots = ref(!!props.filters?.expiring_lots);
 
 function currentParams(overrides = {}) {
     return {
-        search:        search.value,
-        status:        status.value,
-        category_id:   categoryId.value,
-        low_stock:     lowStock.value ? 1 : 0,
+        search: search.value,
+        status: status.value,
+        category_id: categoryId.value,
+        low_stock: lowStock.value ? 1 : 0,
         expiring_lots: expiringLots.value ? 1 : 0,
-        sort:          props.filters?.sort,
-        direction:     props.filters?.direction,
+        sort: props.filters?.sort,
+        direction: props.filters?.direction,
         ...overrides,
     };
 }
@@ -149,7 +149,6 @@ function onDelete(product) {
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-stock-products">
-
             <PageHeader
                 :title="pageTitle"
                 :total="items.total ?? 0"
@@ -188,7 +187,11 @@ function onDelete(product) {
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+            <div
+                v-if="flashMessage && !flashDismissed"
+                class="alert alert-success alert-dismissible mb-3"
+                role="status"
+            >
                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
                 <button
                     type="button"
@@ -235,12 +238,16 @@ function onDelete(product) {
                     <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
                 <div class="form-check mb-0 ms-1">
-                    <input id="low_stock_filter" v-model="lowStock" type="checkbox" class="form-check-input">
-                    <label class="form-check-label small" for="low_stock_filter">{{ t.filter_low_stock ?? 'Só abaixo do mínimo' }}</label>
+                    <input id="low_stock_filter" v-model="lowStock" type="checkbox" class="form-check-input" />
+                    <label class="form-check-label small" for="low_stock_filter">{{
+                        t.filter_low_stock ?? 'Só abaixo do mínimo'
+                    }}</label>
                 </div>
                 <div class="form-check mb-0">
-                    <input id="expiring_lots_filter" v-model="expiringLots" type="checkbox" class="form-check-input">
-                    <label class="form-check-label small" for="expiring_lots_filter">{{ t.filter_expiring_lots ?? 'Só com lote vencendo (30d)' }}</label>
+                    <input id="expiring_lots_filter" v-model="expiringLots" type="checkbox" class="form-check-input" />
+                    <label class="form-check-label small" for="expiring_lots_filter">{{
+                        t.filter_expiring_lots ?? 'Só com lote vencendo (30d)'
+                    }}</label>
                 </div>
             </div>
 

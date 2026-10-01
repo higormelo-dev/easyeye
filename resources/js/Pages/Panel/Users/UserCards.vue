@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
-import TablePagination   from '@/Components/Panel/TablePagination.vue';
-import UserActions       from './UserActions.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import UserActions from './UserActions.vue';
 import { useUserFormat } from './useUserFormat.js';
 
 /**
@@ -12,8 +12,8 @@ import { useUserFormat } from './useUserFormat.js';
  * página 1 a cada ação.
  */
 const props = defineProps({
-    users:     { type: Object, required: true },   // paginator Laravel
-    t:         { type: Object, default: () => ({}) },
+    users: { type: Object, required: true }, // paginator Laravel
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
@@ -41,25 +41,31 @@ const rows = computed(() => props.users?.data ?? []);
                         width="56"
                         height="56"
                         loading="lazy"
-                        style="object-fit:cover;"
-                    >
+                        style="object-fit: cover"
+                    />
                     <div class="min-w-0">
                         <h6 class="mb-1 fw-semibold lh-sm text-break">{{ u.name }}</h6>
                         <div class="d-flex flex-wrap gap-1">
                             <span
                                 v-if="u.deleted"
                                 class="badge badge-soft-secondary rounded text-body-secondary border fs-12"
-                            >{{ t.status_deleted ?? 'Excluído' }}</span>
+                                >{{ t.status_deleted ?? 'Excluído' }}</span
+                            >
                             <span
                                 v-else
-                                :class="u.active
-                                    ? 'badge badge-soft-success rounded text-success border border-success fs-12'
-                                    : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'"
-                            >{{ u.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span>
+                                :class="
+                                    u.active
+                                        ? 'badge badge-soft-success rounded text-success border border-success fs-12'
+                                        : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'
+                                "
+                                >{{ u.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span
+                            >
                             <span v-if="u.is_owner" class="badge badge-soft-warning rounded fs-11">
                                 <i class="ti ti-crown me-1" aria-hidden="true"></i>{{ t.badge_owner ?? 'Proprietário' }}
                             </span>
-                            <span v-if="u.is_self" class="badge badge-soft-primary rounded fs-11">{{ t.badge_self ?? 'Você' }}</span>
+                            <span v-if="u.is_self" class="badge badge-soft-primary rounded fs-11">{{
+                                t.badge_self ?? 'Você'
+                            }}</span>
                         </div>
                     </div>
                 </div>
@@ -82,7 +88,7 @@ const rows = computed(() => props.users?.data ?? []);
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <UserActions
                     :user="u"

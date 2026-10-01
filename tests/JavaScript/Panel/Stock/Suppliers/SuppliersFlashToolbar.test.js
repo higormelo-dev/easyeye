@@ -29,8 +29,12 @@ vi.mock('@inertiajs/vue3', async () => {
 
 vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { template: '<div><slot name="actions" /></div>' } }));
-vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierTable.vue', () => ({ default: { template: '<div class="table-stub" />' } }));
-vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierCards.vue', () => ({ default: { template: '<div class="cards-stub" />' } }));
+vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierTable.vue', () => ({
+    default: { template: '<div class="table-stub" />' },
+}));
+vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierCards.vue', () => ({
+    default: { template: '<div class="cards-stub" />' },
+}));
 vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierFormModal.vue', () => ({ default: { template: '<div />' } }));
 
 const routes = { index: '/s', store: '/s', update: '/s/__ID__', destroy: '/s/__ID__', purchase_orders_index: '/po' };
@@ -46,7 +50,12 @@ afterEach(() => {
 
 function mountPage() {
     wrapper = mount(SuppliersIndex, {
-        props: { items: { data: [], total: 0 }, filters: { search: '', status: 'all', sort: 'name', direction: 'asc' }, routes, t },
+        props: {
+            items: { data: [], total: 0 },
+            filters: { search: '', status: 'all', sort: 'name', direction: 'asc' },
+            routes,
+            t,
+        },
     });
 
     return wrapper;

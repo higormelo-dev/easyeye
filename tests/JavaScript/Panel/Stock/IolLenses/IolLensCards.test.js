@@ -20,12 +20,24 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_manufacturer: 'Fabricante', col_category: 'Tipo', col_diopters: 'Dioptrias', col_price: 'Valor',
-    col_stock: 'Estoque', diopter_range: ':min a :max D', not_informed: 'Não informado',
-    status_active: 'Ativa', status_inactive: 'Inativa', action_movements: 'Movimentações da lente',
-    action_edit: 'Editar', action_activate: 'Ativar', action_deactivate: 'Desativar', action_delete: 'Excluir',
+    col_manufacturer: 'Fabricante',
+    col_category: 'Tipo',
+    col_diopters: 'Dioptrias',
+    col_price: 'Valor',
+    col_stock: 'Estoque',
+    diopter_range: ':min a :max D',
+    not_informed: 'Não informado',
+    status_active: 'Ativa',
+    status_inactive: 'Inativa',
+    action_movements: 'Movimentações da lente',
+    action_edit: 'Editar',
+    action_activate: 'Ativar',
+    action_deactivate: 'Desativar',
+    action_delete: 'Excluir',
     empty_list: 'Nenhuma lente encontrada.',
-    pagination_showing: 'Exibindo', pagination_of: 'de', pagination_suffix: 'lentes',
+    pagination_showing: 'Exibindo',
+    pagination_of: 'de',
+    pagination_suffix: 'lentes',
 };
 
 const nbsp = (s) => s.replace(/ /g, ' ');
@@ -35,16 +47,34 @@ afterEach(() => wrapper?.unmount());
 
 function lens(overrides = {}) {
     return {
-        id: 'l1', manufacturer: 'Zeiss', model_name: 'AT LISA', category: 'Multifocal',
-        diopter_min: 0, diopter_max: 32, price: 4100, image_url: '/storage/l1.jpg', active: true,
-        entity_product_id: 'prod-1', stock: { id: 'prod-1', unit_label: 'Unidade', qty_on_hand: 1.5 }, ...overrides,
+        id: 'l1',
+        manufacturer: 'Zeiss',
+        model_name: 'AT LISA',
+        category: 'Multifocal',
+        diopter_min: 0,
+        diopter_max: 32,
+        price: 4100,
+        image_url: '/storage/l1.jpg',
+        active: true,
+        entity_product_id: 'prod-1',
+        stock: { id: 'prod-1', unit_label: 'Unidade', qty_on_hand: 1.5 },
+        ...overrides,
     };
 }
 
 function mountCards(rows, extra = {}) {
     wrapper = mount(IolLensCards, {
         props: {
-            items: { data: rows, total: rows.length, from: 1, to: rows.length, last_page: 1, current_page: 1, links: [], ...extra },
+            items: {
+                data: rows,
+                total: rows.length,
+                from: 1,
+                to: rows.length,
+                last_page: 1,
+                current_page: 1,
+                links: [],
+                ...extra,
+            },
             t,
             movementsIndexUrl: '/stock/movements',
         },
@@ -101,7 +131,9 @@ describe('IolLensCards', () => {
         const l = lens({ active: false });
         const w = mountCards([l]);
 
-        expect(w.find('button[title="Movimentações da lente"]').attributes('data-href')).toBe('/stock/movements?entity_product_id=prod-1');
+        expect(w.find('button[title="Movimentações da lente"]').attributes('data-href')).toBe(
+            '/stock/movements?entity_product_id=prod-1',
+        );
 
         const items = w.findAll('.dropdown-item');
         expect(items.map((b) => b.text())).toEqual(['Editar', 'Ativar', 'Excluir']);

@@ -15,7 +15,10 @@ vi.mock('@/Pages/Panel/Patients/PatientTable.vue', () => ({ default: { template:
 vi.mock('@/Pages/Panel/Patients/PatientCards.vue', () => ({ default: { template: '<div />' } }));
 vi.mock('@/Pages/Panel/Patients/PatientDetailDrawer.vue', () => ({ default: { template: '<div />' } }));
 vi.mock('@/Pages/Panel/Patients/PatientFormModal.vue', () => ({
-    default: { props: ['open', 'patientId'], template: '<div class="form-stub" :data-open="open" :data-id="patientId ?? \'\'" />' },
+    default: {
+        props: ['open', 'patientId'],
+        template: '<div class="form-stub" :data-open="open" :data-id="patientId ?? \'\'" />',
+    },
 }));
 
 const PROPS = { patients: { data: [], links: [], meta: {} } };
@@ -36,7 +39,11 @@ describe('Pacientes: deep-links', () => {
 
         expect(form.attributes('data-open')).toBe('true');
         expect(form.attributes('data-id')).toBe('');
-        expect(router.get).toHaveBeenCalledWith('/_routes/panel.patients.index', { search: 'ana' }, expect.objectContaining({ replace: true, preserveState: true }));
+        expect(router.get).toHaveBeenCalledWith(
+            '/_routes/panel.patients.index',
+            { search: 'ana' },
+            expect.objectContaining({ replace: true, preserveState: true }),
+        );
     });
 
     it('?open=<id> abre o cadastro do paciente', async () => {

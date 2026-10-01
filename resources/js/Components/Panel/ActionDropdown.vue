@@ -2,25 +2,25 @@
 import { ref, nextTick, onBeforeUnmount, useId } from 'vue';
 
 const props = defineProps({
-    title:    { type: String, default: 'Mais ações' },
-    align:    { type: String, default: 'right' }, // 'right' | 'left'
+    title: { type: String, default: 'Mais ações' },
+    align: { type: String, default: 'right' }, // 'right' | 'left'
     minWidth: { type: Number, default: 180 },
-    icon:     { type: String, default: 'ti ti-dots-vertical' },
+    icon: { type: String, default: 'ti ti-dots-vertical' },
     btnClass: { type: String, default: 'btn btn-sm btn-outline-secondary' },
 });
 
-const open       = ref(false);
+const open = ref(false);
 const triggerRef = ref(null);
-const menuRef    = ref(null);
-const menuStyle  = ref({});
-const menuId     = `ee-dropdown-${useId()}`;
+const menuRef = ref(null);
+const menuStyle = ref({});
+const menuId = `ee-dropdown-${useId()}`;
 
 // Itens navegáveis por teclado (divisores e itens desabilitados ficam de fora).
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 // Campos de formulário dentro do menu (ex.: exportação com datas): setas, Home,
 // End e Tab pertencem ao campo — o menu não intercepta.
-const FIELD     = 'input, select, textarea, [contenteditable="true"]';
-const FIRST     = `${FOCUSABLE}, input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])`;
+const FIELD = 'input, select, textarea, [contenteditable="true"]';
+const FIRST = `${FOCUSABLE}, input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])`;
 
 function toggle(e) {
     e.stopPropagation();
@@ -126,28 +126,25 @@ function position() {
     if (!triggerRef.value || !menuRef.value) return;
 
     const triggerRect = triggerRef.value.getBoundingClientRect();
-    const menuRect    = menuRef.value.getBoundingClientRect();
-    const vh          = window.innerHeight;
-    const vw          = window.innerWidth;
+    const menuRect = menuRef.value.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
 
     // Vertical: open below if space, otherwise above
     const spaceBelow = vh - triggerRect.bottom;
-    const top = spaceBelow > menuRect.height + 8
-        ? triggerRect.bottom + 4
-        : Math.max(8, triggerRect.top - menuRect.height - 4);
+    const top =
+        spaceBelow > menuRect.height + 8 ? triggerRect.bottom + 4 : Math.max(8, triggerRect.top - menuRect.height - 4);
 
     // Horizontal: align right or left edge of trigger
-    let left = props.align === 'right'
-        ? triggerRect.right - menuRect.width
-        : triggerRect.left;
+    let left = props.align === 'right' ? triggerRect.right - menuRect.width : triggerRect.left;
     left = Math.max(8, Math.min(left, vw - menuRect.width - 8));
 
     menuStyle.value = {
         position: 'fixed',
-        top:      `${top}px`,
-        left:     `${left}px`,
+        top: `${top}px`,
+        left: `${left}px`,
         minWidth: `${props.minWidth}px`,
-        zIndex:   1080,
+        zIndex: 1080,
     };
 }
 
@@ -164,7 +161,7 @@ function onMenuClick() {
 
 function onOutsideClick(e) {
     if (triggerRef.value?.contains(e.target)) return;
-    if (menuRef.value?.contains(e.target))    return;
+    if (menuRef.value?.contains(e.target)) return;
     close();
 }
 
@@ -216,7 +213,14 @@ onBeforeUnmount(close);
 
 <style scoped>
 .ee-dropdown-enter-active,
-.ee-dropdown-leave-active { transition: opacity .12s ease, transform .12s ease; }
+.ee-dropdown-leave-active {
+    transition:
+        opacity 0.12s ease,
+        transform 0.12s ease;
+}
 .ee-dropdown-enter-from,
-.ee-dropdown-leave-to     { opacity: 0; transform: scale(.97); }
+.ee-dropdown-leave-to {
+    opacity: 0;
+    transform: scale(0.97);
+}
 </style>

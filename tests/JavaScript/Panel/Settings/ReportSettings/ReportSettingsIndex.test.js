@@ -18,13 +18,23 @@ vi.mock('@inertiajs/vue3', async () => {
 
     return {
         usePage: () => ({ props: inertia.pageProps }),
-        router: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn(), reload: vi.fn(), visit: vi.fn() },
+        router: {
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            patch: vi.fn(),
+            delete: vi.fn(),
+            reload: vi.fn(),
+            visit: vi.fn(),
+        },
         Link: { template: '<a class="link" :href="href"><slot /></a>', props: ['href'] },
         Head: { template: '<div><slot /></div>' },
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view'],
@@ -40,7 +50,8 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder', 'clearLabel', 'wrapperClass', 'maxWidth'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Pages/Panel/Settings/ReportSettings/ReportSettingTable.vue', () => ({
@@ -56,15 +67,27 @@ vi.mock('@/Pages/Panel/Settings/ReportSettings/ReportSettingTable.vue', () => ({
     },
 }));
 vi.mock('@/Pages/Panel/Settings/ReportSettings/ReportSettingCards.vue', () => ({
-    default: { props: ['items', 't', 'emptyText'], template: '<div class="cards-stub">{{ items.data.map((i) => i.title).join(",") }}</div>' },
+    default: {
+        props: ['items', 't', 'emptyText'],
+        template: '<div class="cards-stub">{{ items.data.map((i) => i.title).join(",") }}</div>',
+    },
 }));
 
 const t = {
-    page_title: 'Document templates', total_label: 'Total:', btn_new: 'New template',
-    search_placeholder: 'Search by title or description...', search_clear: 'Clear search', close: 'Close',
-    filter_category_label: 'Filter by category', filter_category_all: 'All categories',
-    filter_status_label: 'Filter by status', filter_status_all: 'All', filter_status_active: 'Active', filter_status_inactive: 'Inactive',
-    empty_list: 'No templates yet.', empty_search: 'No templates match these filters.',
+    page_title: 'Document templates',
+    total_label: 'Total:',
+    btn_new: 'New template',
+    search_placeholder: 'Search by title or description...',
+    search_clear: 'Clear search',
+    close: 'Close',
+    filter_category_label: 'Filter by category',
+    filter_category_all: 'All categories',
+    filter_status_label: 'Filter by status',
+    filter_status_all: 'All',
+    filter_status_active: 'Active',
+    filter_status_inactive: 'Inactive',
+    empty_list: 'No templates yet.',
+    empty_search: 'No templates match these filters.',
     confirm_delete: 'Delete the template ":title"?',
     confirm_reimport: 'Re-import the current global template version into ":title"?',
 };
@@ -77,7 +100,10 @@ const items = {
     total: 17,
 };
 
-const categories = [{ id: 'c1', name: 'Receitas' }, { id: 'c2', name: 'Laudos' }];
+const categories = [
+    { id: 'c1', name: 'Receitas' },
+    { id: 'c2', name: 'Laudos' },
+];
 const baseFilters = { search: '', category: '', status: 'all', sort: 'title', direction: 'asc' };
 const urls = { index: '/panel/setting/report-settings', create: '/panel/setting/report-settings/create' };
 
@@ -148,7 +174,9 @@ describe('Settings/ReportSettings/Index', () => {
 
     it('a busca espera parar de digitar e preserva categoria, status e ordenação', async () => {
         vi.useFakeTimers();
-        const w = mountPage({ filters: { ...baseFilters, category: 'c2', status: 'inactive', sort: 'updated_at', direction: 'desc' } });
+        const w = mountPage({
+            filters: { ...baseFilters, category: 'c2', status: 'inactive', sort: 'updated_at', direction: 'desc' },
+        });
 
         await w.find('.search').setValue('laudo');
         expect(router.get).not.toHaveBeenCalled();
@@ -188,11 +216,18 @@ describe('Settings/ReportSettings/Index', () => {
     });
 
     it('estado vazio distingue "nenhum cadastrado" de "nada com estes filtros"', () => {
-        expect(mountPage({ items: { data: [], total: 0 } }).get('.table-stub').attributes('data-empty')).toBe('No templates yet.');
+        expect(
+            mountPage({ items: { data: [], total: 0 } })
+                .get('.table-stub')
+                .attributes('data-empty'),
+        ).toBe('No templates yet.');
         wrapper.unmount();
 
-        expect(mountPage({ items: { data: [], total: 0 }, filters: { ...baseFilters, status: 'inactive' } })
-            .get('.table-stub').attributes('data-empty')).toBe('No templates match these filters.');
+        expect(
+            mountPage({ items: { data: [], total: 0 }, filters: { ...baseFilters, status: 'inactive' } })
+                .get('.table-stub')
+                .attributes('data-empty'),
+        ).toBe('No templates match these filters.');
     });
 
     it('excluir confirma com o título e usa router.delete; cancelado, nada acontece', async () => {

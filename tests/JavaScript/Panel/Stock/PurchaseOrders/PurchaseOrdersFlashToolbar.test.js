@@ -28,17 +28,34 @@ vi.mock('@inertiajs/vue3', async () => {
 
 vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { template: '<div><slot name="actions" /></div>' } }));
-vi.mock('@/Pages/Panel/Stock/PurchaseOrders/PurchaseOrderTable.vue', () => ({ default: { template: '<div class="table-stub" />' } }));
-vi.mock('@/Pages/Panel/Stock/PurchaseOrders/PurchaseOrderCards.vue', () => ({ default: { template: '<div class="cards-stub" />' } }));
+vi.mock('@/Pages/Panel/Stock/PurchaseOrders/PurchaseOrderTable.vue', () => ({
+    default: { template: '<div class="table-stub" />' },
+}));
+vi.mock('@/Pages/Panel/Stock/PurchaseOrders/PurchaseOrderCards.vue', () => ({
+    default: { template: '<div class="cards-stub" />' },
+}));
 vi.mock('@/Pages/Panel/Stock/PurchaseOrders/PurchaseOrderFormModal.vue', () => ({ default: { template: '<div />' } }));
-vi.mock('@/Pages/Panel/Stock/PurchaseOrders/ReceivePurchaseOrderModal.vue', () => ({ default: { template: '<div />' } }));
+vi.mock('@/Pages/Panel/Stock/PurchaseOrders/ReceivePurchaseOrderModal.vue', () => ({
+    default: { template: '<div />' },
+}));
 
 const routes = {
-    index: '/po', show: '/po/__ID__', send: '/po/__ID__/send', cancel: '/po/__ID__/cancel', destroy: '/po/__ID__',
-    pdf: '/po/__ID__/pdf', suppliers_index: '/s', store: '/po', update: '/po/__ID__', receive: '/po/__ID__/receive',
+    index: '/po',
+    show: '/po/__ID__',
+    send: '/po/__ID__/send',
+    cancel: '/po/__ID__/cancel',
+    destroy: '/po/__ID__',
+    pdf: '/po/__ID__/pdf',
+    suppliers_index: '/s',
+    store: '/po',
+    update: '/po/__ID__',
+    receive: '/po/__ID__/receive',
 };
 const t = { close: 'Close', search_placeholder: 'Search orders', filter_status_all: 'All statuses' };
-const statuses = [{ value: 'draft', label: 'Draft' }, { value: 'sent', label: 'Sent to supplier' }];
+const statuses = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'sent', label: 'Sent to supplier' },
+];
 
 let wrapper;
 

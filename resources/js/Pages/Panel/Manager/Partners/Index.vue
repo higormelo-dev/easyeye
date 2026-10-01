@@ -1,24 +1,24 @@
 <script setup>
 import { ref } from 'vue';
-import { router }                   from '@inertiajs/vue3';
-import AppLayout                    from '@/Layouts/AppLayout.vue';
-import PartnerFormModal             from './PartnerFormModal.vue';
-import LiveStatusBar                from '@/Components/Panel/LiveStatusBar.vue';
-import ActionIconButton             from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup              from '@/Components/Panel/ActionIconGroup.vue';
-import ActionDropdown               from '@/Components/Panel/ActionDropdown.vue';
-import ConfirmationWithReasonModal  from '@/Components/Panel/ConfirmationWithReasonModal.vue';
-import SearchSelect                  from '@/Components/Panel/SearchSelect.vue';
+import { router } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PartnerFormModal from './PartnerFormModal.vue';
+import LiveStatusBar from '@/Components/Panel/LiveStatusBar.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
-import { useDashboardPolling }      from '@/composables/useDashboardPolling.js';
+import { useDashboardPolling } from '@/composables/useDashboardPolling.js';
 
 const props = defineProps({
-    partners:           { type: Array,  default: () => [] },
-    funnel:             { type: Array,  default: () => [] },
-    kpis:               { type: Object, default: () => ({}) },
-    recentCommissions:  { type: Array,  default: () => [] },
-    partnerTypes:       { type: Array,  default: () => [] },
-    t:                  { type: Object, default: () => ({}) },
+    partners: { type: Array, default: () => [] },
+    funnel: { type: Array, default: () => [] },
+    kpis: { type: Object, default: () => ({}) },
+    recentCommissions: { type: Array, default: () => [] },
+    partnerTypes: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
 });
 
 // ── Polling real-time (15s) ────────────────────────────────────────────────────
@@ -28,32 +28,37 @@ const { isRefreshing, lastUpdated, refresh } = useDashboardPolling(
 );
 
 // ── Form modal ────────────────────────────────────────────────────────────────
-const formOpen    = ref(false);
-const editId      = ref(null);
+const formOpen = ref(false);
+const editId = ref(null);
 const editDataUrl = ref('');
-const updateUrl   = ref('');
+const updateUrl = ref('');
 
 function openCreate() {
-    editId.value      = null;
+    editId.value = null;
     editDataUrl.value = '';
-    updateUrl.value   = '';
-    formOpen.value    = true;
+    updateUrl.value = '';
+    formOpen.value = true;
 }
 
 function openEdit(partner) {
-    editId.value      = partner.id;
+    editId.value = partner.id;
     editDataUrl.value = partner.edit_data_url;
-    updateUrl.value   = partner.update_url;
-    formOpen.value    = true;
+    updateUrl.value = partner.update_url;
+    formOpen.value = true;
 }
 
 function closeForm() {
     formOpen.value = false;
-    editId.value   = null;
+    editId.value = null;
 }
 
 // ── Confirmação destrutiva com reason (LGPD/CFM) ──────────────────────────────
-const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
 
 // ── Delete ────────────────────────────────────────────────────────────────────
 function onDelete(partner) {
@@ -65,7 +70,7 @@ function onDelete(partner) {
             const res = await fetch(partner.destroy_url, {
                 method: 'DELETE',
                 headers: {
-                    'Accept':       'application/json',
+                    Accept: 'application/json',
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
@@ -88,7 +93,7 @@ function onPay(commission) {
             const res = await fetch(commission.pay_url, {
                 method: 'PATCH',
                 headers: {
-                    'Accept':       'application/json',
+                    Accept: 'application/json',
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
@@ -103,7 +108,7 @@ function onPay(commission) {
 
 function showToast(msg, type = 'success') {
     if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
-    if (type === 'error'   && window.showErrorToast)   return window.showErrorToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
     alert(msg);
 }
 
@@ -112,7 +117,7 @@ function fmtBrl(val) {
 }
 
 const breadcrumbs = [
-    { label: props.t.breadcrumb_home    ?? 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
     { label: props.t.breadcrumb_current ?? 'Parceiros', url: '#', active: true },
 ];
 
@@ -124,13 +129,11 @@ const exportTo = ref('');
 const exportStatus = ref('');
 
 function exportUrl(format) {
-    const base = format === 'pdf'
-        ? route('manager.partners.export.pdf')
-        : route('manager.partners.export.excel');
+    const base = format === 'pdf' ? route('manager.partners.export.pdf') : route('manager.partners.export.excel');
 
     const params = new URLSearchParams();
-    if (exportFrom.value)   params.set('from', exportFrom.value);
-    if (exportTo.value)     params.set('to', exportTo.value);
+    if (exportFrom.value) params.set('from', exportFrom.value);
+    if (exportTo.value) params.set('to', exportTo.value);
     if (exportStatus.value) params.set('status', exportStatus.value);
 
     const qs = params.toString();
@@ -141,7 +144,6 @@ function exportUrl(format) {
 <template>
     <AppLayout :title="t.page_title" :breadcrumbs="breadcrumbs">
         <div>
-
             <!-- ── Cabeçalho da página ─────────────────────────────────────── -->
             <div class="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom flex-wrap">
                 <h4 class="mb-0 fw-bold me-auto">{{ t.page_title }}</h4>
@@ -154,26 +156,27 @@ function exportUrl(format) {
                     :title="t.export ?? 'Exportar'"
                 >
                     <li class="px-2 pb-2">
-                        <div class="small text-muted fw-semibold mb-1">{{ t.export_filters ?? 'Filtros do export' }}</div>
+                        <div class="small text-muted fw-semibold mb-1">
+                            {{ t.export_filters ?? 'Filtros do export' }}
+                        </div>
                         <label class="form-label small mb-1">{{ t.export_from ?? 'De' }}</label>
-                        <input v-model="exportFrom" type="date" class="form-control form-control-sm mb-2">
+                        <input v-model="exportFrom" type="date" class="form-control form-control-sm mb-2" />
                         <label class="form-label small mb-1">{{ t.export_to ?? 'Até' }}</label>
-                        <input v-model="exportTo" type="date" class="form-control form-control-sm mb-2">
+                        <input v-model="exportTo" type="date" class="form-control form-control-sm mb-2" />
                         <label class="form-label small mb-1">{{ t.export_status ?? 'Status (comissões)' }}</label>
                         <SearchSelect
                             v-model="exportStatus"
                             :options="[
-                                { value: 'pending',   label: t.export_status_pending ?? 'Pendentes' },
-                                { value: 'paid',      label: t.export_status_paid ?? 'Pagas' },
+                                { value: 'pending', label: t.export_status_pending ?? 'Pendentes' },
+                                { value: 'paid', label: t.export_status_paid ?? 'Pagas' },
                                 { value: 'cancelled', label: t.export_status_cancelled ?? 'Canceladas' },
                             ]"
                             :value-key="'value'"
                             :label-key="'label'"
                             :placeholder="t.export_status_all ?? 'Todos'"
                         />
-
                     </li>
-                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><hr class="dropdown-divider my-1" /></li>
                     <li>
                         <a :href="exportUrl('pdf')" target="_blank" class="dropdown-item rounded-1">
                             <i class="ti ti-file-type-pdf me-1 text-danger"></i> {{ t.export_pdf ?? 'Exportar PDF' }}
@@ -181,7 +184,8 @@ function exportUrl(format) {
                     </li>
                     <li>
                         <a :href="exportUrl('excel')" class="dropdown-item rounded-1">
-                            <i class="ti ti-file-type-xls me-1 text-success"></i> {{ t.export_excel ?? 'Exportar Excel' }}
+                            <i class="ti ti-file-type-xls me-1 text-success"></i>
+                            {{ t.export_excel ?? 'Exportar Excel' }}
                         </a>
                     </li>
                 </ActionDropdown>
@@ -192,19 +196,17 @@ function exportUrl(format) {
             </div>
 
             <!-- ── Live status bar ────────────────────────────────────────── -->
-            <LiveStatusBar
-                :is-refreshing="isRefreshing"
-                :last-updated="lastUpdated"
-                :t="t"
-                @refresh="refresh"
-            />
+            <LiveStatusBar :is-refreshing="isRefreshing" :last-updated="lastUpdated" :t="t" @refresh="refresh" />
 
             <!-- ── KPI Cards ───────────────────────────────────────────────── -->
             <div class="row g-3 mb-4">
                 <div class="col-6 col-md-3">
                     <div class="card card-body h-100 border-start border-primary border-3 ps-3">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-primary-subtle" style="width:42px;height:42px;">
+                            <div
+                                class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-primary-subtle"
+                                style="width: 42px; height: 42px"
+                            >
                                 <i class="ti ti-affiliate fs-18 text-primary"></i>
                             </div>
                             <div>
@@ -217,7 +219,10 @@ function exportUrl(format) {
                 <div class="col-6 col-md-3">
                     <div class="card card-body h-100 border-start border-info border-3 ps-3">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-info-subtle" style="width:42px;height:42px;">
+                            <div
+                                class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-info-subtle"
+                                style="width: 42px; height: 42px"
+                            >
                                 <i class="ti ti-target-arrow fs-18 text-info"></i>
                             </div>
                             <div>
@@ -230,7 +235,10 @@ function exportUrl(format) {
                 <div class="col-6 col-md-3">
                     <div class="card card-body h-100 border-start border-warning border-3 ps-3">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-warning-subtle" style="width:42px;height:42px;">
+                            <div
+                                class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-warning-subtle"
+                                style="width: 42px; height: 42px"
+                            >
                                 <i class="ti ti-cash fs-18 text-warning"></i>
                             </div>
                             <div>
@@ -243,7 +251,10 @@ function exportUrl(format) {
                 <div class="col-6 col-md-3">
                     <div class="card card-body h-100 border-start border-success border-3 ps-3">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-success-subtle" style="width:42px;height:42px;">
+                            <div
+                                class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-success-subtle"
+                                style="width: 42px; height: 42px"
+                            >
                                 <i class="ti ti-circle-check fs-18 text-success"></i>
                             </div>
                             <div>
@@ -264,7 +275,7 @@ function exportUrl(format) {
                     <div class="row g-3 text-center">
                         <div v-for="stage in funnel" :key="stage.value" class="col">
                             <div class="p-3 rounded border">
-                                <div class="fw-bold mb-2" style="font-size:1.75rem;">{{ stage.count }}</div>
+                                <div class="fw-bold mb-2" style="font-size: 1.75rem">{{ stage.count }}</div>
                                 <span class="badge" :class="stage.badge">{{ stage.label }}</span>
                             </div>
                         </div>
@@ -290,7 +301,7 @@ function exportUrl(format) {
                                 <th class="text-center">{{ t.col_commissions }}</th>
                                 <th class="text-end">{{ t.col_pending }}</th>
                                 <th class="text-end">{{ t.col_paid }}</th>
-                                <th class="text-end" style="min-width:110px;">{{ t.col_actions }}</th>
+                                <th class="text-end" style="min-width: 110px">{{ t.col_actions }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -323,11 +334,7 @@ function exportUrl(format) {
                                             variant="info"
                                             :href="p.show_url"
                                         />
-                                        <ActionIconButton
-                                            icon="ti ti-edit"
-                                            :title="t.edit"
-                                            @click="openEdit(p)"
-                                        />
+                                        <ActionIconButton icon="ti ti-edit" :title="t.edit" @click="openEdit(p)" />
                                         <ActionIconButton
                                             icon="ti ti-trash"
                                             :title="t.delete"
@@ -369,11 +376,9 @@ function exportUrl(format) {
                                 <td class="text-center">
                                     <div class="d-flex align-items-center justify-content-center gap-2">
                                         <span>{{ c.due_at ?? '—' }}</span>
-                                        <button
-                                            v-if="c.is_pending"
-                                            class="btn btn-xs btn-success"
-                                            @click="onPay(c)"
-                                        >{{ t.pay }}</button>
+                                        <button v-if="c.is_pending" class="btn btn-xs btn-success" @click="onPay(c)">
+                                            {{ t.pay }}
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -381,7 +386,6 @@ function exportUrl(format) {
                     </table>
                 </div>
             </div>
-
         </div>
 
         <!-- Form offcanvas -->
@@ -406,6 +410,5 @@ function exportUrl(format) {
             @close="closeReasonModal"
             @confirm="handleReasonConfirm"
         />
-
     </AppLayout>
 </template>

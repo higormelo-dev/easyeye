@@ -20,14 +20,14 @@ import GuestLayout from '@/Layouts/GuestLayout.vue';
  */
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
-const mode     = ref('totp');   // 'totp' | 'recovery'
-const code     = ref('');
-const busy     = ref(false);
+const mode = ref('totp'); // 'totp' | 'recovery'
+const code = ref('');
+const busy = ref(false);
 const feedback = ref('');
-const isError  = ref(false);
+const isError = ref(false);
 const codeInput = ref(null);
 
 const logoutForm = useForm({});
@@ -37,9 +37,7 @@ const isTotp = computed(() => mode.value === 'totp');
 const RECOVERY_PATTERN = /^[A-Z0-9]{4}-?[A-Z0-9]{4}$/i;
 
 const canSubmit = computed(() => {
-    return isTotp.value
-        ? /^\d{6}$/.test(code.value)
-        : RECOVERY_PATTERN.test(code.value.trim());
+    return isTotp.value ? /^\d{6}$/.test(code.value) : RECOVERY_PATTERN.test(code.value.trim());
 });
 
 /** Recovery code é gravado com hífen no servidor: garante o formato XXXX-XXXX. */
@@ -62,7 +60,7 @@ async function post(url, body) {
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
             body: body ? JSON.stringify(body) : undefined,
         });
@@ -76,7 +74,7 @@ async function post(url, body) {
 }
 
 function errorMessage(status, data) {
-    if (status === 0)   return props.t.network_error ?? 'Erro de rede. Tente novamente.';
+    if (status === 0) return props.t.network_error ?? 'Erro de rede. Tente novamente.';
     if (status === 429) return props.t.too_many_attempts ?? 'Muitas tentativas. Aguarde um minuto e tente novamente.';
     if (status === 401 || status === 419) {
         return props.t.session_expired ?? 'Sua sessão expirou. Recarregue a página e entre novamente.';
@@ -99,14 +97,16 @@ async function verify() {
     }
 
     feedback.value = data.message ?? props.t.verified ?? 'Código verificado.';
-    setTimeout(() => { window.location.href = data.redirect ?? '/panel/dashboard'; }, 900);
+    setTimeout(() => {
+        window.location.href = data.redirect ?? '/panel/dashboard';
+    }, 900);
 }
 
 function toggleMode() {
-    mode.value     = isTotp.value ? 'recovery' : 'totp';
-    code.value     = '';
+    mode.value = isTotp.value ? 'recovery' : 'totp';
+    code.value = '';
     feedback.value = '';
-    isError.value  = false;
+    isError.value = false;
     nextTick(() => codeInput.value?.focus());
 }
 
@@ -118,15 +118,11 @@ function logout() {
 <template>
     <Head :title="t.verify_title" />
 
-    <GuestLayout
-        :app-name="appName"
-        :title="t.verify_title"
-        :subtitle="t.verify_subtitle"
-    >
-        <p class="text-muted mb-1" style="font-size:.9rem;">
+    <GuestLayout :app-name="appName" :title="t.verify_title" :subtitle="t.verify_subtitle">
+        <p class="text-muted mb-1" style="font-size: 0.9rem">
             {{ isTotp ? t.verify_hint_totp : t.verify_hint_recovery }}
         </p>
-        <p class="text-muted mb-4" style="font-size:.9rem;">
+        <p class="text-muted mb-4" style="font-size: 0.9rem">
             {{ t.verify_help }}
         </p>
 
@@ -149,15 +145,11 @@ function logout() {
                     :placeholder="isTotp ? t.code_placeholder : t.recovery_code_placeholder"
                     autofocus
                     :aria-label="isTotp ? t.code_aria_label : t.recovery_code_aria_label"
-                >
+                />
             </div>
 
             <div class="d-grid mb-3">
-                <button
-                    type="submit"
-                    class="btn btn-primary fw-semibold"
-                    :disabled="busy || !canSubmit"
-                >
+                <button type="submit" class="btn btn-primary fw-semibold" :disabled="busy || !canSubmit">
                     <i v-if="busy" class="ti ti-loader-2 ee-spin me-1"></i>
                     <i v-else class="ti ti-shield-check me-1"></i>
                     {{ t.btn_verify }}
@@ -176,7 +168,7 @@ function logout() {
             <button
                 type="button"
                 class="btn btn-link text-muted"
-                style="font-size:.875rem;"
+                style="font-size: 0.875rem"
                 :disabled="logoutForm.processing"
                 @click="logout"
             >

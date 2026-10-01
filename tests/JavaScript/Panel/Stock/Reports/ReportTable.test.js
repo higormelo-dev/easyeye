@@ -10,7 +10,10 @@ import ReportTable from '@/Pages/Panel/Stock/Reports/ReportTable.vue';
  */
 
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
-    default: { props: ['title'], template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>' },
+    default: {
+        props: ['title'],
+        template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>',
+    },
 }));
 vi.mock('@/Components/Panel/ColumnOrderMenu.vue', () => ({
     default: {
@@ -27,7 +30,9 @@ vi.mock('@/Components/Panel/ColumnOrderMenu.vue', () => ({
 const STORAGE_KEY = 'stock_reports_test_columns_order';
 
 const t = {
-    sort_by: 'Ordenar por :column', columns_label: 'Colunas', columns_customize: 'Personalizar colunas',
+    sort_by: 'Ordenar por :column',
+    columns_label: 'Colunas',
+    columns_customize: 'Personalizar colunas',
 };
 
 const columns = [
@@ -115,14 +120,14 @@ describe('ReportTable', () => {
         await ths[1].find('button').trigger('click');
         await ths[0].find('button').trigger('click');
 
-        expect(w.emitted('sort')).toEqual([
-            [{ sort: 'qty', direction: 'asc' }],
-            [{ sort: 'name', direction: 'asc' }],
-        ]);
+        expect(w.emitted('sort')).toEqual([[{ sort: 'qty', direction: 'asc' }], [{ sort: 'name', direction: 'asc' }]]);
     });
 
     it('renderiza células por slot e usa travessão para valor vazio', () => {
-        const w = mountTable({}, { 'cell-qty': '<template #cell-qty="{ row }"><b class="qty">{{ row.qty }} un</b></template>' });
+        const w = mountTable(
+            {},
+            { 'cell-qty': '<template #cell-qty="{ row }"><b class="qty">{{ row.qty }} un</b></template>' },
+        );
         const cells = w.findAll('tbody td');
 
         expect(cells[0].text()).toBe('Lente');

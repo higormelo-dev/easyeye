@@ -21,7 +21,9 @@ vi.mock('@inertiajs/vue3', async () => {
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view', 'viewTableTitle', 'viewCardsTitle'],
@@ -30,7 +32,9 @@ vi.mock('@/Components/Panel/PageHeader.vue', () => ({
             <button type="button" class="to-cards" :aria-label="viewCardsTitle" @click="$emit('set-view', 'cards')" /></div>`,
     },
 }));
-vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { props: ['data'], template: '<nav class="pagination-stub" />' } }));
+vi.mock('@/Components/Panel/TablePagination.vue', () => ({
+    default: { props: ['data'], template: '<nav class="pagination-stub" />' },
+}));
 
 const routes = {
     index: '/doctor-payouts/closings',
@@ -40,7 +44,16 @@ const routes = {
 
 const PAYOUTS = [
     { ...payoutSummary, is_complementary: false },
-    { ...payoutSummary, id: 'po2', code: 'RM-000002', status: 'paid', paid_at: '2026-09-05', total_amount: 90, items_count: 1, is_complementary: true },
+    {
+        ...payoutSummary,
+        id: 'po2',
+        code: 'RM-000002',
+        status: 'paid',
+        paid_at: '2026-09-05',
+        total_amount: 90,
+        items_count: 1,
+        is_complementary: true,
+    },
 ];
 
 let wrapper;
@@ -115,8 +128,17 @@ describe('Financial/DoctorPayouts/Closings', () => {
     it('filtros de médico e status visitam a URL mantendo o outro filtro', async () => {
         const w = mountPage({ filters: { doctor: '', status: 'paid' } });
 
-        expect(w.findAll('[data-test="filter-doctor"] option').map((o) => o.text())).toEqual(['All doctors', 'Dra. Ana Lima', 'Dr. Beto Reis (inactive)']);
-        expect(w.findAll('[data-test="filter-status"] option').map((o) => o.text())).toEqual(['All statuses', 'Closed', 'Paid', 'Cancelled']);
+        expect(w.findAll('[data-test="filter-doctor"] option').map((o) => o.text())).toEqual([
+            'All doctors',
+            'Dra. Ana Lima',
+            'Dr. Beto Reis (inactive)',
+        ]);
+        expect(w.findAll('[data-test="filter-status"] option').map((o) => o.text())).toEqual([
+            'All statuses',
+            'Closed',
+            'Paid',
+            'Cancelled',
+        ]);
 
         await w.find('[data-test="filter-doctor"]').setValue('d1');
         expect(router.get).toHaveBeenLastCalledWith(
@@ -126,7 +148,11 @@ describe('Financial/DoctorPayouts/Closings', () => {
         );
 
         await w.find('[data-test="filters-clear"]').trigger('click');
-        expect(router.get).toHaveBeenLastCalledWith('/doctor-payouts/closings', { doctor: '', status: '' }, expect.any(Object));
+        expect(router.get).toHaveBeenLastCalledWith(
+            '/doctor-payouts/closings',
+            { doctor: '', status: '' },
+            expect.any(Object),
+        );
     });
 
     it('sem fechamentos: mensagem de vazio nas duas vistas', async () => {
@@ -141,8 +167,24 @@ describe('Financial/DoctorPayouts/Closings', () => {
     it('pago em parte: mostra o pago, o saldo e o último pagamento; cancelado sem valores', () => {
         const w = mountPage({
             payouts: paginator([
-                { ...payoutSummary, id: 'pp', status: 'partially_paid', total_amount: 300, paid_amount: 100, remaining_amount: 200, paid_at: '2026-09-05' },
-                { ...payoutSummary, id: 'cc', status: 'cancelled', total_amount: 300, paid_amount: null, remaining_amount: 0, paid_at: null },
+                {
+                    ...payoutSummary,
+                    id: 'pp',
+                    status: 'partially_paid',
+                    total_amount: 300,
+                    paid_amount: 100,
+                    remaining_amount: 200,
+                    paid_at: '2026-09-05',
+                },
+                {
+                    ...payoutSummary,
+                    id: 'cc',
+                    status: 'cancelled',
+                    total_amount: 300,
+                    paid_amount: null,
+                    remaining_amount: 0,
+                    paid_at: null,
+                },
             ]),
         });
         const [partial, cancelled] = w.findAll('[data-test="closing-row"]');

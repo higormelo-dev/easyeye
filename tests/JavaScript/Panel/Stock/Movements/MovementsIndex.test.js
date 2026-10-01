@@ -25,7 +25,9 @@ vi.mock('@inertiajs/vue3', async () => {
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view', 'showViewToggle'],
@@ -41,26 +43,47 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder', 'wrapperClass'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :data-wrapper="wrapperClass" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :data-wrapper="wrapperClass" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Pages/Panel/Stock/Movements/MovementTable.vue', () => ({
-    default: { name: 'MovementTableStub', props: ['items', 't'], emits: ['sort', 'filterProduct'], template: '<div class="table-stub">{{ items.data.length }}</div>' },
+    default: {
+        name: 'MovementTableStub',
+        props: ['items', 't'],
+        emits: ['sort', 'filterProduct'],
+        template: '<div class="table-stub">{{ items.data.length }}</div>',
+    },
 }));
 vi.mock('@/Pages/Panel/Stock/Movements/MovementCards.vue', () => ({
-    default: { name: 'MovementCardsStub', props: ['items'], emits: ['filterProduct'], template: '<div class="cards-stub">{{ items.data.length }}</div>' },
+    default: {
+        name: 'MovementCardsStub',
+        props: ['items'],
+        emits: ['filterProduct'],
+        template: '<div class="cards-stub">{{ items.data.length }}</div>',
+    },
 }));
 vi.mock('@/Pages/Panel/Stock/Movements/MovementFormModal.vue', () => ({
     default: { name: 'MovementFormModalStub', props: ['open'], emits: ['close', 'saved'], template: '<div />' },
 }));
 
 const t = {
-    page_title: 'Stock movements', total_label: 'Total:', btn_products: 'Products', btn_new: 'New movement',
-    search_placeholder: 'Search by product...', filter_product_all: 'All products', filter_type_all: 'All types',
+    page_title: 'Stock movements',
+    total_label: 'Total:',
+    btn_products: 'Products',
+    btn_new: 'New movement',
+    search_placeholder: 'Search by product...',
+    filter_product_all: 'All products',
+    filter_type_all: 'All types',
     close: 'Close',
 };
 
-const routes = { index: '/stock/movements', store: '/stock/movements', products_index: '/stock/products', scan_barcode: '/scan' };
+const routes = {
+    index: '/stock/movements',
+    store: '/stock/movements',
+    products_index: '/stock/products',
+    scan_barcode: '/scan',
+};
 
 let wrapper;
 
@@ -75,10 +98,19 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
-function mountPage(filters = { search: '', entity_product_id: '', type: '', sort: 'occurred_at', direction: 'desc' }, extra = {}) {
+function mountPage(
+    filters = { search: '', entity_product_id: '', type: '', sort: 'occurred_at', direction: 'desc' },
+    extra = {},
+) {
     wrapper = mount(MovementsIndex, {
         props: {
-            items: { data: [{ id: 'm1', entity_product_id: 'p1' }, { id: 'm2', entity_product_id: 'p2' }], total: 42 },
+            items: {
+                data: [
+                    { id: 'm1', entity_product_id: 'p1' },
+                    { id: 'm2', entity_product_id: 'p2' },
+                ],
+                total: 42,
+            },
             products: [{ id: 'p1', name: 'Colírio' }],
             movementTypes: [{ value: 'manual_in', label: 'Manual entry', direction: 1 }],
             filterTypes: [
@@ -131,7 +163,10 @@ describe('Stock/Movements/Index', () => {
 
     it('o filtro de tipo lista todos os tipos do extrato (não só os manuais)', () => {
         const w = mountPage();
-        const options = w.findAll('select')[1].findAll('option').map((o) => o.text());
+        const options = w
+            .findAll('select')[1]
+            .findAll('option')
+            .map((o) => o.text());
 
         expect(options).toEqual(['All types', 'Purchase receipt', 'Manual entry', 'Procedure consumption']);
     });
@@ -164,7 +199,13 @@ describe('Stock/Movements/Index', () => {
     });
 
     it('ordenar mantém busca e filtros', async () => {
-        const w = mountPage({ search: 'ana', entity_product_id: '', type: 'manual_in', sort: 'occurred_at', direction: 'desc' });
+        const w = mountPage({
+            search: 'ana',
+            entity_product_id: '',
+            type: 'manual_in',
+            sort: 'occurred_at',
+            direction: 'desc',
+        });
 
         w.findComponent({ name: 'MovementTableStub' }).vm.$emit('sort', { sort: 'product', direction: 'asc' });
         await nextTick();
@@ -191,7 +232,13 @@ describe('Stock/Movements/Index', () => {
     });
 
     it('depois de lançar só fecha o form: o store já volta com busca/filtros/ordem (sem visita extra)', async () => {
-        const w = mountPage({ search: 'lote', entity_product_id: 'p1', type: 'manual_in', sort: 'quantity', direction: 'asc' });
+        const w = mountPage({
+            search: 'lote',
+            entity_product_id: 'p1',
+            type: 'manual_in',
+            sort: 'quantity',
+            direction: 'asc',
+        });
         const form = () => w.findComponent({ name: 'MovementFormModalStub' });
 
         await w.find('button.new-movement').trigger('click');
@@ -221,6 +268,11 @@ describe('Stock/Movements/Index', () => {
     it('produto filtrado fora da lista de ativos continua visível no select', async () => {
         const w = mountPage({ search: '', entity_product_id: 'p2', type: '', sort: 'occurred_at', direction: 'desc' });
 
-        expect(w.findAll('select')[0].findAll('option').map((o) => o.attributes('value'))).toContain('p2');
+        expect(
+            w
+                .findAll('select')[0]
+                .findAll('option')
+                .map((o) => o.attributes('value')),
+        ).toContain('p2');
     });
 });

@@ -2,17 +2,17 @@
 import { computed } from 'vue';
 
 const props = defineProps({
-    wallet:      { type: Object, default: () => null },
+    wallet: { type: Object, default: () => null },
     permissions: { type: Object, default: () => ({}) },
-    t:           { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['add-credit']);
 
 const PROVIDER_META = {
-    openai:    { label: 'ChatGPT', icon: 'ti ti-brand-openai',    color: '#10a37f', bg: 'rgba(16,163,127,0.10)' },
-    anthropic: { label: 'Claude',  icon: 'ti ti-message-chatbot', color: '#cc785c', bg: 'rgba(204,120,92,0.10)' },
-    gemini:    { label: 'Gemini',  icon: 'ti ti-brand-google',    color: '#4285f4', bg: 'rgba(66,133,244,0.10)' },
+    openai: { label: 'ChatGPT', icon: 'ti ti-brand-openai', color: '#10a37f', bg: 'rgba(16,163,127,0.10)' },
+    anthropic: { label: 'Claude', icon: 'ti ti-message-chatbot', color: '#cc785c', bg: 'rgba(204,120,92,0.10)' },
+    gemini: { label: 'Gemini', icon: 'ti ti-brand-google', color: '#4285f4', bg: 'rgba(66,133,244,0.10)' },
 };
 
 const PROVIDER_ORDER = ['openai', 'anthropic', 'gemini'];
@@ -20,13 +20,11 @@ const PROVIDER_ORDER = ['openai', 'anthropic', 'gemini'];
 const balance = computed(() => props.wallet?.balance ?? null);
 
 const consumedByProvider = computed(() => balance.value?.consumed_by_provider ?? {});
-const totalConsumed      = computed(() =>
-    PROVIDER_ORDER.reduce((sum, p) => sum + (consumedByProvider.value[p] ?? 0), 0),
-);
+const totalConsumed = computed(() => PROVIDER_ORDER.reduce((sum, p) => sum + (consumedByProvider.value[p] ?? 0), 0));
 
 const quotaPct = computed(() => {
     const total = balance.value?.quota_total ?? 0;
-    const used  = balance.value?.quota_used  ?? 0;
+    const used = balance.value?.quota_used ?? 0;
     return total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
 });
 
@@ -52,7 +50,6 @@ function fmtDate(iso) {
 <template>
     <div v-if="wallet" class="card mb-3 border-primary border-opacity-25 internal-wallet-card">
         <div class="card-body p-3">
-
             <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-1">
@@ -100,10 +97,7 @@ function fmtDate(iso) {
                                 <i class="ti ti-calendar-month me-1"></i>
                                 {{ t?.internal_wallet?.quota ?? 'Cota mensal' }}
                             </div>
-                            <span
-                                v-if="balance?.quota_expired"
-                                class="badge bg-danger-subtle text-danger small"
-                            >
+                            <span v-if="balance?.quota_expired" class="badge bg-danger-subtle text-danger small">
                                 {{ t?.internal_wallet?.quota_expired ?? 'expirada' }}
                             </span>
                         </div>
@@ -111,16 +105,17 @@ function fmtDate(iso) {
                             <h4 class="mb-0 fw-bold">{{ fmt(balance?.quota_remaining) }}</h4>
                             <small class="text-muted">/ {{ fmt(balance?.quota_total) }}</small>
                         </div>
-                        <div class="progress mt-2" style="height: 6px;">
+                        <div class="progress mt-2" style="height: 6px">
                             <div
                                 class="progress-bar bg-info"
                                 role="progressbar"
-                                :style="{ width: quotaPct + '%' }">
-                            </div>
+                                :style="{ width: quotaPct + '%' }"
+                            ></div>
                         </div>
                         <small class="text-muted">
                             <i class="ti ti-clock me-1"></i>
-                            {{ t?.internal_wallet?.resets_at ?? 'Reseta em' }} {{ fmtDate(balance?.quota_period_ends_at) }}
+                            {{ t?.internal_wallet?.resets_at ?? 'Reseta em' }}
+                            {{ fmtDate(balance?.quota_period_ends_at) }}
                         </small>
                     </div>
                 </div>
@@ -144,7 +139,10 @@ function fmtDate(iso) {
             <!-- ─── Consumo analítico por provedor ─────────────────────── -->
             <div v-if="totalConsumed > 0" class="provider-analytics">
                 <div class="d-flex align-items-center justify-content-between mb-2">
-                    <small class="text-muted fw-semibold text-uppercase" style="letter-spacing: 0.04em; font-size: .7rem;">
+                    <small
+                        class="text-muted fw-semibold text-uppercase"
+                        style="letter-spacing: 0.04em; font-size: 0.7rem"
+                    >
                         <i class="ti ti-chart-pie me-1"></i>
                         {{ t?.internal_wallet?.consumed_by_provider ?? 'Consumo histórico por provedor' }}
                     </small>
@@ -152,16 +150,18 @@ function fmtDate(iso) {
                 </div>
 
                 <div class="row g-2">
-                    <div
-                        v-for="key in PROVIDER_ORDER"
-                        :key="key"
-                        class="col-12 col-md-4"
-                    >
+                    <div v-for="key in PROVIDER_ORDER" :key="key" class="col-12 col-md-4">
                         <div
                             class="provider-mini-tile p-2 rounded"
-                            :style="{ background: PROVIDER_META[key].bg, borderLeft: `3px solid ${PROVIDER_META[key].color}` }"
+                            :style="{
+                                background: PROVIDER_META[key].bg,
+                                borderLeft: `3px solid ${PROVIDER_META[key].color}`,
+                            }"
                         >
-                            <div class="d-flex align-items-center justify-content-between mb-1 small fw-semibold" :style="{ color: PROVIDER_META[key].color }">
+                            <div
+                                class="d-flex align-items-center justify-content-between mb-1 small fw-semibold"
+                                :style="{ color: PROVIDER_META[key].color }"
+                            >
                                 <span>
                                     <i :class="PROVIDER_META[key].icon" class="me-1"></i>
                                     {{ PROVIDER_META[key].label }}
@@ -184,7 +184,7 @@ function fmtDate(iso) {
 .balance-tile {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
-    transition: transform .15s ease;
+    transition: transform 0.15s ease;
 }
 .balance-tile:hover {
     transform: translateY(-1px);
@@ -197,7 +197,7 @@ function fmtDate(iso) {
     background: #f8fafc;
 }
 
-:root[data-bs-theme=dark] .balance-tile {
+:root[data-bs-theme='dark'] .balance-tile {
     background: #18212f;
     border-color: #384559;
 }

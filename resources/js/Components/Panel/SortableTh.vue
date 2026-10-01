@@ -20,10 +20,10 @@ import { computed } from 'vue';
  * expõe `aria-sort`; visualmente idêntico ao cabeçalho clicável anterior.
  */
 const props = defineProps({
-    colKey:      { type: String, required: true },
+    colKey: { type: String, required: true },
     currentSort: { type: String, default: '' },
-    currentDir:  { type: String, default: 'asc' },
-    title:       { type: String, default: undefined },
+    currentDir: { type: String, default: 'asc' },
+    title: { type: String, default: undefined },
 });
 
 const emit = defineEmits(['sort']);

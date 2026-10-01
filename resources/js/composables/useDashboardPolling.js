@@ -11,8 +11,8 @@ import { router } from '@inertiajs/vue3';
  */
 export function useDashboardPolling(only, intervalMs = 30_000) {
     const isRefreshing = ref(false);
-    const lastUpdated  = ref(new Date());
-    let   timer        = null;
+    const lastUpdated = ref(new Date());
+    let timer = null;
 
     function refresh() {
         if (isRefreshing.value) return;

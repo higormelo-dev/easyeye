@@ -1,15 +1,14 @@
 <script setup>
 const props = defineProps({
-    primaryKpis:      { type: Object, required: true },
+    primaryKpis: { type: Object, required: true },
     subscriptionKpis: { type: Object, required: true },
-    t:                { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 </script>
 
 <template>
     <!-- Linha 1: Clínicas, Ativas, Trial, MRR -->
     <div class="row g-3 mb-3">
-
         <!-- Total Clínicas -->
         <div class="col-6 col-md-3">
             <div class="card stat-card stat-card--entities h-100">
@@ -83,7 +82,6 @@ const props = defineProps({
 
     <!-- Linha 2: Pacientes, Médicos, Prontuários, Agendamentos -->
     <div class="row g-3 mb-4">
-
         <!-- Total Pacientes -->
         <div class="col-6 col-md-3">
             <div class="card stat-card stat-card--patients h-100">

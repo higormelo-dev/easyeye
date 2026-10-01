@@ -8,12 +8,12 @@ const DAY_MS = 86400000;
 
 /** Ícone por status da glosa (badge com ícone + texto, nunca só cor). */
 export const GLOSA_ICONS = {
-    open:             'ti-alert-circle',
-    appealed:         'ti-message-circle-up',
+    open: 'ti-alert-circle',
+    appealed: 'ti-message-circle-up',
     partial_reversed: 'ti-arrow-back-up',
-    reversed:         'ti-circle-check',
-    maintained:       'ti-lock',
-    cancelled:        'ti-circle-x',
+    reversed: 'ti-circle-check',
+    maintained: 'ti-lock',
+    cancelled: 'ti-circle-x',
 };
 
 /** badge-soft-* é legível nos dois temas; 'light' (Cancelada) vira secondary. */
@@ -43,14 +43,23 @@ export function deadlineBadge(glosa, today, dueSoonDays, tx) {
 
     const days = daysUntil(glosa.deadline, today);
     if (days === null) return null;
-    if (days < -1) return { cls: 'badge-soft-danger', icon: 'ti-alert-triangle', text: tx('deadline_overdue_days', { days: -days }) };
+    if (days < -1)
+        return {
+            cls: 'badge-soft-danger',
+            icon: 'ti-alert-triangle',
+            text: tx('deadline_overdue_days', { days: -days }),
+        };
     if (days === -1) return { cls: 'badge-soft-danger', icon: 'ti-alert-triangle', text: tx('deadline_overdue_one') };
     if (days === 0) return { cls: 'badge-soft-danger', icon: 'ti-alarm', text: tx('deadline_today') };
     if (days === 1) return { cls: 'badge-soft-warning', icon: 'ti-clock', text: tx('deadline_tomorrow') };
 
     const soon = days <= Number(dueSoonDays ?? 5);
 
-    return { cls: soon ? 'badge-soft-warning' : 'badge-soft-info', icon: soon ? 'ti-clock' : 'ti-calendar', text: tx('deadline_in_days', { days }) };
+    return {
+        cls: soon ? 'badge-soft-warning' : 'badge-soft-info',
+        icon: soon ? 'ti-clock' : 'ti-calendar',
+        text: tx('deadline_in_days', { days }),
+    };
 }
 
 /** Recurso mais recente (a lista vem em ordem de criação). */

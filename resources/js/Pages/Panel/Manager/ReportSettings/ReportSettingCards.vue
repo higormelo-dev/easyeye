@@ -1,24 +1,24 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import LoadingSpinner  from '@/Components/Panel/LoadingSpinner.vue';
+import LoadingSpinner from '@/Components/Panel/LoadingSpinner.vue';
 import CardsPagination from '@/Components/Panel/CardsPagination.vue';
-import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
-    cardsUrl:      { type: String, required: true },
+    cardsUrl: { type: String, required: true },
     initialSearch: { type: String, default: '' },
     initialStatus: { type: String, default: '' },
     initialCategory: { type: String, default: '' },
-    t:             { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['edit', 'preview', 'publish', 'archive', 'delete']);
 
 const records = ref([]);
-const meta    = ref({ current_page: 1, last_page: 1 });
+const meta = ref({ current_page: 1, last_page: 1 });
 const loading = ref(false);
 
 async function fetchCards(page = 1) {
@@ -26,13 +26,13 @@ async function fetchCards(page = 1) {
     try {
         const params = new URLSearchParams({
             page,
-            search:      props.initialSearch,
-            status:      props.initialStatus,
+            search: props.initialSearch,
+            status: props.initialStatus,
             category_id: props.initialCategory,
         });
-        const json = await fetch(`${props.cardsUrl}?${params}`).then(r => r.json());
+        const json = await fetch(`${props.cardsUrl}?${params}`).then((r) => r.json());
         records.value = json.data;
-        meta.value    = json.meta;
+        meta.value = json.meta;
     } finally {
         loading.value = false;
     }
@@ -65,12 +65,11 @@ defineExpose({ fetchCards });
         <div v-else class="row g-3">
             <div v-for="r in records" :key="r.id" class="col-sm-6 col-xl-4">
                 <div class="card card-body h-100">
-
                     <!-- Header -->
                     <div class="d-flex align-items-start gap-3">
                         <div
                             class="rounded d-flex align-items-center justify-content-center flex-shrink-0 bg-primary-subtle"
-                            style="width:44px;height:44px;"
+                            style="width: 44px; height: 44px"
                         >
                             <i class="ti ti-file-text fs-18 text-primary"></i>
                         </div>
@@ -109,17 +108,14 @@ defineExpose({ fetchCards });
                                 >
                                     <i class="ti ti-signature me-1"></i>{{ t.tab_signature }}
                                 </span>
-                                <span
-                                    v-if="r.show_footer"
-                                    class="badge badge-soft-secondary rounded fs-11"
-                                >
+                                <span v-if="r.show_footer" class="badge badge-soft-secondary rounded fs-11">
                                     <i class="ti ti-layout-bottombar me-1"></i>{{ t.tab_footer }}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <hr class="my-2">
+                    <hr class="my-2" />
 
                     <!-- Actions -->
                     <ActionIconGroup align="end" gap="tight">
@@ -128,38 +124,25 @@ defineExpose({ fetchCards });
                             :title="t.action_preview"
                             @click="$emit('preview', r)"
                         />
-                        <ActionIconButton
-                            icon="ti ti-edit"
-                            :title="t.action_edit"
-                            @click="$emit('edit', r.id)"
-                        />
+                        <ActionIconButton icon="ti ti-edit" :title="t.action_edit" @click="$emit('edit', r.id)" />
                         <ActionDropdown
                             :min-width="160"
                             btn-class="ee-action-icon ee-action-icon--default"
                             icon="ti ti-dots-vertical"
                         >
                             <li v-if="r.status === 'draft' || r.status === 'archived'">
-                                <button
-                                    class="dropdown-item rounded-1 text-success"
-                                    @click="$emit('publish', r)"
-                                >
+                                <button class="dropdown-item rounded-1 text-success" @click="$emit('publish', r)">
                                     <i class="ti ti-send me-1"></i> {{ t.action_publish }}
                                 </button>
                             </li>
                             <li v-if="r.status === 'published'">
-                                <button
-                                    class="dropdown-item rounded-1 text-warning"
-                                    @click="$emit('archive', r)"
-                                >
+                                <button class="dropdown-item rounded-1 text-warning" @click="$emit('archive', r)">
                                     <i class="ti ti-archive me-1"></i> {{ t.action_archive }}
                                 </button>
                             </li>
-                            <li><hr class="dropdown-divider my-1"></li>
+                            <li><hr class="dropdown-divider my-1" /></li>
                             <li>
-                                <button
-                                    class="dropdown-item rounded-1 text-danger"
-                                    @click="$emit('delete', r)"
-                                >
+                                <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', r)">
                                     <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
                                 </button>
                             </li>

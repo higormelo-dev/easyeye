@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 import CatalogCell from './CatalogCell.vue';
 
 /**
@@ -14,17 +14,17 @@ import CatalogCell from './CatalogCell.vue';
  */
 const props = defineProps({
     cardsUrl: { type: String, required: true },
-    search:   { type: String, default: '' },
-    columns:  { type: Array,  required: true },
-    t:        { type: Object, default: () => ({}) },
+    search: { type: String, default: '' },
+    columns: { type: Array, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['view', 'edit', 'toggleActive', 'delete', 'restore']);
 
 const records = ref([]);
-const meta    = ref({ current_page: 1, last_page: 1, total: 0 });
+const meta = ref({ current_page: 1, last_page: 1, total: 0 });
 const loading = ref(false);
-const failed  = ref(false);
+const failed = ref(false);
 
 // Colunas exibidas no corpo do card (o nome já é o título).
 const detailColumns = computed(() => props.columns.filter((c) => c.key !== 'name'));
@@ -37,24 +37,24 @@ let requestSeq = 0;
 
 async function fetchCards(page = 1, search = loadedSearch) {
     const seq = ++requestSeq;
-    loadedSearch  = search ?? '';
+    loadedSearch = search ?? '';
     loading.value = true;
-    failed.value  = false;
+    failed.value = false;
     try {
         const params = new URLSearchParams({ page, search: search ?? '' });
-        const res    = await fetch(`${props.cardsUrl}?${params}`, {
+        const res = await fetch(`${props.cardsUrl}?${params}`, {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const json    = await res.json();
+        const json = await res.json();
         if (seq !== requestSeq) return;
         records.value = json.data ?? [];
-        meta.value    = json.meta ?? { current_page: 1, last_page: 1, total: 0 };
+        meta.value = json.meta ?? { current_page: 1, last_page: 1, total: 0 };
     } catch {
         if (seq !== requestSeq) return;
         records.value = [];
-        failed.value  = true;
+        failed.value = true;
     } finally {
         if (seq === requestSeq) loading.value = false;
     }
@@ -118,11 +118,7 @@ onUnmounted(() => removeSuccessListener?.());
         </div>
 
         <div v-else class="row g-3">
-            <div
-                v-for="item in records"
-                :key="item.id"
-                class="col-12 col-sm-6 col-md-4 col-xl-3"
-            >
+            <div v-for="item in records" :key="item.id" class="col-12 col-sm-6 col-md-4 col-xl-3">
                 <div class="card card-body h-100" :class="{ 'opacity-75': item.deleted }">
                     <div class="d-flex align-items-start gap-2">
                         <h6 class="mb-1 fw-semibold lh-sm me-auto text-break">{{ item.name }}</h6>
@@ -131,7 +127,8 @@ onUnmounted(() => removeSuccessListener?.());
                             class="badge badge-soft-info rounded fs-11"
                             :title="t.status_global"
                             :aria-label="t.status_global"
-                        ><i class="ti ti-star" aria-hidden="true"></i></span>
+                            ><i class="ti ti-star" aria-hidden="true"></i
+                        ></span>
                     </div>
                     <div class="mb-2">
                         <span v-if="item.deleted" class="badge badge-soft-secondary rounded fs-12">
@@ -139,10 +136,13 @@ onUnmounted(() => removeSuccessListener?.());
                         </span>
                         <span
                             v-else
-                            :class="item.active
-                                ? 'badge badge-soft-success rounded text-success border border-success fs-12'
-                                : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'"
-                        >{{ item.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span>
+                            :class="
+                                item.active
+                                    ? 'badge badge-soft-success rounded text-success border border-success fs-12'
+                                    : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'
+                            "
+                            >{{ item.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span
+                        >
                     </div>
 
                     <dl class="small text-muted mb-1">
@@ -152,7 +152,7 @@ onUnmounted(() => removeSuccessListener?.());
                         </div>
                     </dl>
 
-                    <hr class="my-2 mt-auto">
+                    <hr class="my-2 mt-auto" />
 
                     <ActionIconGroup align="end" gap="tight">
                         <ActionIconButton
@@ -181,10 +181,14 @@ onUnmounted(() => removeSuccessListener?.());
                                 <li>
                                     <button class="dropdown-item rounded-1" @click="emit('toggleActive', item)">
                                         <i :class="`ti me-1 ${item.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                        {{ item.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                        {{
+                                            item.active
+                                                ? (t.action_deactivate ?? 'Desativar')
+                                                : (t.action_activate ?? 'Ativar')
+                                        }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+                                <li><hr class="dropdown-divider" /></li>
                                 <li>
                                     <button class="dropdown-item rounded-1 text-danger" @click="emit('delete', item)">
                                         <i class="ti ti-trash me-1"></i> {{ t.action_delete ?? 'Excluir' }}
@@ -199,13 +203,18 @@ onUnmounted(() => removeSuccessListener?.());
 
         <div v-if="meta.last_page > 1" class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
             <p class="text-muted small mb-0">
-                {{ t.pagination_showing ?? 'Exibindo' }} {{ records.length }}
-                {{ t.pagination_of ?? 'de' }} {{ meta.total }} {{ t.pagination_suffix ?? '' }}
+                {{ t.pagination_showing ?? 'Exibindo' }} {{ records.length }} {{ t.pagination_of ?? 'de' }}
+                {{ meta.total }} {{ t.pagination_suffix ?? '' }}
             </p>
             <nav :aria-label="t.pagination_label ?? 'Paginação'">
                 <ul class="pagination pagination-sm mb-0">
                     <li class="page-item" :class="{ disabled: meta.current_page === 1 }">
-                        <button type="button" class="page-link" :aria-label="t.pagination_previous ?? 'Anterior'" @click="goTo(meta.current_page - 1)">
+                        <button
+                            type="button"
+                            class="page-link"
+                            :aria-label="t.pagination_previous ?? 'Anterior'"
+                            @click="goTo(meta.current_page - 1)"
+                        >
                             <i class="ti ti-arrow-left" aria-hidden="true"></i>
                         </button>
                     </li>
@@ -222,10 +231,17 @@ onUnmounted(() => removeSuccessListener?.());
                             class="page-link"
                             :aria-current="p === meta.current_page ? 'page' : undefined"
                             @click="goTo(p)"
-                        >{{ p }}</button>
+                        >
+                            {{ p }}
+                        </button>
                     </li>
                     <li class="page-item" :class="{ disabled: meta.current_page === meta.last_page }">
-                        <button type="button" class="page-link" :aria-label="t.pagination_next ?? 'Próxima'" @click="goTo(meta.current_page + 1)">
+                        <button
+                            type="button"
+                            class="page-link"
+                            :aria-label="t.pagination_next ?? 'Próxima'"
+                            @click="goTo(meta.current_page + 1)"
+                        >
                             <i class="ti ti-arrow-right" aria-hidden="true"></i>
                         </button>
                     </li>

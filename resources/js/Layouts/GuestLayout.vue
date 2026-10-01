@@ -14,7 +14,7 @@ const props = defineProps({
 
 const page = usePage();
 const locales = computed(() => page.props.locales ?? []);
-const activeLocale = computed(() => locales.value.find(l => l.active));
+const activeLocale = computed(() => locales.value.find((l) => l.active));
 const isLoginIllustration = computed(() => props.layoutMode === 'login-illustration');
 const currentYear = new Date().getFullYear();
 
@@ -52,18 +52,21 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
         :class="isLoginIllustration ? 'ee-login-illustration-wrapper' : 'ee-auth-illustration-wrapper'"
     >
         <div class="container-fluid p-0">
-
             <!-- ── Login Illustration (Login page) ── -->
             <template v-if="isLoginIllustration">
                 <div class="row g-0 min-vh-100">
                     <!-- Left panel -->
-                    <div class="col-lg-7 d-none d-lg-flex align-items-center justify-content-center ee-login-illustration-side">
+                    <div
+                        class="col-lg-7 d-none d-lg-flex align-items-center justify-content-center ee-login-illustration-side"
+                    >
                         <slot name="left-panel">
-                            <img :src="illustrationSrc" class="img-fluid ee-login-illustration-image" :alt="appName">
+                            <img :src="illustrationSrc" class="img-fluid ee-login-illustration-image" :alt="appName" />
                         </slot>
                     </div>
                     <!-- Right: form shell (Login.vue provides its own card/logo) -->
-                    <div class="col-12 col-lg-5 d-flex align-items-center justify-content-center px-3 px-md-4 py-4 ee-login-form-side">
+                    <div
+                        class="col-12 col-lg-5 d-flex align-items-center justify-content-center px-3 px-md-4 py-4 ee-login-form-side"
+                    >
                         <div class="w-100 ee-auth-shell ee-login-shell">
                             <slot />
                             <!-- Footer -->
@@ -72,41 +75,45 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
                                     <button
                                         type="button"
                                         class="btn btn-link btn-sm text-muted text-decoration-none"
-                                        style="font-size:.8rem;"
+                                        style="font-size: 0.8rem"
                                         @click.stop="showLocale = !showLocale"
                                     >
                                         {{ activeLocale?.flag }} {{ activeLocale?.native }}
-                                        <i class="ti ti-chevron-down" style="font-size:10px;"></i>
+                                        <i class="ti ti-chevron-down" style="font-size: 10px"></i>
                                     </button>
                                     <div
                                         v-show="showLocale"
                                         class="position-absolute bg-white border rounded shadow-sm py-1"
-                                        style="bottom:calc(100% + 4px); right:0; min-width:140px; z-index:200;"
+                                        style="bottom: calc(100% + 4px); right: 0; min-width: 140px; z-index: 200"
                                     >
                                         <a
                                             v-for="locale in locales"
                                             :key="locale.code"
                                             :href="locale.url"
                                             class="d-flex align-items-center gap-2 px-3 py-2 text-decoration-none"
-                                            style="font-size:.85rem; color:#334155;"
+                                            style="font-size: 0.85rem; color: #334155"
                                             :class="{ 'fw-semibold': locale.active }"
                                         >
                                             {{ locale.flag }} {{ locale.native }}
-                                            <i v-if="locale.active" class="ti ti-check ms-auto" style="color:var(--teal);"></i>
+                                            <i
+                                                v-if="locale.active"
+                                                class="ti ti-check ms-auto"
+                                                style="color: var(--teal)"
+                                            ></i>
                                         </a>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     class="btn btn-link btn-sm text-muted p-1"
-                                    style="font-size:1rem; line-height:1;"
+                                    style="font-size: 1rem; line-height: 1"
                                     @click="toggleDark"
                                 >
                                     <i v-if="isDark" class="ti ti-sun"></i>
                                     <i v-else class="ti ti-moon"></i>
                                 </button>
                             </div>
-                            <p class="text-center mt-3 mb-0" style="font-size:.8rem; color:#94a3b8;">
+                            <p class="text-center mt-3 mb-0" style="font-size: 0.8rem; color: #94a3b8">
                                 &copy; {{ currentYear }} {{ appName }}
                             </p>
                         </div>
@@ -118,17 +125,21 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
             <template v-else>
                 <div class="row g-0 min-vh-100">
                     <!-- Left: illustration or custom slot -->
-                    <div class="col-lg-7 d-none d-lg-flex align-items-center justify-content-center ee-auth-illustration-side">
+                    <div
+                        class="col-lg-7 d-none d-lg-flex align-items-center justify-content-center ee-auth-illustration-side"
+                    >
                         <slot name="left-panel">
-                            <img :src="illustrationSrc" class="img-fluid ee-auth-illustration-image" :alt="appName">
+                            <img :src="illustrationSrc" class="img-fluid ee-auth-illustration-image" :alt="appName" />
                         </slot>
                     </div>
                     <!-- Right: card -->
-                    <div class="col-12 col-lg-5 d-flex align-items-center justify-content-center px-3 px-md-4 py-4 ee-auth-form-side">
+                    <div
+                        class="col-12 col-lg-5 d-flex align-items-center justify-content-center px-3 px-md-4 py-4 ee-auth-form-side"
+                    >
                         <div class="w-100 ee-auth-shell ee-auth-illustration-shell">
                             <div class="text-center mb-4">
                                 <a href="/login" class="d-inline-block">
-                                    <img :src="logoIconSvg" class="img-fluid ee-auth-brand" :alt="appName">
+                                    <img :src="logoIconSvg" class="img-fluid ee-auth-brand" :alt="appName" />
                                 </a>
                             </div>
                             <div class="card ee-auth-illustration-card">
@@ -138,39 +149,50 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
                                         <p v-if="subtitle">{{ subtitle }}</p>
                                     </div>
                                     <slot />
-                                    <div class="border-top pt-3 mt-4 d-flex align-items-center justify-content-center gap-1">
+                                    <div
+                                        class="border-top pt-3 mt-4 d-flex align-items-center justify-content-center gap-1"
+                                    >
                                         <div v-if="locales.length > 1" class="position-relative" ref="localeEl">
                                             <button
                                                 type="button"
                                                 class="btn btn-link btn-sm text-muted text-decoration-none"
-                                                style="font-size:.8rem;"
+                                                style="font-size: 0.8rem"
                                                 @click.stop="showLocale = !showLocale"
                                             >
                                                 {{ activeLocale?.flag }} {{ activeLocale?.native }}
-                                                <i class="ti ti-chevron-down" style="font-size:10px;"></i>
+                                                <i class="ti ti-chevron-down" style="font-size: 10px"></i>
                                             </button>
                                             <div
                                                 v-show="showLocale"
                                                 class="position-absolute bg-white border rounded shadow-sm py-1"
-                                                style="bottom:calc(100% + 4px); right:0; min-width:140px; z-index:200;"
+                                                style="
+                                                    bottom: calc(100% + 4px);
+                                                    right: 0;
+                                                    min-width: 140px;
+                                                    z-index: 200;
+                                                "
                                             >
                                                 <a
                                                     v-for="locale in locales"
                                                     :key="locale.code"
                                                     :href="locale.url"
                                                     class="d-flex align-items-center gap-2 px-3 py-2 text-decoration-none"
-                                                    style="font-size:.85rem; color:#334155;"
+                                                    style="font-size: 0.85rem; color: #334155"
                                                     :class="{ 'fw-semibold': locale.active }"
                                                 >
                                                     {{ locale.flag }} {{ locale.native }}
-                                                    <i v-if="locale.active" class="ti ti-check ms-auto" style="color:var(--teal);"></i>
+                                                    <i
+                                                        v-if="locale.active"
+                                                        class="ti ti-check ms-auto"
+                                                        style="color: var(--teal)"
+                                                    ></i>
                                                 </a>
                                             </div>
                                         </div>
                                         <button
                                             type="button"
                                             class="btn btn-link btn-sm text-muted p-1"
-                                            style="font-size:1rem; line-height:1;"
+                                            style="font-size: 1rem; line-height: 1"
                                             @click="toggleDark"
                                         >
                                             <i v-if="isDark" class="ti ti-sun"></i>
@@ -179,14 +201,13 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
                                     </div>
                                 </div>
                             </div>
-                            <p class="text-center mt-3 mb-0" style="font-size:.8rem; color:#94a3b8;">
+                            <p class="text-center mt-3 mb-0" style="font-size: 0.8rem; color: #94a3b8">
                                 &copy; {{ currentYear }} {{ appName }}
                             </p>
                         </div>
                     </div>
                 </div>
             </template>
-
         </div>
     </div>
 </template>
@@ -206,20 +227,20 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
     color: #0f172a;
     font-size: 1.35rem;
     font-weight: 700;
-    margin-bottom: .35rem;
+    margin-bottom: 0.35rem;
 }
 
 .ee-auth-header p {
     color: #6c7688;
-    font-size: .92rem;
+    font-size: 0.92rem;
     margin-bottom: 0;
 }
 
 .ee-auth-form .form-label {
     color: #334155;
-    font-size: .88rem;
+    font-size: 0.88rem;
     font-weight: 600;
-    margin-bottom: .45rem;
+    margin-bottom: 0.45rem;
 }
 
 .ee-auth-form .form-control,
@@ -290,29 +311,35 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
     font-size: 1.45rem;
     font-weight: 700;
     color: #0f172a;
-    margin-bottom: .25rem;
+    margin-bottom: 0.25rem;
 }
 .ee-login-subtitle {
     color: #6c7688;
-    font-size: .92rem;
+    font-size: 0.92rem;
     margin-bottom: 0;
 }
 .ee-login-forgot {
-    font-size: .85rem;
+    font-size: 0.85rem;
     color: var(--teal);
     text-decoration: none;
 }
-.ee-login-forgot:hover { text-decoration: underline; }
+.ee-login-forgot:hover {
+    text-decoration: underline;
+}
 .ee-login-submit {
     border-radius: 10px;
     min-height: 44px;
     font-weight: 600;
 }
 .ee-login-register {
-    font-size: .9rem;
+    font-size: 0.9rem;
     color: #64748b;
 }
-.ee-login-register a { color: var(--teal); text-decoration: none; font-weight: 600; }
+.ee-login-register a {
+    color: var(--teal);
+    text-decoration: none;
+    font-weight: 600;
+}
 .ee-login-trust {
     display: flex;
     align-items: center;
@@ -367,10 +394,22 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
     position: absolute;
     border-radius: 50%;
     filter: blur(80px);
-    opacity: .18;
+    opacity: 0.18;
 }
-.ee-login-panel-blob-1 { width: 320px; height: 320px; top: -80px; right: -60px; background: #00B4D8; }
-.ee-login-panel-blob-2 { width: 220px; height: 220px; bottom: -60px; left: 5%; background: #6c63ff; }
+.ee-login-panel-blob-1 {
+    width: 320px;
+    height: 320px;
+    top: -80px;
+    right: -60px;
+    background: #00b4d8;
+}
+.ee-login-panel-blob-2 {
+    width: 220px;
+    height: 220px;
+    bottom: -60px;
+    left: 5%;
+    background: #6c63ff;
+}
 .ee-login-panel-logo {
     height: 36px;
     width: auto;
@@ -404,21 +443,21 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
     width: 36px;
     height: 36px;
     border-radius: 8px;
-    background: rgba(0, 180, 216, .15);
+    background: rgba(0, 180, 216, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 16px;
-    color: #00B4D8;
+    color: #00b4d8;
     flex-shrink: 0;
 }
 .ee-login-feature span {
     font-size: 13px;
-    color: rgba(255,255,255,.8);
+    color: rgba(255, 255, 255, 0.8);
     font-weight: 500;
 }
 .ee-login-quote {
-    border-left: 3px solid rgba(0,180,216,.5);
+    border-left: 3px solid rgba(0, 180, 216, 0.5);
     padding: 12px 16px;
     position: relative;
     z-index: 1;
@@ -427,45 +466,73 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
 }
 .ee-login-quote p {
     font-size: 13px;
-    color: rgba(255,255,255,.65);
+    color: rgba(255, 255, 255, 0.65);
     font-style: italic;
     margin-bottom: 6px;
     line-height: 1.6;
 }
 .ee-login-quote cite {
     font-size: 12px;
-    color: rgba(255,255,255,.4);
+    color: rgba(255, 255, 255, 0.4);
     font-style: normal;
 }
 
 /* ── Responsive ── */
 @media (max-width: 991.98px) {
-    .ee-auth-shell { max-width: 640px; }
-    .ee-login-shell { max-width: 640px; }
-    .ee-auth-illustration-shell { max-width: 560px; }
+    .ee-auth-shell {
+        max-width: 640px;
+    }
+    .ee-login-shell {
+        max-width: 640px;
+    }
+    .ee-auth-illustration-shell {
+        max-width: 560px;
+    }
     .ee-login-illustration-wrapper,
-    .ee-auth-illustration-wrapper { background: #ffffff; }
+    .ee-auth-illustration-wrapper {
+        background: #ffffff;
+    }
 }
 
 /* ── Dark mode ── */
-[data-bs-theme="dark"] .main-wrapper.auth-bg { background: #0f1117; }
-[data-bs-theme="dark"] .ee-login-illustration-side,
-[data-bs-theme="dark"] .ee-auth-illustration-side { background: #1a1d2e; }
-[data-bs-theme="dark"] .ee-login-illustration-wrapper,
-[data-bs-theme="dark"] .ee-auth-illustration-wrapper {
+[data-bs-theme='dark'] .main-wrapper.auth-bg {
+    background: #0f1117;
+}
+[data-bs-theme='dark'] .ee-login-illustration-side,
+[data-bs-theme='dark'] .ee-auth-illustration-side {
+    background: #1a1d2e;
+}
+[data-bs-theme='dark'] .ee-login-illustration-wrapper,
+[data-bs-theme='dark'] .ee-auth-illustration-wrapper {
     background: linear-gradient(90deg, #1a1d2e 0 58%, #0f1117 58%);
 }
 @media (max-width: 991.98px) {
-    [data-bs-theme="dark"] .ee-login-illustration-wrapper,
-    [data-bs-theme="dark"] .ee-auth-illustration-wrapper { background: #0f1117; }
+    [data-bs-theme='dark'] .ee-login-illustration-wrapper,
+    [data-bs-theme='dark'] .ee-auth-illustration-wrapper {
+        background: #0f1117;
+    }
 }
-[data-bs-theme="dark"] .ee-login-form-side,
-[data-bs-theme="dark"] .ee-auth-form-side { background: #0f1117; }
-[data-bs-theme="dark"] .ee-auth-illustration-card,
-[data-bs-theme="dark"] .ee-login-card { border-color: #2d3560; }
-[data-bs-theme="dark"] .ee-auth-header h4 { color: #e2e8f0; }
-[data-bs-theme="dark"] .ee-auth-header p { color: #94a3b8; }
-[data-bs-theme="dark"] .ee-auth-form .form-label { color: #cbd5e1; }
-[data-bs-theme="dark"] .ee-login-title { color: #e2e8f0; }
-[data-bs-theme="dark"] .ee-login-subtitle { color: #94a3b8; }
+[data-bs-theme='dark'] .ee-login-form-side,
+[data-bs-theme='dark'] .ee-auth-form-side {
+    background: #0f1117;
+}
+[data-bs-theme='dark'] .ee-auth-illustration-card,
+[data-bs-theme='dark'] .ee-login-card {
+    border-color: #2d3560;
+}
+[data-bs-theme='dark'] .ee-auth-header h4 {
+    color: #e2e8f0;
+}
+[data-bs-theme='dark'] .ee-auth-header p {
+    color: #94a3b8;
+}
+[data-bs-theme='dark'] .ee-auth-form .form-label {
+    color: #cbd5e1;
+}
+[data-bs-theme='dark'] .ee-login-title {
+    color: #e2e8f0;
+}
+[data-bs-theme='dark'] .ee-login-subtitle {
+    color: #94a3b8;
+}
 </style>

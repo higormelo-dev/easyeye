@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout           from '@/Layouts/AppLayout.vue';
-import PageHeader          from '@/Components/Panel/PageHeader.vue';
-import SearchInput         from '@/Components/Panel/SearchInput.vue';
-import CatalogTable        from './CatalogTable.vue';
-import CatalogCards        from './CatalogCards.vue';
-import CatalogFormModal    from './CatalogFormModal.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import CatalogTable from './CatalogTable.vue';
+import CatalogCards from './CatalogCards.vue';
+import CatalogFormModal from './CatalogFormModal.vue';
 import CatalogDetailDrawer from './CatalogDetailDrawer.vue';
 
 /**
@@ -22,24 +22,24 @@ import CatalogDetailDrawer from './CatalogDetailDrawer.vue';
  * (CatalogCards). Schema-driven: `columns`/`fields` vêm do controller.
  */
 const props = defineProps({
-    meta:         { type: Object, required: true },   // { title, cardsUrl, storageKey, ... }
-    breadcrumbs:  { type: Array,  default: () => [] },
-    columns:      { type: Array,  required: true },
-    fields:       { type: Array,  required: true },
-    crudFields:   { type: Object, required: true },
-    routes:       { type: Object, required: true },   // { index, store, cards }
-    urlTemplates: { type: Object, required: true },   // { show, update, destroy, restore }
+    meta: { type: Object, required: true }, // { title, cardsUrl, storageKey, ... }
+    breadcrumbs: { type: Array, default: () => [] },
+    columns: { type: Array, required: true },
+    fields: { type: Array, required: true },
+    crudFields: { type: Object, required: true },
+    routes: { type: Object, required: true }, // { index, store, cards }
+    urlTemplates: { type: Object, required: true }, // { show, update, destroy, restore }
     // Paginator do Laravel ({ data, links, current_page, last_page, total, ... }).
-    items:        { type: Object, default: () => ({ data: [] }) },
-    filters:      { type: Object, default: () => ({}) },   // { search, sort, dir }
+    items: { type: Object, default: () => ({ data: [] }) },
+    filters: { type: Object, default: () => ({}) }, // { search, sort, dir }
     // Colunas que o backend aceita ordenar (whitelist de BaseSettingController).
-    sortable:     { type: Array,  default: () => [] },
-    t:            { type: Object, default: () => ({}) },
+    sortable: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
     // Tab-bar de navegação entre catálogos irmãos (ex.: os 8 sub-catálogos
     // oftalmológicos agrupados sob "Parâmetros oftalmológicos"). `null`/vazio
     // quando o catálogo não participa de nenhum grupo — tab-bar fica oculta.
     // Cada aba é um <a href> de navegação real (full-reload), não estado JS.
-    tabsGroup:    { type: Array,  default: () => null },
+    tabsGroup: { type: Array, default: () => null },
 });
 
 // ── Alternância tabela/cards (preferência por catálogo, no navegador) ────────
@@ -86,17 +86,17 @@ function onSort({ sort, dir }) {
 }
 
 // ── Form modal ──────────────────────────────────────────────────────────────
-const formOpen  = ref(false);
+const formOpen = ref(false);
 const editingId = ref(null);
 
 function openCreate() {
     editingId.value = null;
-    formOpen.value  = true;
+    formOpen.value = true;
 }
 
 function openEdit(item) {
     editingId.value = item.id;
-    formOpen.value  = true;
+    formOpen.value = true;
 }
 
 function onSaved() {
@@ -126,7 +126,7 @@ function csrf() {
 function showToast(msg, type = 'success') {
     if (!msg) return;
     if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
-    if (type === 'error'   && window.showErrorToast)   return window.showErrorToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
 }
 
 // ── Ações: toggleActive / onDelete / onRestore ──────────────────────────────
@@ -134,10 +134,10 @@ async function toggleActive(item) {
     // Patch via update genérico — backend respeita "active" no crudFields.
     const url = urlFor('update', item.id);
     const res = await fetch(url, {
-        method: 'POST',  // _method=PATCH (compatível com FormRequest)
+        method: 'POST', // _method=PATCH (compatível com FormRequest)
         headers: {
             'Content-Type': 'application/json',
-            'Accept':       'application/json',
+            Accept: 'application/json',
             'X-CSRF-TOKEN': csrf(),
         },
         body: JSON.stringify({ ...crudPayloadFor(item), active: !item.active, _method: 'PATCH' }),
@@ -163,7 +163,7 @@ async function onDelete(item) {
     if (!confirm(props.t.confirm_delete ?? 'Excluir este registro?')) return;
     const res = await fetch(urlFor('destroy', item.id), {
         method: 'DELETE',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
     const json = await res.json();
     showToast(json.message, res.ok ? 'success' : 'error');
@@ -173,8 +173,8 @@ async function onDelete(item) {
 async function onRestore(item) {
     if (!confirm(props.t.confirm_restore ?? 'Restaurar este registro?')) return;
     const res = await fetch(urlFor('restore', item.id), {
-        method: 'GET',  // rota legada é GET; mantemos compatibilidade
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        method: 'GET', // rota legada é GET; mantemos compatibilidade
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
     const json = await res.json();
     showToast(json.message, res.ok ? 'success' : 'error');
@@ -188,7 +188,6 @@ const total = computed(() => props.items?.total ?? props.items?.data?.length ?? 
 <template>
     <AppLayout :title="meta.title" :breadcrumbs="breadcrumbs">
         <div class="page-catalog">
-
             <PageHeader
                 :title="meta.title"
                 :total="total"
@@ -251,7 +250,6 @@ const total = computed(() => props.items?.total ?? props.items?.data?.length ?? 
                 @delete="onDelete"
                 @restore="onRestore"
             />
-
         </div>
 
         <CatalogFormModal
@@ -272,7 +270,12 @@ const total = computed(() => props.items?.total ?? props.items?.data?.length ?? 
             :columns="columns"
             :t="t"
             @close="detailOpen = false"
-            @edit="(item) => { detailOpen = false; openEdit(item); }"
+            @edit="
+                (item) => {
+                    detailOpen = false;
+                    openEdit(item);
+                }
+            "
         />
     </AppLayout>
 </template>

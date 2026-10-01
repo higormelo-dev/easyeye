@@ -1,7 +1,7 @@
 <script setup>
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 /**
  * Ações de um usuário, iguais na UserTable e nos UserCards, por `mode`
@@ -15,7 +15,7 @@ import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
  */
 defineProps({
     user: { type: Object, required: true },
-    t:    { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['edit', 'delete', 'restore', 'toggleActive']);
@@ -32,21 +32,13 @@ const emit = defineEmits(['edit', 'delete', 'restore', 'toggleActive']);
         />
 
         <template v-else-if="user.mode === 'full'">
-            <span
-                v-if="user.is_owner"
-                class="user-owner-lock text-body-secondary"
-                :title="t.owner_locked"
-            >
+            <span v-if="user.is_owner" class="user-owner-lock text-body-secondary" :title="t.owner_locked">
                 <i class="ti ti-lock" aria-hidden="true"></i>
                 <span class="visually-hidden">{{ t.owner_locked }}</span>
             </span>
 
             <template v-else>
-                <ActionIconButton
-                    icon="ti ti-edit"
-                    :title="t.btn_edit ?? 'Editar'"
-                    @click="emit('edit', user)"
-                />
+                <ActionIconButton icon="ti ti-edit" :title="t.btn_edit ?? 'Editar'" @click="emit('edit', user)" />
                 <ActionDropdown
                     v-if="!user.is_self"
                     :title="t.more_actions ?? 'Mais ações'"
@@ -59,7 +51,7 @@ const emit = defineEmits(['edit', 'delete', 'restore', 'toggleActive']);
                             {{ user.active ? (t.btn_deactivate ?? 'Desativar') : (t.btn_activate ?? 'Ativar') }}
                         </button>
                     </li>
-                    <li><hr class="dropdown-divider"></li>
+                    <li><hr class="dropdown-divider" /></li>
                     <li>
                         <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', user)">
                             <i class="ti ti-trash me-1" aria-hidden="true"></i>{{ t.btn_delete ?? 'Excluir' }}

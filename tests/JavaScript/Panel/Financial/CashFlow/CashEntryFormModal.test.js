@@ -42,16 +42,35 @@ vi.mock('@/Components/Panel/SearchSelect.vue', () => ({
 }));
 
 const t = {
-    form_title_new: 'New entry', form_title_edit: 'Edit entry', form_type: 'Type', form_description: 'Description',
-    form_amount: 'Amount', form_date: 'Date', form_category: 'Category', form_category_none: 'No category',
-    form_status: 'Status', form_notes: 'Notes', form_save: 'Save', form_create: 'Create', form_cancel: 'Cancel',
-    form_payment_method: 'Payment method', form_payment_method_none: 'Not informed',
-    form_covenant: 'Insurance', form_covenant_none: 'None', form_required: 'required',
-    form_save_and_new: 'Save and add another', form_save_error: 'Could not save the entry.',
-    form_schedule_locked: 'Amount and method come from the schedule.', form_schedule_link: 'Edit in the schedule',
-    network_error: 'Connection failed.', session_expired: 'Session expired.',
-    form_discard_title: 'Discard changes?', form_discard_confirm: 'Discard', form_discard_keep: 'Keep editing',
-    lock_billing_claim_hint: 'Created by a claim payment.', lock_closed_period_hint: 'Period is closed.',
+    form_title_new: 'New entry',
+    form_title_edit: 'Edit entry',
+    form_type: 'Type',
+    form_description: 'Description',
+    form_amount: 'Amount',
+    form_date: 'Date',
+    form_category: 'Category',
+    form_category_none: 'No category',
+    form_status: 'Status',
+    form_notes: 'Notes',
+    form_save: 'Save',
+    form_create: 'Create',
+    form_cancel: 'Cancel',
+    form_payment_method: 'Payment method',
+    form_payment_method_none: 'Not informed',
+    form_covenant: 'Insurance',
+    form_covenant_none: 'None',
+    form_required: 'required',
+    form_save_and_new: 'Save and add another',
+    form_save_error: 'Could not save the entry.',
+    form_schedule_locked: 'Amount and method come from the schedule.',
+    form_schedule_link: 'Edit in the schedule',
+    network_error: 'Connection failed.',
+    session_expired: 'Session expired.',
+    form_discard_title: 'Discard changes?',
+    form_discard_confirm: 'Discard',
+    form_discard_keep: 'Keep editing',
+    lock_billing_claim_hint: 'Created by a claim payment.',
+    lock_closed_period_hint: 'Period is closed.',
     types: { income: 'Income', expense: 'Expense' },
     statuses: { pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled' },
 };
@@ -70,21 +89,51 @@ const paymentMethods = [
 ];
 
 const row = {
-    id: 'e1', code: 'FLC-0000000001', entry_date: '2026-06-10', description: 'Consulta Maria', type: 'income', status: 'pending',
-    amount: 180.5, category_id: 'cat-in', category_name: 'Consultas', covenant_id: 'cov-1', covenant_name: 'UNIMED',
-    payment_method: 'credit', payment_method_label: 'Crédito', origin: 'manual', has_split: false, schedule_date: null,
-    notes: 'Obs', lock_reason: null,
+    id: 'e1',
+    code: 'FLC-0000000001',
+    entry_date: '2026-06-10',
+    description: 'Consulta Maria',
+    type: 'income',
+    status: 'pending',
+    amount: 180.5,
+    category_id: 'cat-in',
+    category_name: 'Consultas',
+    covenant_id: 'cov-1',
+    covenant_name: 'UNIMED',
+    payment_method: 'credit',
+    payment_method_label: 'Crédito',
+    origin: 'manual',
+    has_split: false,
+    schedule_date: null,
+    notes: 'Obs',
+    lock_reason: null,
 };
 
 const scheduleSplitRow = {
-    ...row, id: 'e2', origin: 'schedule', has_split: true, payment_method: 'credit_cash', amount: 300, schedule_date: '2026-06-09',
+    ...row,
+    id: 'e2',
+    origin: 'schedule',
+    has_split: true,
+    payment_method: 'credit_cash',
+    amount: 300,
+    schedule_date: '2026-06-09',
 };
 
 let wrapper;
 
 function mountModal(props = {}) {
     wrapper = mount(CashEntryFormModal, {
-        props: { open: true, entry: null, categories, covenants, paymentMethods, today: '2031-01-15', canEditSchedule: true, t, ...props },
+        props: {
+            open: true,
+            entry: null,
+            categories,
+            covenants,
+            paymentMethods,
+            today: '2031-01-15',
+            canEditSchedule: true,
+            t,
+            ...props,
+        },
         attachTo: document.body,
     });
 
@@ -95,10 +144,10 @@ function jsonResponse(status, body) {
     return Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
 }
 
-const amountInput      = (w) => w.find('[data-test="amount-input"]');
+const amountInput = (w) => w.find('[data-test="amount-input"]');
 const descriptionInput = (w) => w.find('[data-test="description-input"]');
-const paymentSelect    = (w) => w.find('[data-test="payment-method-input"]');
-const statusSelect     = (w) => w.find('[data-test="status-input"]');
+const paymentSelect = (w) => w.find('[data-test="payment-method-input"]');
+const statusSelect = (w) => w.find('[data-test="status-input"]');
 const [categorySelect, covenantSelect] = [
     (w) => w.findAll('select.search-select-stub')[0],
     (w) => w.findAll('select.search-select-stub')[1],
@@ -118,7 +167,15 @@ describe('CashFlow/CashEntryFormModal — campos', () => {
         const w = mountModal();
         const labels = w.findAll('legend, label.form-label').map((el) => el.text().replace('*', '').trim());
 
-        expect(labels.slice(0, 7)).toEqual(['Type (required)', 'Amount', 'Description', 'Date', 'Payment method', 'Category', 'Status']);
+        expect(labels.slice(0, 7)).toEqual([
+            'Type (required)',
+            'Amount',
+            'Description',
+            'Date',
+            'Payment method',
+            'Category',
+            'Status',
+        ]);
     });
 
     it('novo: valor vazio com placeholder localizado (sem "0" para apagar), "hoje" do servidor e foco no tipo', async () => {
@@ -157,8 +214,16 @@ describe('CashFlow/CashEntryFormModal — campos', () => {
         const [url] = fetch.mock.calls[0];
         expect(url).toBe('/_routes/panel.financial.cash-flow.update/e1');
         expect(sentBody()).toEqual({
-            type: 'income', amount: 180.5, description: 'Consulta Maria', entry_date: '2026-06-10', payment_method: 'credit',
-            category_id: 'cat-in', status: 'paid', covenant_id: 'cov-1', notes: 'Obs', _method: 'PATCH',
+            type: 'income',
+            amount: 180.5,
+            description: 'Consulta Maria',
+            entry_date: '2026-06-10',
+            payment_method: 'credit',
+            category_id: 'cat-in',
+            status: 'paid',
+            covenant_id: 'cov-1',
+            notes: 'Obs',
+            _method: 'PATCH',
         });
         expect(w.emitted('saved')[0][0]).toMatchObject({ message: 'Saved.', entryDate: '2026-06-10', keepOpen: false });
     });
@@ -175,18 +240,36 @@ describe('CashFlow/CashEntryFormModal — campos', () => {
 
         expect(fetch.mock.calls[0][0]).toBe('/_routes/panel.financial.cash-flow.store');
         expect(sentBody()).toMatchObject({
-            entry_date: '2031-01-15', amount: 1234.5, description: 'Venda de colírio', payment_method: 'cash', covenant_id: 'cov-1',
+            entry_date: '2031-01-15',
+            amount: 1234.5,
+            description: 'Venda de colírio',
+            payment_method: 'cash',
+            covenant_id: 'cov-1',
         });
     });
 
     it('convênio/categoria inativados depois do lançamento continuam aparecendo na edição', () => {
         const w = mountModal({
-            entry: { ...row, covenant_id: 'cov-old', covenant_name: 'CONVÊNIO ANTIGO', category_id: 'cat-old', category_name: 'Antiga' },
+            entry: {
+                ...row,
+                covenant_id: 'cov-old',
+                covenant_name: 'CONVÊNIO ANTIGO',
+                category_id: 'cat-old',
+                category_name: 'Antiga',
+            },
         });
 
-        expect(covenantSelect(w).findAll('option').map((o) => o.text())).toContain('CONVÊNIO ANTIGO');
+        expect(
+            covenantSelect(w)
+                .findAll('option')
+                .map((o) => o.text()),
+        ).toContain('CONVÊNIO ANTIGO');
         expect(covenantSelect(w).element.value).toBe('cov-old');
-        expect(categorySelect(w).findAll('option').map((o) => o.text())).toContain('Antiga');
+        expect(
+            categorySelect(w)
+                .findAll('option')
+                .map((o) => o.text()),
+        ).toContain('Antiga');
     });
 
     it('trocar o tipo limpa a categoria do outro tipo e filtra as opções', async () => {
@@ -195,7 +278,9 @@ describe('CashFlow/CashEntryFormModal — campos', () => {
         await w.find('input[type="radio"][value="expense"]').trigger('change');
 
         expect(categorySelect(w).element.value).toBe('');
-        const options = categorySelect(w).findAll('option').map((o) => o.text());
+        const options = categorySelect(w)
+            .findAll('option')
+            .map((o) => o.text());
         expect(options).toContain('Aluguel');
         expect(options).not.toContain('Consultas');
     });
@@ -203,7 +288,14 @@ describe('CashFlow/CashEntryFormModal — campos', () => {
     it('rótulos vêm de `t` e todo campo tem rótulo associado', () => {
         const w = mountModal();
 
-        for (const selector of ['input[type="date"]', '[data-test="amount-input"]', '[data-test="description-input"]', '[data-test="payment-method-input"]', '[data-test="status-input"]', 'textarea']) {
+        for (const selector of [
+            'input[type="date"]',
+            '[data-test="amount-input"]',
+            '[data-test="description-input"]',
+            '[data-test="payment-method-input"]',
+            '[data-test="status-input"]',
+            'textarea',
+        ]) {
             const id = w.find(selector).attributes('id');
             expect(id, selector).toBeTruthy();
             expect(w.find(`label[for="${id}"]`).exists(), selector).toBe(true);
@@ -243,7 +335,13 @@ describe('CashFlow/CashEntryFormModal — teclado e "lançar outro"', () => {
         await w.find('[data-test="submit-another"]').trigger('click');
         await flushPromises();
 
-        expect(sentBody()).toMatchObject({ type: 'expense', amount: 50, description: 'Material de limpeza', entry_date: '2031-01-10', payment_method: 'cash' });
+        expect(sentBody()).toMatchObject({
+            type: 'expense',
+            amount: 50,
+            description: 'Material de limpeza',
+            entry_date: '2031-01-10',
+            payment_method: 'cash',
+        });
         expect(w.emitted('saved')[0][0]).toMatchObject({ keepOpen: true, entryDate: '2031-01-10' });
         expect(w.emitted('close')).toBeUndefined();
 
@@ -298,7 +396,9 @@ describe('CashFlow/CashEntryFormModal — recebimento da agenda com pagamento di
         expect(lock.text()).toContain('Amount and method come from the schedule.');
         expect(amountInput(w).attributes('aria-describedby')).toContain(lock.attributes('id'));
         expect(w.find('[data-test="schedule-link"]').text()).toBe('Edit in the schedule');
-        expect(w.find('[data-test="schedule-link"]').attributes('href')).toBe('/_routes/panel.schedules.index?date=2026-06-09');
+        expect(w.find('[data-test="schedule-link"]').attributes('href')).toBe(
+            '/_routes/panel.schedules.index?date=2026-06-09',
+        );
     });
 
     it('sem acesso à agenda: mantém a trava, sem o link', () => {
@@ -367,14 +467,16 @@ describe('CashFlow/CashEntryFormModal — datas e erros', () => {
     });
 
     it('422 com errors: erro no próprio campo (valor e data) e chave fora do formulário no alerta', async () => {
-        fetch.mockImplementationOnce(() => jsonResponse(422, {
-            message: 'Dados de validação inválidos',
-            errors: {
-                amount: ['Valor e forma só pela agenda.'],
-                entry_date: ['Caixa fechado.'],
-                billing_claim_id: ['Lançamento de guia não pode ser alterado.'],
-            },
-        }));
+        fetch.mockImplementationOnce(() =>
+            jsonResponse(422, {
+                message: 'Dados de validação inválidos',
+                errors: {
+                    amount: ['Valor e forma só pela agenda.'],
+                    entry_date: ['Caixa fechado.'],
+                    billing_claim_id: ['Lançamento de guia não pode ser alterado.'],
+                },
+            }),
+        );
         const w = mountModal({ entry: row });
 
         await w.find('form').trigger('submit');
@@ -384,12 +486,15 @@ describe('CashFlow/CashEntryFormModal — datas e erros', () => {
         expect(w.find('[data-test="entry-date-error"]').text()).toBe('Caixa fechado.');
         expect(w.find('[data-test="amount-error"]').text()).toBe('Valor e forma só pela agenda.');
         expect(amountInput(w).attributes('aria-invalid')).toBe('true');
-        expect(amountInput(w).attributes('aria-describedby')).toBe(w.find('[data-test="amount-error"]').attributes('id'));
+        expect(amountInput(w).attributes('aria-describedby')).toBe(
+            w.find('[data-test="amount-error"]').attributes('id'),
+        );
         expect(w.find('[data-test="form-error"]').text()).toContain('Lançamento de guia não pode ser alterado.');
     });
 
     it('500 mostra a mensagem genérica; 419 pede para recarregar; falha de rede avisa e reabilita', async () => {
-        fetch.mockImplementationOnce(() => jsonResponse(500, {}))
+        fetch
+            .mockImplementationOnce(() => jsonResponse(500, {}))
             .mockImplementationOnce(() => jsonResponse(419, { message: 'CSRF token mismatch.' }))
             .mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
         const w = mountModal({ entry: row });

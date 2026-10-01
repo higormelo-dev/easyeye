@@ -24,7 +24,9 @@ vi.mock('@inertiajs/vue3', async () => {
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view'],
@@ -33,18 +35,22 @@ vi.mock('@/Components/Panel/PageHeader.vue', () => ({
             <button type="button" class="to-cards" @click="$emit('set-view', 'cards')" /><slot name="actions" /></div>`,
     },
 }));
-vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { props: ['data'], template: '<nav class="pagination-stub" />' } }));
+vi.mock('@/Components/Panel/TablePagination.vue', () => ({
+    default: { props: ['data'], template: '<nav class="pagination-stub" />' },
+}));
 vi.mock('@/Pages/Panel/Financial/DoctorPayouts/DeductionRatesCard.vue', () => ({
     default: {
         props: ['rates', 'routes'],
-        template: '<section class="deductions-stub" :data-count="rates.length" :data-store="routes.deduction_rate_store" />',
+        template:
+            '<section class="deductions-stub" :data-count="rates.length" :data-store="routes.deduction_rate_store" />',
     },
 }));
 vi.mock('@/Pages/Panel/Financial/DoctorPayouts/RuleFormModal.vue', () => ({
     default: {
         props: ['open', 'rule', 'template', 'options', 'routes'],
         emits: ['close'],
-        template: '<div class="rule-modal-stub" :data-open="String(open)" :data-rule="rule?.id ?? \'\'" :data-template="template?.id ?? \'\'" />',
+        template:
+            '<div class="rule-modal-stub" :data-open="String(open)" :data-rule="rule?.id ?? \'\'" :data-template="template?.id ?? \'\'" />',
     },
 }));
 
@@ -60,14 +66,44 @@ const routes = {
 
 const RULES = [
     {
-        id: 'r1', doctor_id: null, doctor_name: null, service_type: 'consultation', item_kind: null, item_id: null, item_name: null,
-        payer_scope: 'any', covenant_id: null, covenant_name: null, calculation: 'percentage', percentage: 60, fixed_amount: null,
-        valid_from: null, valid_until: null, active: true, notes: null, is_general: true,
+        id: 'r1',
+        doctor_id: null,
+        doctor_name: null,
+        service_type: 'consultation',
+        item_kind: null,
+        item_id: null,
+        item_name: null,
+        payer_scope: 'any',
+        covenant_id: null,
+        covenant_name: null,
+        calculation: 'percentage',
+        percentage: 60,
+        fixed_amount: null,
+        valid_from: null,
+        valid_until: null,
+        active: true,
+        notes: null,
+        is_general: true,
     },
     {
-        id: 'r2', doctor_id: 'd1', doctor_name: 'Dra. Ana Lima', service_type: 'procedure', item_kind: 'procedure', item_id: 'pr1',
-        item_name: 'Facectomia', payer_scope: 'covenant', covenant_id: 'c1', covenant_name: 'Unimed', calculation: 'fixed',
-        percentage: null, fixed_amount: 350, valid_from: '2026-01-01', valid_until: '2026-12-31', active: false, notes: 'Pacote', is_general: false,
+        id: 'r2',
+        doctor_id: 'd1',
+        doctor_name: 'Dra. Ana Lima',
+        service_type: 'procedure',
+        item_kind: 'procedure',
+        item_id: 'pr1',
+        item_name: 'Facectomia',
+        payer_scope: 'covenant',
+        covenant_id: 'c1',
+        covenant_name: 'Unimed',
+        calculation: 'fixed',
+        percentage: null,
+        fixed_amount: 350,
+        valid_from: '2026-01-01',
+        valid_until: '2026-12-31',
+        active: false,
+        notes: 'Pacote',
+        is_general: false,
     },
 ];
 
@@ -134,7 +170,10 @@ describe('Financial/DoctorPayouts/Rules', () => {
 
     it('durante a visita o switch fica travado; ao terminar volta ao valor do servidor (ex.: recusado)', async () => {
         let visit = null;
-        vi.mocked(router.patch).mockImplementation((url, data, options) => { visit = options; options.onStart?.(); });
+        vi.mocked(router.patch).mockImplementation((url, data, options) => {
+            visit = options;
+            options.onStart?.();
+        });
         const w = mountPage();
 
         const toggle = w.find('[data-test="settings-visible"]');
@@ -156,7 +195,9 @@ describe('Financial/DoctorPayouts/Rules', () => {
         const toggle = w.find('[data-test="settings-visible"]');
         expect(toggle.element.checked).toBe(true);
         expect(toggle.attributes('disabled')).toBeDefined();
-        expect(w.find('[data-test="settings-admin-only"]').text()).toBe('Only administrators can perform this operation.');
+        expect(w.find('[data-test="settings-admin-only"]').text()).toBe(
+            'Only administrators can perform this operation.',
+        );
 
         await toggle.trigger('change');
         expect(router.patch).not.toHaveBeenCalled();
@@ -181,7 +222,11 @@ describe('Financial/DoctorPayouts/Rules', () => {
         );
 
         await w.find('[data-test="filter-status"]').setValue('inactive');
-        expect(router.get).toHaveBeenLastCalledWith('/doctor-payouts/rules', expect.objectContaining({ status: 'inactive' }), expect.any(Object));
+        expect(router.get).toHaveBeenLastCalledWith(
+            '/doctor-payouts/rules',
+            expect.objectContaining({ status: 'inactive' }),
+            expect.any(Object),
+        );
     });
 
     it('tabela: escopo, cálculo, vigência e situação por regra', () => {
@@ -200,7 +245,9 @@ describe('Financial/DoctorPayouts/Rules', () => {
         expect(specific.text()).toContain('Facectomia');
         expect(specific.text()).toContain('Insurance');
         expect(specific.text()).toContain('Unimed');
-        expect(specific.find('[data-test="rule-calculation"]').text()).toBe(`${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(350)} fixed`);
+        expect(specific.find('[data-test="rule-calculation"]').text()).toBe(
+            `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(350)} fixed`,
+        );
         expect(specific.text()).toContain('01/01/2026 to 31/12/2026');
         expect(specific.text()).toContain('Inactive');
     });
@@ -233,7 +280,10 @@ describe('Financial/DoctorPayouts/Rules', () => {
     });
 
     it('excluir cancelado não apaga', async () => {
-        vi.stubGlobal('confirm', vi.fn(() => false));
+        vi.stubGlobal(
+            'confirm',
+            vi.fn(() => false),
+        );
         const w = mountPage();
 
         await w.findAll('[data-test="rule-delete"]')[0].trigger('click');
@@ -242,22 +292,35 @@ describe('Financial/DoctorPayouts/Rules', () => {
     });
 
     it('divisão (E4): resumo do grupo sob o cálculo, com o nome do médico fixo (tabela e cards)', async () => {
-        const split = { ...RULES[0], id: 'r3', participants: [{ role: 'doctor', doctor_id: 'd1', percentage: 60 }, { role: 'executor', doctor_id: null, percentage: 40 }] };
+        const split = {
+            ...RULES[0],
+            id: 'r3',
+            participants: [
+                { role: 'doctor', doctor_id: 'd1', percentage: 60 },
+                { role: 'executor', doctor_id: null, percentage: 40 },
+            ],
+        };
         const w = mountPage({ rules: paginator([...RULES, split]) });
 
         const rows = w.findAll('[data-test="rule-row"]');
         expect(rows[0].find('[data-test="rule-split"]').exists()).toBe(false);
         expect(rows[1].find('[data-test="rule-split"]').exists()).toBe(false);
-        expect(rows[2].find('[data-test="rule-split"]').text()).toBe('The clinic keeps 40%. Dra. Ana Lima 60% · Performer (item doctor) 40%');
+        expect(rows[2].find('[data-test="rule-split"]').text()).toBe(
+            'The clinic keeps 40%. Dra. Ana Lima 60% · Performer (item doctor) 40%',
+        );
 
         await w.find('.to-cards').trigger('click');
         const cards = w.findAll('[data-test="rule-card"]');
-        expect(cards[2].find('[data-test="rule-split"]').text()).toBe('The clinic keeps 40%. Dra. Ana Lima 60% · Performer (item doctor) 40%');
+        expect(cards[2].find('[data-test="rule-split"]').text()).toBe(
+            'The clinic keeps 40%. Dra. Ana Lima 60% · Performer (item doctor) 40%',
+        );
         expect(cards[0].find('[data-test="rule-split"]').exists()).toBe(false);
     });
 
     it('deduções (E4): o card recebe as vigências e as rotas', () => {
-        const w = mountPage({ deduction_rates: [{ id: 'dr1', kind: 'tax', percentage: 6, valid_from: '2026-01-01', notes: null }] });
+        const w = mountPage({
+            deduction_rates: [{ id: 'dr1', kind: 'tax', percentage: 6, valid_from: '2026-01-01', notes: null }],
+        });
 
         const card = w.find('.deductions-stub');
         expect(card.attributes('data-count')).toBe('1');

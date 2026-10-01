@@ -1,37 +1,40 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import LoadingSpinner  from '@/Components/Panel/LoadingSpinner.vue';
-import StatusBadge     from '@/Components/Panel/StatusBadge.vue';
+import LoadingSpinner from '@/Components/Panel/LoadingSpinner.vue';
+import StatusBadge from '@/Components/Panel/StatusBadge.vue';
 import CardsPagination from '@/Components/Panel/CardsPagination.vue';
-import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
-    cardsUrl:      { type: String, required: true },
+    cardsUrl: { type: String, required: true },
     initialSearch: { type: String, default: '' },
-    t:             { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit   = defineEmits(['view', 'edit', 'delete', 'toggleActive']);
-const plans  = ref([]);
-const meta   = ref({ current_page: 1, last_page: 1 });
+const emit = defineEmits(['view', 'edit', 'delete', 'toggleActive']);
+const plans = ref([]);
+const meta = ref({ current_page: 1, last_page: 1 });
 const loading = ref(false);
 
 async function fetchCards(p = 1) {
     loading.value = true;
     try {
         const params = new URLSearchParams({ page: p, search: props.initialSearch });
-        const json   = await fetch(`${props.cardsUrl}?${params}`).then(r => r.json());
+        const json = await fetch(`${props.cardsUrl}?${params}`).then((r) => r.json());
         plans.value = json.data;
-        meta.value  = json.meta;
+        meta.value = json.meta;
     } finally {
         loading.value = false;
     }
 }
 
-watch(() => props.initialSearch, () => fetchCards(1));
+watch(
+    () => props.initialSearch,
+    () => fetchCards(1),
+);
 
 let removeSuccessListener;
 onMounted(() => {
@@ -59,7 +62,7 @@ onUnmounted(() => removeSuccessListener?.());
                     <div class="d-flex align-items-start gap-3">
                         <div
                             class="avatar-sm rounded-circle bg-info-subtle d-flex align-items-center justify-content-center flex-shrink-0"
-                            style="width:44px;height:44px;"
+                            style="width: 44px; height: 44px"
                         >
                             <i class="ti ti-box text-info fs-18"></i>
                         </div>
@@ -77,30 +80,19 @@ onUnmounted(() => removeSuccessListener?.());
                                     <strong class="fw-semibold text-body">{{ p.price }}</strong>
                                     <span class="ms-1 badge badge-soft-info rounded fs-11">{{ p.billing_cycle }}</span>
                                 </div>
-                                <div v-if="p.description" class="mt-1 text-muted" style="font-size:.8rem;">
+                                <div v-if="p.description" class="mt-1 text-muted" style="font-size: 0.8rem">
                                     {{ p.description }}
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <hr class="my-2">
+                    <hr class="my-2" />
 
                     <ActionIconGroup align="end" gap="tight">
-                        <ActionIconButton
-                            icon="ti ti-eye"
-                            :title="t.action_view"
-                            @click="$emit('view', p.id)"
-                        />
-                        <ActionIconButton
-                            icon="ti ti-edit"
-                            :title="t.action_edit"
-                            @click="$emit('edit', p.id)"
-                        />
-                        <ActionDropdown
-                            btn-class="ee-action-icon ee-action-icon--default"
-                            icon="ti ti-dots-vertical"
-                        >
+                        <ActionIconButton icon="ti ti-eye" :title="t.action_view" @click="$emit('view', p.id)" />
+                        <ActionIconButton icon="ti ti-edit" :title="t.action_edit" @click="$emit('edit', p.id)" />
+                        <ActionDropdown btn-class="ee-action-icon ee-action-icon--default" icon="ti ti-dots-vertical">
                             <li>
                                 <button class="dropdown-item rounded-1" @click="$emit('toggleActive', p.id, p.active)">
                                     <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"></i>

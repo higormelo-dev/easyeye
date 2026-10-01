@@ -12,15 +12,28 @@ vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
     default: { template: '<div class="dd"><slot name="trigger" /><slot /></div>' },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
-    default: { props: ['title', 'icon', 'href'], emits: ['click'], template: '<button type="button" :title="title" :data-href="href" @click="$emit(\'click\')" />' },
+    default: {
+        props: ['title', 'icon', 'href'],
+        emits: ['click'],
+        template: '<button type="button" :title="title" :data-href="href" @click="$emit(\'click\')" />',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_name: 'Nome', col_phone: 'Telefone', col_record: 'CRM', col_email: 'E-mail',
-    col_created_at: 'Cadastro', col_code: 'Código', sort_by: 'Ordenar por :column',
-    action_view: 'Visualizar', action_work_schedule: 'Horários de atendimento', action_edit: 'Editar',
-    action_delete: 'Excluir', whatsapp: 'WhatsApp', empty_list: 'Nenhum médico encontrado.',
+    col_name: 'Nome',
+    col_phone: 'Telefone',
+    col_record: 'CRM',
+    col_email: 'E-mail',
+    col_created_at: 'Cadastro',
+    col_code: 'Código',
+    sort_by: 'Ordenar por :column',
+    action_view: 'Visualizar',
+    action_work_schedule: 'Horários de atendimento',
+    action_edit: 'Editar',
+    action_delete: 'Excluir',
+    whatsapp: 'WhatsApp',
+    empty_list: 'Nenhum médico encontrado.',
 };
 
 let wrapper;
@@ -30,10 +43,21 @@ afterEach(() => wrapper?.unmount());
 
 function doctor(overrides = {}) {
     return {
-        id: 'd1', code: 'MED-1', full_name: 'DRA ANA', record: '12345', record_specialty: 'RETINA',
-        email: 'ana@clinica.test', cellphone: '(61) 99999-8888', whatsapp: true, color: '#ff0000',
-        active: true, created_at: '01/09/2026', photo_url: '/img.png',
-        work_schedule_url: '/doctors/d1/work-schedule', mode: 'full', ...overrides,
+        id: 'd1',
+        code: 'MED-1',
+        full_name: 'DRA ANA',
+        record: '12345',
+        record_specialty: 'RETINA',
+        email: 'ana@clinica.test',
+        cellphone: '(61) 99999-8888',
+        whatsapp: true,
+        color: '#ff0000',
+        active: true,
+        created_at: '01/09/2026',
+        photo_url: '/img.png',
+        work_schedule_url: '/doctors/d1/work-schedule',
+        mode: 'full',
+        ...overrides,
     };
 }
 
@@ -69,7 +93,10 @@ describe('DoctorTable', () => {
     });
 
     it('respeita a ordem de colunas salva no navegador', () => {
-        window.localStorage.setItem('doc_table_columns_order', JSON.stringify(['codigo', 'nome', 'telefone', 'crm', 'email', 'cadastro']));
+        window.localStorage.setItem(
+            'doc_table_columns_order',
+            JSON.stringify(['codigo', 'nome', 'telefone', 'crm', 'email', 'cadastro']),
+        );
         const w = mountTable();
 
         expect(headerLabels(w).slice(0, 2)).toEqual(['Código', 'Nome']);
@@ -95,7 +122,9 @@ describe('DoctorTable', () => {
         const w = mountTable([doctor({ mode: 'full' })]);
 
         expect(w.find('button[title="Visualizar"]').exists()).toBe(true);
-        expect(w.find('button[title="Horários de atendimento"]').attributes('data-href')).toBe('/doctors/d1/work-schedule');
+        expect(w.find('button[title="Horários de atendimento"]').attributes('data-href')).toBe(
+            '/doctors/d1/work-schedule',
+        );
         expect(w.text()).toContain('Editar');
         expect(w.text()).toContain('Excluir');
     });

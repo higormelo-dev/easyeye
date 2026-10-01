@@ -28,12 +28,12 @@ function submit() {
     <Head title="Entrar — Portal do Paciente" />
 
     <div class="d-flex align-items-center justify-content-center min-vh-100 bg-light px-3">
-        <div class="card shadow-sm border-0" style="max-width: 420px; width: 100%;">
+        <div class="card shadow-sm border-0" style="max-width: 420px; width: 100%">
             <div class="card-body p-4 p-md-5">
                 <div class="text-center mb-4">
                     <div
                         class="rounded-circle d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary mb-3"
-                        style="width:56px;height:56px;"
+                        style="width: 56px; height: 56px"
                     >
                         <i class="ti ti-heart-handshake fs-4"></i>
                     </div>
@@ -61,7 +61,7 @@ function submit() {
                                 autocomplete="username"
                                 autofocus
                                 required
-                            >
+                            />
                         </div>
                     </div>
 
@@ -76,7 +76,7 @@ function submit() {
                                 :class="{ 'is-invalid': form.errors.password }"
                                 autocomplete="current-password"
                                 required
-                            >
+                            />
                             <button
                                 type="button"
                                 class="btn btn-light"
@@ -93,12 +93,7 @@ function submit() {
 
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="form-check mb-0">
-                            <input
-                                v-model="form.remember"
-                                type="checkbox"
-                                id="remember"
-                                class="form-check-input"
-                            >
+                            <input v-model="form.remember" type="checkbox" id="remember" class="form-check-input" />
                             <label for="remember" class="form-check-label">Lembrar de mim</label>
                         </div>
                         <a :href="route('patient-portal.password.request')" class="small">Esqueci minha senha</a>
@@ -122,7 +117,11 @@ function submit() {
     animation: eeSpin 1s linear infinite;
 }
 @keyframes eeSpin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 </style>

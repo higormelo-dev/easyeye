@@ -10,7 +10,9 @@ import SuppliersIndex from '@/Pages/Panel/Stock/Suppliers/Index.vue';
  * ordenação que preservam uns aos outros.
  */
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: { title: String, total: Number, totalLabel: String, view: String, showViewToggle: Boolean },
@@ -27,7 +29,8 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierTable.vue', () => ({
@@ -44,12 +47,21 @@ vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierTable.vue', () => ({
 vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierCards.vue', () => ({
     default: { props: ['items', 't'], template: '<div class="cards-stub">{{ items.data.length }}</div>' },
 }));
-vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierFormModal.vue', () => ({ default: { props: ['open', 'item'], template: '<div />' } }));
+vi.mock('@/Pages/Panel/Stock/Suppliers/SupplierFormModal.vue', () => ({
+    default: { props: ['open', 'item'], template: '<div />' },
+}));
 
 const t = {
-    page_title: 'Suppliers', total_label: 'Total:', btn_purchase_orders: 'Purchase orders', btn_new: 'New supplier',
-    search_placeholder: 'Search by name...', filter_status_label: 'Filter by status', filter_status_all: 'All',
-    filter_status_active: 'Active', filter_status_inactive: 'Inactive', confirm_delete: 'Delete supplier ":name"?',
+    page_title: 'Suppliers',
+    total_label: 'Total:',
+    btn_purchase_orders: 'Purchase orders',
+    btn_new: 'New supplier',
+    search_placeholder: 'Search by name...',
+    filter_status_label: 'Filter by status',
+    filter_status_all: 'All',
+    filter_status_active: 'Active',
+    filter_status_inactive: 'Inactive',
+    confirm_delete: 'Delete supplier ":name"?',
 };
 
 const routes = { index: '/s', store: '/s', update: '/s/__ID__', destroy: '/s/__ID__', purchase_orders_index: '/po' };
@@ -70,7 +82,13 @@ afterEach(() => {
 function mountPage(filters = { search: '', status: 'all', sort: 'name', direction: 'asc' }) {
     wrapper = mount(SuppliersIndex, {
         props: {
-            items: { data: [{ id: 's1', name: 'Alfa' }, { id: 's2', name: 'Beta' }], total: 42 },
+            items: {
+                data: [
+                    { id: 's1', name: 'Alfa' },
+                    { id: 's2', name: 'Beta' },
+                ],
+                total: 42,
+            },
             filters,
             routes,
             t,

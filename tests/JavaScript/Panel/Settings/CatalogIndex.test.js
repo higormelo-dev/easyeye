@@ -29,7 +29,8 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({ default: { template: '<div><slot /></div>' } }));
@@ -61,7 +62,15 @@ afterEach(() => {
 });
 
 function row(i) {
-    return { id: `id-${i}`, code: `CVP-${i}`, name: `CONVÊNIO ${i}`, active: true, deleted: false, is_global: false, mode: 'full' };
+    return {
+        id: `id-${i}`,
+        code: `CVP-${i}`,
+        name: `CONVÊNIO ${i}`,
+        active: true,
+        deleted: false,
+        is_global: false,
+        mode: 'full',
+    };
 }
 
 function paginator(rows, overrides = {}) {
@@ -116,15 +125,20 @@ describe('Catalog/Index — layout igual à tela de pacientes', () => {
 
     it('exibe a paginação traduzida quando há mais de uma página', () => {
         const rows = Array.from({ length: 15 }, (_, i) => row(i + 1));
-        const w = mountWith(paginator(rows, {
-            last_page: 55, to: 15, total: 812, next_page_url: '/catalog?page=2',
-            links: [
-                { url: null, label: '&laquo;', active: false },
-                { url: '/catalog?page=1', label: '1', active: true },
-                { url: '/catalog?page=2', label: '2', active: false },
-                { url: '/catalog?page=2', label: '&raquo;', active: false },
-            ],
-        }));
+        const w = mountWith(
+            paginator(rows, {
+                last_page: 55,
+                to: 15,
+                total: 812,
+                next_page_url: '/catalog?page=2',
+                links: [
+                    { url: null, label: '&laquo;', active: false },
+                    { url: '/catalog?page=1', label: '1', active: true },
+                    { url: '/catalog?page=2', label: '2', active: false },
+                    { url: '/catalog?page=2', label: '&raquo;', active: false },
+                ],
+            }),
+        );
 
         expect(w.text()).toContain('Exibindo 1–15');
         expect(w.text()).toContain('de 812 registros');

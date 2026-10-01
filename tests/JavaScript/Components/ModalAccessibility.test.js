@@ -19,7 +19,7 @@ describe.each([
         });
 
         const dialog = document.querySelector('[role="dialog"]');
-        const title  = document.getElementById(dialog.getAttribute('aria-labelledby'));
+        const title = document.getElementById(dialog.getAttribute('aria-labelledby'));
 
         expect(dialog.getAttribute('aria-modal')).toBe('true');
         expect(title.textContent).toContain('Excluir lançamento');
@@ -57,7 +57,11 @@ describe.each([
         document.body.appendChild(opener);
         opener.focus();
 
-        wrapper = mount(Component, { attachTo: document.body, props: { open: false }, slots: { header: '<h5>T</h5>' } });
+        wrapper = mount(Component, {
+            attachTo: document.body,
+            props: { open: false },
+            slots: { header: '<h5>T</h5>' },
+        });
         await wrapper.setProps({ open: true });
         document.querySelector('.btn-close').focus();
 
@@ -71,7 +75,7 @@ describe.each([
 
     it('não rouba o foco se a página já o moveu para outro lugar', async () => {
         const opener = document.createElement('button');
-        const other  = document.createElement('input');
+        const other = document.createElement('input');
         document.body.append(opener, other);
         opener.focus();
 

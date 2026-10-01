@@ -18,8 +18,8 @@ import { router } from '@inertiajs/vue3';
  * @param {{ isDirty: () => boolean, message: () => string }} options
  */
 export function useUnsavedChangesGuard({ isDirty, message }) {
-    let bypassing   = false;
-    let stopBefore  = null;
+    let bypassing = false;
+    let stopBefore = null;
 
     function onBefore(event) {
         const visit = event?.detail?.visit;

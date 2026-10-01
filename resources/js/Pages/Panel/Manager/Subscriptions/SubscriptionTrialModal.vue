@@ -1,41 +1,47 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import SearchSelect from "@/Components/Panel/SearchSelect.vue";
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    open:         { type: Boolean, required: true },
-    subscription: { type: Object,  default: null },
-    plans:        { type: Array,   default: () => [] },
-    trialDays:    { type: Number,  default: 14 },
-    t:            { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    subscription: { type: Object, default: null },
+    plans: { type: Array, default: () => [] },
+    trialDays: { type: Number, default: 14 },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const saving = ref(false);
-const error  = ref('');
-const form   = ref({ plan_id: '', days: '' });
+const error = ref('');
+const form = ref({ plan_id: '', days: '' });
 
-watch(() => props.open, (val) => {
-    if (val) { form.value = { plan_id: '', days: '' }; error.value = ''; }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val) {
+            form.value = { plan_id: '', days: '' };
+            error.value = '';
+        }
+    },
+);
 
 async function submit() {
     saving.value = true;
-    error.value  = '';
+    error.value = '';
     try {
         const res = await fetch(route('manager.subscriptions.trial'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
             body: JSON.stringify({
                 entity_id: props.subscription?.entity_id,
-                plan_id:   form.value.plan_id || undefined,
-                days:      form.value.days    ? Number(form.value.days) : undefined,
+                plan_id: form.value.plan_id || undefined,
+                days: form.value.days ? Number(form.value.days) : undefined,
             }),
         });
 
@@ -61,16 +67,13 @@ async function submit() {
             v-if="open"
             class="modal fade show d-block"
             tabindex="-1"
-            style="background:rgba(0,0,0,.4)"
+            style="background: rgba(0, 0, 0, 0.4)"
             @click.self="$emit('close')"
         >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-
                     <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="ti ti-clock-play me-2 text-info"></i>{{ t.trial_title }}
-                        </h5>
+                        <h5 class="modal-title"><i class="ti ti-clock-play me-2 text-info"></i>{{ t.trial_title }}</h5>
                         <button type="button" class="btn-close" @click="$emit('close')"></button>
                     </div>
 
@@ -97,7 +100,7 @@ async function submit() {
                                 max="365"
                                 class="form-control"
                                 :placeholder="trialDays"
-                            >
+                            />
                             <div class="form-text">
                                 {{ t.trial_days_hint?.replace(':days', trialDays) }}
                             </div>
@@ -110,13 +113,14 @@ async function submit() {
                     </div>
 
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" @click="$emit('close')">{{ t.btn_cancel }}</button>
+                        <button type="button" class="btn btn-secondary" @click="$emit('close')">
+                            {{ t.btn_cancel }}
+                        </button>
                         <button type="button" class="btn btn-info text-white" :disabled="saving" @click="submit">
                             <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
                             {{ t.trial_btn }}
                         </button>
                     </div>
-
                 </div>
             </div>
         </div>

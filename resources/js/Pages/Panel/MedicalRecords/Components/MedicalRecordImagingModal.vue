@@ -8,45 +8,48 @@
 import { ref, watch } from 'vue';
 
 const props = defineProps({
-    show:      { type: Boolean, default: false },
-    fetchUrl:  { type: String, required: true },
+    show: { type: Boolean, default: false },
+    fetchUrl: { type: String, required: true },
     moduleUrl: { type: String, default: '' },
-    t:         { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
 
-const loading  = ref(false);
-const error    = ref('');
-const exams    = ref([]);
+const loading = ref(false);
+const error = ref('');
+const exams = ref([]);
 const selected = ref(null); // exame em visualização ampliada
-const loaded   = ref(false);
+const loaded = ref(false);
 
 function tt(key, fallback) {
     const v = props.t?.[key];
     return typeof v === 'string' && v !== '' ? v : fallback;
 }
 
-watch(() => props.show, async (open) => {
-    if (!open) return;
-    selected.value = null;
-    if (loaded.value) return; // URLs presigned valem 2h — não refazer a cada abertura
+watch(
+    () => props.show,
+    async (open) => {
+        if (!open) return;
+        selected.value = null;
+        if (loaded.value) return; // URLs presigned valem 2h — não refazer a cada abertura
 
-    loading.value = true;
-    error.value = '';
-    try {
-        const res = await fetch(props.fetchUrl, { headers: { Accept: 'application/json' } });
-        if (!res.ok) throw new Error(String(res.status));
-        const json = await res.json();
-        exams.value = Array.isArray(json.exams) ? json.exams : [];
-        loaded.value = true;
-        if (exams.value.length) selected.value = exams.value[0];
-    } catch {
-        error.value = tt('imaging_error', 'Não foi possível carregar os exames. Tente novamente.');
-    } finally {
-        loading.value = false;
-    }
-});
+        loading.value = true;
+        error.value = '';
+        try {
+            const res = await fetch(props.fetchUrl, { headers: { Accept: 'application/json' } });
+            if (!res.ok) throw new Error(String(res.status));
+            const json = await res.json();
+            exams.value = Array.isArray(json.exams) ? json.exams : [];
+            loaded.value = true;
+            if (exams.value.length) selected.value = exams.value[0];
+        } catch {
+            error.value = tt('imaging_error', 'Não foi possível carregar os exames. Tente novamente.');
+        } finally {
+            loading.value = false;
+        }
+    },
+);
 
 function pick(exam) {
     selected.value = exam;
@@ -55,17 +58,30 @@ function pick(exam) {
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="modal fade show d-block" style="background: rgba(15, 23, 42, .45);"
-             role="dialog" aria-modal="true" @click.self="emit('close')">
+        <div
+            v-if="show"
+            class="modal fade show d-block"
+            style="background: rgba(15, 23, 42, 0.45)"
+            role="dialog"
+            aria-modal="true"
+            @click.self="emit('close')"
+        >
             <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
                         <h5 class="modal-title">
-                            <i class="fas fa-x-ray me-2 text-primary"></i>{{ tt('imaging_title', 'Exames de imagem do paciente') }}
+                            <i class="fas fa-x-ray me-2 text-primary"></i
+                            >{{ tt('imaging_title', 'Exames de imagem do paciente') }}
                         </h5>
-                        <a v-if="moduleUrl" :href="moduleUrl" target="_blank" rel="noopener"
-                           class="btn btn-outline-secondary btn-sm ms-auto me-2">
-                            <i class="fas fa-external-link-alt me-1"></i>{{ tt('imaging_open_module', 'Abrir módulo de imagens') }}
+                        <a
+                            v-if="moduleUrl"
+                            :href="moduleUrl"
+                            target="_blank"
+                            rel="noopener"
+                            class="btn btn-outline-secondary btn-sm ms-auto me-2"
+                        >
+                            <i class="fas fa-external-link-alt me-1"></i
+                            >{{ tt('imaging_open_module', 'Abrir módulo de imagens') }}
                         </a>
                         <button type="button" class="btn-close" @click="emit('close')"></button>
                     </div>
@@ -90,20 +106,47 @@ function pick(exam) {
                             <div class="col-12 col-lg-8">
                                 <div v-if="selected" class="border rounded p-2 bg-light h-100 d-flex flex-column">
                                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2 small">
-                                        <span class="fw-semibold">{{ selected.exam_type ?? tt('imaging_exam', 'Exame') }}</span>
-                                        <span class="badge bg-primary-subtle text-primary border border-primary">{{ selected.laterality }}</span>
-                                        <span v-if="selected.performed_at" class="text-muted">{{ selected.performed_at }}</span>
-                                        <span v-if="selected.source" class="badge bg-secondary-subtle text-secondary border border-secondary">{{ selected.source }}</span>
-                                        <span v-for="cid in selected.diagnosis" :key="cid"
-                                              class="badge bg-info-subtle text-info border border-info">{{ cid }}</span>
-                                        <a v-if="selected.original_url" :href="selected.original_url" target="_blank" rel="noopener"
-                                           class="btn btn-outline-secondary btn-sm ms-auto py-0">
-                                            <i class="fas fa-download me-1"></i>{{ selected.is_pdf ? 'PDF' : tt('imaging_original', 'Original') }}
+                                        <span class="fw-semibold">{{
+                                            selected.exam_type ?? tt('imaging_exam', 'Exame')
+                                        }}</span>
+                                        <span class="badge bg-primary-subtle text-primary border border-primary">{{
+                                            selected.laterality
+                                        }}</span>
+                                        <span v-if="selected.performed_at" class="text-muted">{{
+                                            selected.performed_at
+                                        }}</span>
+                                        <span
+                                            v-if="selected.source"
+                                            class="badge bg-secondary-subtle text-secondary border border-secondary"
+                                            >{{ selected.source }}</span
+                                        >
+                                        <span
+                                            v-for="cid in selected.diagnosis"
+                                            :key="cid"
+                                            class="badge bg-info-subtle text-info border border-info"
+                                            >{{ cid }}</span
+                                        >
+                                        <a
+                                            v-if="selected.original_url"
+                                            :href="selected.original_url"
+                                            target="_blank"
+                                            rel="noopener"
+                                            class="btn btn-outline-secondary btn-sm ms-auto py-0"
+                                        >
+                                            <i class="fas fa-download me-1"></i
+                                            >{{ selected.is_pdf ? 'PDF' : tt('imaging_original', 'Original') }}
                                         </a>
                                     </div>
-                                    <div class="flex-grow-1 d-flex align-items-center justify-content-center overflow-hidden">
-                                        <img v-if="selected.display_url" :src="selected.display_url" :alt="selected.exam_type ?? 'Exame'"
-                                             class="img-fluid rounded" style="max-height: 62vh; object-fit: contain;">
+                                    <div
+                                        class="flex-grow-1 d-flex align-items-center justify-content-center overflow-hidden"
+                                    >
+                                        <img
+                                            v-if="selected.display_url"
+                                            :src="selected.display_url"
+                                            :alt="selected.exam_type ?? 'Exame'"
+                                            class="img-fluid rounded"
+                                            style="max-height: 62vh; object-fit: contain"
+                                        />
                                         <div v-else class="text-muted small py-5">
                                             {{ tt('imaging_no_preview', 'Sem visualização — use o arquivo original.') }}
                                         </div>
@@ -113,22 +156,40 @@ function pick(exam) {
 
                             <!-- Lista/miniaturas -->
                             <div class="col-12 col-lg-4">
-                                <div class="list-group overflow-auto" style="max-height: 66vh;">
-                                    <button v-for="exam in exams" :key="exam.id" type="button"
-                                            class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2"
-                                            :class="{ active: selected && selected.id === exam.id }"
-                                            @click="pick(exam)">
-                                        <img v-if="exam.thumb_url" :src="exam.thumb_url" alt=""
-                                             class="rounded border flex-shrink-0"
-                                             style="width: 56px; height: 42px; object-fit: cover;">
-                                        <span v-else class="rounded border bg-light d-inline-flex align-items-center justify-content-center flex-shrink-0"
-                                              style="width: 56px; height: 42px;"><i class="fas fa-file-medical text-muted"></i></span>
+                                <div class="list-group overflow-auto" style="max-height: 66vh">
+                                    <button
+                                        v-for="exam in exams"
+                                        :key="exam.id"
+                                        type="button"
+                                        class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2"
+                                        :class="{ active: selected && selected.id === exam.id }"
+                                        @click="pick(exam)"
+                                    >
+                                        <img
+                                            v-if="exam.thumb_url"
+                                            :src="exam.thumb_url"
+                                            alt=""
+                                            class="rounded border flex-shrink-0"
+                                            style="width: 56px; height: 42px; object-fit: cover"
+                                        />
+                                        <span
+                                            v-else
+                                            class="rounded border bg-light d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                                            style="width: 56px; height: 42px"
+                                            ><i class="fas fa-file-medical text-muted"></i
+                                        ></span>
                                         <span class="text-start small lh-sm">
-                                            <span class="d-block fw-semibold text-truncate" style="max-width: 180px;">
+                                            <span class="d-block fw-semibold text-truncate" style="max-width: 180px">
                                                 {{ exam.exam_type ?? tt('imaging_exam', 'Exame') }}
                                             </span>
-                                            <span class="d-block" :class="selected && selected.id === exam.id ? '' : 'text-muted'">
-                                                {{ exam.laterality }}<template v-if="exam.performed_at"> · {{ exam.performed_at }}</template>
+                                            <span
+                                                class="d-block"
+                                                :class="selected && selected.id === exam.id ? '' : 'text-muted'"
+                                            >
+                                                {{ exam.laterality
+                                                }}<template v-if="exam.performed_at">
+                                                    · {{ exam.performed_at }}</template
+                                                >
                                             </span>
                                         </span>
                                     </button>

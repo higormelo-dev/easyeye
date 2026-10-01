@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import StatusBadge      from '@/Components/Panel/StatusBadge.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import StatusBadge from '@/Components/Panel/StatusBadge.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
 /**
@@ -10,17 +10,19 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * MESMO paginator (a página só alterna a vista).
  */
 const props = defineProps({
-    rules:     { type: Array,  default: () => [] },
-    doctors:   { type: Array,  default: () => [] },   // nomes dos médicos fixos na divisão (E4)
-    t:         { type: Object, default: () => ({}) },
+    rules: { type: Array, default: () => [] },
+    doctors: { type: Array, default: () => [] }, // nomes dos médicos fixos na divisão (E4)
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
 const emit = defineEmits(['edit', 'duplicate', 'delete']);
 
-const { ruleLabel, validityLabel, serviceTypeLabel, serviceTypeIcon, splitSummary } = useDoctorPayoutFormat(() => props.t);
+const { ruleLabel, validityLabel, serviceTypeLabel, serviceTypeIcon, splitSummary } = useDoctorPayoutFormat(
+    () => props.t,
+);
 
-const rows   = computed(() => props.rules ?? []);
+const rows = computed(() => props.rules ?? []);
 const splits = computed(() => new Map(rows.value.map((rule) => [rule.id, splitSummary(rule, props.doctors)])));
 
 const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.payer_scope;
@@ -33,12 +35,23 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
     </div>
 
     <ul v-else class="row g-3 list-unstyled mb-0" :aria-label="t.rules_title">
-        <li v-for="rule in rows" :key="rule.id" class="col-12 col-sm-6 col-xl-4" data-test="rule-card" :data-id="rule.id">
+        <li
+            v-for="rule in rows"
+            :key="rule.id"
+            class="col-12 col-sm-6 col-xl-4"
+            data-test="rule-card"
+            :data-id="rule.id"
+        >
             <div class="card card-body h-100 mb-0">
                 <div class="d-flex align-items-start justify-content-between gap-2">
                     <div>
                         <p class="fw-semibold mb-0">
-                            <i :class="serviceTypeIcon(rule.service_type)" class="me-1 text-primary" aria-hidden="true"></i>{{ serviceTypeLabel(rule.service_type) }}
+                            <i
+                                :class="serviceTypeIcon(rule.service_type)"
+                                class="me-1 text-primary"
+                                aria-hidden="true"
+                            ></i
+                            >{{ serviceTypeLabel(rule.service_type) }}
                         </p>
                         <p class="fs-5 fw-bold mb-0 text-body" data-test="rule-calculation">{{ ruleLabel(rule) }}</p>
                         <p v-if="splits.get(rule.id)" class="small text-muted mb-0" data-test="rule-split">
@@ -59,7 +72,10 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
                     </div>
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_scope_payer }}:</dt>
-                        <dd class="mb-0 text-break">{{ payerLabel(rule) }}<template v-if="rule.covenant_name"> · {{ rule.covenant_name }}</template></dd>
+                        <dd class="mb-0 text-break">
+                            {{ payerLabel(rule)
+                            }}<template v-if="rule.covenant_name"> · {{ rule.covenant_name }}</template>
+                        </dd>
                     </div>
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_validity }}:</dt>
@@ -71,12 +87,28 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end" gap="tight">
-                    <ActionIconButton icon="ti ti-edit" :title="t.rules_edit" data-test="rule-edit" @click="emit('edit', rule)" />
-                    <ActionIconButton icon="ti ti-copy" :title="t.rules_duplicate" data-test="rule-duplicate" @click="emit('duplicate', rule)" />
-                    <ActionIconButton icon="ti ti-trash" variant="danger" :title="t.rules_delete" data-test="rule-delete" @click="emit('delete', rule)" />
+                    <ActionIconButton
+                        icon="ti ti-edit"
+                        :title="t.rules_edit"
+                        data-test="rule-edit"
+                        @click="emit('edit', rule)"
+                    />
+                    <ActionIconButton
+                        icon="ti ti-copy"
+                        :title="t.rules_duplicate"
+                        data-test="rule-duplicate"
+                        @click="emit('duplicate', rule)"
+                    />
+                    <ActionIconButton
+                        icon="ti ti-trash"
+                        variant="danger"
+                        :title="t.rules_delete"
+                        data-test="rule-delete"
+                        @click="emit('delete', rule)"
+                    />
                 </ActionIconGroup>
             </div>
         </li>

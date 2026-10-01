@@ -1,19 +1,19 @@
 <script setup>
 import { computed, ref, useId, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
-import AppLayout        from '@/Layouts/AppLayout.vue';
-import PageHeader       from '@/Components/Panel/PageHeader.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import ReportExportMenu from '@/Pages/Panel/Financial/Reports/ReportExportMenu.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import AllocateReceiptModal from './AllocateReceiptModal.vue';
-import ApuracaoFilters  from './ApuracaoFilters.vue';
-import ApuracaoKpis     from './ApuracaoKpis.vue';
-import ApuracaoSummary  from './ApuracaoSummary.vue';
+import ApuracaoFilters from './ApuracaoFilters.vue';
+import ApuracaoKpis from './ApuracaoKpis.vue';
+import ApuracaoSummary from './ApuracaoSummary.vue';
 import ClosePeriodModal from './ClosePeriodModal.vue';
-import FlashMessage     from './FlashMessage.vue';
+import FlashMessage from './FlashMessage.vue';
 import PayoutItemsTable from './PayoutItemsTable.vue';
-import PayoutTabs       from './PayoutTabs.vue';
+import PayoutTabs from './PayoutTabs.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
 /**
@@ -24,30 +24,30 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * carrega os filtros nos links.
  */
 const props = defineProps({
-    breadcrumbs:     { type: Array,  default: () => [] },
-    tabs:            { type: Object, default: () => ({}) },
-    filters:         { type: Object, default: () => ({}) },   // { doctor, from, to, status, service_type, receipt, warning }
-    period_capped:   { type: Object, default: null },         // { requested_from, requested_to, max_days }
-    today:           { type: String, default: '' },
-    options:         { type: Object, default: () => ({ doctors: [] }) },
+    breadcrumbs: { type: Array, default: () => [] },
+    tabs: { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) }, // { doctor, from, to, status, service_type, receipt, warning }
+    period_capped: { type: Object, default: null }, // { requested_from, requested_to, max_days }
+    today: { type: String, default: '' },
+    options: { type: Object, default: () => ({ doctors: [] }) },
     selected_doctor: { type: Object, default: null },
-    kpis:            { type: Object, default: null },
-    summary:         { type: Array,  default: null },
-    items:           { type: Object, default: null },         // paginator Laravel
-    close_preview:   { type: Object, default: null },
-    unassigned_exams: { type: Number, default: 0 },        // exames do equipamento sem médico no período
-    manual_receipts: { type: Array,  default: null },         // receitas avulsas com saldo (carregadas sob demanda)
-    reason_limits:   { type: Object, default: () => ({ min: 10, max: 1000 }) },
-    routes:          { type: Object, required: true },        // { index, export, close, rules, closing_show, allocate, allocation }
-    t:               { type: Object, default: () => ({}) },
-    shared:          { type: Object, default: () => ({}) },
+    kpis: { type: Object, default: null },
+    summary: { type: Array, default: null },
+    items: { type: Object, default: null }, // paginator Laravel
+    close_preview: { type: Object, default: null },
+    unassigned_exams: { type: Number, default: 0 }, // exames do equipamento sem médico no período
+    manual_receipts: { type: Array, default: null }, // receitas avulsas com saldo (carregadas sob demanda)
+    reason_limits: { type: Object, default: () => ({ min: 10, max: 1000 }) },
+    routes: { type: Object, required: true }, // { index, export, close, rules, closing_show, allocate, allocation }
+    t: { type: Object, default: () => ({}) },
+    shared: { type: Object, default: () => ({}) },
 });
 
 const { tx, date, number, countText } = useDoctorPayoutFormat(() => props.t);
 
 const uid = useId();
 const ids = {
-    closeHint:  `dp-close-hint-${uid}`,
+    closeHint: `dp-close-hint-${uid}`,
     itemsTitle: `dp-items-title-${uid}`,
 };
 
@@ -55,20 +55,28 @@ const ids = {
 const loading = ref(false);
 
 function applyFilters(next) {
-    router.get(props.routes.index, {
-        doctor:       next.doctor ?? '',
-        from:         next.from ?? '',
-        to:           next.to ?? '',
-        status:       next.status ?? '',
-        service_type: next.service_type ?? '',
-        receipt:      next.receipt ?? '',
-        warning:      next.warning ?? '',
-    }, {
-        preserveState:  true,
-        preserveScroll: true,
-        onStart:        () => { loading.value = true; },
-        onFinish:       () => { loading.value = false; },
-    });
+    router.get(
+        props.routes.index,
+        {
+            doctor: next.doctor ?? '',
+            from: next.from ?? '',
+            to: next.to ?? '',
+            status: next.status ?? '',
+            service_type: next.service_type ?? '',
+            receipt: next.receipt ?? '',
+            warning: next.warning ?? '',
+        },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            onStart: () => {
+                loading.value = true;
+            },
+            onFinish: () => {
+                loading.value = false;
+            },
+        },
+    );
 }
 
 /** Lista filtrada pelos mesmos filtros de período/médico + os informados. */
@@ -77,18 +85,23 @@ function showItems(patch) {
 }
 
 /** Itens que bloqueiam o fechamento (sem regra): o KPI e o alerta levam a eles. */
-const noRuleUrl = computed(() => `${props.routes.index}?${new URLSearchParams({
-    doctor:  props.filters.doctor ?? '',
-    from:    props.filters.from ?? '',
-    to:      props.filters.to ?? '',
-    status:  'pending',
-    warning: 'no_rule',
-}).toString()}`);
+const noRuleUrl = computed(
+    () =>
+        `${props.routes.index}?${new URLSearchParams({
+            doctor: props.filters.doctor ?? '',
+            from: props.filters.from ?? '',
+            to: props.filters.to ?? '',
+            status: 'pending',
+            warning: 'no_rule',
+        }).toString()}`,
+);
 
 /** Período anterior ao último fechamento: só consulta (nada a liberar aqui). */
-const historicalText = computed(() => (
-    props.close_preview?.historical ? tx('historical_period', { date: date(props.close_preview.last_closed_until) }) : ''
-));
+const historicalText = computed(() =>
+    props.close_preview?.historical
+        ? tx('historical_period', { date: date(props.close_preview.last_closed_until) })
+        : '',
+);
 
 const periodCappedText = computed(() => {
     const capped = props.period_capped;
@@ -96,30 +109,32 @@ const periodCappedText = computed(() => {
 
     return tx('period_capped', {
         requested_from: date(capped.requested_from),
-        requested_to:   date(capped.requested_to),
-        days:           number(capped.max_days),
-        from:           date(props.filters.from),
-        to:             date(props.filters.to),
+        requested_to: date(capped.requested_to),
+        days: number(capped.max_days),
+        from: date(props.filters.from),
+        to: date(props.filters.to),
     });
 });
 
 // ── Exportação (período aplicado, o mesmo dos números na tela) ──────────────
 const EXPORT_FORMATS = [
-    { key: 'csv',  icon: 'ti ti-file-type-csv',    labelKey: 'export_csv' },
+    { key: 'csv', icon: 'ti ti-file-type-csv', labelKey: 'export_csv' },
     { key: 'xlsx', icon: 'ti ti-file-spreadsheet', labelKey: 'export_xlsx' },
 ];
 
-const exportOptions = computed(() => EXPORT_FORMATS.map((format) => ({
-    key:   format.key,
-    icon:  format.icon,
-    label: props.t[format.labelKey] ?? format.key.toUpperCase(),
-    href:  `${props.routes.export}?${new URLSearchParams({
-        doctor: props.filters.doctor ?? '',
-        from:   props.filters.from ?? '',
-        to:     props.filters.to ?? '',
-        format: format.key,
-    }).toString()}`,
-})));
+const exportOptions = computed(() =>
+    EXPORT_FORMATS.map((format) => ({
+        key: format.key,
+        icon: format.icon,
+        label: props.t[format.labelKey] ?? format.key.toUpperCase(),
+        href: `${props.routes.export}?${new URLSearchParams({
+            doctor: props.filters.doctor ?? '',
+            from: props.filters.from ?? '',
+            to: props.filters.to ?? '',
+            format: format.key,
+        }).toString()}`,
+    })),
+);
 
 // ── Fechar período ──────────────────────────────────────────────────────────
 const closeOpen = ref(false);
@@ -152,8 +167,8 @@ function openClose() {
 const rows = computed(() => props.items?.data ?? []);
 
 // ── Recebimento manual: selecionar itens → alocar receita avulsa do caixa ───
-const selected        = ref([]);
-const allocateOpen    = ref(false);
+const selected = ref([]);
+const allocateOpen = ref(false);
 const receiptsLoading = ref(false);
 
 const selectedRows = computed(() => rows.value.filter((row) => selected.value.includes(row.row_id ?? row.key)));
@@ -161,16 +176,32 @@ const selectedRows = computed(() => rows.value.filter((row) => selected.value.in
 // Seleção vale para a lista que está na tela: trocar página, médico, período
 // ou filtro limpa (a recarga parcial das receitas não mexe nesses valores).
 watch(
-    () => [props.items?.current_page, props.filters.doctor, props.filters.from, props.filters.to, props.filters.status, props.filters.service_type, props.filters.receipt, props.filters.warning].join('|'),
-    () => { selected.value = []; },
+    () =>
+        [
+            props.items?.current_page,
+            props.filters.doctor,
+            props.filters.from,
+            props.filters.to,
+            props.filters.status,
+            props.filters.service_type,
+            props.filters.receipt,
+            props.filters.warning,
+        ].join('|'),
+    () => {
+        selected.value = [];
+    },
 );
 
 function loadReceipts() {
     router.reload({
-        only:           ['manual_receipts'],
+        only: ['manual_receipts'],
         preserveScroll: true,
-        onStart:        () => { receiptsLoading.value = true; },
-        onFinish:       () => { receiptsLoading.value = false; },
+        onStart: () => {
+            receiptsLoading.value = true;
+        },
+        onFinish: () => {
+            receiptsLoading.value = false;
+        },
     });
 }
 
@@ -181,13 +212,13 @@ function closeAllocate(done = false) {
 }
 
 // Estorno de alocação (admin ou financeiro, com motivo).
-const reversing    = ref(null);
-const reverseBusy  = ref(false);
+const reversing = ref(null);
+const reverseBusy = ref(false);
 const reverseError = ref('');
 
 function askReverse(allocation) {
     reverseError.value = '';
-    reversing.value    = allocation;
+    reversing.value = allocation;
 }
 
 function cancelReverse() {
@@ -199,13 +230,13 @@ function cancelReverse() {
 function confirmReverse(reason) {
     if (!reversing.value || reverseBusy.value) return;
 
-    reverseBusy.value  = true;
+    reverseBusy.value = true;
     reverseError.value = '';
 
     router.delete(props.routes.allocation.replace('__ID__', reversing.value.id), {
-        data:           { reason },
+        data: { reason },
         preserveScroll: true,
-        onSuccess:      (page) => {
+        onSuccess: (page) => {
             const denied = page?.props?.flash?.error;
             if (denied) {
                 reverseError.value = String(denied);
@@ -215,8 +246,12 @@ function confirmReverse(reason) {
 
             reversing.value = null;
         },
-        onError:  (errors) => { reverseError.value = Object.values(errors ?? {}).flat()[0] ?? ''; },
-        onFinish: () => { reverseBusy.value = false; },
+        onError: (errors) => {
+            reverseError.value = Object.values(errors ?? {}).flat()[0] ?? '';
+        },
+        onFinish: () => {
+            reverseBusy.value = false;
+        },
     });
 }
 </script>
@@ -261,7 +296,8 @@ function confirmReverse(reason) {
                 role="status"
                 data-test="unassigned-exams"
             >
-                <i class="ti ti-user-question mt-1" aria-hidden="true"></i><span>{{ countText('unassigned_exams', unassigned_exams) }}</span>
+                <i class="ti ti-user-question mt-1" aria-hidden="true"></i
+                ><span>{{ countText('unassigned_exams', unassigned_exams) }}</span>
             </div>
 
             <!-- Sem médico: orientação, nada calculado -->
@@ -274,11 +310,21 @@ function confirmReverse(reason) {
             </div>
 
             <div v-else class="d-grid gap-3" :aria-busy="loading ? 'true' : 'false'">
-                <div v-if="period_capped" class="alert alert-warning d-flex align-items-start gap-2 mb-0" role="status" data-test="period-capped">
+                <div
+                    v-if="period_capped"
+                    class="alert alert-warning d-flex align-items-start gap-2 mb-0"
+                    role="status"
+                    data-test="period-capped"
+                >
                     <i class="ti ti-alert-triangle mt-1" aria-hidden="true"></i><span>{{ periodCappedText }}</span>
                 </div>
 
-                <div v-if="historicalText" class="alert alert-info d-flex align-items-start gap-2 mb-0" role="status" data-test="historical-period">
+                <div
+                    v-if="historicalText"
+                    class="alert alert-info d-flex align-items-start gap-2 mb-0"
+                    role="status"
+                    data-test="historical-period"
+                >
                     <i class="ti ti-history mt-1" aria-hidden="true"></i><span>{{ historicalText }}</span>
                 </div>
 
@@ -328,7 +374,9 @@ function confirmReverse(reason) {
                             @click="allocateOpen = true"
                         >
                             <i class="ti ti-cash-banknote me-1" aria-hidden="true"></i>{{ t.allocate_action }}
-                            <span v-if="selected.length" class="badge text-bg-primary ms-1">{{ number(selectedRows.length) }}</span>
+                            <span v-if="selected.length" class="badge text-bg-primary ms-1">{{
+                                number(selectedRows.length)
+                            }}</span>
                         </button>
                     </div>
                     <PayoutItemsTable

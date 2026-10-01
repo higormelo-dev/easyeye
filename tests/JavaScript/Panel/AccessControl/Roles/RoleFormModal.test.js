@@ -21,7 +21,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 reset: () => Object.assign(form, { ...initial, permission_ids: [] }),
-                clearErrors: () => { form.errors = {}; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
                 post: vi.fn(),
                 put: vi.fn(),
             });
@@ -36,22 +38,37 @@ vi.mock('@/Components/Panel/OffcanvasPanel.vue', () => ({
     default: {
         props: ['open', 'width'],
         emits: ['close'],
-        template: '<div v-if="open" class="offcanvas-stub"><header><slot name="header" /></header><slot /><footer><slot name="footer" /></footer></div>',
+        template:
+            '<div v-if="open" class="offcanvas-stub"><header><slot name="header" /></header><slot /><footer><slot name="footer" /></footer></div>',
     },
 }));
 
 const t = {
-    form_title_create: 'New profile', form_title_edit: 'Edit profile', field_name: 'Name',
-    field_description: 'Description', field_description_hint: 'Optional — explain when to use it',
-    field_permissions: 'Permissions', no_permissions: 'No permissions available to assign.',
-    select_all: 'Select all', unselect_all: 'Unselect all', btn_cancel: 'Cancel',
-    btn_create: 'Create profile', btn_save: 'Save changes', required: 'required',
+    form_title_create: 'New profile',
+    form_title_edit: 'Edit profile',
+    field_name: 'Name',
+    field_description: 'Description',
+    field_description_hint: 'Optional — explain when to use it',
+    field_permissions: 'Permissions',
+    no_permissions: 'No permissions available to assign.',
+    select_all: 'Select all',
+    unselect_all: 'Unselect all',
+    btn_cancel: 'Cancel',
+    btn_create: 'Create profile',
+    btn_save: 'Save changes',
+    required: 'required',
 };
 
 const routes = { store: '/panel/accesscontrol/roles', update: '/panel/accesscontrol/roles/__ID__' };
 
 const availablePermissions = [
-    { group: 'Financial', items: [{ id: 'p1', key: 'financial.view', label: 'View financials' }, { id: 'p2', key: 'financial.manage', label: 'Manage financials' }] },
+    {
+        group: 'Financial',
+        items: [
+            { id: 'p1', key: 'financial.view', label: 'View financials' },
+            { id: 'p2', key: 'financial.manage', label: 'Manage financials' },
+        ],
+    },
     // Sem PermissionRecord sincronizado (id nulo): o grupo não aparece.
     { group: 'Legacy', items: [{ id: null, key: 'legacy.x', label: 'Legacy' }] },
 ];
@@ -91,12 +108,17 @@ describe('AccessControl/Roles/RoleFormModal', () => {
         await w.findAll('footer button')[1].trigger('click');
 
         const form = forms.at(-1);
-        expect(form.post).toHaveBeenCalledWith('/panel/accesscontrol/roles', expect.objectContaining({ preserveScroll: true }));
+        expect(form.post).toHaveBeenCalledWith(
+            '/panel/accesscontrol/roles',
+            expect.objectContaining({ preserveScroll: true }),
+        );
         expect(form.put).not.toHaveBeenCalled();
     });
 
     it('editar: preenche com o perfil e envia para a rota do próprio id', async () => {
-        const w = await mountModal({ role: { id: 'r9', name: 'Billing', description: 'Cash', permission_ids: ['p1'] } });
+        const w = await mountModal({
+            role: { id: 'r9', name: 'Billing', description: 'Cash', permission_ids: ['p1'] },
+        });
 
         expect(w.get('header').text()).toBe('Edit profile');
         expect(w.get('#role_name').element.value).toBe('Billing');

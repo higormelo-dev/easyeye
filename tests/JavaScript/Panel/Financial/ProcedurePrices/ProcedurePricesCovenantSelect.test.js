@@ -30,7 +30,10 @@ vi.mock('@/Components/Panel/CenteredModal.vue', () => ({
     },
 }));
 
-const covenants  = [{ id: 'c1', name: 'Particular', tiss: false }, { id: 'c2', name: 'Unimed', tiss: true }];
+const covenants = [
+    { id: 'c1', name: 'Particular', tiss: false },
+    { id: 'c2', name: 'Unimed', tiss: true },
+];
 const procedures = [{ id: 'p1', code: '10101012', name: 'Consulta' }];
 
 let wrapper;

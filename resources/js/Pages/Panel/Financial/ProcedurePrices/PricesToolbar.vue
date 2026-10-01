@@ -15,17 +15,17 @@ const props = defineProps({
     filter: { type: String, default: 'all' },
     /** { all, priced, unpriced } */
     counts: { type: Object, default: () => ({ all: 0, priced: 0, unpriced: 0 }) },
-    t:      { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['update:search', 'update:filter']);
 
-const { tx }     = useTrans(() => props.t);
+const { tx } = useTrans(() => props.t);
 const { number } = useLocaleFormat();
 
 const chips = computed(() => [
-    { key: 'all',      label: tx('filter_all') },
-    { key: 'priced',   label: tx('filter_priced') },
+    { key: 'all', label: tx('filter_all') },
+    { key: 'priced', label: tx('filter_priced') },
     { key: 'unpriced', label: tx('filter_unpriced') },
 ]);
 </script>

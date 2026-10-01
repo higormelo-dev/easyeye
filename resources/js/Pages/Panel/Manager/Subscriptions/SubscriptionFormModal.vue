@@ -5,36 +5,36 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    open:           { type: Boolean, required: true },
-    subscriptionId: { type: String,  default: null },
-    plans:          { type: Array,   default: () => [] },
-    statuses:       { type: Array,   default: () => [] },
-    t:              { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    subscriptionId: { type: String, default: null },
+    plans: { type: Array, default: () => [] },
+    statuses: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
-const loading    = ref(false);
-const saving     = ref(false);
-const errors     = ref({});
-const form       = ref({ plan_id: '', status: '', starts_at: '', ends_at: '', trial_ends_at: '' });
+const loading = ref(false);
+const saving = ref(false);
+const errors = ref({});
+const form = ref({ plan_id: '', status: '', starts_at: '', ends_at: '', trial_ends_at: '' });
 
 function resetForm() {
-    form.value   = { plan_id: '', status: '', starts_at: '', ends_at: '', trial_ends_at: '' };
+    form.value = { plan_id: '', status: '', starts_at: '', ends_at: '', trial_ends_at: '' };
     errors.value = {};
 }
 
 async function loadData(id) {
     loading.value = true;
     try {
-        const res  = await fetch(route('manager.subscriptions.show', id));
+        const res = await fetch(route('manager.subscriptions.show', id));
         const json = await res.json();
-        const d    = json.data;
+        const d = json.data;
         form.value = {
-            plan_id:       d.plan_id       ?? '',
-            status:        d.status        ?? '',
-            starts_at:     d.starts_at_raw ?? '',
-            ends_at:       d.ends_at_raw   ?? '',
+            plan_id: d.plan_id ?? '',
+            status: d.status ?? '',
+            starts_at: d.starts_at_raw ?? '',
+            ends_at: d.ends_at_raw ?? '',
             trial_ends_at: d.trial_ends_at_raw ?? '',
         };
     } finally {
@@ -42,9 +42,15 @@ async function loadData(id) {
     }
 }
 
-watch(() => props.open, (val) => {
-    if (val) { resetForm(); if (props.subscriptionId) loadData(props.subscriptionId); }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val) {
+            resetForm();
+            if (props.subscriptionId) loadData(props.subscriptionId);
+        }
+    },
+);
 
 async function submit() {
     saving.value = true;
@@ -55,7 +61,7 @@ async function submit() {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
             body: JSON.stringify(form.value),
         });
@@ -82,13 +88,7 @@ function firstError(field) {
 </script>
 
 <template>
-    <OffcanvasPanel
-        :open="open"
-        :width="480"
-        :loading="loading"
-        :loading-label="t.loading"
-        @close="$emit('close')"
-    >
+    <OffcanvasPanel :open="open" :width="480" :loading="loading" :loading-label="t.loading" @close="$emit('close')">
         <!-- Header -->
         <template #header>
             <h5 class="mb-0 fw-semibold">
@@ -100,7 +100,6 @@ function firstError(field) {
         <!-- Body -->
         <form @submit.prevent="submit">
             <div class="row g-3">
-
                 <!-- Plano -->
                 <div class="col-md-6">
                     <label class="form-label">{{ t.form_field_plan }}</label>
@@ -135,22 +134,21 @@ function firstError(field) {
                         type="date"
                         class="form-control"
                         :class="{ 'is-invalid': firstError('starts_at') }"
-                    >
+                    />
                     <div v-if="firstError('starts_at')" class="invalid-feedback">{{ firstError('starts_at') }}</div>
                 </div>
 
                 <!-- Vencimento -->
                 <div class="col-md-4">
                     <label class="form-label">{{ t.form_field_ends }}</label>
-                    <input v-model="form.ends_at" type="date" class="form-control">
+                    <input v-model="form.ends_at" type="date" class="form-control" />
                 </div>
 
                 <!-- Trial até -->
                 <div class="col-md-4">
                     <label class="form-label">{{ t.form_field_trial }}</label>
-                    <input v-model="form.trial_ends_at" type="date" class="form-control">
+                    <input v-model="form.trial_ends_at" type="date" class="form-control" />
                 </div>
-
             </div>
         </form>
 

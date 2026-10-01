@@ -55,7 +55,7 @@ async function typeQuery(value) {
     await flushPromises();
 }
 
-const input   = () => wrapper.get('input');
+const input = () => wrapper.get('input');
 const listbox = () => wrapper.find('[role="listbox"]');
 
 beforeEach(() => {
@@ -101,7 +101,9 @@ describe('Cid10Picker (combobox acessível)', () => {
         expect(options[1].attributes('aria-selected')).toBe('false');
 
         await input().trigger('keydown', { key: 'Enter' });
-        expect(wrapper.emitted('update:modelValue').at(-1)[0]).toEqual([{ code: 'H40.1', description: RESULTS[0].description }]);
+        expect(wrapper.emitted('update:modelValue').at(-1)[0]).toEqual([
+            { code: 'H40.1', description: RESULTS[0].description },
+        ]);
         expect(listbox().exists()).toBe(false);
         expect(input().attributes('aria-expanded')).toBe('false');
     });
@@ -154,7 +156,12 @@ describe('Cid10Picker (combobox acessível)', () => {
     });
 
     it('vínculos externos: id, rótulo, descrição e aria-invalid vão para o input', () => {
-        mountPicker({ inputId: 'cid-x', ariaLabelledby: 'cid-x-label', ariaDescribedby: 'cid-x-hint cid-x-error', invalid: true });
+        mountPicker({
+            inputId: 'cid-x',
+            ariaLabelledby: 'cid-x-label',
+            ariaDescribedby: 'cid-x-hint cid-x-error',
+            invalid: true,
+        });
 
         expect(input().attributes('id')).toBe('cid-x');
         expect(input().attributes('aria-labelledby')).toBe('cid-x-label');
@@ -174,7 +181,10 @@ describe('Cid10Picker (chips)', () => {
         mountPicker({ modelValue: selected, primaryToggle: true });
 
         const removes = wrapper.findAll('[data-test="cid-remove"]');
-        expect(removes.map((b) => b.attributes('aria-label'))).toEqual(['Remover H40.1 – Glaucoma', 'Remover Pós-operatório tardio']);
+        expect(removes.map((b) => b.attributes('aria-label'))).toEqual([
+            'Remover H40.1 – Glaucoma',
+            'Remover Pós-operatório tardio',
+        ]);
 
         const stars = wrapper.findAll('[data-test="cid-primary"]');
         expect(stars[0].attributes('aria-pressed')).toBe('true');
@@ -221,7 +231,13 @@ describe('CidField (guias do faturamento)', () => {
     it('rótulo, dica e erro chegam ao input do picker (antes: só no grupo)', () => {
         wrapper = mount(CidField, {
             attachTo: document.body,
-            props: { id: 'bf-cid', searchUrl: '/cid10', label: 'CID (indicação clínica)', hint: 'Letra + 2 dígitos', error: 'CID inválido' },
+            props: {
+                id: 'bf-cid',
+                searchUrl: '/cid10',
+                label: 'CID (indicação clínica)',
+                hint: 'Letra + 2 dígitos',
+                error: 'CID inválido',
+            },
         });
 
         const field = wrapper.get('input');

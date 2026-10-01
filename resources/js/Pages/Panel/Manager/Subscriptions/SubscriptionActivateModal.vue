@@ -4,48 +4,51 @@ import { router } from '@inertiajs/vue3';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    open:          { type: Boolean, required: true },
-    subscription:  { type: Object,  default: null },
-    plans:         { type: Array,   default: () => [] },
-    billingCycles: { type: Array,   default: () => [] },
-    gateways:      { type: Array,   default: () => [] },
-    t:             { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    subscription: { type: Object, default: null },
+    plans: { type: Array, default: () => [] },
+    billingCycles: { type: Array, default: () => [] },
+    gateways: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
-const saving  = ref(false);
-const error   = ref('');
-const form    = ref({ plan_id: '', billing_cycle: '', gateway: '' });
+const saving = ref(false);
+const error = ref('');
+const form = ref({ plan_id: '', billing_cycle: '', gateway: '' });
 
 // Preserva o rótulo "Nome — Preço" do plano no SearchSelect.
 const planOptions = computed(() =>
     props.plans.map((p) => ({ id: p.id, label: p.price ? `${p.name} — ${p.price}` : p.name })),
 );
 
-watch(() => props.open, (val) => {
-    if (val) {
-        form.value  = { plan_id: '', billing_cycle: props.billingCycles[0]?.value ?? '', gateway: '' };
-        error.value = '';
-    }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val) {
+            form.value = { plan_id: '', billing_cycle: props.billingCycles[0]?.value ?? '', gateway: '' };
+            error.value = '';
+        }
+    },
+);
 
 async function submit() {
     saving.value = true;
-    error.value  = '';
+    error.value = '';
     try {
         const res = await fetch(route('manager.subscriptions.activate'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
             body: JSON.stringify({
-                entity_id:     props.subscription?.entity_id,
-                plan_id:       form.value.plan_id,
+                entity_id: props.subscription?.entity_id,
+                plan_id: form.value.plan_id,
                 billing_cycle: form.value.billing_cycle,
-                gateway:       form.value.gateway || undefined,
+                gateway: form.value.gateway || undefined,
             }),
         });
 
@@ -71,12 +74,11 @@ async function submit() {
             v-if="open"
             class="modal fade show d-block"
             tabindex="-1"
-            style="background:rgba(0,0,0,.4)"
+            style="background: rgba(0, 0, 0, 0.4)"
             @click.self="$emit('close')"
         >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-
                     <div class="modal-header">
                         <h5 class="modal-title">
                             <i class="ti ti-player-play me-2 text-success"></i>{{ t.activate_title }}
@@ -101,7 +103,6 @@ async function submit() {
                                 :placeholder="t.activate_plan_select"
                                 :clearable="false"
                             />
-
                         </div>
 
                         <!-- Ciclo -->
@@ -136,13 +137,14 @@ async function submit() {
                     </div>
 
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" @click="$emit('close')">{{ t.btn_cancel }}</button>
+                        <button type="button" class="btn btn-secondary" @click="$emit('close')">
+                            {{ t.btn_cancel }}
+                        </button>
                         <button type="button" class="btn btn-success" :disabled="saving" @click="submit">
                             <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
                             {{ t.activate_btn }}
                         </button>
                     </div>
-
                 </div>
             </div>
         </div>

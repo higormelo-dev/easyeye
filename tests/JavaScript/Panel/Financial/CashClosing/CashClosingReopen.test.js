@@ -30,19 +30,36 @@ vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { template: '<div><slot /><
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { template: '<div><slot name="actions" /></div>' } }));
 vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { template: '<nav />' } }));
 vi.mock('@/Components/Panel/PeriodFilter.vue', () => ({ default: { template: '<div class="period-stub" />' } }));
-vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({ default: { template: '<div class="dropdown-stub"><ul><slot /></ul></div>' } }));
-vi.mock('@/Components/Panel/CenteredModal.vue', () => ({ default: { props: ['open'], template: '<div v-if="open"><slot /><slot name="footer" /></div>' } }));
+vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
+    default: { template: '<div class="dropdown-stub"><ul><slot /></ul></div>' },
+}));
+vi.mock('@/Components/Panel/CenteredModal.vue', () => ({
+    default: { props: ['open'], template: '<div v-if="open"><slot /><slot name="footer" /></div>' },
+}));
 
 const t = {
-    reopen: 'Reopen period', reopen_title: 'Reopen period?', reopen_confirm: 'Reopen period',
-    reopen_message: 'Reopening :from to :to allows changes again.', reopened: 'Period reopened.', reopen_error: 'Could not reopen.',
+    reopen: 'Reopen period',
+    reopen_title: 'Reopen period?',
+    reopen_confirm: 'Reopen period',
+    reopen_message: 'Reopening :from to :to allows changes again.',
+    reopened: 'Period reopened.',
+    reopen_error: 'Could not reopen.',
 };
 
 const closes = {
-    data: [{
-        id: 'c1', period_start: '2026-08-01', period_end: '2026-08-31', total_income: 1000, total_expense: 400, balance: 600,
-        closed_at: '2026-09-01T10:30:00-03:00', closed_by_name: 'Ana', notes: null,
-    }],
+    data: [
+        {
+            id: 'c1',
+            period_start: '2026-08-01',
+            period_end: '2026-08-31',
+            total_income: 1000,
+            total_expense: 400,
+            balance: 600,
+            closed_at: '2026-09-01T10:30:00-03:00',
+            closed_by_name: 'Ana',
+            notes: null,
+        },
+    ],
     total: 1,
 };
 
@@ -52,7 +69,15 @@ function mountPage() {
     wrapper = mount(CashClosingIndex, {
         props: {
             closes,
-            preview: { income: 0, expense: 0, balance: 0, pending: 0, entries_count: 0, overlaps: false, by_payment_method: [] },
+            preview: {
+                income: 0,
+                expense: 0,
+                balance: 0,
+                pending: 0,
+                entries_count: 0,
+                overlaps: false,
+                by_payment_method: [],
+            },
             filters: { from: '2026-09-01', to: '2026-09-26' },
             today: '2026-09-26',
             can_reopen: true,
@@ -64,7 +89,7 @@ function mountPage() {
     return wrapper;
 }
 
-const reasonField   = (w) => w.find('.modal textarea');
+const reasonField = (w) => w.find('.modal textarea');
 const confirmButton = (w) => w.findAll('.modal .modal-footer button').find((b) => b.text().includes('Reopen period'));
 
 beforeEach(() => {
@@ -79,7 +104,10 @@ afterEach(() => {
 
 describe('Financial/CashClosing — reabertura com motivo (modal real)', () => {
     it('confirmar só libera com 10+ caracteres e envia o motivo aparado', async () => {
-        vi.mocked(router.delete).mockImplementation((url, options) => { options.onSuccess?.({ props: { flash: {} } }); options.onFinish?.(); });
+        vi.mocked(router.delete).mockImplementation((url, options) => {
+            options.onSuccess?.({ props: { flash: {} } });
+            options.onFinish?.();
+        });
         const w = mountPage();
 
         await w.find('[data-test="reopen"]').trigger('click');

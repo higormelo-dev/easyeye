@@ -1,12 +1,12 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { router, Link, useForm } from '@inertiajs/vue3';
-import AppLayout       from '@/Layouts/AppLayout.vue';
-import PageHeader      from '@/Components/Panel/PageHeader.vue';
-import SearchInput     from '@/Components/Panel/SearchInput.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 /**
  * Lista de usuários de uma empresa cliente (visão Manager SaaS).
@@ -16,11 +16,11 @@ import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
  * Confirmação antes da impersonação evita cliques acidentais.
  */
 const props = defineProps({
-    entity:          { type: Object, required: true },   // { id, code, name }
-    users:           { type: Object, required: true },   // paginator Laravel
-    filters:         { type: Object, default: () => ({}) },
+    entity: { type: Object, required: true }, // { id, code, name }
+    users: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) },
     isImpersonating: { type: Boolean, default: false },
-    t:               { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 // ── Breadcrumbs ──────────────────────────────────────────────────────────────
@@ -64,7 +64,9 @@ function confirmImpersonate() {
     if (!pendingUser.value?.impersonate_url) return;
     impersonateForm.post(pendingUser.value.impersonate_url, {
         preserveScroll: false,
-        onFinish: () => { pendingUser.value = null; },
+        onFinish: () => {
+            pendingUser.value = null;
+        },
     });
 }
 </script>
@@ -72,16 +74,9 @@ function confirmImpersonate() {
 <template>
     <AppLayout :title="t.page_title ?? 'Usuários'" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader
-                :title="t.page_title ?? 'Usuários'"
-                :subtitle="entity.name"
-                :total="users.total"
-            >
+            <PageHeader :title="t.page_title ?? 'Usuários'" :subtitle="entity.name" :total="users.total">
                 <template #actions>
-                    <Link
-                        :href="route('manager.entities.index')"
-                        class="btn btn-outline-secondary btn-sm"
-                    >
+                    <Link :href="route('manager.entities.index')" class="btn btn-outline-secondary btn-sm">
                         <i class="ti ti-arrow-left me-1"></i>{{ t.btn_back ?? 'Voltar' }}
                     </Link>
                 </template>
@@ -98,7 +93,7 @@ function confirmImpersonate() {
                 <SearchInput
                     v-model="search"
                     :placeholder="t.search_placeholder ?? 'Buscar...'"
-                    style="min-width: 280px;"
+                    style="min-width: 280px"
                 />
             </div>
 
@@ -130,7 +125,9 @@ function confirmImpersonate() {
                                 :class="{ 'table-secondary opacity-75': u.deleted }"
                             >
                                 <td class="text-muted small">{{ u.created_at }}</td>
-                                <td><code class="text-muted small">{{ u.code }}</code></td>
+                                <td>
+                                    <code class="text-muted small">{{ u.code }}</code>
+                                </td>
                                 <td class="fw-medium">{{ u.name }}</td>
                                 <td class="text-muted">{{ u.email }}</td>
                                 <td>
@@ -138,26 +135,29 @@ function confirmImpersonate() {
                                     <span v-else class="text-muted">—</span>
                                 </td>
                                 <td class="text-center">
-                                    <span
-                                        v-if="u.deleted"
-                                        class="badge badge-soft-secondary rounded fs-13 fw-medium"
-                                    >{{ t.status_deleted ?? 'Removido' }}</span>
+                                    <span v-if="u.deleted" class="badge badge-soft-secondary rounded fs-13 fw-medium">{{
+                                        t.status_deleted ?? 'Removido'
+                                    }}</span>
                                     <span
                                         v-else-if="u.active"
                                         class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                                    >{{ t.status_active ?? 'Ativo' }}</span>
+                                        >{{ t.status_active ?? 'Ativo' }}</span
+                                    >
                                     <span
                                         v-else
                                         class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
-                                    >{{ t.status_inactive ?? 'Inativo' }}</span>
+                                        >{{ t.status_inactive ?? 'Inativo' }}</span
+                                    >
                                 </td>
                                 <td class="text-end">
                                     <ActionIconGroup align="end" gap="tight">
                                         <ActionIconButton
                                             icon="ti ti-user-cog"
-                                            :title="u.can_impersonate
-                                                ? (t.action_impersonate ?? 'Entrar como este usuário')
-                                                : (t.action_impersonate_disabled ?? 'Não é possível impersonar')"
+                                            :title="
+                                                u.can_impersonate
+                                                    ? (t.action_impersonate ?? 'Entrar como este usuário')
+                                                    : (t.action_impersonate_disabled ?? 'Não é possível impersonar')
+                                            "
                                             variant="info"
                                             :disabled="!u.can_impersonate"
                                             @click="askImpersonate(u)"
@@ -170,17 +170,14 @@ function confirmImpersonate() {
                 </div>
             </div>
 
-            <TablePagination
-                :data="users"
-                class="mt-3"
-            />
+            <TablePagination :data="users" class="mt-3" />
 
             <!-- Modal de confirmação de impersonação -->
             <div
                 v-if="pendingUser"
                 class="modal d-block"
                 tabindex="-1"
-                style="background: rgba(0,0,0,.45);"
+                style="background: rgba(0, 0, 0, 0.45)"
                 @click.self="cancelImpersonate"
             >
                 <div class="modal-dialog modal-dialog-centered">
@@ -188,14 +185,24 @@ function confirmImpersonate() {
                         <div class="modal-header">
                             <h5 class="modal-title">
                                 <i class="ti ti-user-cog me-1 text-info"></i>
-                                {{ (t.confirm_impersonate_title ?? 'Entrar como :name?').replace(':name', pendingUser.name) }}
+                                {{
+                                    (t.confirm_impersonate_title ?? 'Entrar como :name?').replace(
+                                        ':name',
+                                        pendingUser.name,
+                                    )
+                                }}
                             </h5>
                             <button type="button" class="btn-close" @click="cancelImpersonate"></button>
                         </div>
                         <div class="modal-body">
-                            <p class="mb-2">{{ t.confirm_impersonate_text ?? 'Você assumirá temporariamente o contexto desta clínica.' }}</p>
+                            <p class="mb-2">
+                                {{
+                                    t.confirm_impersonate_text ??
+                                    'Você assumirá temporariamente o contexto desta clínica.'
+                                }}
+                            </p>
                             <div class="small text-muted">
-                                <strong>{{ t.col_email ?? 'E-mail' }}:</strong> {{ pendingUser.email }}<br>
+                                <strong>{{ t.col_email ?? 'E-mail' }}:</strong> {{ pendingUser.email }}<br />
                                 <strong>{{ t.col_rule ?? 'Papel' }}:</strong> {{ pendingUser.rule || '—' }}
                             </div>
                         </div>
@@ -214,7 +221,10 @@ function confirmImpersonate() {
                                 :disabled="impersonateForm.processing"
                                 @click="confirmImpersonate"
                             >
-                                <span v-if="impersonateForm.processing" class="spinner-border spinner-border-sm me-1"></span>
+                                <span
+                                    v-if="impersonateForm.processing"
+                                    class="spinner-border spinner-border-sm me-1"
+                                ></span>
                                 <i v-else class="ti ti-check me-1"></i>
                                 {{ t.confirm_impersonate_yes ?? 'Sim, continuar' }}
                             </button>

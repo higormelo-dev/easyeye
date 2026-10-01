@@ -16,15 +16,19 @@ import { ref, watch } from 'vue';
 export function useColumnOrder(storageKey, defaultOrder) {
     const order = ref(loadOrder(storageKey, defaultOrder));
 
-    watch(order, (value) => {
-        if (typeof window === 'undefined') return;
+    watch(
+        order,
+        (value) => {
+            if (typeof window === 'undefined') return;
 
-        try {
-            window.localStorage.setItem(storageKey, JSON.stringify(value));
-        } catch {
-            // Storage cheio/privado — preferência só não persiste, não quebra a tela.
-        }
-    }, { deep: true });
+            try {
+                window.localStorage.setItem(storageKey, JSON.stringify(value));
+            } catch {
+                // Storage cheio/privado — preferência só não persiste, não quebra a tela.
+            }
+        },
+        { deep: true },
+    );
 
     /** Move o item de `fromIndex` pra `toIndex` (drag-and-drop ou setas). */
     function moveTo(fromIndex, toIndex) {
@@ -58,9 +62,10 @@ function loadOrder(storageKey, defaultOrder) {
         // evita ordem quebrada (colunas somem/duplicam) se um deploy futuro
         // renomear/remover/adicionar uma coluna e o localStorage antigo ficar
         // com um conjunto diferente.
-        const isValid = Array.isArray(parsed)
-            && parsed.length === defaultOrder.length
-            && defaultOrder.every((key) => parsed.includes(key));
+        const isValid =
+            Array.isArray(parsed) &&
+            parsed.length === defaultOrder.length &&
+            defaultOrder.every((key) => parsed.includes(key));
 
         return isValid ? parsed : [...defaultOrder];
     } catch {

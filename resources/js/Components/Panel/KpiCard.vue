@@ -13,25 +13,25 @@ import { Link } from '@inertiajs/vue3';
  *   (`toggle`: aria-pressed = `active`, emite `click`).
  */
 const props = defineProps({
-    label:    { type: String,  required: true },
-    value:    { type: [String, Number], default: '—' },
-    icon:     { type: String,  default: '' },
+    label: { type: String, required: true },
+    value: { type: [String, Number], default: '—' },
+    icon: { type: String, default: '' },
     /** success | danger | warning | info | primary | secondary */
-    tone:     { type: String,  default: 'secondary' },
-    hint:     { type: String,  default: '' },
-    subtitle: { type: String,  default: '' },
-    href:     { type: String,  default: '' },
-    toggle:   { type: Boolean, default: false },
-    active:   { type: Boolean, default: false },
-    loading:  { type: Boolean, default: false },
+    tone: { type: String, default: 'secondary' },
+    hint: { type: String, default: '' },
+    subtitle: { type: String, default: '' },
+    href: { type: String, default: '' },
+    toggle: { type: Boolean, default: false },
+    active: { type: Boolean, default: false },
+    loading: { type: Boolean, default: false },
     /** Sufixo do data-test do valor (`kpi-<testId>`). */
-    testId:   { type: String,  default: '' },
+    testId: { type: String, default: '' },
 });
 
 const emit = defineEmits(['click']);
 
 const TONES = ['success', 'danger', 'warning', 'info', 'primary', 'secondary'];
-const tone  = computed(() => (TONES.includes(props.tone) ? props.tone : 'secondary'));
+const tone = computed(() => (TONES.includes(props.tone) ? props.tone : 'secondary'));
 
 const tag = computed(() => {
     if (props.href) return Link;
@@ -73,7 +73,11 @@ function onClick(event) {
             <span v-if="loading" class="placeholder-glow d-block mt-1" aria-hidden="true">
                 <span class="placeholder col-8"></span>
             </span>
-            <span v-else class="d-block fw-bold fs-5 text-body text-nowrap kpi-card__value" :data-test="testId ? `kpi-${testId}` : undefined">
+            <span
+                v-else
+                class="d-block fw-bold fs-5 text-body text-nowrap kpi-card__value"
+                :data-test="testId ? `kpi-${testId}` : undefined"
+            >
                 {{ value }}
             </span>
 
@@ -102,7 +106,9 @@ function onClick(event) {
 
 .kpi-card--interactive {
     cursor: pointer;
-    transition: transform var(--ee-duration-fast, 150ms) ease, box-shadow var(--ee-duration-fast, 150ms) ease;
+    transition:
+        transform var(--ee-duration-fast, 150ms) ease,
+        box-shadow var(--ee-duration-fast, 150ms) ease;
 }
 
 .kpi-card--interactive:hover {
@@ -117,7 +123,9 @@ function onClick(event) {
 
 .kpi-card--active {
     background-color: var(--bs-tertiary-bg);
-    box-shadow: inset 0 0 0 1px var(--bs-border-color), var(--bs-box-shadow-sm) !important;
+    box-shadow:
+        inset 0 0 0 1px var(--bs-border-color),
+        var(--bs-box-shadow-sm) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -17,14 +17,14 @@ import ProviderTopupModal from '@/Pages/Panel/Manager/AiCreditPurchases/Provider
 describe('ProviderTopupModal', () => {
     const tStubs = {
         topup: {
-            modal_title:  'Registrar recarga no provedor',
-            provider:     'Provedor',
-            amount:       'Valor (USD)',
+            modal_title: 'Registrar recarga no provedor',
+            provider: 'Provedor',
+            amount: 'Valor (USD)',
             topped_up_at: 'Data',
-            reference:    'Referência',
-            note:         'Observação',
-            submit:       'Registrar recarga',
-            cancel:       'Cancelar',
+            reference: 'Referência',
+            note: 'Observação',
+            submit: 'Registrar recarga',
+            cancel: 'Cancelar',
         },
     };
 
@@ -69,7 +69,9 @@ describe('ProviderTopupModal', () => {
 
     it('renderiza os 3 provedores como opções (radio)', () => {
         const wrapper = mountModal();
-        const radios = document.body.querySelectorAll('input[type="radio"][name][value], input[type="radio"].btn-check');
+        const radios = document.body.querySelectorAll(
+            'input[type="radio"][name][value], input[type="radio"].btn-check',
+        );
         const values = Array.from(document.body.querySelectorAll('input[type="radio"].btn-check')).map((r) => r.value);
 
         expect(values).toContain('openai');
@@ -156,19 +158,19 @@ describe('ProviderTopupModal', () => {
         expect(payload.provider).toBe('anthropic');
         expect(payload.amount_usd).toBe(250.5);
         expect(payload.amount_brl).toBe(1300);
-        expect(payload.reference).toBeNull();                           // vazio → null
+        expect(payload.reference).toBeNull(); // vazio → null
         expect(payload.note).toBeNull();
-        expect(payload.topped_up_at).toBeTruthy();                      // datetime preenchido por default
+        expect(payload.topped_up_at).toBeTruthy(); // datetime preenchido por default
         wrapper.unmount();
     });
 
     it('emite submit com reference e note quando preenchidos', async () => {
         const wrapper = mountModal();
 
-        fillNumber(brlInput(), '550');                                   // valor pago obrigatório
+        fillNumber(brlInput(), '550'); // valor pago obrigatório
 
         const inputs = document.body.querySelectorAll('input[type="text"]');
-        const refInput = inputs[0];                                      // referência é o primeiro text
+        const refInput = inputs[0]; // referência é o primeiro text
         refInput.value = 'ch_TEST_001';
         refInput.dispatchEvent(new Event('input'));
 
@@ -190,8 +192,9 @@ describe('ProviderTopupModal', () => {
     it('emite close ao clicar em cancelar', async () => {
         const wrapper = mountModal();
 
-        const cancelBtn = Array.from(document.body.querySelectorAll('button'))
-            .find((b) => b.textContent.trim() === 'Cancelar');
+        const cancelBtn = Array.from(document.body.querySelectorAll('button')).find(
+            (b) => b.textContent.trim() === 'Cancelar',
+        );
 
         cancelBtn.click();
         await wrapper.vm.$nextTick();
@@ -207,8 +210,9 @@ describe('ProviderTopupModal', () => {
         await wrapper.vm.$nextTick();
 
         const submit = document.body.querySelector('button[type="submit"]');
-        const cancel = Array.from(document.body.querySelectorAll('button'))
-            .find((b) => b.textContent.trim() === 'Cancelar');
+        const cancel = Array.from(document.body.querySelectorAll('button')).find(
+            (b) => b.textContent.trim() === 'Cancelar',
+        );
 
         expect(submit.disabled).toBe(true);
         expect(cancel.disabled).toBe(true);
@@ -253,8 +257,9 @@ describe('ProviderTopupModal', () => {
         wrapper.vm.setSaving(true);
         await wrapper.vm.$nextTick();
 
-        const cancelBtn = Array.from(document.body.querySelectorAll('button'))
-            .find((b) => b.textContent.trim() === 'Cancelar');
+        const cancelBtn = Array.from(document.body.querySelectorAll('button')).find(
+            (b) => b.textContent.trim() === 'Cancelar',
+        );
 
         cancelBtn.click();
         await wrapper.vm.$nextTick();

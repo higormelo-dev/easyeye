@@ -2,9 +2,9 @@
 import { computed } from 'vue';
 
 const props = defineProps({
-    activation:      { type: Array,  required: true },
+    activation: { type: Array, required: true },
     activationScore: { type: Number, required: true },
-    t:               { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 const color = computed(() => {
@@ -29,11 +29,11 @@ const color = computed(() => {
                 </div>
                 <div class="text-end">
                     <span :class="`fs-4 fw-bold text-${color}`">{{ activationScore }}%</span>
-                    <div class="text-muted" style="font-size:.7rem;">{{ t.activation_done }}</div>
+                    <div class="text-muted" style="font-size: 0.7rem">{{ t.activation_done }}</div>
                 </div>
             </div>
 
-            <div class="progress mb-3" style="height:8px;border-radius:4px;">
+            <div class="progress mb-3" style="height: 8px; border-radius: 4px">
                 <div class="progress-bar" :class="`bg-${color}`" :style="`width:${activationScore}%`" />
             </div>
 
@@ -44,12 +44,17 @@ const color = computed(() => {
                     class="d-flex align-items-center gap-1 px-3 py-2 rounded border flex-shrink-0"
                     :class="step.done ? 'border-success bg-success bg-opacity-10' : 'bg-white'"
                 >
-                    <i class="flex-shrink-0 fs-16" :class="step.done ? 'ti ti-circle-check text-success' : 'ti ti-circle text-muted'"></i>
+                    <i
+                        class="flex-shrink-0 fs-16"
+                        :class="step.done ? 'ti ti-circle-check text-success' : 'ti ti-circle text-muted'"
+                    ></i>
                     <span class="small text-nowrap" :class="step.done ? 'text-success fw-medium' : 'text-muted'">
                         {{ step.label }}
-                        <span v-if="!step.done && !step.required" class="text-muted fst-italic">({{ t.activation_optional ?? 'opcional' }})</span>
+                        <span v-if="!step.done && !step.required" class="text-muted fst-italic"
+                            >({{ t.activation_optional ?? 'opcional' }})</span
+                        >
                     </span>
-                    <span v-if="!step.done" class="fw-semibold small" style="color:#0d6efd">+{{ step.weight }}%</span>
+                    <span v-if="!step.done" class="fw-semibold small" style="color: #0d6efd">+{{ step.weight }}%</span>
                 </div>
             </div>
         </div>

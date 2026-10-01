@@ -15,36 +15,49 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  *   #adjustments-footer                  – formulário de novo ajuste
  */
 const props = defineProps({
-    statement: { type: Object, required: true },   // { payout, groups, adjustments }
-    t:         { type: Object, default: () => ({}) },
+    statement: { type: Object, required: true }, // { payout, groups, adjustments }
+    t: { type: Object, default: () => ({}) },
 });
 
-const {
-    tx, money, signedMoney, number, dateTime, periodText, serviceTypePlural, serviceTypeIcon, grossLabel,
-} = useDoctorPayoutFormat(() => props.t);
+const { tx, money, signedMoney, number, dateTime, periodText, serviceTypePlural, serviceTypeIcon, grossLabel } =
+    useDoctorPayoutFormat(() => props.t);
 
 const uid = useId();
 const ids = {
-    header:      `statement-header-${uid}`,
+    header: `statement-header-${uid}`,
     adjustments: `statement-adjustments-${uid}`,
-    totals:      `statement-totals-${uid}`,
+    totals: `statement-totals-${uid}`,
 };
 
-const payout      = computed(() => props.statement?.payout ?? {});
-const groups      = computed(() => props.statement?.groups ?? []);
+const payout = computed(() => props.statement?.payout ?? {});
+const groups = computed(() => props.statement?.groups ?? []);
 const adjustments = computed(() => props.statement?.adjustments ?? []);
 
 function notice(key, at, user, reason) {
     return tx(key, { date: dateTime(at), user: user || props.t.none, reason: reason || props.t.none });
 }
 
-const cancelledText = computed(() => (payout.value.cancelled_at
-    ? notice('statement_cancelled', payout.value.cancelled_at, payout.value.cancelled_by_name, payout.value.cancel_reason)
-    : ''));
+const cancelledText = computed(() =>
+    payout.value.cancelled_at
+        ? notice(
+              'statement_cancelled',
+              payout.value.cancelled_at,
+              payout.value.cancelled_by_name,
+              payout.value.cancel_reason,
+          )
+        : '',
+);
 
-const reversedText = computed(() => (payout.value.payment_reversed_at
-    ? notice('statement_reversed', payout.value.payment_reversed_at, payout.value.payment_reversed_by_name, payout.value.payment_reversal_reason)
-    : ''));
+const reversedText = computed(() =>
+    payout.value.payment_reversed_at
+        ? notice(
+              'statement_reversed',
+              payout.value.payment_reversed_at,
+              payout.value.payment_reversed_by_name,
+              payout.value.payment_reversal_reason,
+          )
+        : '',
+);
 </script>
 
 <template>
@@ -59,7 +72,9 @@ const reversedText = computed(() => (payout.value.payment_reversed_at
                 <dl class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 small mb-0">
                     <div class="col">
                         <dt class="text-muted fw-normal">{{ t.statement_doctor }}</dt>
-                        <dd class="fw-semibold mb-0 text-break" data-test="statement-doctor">{{ payout.doctor_name || t.none }}</dd>
+                        <dd class="fw-semibold mb-0 text-break" data-test="statement-doctor">
+                            {{ payout.doctor_name || t.none }}
+                        </dd>
                     </div>
                     <div class="col">
                         <dt class="text-muted fw-normal">{{ t.statement_record }}</dt>
@@ -67,7 +82,9 @@ const reversedText = computed(() => (payout.value.payment_reversed_at
                     </div>
                     <div class="col">
                         <dt class="text-muted fw-normal">{{ t.statement_period }}</dt>
-                        <dd class="mb-0 text-nowrap" data-test="statement-period">{{ periodText(payout.period_start, payout.period_end) }}</dd>
+                        <dd class="mb-0 text-nowrap" data-test="statement-period">
+                            {{ periodText(payout.period_start, payout.period_end) }}
+                        </dd>
                     </div>
                     <div class="col">
                         <dt class="text-muted fw-normal">{{ t.statement_closed_at }}</dt>
@@ -85,11 +102,22 @@ const reversedText = computed(() => (payout.value.payment_reversed_at
             </div>
         </section>
 
-        <div v-if="cancelledText" class="alert alert-secondary d-flex gap-2 mb-0" role="note" data-test="statement-cancelled">
+        <div
+            v-if="cancelledText"
+            class="alert alert-secondary d-flex gap-2 mb-0"
+            role="note"
+            data-test="statement-cancelled"
+        >
             <i class="ti ti-circle-x mt-1" aria-hidden="true"></i><span class="text-break">{{ cancelledText }}</span>
         </div>
-        <div v-if="reversedText" class="alert alert-warning d-flex gap-2 mb-0" role="note" data-test="statement-reversed">
-            <i class="ti ti-arrow-back-up mt-1" aria-hidden="true"></i><span class="text-break">{{ reversedText }}</span>
+        <div
+            v-if="reversedText"
+            class="alert alert-warning d-flex gap-2 mb-0"
+            role="note"
+            data-test="statement-reversed"
+        >
+            <i class="ti ti-arrow-back-up mt-1" aria-hidden="true"></i
+            ><span class="text-break">{{ reversedText }}</span>
         </div>
 
         <!-- Atendimentos por tipo, com subtotais -->
@@ -124,7 +152,9 @@ const reversedText = computed(() => (payout.value.payment_reversed_at
                 </h3>
             </div>
             <div class="card-body">
-                <p v-if="adjustments.length === 0" class="small text-muted mb-0" data-test="adjustments-empty">{{ t.adjustments_empty }}</p>
+                <p v-if="adjustments.length === 0" class="small text-muted mb-0" data-test="adjustments-empty">
+                    {{ t.adjustments_empty }}
+                </p>
                 <ul v-else class="list-unstyled mb-0 d-grid gap-2">
                     <li
                         v-for="adjustment in adjustments"
@@ -135,15 +165,23 @@ const reversedText = computed(() => (payout.value.payment_reversed_at
                         <div class="me-auto statement-view__min-w-0">
                             <p class="fw-medium mb-0 text-break">{{ adjustment.description }}</p>
                             <p class="small text-muted mb-0">
-                                {{ dateTime(adjustment.created_at) }}<template v-if="adjustment.created_by_name"> · {{ adjustment.created_by_name }}</template>
+                                {{ dateTime(adjustment.created_at)
+                                }}<template v-if="adjustment.created_by_name">
+                                    · {{ adjustment.created_by_name }}</template
+                                >
                             </p>
                         </div>
                         <span class="fw-semibold text-nowrap statement-view__value" data-test="adjustment-amount">
                             <i
                                 class="ti me-1"
-                                :class="Number(adjustment.amount) < 0 ? 'ti-arrow-up-right text-danger' : 'ti-arrow-down-left text-success'"
+                                :class="
+                                    Number(adjustment.amount) < 0
+                                        ? 'ti-arrow-up-right text-danger'
+                                        : 'ti-arrow-down-left text-success'
+                                "
                                 aria-hidden="true"
-                            ></i>{{ signedMoney(adjustment.amount) }}
+                            ></i
+                            >{{ signedMoney(adjustment.amount) }}
                         </span>
                         <slot name="adjustment-actions" :adjustment="adjustment" />
                     </li>
@@ -159,19 +197,27 @@ const reversedText = computed(() => (payout.value.payment_reversed_at
                 <dl class="mb-0 statement-view__totals">
                     <div class="d-flex justify-content-between gap-3 py-1">
                         <dt class="fw-normal text-muted">{{ grossLabel(payout) }}</dt>
-                        <dd class="mb-0 statement-view__value" data-test="total-gross">{{ money(payout.gross_amount) }}</dd>
+                        <dd class="mb-0 statement-view__value" data-test="total-gross">
+                            {{ money(payout.gross_amount) }}
+                        </dd>
                     </div>
                     <div class="d-flex justify-content-between gap-3 py-1">
                         <dt class="fw-normal">{{ t.statement_items_total }}</dt>
-                        <dd class="mb-0 statement-view__value" data-test="total-items">{{ money(payout.items_amount) }}</dd>
+                        <dd class="mb-0 statement-view__value" data-test="total-items">
+                            {{ money(payout.items_amount) }}
+                        </dd>
                     </div>
                     <div class="d-flex justify-content-between gap-3 py-1">
                         <dt class="fw-normal">{{ t.statement_adjustments_total }}</dt>
-                        <dd class="mb-0 statement-view__value" data-test="total-adjustments">{{ signedMoney(payout.adjustments_amount) }}</dd>
+                        <dd class="mb-0 statement-view__value" data-test="total-adjustments">
+                            {{ signedMoney(payout.adjustments_amount) }}
+                        </dd>
                     </div>
                     <div class="d-flex justify-content-between gap-3 border-top pt-2 mt-1 fs-5 fw-bold">
                         <dt>{{ t.statement_net_total }}</dt>
-                        <dd class="mb-0 statement-view__value" data-test="total-net">{{ money(payout.total_amount) }}</dd>
+                        <dd class="mb-0 statement-view__value" data-test="total-net">
+                            {{ money(payout.total_amount) }}
+                        </dd>
                     </div>
                 </dl>
             </div>

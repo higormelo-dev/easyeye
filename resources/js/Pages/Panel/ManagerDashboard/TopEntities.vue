@@ -1,7 +1,7 @@
 <script setup>
 const props = defineProps({
     topEntities: { type: Array, default: () => [] },
-    t:           { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 function formatDate(date) {
@@ -11,9 +11,7 @@ function formatDate(date) {
 
 <template>
     <div class="card mgr-chart-card">
-        <div class="card-header">
-            <i class="ti ti-trophy me-2"></i>{{ t.top_entities }}
-        </div>
+        <div class="card-header"><i class="ti ti-trophy me-2"></i>{{ t.top_entities }}</div>
         <div class="card-body p-0">
             <table class="table mgr-table mb-0">
                 <thead>

@@ -9,29 +9,33 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * operadora TISS vinculada. Upload via useForm com forceFormData.
  */
 const props = defineProps({
-    open:      { type: Boolean, default: false },
-    covenants: { type: Array,   default: () => [] },
-    url:       { type: String,  required: true },
-    t:         { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    covenants: { type: Array, default: () => [] },
+    url: { type: String, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const form = useForm({
     covenant_id: '',
-    xml_file:    null,
+    xml_file: null,
 });
 
 const rootRef = ref(null);
 
 const covenantsWithOperator = computed(() => props.covenants.filter((c) => c.has_tiss_operator));
-const disabled              = computed(() => covenantsWithOperator.value.length === 0);
+const disabled = computed(() => covenantsWithOperator.value.length === 0);
 
-watch(() => props.open, (open) => {
-    if (!open) return;
-    form.reset();
-    form.clearErrors();
-}, { immediate: true });
+watch(
+    () => props.open,
+    (open) => {
+        if (!open) return;
+        form.reset();
+        form.clearErrors();
+    },
+    { immediate: true },
+);
 
 function onFileChange(event) {
     form.xml_file = event.target.files?.[0] ?? null;
@@ -45,10 +49,10 @@ function submit() {
     if (form.processing || disabled.value) return;
 
     form.post(props.url, {
-        forceFormData:  true,
+        forceFormData: true,
         preserveScroll: true,
-        preserveState:  true,
-        onSuccess:      () => emit('saved'),
+        preserveState: true,
+        onSuccess: () => emit('saved'),
     });
 }
 
@@ -58,7 +62,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
 <template>
     <OffcanvasPanel :open="open" :width="480" @close="requestClose">
         <template #header>
-            <h5 class="mb-0 fw-semibold"><i class="ti ti-file-upload me-2 text-primary" aria-hidden="true"></i>{{ t.import_return_title }}</h5>
+            <h5 class="mb-0 fw-semibold">
+                <i class="ti ti-file-upload me-2 text-primary" aria-hidden="true"></i>{{ t.import_return_title }}
+            </h5>
         </template>
 
         <form ref="rootRef" novalidate @submit.prevent="submit">
@@ -101,13 +107,15 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     :disabled="disabled"
                     :class="{ 'is-invalid': form.errors.xml_file }"
                     @change="onFileChange"
-                >
+                />
                 <div v-if="form.errors.xml_file" class="invalid-feedback">{{ form.errors.xml_file }}</div>
             </div>
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">{{ t.btn_cancel }}</button>
+            <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">
+                {{ t.btn_cancel }}
+            </button>
             <button type="button" class="btn btn-primary" :disabled="form.processing || disabled" @click="submit">
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                 {{ form.processing ? t.processing : t.import_return_btn }}

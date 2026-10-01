@@ -9,8 +9,8 @@ import { usePage } from '@inertiajs/vue3';
  */
 const props = defineProps({
     item: { type: Object, required: true },
-    col:  { type: Object, required: true },
-    t:    { type: Object, default: () => ({}) },
+    col: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const page = usePage();
@@ -18,7 +18,7 @@ const page = usePage();
 // Locale do usuário (pt_BR → pt-BR) para números; fallback pt-BR.
 const locale = computed(() => String(page.props?.locale ?? 'pt_BR').replace('_', '-'));
 
-const value   = computed(() => props.item?.[props.col.key]);
+const value = computed(() => props.item?.[props.col.key]);
 const isEmpty = computed(() => value.value === null || value.value === undefined || value.value === '');
 const display = computed(() => (isEmpty.value ? '—' : value.value));
 </script>
@@ -40,7 +40,8 @@ const display = computed(() => (isEmpty.value ? '—' : value.value));
     <span
         v-else-if="col.type === 'yesno'"
         :class="`badge rounded fs-11 ${value ? 'badge-soft-success text-success border border-success' : 'badge-soft-secondary'}`"
-    >{{ value ? (t.yes ?? 'Sim') : (t.no ?? 'Não') }}</span>
+        >{{ value ? (t.yes ?? 'Sim') : (t.no ?? 'Não') }}</span
+    >
 
     <span v-else-if="col.type === 'numeric'" class="font-monospace small">
         {{ Number(value ?? 0).toLocaleString(locale) }}

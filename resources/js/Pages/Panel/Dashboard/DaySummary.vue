@@ -1,8 +1,8 @@
 <script setup>
 defineProps({
-    stats:        { type: Object,  required: true },
+    stats: { type: Object, required: true },
     isRefreshing: { type: Boolean, default: false },
-    t:            { type: Object,  required: true },
+    t: { type: Object, required: true },
 });
 </script>
 
@@ -13,7 +13,7 @@ defineProps({
                 <i class="ti ti-chart-bar me-2 text-warning"></i>
                 {{ t.section_day_summary }}
             </span>
-            <span v-if="isRefreshing" class="text-muted" style="font-size:.75rem;">
+            <span v-if="isRefreshing" class="text-muted" style="font-size: 0.75rem">
                 <i class="ti ti-loader-2 db-spin"></i>
             </span>
         </div>

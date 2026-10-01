@@ -6,8 +6,13 @@ import ContactLensCalculatorModal from '@/Pages/Panel/MedicalRecords/Components/
 import MedicalRecordViewModal from '@/Pages/Panel/MedicalRecords/Components/MedicalRecordViewModal.vue';
 import PreviousRecordsCard from '@/Pages/Panel/MedicalRecords/Components/PreviousRecordsCard.vue';
 import {
-    computeContactLens, contactLensCompact, contactLensOutOfRange, contactLensSummary, refractionFromRecord,
-    sphericalEquivalent, vertexConvert,
+    computeContactLens,
+    contactLensCompact,
+    contactLensOutOfRange,
+    contactLensSummary,
+    refractionFromRecord,
+    sphericalEquivalent,
+    vertexConvert,
 } from '@/Pages/Panel/MedicalRecords/Components/contactLens.js';
 
 /**
@@ -17,13 +22,18 @@ import {
  */
 
 const calc = computeContactLens({
-    vertex_distance_mm: 12, vertex_od: -6, vertex_oe: 6, se_od_sphere: -2, se_od_cylinder: -1,
+    vertex_distance_mm: 12,
+    vertex_od: -6,
+    vertex_oe: 6,
+    se_od_sphere: -2,
+    se_od_cylinder: -1,
 });
 
-const mountModal = (props = {}) => mount(ContactLensCalculatorModal, {
-    props: { open: true, t: {}, ...props },
-    global: { stubs: { teleport: true } },
-});
+const mountModal = (props = {}) =>
+    mount(ContactLensCalculatorModal, {
+        props: { open: true, t: {}, ...props },
+        global: { stubs: { teleport: true } },
+    });
 
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -52,33 +62,59 @@ describe('contactLens.js — mesmas fórmulas e arredondamento do servidor', () 
 
     it('nada digitado não gera cálculo; faixa do servidor é conferida antes de salvar', () => {
         expect(computeContactLens({ vertex_distance_mm: 12 })).toBeNull();
-        expect(calc).toMatchObject({ version: 1, vertex_od_result: -5.6, vertex_oe_result: 6.47, se_od_result: -2.5, se_oe_result: null });
+        expect(calc).toMatchObject({
+            version: 1,
+            vertex_od_result: -5.6,
+            vertex_oe_result: 6.47,
+            se_od_result: -2.5,
+            se_oe_result: null,
+        });
 
         expect(contactLensOutOfRange({ vertex_distance_mm: 0, vertex_od: -6 })).toEqual([]);
-        expect(contactLensOutOfRange({ vertex_distance_mm: 3, vertex_od: -41, se_oe_cylinder: 16 }))
-            .toEqual(['vertex_distance_mm', 'vertex_od', 'se_oe_cylinder']);
+        expect(contactLensOutOfRange({ vertex_distance_mm: 3, vertex_od: -41, se_oe_cylinder: 16 })).toEqual([
+            'vertex_distance_mm',
+            'vertex_od',
+            'se_oe_cylinder',
+        ]);
     });
 
     it('refração do prontuário ("+1.50", "-0,75", "0.00") vira número', () => {
-        const r = refractionFromRecord({
-            dynamic_spherical_right: '+1.50', dynamic_cylindrical_right: '-0,75',
-            dynamic_spherical_left: '0.00', dynamic_cylindrical_left: '',
-        }, 'dynamic');
+        const r = refractionFromRecord(
+            {
+                dynamic_spherical_right: '+1.50',
+                dynamic_cylindrical_right: '-0,75',
+                dynamic_spherical_left: '0.00',
+                dynamic_cylindrical_left: '',
+            },
+            'dynamic',
+        );
 
         expect(r).toEqual({ od: { sphere: 1.5, cylinder: -0.75 }, oe: { sphere: 0, cylinder: null } });
     });
 
     it('bloco de refração em branco (tudo "0.00"/"0°", como o servidor) não vira plano', () => {
-        expect(refractionFromRecord({
-            static_spherical_right: '0.00', static_cylindrical_right: '0,00', static_axis_right: '0°',
-            static_spherical_left: '+0.00', static_cylindrical_left: '', static_axis_left: '0º',
-        }, 'static')).toBeNull();
+        expect(
+            refractionFromRecord(
+                {
+                    static_spherical_right: '0.00',
+                    static_cylindrical_right: '0,00',
+                    static_axis_right: '0°',
+                    static_spherical_left: '+0.00',
+                    static_cylindrical_left: '',
+                    static_axis_left: '0º',
+                },
+                'static',
+            ),
+        ).toBeNull();
         expect(refractionFromRecord({}, 'dynamic')).toBeNull();
     });
 
     it('resumo traduzido: rótulo com a distância e olhos de cada idioma', () => {
         const rows = contactLensSummary(calc, {
-            od: 'OD', oe: 'OS', contact_lens_vertex_label: 'Contact lens (vertex :mm mm)', contact_lens_se_title: 'Spherical equivalent',
+            od: 'OD',
+            oe: 'OS',
+            contact_lens_vertex_label: 'Contact lens (vertex :mm mm)',
+            contact_lens_se_title: 'Spherical equivalent',
         });
 
         expect(rows).toEqual([
@@ -90,11 +126,17 @@ describe('contactLens.js — mesmas fórmulas e arredondamento do servidor', () 
 
     it('versão curta do painel: só o resultado por olho, sigla traduzida e rótulo completo', () => {
         expect(contactLensCompact(calc, { od: 'OD', oe: 'OS', contact_lens_short: 'CL' })).toEqual([
-            { key: 'vertex', tag: 'CL', label: 'Esférico → lente de contato (vértice 12 mm)', value: 'OD -5.60 | OS +6.47' },
+            {
+                key: 'vertex',
+                tag: 'CL',
+                label: 'Esférico → lente de contato (vértice 12 mm)',
+                value: 'OD -5.60 | OS +6.47',
+            },
             { key: 'se', tag: 'SE', label: 'Equivalente esférico', value: 'OD -2.50' },
         ]);
-        expect(contactLensCompact({ ...calc, vertex_od_result: null, vertex_oe_result: null }))
-            .toEqual([{ key: 'se', tag: 'SE', label: 'Equivalente esférico', value: 'OD -2.50' }]);
+        expect(contactLensCompact({ ...calc, vertex_od_result: null, vertex_oe_result: null })).toEqual([
+            { key: 'se', tag: 'SE', label: 'Equivalente esférico', value: 'OD -2.50' },
+        ]);
         expect(contactLensCompact(null)).toEqual([]);
     });
 });
@@ -114,7 +156,11 @@ describe('ContactLensCalculatorModal', () => {
         await wrapper.find('[data-action="apply"]').trigger('click');
 
         expect(wrapper.emitted('apply')[0][0]).toMatchObject({
-            vertex_distance_mm: 12, vertex_od: -6, vertex_od_result: -5.6, se_od_result: -2.5, se_oe_result: null,
+            vertex_distance_mm: 12,
+            vertex_od: -6,
+            vertex_od_result: -5.6,
+            se_od_result: -2.5,
+            se_oe_result: null,
         });
         expect(wrapper.emitted('close')).toHaveLength(1);
     });
@@ -126,10 +172,14 @@ describe('ContactLensCalculatorModal', () => {
     it('copia esférico/cilindro da refração dinâmica ou estática do prontuário', async () => {
         const wrapper = mountModal({
             record: {
-                dynamic_spherical_right: '-2.00', dynamic_cylindrical_right: '-1.00',
-                dynamic_spherical_left: '+1.50', dynamic_cylindrical_left: '0.00',
-                static_spherical_right: '-6.00', static_cylindrical_right: '0.00',
-                static_spherical_left: '+6.00', static_cylindrical_left: '0.00',
+                dynamic_spherical_right: '-2.00',
+                dynamic_cylindrical_right: '-1.00',
+                dynamic_spherical_left: '+1.50',
+                dynamic_cylindrical_left: '0.00',
+                static_spherical_right: '-6.00',
+                static_cylindrical_right: '0.00',
+                static_spherical_left: '+6.00',
+                static_cylindrical_left: '0.00',
             },
         });
 
@@ -178,7 +228,11 @@ describe('ContactLensCalculatorModal', () => {
     });
 
     it('prontuário assinado: só consulta (campos travados, sem usar/remover/copiar)', () => {
-        const wrapper = mountModal({ modelValue: calc, readonly: true, t: { contact_lens_locked: 'Signed record: calculation is read-only.' } });
+        const wrapper = mountModal({
+            modelValue: calc,
+            readonly: true,
+            t: { contact_lens_locked: 'Signed record: calculation is read-only.' },
+        });
 
         expect(wrapper.find('fieldset').attributes('disabled')).toBeDefined();
         expect(wrapper.text()).toContain('Signed record: calculation is read-only.');
@@ -227,10 +281,13 @@ describe('ContactLensCalculatorModal', () => {
 
 describe('Consulta posterior — visualização do prontuário', () => {
     it('mostra o cálculo vinculado na seção Refração', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () => ({
-            ok: true,
-            json: async () => ({ main_complaint: 'Adaptação de lente de contato', contact_lens_calculation: calc }),
-        })));
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => ({
+                ok: true,
+                json: async () => ({ main_complaint: 'Adaptação de lente de contato', contact_lens_calculation: calc }),
+            })),
+        );
 
         const wrapper = mount(MedicalRecordViewModal, {
             props: { open: true, record: { show_url: '/panel/patients/1/medicalrecords/1' }, t: {} },
@@ -248,8 +305,18 @@ describe('Consulta posterior — visualização do prontuário', () => {
             props: {
                 t: {},
                 records: [
-                    { id: 'a', created_at_formatted: '01/09/2026', doctor_name: 'Dra. A', summary: { contact_lens: calc } },
-                    { id: 'b', created_at_formatted: '01/08/2026', doctor_name: 'Dr. B', summary: { contact_lens: null } },
+                    {
+                        id: 'a',
+                        created_at_formatted: '01/09/2026',
+                        doctor_name: 'Dra. A',
+                        summary: { contact_lens: calc },
+                    },
+                    {
+                        id: 'b',
+                        created_at_formatted: '01/08/2026',
+                        doctor_name: 'Dr. B',
+                        summary: { contact_lens: null },
+                    },
                 ],
             },
         });
@@ -271,8 +338,12 @@ describe('Local de acesso: Prontuário (não mais o Gerenciador de Imagens)', ()
 
     it('prontuário: botão só para médico, resultado no form e modal travado quando assinado', () => {
         expect(form).toContain('contact_lens_calculation: r?.contact_lens_calculation ?? null');
-        expect(form).toMatch(/<button\s+v-if="isDoctor"[^>]*\s+data-contact-lens-open\s+:disabled="isLocked && !contactLensRows\.length"/);
-        expect(form).toMatch(/<ContactLensCalculatorModal[^>]*:readonly="isLocked"[^>]*@apply="applyContactLens"[^>]*@remove="removeContactLens"/);
+        expect(form).toMatch(
+            /<button\s+v-if="isDoctor"[^>]*\s+data-contact-lens-open\s+:disabled="isLocked && !contactLensRows\.length"/,
+        );
+        expect(form).toMatch(
+            /<ContactLensCalculatorModal[^>]*:readonly="isLocked"[^>]*@apply="applyContactLens"[^>]*@remove="removeContactLens"/,
+        );
         expect(form).toMatch(/v-if="contactLensRows\.length"[^>]*data-contact-lens-summary/);
     });
 
@@ -281,6 +352,8 @@ describe('Local de acesso: Prontuário (não mais o Gerenciador de Imagens)', ()
 
         expect(eyeImages).not.toContain('LensCalculatorModal');
         expect(eyeImages).not.toContain('lens_calc_');
-        expect(existsSync(resolve(process.cwd(), 'resources/js/Pages/Panel/EyeImages/LensCalculatorModal.vue'))).toBe(false);
+        expect(existsSync(resolve(process.cwd(), 'resources/js/Pages/Panel/EyeImages/LensCalculatorModal.vue'))).toBe(
+            false,
+        );
     });
 });

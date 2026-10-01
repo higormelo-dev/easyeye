@@ -1,22 +1,22 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout  from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    doctors:     { type: Array,  default: () => [] },
-    filters:     { type: Object, default: () => ({}) },
-    schedules:   { type: Array,  default: () => [] },
-    summary:     { type: Object, default: null },
+    breadcrumbs: { type: Array, default: () => [] },
+    doctors: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    schedules: { type: Array, default: () => [] },
+    summary: { type: Object, default: null },
 });
 
 const form = ref({
-    date_from:  props.filters.date_from  || '',
+    date_from: props.filters.date_from || '',
     date_until: props.filters.date_until || '',
-    doctor_id:  props.filters.doctor_id  || '',
+    doctor_id: props.filters.doctor_id || '',
 });
 
 function applyFilter() {
@@ -36,11 +36,11 @@ const hasResults = computed(() => props.summary !== null);
                     <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
                         <div class="col-md-3">
                             <label class="form-label small mb-1">De *</label>
-                            <input v-model="form.date_from" type="date" class="form-control" required>
+                            <input v-model="form.date_from" type="date" class="form-control" required />
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small mb-1">Até *</label>
-                            <input v-model="form.date_until" type="date" class="form-control" required>
+                            <input v-model="form.date_until" type="date" class="form-control" required />
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small mb-1">Médico</label>
@@ -58,28 +58,36 @@ const hasResults = computed(() => props.summary !== null);
             <template v-if="hasResults">
                 <div class="row g-3 mb-3">
                     <div class="col-6 col-md-3">
-                        <div class="card h-100"><div class="card-body py-3">
-                            <small class="text-muted d-block">Total ausentes</small>
-                            <div class="fw-bold fs-5 text-danger">{{ summary.total_absent }}</div>
-                        </div></div>
+                        <div class="card h-100">
+                            <div class="card-body py-3">
+                                <small class="text-muted d-block">Total ausentes</small>
+                                <div class="fw-bold fs-5 text-danger">{{ summary.total_absent }}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="card h-100"><div class="card-body py-3">
-                            <small class="text-muted d-block">Não comparecimentos</small>
-                            <div class="fw-bold fs-5 text-warning">{{ summary.noshow }}</div>
-                        </div></div>
+                        <div class="card h-100">
+                            <div class="card-body py-3">
+                                <small class="text-muted d-block">Não comparecimentos</small>
+                                <div class="fw-bold fs-5 text-warning">{{ summary.noshow }}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="card h-100"><div class="card-body py-3">
-                            <small class="text-muted d-block">Cancelados</small>
-                            <div class="fw-bold fs-5 text-secondary">{{ summary.cancelled }}</div>
-                        </div></div>
+                        <div class="card h-100">
+                            <div class="card-body py-3">
+                                <small class="text-muted d-block">Cancelados</small>
+                                <div class="fw-bold fs-5 text-secondary">{{ summary.cancelled }}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="card h-100"><div class="card-body py-3">
-                            <small class="text-muted d-block">Taxa de absenteísmo</small>
-                            <div class="fw-bold fs-5 text-danger">{{ summary.absenteeism_rate }}%</div>
-                        </div></div>
+                        <div class="card h-100">
+                            <div class="card-body py-3">
+                                <small class="text-muted d-block">Taxa de absenteísmo</small>
+                                <div class="fw-bold fs-5 text-danger">{{ summary.absenteeism_rate }}%</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -106,7 +114,9 @@ const hasResults = computed(() => props.summary !== null);
                                     <td>{{ s.doctor_name || '—' }}</td>
                                     <td class="text-muted small">{{ s.covenant || '—' }}</td>
                                     <td class="text-center">
-                                        <span class="badge badge-soft-warning rounded fs-11">{{ s.situation_label }}</span>
+                                        <span class="badge badge-soft-warning rounded fs-11">{{
+                                            s.situation_label
+                                        }}</span>
                                     </td>
                                 </tr>
                             </tbody>

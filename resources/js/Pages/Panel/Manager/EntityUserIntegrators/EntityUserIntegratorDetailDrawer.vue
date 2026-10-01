@@ -8,20 +8,20 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
  * — consistente com o padrão dos demais DetailDrawers do Manager.
  */
 const props = defineProps({
-    open:    { type: Boolean, required: true },
-    showUrl: { type: String,  default: '' },
-    t:       { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    showUrl: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit    = defineEmits(['close', 'edit']);
+const emit = defineEmits(['close', 'edit']);
 const loading = ref(false);
-const item    = ref(null);
+const item = ref(null);
 
 async function loadDetail(url) {
     loading.value = true;
-    item.value    = null;
+    item.value = null;
     try {
-        const res  = await fetch(url, { headers: { Accept: 'application/json' } });
+        const res = await fetch(url, { headers: { Accept: 'application/json' } });
         const json = await res.json();
         item.value = json.data;
     } finally {
@@ -29,14 +29,17 @@ async function loadDetail(url) {
     }
 }
 
-watch(() => props.open, (val) => {
-    if (val && props.showUrl) {
-        loadDetail(props.showUrl);
-    }
-    if (!val) {
-        item.value = null;
-    }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val && props.showUrl) {
+            loadDetail(props.showUrl);
+        }
+        if (!val) {
+            item.value = null;
+        }
+    },
+);
 </script>
 
 <template>
@@ -88,7 +91,9 @@ watch(() => props.open, (val) => {
                 <div class="detail-table">
                     <div class="detail-row">
                         <span class="detail-label">{{ t.col_code ?? 'Código' }}</span>
-                        <span class="detail-value"><code>{{ item.code }}</code></span>
+                        <span class="detail-value"
+                            ><code>{{ item.code }}</code></span
+                        >
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">{{ t.col_name ?? 'Nome' }}</span>
@@ -129,25 +134,36 @@ watch(() => props.open, (val) => {
 </template>
 
 <style scoped>
-.detail-section { margin-bottom: 1.5rem; }
+.detail-section {
+    margin-bottom: 1.5rem;
+}
 .detail-section__title {
-    font-size: .72rem;
+    font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: 0.06em;
     color: var(--bs-secondary-color);
-    margin-bottom: .5rem;
-    padding-bottom: .25rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
     border-bottom: 1px solid var(--bs-border-color);
 }
-.detail-table { display: grid; gap: .375rem; }
+.detail-table {
+    display: grid;
+    gap: 0.375rem;
+}
 .detail-row {
     display: grid;
     grid-template-columns: 150px 1fr;
-    gap: .5rem;
-    font-size: .875rem;
+    gap: 0.5rem;
+    font-size: 0.875rem;
     align-items: baseline;
 }
-.detail-label { font-weight: 600; color: var(--bs-body-color); }
-.detail-value { color: var(--bs-secondary-color); word-break: break-word; }
+.detail-label {
+    font-weight: 600;
+    color: var(--bs-body-color);
+}
+.detail-value {
+    color: var(--bs-secondary-color);
+    word-break: break-word;
+}
 </style>

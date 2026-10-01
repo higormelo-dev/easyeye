@@ -21,13 +21,23 @@ vi.mock('@inertiajs/vue3', async () => {
 
     return {
         usePage: () => ({ props: inertia.pageProps }),
-        router: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn(), reload: vi.fn(), visit: vi.fn() },
+        router: {
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            patch: vi.fn(),
+            delete: vi.fn(),
+            reload: vi.fn(),
+            visit: vi.fn(),
+        },
         Link: { template: '<a><slot /></a>', props: ['href'] },
         Head: { template: '<div><slot /></div>' },
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view', 'showViewToggle'],
@@ -44,7 +54,8 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder', 'clearLabel', 'wrapperClass', 'maxWidth'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :data-wrapper-class="wrapperClass" :data-max-width="maxWidth" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :data-wrapper-class="wrapperClass" :data-max-width="maxWidth" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Pages/Panel/Stock/Products/ProductTable.vue', () => ({
@@ -59,17 +70,30 @@ vi.mock('@/Pages/Panel/Stock/Products/ProductTable.vue', () => ({
     },
 }));
 vi.mock('@/Pages/Panel/Stock/Products/ProductCards.vue', () => ({
-    default: { props: ['items', 't'], template: '<div class="cards-stub">{{ items.data.map((p) => p.name).join(",") }}</div>' },
+    default: {
+        props: ['items', 't'],
+        template: '<div class="cards-stub">{{ items.data.map((p) => p.name).join(",") }}</div>',
+    },
 }));
 vi.mock('@/Pages/Panel/Stock/Products/ProductFormModal.vue', () => ({ default: { template: '<div />' } }));
 
 const t = {
-    page_title: 'Products', total_label: 'Total:', btn_movements: 'Movements', btn_import: 'Import',
-    btn_new: 'New product', search_placeholder: 'Search by name...', filter_status_all: 'All',
-    filter_status_active: 'Active', filter_status_inactive: 'Inactive', category_all: 'All categories',
-    filter_low_stock: 'Below minimum only', filter_expiring_lots: 'Lot expiring only (30d)',
-    confirm_delete: 'Delete the product ":name"?', search_clear: 'Clear search',
-    toggle_error: 'Could not load the current product data.', close: 'Close',
+    page_title: 'Products',
+    total_label: 'Total:',
+    btn_movements: 'Movements',
+    btn_import: 'Import',
+    btn_new: 'New product',
+    search_placeholder: 'Search by name...',
+    filter_status_all: 'All',
+    filter_status_active: 'Active',
+    filter_status_inactive: 'Inactive',
+    category_all: 'All categories',
+    filter_low_stock: 'Below minimum only',
+    filter_expiring_lots: 'Lot expiring only (30d)',
+    confirm_delete: 'Delete the product ":name"?',
+    search_clear: 'Clear search',
+    toggle_error: 'Could not load the current product data.',
+    close: 'Close',
 };
 
 const routes = {
@@ -81,7 +105,15 @@ const routes = {
     import_index: '/stock/products/import',
 };
 
-const baseFilters = { search: '', status: 'all', category_id: '', low_stock: false, expiring_lots: false, sort: 'name', direction: 'asc' };
+const baseFilters = {
+    search: '',
+    status: 'all',
+    category_id: '',
+    low_stock: false,
+    expiring_lots: false,
+    sort: 'name',
+    direction: 'asc',
+};
 
 let wrapper;
 
@@ -101,7 +133,13 @@ afterEach(() => {
 function mountPage(filters = baseFilters) {
     wrapper = mount(ProductsIndex, {
         props: {
-            items: { data: [{ id: 'p1', name: 'Colírio', unit: 'un', active: true }, { id: 'p2', name: 'Seringa', unit: 'un', active: false }], total: 42 },
+            items: {
+                data: [
+                    { id: 'p1', name: 'Colírio', unit: 'un', active: true },
+                    { id: 'p2', name: 'Seringa', unit: 'un', active: false },
+                ],
+                total: 42,
+            },
             categories: [{ id: 'c1', name: 'Colírios' }],
             filters,
             routes,
@@ -156,7 +194,12 @@ describe('Stock/Products/Index', () => {
 
         expect(w.find('.search').attributes('data-wrapper-class')).toBe('');
         expect(w.find('.search').attributes('data-max-width')).toBe('280px');
-        expect(w.findAll('select')[0].findAll('option').map((o) => o.text())).toEqual(['All', 'Active', 'Inactive']);
+        expect(
+            w
+                .findAll('select')[0]
+                .findAll('option')
+                .map((o) => o.text()),
+        ).toEqual(['All', 'Active', 'Inactive']);
     });
 
     it('começa na tabela e alterna para cards (mesmo paginator), guardando a preferência', async () => {
@@ -179,7 +222,14 @@ describe('Stock/Products/Index', () => {
 
     it('a busca espera parar de digitar e preserva ordenação e filtros', async () => {
         vi.useFakeTimers();
-        const w = mountPage({ ...baseFilters, status: 'active', category_id: 'c1', low_stock: true, sort: 'qty_on_hand', direction: 'desc' });
+        const w = mountPage({
+            ...baseFilters,
+            status: 'active',
+            category_id: 'c1',
+            low_stock: true,
+            sort: 'qty_on_hand',
+            direction: 'desc',
+        });
 
         await w.find('.search').setValue('colirio');
         expect(router.get).not.toHaveBeenCalled();
@@ -190,7 +240,15 @@ describe('Stock/Products/Index', () => {
         expect(router.get).toHaveBeenCalledTimes(1);
         expect(router.get).toHaveBeenCalledWith(
             '/stock/products',
-            { search: 'colirio', status: 'active', category_id: 'c1', low_stock: 1, expiring_lots: 0, sort: 'qty_on_hand', direction: 'desc' },
+            {
+                search: 'colirio',
+                status: 'active',
+                category_id: 'c1',
+                low_stock: 1,
+                expiring_lots: 0,
+                sort: 'qty_on_hand',
+                direction: 'desc',
+            },
             expect.objectContaining({ preserveState: true, replace: true }),
         );
     });
@@ -215,14 +273,24 @@ describe('Stock/Products/Index', () => {
 
         expect(router.get).toHaveBeenCalledWith(
             '/stock/products',
-            { search: 'col', status: 'all', category_id: '', low_stock: 0, expiring_lots: 1, sort: 'qty_on_hand', direction: 'desc' },
+            {
+                search: 'col',
+                status: 'all',
+                category_id: '',
+                low_stock: 0,
+                expiring_lots: 1,
+                sort: 'qty_on_hand',
+                direction: 'desc',
+            },
             expect.objectContaining({ preserveState: true }),
         );
     });
 
     it('ativar/desativar busca o produto atual e envia só nome, unidade e o status inverso ao da linha', async () => {
         // Outra pessoa renomeou o produto (e até já o desativou) depois que a página abriu.
-        const get = vi.fn().mockResolvedValue({ data: { data: { id: 'p1', name: 'Colírio 10ml', unit: 'fr', active: false } } });
+        const get = vi
+            .fn()
+            .mockResolvedValue({ data: { data: { id: 'p1', name: 'Colírio 10ml', unit: 'fr', active: false } } });
         vi.stubGlobal('axios', { get });
         const w = mountPage();
 
@@ -263,6 +331,9 @@ describe('Stock/Products/Index', () => {
         expect(router.delete).not.toHaveBeenCalled();
 
         await w.find('.delete-row').trigger('click');
-        expect(router.delete).toHaveBeenCalledWith('/stock/products/p1', expect.objectContaining({ preserveScroll: true }));
+        expect(router.delete).toHaveBeenCalledWith(
+            '/stock/products/p1',
+            expect.objectContaining({ preserveScroll: true }),
+        );
     });
 });

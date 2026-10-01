@@ -8,10 +8,10 @@ import AppLayout from '@/Layouts/AppLayout.vue';
  * todas as rotas protegidas pra cá enquanto o status estiver fora dos limites.
  */
 const props = defineProps({
-    entity:           { type: Object, default: null },
+    entity: { type: Object, default: null },
     lastSubscription: { type: Object, default: null },
-    plans:            { type: Array,  default: () => [] },
-    urls:             { type: Object, required: true },
+    plans: { type: Array, default: () => [] },
+    urls: { type: Object, required: true },
 });
 
 function brl(value) {
@@ -24,15 +24,19 @@ function brl(value) {
         <div class="container py-5">
             <div class="row justify-content-center">
                 <div class="col-lg-10 col-xl-9">
-
                     <!-- Hero -->
                     <div class="text-center mb-5">
-                        <div class="d-inline-flex align-items-center justify-content-center mb-3 bg-danger-subtle rounded-circle" style="width: 96px; height: 96px;">
+                        <div
+                            class="d-inline-flex align-items-center justify-content-center mb-3 bg-danger-subtle rounded-circle"
+                            style="width: 96px; height: 96px"
+                        >
                             <i class="ti ti-lock fs-1 text-danger"></i>
                         </div>
                         <h2 class="fw-bold mb-2">Assinatura expirada</h2>
                         <p class="text-muted mb-0">
-                            <span v-if="entity">A empresa <strong>{{ entity.name }}</strong> está com o acesso bloqueado.</span>
+                            <span v-if="entity"
+                                >A empresa <strong>{{ entity.name }}</strong> está com o acesso bloqueado.</span
+                            >
                             <span v-else>O acesso ao sistema está bloqueado.</span>
                             Renove para continuar usando o EasyEye.
                         </p>
@@ -45,7 +49,9 @@ function brl(value) {
                             <strong>Última assinatura:</strong>
                             {{ lastSubscription.plan_name ?? '—' }}
                             <span v-if="lastSubscription.ends_at"> — encerrada em {{ lastSubscription.ends_at }}</span>
-                            <span v-if="lastSubscription.status" class="badge bg-secondary ms-2 fs-11">{{ lastSubscription.status }}</span>
+                            <span v-if="lastSubscription.status" class="badge bg-secondary ms-2 fs-11">{{
+                                lastSubscription.status
+                            }}</span>
                         </div>
                     </div>
 
@@ -63,7 +69,9 @@ function brl(value) {
 
                                     <div class="mb-3">
                                         <span class="fs-3 fw-bold text-primary">{{ brl(plan.price) }}</span>
-                                        <small class="text-muted">/ {{ plan.billing_cycle === 'monthly' ? 'mês' : 'ano' }}</small>
+                                        <small class="text-muted"
+                                            >/ {{ plan.billing_cycle === 'monthly' ? 'mês' : 'ano' }}</small
+                                        >
                                     </div>
 
                                     <ul class="list-unstyled small mb-3 flex-grow-1">

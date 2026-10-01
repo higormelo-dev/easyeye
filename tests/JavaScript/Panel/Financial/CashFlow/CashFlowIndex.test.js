@@ -17,14 +17,18 @@ vi.mock('@inertiajs/vue3', () => ({
     Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
 }));
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel'],
         template: '<div><span class="total">{{ totalLabel }} {{ total }}</span><slot name="actions" /></div>',
     },
 }));
-vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { props: ['data'], template: '<nav class="pagination-stub" />' } }));
+vi.mock('@/Components/Panel/TablePagination.vue', () => ({
+    default: { props: ['data'], template: '<nav class="pagination-stub" />' },
+}));
 vi.mock('@/Components/Panel/PeriodFilter.vue', () => ({
     default: {
         name: 'PeriodFilterStub',
@@ -62,57 +66,141 @@ vi.mock('@/Pages/Panel/Financial/CashFlow/CashEntryFormModal.vue', () => ({
 }));
 
 const t = {
-    page_title: 'Cash Flow', total_label: 'Total:', new_entry: 'New entry', close_cash: 'Close cash register', report: 'Report',
+    page_title: 'Cash Flow',
+    total_label: 'Total:',
+    new_entry: 'New entry',
+    close_cash: 'Close cash register',
+    report: 'Report',
     kpis_label: 'Period indicators',
-    kpi_received: 'Received', kpi_received_hint: 'Paid income.',
-    kpi_receivable: 'Receivable', kpi_receivable_hint: 'Pending income.',
-    kpi_paid: 'Paid', kpi_paid_hint: 'Paid expenses.',
-    kpi_payable: 'Payable', kpi_payable_hint: 'Pending expenses.',
-    kpi_realized_balance: 'Realized balance', kpi_realized_balance_hint: 'Received minus paid.',
-    kpi_projected_balance: 'Projected balance', kpi_projected_balance_hint: 'Realized plus receivable minus payable.',
+    kpi_received: 'Received',
+    kpi_received_hint: 'Paid income.',
+    kpi_receivable: 'Receivable',
+    kpi_receivable_hint: 'Pending income.',
+    kpi_paid: 'Paid',
+    kpi_paid_hint: 'Paid expenses.',
+    kpi_payable: 'Payable',
+    kpi_payable_hint: 'Pending expenses.',
+    kpi_realized_balance: 'Realized balance',
+    kpi_realized_balance_hint: 'Received minus paid.',
+    kpi_projected_balance: 'Projected balance',
+    kpi_projected_balance_hint: 'Realized plus receivable minus payable.',
     kpi_scope_note: 'Indicators follow the filters.',
-    filters_label: 'Cash flow filters', search_placeholder: 'Search by description or code', search_clear: 'Clear search',
-    filter_type: 'Type', filter_type_all: 'All', filter_type_income: 'Income', filter_type_expense: 'Expenses',
-    filter_status: 'Status', filter_status_all: 'All statuses', filter_category: 'Category', filter_category_all: 'All categories',
-    filter_clear: 'Clear filters', filtering: 'Updating the list…',
-    closed_banner: 'Part of this period is closed (:periods).', closed_banner_link: 'View closings',
-    table_caption: 'Entries for the period', sort_by: 'Sort by :column',
-    col_code: 'Code', col_date: 'Date', col_description: 'Description', col_patient: 'Patient', col_category: 'Category',
-    col_payment_method: 'Method', col_origin: 'Origin', col_type: 'Type', col_status: 'Status', col_value: 'Amount', col_actions: 'Actions',
-    empty: 'No entries in this period.', empty_filtered: 'No entries match these filters.',
-    action_edit: 'Edit entry', action_delete: 'Delete entry',
-    footer_label: 'Filter totals (:count entries, cancelled excluded)', footer_income: 'Income', footer_expense: 'Expenses', footer_balance: 'Balance',
+    filters_label: 'Cash flow filters',
+    search_placeholder: 'Search by description or code',
+    search_clear: 'Clear search',
+    filter_type: 'Type',
+    filter_type_all: 'All',
+    filter_type_income: 'Income',
+    filter_type_expense: 'Expenses',
+    filter_status: 'Status',
+    filter_status_all: 'All statuses',
+    filter_category: 'Category',
+    filter_category_all: 'All categories',
+    filter_clear: 'Clear filters',
+    filtering: 'Updating the list…',
+    closed_banner: 'Part of this period is closed (:periods).',
+    closed_banner_link: 'View closings',
+    table_caption: 'Entries for the period',
+    sort_by: 'Sort by :column',
+    col_code: 'Code',
+    col_date: 'Date',
+    col_description: 'Description',
+    col_patient: 'Patient',
+    col_category: 'Category',
+    col_payment_method: 'Method',
+    col_origin: 'Origin',
+    col_type: 'Type',
+    col_status: 'Status',
+    col_value: 'Amount',
+    col_actions: 'Actions',
+    empty: 'No entries in this period.',
+    empty_filtered: 'No entries match these filters.',
+    action_edit: 'Edit entry',
+    action_delete: 'Delete entry',
+    footer_label: 'Filter totals (:count entries, cancelled excluded)',
+    footer_income: 'Income',
+    footer_expense: 'Expenses',
+    footer_balance: 'Balance',
     origins: { schedule: 'Schedule', claim: 'Claim', purchase: 'Purchase', manual: 'Manual' },
-    lock_billing_claim: 'Insurance claim', lock_billing_claim_hint: 'Created by a claim payment.',
-    lock_closed_period: 'Register closed', lock_closed_period_hint: 'Reopen the period to change it.',
-    types: { income: 'Income', expense: 'Expense' }, statuses: { pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled' },
-    delete_title: 'Delete entry?', delete_message: 'It leaves the balance.', delete_confirm: 'Delete', cancel: 'Cancel',
-    deleted: 'Entry deleted.', delete_error: 'Could not delete the entry.', network_error: 'Connection failed.',
-    session_expired: 'Session expired.', saved_outside_period: 'Saved on :date, outside the filter.',
+    lock_billing_claim: 'Insurance claim',
+    lock_billing_claim_hint: 'Created by a claim payment.',
+    lock_closed_period: 'Register closed',
+    lock_closed_period_hint: 'Reopen the period to change it.',
+    types: { income: 'Income', expense: 'Expense' },
+    statuses: { pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled' },
+    delete_title: 'Delete entry?',
+    delete_message: 'It leaves the balance.',
+    delete_confirm: 'Delete',
+    cancel: 'Cancel',
+    deleted: 'Entry deleted.',
+    delete_error: 'Could not delete the entry.',
+    network_error: 'Connection failed.',
+    session_expired: 'Session expired.',
+    saved_outside_period: 'Saved on :date, outside the filter.',
     shared: { period: { label: 'Period' } },
 };
 
 const rows = [
     {
-        id: 'free', code: 'FLC-0000000003', entry_date: '2026-09-10', description: 'Consulta particular', type: 'income', status: 'paid',
-        amount: 180, patient_name: 'MARIA DA SILVA', payment_method: 'cash', payment_method_label: 'À Vista',
-        origin: 'schedule', category_name: null, covenant_name: null, lock_reason: null,
+        id: 'free',
+        code: 'FLC-0000000003',
+        entry_date: '2026-09-10',
+        description: 'Consulta particular',
+        type: 'income',
+        status: 'paid',
+        amount: 180,
+        patient_name: 'MARIA DA SILVA',
+        payment_method: 'cash',
+        payment_method_label: 'À Vista',
+        origin: 'schedule',
+        category_name: null,
+        covenant_name: null,
+        lock_reason: null,
     },
     {
-        id: 'claim', code: 'FLC-0000000002', entry_date: '2026-09-11', description: 'Recebimento de guia', type: 'income', status: 'paid',
-        amount: 250, patient_name: null, payment_method: 'transfer', payment_method_label: 'Transferência Bancária',
-        origin: 'claim', category_name: null, covenant_name: 'Unimed', lock_reason: 'billing_claim',
+        id: 'claim',
+        code: 'FLC-0000000002',
+        entry_date: '2026-09-11',
+        description: 'Recebimento de guia',
+        type: 'income',
+        status: 'paid',
+        amount: 250,
+        patient_name: null,
+        payment_method: 'transfer',
+        payment_method_label: 'Transferência Bancária',
+        origin: 'claim',
+        category_name: null,
+        covenant_name: 'Unimed',
+        lock_reason: 'billing_claim',
     },
     {
-        id: 'closed', code: 'FLC-0000000001', entry_date: '2026-09-02', description: 'Aluguel', type: 'expense', status: 'paid',
-        amount: 1500, patient_name: null, payment_method: null, payment_method_label: null,
-        origin: 'manual', category_name: 'Aluguel', covenant_name: null, lock_reason: 'closed_period',
+        id: 'closed',
+        code: 'FLC-0000000001',
+        entry_date: '2026-09-02',
+        description: 'Aluguel',
+        type: 'expense',
+        status: 'paid',
+        amount: 1500,
+        patient_name: null,
+        payment_method: null,
+        payment_method_label: null,
+        origin: 'manual',
+        category_name: 'Aluguel',
+        covenant_name: null,
+        lock_reason: 'closed_period',
     },
 ];
 
 const overview = {
-    received: 430, receivable: 50, paid: 1500, payable: 20, realized_balance: -1070, projected_balance: -1040,
-    income_total: 480, expense_total: 1520, entries_count: 5,
+    received: 430,
+    receivable: 50,
+    paid: 1500,
+    payable: 20,
+    realized_balance: -1070,
+    projected_balance: -1040,
+    income_total: 480,
+    expense_total: 1520,
+    entries_count: 5,
 };
 
 const categories = [
@@ -120,9 +208,12 @@ const categories = [
     { id: 'cat-out', name: 'Aluguel', type: 'expense' },
 ];
 
-const brl = (value, signed = false) => new Intl.NumberFormat('pt-BR', {
-    style: 'currency', currency: 'BRL', ...(signed ? { signDisplay: 'exceptZero' } : {}),
-}).format(value);
+const brl = (value, signed = false) =>
+    new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        ...(signed ? { signDisplay: 'exceptZero' } : {}),
+    }).format(value);
 
 let wrapper;
 
@@ -135,7 +226,16 @@ function mountPage(extra = {}) {
             covenants: [{ id: 'cov-1', name: 'UNIMED' }],
             payment_methods: [{ value: 'cash', label: 'À Vista' }],
             closed_periods: [],
-            filters: { from: '2026-09-01', to: '2026-09-30', type: null, status: null, category_id: null, search: '', sort: 'entry_date', direction: 'desc' },
+            filters: {
+                from: '2026-09-01',
+                to: '2026-09-30',
+                type: null,
+                status: null,
+                category_id: null,
+                search: '',
+                sort: 'entry_date',
+                direction: 'desc',
+            },
             today: '2026-09-26',
             can_edit_schedule: true,
             t,
@@ -150,9 +250,9 @@ function jsonResponse(status, body) {
     return Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
 }
 
-const INDEX_URL   = '/_routes/panel.financial.cash-flow.index';
-const VISIT_OPTS  = expect.objectContaining({ preserveState: true, preserveScroll: true, replace: true });
-const lastVisit   = () => vi.mocked(router.get).mock.calls.at(-1);
+const INDEX_URL = '/_routes/panel.financial.cash-flow.index';
+const VISIT_OPTS = expect.objectContaining({ preserveState: true, preserveScroll: true, replace: true });
+const lastVisit = () => vi.mocked(router.get).mock.calls.at(-1);
 
 beforeEach(() => {
     vi.mocked(router.get).mockReset();
@@ -196,16 +296,20 @@ describe('Financial/CashFlow/Index — cabeçalho e KPIs', () => {
     it('atalho "Fechar caixa" leva o período limitado a hoje; "Relatório" mantém De/Até', () => {
         const w = mountPage();
 
-        expect(w.find('[data-test="close-cash-link"]').attributes('href'))
-            .toBe('/_routes/panel.financial.cash-closing.index?from=2026-09-01&to=2026-09-26');
-        expect(w.find('[data-test="report-link"]').attributes('href'))
-            .toBe('/_routes/panel.financial.reports.cash-flow?from=2026-09-01&to=2026-09-30');
+        expect(w.find('[data-test="close-cash-link"]').attributes('href')).toBe(
+            '/_routes/panel.financial.cash-closing.index?from=2026-09-01&to=2026-09-26',
+        );
+        expect(w.find('[data-test="report-link"]').attributes('href')).toBe(
+            '/_routes/panel.financial.reports.cash-flow?from=2026-09-01&to=2026-09-30',
+        );
     });
 
     it('avisa quando o período filtrado cruza um caixa fechado, com datas formatadas', () => {
         const w = mountPage({ closed_periods: [{ period_start: '2026-09-01', period_end: '2026-09-05' }] });
 
-        expect(w.find('[data-test="closed-banner"]').text()).toContain('Part of this period is closed (01/09/2026–05/09/2026).');
+        expect(w.find('[data-test="closed-banner"]').text()).toContain(
+            'Part of this period is closed (01/09/2026–05/09/2026).',
+        );
     });
 });
 
@@ -296,7 +400,14 @@ describe('Financial/CashFlow/Index — tabela e cards', () => {
 
         const filtered = mountPage({
             entries: { data: [], total: 0 },
-            filters: { from: '2026-09-01', to: '2026-09-30', type: 'expense', status: null, category_id: null, search: '' },
+            filters: {
+                from: '2026-09-01',
+                to: '2026-09-30',
+                type: 'expense',
+                status: null,
+                category_id: null,
+                search: '',
+            },
         });
         expect(filtered.find('[data-test="empty-state"]').text()).toContain('No entries match these filters.');
         expect(filtered.find('[data-test="empty-clear-filters"]').exists()).toBe(true);
@@ -323,7 +434,14 @@ describe('Financial/CashFlow/Index — filtros com aplicação automática', () 
 
     it('tipo segmentado: aria-pressed e aplica na hora; troca de tipo tira categoria incompatível', async () => {
         const w = mountPage({
-            filters: { from: '2026-09-01', to: '2026-09-30', type: null, status: null, category_id: 'cat-in', search: '' },
+            filters: {
+                from: '2026-09-01',
+                to: '2026-09-30',
+                type: null,
+                status: null,
+                category_id: 'cat-in',
+                search: '',
+            },
         });
 
         expect(w.find('[data-test="type-all"]').attributes('aria-pressed')).toBe('true');
@@ -345,10 +463,18 @@ describe('Financial/CashFlow/Index — filtros com aplicação automática', () 
         const w = mountPage();
 
         await w.find('[data-test="status-filter"]').setValue('pending');
-        expect(lastVisit()).toEqual([INDEX_URL, { from: '2026-09-01', to: '2026-09-30', status: 'pending' }, VISIT_OPTS]);
+        expect(lastVisit()).toEqual([
+            INDEX_URL,
+            { from: '2026-09-01', to: '2026-09-30', status: 'pending' },
+            VISIT_OPTS,
+        ]);
 
         await w.find('select.category-filter').setValue('cat-out');
-        expect(lastVisit()).toEqual([INDEX_URL, { from: '2026-09-01', to: '2026-09-30', status: 'pending', category_id: 'cat-out' }, VISIT_OPTS]);
+        expect(lastVisit()).toEqual([
+            INDEX_URL,
+            { from: '2026-09-01', to: '2026-09-30', status: 'pending', category_id: 'cat-out' },
+            VISIT_OPTS,
+        ]);
     });
 
     it('período do PeriodFilter aplica na hora (hoje do servidor e rótulos compartilhados repassados)', async () => {
@@ -368,21 +494,36 @@ describe('Financial/CashFlow/Index — filtros com aplicação automática', () 
     it('"Limpar filtros" só aparece com filtro e limpa busca/tipo/status/categoria mantendo o período (uma requisição)', async () => {
         vi.useFakeTimers();
         const w = mountPage({
-            filters: { from: '2026-09-01', to: '2026-09-30', type: 'income', status: 'paid', category_id: 'cat-in', search: 'consulta', sort: 'amount', direction: 'asc' },
+            filters: {
+                from: '2026-09-01',
+                to: '2026-09-30',
+                type: 'income',
+                status: 'paid',
+                category_id: 'cat-in',
+                search: 'consulta',
+                sort: 'amount',
+                direction: 'asc',
+            },
         });
 
         await w.find('[data-test="clear-filters"]').trigger('click');
         vi.advanceTimersByTime(1000);
 
         expect(router.get).toHaveBeenCalledTimes(1);
-        expect(lastVisit()).toEqual([INDEX_URL, { from: '2026-09-01', to: '2026-09-30', sort: 'amount', direction: 'asc' }, VISIT_OPTS]);
+        expect(lastVisit()).toEqual([
+            INDEX_URL,
+            { from: '2026-09-01', to: '2026-09-30', sort: 'amount', direction: 'asc' },
+            VISIT_OPTS,
+        ]);
         await nextTick();
         expect(w.find('[data-test="clear-filters"]').exists()).toBe(false);
         expect(w.find('input[type="text"]').element.value).toBe('');
     });
 
     it('enquanto carrega: aviso em aria-live, lista com aria-busy e KPIs em placeholder', async () => {
-        vi.mocked(router.get).mockImplementation((url, data, options) => { options.onStart?.(); });
+        vi.mocked(router.get).mockImplementation((url, data, options) => {
+            options.onStart?.();
+        });
         const w = mountPage();
 
         await w.find('[data-test="status-filter"]').setValue('paid');
@@ -410,10 +551,12 @@ describe('Financial/CashFlow/Index — lançamento e exclusão', () => {
     });
 
     it('excluir pede confirmação com resumo e mostra o erro do servidor dentro da confirmação', async () => {
-        fetch.mockImplementationOnce(() => jsonResponse(422, {
-            message: 'Dados de validação inválidos',
-            errors: { entry_date: ['O caixa deste período está fechado.'] },
-        }));
+        fetch.mockImplementationOnce(() =>
+            jsonResponse(422, {
+                message: 'Dados de validação inválidos',
+                errors: { entry_date: ['O caixa deste período está fechado.'] },
+            }),
+        );
         const w = mountPage();
 
         await w.find('[data-test="row-free"] [data-test="delete"]').trigger('click');
@@ -458,21 +601,29 @@ describe('Financial/CashFlow/Index — lançamento e exclusão', () => {
 
         expect(w.find('[data-test="delete-summary"]').exists()).toBe(false);
         expect(window.showSuccessToast).toHaveBeenCalledWith('Entry deleted successfully.');
-        expect(router.reload).toHaveBeenCalledWith(expect.objectContaining({ only: ['entries', 'overview', 'closed_periods', 'today'] }));
+        expect(router.reload).toHaveBeenCalledWith(
+            expect.objectContaining({ only: ['entries', 'overview', 'closed_periods', 'today'] }),
+        );
     });
 
     it('excluir o último item de uma página > 1 leva à última página com dados', async () => {
         const lastPageUrl = 'http://localhost/panel/financial/cash-flow?from=2026-09-01&to=2026-09-30&page=1';
-        vi.mocked(router.reload).mockImplementationOnce((options) => options.onSuccess?.({
-            props: { entries: { data: [], total: 30, current_page: 2, last_page: 1, last_page_url: lastPageUrl } },
-        }));
+        vi.mocked(router.reload).mockImplementationOnce((options) =>
+            options.onSuccess?.({
+                props: { entries: { data: [], total: 30, current_page: 2, last_page: 1, last_page_url: lastPageUrl } },
+            }),
+        );
         const w = mountPage({ entries: { data: [rows[0]], total: 31, current_page: 2, last_page: 2 } });
 
         await w.find('[data-test="row-free"] [data-test="delete"]').trigger('click');
         await w.find('[data-test="confirm-delete"]').trigger('click');
         await flushPromises();
 
-        expect(router.get).toHaveBeenCalledWith(lastPageUrl, {}, { preserveState: true, preserveScroll: true, replace: true });
+        expect(router.get).toHaveBeenCalledWith(
+            lastPageUrl,
+            {},
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
     });
 
     it('"Salvar e lançar outro" mantém o modal aberto, avisa e recarrega a lista', async () => {
@@ -485,7 +636,9 @@ describe('Financial/CashFlow/Index — lançamento e exclusão', () => {
 
         expect(modal.props('open')).toBe(true);
         expect(window.showSuccessToast).toHaveBeenCalledWith('Entry created successfully.');
-        expect(router.reload).toHaveBeenCalledWith(expect.objectContaining({ only: ['entries', 'overview', 'closed_periods', 'today'] }));
+        expect(router.reload).toHaveBeenCalledWith(
+            expect.objectContaining({ only: ['entries', 'overview', 'closed_periods', 'today'] }),
+        );
 
         modal.vm.$emit('saved', { message: 'Entry created successfully.', entryDate: '2026-09-10' });
         await flushPromises();
@@ -495,9 +648,14 @@ describe('Financial/CashFlow/Index — lançamento e exclusão', () => {
     it('salvar com data fora do filtro avisa no toast (evita lançar de novo)', async () => {
         const w = mountPage();
 
-        w.findComponent({ name: 'CashEntryFormModalStub' }).vm.$emit('saved', { message: 'Entry created successfully.', entryDate: '2026-10-02' });
+        w.findComponent({ name: 'CashEntryFormModalStub' }).vm.$emit('saved', {
+            message: 'Entry created successfully.',
+            entryDate: '2026-10-02',
+        });
         await flushPromises();
 
-        expect(window.showSuccessToast).toHaveBeenCalledWith('Entry created successfully. Saved on 02/10/2026, outside the filter.');
+        expect(window.showSuccessToast).toHaveBeenCalledWith(
+            'Entry created successfully. Saved on 02/10/2026, outside the filter.',
+        );
     });
 });

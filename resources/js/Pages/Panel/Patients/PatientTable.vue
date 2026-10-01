@@ -10,13 +10,13 @@ import { formatPatientCode } from '@/utils/formatPatientCode.js';
 
 const props = defineProps({
     patients: { type: Object, required: true },
-    filters:  { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['sort', 'edit', 'view', 'delete', 'toggleActive', 'restore']);
 
 const currentSort = computed(() => props.filters.sort ?? 'created_at');
-const currentDir  = computed(() => props.filters.direction ?? 'desc');
+const currentDir = computed(() => props.filters.direction ?? 'desc');
 
 function sort(col) {
     const dir = currentSort.value === col && currentDir.value === 'asc' ? 'desc' : 'asc';
@@ -36,24 +36,23 @@ const sortableColClass = 'cursor-pointer user-select-none';
 // paciente são reordenáveis. Ordem padrão pedida: Nome, Telefone, Cadastro,
 // Código — Gênero entra ao final por não ter sido especificada.
 const COLUMN_DEFS = [
-    { key: 'nome',     label: 'Nome',     sortKey: 'full_name' },
+    { key: 'nome', label: 'Nome', sortKey: 'full_name' },
     { key: 'telefone', label: 'Telefone', sortKey: 'cellphone' },
     { key: 'cadastro', label: 'Cadastro', sortKey: 'created_at' },
-    { key: 'codigo',   label: 'Código',   sortKey: 'code' },
-    { key: 'genero',   label: 'Gênero',   sortKey: null },
+    { key: 'codigo', label: 'Código', sortKey: 'code' },
+    { key: 'genero', label: 'Gênero', sortKey: null },
 ];
 const DEFAULT_COLUMN_ORDER = ['nome', 'telefone', 'cadastro', 'codigo', 'genero'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'pat_table_columns_order',
-    DEFAULT_COLUMN_ORDER,
-);
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('pat_table_columns_order', DEFAULT_COLUMN_ORDER);
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.find((c) => c.key === key))
-        .filter(Boolean)
-));
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.find((c) => c.key === key)).filter(Boolean),
+);
 </script>
 
 <template>
@@ -70,11 +69,7 @@ const orderedColumns = computed(() => (
                 <span class="d-none d-sm-inline">Colunas</span>
             </template>
 
-            <ColumnOrderMenu
-                :columns="orderedColumns"
-                @move="moveColumn"
-                @reset="resetColumnOrder"
-            />
+            <ColumnOrderMenu :columns="orderedColumns" @move="moveColumn" @reset="resetColumnOrder" />
         </ActionDropdown>
     </div>
 
@@ -84,10 +79,7 @@ const orderedColumns = computed(() => (
             <thead class="table-light">
                 <tr>
                     <template v-for="col in orderedColumns" :key="col.key">
-                        <th
-                            :class="col.sortKey ? sortableColClass : ''"
-                            @click="col.sortKey && sort(col.sortKey)"
-                        >
+                        <th :class="col.sortKey ? sortableColClass : ''" @click="col.sortKey && sort(col.sortKey)">
                             {{ col.label }}
                             <i v-if="col.sortKey" :class="sortIcon(col.sortKey)" class="ms-1 fs-11"></i>
                         </th>
@@ -117,8 +109,8 @@ const orderedColumns = computed(() => (
                                     :src="p.photo_url"
                                     :alt="p.full_name"
                                     class="rounded-circle"
-                                    style="width:30px;height:30px;object-fit:cover;"
-                                >
+                                    style="width: 30px; height: 30px; object-fit: cover"
+                                />
                                 <span class="fw-medium">{{ p.full_name }}</span>
                                 <i v-if="p.deleted" class="ti ti-trash text-danger ms-1" title="Excluído"></i>
                             </div>
@@ -132,18 +124,19 @@ const orderedColumns = computed(() => (
                         </td>
                     </template>
                     <td class="text-center">
-                        <span
-                            v-if="p.deleted"
-                            class="badge badge-soft-secondary rounded fs-13 fw-medium"
-                        >Excluído</span>
+                        <span v-if="p.deleted" class="badge badge-soft-secondary rounded fs-13 fw-medium"
+                            >Excluído</span
+                        >
                         <span
                             v-else-if="p.active"
                             class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                        >Sim</span>
+                            >Sim</span
+                        >
                         <span
                             v-else
                             class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
-                        >Não</span>
+                            >Não</span
+                        >
                     </td>
                     <td class="text-end">
                         <!-- RESTORE -->
@@ -160,22 +153,14 @@ const orderedColumns = computed(() => (
                         <!-- VIEW ONLY -->
                         <template v-else-if="p.mode === 'view_only'">
                             <ActionIconGroup align="end">
-                                <ActionIconButton
-                                    icon="ti ti-eye"
-                                    title="Visualizar"
-                                    @click="$emit('view', p.id)"
-                                />
+                                <ActionIconButton icon="ti ti-eye" title="Visualizar" @click="$emit('view', p.id)" />
                             </ActionIconGroup>
                         </template>
 
                         <!-- FULL ACTIONS -->
                         <template v-else-if="p.mode === 'full'">
                             <ActionIconGroup align="end" gap="tight">
-                                <ActionIconButton
-                                    icon="ti ti-eye"
-                                    title="Visualizar"
-                                    @click="$emit('view', p.id)"
-                                />
+                                <ActionIconButton icon="ti ti-eye" title="Visualizar" @click="$emit('view', p.id)" />
                                 <ActionIconButton
                                     icon="ti ti-stethoscope"
                                     title="Prontuário"
@@ -187,10 +172,7 @@ const orderedColumns = computed(() => (
                                     icon="ti ti-dots-vertical"
                                 >
                                     <li>
-                                        <button
-                                            class="dropdown-item rounded-1"
-                                            @click="$emit('edit', p.id)"
-                                        >
+                                        <button class="dropdown-item rounded-1" @click="$emit('edit', p.id)">
                                             <i class="ti ti-edit me-1"></i> Editar
                                         </button>
                                     </li>
@@ -203,7 +185,7 @@ const orderedColumns = computed(() => (
                                             {{ p.active ? 'Desativar' : 'Ativar' }}
                                         </button>
                                     </li>
-                                    <li><hr class="dropdown-divider"></li>
+                                    <li><hr class="dropdown-divider" /></li>
                                     <li>
                                         <button
                                             class="dropdown-item rounded-1 text-danger"
@@ -222,22 +204,14 @@ const orderedColumns = computed(() => (
     </div>
 
     <!-- Pagination -->
-    <div
-        v-if="patients.last_page > 1"
-        class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2"
-    >
+    <div v-if="patients.last_page > 1" class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
         <p class="text-muted small mb-0">
             Exibindo {{ patients.from }}–{{ patients.to }} de {{ patients.total }} pacientes
         </p>
         <nav>
             <ul class="pagination pagination-sm mb-0">
                 <li class="page-item" :class="{ disabled: patients.current_page === 1 }">
-                    <Link
-                        class="page-link"
-                        :href="patients.prev_page_url ?? '#'"
-                        preserve-scroll
-                        preserve-state
-                    >
+                    <Link class="page-link" :href="patients.prev_page_url ?? '#'" preserve-scroll preserve-state>
                         <i class="ti ti-arrow-left"></i>
                     </Link>
                 </li>
@@ -253,12 +227,7 @@ const orderedColumns = computed(() => (
                     </li>
                 </template>
                 <li class="page-item" :class="{ disabled: patients.current_page === patients.last_page }">
-                    <Link
-                        class="page-link"
-                        :href="patients.next_page_url ?? '#'"
-                        preserve-scroll
-                        preserve-state
-                    >
+                    <Link class="page-link" :href="patients.next_page_url ?? '#'" preserve-scroll preserve-state>
                         <i class="ti ti-arrow-right"></i>
                     </Link>
                 </li>
@@ -268,5 +237,7 @@ const orderedColumns = computed(() => (
 </template>
 
 <style scoped>
-.cursor-pointer { cursor: pointer; }
+.cursor-pointer {
+    cursor: pointer;
+}
 </style>

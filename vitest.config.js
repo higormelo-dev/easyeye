@@ -13,7 +13,7 @@ export default defineConfig({
     plugins: [vue()],
     resolve: {
         alias: {
-            '@':    path.resolve(__dirname, './resources/js'),
+            '@': path.resolve(__dirname, './resources/js'),
             '@img': path.resolve(__dirname, './resources/img'),
         },
     },
@@ -26,11 +26,7 @@ export default defineConfig({
             provider: 'v8',
             reporter: ['text', 'html'],
             include: ['resources/js/**/*.vue', 'resources/js/**/*.js'],
-            exclude: [
-                'resources/js/ziggy.js',
-                'resources/js/**/*.test.{js,vue}',
-                'resources/js/**/*.spec.{js,vue}',
-            ],
+            exclude: ['resources/js/ziggy.js', 'resources/js/**/*.test.{js,vue}', 'resources/js/**/*.spec.{js,vue}'],
         },
     },
 });

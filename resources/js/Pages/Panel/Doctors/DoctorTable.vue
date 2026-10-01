@@ -1,10 +1,10 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useTrans } from '@/composables/useTrans.js';
 
@@ -14,9 +14,9 @@ import { useTrans } from '@/composables/useTrans.js';
  * WhatsApp, status e ações por `mode` (ActionPolicy).
  */
 const props = defineProps({
-    doctors: { type: Object, required: true },   // paginator Laravel
+    doctors: { type: Object, required: true }, // paginator Laravel
     filters: { type: Object, default: () => ({}) },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['sort', 'view', 'edit', 'delete', 'toggleActive']);
@@ -25,7 +25,7 @@ const { tx } = useTrans(() => props.t);
 
 // ── Ordenação ────────────────────────────────────────────────────────────────
 const currentSort = computed(() => props.filters.sort ?? 'created_at');
-const currentDir  = computed(() => props.filters.direction ?? 'desc');
+const currentDir = computed(() => props.filters.direction ?? 'desc');
 
 function sort(sortKey) {
     const direction = currentSort.value === sortKey && currentDir.value === 'asc' ? 'desc' : 'asc';
@@ -47,30 +47,29 @@ function ariaSort(col) {
 // Status/Ações ficam fixas no fim (mesma convenção da tabela de pacientes).
 // sortKey = chave aceita pela whitelist de DoctorsController::SORTABLE.
 const COLUMN_DEFS = computed(() => [
-    { key: 'nome',     label: props.t.col_name ?? 'Nome',           sortKey: 'full_name' },
-    { key: 'telefone', label: props.t.col_phone ?? 'Telefone',      sortKey: 'cellphone' },
-    { key: 'crm',      label: props.t.col_record ?? 'CRM',          sortKey: 'record' },
-    { key: 'email',    label: props.t.col_email ?? 'E-mail',        sortKey: 'email' },
+    { key: 'nome', label: props.t.col_name ?? 'Nome', sortKey: 'full_name' },
+    { key: 'telefone', label: props.t.col_phone ?? 'Telefone', sortKey: 'cellphone' },
+    { key: 'crm', label: props.t.col_record ?? 'CRM', sortKey: 'record' },
+    { key: 'email', label: props.t.col_email ?? 'E-mail', sortKey: 'email' },
     { key: 'cadastro', label: props.t.col_created_at ?? 'Cadastro', sortKey: 'created_at' },
-    { key: 'codigo',   label: props.t.col_code ?? 'Código',         sortKey: 'code' },
+    { key: 'codigo', label: props.t.col_code ?? 'Código', sortKey: 'code' },
 ]);
 const DEFAULT_COLUMN_ORDER = ['nome', 'telefone', 'crm', 'email', 'cadastro', 'codigo'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'doc_table_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('doc_table_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 </script>
 
@@ -138,11 +137,13 @@ const columnMenuLabels = computed(() => ({
                                     :src="d.photo_url"
                                     :alt="d.full_name"
                                     class="rounded-circle"
-                                    style="width:30px;height:30px;object-fit:cover;"
-                                >
+                                    style="width: 30px; height: 30px; object-fit: cover"
+                                />
                                 <div>
                                     <div class="fw-medium">{{ d.full_name }}</div>
-                                    <div v-if="d.record_specialty" class="text-muted small">{{ d.record_specialty }}</div>
+                                    <div v-if="d.record_specialty" class="text-muted small">
+                                        {{ d.record_specialty }}
+                                    </div>
                                 </div>
                             </div>
                         </td>
@@ -173,11 +174,13 @@ const columnMenuLabels = computed(() => ({
                         <span
                             v-if="d.active"
                             class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                        >{{ t.status_active ?? 'Ativo' }}</span>
+                            >{{ t.status_active ?? 'Ativo' }}</span
+                        >
                         <span
                             v-else
                             class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
-                        >{{ t.status_inactive ?? 'Inativo' }}</span>
+                            >{{ t.status_inactive ?? 'Inativo' }}</span
+                        >
                     </td>
 
                     <!-- Ações por mode (ActionPolicy), como em pacientes -->
@@ -213,12 +216,19 @@ const columnMenuLabels = computed(() => ({
                                     </button>
                                 </li>
                                 <li>
-                                    <button class="dropdown-item rounded-1" @click="emit('toggleActive', d.id, d.active)">
+                                    <button
+                                        class="dropdown-item rounded-1"
+                                        @click="emit('toggleActive', d.id, d.active)"
+                                    >
                                         <i :class="`ti me-1 ${d.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                        {{ d.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                        {{
+                                            d.active
+                                                ? (t.action_deactivate ?? 'Desativar')
+                                                : (t.action_activate ?? 'Ativar')
+                                        }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+                                <li><hr class="dropdown-divider" /></li>
                                 <li>
                                     <button class="dropdown-item rounded-1 text-danger" @click="emit('delete', d.id)">
                                         <i class="ti ti-trash me-1"></i> {{ t.action_delete ?? 'Excluir' }}

@@ -30,15 +30,15 @@ import {
  *                             desabilitar um botão que usaria o último período válido
  */
 const props = defineProps({
-    from:     { type: String,  default: '' },
-    to:       { type: String,  default: '' },
-    today:    { type: String,  default: '' },
-    presets:  { type: Array,   default: () => PERIOD_PRESETS },
+    from: { type: String, default: '' },
+    to: { type: String, default: '' },
+    today: { type: String, default: '' },
+    presets: { type: Array, default: () => PERIOD_PRESETS },
     /** Maior data aceita (ex.: fechamento de caixa não aceita futuro). */
-    max:      { type: String,  default: '' },
-    labels:   { type: Object,  default: () => ({}) },
+    max: { type: String, default: '' },
+    labels: { type: Object, default: () => ({}) },
     /** Rótulos visualmente ocultos (barra de filtros compacta). */
-    compact:  { type: Boolean, default: false },
+    compact: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
 });
 
@@ -49,43 +49,46 @@ const { date } = useLocaleFormat();
 const uid = useId();
 const ids = {
     preset: `period-preset-${uid}`,
-    from:   `period-from-${uid}`,
-    to:     `period-to-${uid}`,
-    error:  `period-error-${uid}`,
+    from: `period-from-${uid}`,
+    to: `period-to-${uid}`,
+    error: `period-error-${uid}`,
 };
 
 const FALLBACK = {
-    label:         'Período',
-    from:          'De',
-    to:            'Até',
+    label: 'Período',
+    from: 'De',
+    to: 'Até',
     invalid_range: 'A data inicial deve ser anterior ou igual à final.',
-    invalid_date:  'Informe uma data válida.',
-    after_max:     'A data não pode ser posterior a :date.',
+    invalid_date: 'Informe uma data válida.',
+    after_max: 'A data não pode ser posterior a :date.',
     presets: {
-        today:      'Hoje',
-        yesterday:  'Ontem',
-        last7:      'Últimos 7 dias',
-        month:      'Mês atual',
+        today: 'Hoje',
+        yesterday: 'Ontem',
+        last7: 'Últimos 7 dias',
+        month: 'Mês atual',
         last_month: 'Mês anterior',
-        year:       'Ano atual',
-        custom:     'Personalizado',
+        year: 'Ano atual',
+        custom: 'Personalizado',
     },
 };
 
-const text        = (key) => props.labels?.[key] ?? FALLBACK[key];
+const text = (key) => props.labels?.[key] ?? FALLBACK[key];
 const presetLabel = (preset) => props.labels?.presets?.[preset] ?? FALLBACK.presets[preset] ?? preset;
 
 const reference = computed(() => props.today || localToday());
 
 const localFrom = ref(props.from);
-const localTo   = ref(props.to);
-const error     = ref('');
+const localTo = ref(props.to);
+const error = ref('');
 
-watch(() => [props.from, props.to], ([from, to]) => {
-    localFrom.value = from;
-    localTo.value   = to;
-    error.value     = '';
-});
+watch(
+    () => [props.from, props.to],
+    ([from, to]) => {
+        localFrom.value = from;
+        localTo.value = to;
+        error.value = '';
+    },
+);
 
 const selectedPreset = computed(() => detectPreset(localFrom.value, localTo.value, reference.value, props.presets));
 
@@ -93,9 +96,8 @@ function apply(from, to, preset) {
     const reason = rangeError(from, to, props.max);
 
     if (reason) {
-        error.value = reason === 'after_max'
-            ? String(text('after_max')).replaceAll(':date', date(props.max))
-            : text(reason);
+        error.value =
+            reason === 'after_max' ? String(text('after_max')).replaceAll(':date', date(props.max)) : text(reason);
         emit('invalid', { reason, from, to });
 
         return;
@@ -121,7 +123,7 @@ function onPreset(event) {
     if (!range) return;
 
     localFrom.value = range.from;
-    localTo.value   = range.to;
+    localTo.value = range.to;
     apply(range.from, range.to, preset);
 }
 
@@ -136,7 +138,7 @@ function onDate(field, value) {
 
     if (isPartialYear(localFrom.value) || isPartialYear(localTo.value)) {
         typing.value = true;
-        error.value  = '';
+        error.value = '';
 
         return;
     }
@@ -188,7 +190,7 @@ const labelClass = computed(() => (props.compact ? 'visually-hidden' : 'form-lab
                     data-test="period-from"
                     @change="onDate('from', $event.target.value)"
                     @blur="onDateBlur"
-                >
+                />
             </div>
             <div class="period-filter__field">
                 <label :for="ids.to" :class="labelClass">{{ text('to') }}</label>
@@ -206,7 +208,7 @@ const labelClass = computed(() => (props.compact ? 'visually-hidden' : 'form-lab
                     data-test="period-to"
                     @change="onDate('to', $event.target.value)"
                     @blur="onDateBlur"
-                >
+                />
             </div>
         </div>
         <div v-if="error" :id="ids.error" class="small text-danger mt-1" role="alert" data-test="period-error">

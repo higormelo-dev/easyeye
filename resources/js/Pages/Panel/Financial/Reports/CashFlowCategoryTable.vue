@@ -9,10 +9,10 @@ import { usePercent } from './useReportPage.js';
  * percentual também em texto. Linhas já agrupadas por category_id no servidor.
  */
 const props = defineProps({
-    type:  { type: String, required: true },        // 'income' | 'expense'
-    rows:  { type: Array,  default: () => [] },     // [{ key, category_id, category, type, total, share }]
-    total: { type: Number, default: 0 },            // total do tipo (summary.income / summary.expense)
-    t:     { type: Object, default: () => ({}) },
+    type: { type: String, required: true }, // 'income' | 'expense'
+    rows: { type: Array, default: () => [] }, // [{ key, category_id, category, type, total, share }]
+    total: { type: Number, default: 0 }, // total do tipo (summary.income / summary.expense)
+    t: { type: Object, default: () => ({}) },
 });
 
 const { money } = useLocaleFormat();
@@ -21,12 +21,12 @@ const { percent } = usePercent();
 const headingId = `cf-category-${props.type}-${useId()}`;
 
 const META = {
-    income:  { icon: 'ti ti-arrow-down-left text-success', bar: 'bg-success' },
+    income: { icon: 'ti ti-arrow-down-left text-success', bar: 'bg-success' },
     expense: { icon: 'ti ti-arrow-up-right text-danger', bar: 'bg-danger' },
 };
 
-const c     = computed(() => props.t.cashflow ?? {});
-const meta  = computed(() => META[props.type] ?? META.income);
+const c = computed(() => props.t.cashflow ?? {});
+const meta = computed(() => META[props.type] ?? META.income);
 const title = computed(() => c.value[`by_category_${props.type}`] ?? '');
 const empty = computed(() => c.value[`no_category_${props.type}`] ?? '');
 
@@ -46,7 +46,11 @@ function barWidth(share) {
         </div>
         <div class="table-responsive">
             <table class="table table-sm align-middle mb-0 cf-category-table">
-                <caption class="visually-hidden">{{ title }}</caption>
+                <caption class="visually-hidden">
+                    {{
+                        title
+                    }}
+                </caption>
                 <thead class="table-light">
                     <tr>
                         <th scope="col">{{ c.col_category }}</th>
@@ -56,17 +60,33 @@ function barWidth(share) {
                 </thead>
                 <tbody>
                     <tr v-if="rows.length === 0">
-                        <td colspan="3" class="text-center text-body-secondary py-4" data-test="category-empty">{{ empty }}</td>
+                        <td colspan="3" class="text-center text-body-secondary py-4" data-test="category-empty">
+                            {{ empty }}
+                        </td>
                     </tr>
                     <tr v-for="row in rows" :key="row.key" data-test="category-row">
                         <th scope="row" class="fw-medium text-body cf-category-table__name">{{ row.category }}</th>
-                        <td class="text-end text-body text-nowrap" data-test="category-total">{{ money(row.total) }}</td>
+                        <td class="text-end text-body text-nowrap" data-test="category-total">
+                            {{ money(row.total) }}
+                        </td>
                         <td>
                             <div class="d-flex align-items-center gap-2">
-                                <div class="progress flex-grow-1 cf-category-table__bar" aria-hidden="true" data-test="category-bar">
-                                    <div class="progress-bar" :class="meta.bar" :style="{ width: barWidth(row.share) }"></div>
+                                <div
+                                    class="progress flex-grow-1 cf-category-table__bar"
+                                    aria-hidden="true"
+                                    data-test="category-bar"
+                                >
+                                    <div
+                                        class="progress-bar"
+                                        :class="meta.bar"
+                                        :style="{ width: barWidth(row.share) }"
+                                    ></div>
                                 </div>
-                                <span class="small text-body text-nowrap cf-category-table__percent" data-test="category-share">{{ percent(row.share) }}</span>
+                                <span
+                                    class="small text-body text-nowrap cf-category-table__percent"
+                                    data-test="category-share"
+                                    >{{ percent(row.share) }}</span
+                                >
                             </div>
                         </td>
                     </tr>
@@ -74,7 +94,9 @@ function barWidth(share) {
                 <tfoot v-if="rows.length">
                     <tr>
                         <th scope="row">{{ c.col_total }}</th>
-                        <td class="text-end fw-semibold text-body text-nowrap" data-test="category-footer">{{ money(total) }}</td>
+                        <td class="text-end fw-semibold text-body text-nowrap" data-test="category-footer">
+                            {{ money(total) }}
+                        </td>
                         <td></td>
                     </tr>
                 </tfoot>

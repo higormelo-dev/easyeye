@@ -18,8 +18,8 @@ import EyeImageReportModal from '@/Pages/Panel/EyeImages/EyeImageReportModal.vue
 describe('EyeImageReportModal — laudo em lote', () => {
     const urls = {
         templates: '/_routes/eye-images.report-templates.index',
-        preview:   '/_routes/eye-images.report-templates.preview',
-        store:     '/_routes/eye-images.reports.store',
+        preview: '/_routes/eye-images.report-templates.preview',
+        store: '/_routes/eye-images.reports.store',
     };
     const patient = { id: 'pat-1', code: '123', name: 'Amanda Alves de Moura' };
 
@@ -40,7 +40,7 @@ describe('EyeImageReportModal — laudo em lote', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         globalThis.window.axios = {
-            get:  vi.fn(() => Promise.resolve({ data: { data: [] } })),
+            get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
             post: vi.fn(() => Promise.resolve({ data: { title: 'Laudo Pentacan', pdf_url: '/pdf/1' } })),
         };
     });
@@ -78,8 +78,9 @@ describe('EyeImageReportModal — laudo em lote', () => {
 
         expect(wrapper.emitted('saved')).toBeTruthy();
 
-        const nextBtn = Array.from(document.body.querySelectorAll('button'))
-            .find((b) => b.textContent.includes('Próximo laudo: Retinografia'));
+        const nextBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
+            b.textContent.includes('Próximo laudo: Retinografia'),
+        );
         expect(nextBtn).toBeTruthy();
 
         nextBtn.click();
@@ -94,8 +95,9 @@ describe('EyeImageReportModal — laudo em lote', () => {
         await flushPromises();
         await save(wrapper);
 
-        const nextBtn = Array.from(document.body.querySelectorAll('button'))
-            .find((b) => b.textContent.includes('Próximo laudo'));
+        const nextBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
+            b.textContent.includes('Próximo laudo'),
+        );
         expect(nextBtn).toBeUndefined();
         wrapper.unmount();
     });
@@ -131,11 +133,11 @@ describe('EyeImageReportModal — laudo em lote', () => {
  */
 describe('EyeImageReportModal — inserir imagem / frases rápidas / extrair PDF', () => {
     const urls = {
-        templates:      '/_routes/eye-images.report-templates.index',
-        preview:        '/_routes/eye-images.report-templates.preview',
-        store:          '/_routes/eye-images.reports.store',
-        phrasesIndex:   '/_routes/eye-images.report-phrases.index',
-        phrasesStore:   '/_routes/eye-images.report-phrases.store',
+        templates: '/_routes/eye-images.report-templates.index',
+        preview: '/_routes/eye-images.report-templates.preview',
+        store: '/_routes/eye-images.reports.store',
+        phrasesIndex: '/_routes/eye-images.report-phrases.index',
+        phrasesStore: '/_routes/eye-images.report-phrases.store',
         phrasesDestroy: '/_routes/eye-images.report-phrases.destroy/__ID__',
         extractPdfText: '/_routes/eye-images.reports.extract-pdf-text',
     };
@@ -164,7 +166,7 @@ describe('EyeImageReportModal — inserir imagem / frases rápidas / extrair PDF
     beforeEach(() => {
         document.body.innerHTML = '';
         globalThis.window.axios = {
-            get:  vi.fn(() => Promise.resolve({ data: { data: [] } })),
+            get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
             post: vi.fn(() => Promise.resolve({ data: { title: 'x', pdf_url: '/pdf/1' } })),
             delete: vi.fn(() => Promise.resolve({})),
         };
@@ -199,9 +201,11 @@ describe('EyeImageReportModal — inserir imagem / frases rápidas / extrair PDF
         // valor, e é assim que fetchTemplates()/fetchPhrases() disparam de
         // verdade em produção (reportModalOpen começa false, só vira true
         // quando o médico abre o laudo).
-        window.axios.get = vi.fn(() => Promise.resolve({
-            data: { data: [{ id: 'phrase-1', label: 'Fundo de olho normal', content: '<p>Sem alterações.</p>' }] },
-        }));
+        window.axios.get = vi.fn(() =>
+            Promise.resolve({
+                data: { data: [{ id: 'phrase-1', label: 'Fundo de olho normal', content: '<p>Sem alterações.</p>' }] },
+            }),
+        );
         const wrapper = mountModal({ open: false });
         await wrapper.setProps({ open: true });
         await flushPromises();

@@ -8,20 +8,24 @@ import { Link } from '@inertiajs/vue3';
  * (sem role=tab, que exigiria tabpanels na mesma página).
  */
 const props = defineProps({
-    tabs:    { type: Object, default: () => ({}) },   // { apuracao, closings, rules } → URLs
+    tabs: { type: Object, default: () => ({}) }, // { apuracao, closings, rules } → URLs
     current: { type: String, default: '' },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const TABS = [
     { key: 'apuracao', icon: 'ti ti-calculator' },
     { key: 'closings', icon: 'ti ti-lock' },
-    { key: 'rules',    icon: 'ti ti-adjustments-dollar' },
+    { key: 'rules', icon: 'ti ti-adjustments-dollar' },
 ];
 
-const items = computed(() => TABS
-    .filter((tab) => props.tabs?.[tab.key])
-    .map((tab) => ({ ...tab, href: props.tabs[tab.key], label: props.t.tabs?.[tab.key] ?? tab.key })));
+const items = computed(() =>
+    TABS.filter((tab) => props.tabs?.[tab.key]).map((tab) => ({
+        ...tab,
+        href: props.tabs[tab.key],
+        label: props.t.tabs?.[tab.key] ?? tab.key,
+    })),
+);
 </script>
 
 <template>

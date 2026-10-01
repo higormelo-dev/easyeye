@@ -21,115 +21,129 @@ import ProviderCostsCard from '@/Pages/Panel/Manager/AiCreditPurchases/ProviderC
 describe('ProviderCostsCard', () => {
     const baseCosts = {
         summary: {
-            month_to_date_usd:  125.50,
-            last_7d_usd:        40.20,
-            yesterday_usd:      5.10,
-            month_forecast_usd: 250.00,
-            total_calls_mtd:    1200,
+            month_to_date_usd: 125.5,
+            last_7d_usd: 40.2,
+            yesterday_usd: 5.1,
+            month_forecast_usd: 250.0,
+            total_calls_mtd: 1200,
         },
         by_provider: {
             openai: {
-                label:                 'ChatGPT',
-                month_to_date_usd:     80.00,
-                last_7d_usd:           28.00,
-                yesterday_usd:         3.50,
-                month_forecast_usd:    160.00,
-                calls_mtd:             800,
-                avg_cost_per_call_usd: 0.10,
+                label: 'ChatGPT',
+                month_to_date_usd: 80.0,
+                last_7d_usd: 28.0,
+                yesterday_usd: 3.5,
+                month_forecast_usd: 160.0,
+                calls_mtd: 800,
+                avg_cost_per_call_usd: 0.1,
                 models_breakdown: [
-                    { model: 'gpt-5-mini', calls: 600, cost_usd: 60.00 },
-                    { model: 'gpt-5',       calls: 200, cost_usd: 20.00 },
+                    { model: 'gpt-5-mini', calls: 600, cost_usd: 60.0 },
+                    { model: 'gpt-5', calls: 200, cost_usd: 20.0 },
                 ],
                 estimated_balance: {
-                    has_topups:                     true,
-                    total_topped_up_usd:            200.00,
-                    consumed_since_first_topup_usd: 80.00,
-                    remaining_usd:                  120.00,
-                    daily_burn_usd:                 4.00,
-                    days_remaining:                 30,
-                    alert_level:                    'ok',
-                    first_topup_at:                 '2026-05-01 10:00:00',
+                    has_topups: true,
+                    total_topped_up_usd: 200.0,
+                    consumed_since_first_topup_usd: 80.0,
+                    remaining_usd: 120.0,
+                    daily_burn_usd: 4.0,
+                    days_remaining: 30,
+                    alert_level: 'ok',
+                    first_topup_at: '2026-05-01 10:00:00',
                 },
                 recent_topups: [
-                    { id: 't1', amount_usd: 100, topped_up_at: '2026-05-15T10:00:00Z', reference: 'ch_1', note: null, created_by_name: 'Higor' },
-                    { id: 't2', amount_usd: 100, topped_up_at: '2026-05-01T10:00:00Z', reference: null, note: null, created_by_name: 'Higor' },
+                    {
+                        id: 't1',
+                        amount_usd: 100,
+                        topped_up_at: '2026-05-15T10:00:00Z',
+                        reference: 'ch_1',
+                        note: null,
+                        created_by_name: 'Higor',
+                    },
+                    {
+                        id: 't2',
+                        amount_usd: 100,
+                        topped_up_at: '2026-05-01T10:00:00Z',
+                        reference: null,
+                        note: null,
+                        created_by_name: 'Higor',
+                    },
                 ],
             },
             anthropic: {
-                label:                 'Claude',
-                month_to_date_usd:     30.00,
-                last_7d_usd:           10.00,
-                yesterday_usd:         1.00,
-                month_forecast_usd:    60.00,
-                calls_mtd:             200,
+                label: 'Claude',
+                month_to_date_usd: 30.0,
+                last_7d_usd: 10.0,
+                yesterday_usd: 1.0,
+                month_forecast_usd: 60.0,
+                calls_mtd: 200,
                 avg_cost_per_call_usd: 0.15,
-                models_breakdown:      [],
+                models_breakdown: [],
                 estimated_balance: {
-                    has_topups:                     true,
-                    total_topped_up_usd:            50.00,
-                    consumed_since_first_topup_usd: 30.00,
-                    remaining_usd:                  20.00,
-                    daily_burn_usd:                 1.42,
-                    days_remaining:                 14,
-                    alert_level:                    'warning',
-                    first_topup_at:                 '2026-05-10 10:00:00',
+                    has_topups: true,
+                    total_topped_up_usd: 50.0,
+                    consumed_since_first_topup_usd: 30.0,
+                    remaining_usd: 20.0,
+                    daily_burn_usd: 1.42,
+                    days_remaining: 14,
+                    alert_level: 'warning',
+                    first_topup_at: '2026-05-10 10:00:00',
                 },
                 recent_topups: [],
             },
             gemini: {
-                label:                 'Gemini',
-                month_to_date_usd:     15.50,
-                last_7d_usd:           2.20,
-                yesterday_usd:         0.60,
-                month_forecast_usd:    30.00,
-                calls_mtd:             200,
+                label: 'Gemini',
+                month_to_date_usd: 15.5,
+                last_7d_usd: 2.2,
+                yesterday_usd: 0.6,
+                month_forecast_usd: 30.0,
+                calls_mtd: 200,
                 avg_cost_per_call_usd: 0.077,
-                models_breakdown:      [],
+                models_breakdown: [],
                 estimated_balance: {
-                    has_topups:                     false,
-                    total_topped_up_usd:            0,
+                    has_topups: false,
+                    total_topped_up_usd: 0,
                     consumed_since_first_topup_usd: 0,
-                    remaining_usd:                  null,
-                    daily_burn_usd:                 0.31,
-                    days_remaining:                 null,
-                    alert_level:                    'unknown',
-                    first_topup_at:                 null,
+                    remaining_usd: null,
+                    daily_burn_usd: 0.31,
+                    days_remaining: null,
+                    alert_level: 'unknown',
+                    first_topup_at: null,
                 },
                 recent_topups: [],
             },
         },
         margin: {
-            credits_consumed_mtd:  10000,
-            revenue_estimate_usd:  100.00,
-            cost_mtd_usd:          125.50,
-            gross_margin_usd:      -25.50,
-            gross_margin_pct:      -25.5,
-            margin_multiplier:     2.0,
+            credits_consumed_mtd: 10000,
+            revenue_estimate_usd: 100.0,
+            cost_mtd_usd: 125.5,
+            gross_margin_usd: -25.5,
+            gross_margin_pct: -25.5,
+            margin_multiplier: 2.0,
         },
     };
 
     const tStubs = {
         provider_costs: {
-            title:              'Custos',
-            subtitle:           'sub',
-            alerts_setup:       'Alertas externos',
-            mtd:                'Mês',
-            last_7d:            '7 dias',
-            yesterday:          'Ontem',
-            forecast:           'Forecast',
-            forecast_help:      'extrap.',
-            estimated_balance:  'Saldo estimado',
-            days_left:          'dias',
-            no_topups:          'Registre uma recarga',
-            recent_topups:      'Últimas recargas',
+            title: 'Custos',
+            subtitle: 'sub',
+            alerts_setup: 'Alertas externos',
+            mtd: 'Mês',
+            last_7d: '7 dias',
+            yesterday: 'Ontem',
+            forecast: 'Forecast',
+            forecast_help: 'extrap.',
+            estimated_balance: 'Saldo estimado',
+            days_left: 'dias',
+            no_topups: 'Registre uma recarga',
+            recent_topups: 'Últimas recargas',
             margin: {
-                title:   'Margem (mês)',
+                title: 'Margem (mês)',
                 revenue: 'Receita',
-                cost:    'Custo',
-                gross:   'Lucro',
+                cost: 'Custo',
+                gross: 'Lucro',
             },
             checklist: {
-                title:    'Configure alertas',
+                title: 'Configure alertas',
                 subtitle: 'sub',
             },
         },
@@ -139,9 +153,9 @@ describe('ProviderCostsCard', () => {
     function mountCard(propsOverride = {}) {
         return mount(ProviderCostsCard, {
             props: {
-                costs:       baseCosts,
+                costs: baseCosts,
                 permissions: { create_topup: true },
-                t:           tStubs,
+                t: tStubs,
                 ...propsOverride,
             },
         });
@@ -166,11 +180,11 @@ describe('ProviderCostsCard', () => {
         const text = wrapper.text();
 
         // Todos os valores devem aparecer formatados como USD
-        expect(text).toContain('$125.50');                              // MTD total
-        expect(text).toContain('$40.20');                               // last_7d
-        expect(text).toContain('$5.10');                                // yesterday
-        expect(text).toContain('$250.00');                              // forecast
-        expect(text).toContain('1.200');                                // total_calls_mtd (toLocaleString pt-BR usa ponto)
+        expect(text).toContain('$125.50'); // MTD total
+        expect(text).toContain('$40.20'); // last_7d
+        expect(text).toContain('$5.10'); // yesterday
+        expect(text).toContain('$250.00'); // forecast
+        expect(text).toContain('1.200'); // total_calls_mtd (toLocaleString pt-BR usa ponto)
     });
 
     it('renderiza 3 cards por provedor (1 por provedor)', () => {
@@ -245,7 +259,7 @@ describe('ProviderCostsCard', () => {
     it('mostra botão "+" em cada provider quando permission create_topup=true', () => {
         const wrapper = mountCard();
         const addButtons = wrapper.findAll('button[title*="recarga" i], button[title="Registrar recarga"]');
-        expect(addButtons.length).toBe(3);                              // 1 por provedor
+        expect(addButtons.length).toBe(3); // 1 por provedor
     });
 
     it('OCULTA botão "+" quando create_topup=false', () => {
@@ -280,7 +294,10 @@ describe('ProviderCostsCard', () => {
 
     it('checklist contém links para os 3 painéis externos de billing', async () => {
         const wrapper = mountCard();
-        await wrapper.findAll('button').find((b) => b.text().includes('Alertas externos')).trigger('click');
+        await wrapper
+            .findAll('button')
+            .find((b) => b.text().includes('Alertas externos'))
+            .trigger('click');
 
         const links = wrapper.find('.alert.alert-info').findAll('a');
         const hrefs = links.map((a) => a.attributes('href'));

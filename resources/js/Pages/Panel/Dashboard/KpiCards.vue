@@ -3,89 +3,89 @@ import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
-    stats:        { type: Object,  required: true },
-    isDoctor:     { type: Boolean, default: false },
+    stats: { type: Object, required: true },
+    isDoctor: { type: Boolean, default: false },
     // Telas que o usuário pode abrir (PanelDashboardController::buildAccess —
     // mesmas regras das rotas): sem acesso, o card não vira link para um 403.
-    access:       { type: Object,  default: () => ({}) },
+    access: { type: Object, default: () => ({}) },
     isRefreshing: { type: Boolean, default: false },
-    t:            { type: Object,  required: true },
+    t: { type: Object, required: true },
 });
 
 // ── Atalhos: indicador → lista relacionada (só com acesso à tela) ───────────
 
 const row1 = computed(() => [
     {
-        key:     'patients',
-        icon:    'ti ti-users',
-        value:   props.stats.total_patients,
-        label:   props.t.kpi_patients,
+        key: 'patients',
+        icon: 'ti ti-users',
+        value: props.stats.total_patients,
+        label: props.t.kpi_patients,
         variant: 'patients',
-        url:     props.access.patients ? route('panel.patients.index') : null,
+        url: props.access.patients ? route('panel.patients.index') : null,
     },
     {
-        key:     'today',
-        icon:    'ti ti-calendar-check',
-        value:   props.stats.today_count,
-        label:   props.t.kpi_today,
+        key: 'today',
+        icon: 'ti ti-calendar-check',
+        value: props.stats.today_count,
+        label: props.t.kpi_today,
         variant: 'today',
-        url:     props.access.schedules ? route('panel.schedules.index') : null,
+        url: props.access.schedules ? route('panel.schedules.index') : null,
     },
     {
-        key:     'doctors',
-        icon:    'ti ti-stethoscope',
-        value:   props.stats.total_doctors,
-        label:   props.t.kpi_doctors,
+        key: 'doctors',
+        icon: 'ti ti-stethoscope',
+        value: props.stats.total_doctors,
+        label: props.t.kpi_doctors,
         variant: 'doctors',
-        url:     props.access.doctors ? route('panel.doctors.index') : null,
+        url: props.access.doctors ? route('panel.doctors.index') : null,
     },
     {
-        key:     'surgeries',
-        icon:    'ti ti-cut',
-        value:   null,
-        label:   props.t.kpi_surgeries,
+        key: 'surgeries',
+        icon: 'ti ti-cut',
+        value: null,
+        label: props.t.kpi_surgeries,
         variant: 'surgeries',
-        soon:    true,
+        soon: true,
     },
 ]);
 
 const row2 = computed(() => {
     const base = [
         {
-            key:     'exams',
-            icon:    'ti ti-eye',
-            value:   null,
-            label:   props.t.kpi_exams_pending,
+            key: 'exams',
+            icon: 'ti ti-eye',
+            value: null,
+            label: props.t.kpi_exams_pending,
             variant: 'exams',
-            soon:    true,
+            soon: true,
         },
     ];
 
     if (!props.isDoctor) {
         base.push(
             {
-                key:     'guides',
-                icon:    'ti ti-file-invoice',
-                value:   null,
-                label:   props.t.kpi_guides_waiting,
+                key: 'guides',
+                icon: 'ti ti-file-invoice',
+                value: null,
+                label: props.t.kpi_guides_waiting,
                 variant: 'guides',
-                soon:    true,
+                soon: true,
             },
             {
-                key:     'receivable',
-                icon:    'ti ti-currency-dollar',
-                value:   null,
-                label:   props.t.kpi_receivable,
+                key: 'receivable',
+                icon: 'ti ti-currency-dollar',
+                value: null,
+                label: props.t.kpi_receivable,
                 variant: 'receivable',
-                soon:    true,
+                soon: true,
             },
             {
-                key:     'satisfaction',
-                icon:    'ti ti-star',
-                value:   null,
-                label:   props.t.kpi_satisfaction,
+                key: 'satisfaction',
+                icon: 'ti ti-star',
+                value: null,
+                label: props.t.kpi_satisfaction,
                 variant: 'satisfaction',
-                soon:    true,
+                soon: true,
             },
         );
     }

@@ -25,8 +25,13 @@ vi.mock('@inertiajs/vue3', async () => {
                 processing: false,
                 transformer: null,
                 reset: () => Object.assign(form, JSON.parse(JSON.stringify(initial))),
-                clearErrors: () => { form.errors = {}; },
-                transform: (fn) => { form.transformer = fn; return form; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
+                transform: (fn) => {
+                    form.transformer = fn;
+                    return form;
+                },
                 post: vi.fn(),
             });
             forms.push(form);
@@ -60,7 +65,12 @@ const receipts = [
 
 const rows = [
     { ...itemRows[0], key: 'schedule:s1', receipt: { status: 'awaiting', open: 200 } },
-    { ...itemRows[1], key: 'patient_exam:p|e|2026-09-03', receipt: { status: 'not_linked', open: null }, forecast: 100 },
+    {
+        ...itemRows[1],
+        key: 'patient_exam:p|e|2026-09-03',
+        receipt: { status: 'not_linked', open: null },
+        forecast: 100,
+    },
 ];
 
 let wrapper;
@@ -110,7 +120,9 @@ describe('Financial/DoctorPayouts/AllocateReceiptModal', () => {
 
         // pesos: 200 (a receber) e 100 (previsão) → 300 do saldo = 200 + 100
         expect(form().items.map((item) => item.amount)).toEqual([200, 100]);
-        expect(w.find('[data-test="allocate-total"]').text()).toContain(`Total allocated: ${brl(300)} of ${brl(300)} available`);
+        expect(w.find('[data-test="allocate-total"]').text()).toContain(
+            `Total allocated: ${brl(300)} of ${brl(300)} available`,
+        );
     });
 
     it('total acima do saldo bloqueia a confirmação', async () => {
@@ -130,9 +142,16 @@ describe('Financial/DoctorPayouts/AllocateReceiptModal', () => {
         await w.findAll('.money-stub')[0].setValue('120.5');
         await w.find('[data-test="allocate-confirm"]').trigger('click');
 
-        expect(form().post).toHaveBeenCalledWith('/doctor-payouts/allocations', expect.objectContaining({ preserveScroll: true }));
+        expect(form().post).toHaveBeenCalledWith(
+            '/doctor-payouts/allocations',
+            expect.objectContaining({ preserveScroll: true }),
+        );
 
-        const payload = form().transformer({ cash_entry_id: form().cash_entry_id, items: form().items, notes: form().notes });
+        const payload = form().transformer({
+            cash_entry_id: form().cash_entry_id,
+            items: form().items,
+            notes: form().notes,
+        });
         expect(payload.cash_entry_id).toBe('ce1');
         expect(payload.items).toEqual([{ key: 'schedule:s1', amount: 120.5 }]);
     });

@@ -23,11 +23,23 @@ vi.mock('@inertiajs/vue3', async () => {
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title', 'breadcrumbs'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
-vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { props: ['title'], template: '<div><h4>{{ title }}</h4><slot name="actions" /></div>' } }));
-vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { props: ['data'], template: '<nav class="pagination-stub" />' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: {
+        props: ['title', 'breadcrumbs'],
+        template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>',
+    },
+}));
+vi.mock('@/Components/Panel/PageHeader.vue', () => ({
+    default: { props: ['title'], template: '<div><h4>{{ title }}</h4><slot name="actions" /></div>' },
+}));
+vi.mock('@/Components/Panel/TablePagination.vue', () => ({
+    default: { props: ['data'], template: '<nav class="pagination-stub" />' },
+}));
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
-    default: { props: ['title'], template: '<div class="dd" :data-title="title"><slot name="trigger" /><ul><slot /></ul></div>' },
+    default: {
+        props: ['title'],
+        template: '<div class="dd" :data-title="title"><slot name="trigger" /><ul><slot /></ul></div>',
+    },
 }));
 vi.mock('@/Components/Panel/PeriodFilter.vue', () => ({
     default: {
@@ -57,7 +69,8 @@ vi.mock('@/Pages/Panel/Financial/DoctorPayouts/ClosePeriodModal.vue', () => ({
     default: {
         props: ['open', 'preview', 'doctorId', 'doctor', 'action'],
         emits: ['close'],
-        template: '<div class="close-modal-stub" :data-open="String(open)" :data-doctor="doctorId" :data-action="action" />',
+        template:
+            '<div class="close-modal-stub" :data-open="String(open)" :data-doctor="doctorId" :data-action="action" />',
     },
 }));
 
@@ -76,8 +89,15 @@ const tabs = { apuracao: '/doctor-payouts', closings: '/doctor-payouts/closings'
 const filters = { doctor: 'd1', from: '2026-09-01', to: '2026-09-27', status: '', service_type: '' };
 
 const kpis = {
-    production_count: 3, to_release: 180, release_base: 300, release_count: 1, paid: 80, to_pay: 0,
-    awaiting_count: 2, awaiting_forecast: 120, no_rule: 1,
+    production_count: 3,
+    to_release: 180,
+    release_base: 300,
+    release_count: 1,
+    paid: 80,
+    to_pay: 0,
+    awaiting_count: 2,
+    awaiting_forecast: 120,
+    no_rule: 1,
 };
 
 const summary = [
@@ -87,8 +107,14 @@ const summary = [
 ];
 
 const openPreview = {
-    period_start: '2026-09-01', period_end: '2026-09-27', count: 2, charged_cents: 75050, payout_cents: 18000,
-    blocking: 0, warnings: {}, can_close: true,
+    period_start: '2026-09-01',
+    period_end: '2026-09-27',
+    count: 2,
+    charged_cents: 75050,
+    payout_cents: 18000,
+    blocking: 0,
+    warnings: {},
+    can_close: true,
 };
 
 let wrapper;
@@ -130,7 +156,14 @@ afterEach(() => {
 
 describe('Financial/DoctorPayouts/Index — apuração', () => {
     it('sem médico: orienta a escolher, sem indicadores, exportação ou "Fechar período"', () => {
-        const w = mountPage({ filters: { ...filters, doctor: '' }, selected_doctor: null, kpis: null, summary: null, items: null, close_preview: null });
+        const w = mountPage({
+            filters: { ...filters, doctor: '' },
+            selected_doctor: null,
+            kpis: null,
+            summary: null,
+            items: null,
+            close_preview: null,
+        });
 
         expect(w.find('[data-test="select-doctor"]').text()).toContain('Select a doctor');
         expect(w.find('[data-test="select-doctor"]').text()).toContain('Choose the doctor and the period.');
@@ -164,7 +197,9 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
 
         const noRule = w.find('[data-kpi="no_rule"] a');
         // Abre a lista dos itens que bloqueiam (sem regra); o alerta mantém o atalho para as regras.
-        expect(noRule.attributes('href')).toBe('/doctor-payouts?doctor=d1&from=2026-09-01&to=2026-09-27&status=pending&warning=no_rule');
+        expect(noRule.attributes('href')).toBe(
+            '/doctor-payouts?doctor=d1&from=2026-09-01&to=2026-09-27&status=pending&warning=no_rule',
+        );
         expect(noRule.classes()).toContain('border-danger');
     });
 
@@ -211,12 +246,26 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
 
     it('aguardando recebimento mostra a previsão no lugar do repasse; parcela complementar mostra o recebido acumulado', () => {
         const awaiting = {
-            ...itemRows[0], key: 'schedule:s9', row_id: 'schedule:s9#0', status: 'awaiting', payout: 0, forecast: 120,
-            base_source: 'charged', tranche: 0,
+            ...itemRows[0],
+            key: 'schedule:s9',
+            row_id: 'schedule:s9#0',
+            status: 'awaiting',
+            payout: 0,
+            forecast: 120,
+            base_source: 'charged',
+            tranche: 0,
         };
         const complement = {
-            ...itemRows[0], key: 'schedule:s1', row_id: 'schedule:s1#2', status: 'pending', base_source: 'received',
-            tranche: 2, charged: 200, received: 230, payout: 120, released_before: 18,
+            ...itemRows[0],
+            key: 'schedule:s1',
+            row_id: 'schedule:s1#2',
+            status: 'pending',
+            base_source: 'received',
+            tranche: 2,
+            charged: 200,
+            received: 230,
+            payout: 120,
+            released_before: 18,
         };
         const w = mountPage({ items: paginator([awaiting, complement]) });
 
@@ -232,7 +281,9 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
     });
 
     it('fechamento: avisa período antes do último fechado e total negativo', () => {
-        const before = mountPage({ close_preview: { ...openPreview, can_close: false, last_closed_until: '2026-09-30' } });
+        const before = mountPage({
+            close_preview: { ...openPreview, can_close: false, last_closed_until: '2026-09-30' },
+        });
         expect(before.find('[data-test="close-hint"]').text()).toBe('There is already a closing up to 30/09/2026.');
         before.unmount();
 
@@ -283,7 +334,12 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
     });
 
     it('recebimento manual do item aparece na coluna e o estorno pede motivo e envia DELETE', async () => {
-        const withManual = [{ ...itemRows[0], manual_allocations: [{ id: 'al1', amount: 50, date: '2026-09-05', description: 'Depósito convênio' }] }];
+        const withManual = [
+            {
+                ...itemRows[0],
+                manual_allocations: [{ id: 'al1', amount: 50, date: '2026-09-05', description: 'Depósito convênio' }],
+            },
+        ];
         const w = mountPage({ items: paginator(withManual) });
 
         const manual = w.find('[data-test="item-manual"]');
@@ -350,22 +406,46 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
         await w.find('[data-test="filter-doctor"]').setValue('d2');
         expect(router.get).toHaveBeenLastCalledWith(
             '/doctor-payouts',
-            { doctor: 'd2', from: '2026-09-01', to: '2026-09-27', status: '', service_type: '', receipt: '', warning: '' },
+            {
+                doctor: 'd2',
+                from: '2026-09-01',
+                to: '2026-09-27',
+                status: '',
+                service_type: '',
+                receipt: '',
+                warning: '',
+            },
             expect.objectContaining({ preserveState: true, preserveScroll: true }),
         );
 
         await w.find('.period-stub').trigger('click');
         expect(router.get).toHaveBeenLastCalledWith(
             '/doctor-payouts',
-            { doctor: 'd1', from: '2026-08-01', to: '2026-08-31', status: '', service_type: '', receipt: '', warning: '' },
+            {
+                doctor: 'd1',
+                from: '2026-08-01',
+                to: '2026-08-31',
+                status: '',
+                service_type: '',
+                receipt: '',
+                warning: '',
+            },
             expect.objectContaining({ preserveState: true, preserveScroll: true }),
         );
 
         await w.find('[data-test="filter-status"]').setValue('paid');
-        expect(router.get).toHaveBeenLastCalledWith('/doctor-payouts', expect.objectContaining({ doctor: 'd1', status: 'paid' }), expect.any(Object));
+        expect(router.get).toHaveBeenLastCalledWith(
+            '/doctor-payouts',
+            expect.objectContaining({ doctor: 'd1', status: 'paid' }),
+            expect.any(Object),
+        );
 
         await w.find('[data-test="filter-type"]').setValue('exam');
-        expect(router.get).toHaveBeenLastCalledWith('/doctor-payouts', expect.objectContaining({ service_type: 'exam' }), expect.any(Object));
+        expect(router.get).toHaveBeenLastCalledWith(
+            '/doctor-payouts',
+            expect.objectContaining({ service_type: 'exam' }),
+            expect.any(Object),
+        );
     });
 
     it('o período não aceita datas futuras (máximo = hoje do servidor)', () => {
@@ -381,7 +461,15 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
 
         expect(router.get).toHaveBeenLastCalledWith(
             '/doctor-payouts',
-            { doctor: 'd1', from: '2026-09-01', to: '2026-09-27', status: '', service_type: '', receipt: '', warning: '' },
+            {
+                doctor: 'd1',
+                from: '2026-09-01',
+                to: '2026-09-27',
+                status: '',
+                service_type: '',
+                receipt: '',
+                warning: '',
+            },
             expect.any(Object),
         );
     });
@@ -389,7 +477,9 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
     it('filtro de recebimento vai na URL; o período é pela data do recebimento', async () => {
         const w = mountPage();
 
-        expect(w.find('[data-test="period-hint"]').text()).toBe('By the receipt date. The rule applies by the attendance date.');
+        expect(w.find('[data-test="period-hint"]').text()).toBe(
+            'By the receipt date. The rule applies by the attendance date.',
+        );
 
         const options = w.findAll('[data-test="filter-receipt"] option').map((option) => option.text());
         expect(options[0]).toBe('Any situation');
@@ -397,12 +487,25 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
         expect(options).toContain('No own charge');
 
         await w.find('[data-test="filter-receipt"]').setValue('awaiting');
-        expect(router.get).toHaveBeenLastCalledWith('/doctor-payouts', expect.objectContaining({ doctor: 'd1', receipt: 'awaiting' }), expect.any(Object));
+        expect(router.get).toHaveBeenLastCalledWith(
+            '/doctor-payouts',
+            expect.objectContaining({ doctor: 'd1', receipt: 'awaiting' }),
+            expect.any(Object),
+        );
     });
 
     it('recebimento da clínica: indicadores separados da previsão, avisos e coluna por item', () => {
-        const receipt = { billed: 500, glosa: 200, received: 300, open: 150, difference: 20, open_count: 1, not_linked_count: 1, unconfirmed_count: 2 };
-        const w       = mountPage({ kpis: { ...kpis, receipt } });
+        const receipt = {
+            billed: 500,
+            glosa: 200,
+            received: 300,
+            open: 150,
+            difference: 20,
+            open_count: 1,
+            not_linked_count: 1,
+            unconfirmed_count: 2,
+        };
+        const w = mountPage({ kpis: { ...kpis, receipt } });
 
         const section = w.find('[data-test="receipt-kpis"]');
         expect(section.find('h2').text()).toBe('Clinic receipts');
@@ -413,7 +516,9 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
         expect(w.find('[data-test="kpi-receipt_open"]').text()).toBe(brl(150));
         expect(w.find('[data-kpi="receipt_open"]').text()).toContain('1 attendance(s) awaiting');
 
-        expect(w.find('[data-test="receipt-note-unconfirmed"]').text()).toContain('2 attendance(s) paid without entry.');
+        expect(w.find('[data-test="receipt-note-unconfirmed"]').text()).toContain(
+            '2 attendance(s) paid without entry.',
+        );
         expect(w.find('[data-test="receipt-note-difference"]').text()).toContain(brl(20));
         expect(w.find('[data-test="receipt-note-not_linked"]').text()).toContain('1 item(s) without an own charge.');
 
@@ -450,10 +555,13 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
     });
 
     it('período acima do limite: aviso com as datas pedidas e as mostradas', () => {
-        const w = mountPage({ period_capped: { requested_from: '2024-01-01', requested_to: '2026-09-27', max_days: 366 } });
+        const w = mountPage({
+            period_capped: { requested_from: '2024-01-01', requested_to: '2026-09-27', max_days: 366 },
+        });
 
-        expect(w.find('[data-test="period-capped"]').text())
-            .toBe('Requested 01/01/2024 to 27/09/2026 exceeds 366 days. Showing 01/09/2026 to 27/09/2026.');
+        expect(w.find('[data-test="period-capped"]').text()).toBe(
+            'Requested 01/01/2024 to 27/09/2026 exceeds 366 days. Showing 01/09/2026 to 27/09/2026.',
+        );
     });
 
     it('abas: a apuração é a página atual', () => {
@@ -487,7 +595,15 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
 
         expect(router.get).toHaveBeenLastCalledWith(
             '/doctor-payouts',
-            { doctor: 'd1', from: '2026-09-01', to: '2026-09-27', status: 'in_payout', service_type: 'exam', receipt: '', warning: '' },
+            {
+                doctor: 'd1',
+                from: '2026-09-01',
+                to: '2026-09-27',
+                status: 'in_payout',
+                service_type: 'exam',
+                receipt: '',
+                warning: '',
+            },
             expect.any(Object),
         );
     });
@@ -511,21 +627,38 @@ describe('Financial/DoctorPayouts/Index — apuração', () => {
         expect(w.find('[data-test="filter-status"]').text()).toContain('With receipt (no forecast)');
 
         await w.find('[data-test="filter-warning"]').setValue('no_rule');
-        expect(router.get).toHaveBeenLastCalledWith('/doctor-payouts', expect.objectContaining({ warning: 'no_rule' }), expect.any(Object));
+        expect(router.get).toHaveBeenLastCalledWith(
+            '/doctor-payouts',
+            expect.objectContaining({ warning: 'no_rule' }),
+            expect.any(Object),
+        );
     });
 
     it('período anterior ao último fechamento: aviso de consulta histórica', () => {
-        const w = mountPage({ close_preview: { ...openPreview, can_close: false, historical: true, last_closed_until: '2026-09-30' } });
+        const w = mountPage({
+            close_preview: { ...openPreview, can_close: false, historical: true, last_closed_until: '2026-09-30' },
+        });
 
-        expect(w.find('[data-test="historical-period"]').text()).toBe('This period ends before the last closing (30/09/2026).');
+        expect(w.find('[data-test="historical-period"]').text()).toBe(
+            'This period ends before the last closing (30/09/2026).',
+        );
     });
 
     it('exames do equipamento sem médico: aviso com singular/plural, mesmo sem médico escolhido', () => {
-        expect(mountPage({ unassigned_exams: 1 }).find('[data-test="unassigned-exams"]').text())
-            .toBe('1 equipment exam in the period has no doctor.');
+        expect(mountPage({ unassigned_exams: 1 }).find('[data-test="unassigned-exams"]').text()).toBe(
+            '1 equipment exam in the period has no doctor.',
+        );
         wrapper.unmount();
 
-        const w = mountPage({ unassigned_exams: 3, filters: { ...filters, doctor: '' }, selected_doctor: null, kpis: null, summary: null, items: null, close_preview: null });
+        const w = mountPage({
+            unassigned_exams: 3,
+            filters: { ...filters, doctor: '' },
+            selected_doctor: null,
+            kpis: null,
+            summary: null,
+            items: null,
+            close_preview: null,
+        });
         expect(w.find('[data-test="unassigned-exams"]').text()).toBe('3 equipment exams in the period have no doctor.');
     });
 

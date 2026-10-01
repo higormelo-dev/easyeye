@@ -1,14 +1,14 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh       from '@/Components/Panel/SortableTh.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
-import { useColumnOrder }  from '@/composables/useColumnOrder.js';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
-import { useTrans }        from '@/composables/useTrans.js';
+import { useTrans } from '@/composables/useTrans.js';
 
 /**
  * Tabela de lentes IOL (catarata) no padrão de Patients/PatientTable:
@@ -21,9 +21,9 @@ import { useTrans }        from '@/composables/useTrans.js';
  * stock.manage + feature).
  */
 const props = defineProps({
-    items:             { type: Object, required: true },   // paginator Laravel
-    filters:           { type: Object, default: () => ({}) },
-    t:                 { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
     movementsIndexUrl: { type: String, default: '' },
 });
 
@@ -36,35 +36,34 @@ const rows = computed(() => props.items?.data ?? []);
 
 // ── Ordenação (padrão = fabricante A→Z, igual ao backend) ──────────────────
 const currentSort = computed(() => props.filters.sort ?? 'manufacturer');
-const currentDir  = computed(() => props.filters.direction ?? 'asc');
+const currentDir = computed(() => props.filters.direction ?? 'asc');
 
 // ── Ordem de colunas personalizável ─────────────────────────────────────────
 // sortKey = chave aceita por IolLensesController::SORTABLE.
 const COLUMN_DEFS = computed(() => [
-    { key: 'modelo',     label: props.t.col_model ?? 'Modelo',             sortKey: 'model_name' },
-    { key: 'fabricante', label: props.t.col_manufacturer ?? 'Fabricante',  sortKey: 'manufacturer' },
-    { key: 'tipo',       label: props.t.col_category ?? 'Tipo',            sortKey: 'category' },
-    { key: 'dioptrias',  label: props.t.col_diopters ?? 'Dioptrias',       sortKey: 'diopter_min' },
-    { key: 'valor',      label: props.t.col_price ?? 'Valor',              sortKey: 'price', numeric: true },
-    { key: 'estoque',    label: props.t.col_stock ?? 'Estoque',            sortKey: 'qty_on_hand', numeric: true },
+    { key: 'modelo', label: props.t.col_model ?? 'Modelo', sortKey: 'model_name' },
+    { key: 'fabricante', label: props.t.col_manufacturer ?? 'Fabricante', sortKey: 'manufacturer' },
+    { key: 'tipo', label: props.t.col_category ?? 'Tipo', sortKey: 'category' },
+    { key: 'dioptrias', label: props.t.col_diopters ?? 'Dioptrias', sortKey: 'diopter_min' },
+    { key: 'valor', label: props.t.col_price ?? 'Valor', sortKey: 'price', numeric: true },
+    { key: 'estoque', label: props.t.col_stock ?? 'Estoque', sortKey: 'qty_on_hand', numeric: true },
 ]);
 const DEFAULT_COLUMN_ORDER = ['modelo', 'fabricante', 'tipo', 'dioptrias', 'valor', 'estoque'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'stock_iollenses_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('stock_iollenses_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 
 // ── Formatação ──────────────────────────────────────────────────────────────
@@ -136,7 +135,8 @@ function movementsUrl(lens) {
                         :current-dir="currentDir"
                         :title="tx('sort_by', { column: col.label })"
                         @sort="emit('sort', $event)"
-                    >{{ col.label }}</SortableTh>
+                        >{{ col.label }}</SortableTh
+                    >
                     <th class="text-center">{{ t.col_status ?? 'Status' }}</th>
                     <th class="text-end">{{ t.col_actions ?? 'Ações' }}</th>
                 </tr>
@@ -160,14 +160,15 @@ function movementsUrl(lens) {
                                     width="30"
                                     height="30"
                                     loading="lazy"
-                                    style="object-fit:cover;"
-                                >
+                                    style="object-fit: cover"
+                                />
                                 <span
                                     v-else
                                     class="rounded bg-body-tertiary border d-inline-flex align-items-center justify-content-center flex-shrink-0 text-body-secondary"
-                                    style="width:30px;height:30px;"
+                                    style="width: 30px; height: 30px"
                                     aria-hidden="true"
-                                ><i class="ti ti-eye"></i></span>
+                                    ><i class="ti ti-eye"></i
+                                ></span>
                                 <span class="fw-medium">{{ lens.model_name }}</span>
                             </div>
                         </td>
@@ -189,11 +190,13 @@ function movementsUrl(lens) {
                         <span
                             v-if="lens.active"
                             class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                        >{{ t.status_active ?? 'Ativa' }}</span>
+                            >{{ t.status_active ?? 'Ativa' }}</span
+                        >
                         <span
                             v-else
                             class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
-                        >{{ t.status_inactive ?? 'Inativa' }}</span>
+                            >{{ t.status_inactive ?? 'Inativa' }}</span
+                        >
                     </td>
 
                     <td class="text-end">
@@ -212,19 +215,36 @@ function movementsUrl(lens) {
                             >
                                 <li>
                                     <button type="button" class="dropdown-item rounded-1" @click="emit('edit', lens)">
-                                        <i class="ti ti-edit me-1" aria-hidden="true"></i> {{ t.action_edit ?? 'Editar' }}
+                                        <i class="ti ti-edit me-1" aria-hidden="true"></i>
+                                        {{ t.action_edit ?? 'Editar' }}
                                     </button>
                                 </li>
                                 <li>
-                                    <button type="button" class="dropdown-item rounded-1" @click="emit('toggleActive', lens)">
-                                        <i :class="`ti me-1 ${lens.active ? 'ti-lock-open' : 'ti-lock'}`" aria-hidden="true"></i>
-                                        {{ lens.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                    <button
+                                        type="button"
+                                        class="dropdown-item rounded-1"
+                                        @click="emit('toggleActive', lens)"
+                                    >
+                                        <i
+                                            :class="`ti me-1 ${lens.active ? 'ti-lock-open' : 'ti-lock'}`"
+                                            aria-hidden="true"
+                                        ></i>
+                                        {{
+                                            lens.active
+                                                ? (t.action_deactivate ?? 'Desativar')
+                                                : (t.action_activate ?? 'Ativar')
+                                        }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+                                <li><hr class="dropdown-divider" /></li>
                                 <li>
-                                    <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', lens)">
-                                        <i class="ti ti-trash me-1" aria-hidden="true"></i> {{ t.action_delete ?? 'Excluir' }}
+                                    <button
+                                        type="button"
+                                        class="dropdown-item rounded-1 text-danger"
+                                        @click="emit('delete', lens)"
+                                    >
+                                        <i class="ti ti-trash me-1" aria-hidden="true"></i>
+                                        {{ t.action_delete ?? 'Excluir' }}
                                     </button>
                                 </li>
                             </ActionDropdown>

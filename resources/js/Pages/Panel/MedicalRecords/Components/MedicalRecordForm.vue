@@ -3,9 +3,9 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } 
 import { useForm, router, usePage } from '@inertiajs/vue3';
 import { validatePayload } from '@/utils/formRulesValidator.js';
 import PdfPreviewModal from './PdfPreviewModal.vue';
-import TinyMceEditor   from '@/Components/Panel/TinyMceEditor.vue';
-import SearchSelect    from '@/Components/Panel/SearchSelect.vue';
-import AcuitySelect    from '@/Pages/Panel/MedicalRecords/Components/AcuitySelect.vue';
+import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import AcuitySelect from '@/Pages/Panel/MedicalRecords/Components/AcuitySelect.vue';
 import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
 import MedicalRecordImagingModal from './MedicalRecordImagingModal.vue';
 import MedicalRecordProceduresModal from './MedicalRecordProceduresModal.vue';
@@ -26,27 +26,35 @@ import { recordColumnOrder } from './recordLayout.js';
  *   - Auditable: backend grava audit_logs para toda CUD
  */
 const props = defineProps({
-    patient:         { type: Object,  required: true },
-    medicalrecord:   { type: Object,  default: null },
-    doctors:         { type: Array,   default: () => [] },
-    currentDoctorId: { type: String,  default: null },
+    patient: { type: Object, required: true },
+    medicalrecord: { type: Object, default: null },
+    doctors: { type: Array, default: () => [] },
+    currentDoctorId: { type: String, default: null },
     canChooseDoctor: { type: Boolean, default: false },
-    isDoctor:        { type: Boolean, default: false },
-    isEdit:          { type: Boolean, default: false },
+    isDoctor: { type: Boolean, default: false },
+    isEdit: { type: Boolean, default: false },
     // Fluxo Agenda ↔ Prontuário ({ id, situation, update_url } | null) — ver
     // ScheduleFlowGuard.vue. Aqui habilita Finalizar/Dilatar/Exame na barra.
-    scheduleFlow:    { type: Object,  default: null },
-    catalogs:        { type: Object,  required: true },
-    urls:            { type: Object,  required: true },
-    storage:         { type: Object,  default: () => ({
-        used_bytes: 0, limit_bytes: 0, limit_gb: 0, is_unlimited: false,
-        percent: 0, remaining_bytes: null,
-        max_file_size_bytes: 10485760, max_files_per_batch: 10,
-        accept: '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx',
-        accept_mimes: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'],
-    }) },
-    ai:              { type: Object,  default: () => ({ enabled: false }) },
-    t:               { type: Object,  default: () => ({}) },
+    scheduleFlow: { type: Object, default: null },
+    catalogs: { type: Object, required: true },
+    urls: { type: Object, required: true },
+    storage: {
+        type: Object,
+        default: () => ({
+            used_bytes: 0,
+            limit_bytes: 0,
+            limit_gb: 0,
+            is_unlimited: false,
+            percent: 0,
+            remaining_bytes: null,
+            max_file_size_bytes: 10485760,
+            max_files_per_batch: 10,
+            accept: '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx',
+            accept_mimes: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'],
+        }),
+    },
+    ai: { type: Object, default: () => ({ enabled: false }) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const r = props.medicalrecord;
@@ -58,21 +66,23 @@ const isLocked = computed(() => Boolean(r?.is_locked));
 // "Finalizar" de novo (espelha App\Enums\ScheduleSituation::isTerminal).
 // Salvar existe sempre.
 const TERMINAL_SITUATIONS = [7, 8, 9];
-const flowActive = computed(() => Boolean(
-    props.scheduleFlow
-    && props.isDoctor
-    && !isLocked.value
-    && !TERMINAL_SITUATIONS.includes(Number(props.scheduleFlow.situation)),
-));
+const flowActive = computed(() =>
+    Boolean(
+        props.scheduleFlow &&
+        props.isDoctor &&
+        !isLocked.value &&
+        !TERMINAL_SITUATIONS.includes(Number(props.scheduleFlow.situation)),
+    ),
+);
 
 // Atalhos para catálogos
 const visualAcuityTypes = computed(() => props.catalogs.visual_acuity_types ?? []);
-const colorVisionTypes  = computed(() => props.catalogs.color_vision_types ?? []);
-const coverTestTypes    = computed(() => props.catalogs.cover_test_types ?? []);
-const nearPointTypes    = computed(() => props.catalogs.near_point_types ?? []);
-const additionTypes     = computed(() => props.catalogs.addition_types ?? []);
-const lenses            = computed(() => props.catalogs.lenses ?? []);
-const examReports       = computed(() => props.catalogs.exam_reports ?? []);
+const colorVisionTypes = computed(() => props.catalogs.color_vision_types ?? []);
+const coverTestTypes = computed(() => props.catalogs.cover_test_types ?? []);
+const nearPointTypes = computed(() => props.catalogs.near_point_types ?? []);
+const additionTypes = computed(() => props.catalogs.addition_types ?? []);
+const lenses = computed(() => props.catalogs.lenses ?? []);
+const examReports = computed(() => props.catalogs.exam_reports ?? []);
 const documentationTemplates = computed(() => normalizeDocTemplates(props.catalogs.available_templates ?? []));
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -82,74 +92,74 @@ const form = useForm({
     doctor_id: r?.doctor_id ?? props.currentDoctorId ?? '',
 
     // Anamnese
-    main_complaint:           r?.main_complaint ?? '',
-    hda:                      r?.hda ?? '',
-    diabetic:                 r?.diabetic ?? false,
-    diabetic_family:          r?.diabetic_family ?? false,
-    hypertensive:             r?.hypertensive ?? false,
-    hypertensive_family:      r?.hypertensive_family ?? false,
-    glaucomatous:             r?.glaucomatous ?? false,
-    glaucomatous_family:      r?.glaucomatous_family ?? false,
-    others_history:           r?.others_history ?? '',
-    ocular_surgical_history:  r?.ocular_surgical_history ?? '',
-    medications_in_use:       r?.medications_in_use ?? '',
+    main_complaint: r?.main_complaint ?? '',
+    hda: r?.hda ?? '',
+    diabetic: r?.diabetic ?? false,
+    diabetic_family: r?.diabetic_family ?? false,
+    hypertensive: r?.hypertensive ?? false,
+    hypertensive_family: r?.hypertensive_family ?? false,
+    glaucomatous: r?.glaucomatous ?? false,
+    glaucomatous_family: r?.glaucomatous_family ?? false,
+    others_history: r?.others_history ?? '',
+    ocular_surgical_history: r?.ocular_surgical_history ?? '',
+    medications_in_use: r?.medications_in_use ?? '',
 
     // Selects clínicos
-    visual_acuity_type_id:                     r?.visual_acuity_type_id ?? '',
+    visual_acuity_type_id: r?.visual_acuity_type_id ?? '',
     visual_acuity_without_correction_right_id: r?.visual_acuity_without_correction_right_id ?? '',
-    visual_acuity_without_correction_left_id:  r?.visual_acuity_without_correction_left_id ?? '',
-    visual_acuity_with_correction_right_id:    r?.visual_acuity_with_correction_right_id ?? '',
-    visual_acuity_with_correction_left_id:     r?.visual_acuity_with_correction_left_id ?? '',
+    visual_acuity_without_correction_left_id: r?.visual_acuity_without_correction_left_id ?? '',
+    visual_acuity_with_correction_right_id: r?.visual_acuity_with_correction_right_id ?? '',
+    visual_acuity_with_correction_left_id: r?.visual_acuity_with_correction_left_id ?? '',
     near_point_convergence_id: r?.near_point_convergence_id ?? '',
-    cover_test_type_id:        r?.cover_test_type_id ?? '',
-    color_vision_type_id:      r?.color_vision_type_id ?? '',
-    addition_type_id:          r?.addition_type_id ?? '',
+    cover_test_type_id: r?.cover_test_type_id ?? '',
+    color_vision_type_id: r?.color_vision_type_id ?? '',
+    addition_type_id: r?.addition_type_id ?? '',
     // Multi-características de lente (Multifocal + Antirreflexo...) — array;
     // fallback: registro antigo com single vira array de 1.
-    lens_away_ids:             r?.lens_away_ids ?? (r?.lens_away_id ? [r.lens_away_id] : []),
-    lens_near_ids:             r?.lens_near_ids ?? (r?.lens_near_id ? [r.lens_near_id] : []),
+    lens_away_ids: r?.lens_away_ids ?? (r?.lens_away_id ? [r.lens_away_id] : []),
+    lens_near_ids: r?.lens_near_ids ?? (r?.lens_near_id ? [r.lens_near_id] : []),
 
     // Refração dinâmica
-    dynamic_spherical_right:   r?.dynamic_spherical_right ?? '0.00',
-    dynamic_spherical_left:    r?.dynamic_spherical_left ?? '0.00',
+    dynamic_spherical_right: r?.dynamic_spherical_right ?? '0.00',
+    dynamic_spherical_left: r?.dynamic_spherical_left ?? '0.00',
     dynamic_cylindrical_right: r?.dynamic_cylindrical_right ?? '0.00',
-    dynamic_cylindrical_left:  r?.dynamic_cylindrical_left ?? '0.00',
-    dynamic_axis_right:        r?.dynamic_axis_right ?? '',
-    dynamic_axis_left:         r?.dynamic_axis_left ?? '',
+    dynamic_cylindrical_left: r?.dynamic_cylindrical_left ?? '0.00',
+    dynamic_axis_right: r?.dynamic_axis_right ?? '',
+    dynamic_axis_left: r?.dynamic_axis_left ?? '',
 
     // Refração estática
-    static_spherical_right:    r?.static_spherical_right ?? '0.00',
-    static_spherical_left:     r?.static_spherical_left ?? '0.00',
-    static_cylindrical_right:  r?.static_cylindrical_right ?? '0.00',
-    static_cylindrical_left:   r?.static_cylindrical_left ?? '0.00',
-    static_axis_right:         r?.static_axis_right ?? '',
-    static_axis_left:          r?.static_axis_left ?? '',
+    static_spherical_right: r?.static_spherical_right ?? '0.00',
+    static_spherical_left: r?.static_spherical_left ?? '0.00',
+    static_cylindrical_right: r?.static_cylindrical_right ?? '0.00',
+    static_cylindrical_left: r?.static_cylindrical_left ?? '0.00',
+    static_axis_right: r?.static_axis_right ?? '',
+    static_axis_left: r?.static_axis_left ?? '',
 
     // Exame físico
-    ocular_motility:   r?.ocular_motility ?? '',
-    tonometer_right:   r?.tonometer_right ?? '',
-    tonometer_left:    r?.tonometer_left ?? '',
-    tonometer_time:    r?.tonometer_time ?? '',
-    pachymetry_right:  r?.pachymetry_right ?? '',
-    pachymetry_left:   r?.pachymetry_left ?? '',
-    gonioscopy_right:  r?.gonioscopy_right ?? '',
-    gonioscopy_left:   r?.gonioscopy_left ?? '',
+    ocular_motility: r?.ocular_motility ?? '',
+    tonometer_right: r?.tonometer_right ?? '',
+    tonometer_left: r?.tonometer_left ?? '',
+    tonometer_time: r?.tonometer_time ?? '',
+    pachymetry_right: r?.pachymetry_right ?? '',
+    pachymetry_left: r?.pachymetry_left ?? '',
+    gonioscopy_right: r?.gonioscopy_right ?? '',
+    gonioscopy_left: r?.gonioscopy_left ?? '',
 
     // Achados
-    biomicroscopy_right:   r?.biomicroscopy_right ?? props.t?.biomicroscopy_ph ?? '',
-    biomicroscopy_left:    r?.biomicroscopy_left ?? props.t?.biomicroscopy_ph ?? '',
-    fundoscopy_right:      r?.fundoscopy_right ?? props.t?.fundoscopy_ph ?? '',
-    fundoscopy_left:       r?.fundoscopy_left ?? props.t?.fundoscopy_ph ?? '',
-    observation_general:   r?.observation_general ?? '',
+    biomicroscopy_right: r?.biomicroscopy_right ?? props.t?.biomicroscopy_ph ?? '',
+    biomicroscopy_left: r?.biomicroscopy_left ?? props.t?.biomicroscopy_ph ?? '',
+    fundoscopy_right: r?.fundoscopy_right ?? props.t?.fundoscopy_ph ?? '',
+    fundoscopy_left: r?.fundoscopy_left ?? props.t?.fundoscopy_ph ?? '',
+    observation_general: r?.observation_general ?? '',
     observation_of_lenses: r?.observation_of_lenses ?? '',
     // Cálculo de lentes de contato vinculado à consulta (entradas +
     // resultados; o servidor recalcula ao salvar). null = sem cálculo.
     contact_lens_calculation: r?.contact_lens_calculation ?? null,
 
     // Diagnóstico & conduta
-    diagnosis_cids:    r?.diagnosis_cids ?? [],
-    clinical_conduct:  r?.clinical_conduct ?? '',
-    follow_up_days:    r?.follow_up_days ?? '',
+    diagnosis_cids: r?.diagnosis_cids ?? [],
+    clinical_conduct: r?.clinical_conduct ?? '',
+    follow_up_days: r?.follow_up_days ?? '',
 
     // Vínculo opcional com agenda (edit: hidratado do registro; create:
     // ?schedule_id= no mount)
@@ -158,7 +168,7 @@ const form = useForm({
     // Intenções de fluxo (não persistidas — ver redirectAfterSave):
     //   flow_action: save | finish | dilate | exam
     //   post_save_action: ação da barra a abrir após o 1º save (create → edit)
-    flow_action:      null,
+    flow_action: null,
     post_save_action: null,
 });
 
@@ -167,25 +177,23 @@ const form = useForm({
 // ──────────────────────────────────────────────────────────────────────────
 
 // F9 — Validação
-const validationRules  = ref({});
-const clientErrors     = ref({});
-const hasClientErrors  = ref(false);
+const validationRules = ref({});
+const clientErrors = ref({});
+const hasClientErrors = ref(false);
 
 // Toggle "outros antecedentes"
 const showOthersHistory = ref(Boolean(r?.others_history));
 const othersHistoryInput = ref(null);
 
 // Tonometria
-const tonometryPdfSrc      = ref('');
+const tonometryPdfSrc = ref('');
 const tonometryStampedTime = ref(
-    r?.tonometer_time
-        ? r.tonometer_time.slice(0, 5)
-        : new Date().toTimeString().slice(0, 5)
+    r?.tonometer_time ? r.tonometer_time.slice(0, 5) : new Date().toTimeString().slice(0, 5),
 );
 
 // Presbiopia
-const presbyopiaAddition  = ref(0);
-const presbyopiaObsForm   = reactive({ content: '' });
+const presbyopiaAddition = ref(0);
+const presbyopiaObsForm = reactive({ content: '' });
 
 // ──────────────────────────────────────────────────────────────────────────
 // Prontuário personalizado por médico (3 modos: padrão EasyEye / meu modelo /
@@ -204,16 +212,21 @@ const presbyopiaObsForm   = reactive({ content: '' });
 // colunas sem vão em branco; a chave 'av_sem_tono' é a antiga (a Tonometria
 // virou seção própria e entra logo depois de A/V com correção).
 const SECTION_DEFS = [
-    { key: 'cromatica_ppc_cover', col: 'left',  labelKeys: ['chromatic_vision', 'near_point', 'cover_test'], label: 'Vis. cromática / PPC / Cover test' },
-    { key: 'av_sem_tono',         col: 'left',  labelKeys: ['av_without'], label: 'A/V sem correção' },
-    { key: 'av_com',              col: 'left',  labelKeys: ['av_with'], label: 'A/V com correção' },
-    { key: 'tonometria',          col: 'left',  labelKeys: ['tonometry'], label: 'Tonometria' },
-    { key: 'dinamica',            col: 'left',  labelKeys: ['dynamic'], label: 'Dinâmica' },
-    { key: 'estatica',            col: 'left',  labelKeys: ['static'], label: 'Estática' },
-    { key: 'adicao',              col: 'right', labelKeys: ['addition', 'lens_away', 'lens_near'], label: 'Adição / Longe / Perto' },
-    { key: 'biomicroscopia',      col: 'right', labelKeys: ['biomicroscopy'], label: 'Biomicroscopia' },
-    { key: 'fundoscopia',         col: 'right', labelKeys: ['fundoscopy'], label: 'Fundoscopia' },
-    { key: 'obs_geral',           col: 'right', labelKeys: ['general_obs'], label: 'Observação geral' },
+    {
+        key: 'cromatica_ppc_cover',
+        col: 'left',
+        labelKeys: ['chromatic_vision', 'near_point', 'cover_test'],
+        label: 'Vis. cromática / PPC / Cover test',
+    },
+    { key: 'av_sem_tono', col: 'left', labelKeys: ['av_without'], label: 'A/V sem correção' },
+    { key: 'av_com', col: 'left', labelKeys: ['av_with'], label: 'A/V com correção' },
+    { key: 'tonometria', col: 'left', labelKeys: ['tonometry'], label: 'Tonometria' },
+    { key: 'dinamica', col: 'left', labelKeys: ['dynamic'], label: 'Dinâmica' },
+    { key: 'estatica', col: 'left', labelKeys: ['static'], label: 'Estática' },
+    { key: 'adicao', col: 'right', labelKeys: ['addition', 'lens_away', 'lens_near'], label: 'Adição / Longe / Perto' },
+    { key: 'biomicroscopia', col: 'right', labelKeys: ['biomicroscopy'], label: 'Biomicroscopia' },
+    { key: 'fundoscopia', col: 'right', labelKeys: ['fundoscopy'], label: 'Fundoscopia' },
+    { key: 'obs_geral', col: 'right', labelKeys: ['general_obs'], label: 'Observação geral' },
 ];
 
 // Snapshot local da preferência (Inertia shared props não re-hidratam após
@@ -222,25 +235,29 @@ const persistedLayout = ref(usePage().props.auth?.user?.preferences?.medical_rec
 
 const recordMode = ref(persistedLayout.value?.default_mode ?? 'default'); // default | custom | free
 const isCustomMode = computed(() => recordMode.value === 'custom');
-const isFreeMode   = computed(() => recordMode.value === 'free');
+const isFreeMode = computed(() => recordMode.value === 'free');
 
 function seedLayout() {
     const saved = persistedLayout.value?.custom ?? null;
     // Seções que faltam no modelo salvo (novas ou que mudaram de coluna)
     // entram na posição padrão da coluna — nunca somem silenciosamente.
-    const buildColumn = (col) => recordColumnOrder(SECTION_DEFS.filter(s => s.col === col).map(s => s.key), saved?.[col]);
+    const buildColumn = (col) =>
+        recordColumnOrder(
+            SECTION_DEFS.filter((s) => s.col === col).map((s) => s.key),
+            saved?.[col],
+        );
     return {
-        left:   buildColumn('left'),
-        right:  buildColumn('right'),
-        hidden: (saved?.hidden ?? []).filter(k => SECTION_DEFS.some(s => s.key === k)),
+        left: buildColumn('left'),
+        right: buildColumn('right'),
+        hidden: (saved?.hidden ?? []).filter((k) => SECTION_DEFS.some((s) => s.key === k)),
     };
 }
 const sectionLayout = reactive(seedLayout());
 
 function sectionStyle(key) {
-    if (isFreeMode.value) return {};             // colunas inteiras já somem no modo livre
-    if (!isCustomMode.value) return {};          // modo padrão EasyEye: layout intacto
-    const def   = SECTION_DEFS.find(s => s.key === key);
+    if (isFreeMode.value) return {}; // colunas inteiras já somem no modo livre
+    if (!isCustomMode.value) return {}; // modo padrão EasyEye: layout intacto
+    const def = SECTION_DEFS.find((s) => s.key === key);
     const order = sectionLayout[def.col].indexOf(key);
     const style = { order: order >= 0 ? order : 99 };
     if (sectionLayout.hidden.includes(key)) style.display = 'none';
@@ -249,8 +266,8 @@ function sectionStyle(key) {
 
 function moveSection(col, key, dir) {
     const arr = sectionLayout[col];
-    const i   = arr.indexOf(key);
-    const j   = i + dir;
+    const i = arr.indexOf(key);
+    const j = i + dir;
     if (i < 0 || j < 0 || j >= arr.length) return;
     [arr[i], arr[j]] = [arr[j], arr[i]];
 }
@@ -262,21 +279,26 @@ function toggleSection(key) {
 }
 
 function sectionLabel(key) {
-    const def = SECTION_DEFS.find(s => s.key === key);
+    const def = SECTION_DEFS.find((s) => s.key === key);
     if (!def) return key;
 
-    return def.labelKeys.map(k => tt(k)).filter(Boolean).join(' / ') || def.label;
+    return (
+        def.labelKeys
+            .map((k) => tt(k))
+            .filter(Boolean)
+            .join(' / ') || def.label
+    );
 }
 
 const showLayoutModal = ref(false);
-const layoutSaving    = ref(false);
+const layoutSaving = ref(false);
 const layoutSavedFlash = ref('');
 
 // ── Modelo pessoal de TEXTO LIVRE (preferences.free_text_template) ─────────
 // Texto salvo pelo médico (ex.: esqueleto HDA:/AP:/AV:/BIO:/FO:/HD:/CD:) que
 // pré-preenche a caixa quando ele entra no modo livre com a caixa vazia.
-const freeTextTemplate      = ref(usePage().props.auth?.user?.preferences?.free_text_template ?? '');
-const freeTemplateSaving    = ref(false);
+const freeTextTemplate = ref(usePage().props.auth?.user?.preferences?.free_text_template ?? '');
+const freeTemplateSaving = ref(false);
 const freeTemplateSavedFlash = ref(false);
 
 async function saveFreeTextTemplate() {
@@ -289,7 +311,9 @@ async function saveFreeTextTemplate() {
         });
         freeTextTemplate.value = data.data?.free_text_template ?? content;
         freeTemplateSavedFlash.value = true;
-        setTimeout(() => { freeTemplateSavedFlash.value = false; }, 2500);
+        setTimeout(() => {
+            freeTemplateSavedFlash.value = false;
+        }, 2500);
     } catch (e) {
         console.error('Failed to persist free text template:', e);
     } finally {
@@ -300,7 +324,11 @@ async function saveFreeTextTemplate() {
 function applyFreeTextTemplate() {
     if (!freeTextTemplate.value) return;
     const current = (form.observation_general || '').trim();
-    if (current && !window.confirm(tt('free_template_overwrite', 'A caixa já tem conteúdo. Substituir pelo seu modelo?'))) return;
+    if (
+        current &&
+        !window.confirm(tt('free_template_overwrite', 'A caixa já tem conteúdo. Substituir pelo seu modelo?'))
+    )
+        return;
     form.observation_general = freeTextTemplate.value;
 }
 
@@ -336,35 +364,38 @@ async function persistPreference(patch) {
 async function saveMyLayout() {
     const ok = await persistPreference({
         custom: {
-            left:   [...sectionLayout.left],
-            right:  [...sectionLayout.right],
+            left: [...sectionLayout.left],
+            right: [...sectionLayout.right],
             hidden: [...sectionLayout.hidden],
         },
     });
     if (ok) {
         layoutSavedFlash.value = tt('layout_saved', 'Modelo salvo!');
-        setTimeout(() => { layoutSavedFlash.value = ''; }, 2500);
+        setTimeout(() => {
+            layoutSavedFlash.value = '';
+        }, 2500);
     }
 }
 
-const isCurrentModeDefault = computed(() =>
-    (persistedLayout.value?.default_mode ?? 'default') === recordMode.value);
+const isCurrentModeDefault = computed(() => (persistedLayout.value?.default_mode ?? 'default') === recordMode.value);
 
 async function saveDefaultMode() {
     const ok = await persistPreference({ default_mode: recordMode.value });
     if (ok) {
         layoutSavedFlash.value = tt('default_mode_saved', 'Definido como seu padrão!');
-        setTimeout(() => { layoutSavedFlash.value = ''; }, 2500);
+        setTimeout(() => {
+            layoutSavedFlash.value = '';
+        }, 2500);
     }
 }
 
 // Evoluções clínicas (texto livre, append-only) — histórico por PACIENTE,
 // atravessa prontuários. Carregado sob demanda ao abrir o modal.
 const showEvolutionModal = ref(false);
-const evolutions         = ref([]);
-const evolutionsLoaded   = ref(false);
-const evolutionText      = ref('');
-const evolutionBusy      = ref(false);
+const evolutions = ref([]);
+const evolutionsLoaded = ref(false);
+const evolutionText = ref('');
+const evolutionBusy = ref(false);
 
 // Procedimento estruturado (Fase 3 gap-fill) — estado interno inteiro vive
 // em MedicalRecordProceduresModal.vue, aqui só o toggle de visibilidade.
@@ -413,19 +444,26 @@ async function saveEvolution() {
 // Documentações
 const documentations = ref(r?.documentations ?? []);
 // Mantém a lista sincronizada após reload parcial (ex.: novo laudo de IA aprovado).
-watch(() => props.medicalrecord?.documentations, (v) => { if (Array.isArray(v)) documentations.value = v; });
+watch(
+    () => props.medicalrecord?.documentations,
+    (v) => {
+        if (Array.isArray(v)) documentations.value = v;
+    },
+);
 
 // ── Assistente de IA ────────────────────────────────────────────────────────
-const aiEnabled  = computed(() => Boolean(props.ai?.enabled) && props.isEdit);
+const aiEnabled = computed(() => Boolean(props.ai?.enabled) && props.isEdit);
 const aiPanelOpen = ref(false);
 const aiContext = computed(() => ({
-    workflow_default:  props.ai?.default_workflow ?? 'record_assist',
-    patient_id:        props.patient?.id ?? null,
+    workflow_default: props.ai?.default_workflow ?? 'record_assist',
+    patient_id: props.patient?.id ?? null,
     medical_record_id: r?.id ?? null,
-    can_insert:        !isLocked.value,
+    can_insert: !isLocked.value,
 }));
 
-function openAiPanel() { aiPanelOpen.value = true; }
+function openAiPanel() {
+    aiPanelOpen.value = true;
+}
 
 // Insere uma sugestão da IA num campo do prontuário (texto), com confirmação
 // quando o campo já tem conteúdo. Nunca substitui sem o médico decidir.
@@ -433,7 +471,10 @@ function applyAiSuggestion({ field, value }) {
     if (isLocked.value || !value) return;
     const target = field === 'observations' ? 'observation_general' : 'clinical_conduct';
     const current = (form[target] || '').trim();
-    if (current && !window.confirm(tt('ai_insert_confirm', 'O campo já tem conteúdo. Anexar a sugestão da IA ao final?'))) {
+    if (
+        current &&
+        !window.confirm(tt('ai_insert_confirm', 'O campo já tem conteúdo. Anexar a sugestão da IA ao final?'))
+    ) {
         return;
     }
     form[target] = current ? `${current}\n${value}` : value;
@@ -445,93 +486,92 @@ function onAiApproved() {
 }
 const docForm = reactive({
     report_setting_content_id: '',
-    title:        '',
-    content:      '',
-    exam_type:    '',
+    title: '',
+    content: '',
+    exam_type: '',
     exam_subtype: '',
-    exam_label:   '',
+    exam_label: '',
 });
-const docTemplates    = ref(documentationTemplates.value);
-const docSaving       = ref(false);
+const docTemplates = ref(documentationTemplates.value);
+const docSaving = ref(false);
 const quickActionBusy = ref(false);
 
 // F5 — Medicamentos
-const prescription      = ref([]);
-const medicineLists     = ref('');
-const medSearchQuery    = ref('');
-const medSearchResults  = ref([]);
-const medSearchOpen     = ref(false);
-const medSearchLoading  = ref(false);
-const maxMedicines      = 5;
+const prescription = ref([]);
+const medicineLists = ref('');
+const medSearchQuery = ref('');
+const medSearchResults = ref([]);
+const medSearchOpen = ref(false);
+const medSearchLoading = ref(false);
+const maxMedicines = 5;
 // Busca inteligente + posologia: abas Recentes | Favoritos | Buscar, seleção
 // com sugestão de posologia editável (minha posologia > genérica da base) e
 // presets por médico. Ver MedicationPresetsController.
-const medTab            = ref('search');   // search | recents | favorites
-const medPresets        = ref({ recents: [], favorites: [] });
-const selectedMed       = ref(null);
-const posologyDraft     = ref('');
-const posologySaving    = ref(false);
+const medTab = ref('search'); // search | recents | favorites
+const medPresets = ref({ recents: [], favorites: [] });
+const selectedMed = ref(null);
+const posologyDraft = ref('');
+const posologySaving = ref(false);
 const posologySavedFlash = ref(false);
 
 // F6 — Procedimentos + Indicações
-const procSelected     = ref([]);
-const indSelected      = ref([]);
-const procedureLists   = ref('');
-const procSearchQuery  = ref('');
+const procSelected = ref([]);
+const indSelected = ref([]);
+const procedureLists = ref('');
+const procSearchQuery = ref('');
 const procSearchResults = ref([]);
-const procSearchOpen   = ref(false);
+const procSearchOpen = ref(false);
 const procSearchLoading = ref(false);
 const procTypeSelected = ref('');
-const indSearchQuery   = ref('');
+const indSearchQuery = ref('');
 const indSearchResults = ref([]);
-const indSearchOpen    = ref(false);
+const indSearchOpen = ref(false);
 const indSearchLoading = ref(false);
 const maxProcSolicitations = 10;
 
 // F7 — Atestados
 const attendanceForm = reactive({ content: '' });
-const medicalForm    = reactive({ days: 1, date: '', content: '', daysPreview: '' });
+const medicalForm = reactive({ days: 1, date: '', content: '', daysPreview: '' });
 
 // F8 — Catarata
 const cataractForm = reactive({
-    eye:          'right',
-    template:     'pre_operatorio',
+    eye: 'right',
+    template: 'pre_operatorio',
     date_surgery: '',
     hour_surgery: '',
 });
 
 // Anexos — gerenciados pelo MedicalRecordFileUploadModal
-const uploadedFiles    = ref(r?.files ?? []);
-const showUploadModal  = ref(false);
-const storageState     = ref({ ...props.storage });
+const uploadedFiles = ref(r?.files ?? []);
+const showUploadModal = ref(false);
+const storageState = ref({ ...props.storage });
 
 // PDF preview
-const pdfPreviewUrl   = ref('');
+const pdfPreviewUrl = ref('');
 const pdfPreviewTitle = ref('');
-const showPdfPreview  = ref(false);
+const showPdfPreview = ref(false);
 
 // Modais Bootstrap genéricos (controlados por ref booleano)
 const showDocumentationsModal = ref(false);
-const showDocModal            = ref(false);
-const showMedicationModal     = ref(false);
-const showProcedureModal      = ref(false);
-const showCataractModal       = ref(false);
+const showDocModal = ref(false);
+const showMedicationModal = ref(false);
+const showProcedureModal = ref(false);
+const showCataractModal = ref(false);
 const showAttendanceCertModal = ref(false);
-const showMedicalCertModal    = ref(false);
-const showExamHubModal        = ref(false);
-const showImagingModal        = ref(false);
-const showTonometryModal      = ref(false);
-const showPresbyopiaObsModal  = ref(false);
-const showContactLensCalc     = ref(false);
+const showMedicalCertModal = ref(false);
+const showExamHubModal = ref(false);
+const showImagingModal = ref(false);
+const showTonometryModal = ref(false);
+const showPresbyopiaObsModal = ref(false);
+const showContactLensCalc = ref(false);
 
 // CID-10 search state
-const cidQuery       = ref('');
-const cidResults     = ref([]);
-const cidOpen        = ref(false);
-const cidSearching   = ref(false);
+const cidQuery = ref('');
+const cidResults = ref([]);
+const cidOpen = ref(false);
+const cidSearching = ref(false);
 const cidActiveIndex = ref(-1);
-const selectedCids   = ref(Array.isArray(r?.diagnosis_cids) ? [...r.diagnosis_cids] : []);
-
+const selectedCids = ref(Array.isArray(r?.diagnosis_cids) ? [...r.diagnosis_cids] : []);
 
 // ──────────────────────────────────────────────────────────────────────────
 // Lifecycle
@@ -562,7 +602,9 @@ onMounted(async () => {
 
 onBeforeUnmount(clearAiContext);
 
-watch(tonometryStampedTime, (v) => { form.tonometer_time = v; });
+watch(tonometryStampedTime, (v) => {
+    form.tonometer_time = v;
+});
 
 watch(showOthersHistory, async (v) => {
     if (v) {
@@ -571,7 +613,13 @@ watch(showOthersHistory, async (v) => {
     }
 });
 
-watch(selectedCids, (v) => { form.diagnosis_cids = v; }, { deep: true });
+watch(
+    selectedCids,
+    (v) => {
+        form.diagnosis_cids = v;
+    },
+    { deep: true },
+);
 
 // ──────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -586,9 +634,9 @@ function normalizeDocTemplates(payload) {
     if (Array.isArray(payload)) return payload;
     if (!payload || typeof payload !== 'object') return [];
     return Object.entries(payload).map(([id, group]) => ({
-        report_setting_id:    group.report_setting_id ?? id,
+        report_setting_id: group.report_setting_id ?? id,
         report_setting_title: group.report_setting_title ?? group.title ?? '',
-        contents:             Array.isArray(group.contents) ? group.contents : [],
+        contents: Array.isArray(group.contents) ? group.contents : [],
     }));
 }
 
@@ -618,10 +666,7 @@ async function fetchValidationRules() {
 // ──────────────────────────────────────────────────────────────────────────
 
 /** Eixo refrativo é exibido como "0º" — precisa limpar antes de validar como número. */
-const AXIS_FIELDS = [
-    'dynamic_axis_right', 'dynamic_axis_left',
-    'static_axis_right',  'static_axis_left',
-];
+const AXIS_FIELDS = ['dynamic_axis_right', 'dynamic_axis_left', 'static_axis_right', 'static_axis_left'];
 
 /**
  * F9 — Validação client-side antes do submit (paridade com Alpine
@@ -646,23 +691,23 @@ function validateBeforeSubmit() {
 
     const i = i18n.value;
     const labels = {
-        doctor_id:        i.field_doctor        ?? 'Médico',
-        main_complaint:   i.field_complaint     ?? 'Queixa principal',
+        doctor_id: i.field_doctor ?? 'Médico',
+        main_complaint: i.field_complaint ?? 'Queixa principal',
         pachymetry_right: i.field_pachymetry_od ?? 'Paquimetria OD',
-        pachymetry_left:  i.field_pachymetry_oe ?? 'Paquimetria OE',
-        follow_up_days:   i.field_follow_up     ?? 'Dias de retorno',
+        pachymetry_left: i.field_pachymetry_oe ?? 'Paquimetria OE',
+        follow_up_days: i.field_follow_up ?? 'Dias de retorno',
     };
 
     const result = validatePayload(payload, validationRules.value, labels);
 
     if (!result.valid) {
-        clientErrors.value    = result.errors;
+        clientErrors.value = result.errors;
         hasClientErrors.value = true;
         nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
         return false;
     }
 
-    clientErrors.value    = {};
+    clientErrors.value = {};
     hasClientErrors.value = false;
     return true;
 }
@@ -694,9 +739,14 @@ function submit(flowAction = null) {
     const method = props.isEdit ? 'put' : 'post';
     form[method](url, {
         preserveScroll: true,
-        onSuccess: () => { if (shouldPromptDestination) promptSaveDestination(); },
+        onSuccess: () => {
+            if (shouldPromptDestination) promptSaveDestination();
+        },
         onError: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
-        onFinish: () => { form.flow_action = null; form.post_save_action = null; },
+        onFinish: () => {
+            form.flow_action = null;
+            form.post_save_action = null;
+        },
     });
 }
 
@@ -714,23 +764,26 @@ const saveDestinationOptions = computed(() => [
     {
         action: 'continue',
         label: tt('save_prompt_continue', 'Continuar no prontuário'),
-        hint:  tt('save_prompt_continue_hint', 'Fica nesta tela — o atendimento segue em andamento.'),
-        icon:  'fas fa-notes-medical',
-        btn:   'btn-primary',
+        hint: tt('save_prompt_continue_hint', 'Fica nesta tela — o atendimento segue em andamento.'),
+        icon: 'fas fa-notes-medical',
+        btn: 'btn-primary',
     },
     {
         action: 'agenda',
         label: tt('save_prompt_agenda', 'Ir para a Agenda'),
-        hint:  tt('save_prompt_agenda_hint', 'Salvo — a consulta continua em andamento, você segue pro próximo paciente.'),
-        icon:  'fas fa-calendar-alt',
-        btn:   'btn-outline-primary',
+        hint: tt(
+            'save_prompt_agenda_hint',
+            'Salvo — a consulta continua em andamento, você segue pro próximo paciente.',
+        ),
+        icon: 'fas fa-calendar-alt',
+        btn: 'btn-outline-primary',
     },
     {
         action: 'list',
         label: tt('save_prompt_list', 'Ver prontuários do paciente'),
-        hint:  tt('save_prompt_list_hint', 'Histórico completo de atendimentos deste paciente.'),
-        icon:  'fas fa-folder-open',
-        btn:   'btn-outline-secondary',
+        hint: tt('save_prompt_list_hint', 'Histórico completo de atendimentos deste paciente.'),
+        icon: 'fas fa-folder-open',
+        btn: 'btn-outline-secondary',
     },
 ]);
 
@@ -752,17 +805,19 @@ function chooseSaveDestination(action) {
 // reabre com a ação escolhida (?action=), sem passar pela Agenda.
 // ──────────────────────────────────────────────────────────────────────────
 const POST_SAVE_ACTIONS = {
-    medication:             () => openMedicationPrescription(),
-    procedures:             () => openProcedureSolicitation(),
-    pterygium:              () => issueQuickAction('pterygium-prescription', {}, { preview: true }),
-    cataract:               () => openCataractPrescription(),
-    test_eye:               () => issueQuickAction('test-eye', {}, { preview: true }),
-    retinal_mapping:        () => issueQuickAction('retinal-mapping', {}, { preview: true }),
+    medication: () => openMedicationPrescription(),
+    procedures: () => openProcedureSolicitation(),
+    pterygium: () => issueQuickAction('pterygium-prescription', {}, { preview: true }),
+    cataract: () => openCataractPrescription(),
+    test_eye: () => issueQuickAction('test-eye', {}, { preview: true }),
+    retinal_mapping: () => issueQuickAction('retinal-mapping', {}, { preview: true }),
     attendance_certificate: () => openAttendanceCertificate(),
-    medical_certificate:    () => openMedicalCertificate(),
-    exam_hub:               () => { showExamHubModal.value = true; },
-    documentations:         () => openDocumentationsModal(),
-    upload:                 () => openUploadModal(),
+    medical_certificate: () => openMedicalCertificate(),
+    exam_hub: () => {
+        showExamHubModal.value = true;
+    },
+    documentations: () => openDocumentationsModal(),
+    upload: () => openUploadModal(),
 };
 
 function withRecord(actionKey) {
@@ -819,10 +874,18 @@ async function formatLens(kind, field) {
 }
 
 const LENS_ORDER = [
-    'dynamic_spherical_right', 'dynamic_cylindrical_right', 'dynamic_axis_right',
-    'dynamic_spherical_left',  'dynamic_cylindrical_left',  'dynamic_axis_left',
-    'static_spherical_right',  'static_cylindrical_right',  'static_axis_right',
-    'static_spherical_left',   'static_cylindrical_left',   'static_axis_left',
+    'dynamic_spherical_right',
+    'dynamic_cylindrical_right',
+    'dynamic_axis_right',
+    'dynamic_spherical_left',
+    'dynamic_cylindrical_left',
+    'dynamic_axis_left',
+    'static_spherical_right',
+    'static_cylindrical_right',
+    'static_axis_right',
+    'static_spherical_left',
+    'static_cylindrical_left',
+    'static_axis_left',
 ];
 
 function focusNextLensField(currentName) {
@@ -860,7 +923,12 @@ async function printTonometry() {
             const res = await fetch(props.urls.store_tonometry, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
-                body: JSON.stringify({ od: form.tonometer_right, oe: form.tonometer_left, time, doctor_id: doctorIdVal }),
+                body: JSON.stringify({
+                    od: form.tonometer_right,
+                    oe: form.tonometer_left,
+                    time,
+                    doctor_id: doctorIdVal,
+                }),
             });
             if (res.ok) {
                 const doc = await res.json();
@@ -873,7 +941,12 @@ async function printTonometry() {
             console.error('Tonometry save error:', e);
         }
     }
-    const params = new URLSearchParams({ time, od: form.tonometer_right ?? '', oe: form.tonometer_left ?? '', doctor_id: doctorIdVal });
+    const params = new URLSearchParams({
+        time,
+        od: form.tonometer_right ?? '',
+        oe: form.tonometer_left ?? '',
+        doctor_id: doctorIdVal,
+    });
     tonometryPdfSrc.value = `${props.urls.tonometry_pdf}?${params.toString()}`;
     showTonometryModal.value = true;
 }
@@ -919,14 +992,14 @@ async function calcPresbyopia() {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
             body: JSON.stringify({
                 dynamic_spherical_right: form.dynamic_spherical_right,
-                dynamic_spherical_left:  form.dynamic_spherical_left,
-                addition:                presbyopiaAddition.value,
+                dynamic_spherical_left: form.dynamic_spherical_left,
+                addition: presbyopiaAddition.value,
             }),
         });
         if (!res.ok) return;
         const data = await res.json();
         form.static_spherical_right = String(data.static_spherical_right ?? data.right ?? 0);
-        form.static_spherical_left  = String(data.static_spherical_left  ?? data.left  ?? 0);
+        form.static_spherical_left = String(data.static_spherical_left ?? data.left ?? 0);
     } catch (e) {
         console.error('Presbyopia calc error:', e);
     }
@@ -1043,11 +1116,11 @@ function issueMedicalDeclaration() {
 
 function resetDocForm() {
     docForm.report_setting_content_id = '';
-    docForm.title        = '';
-    docForm.content      = '';
-    docForm.exam_type    = '';
+    docForm.title = '';
+    docForm.content = '';
+    docForm.exam_type = '';
     docForm.exam_subtype = '';
-    docForm.exam_label   = '';
+    docForm.exam_label = '';
 }
 
 async function previewTemplate() {
@@ -1108,9 +1181,9 @@ async function saveExamReport() {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
             body: JSON.stringify({
                 exam_type: docForm.exam_type,
-                subtype:   docForm.exam_subtype || null,
-                content:   docForm.content,
-                title:     docForm.title,
+                subtype: docForm.exam_subtype || null,
+                content: docForm.content,
+                title: docForm.title,
             }),
         });
         if (!res.ok) {
@@ -1149,11 +1222,11 @@ async function openExam(examType, subtype = null) {
         }
         const data = await res.json();
         resetDocForm();
-        docForm.exam_type    = data.exam_type;
+        docForm.exam_type = data.exam_type;
         docForm.exam_subtype = data.subtype || '';
-        docForm.exam_label   = data.label || '';
-        docForm.title        = data.title || data.label || '';
-        docForm.content      = data.html || '';
+        docForm.exam_label = data.label || '';
+        docForm.title = data.title || data.label || '';
+        docForm.content = data.html || '';
         showDocModal.value = true;
     } catch (e) {
         console.error('Open exam template error:', e);
@@ -1176,13 +1249,15 @@ async function loadMedPresets() {
     try {
         const res = await fetch(props.urls.medication_presets, { headers: { Accept: 'application/json' } });
         if (res.ok) medPresets.value = await res.json();
-    } catch { /**/ }
+    } catch {
+        /**/
+    }
 }
 
 // Posologia genérica da base (sugestão default quando o médico não tem a dele)
 function genericPosology(item) {
-    const usage = [item.dosage, item.frequency].filter(Boolean).join(' ')
-        + (item.duration ? ` por ${item.duration}` : '');
+    const usage =
+        [item.dosage, item.frequency].filter(Boolean).join(' ') + (item.duration ? ` por ${item.duration}` : '');
     const lines = [];
     if (usage.trim()) lines.push(usage.trim());
     if (item.instructions) lines.push(`Obs: ${item.instructions}`);
@@ -1193,7 +1268,7 @@ function genericPosology(item) {
 // Nada entra na receita sem passar pelo draft editável.
 function selectMedicine(item) {
     if (!item?.id) return;
-    selectedMed.value   = item;
+    selectedMed.value = item;
     posologyDraft.value = item.my_posology || genericPosology(item);
     posologySavedFlash.value = false;
     medSearchOpen.value = false;
@@ -1208,7 +1283,10 @@ async function confirmAddMedicine() {
     const item = selectedMed.value;
     if (!item) return;
     if (prescription.value.length >= maxMedicines) return;
-    if (prescription.value.some((m) => m.id === item.id)) { cancelSelection(); return; }
+    if (prescription.value.some((m) => m.id === item.id)) {
+        cancelSelection();
+        return;
+    }
 
     if (props.urls.medication_format) {
         try {
@@ -1237,7 +1315,9 @@ async function confirmAddMedicine() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
             body: JSON.stringify({ medicine_id: item.id }),
-        }).then(() => loadMedPresets()).catch(() => {});
+        })
+            .then(() => loadMedPresets())
+            .catch(() => {});
     }
 }
 
@@ -1254,7 +1334,9 @@ async function saveMyPosology() {
         if (res.ok) {
             item.my_posology = posologyDraft.value.trim() || null;
             posologySavedFlash.value = true;
-            setTimeout(() => { posologySavedFlash.value = false; }, 2500);
+            setTimeout(() => {
+                posologySavedFlash.value = false;
+            }, 2500);
             loadMedPresets();
         }
     } finally {
@@ -1281,19 +1363,26 @@ async function toggleMedFavorite(item) {
 async function searchMedicines() {
     const q = (medSearchQuery.value || '').trim();
     if (q.length < 2 || !props.urls.medicine_search) {
-        medSearchResults.value = []; medSearchOpen.value = false; return;
+        medSearchResults.value = [];
+        medSearchOpen.value = false;
+        return;
     }
     medSearchLoading.value = true;
     try {
         const res = await fetch(`${props.urls.medicine_search}?q=${encodeURIComponent(q)}`, {
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
         });
-        if (!res.ok) { medSearchResults.value = []; medSearchOpen.value = false; return; }
+        if (!res.ok) {
+            medSearchResults.value = [];
+            medSearchOpen.value = false;
+            return;
+        }
         medSearchResults.value = await res.json();
         medSearchOpen.value = medSearchResults.value.length > 0;
     } catch (e) {
         console.error('Medicine search error:', e);
-        medSearchResults.value = []; medSearchOpen.value = false;
+        medSearchResults.value = [];
+        medSearchOpen.value = false;
     } finally {
         medSearchLoading.value = false;
     }
@@ -1304,8 +1393,11 @@ function removeMedicine(idx) {
 }
 
 function clearMedicines() {
-    prescription.value = []; medicineLists.value = ''; medSearchQuery.value = '';
-    medSearchResults.value = []; medSearchOpen.value = false;
+    prescription.value = [];
+    medicineLists.value = '';
+    medSearchQuery.value = '';
+    medSearchResults.value = [];
+    medSearchOpen.value = false;
     cancelSelection();
 }
 
@@ -1319,24 +1411,33 @@ function submitMedicationPrescription() {
 // ──────────────────────────────────────────────────────────────────────────
 // F6 — Procedimentos + Indicações
 // ──────────────────────────────────────────────────────────────────────────
-function openProcedureSolicitation() { showProcedureModal.value = true; }
+function openProcedureSolicitation() {
+    showProcedureModal.value = true;
+}
 
 async function searchProcedures() {
     const q = (procSearchQuery.value || '').trim();
     if (q.length < 2 || !props.urls.procedure_search) {
-        procSearchResults.value = []; procSearchOpen.value = false; return;
+        procSearchResults.value = [];
+        procSearchOpen.value = false;
+        return;
     }
     procSearchLoading.value = true;
     try {
         const res = await fetch(`${props.urls.procedure_search}?q=${encodeURIComponent(q)}`, {
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
         });
-        if (!res.ok) { procSearchResults.value = []; procSearchOpen.value = false; return; }
+        if (!res.ok) {
+            procSearchResults.value = [];
+            procSearchOpen.value = false;
+            return;
+        }
         procSearchResults.value = await res.json();
         procSearchOpen.value = procSearchResults.value.length > 0;
     } catch (e) {
         console.error('Procedure search error:', e);
-        procSearchResults.value = []; procSearchOpen.value = false;
+        procSearchResults.value = [];
+        procSearchOpen.value = false;
     } finally {
         procSearchLoading.value = false;
     }
@@ -1345,19 +1446,26 @@ async function searchProcedures() {
 async function searchIndications() {
     const q = (indSearchQuery.value || '').trim();
     if (q.length < 2 || !props.urls.indication_search) {
-        indSearchResults.value = []; indSearchOpen.value = false; return;
+        indSearchResults.value = [];
+        indSearchOpen.value = false;
+        return;
     }
     indSearchLoading.value = true;
     try {
         const res = await fetch(`${props.urls.indication_search}?q=${encodeURIComponent(q)}`, {
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
         });
-        if (!res.ok) { indSearchResults.value = []; indSearchOpen.value = false; return; }
+        if (!res.ok) {
+            indSearchResults.value = [];
+            indSearchOpen.value = false;
+            return;
+        }
         indSearchResults.value = await res.json();
         indSearchOpen.value = indSearchResults.value.length > 0;
     } catch (e) {
         console.error('Indication search error:', e);
-        indSearchResults.value = []; indSearchOpen.value = false;
+        indSearchResults.value = [];
+        indSearchOpen.value = false;
     } finally {
         indSearchLoading.value = false;
     }
@@ -1370,21 +1478,28 @@ async function addProcedure(item) {
     const type = procTypeSelected.value || '';
     const idx = procSelected.value.length;
     procSelected.value.push({
-        id: item.id, name: item.name, code: item.code,
-        type, type_label: type ? TYPE_LABEL[type] : '',
+        id: item.id,
+        name: item.name,
+        code: item.code,
+        type,
+        type_label: type ? TYPE_LABEL[type] : '',
     });
-    procSearchQuery.value = ''; procSearchResults.value = []; procSearchOpen.value = false;
-    await _appendSolicitationLine({ kind: 'procedure', id: item.id, type: type || null },
-        () => procSelected.value.splice(idx, 1));
+    procSearchQuery.value = '';
+    procSearchResults.value = [];
+    procSearchOpen.value = false;
+    await _appendSolicitationLine({ kind: 'procedure', id: item.id, type: type || null }, () =>
+        procSelected.value.splice(idx, 1),
+    );
 }
 
 async function addIndication(item) {
     if (procSelected.value.length + indSelected.value.length >= maxProcSolicitations) return;
     const idx = indSelected.value.length;
     indSelected.value.push({ id: item.id, description: item.description });
-    indSearchQuery.value = ''; indSearchResults.value = []; indSearchOpen.value = false;
-    await _appendSolicitationLine({ kind: 'indication', id: item.id },
-        () => indSelected.value.splice(idx, 1));
+    indSearchQuery.value = '';
+    indSearchResults.value = [];
+    indSearchOpen.value = false;
+    await _appendSolicitationLine({ kind: 'indication', id: item.id }, () => indSelected.value.splice(idx, 1));
 }
 
 async function _appendSolicitationLine(payload, onError) {
@@ -1395,26 +1510,36 @@ async function _appendSolicitationLine(payload, onError) {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
             body: JSON.stringify(payload),
         });
-        if (!res.ok) { onError?.(); return; }
+        if (!res.ok) {
+            onError?.();
+            return;
+        }
         const { line } = await res.json();
         if (!line) return;
-        procedureLists.value = procedureLists.value
-            ? `${procedureLists.value.trimEnd()}\n${line}\n`
-            : `${line}\n`;
+        procedureLists.value = procedureLists.value ? `${procedureLists.value.trimEnd()}\n${line}\n` : `${line}\n`;
     } catch (e) {
         console.error('Format solicitation line error:', e);
         onError?.();
     }
 }
 
-function removeProcedure(idx) { procSelected.value.splice(idx, 1); }
-function removeIndication(idx) { indSelected.value.splice(idx, 1); }
+function removeProcedure(idx) {
+    procSelected.value.splice(idx, 1);
+}
+function removeIndication(idx) {
+    indSelected.value.splice(idx, 1);
+}
 
 function clearProcedureSolicitation() {
-    procSelected.value = []; indSelected.value = []; procedureLists.value = '';
-    procSearchQuery.value = ''; indSearchQuery.value = '';
-    procSearchResults.value = []; indSearchResults.value = [];
-    procSearchOpen.value = false; indSearchOpen.value = false;
+    procSelected.value = [];
+    indSelected.value = [];
+    procedureLists.value = '';
+    procSearchQuery.value = '';
+    indSearchQuery.value = '';
+    procSearchResults.value = [];
+    indSearchResults.value = [];
+    procSearchOpen.value = false;
+    indSearchOpen.value = false;
 }
 
 function submitProcedureSolicitation() {
@@ -1441,7 +1566,10 @@ function submitAttendanceCertificate() {
 }
 
 function openMedicalCertificate() {
-    medicalForm.days = 1; medicalForm.date = ''; medicalForm.content = ''; medicalForm.daysPreview = '';
+    medicalForm.days = 1;
+    medicalForm.date = '';
+    medicalForm.content = '';
+    medicalForm.daysPreview = '';
     refreshDayExtension();
     showMedicalCertModal.value = true;
 }
@@ -1463,7 +1591,8 @@ function debouncedRefreshDayExtension() {
 async function refreshDayExtension() {
     const days = Number(medicalForm.days);
     if (!Number.isInteger(days) || days < 1 || days > 365) {
-        medicalForm.daysPreview = ''; return;
+        medicalForm.daysPreview = '';
+        return;
     }
     if (!props.urls.day_extension_preview) return;
     try {
@@ -1472,7 +1601,10 @@ async function refreshDayExtension() {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
             body: JSON.stringify({ days }),
         });
-        if (!res.ok) { medicalForm.daysPreview = ''; return; }
+        if (!res.ok) {
+            medicalForm.daysPreview = '';
+            return;
+        }
         const data = await res.json();
         medicalForm.daysPreview = data.display || '';
     } catch (e) {
@@ -1515,8 +1647,8 @@ function formatCataractDate(event) {
 function submitCataractPrescription() {
     if (!cataractForm.eye) return;
     const payload = {
-        eye:          cataractForm.eye,
-        template:     cataractForm.template || 'pre_operatorio',
+        eye: cataractForm.eye,
+        template: cataractForm.template || 'pre_operatorio',
         date_surgery: (cataractForm.date_surgery || '').trim(),
         hour_surgery: (cataractForm.hour_surgery || '').trim(),
     };
@@ -1530,14 +1662,20 @@ function submitCataractPrescription() {
 async function searchCid10() {
     const q = (cidQuery.value || '').trim();
     if (q.length < 2 || !props.urls.cid10_search) {
-        cidResults.value = []; cidOpen.value = false; return;
+        cidResults.value = [];
+        cidOpen.value = false;
+        return;
     }
     cidSearching.value = true;
     try {
         const res = await fetch(`${props.urls.cid10_search}?q=${encodeURIComponent(q)}`, {
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
         });
-        if (!res.ok) { cidResults.value = []; cidOpen.value = false; return; }
+        if (!res.ok) {
+            cidResults.value = [];
+            cidOpen.value = false;
+            return;
+        }
         const list = await res.json();
         cidResults.value = list.filter((c) => !selectedCids.value.some((s) => s.code === c.code));
         cidOpen.value = cidResults.value.length > 0;
@@ -1553,7 +1691,9 @@ function selectCid(item) {
     if (!selectedCids.value.some((s) => s.code === item.code)) {
         selectedCids.value.push({ code: item.code, description: item.description });
     }
-    cidQuery.value = ''; cidResults.value = []; cidOpen.value = false;
+    cidQuery.value = '';
+    cidResults.value = [];
+    cidOpen.value = false;
 }
 
 function removeCid(code) {
@@ -1576,7 +1716,7 @@ function openUploadModal() {
 
 function onFileUploaded(file) {
     // Empilha cada arquivo retornado pelo backend conforme conclui o upload.
-    if (file?.id && !uploadedFiles.value.some(f => f.id === file.id)) {
+    if (file?.id && !uploadedFiles.value.some((f) => f.id === file.id)) {
         uploadedFiles.value.push(file);
     }
 }
@@ -1592,8 +1732,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
     <form @submit.prevent="submit" class="pmr-form" enctype="multipart/form-data" novalidate>
         <!-- Assistente de IA -->
         <div v-if="aiEnabled" class="d-flex justify-content-end align-items-center gap-2 px-3 pt-2">
-            <button type="button" class="btn btn-sm btn-info text-white d-inline-flex align-items-center gap-1"
-                    @click="openAiPanel">
+            <button
+                type="button"
+                class="btn btn-sm btn-info text-white d-inline-flex align-items-center gap-1"
+                @click="openAiPanel"
+            >
                 <i class="ti ti-robot"></i>{{ ai?.assistant?.title ?? 'Assistente de IA' }}
             </button>
         </div>
@@ -1610,7 +1753,9 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
         <!-- F9 erros client -->
         <div v-if="hasClientErrors" class="alert alert-danger m-3 mb-0" role="alert">
-            <h6 class="alert-heading mb-1"><i class="fas fa-exclamation-triangle me-1"></i>{{ tt('client_errors_title', 'Erros de validação') }}</h6>
+            <h6 class="alert-heading mb-1">
+                <i class="fas fa-exclamation-triangle me-1"></i>{{ tt('client_errors_title', 'Erros de validação') }}
+            </h6>
             <ul class="mb-0 small ps-3">
                 <template v-for="(msgs, field) in clientErrors" :key="field">
                     <li v-for="(m, i) in msgs" :key="`${field}-${i}`">{{ m }}</li>
@@ -1620,7 +1765,9 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
         <!-- Erros Inertia (server) -->
         <div v-if="Object.keys(form.errors).length" class="alert alert-danger m-3 mb-0" role="alert">
-            <h6 class="alert-heading mb-1"><i class="fas fa-exclamation-triangle me-1"></i>{{ tt('server_errors_title', 'Erros do servidor') }}</h6>
+            <h6 class="alert-heading mb-1">
+                <i class="fas fa-exclamation-triangle me-1"></i>{{ tt('server_errors_title', 'Erros do servidor') }}
+            </h6>
             <ul class="mb-0 small ps-3">
                 <li v-for="(msg, field) in form.errors" :key="field">{{ msg }}</li>
             </ul>
@@ -1639,16 +1786,18 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         </div>
 
         <!-- Médico (select se admin ou sem currentDoctor) -->
-        <input v-if="!canChooseDoctor && currentDoctorId" type="hidden" name="doctor_id" :value="form.doctor_id">
+        <input v-if="!canChooseDoctor && currentDoctorId" type="hidden" name="doctor_id" :value="form.doctor_id" />
         <div v-else class="pmr-section px-3 pt-2">
             <div class="row g-2">
                 <div class="col-12 col-md-4 col-lg-3">
                     <label class="pmr-label">{{ tt('doctor', 'Médico') }}</label>
-                    <SearchSelect v-model="form.doctor_id"
-                                  :options="doctors"
-                                  :placeholder="tt('select', 'Selecione')"
-                                  :invalid="Boolean(form.errors.doctor_id)"
-                                  :disabled="isLocked" />
+                    <SearchSelect
+                        v-model="form.doctor_id"
+                        :options="doctors"
+                        :placeholder="tt('select', 'Selecione')"
+                        :invalid="Boolean(form.errors.doctor_id)"
+                        :disabled="isLocked"
+                    />
                 </div>
             </div>
         </div>
@@ -1656,34 +1805,54 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         <!-- Modelo de prontuário (padrão / meu modelo / texto livre) — só médico -->
         <div v-if="isDoctor" class="px-3 pt-2 d-flex align-items-center gap-2 flex-wrap pmr-mode-bar">
             <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn"
-                        :class="recordMode === 'default' ? 'btn-primary' : 'btn-outline-secondary'"
-                        @click="recordMode = 'default'">
+                <button
+                    type="button"
+                    class="btn"
+                    :class="recordMode === 'default' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="recordMode = 'default'"
+                >
                     <i class="fas fa-eye me-1"></i>{{ tt('mode_default', 'Padrão EasyEye') }}
                 </button>
-                <button type="button" class="btn"
-                        :class="recordMode === 'custom' ? 'btn-primary' : 'btn-outline-secondary'"
-                        @click="recordMode = 'custom'">
+                <button
+                    type="button"
+                    class="btn"
+                    :class="recordMode === 'custom' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="recordMode = 'custom'"
+                >
                     <i class="fas fa-user-pen me-1"></i>{{ tt('mode_custom', 'Meu prontuário') }}
                 </button>
-                <button type="button" class="btn"
-                        :class="recordMode === 'free' ? 'btn-primary' : 'btn-outline-secondary'"
-                        @click="recordMode = 'free'">
+                <button
+                    type="button"
+                    class="btn"
+                    :class="recordMode === 'free' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="recordMode = 'free'"
+                >
                     <i class="fas fa-align-left me-1"></i>{{ tt('mode_free', 'Texto livre') }}
                 </button>
             </div>
 
-            <button v-if="isCustomMode" type="button" class="btn btn-outline-primary btn-sm"
-                    @click="showLayoutModal = true">
+            <button
+                v-if="isCustomMode"
+                type="button"
+                class="btn btn-outline-primary btn-sm"
+                @click="showLayoutModal = true"
+            >
                 <i class="fas fa-sliders me-1"></i>{{ tt('customize', 'Personalizar') }}
             </button>
 
-            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none"
-                    :disabled="isCurrentModeDefault || layoutSaving"
-                    :title="tt('default_mode_hint', 'Novos atendimentos abrirão neste formato')"
-                    @click="saveDefaultMode">
+            <button
+                type="button"
+                class="btn btn-link btn-sm p-0 text-decoration-none"
+                :disabled="isCurrentModeDefault || layoutSaving"
+                :title="tt('default_mode_hint', 'Novos atendimentos abrirão neste formato')"
+                @click="saveDefaultMode"
+            >
                 <i :class="isCurrentModeDefault ? 'fas fa-star text-warning' : 'far fa-star'" class="me-1"></i>
-                {{ isCurrentModeDefault ? tt('is_default_mode', 'Seu padrão') : tt('set_default_mode', 'Definir como meu padrão') }}
+                {{
+                    isCurrentModeDefault
+                        ? tt('is_default_mode', 'Seu padrão')
+                        : tt('set_default_mode', 'Definir como meu padrão')
+                }}
             </button>
 
             <span v-if="layoutSavedFlash" class="badge bg-success-subtle text-success">{{ layoutSavedFlash }}</span>
@@ -1697,11 +1866,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             <div class="row g-2 align-items-start">
                 <div class="col-12 col-xl-8">
                     <label class="pmr-label">{{ tt('complaint', 'Queixa principal') }}</label>
-                    <textarea v-model="form.main_complaint" name="main_complaint" rows="4"
-                              class="form-control form-control-sm"
-                              :class="{ 'is-invalid': form.errors.main_complaint }"
-                              :placeholder="tt('complaint_ph', 'Descreva a queixa principal...')"
-                              :disabled="isLocked"></textarea>
+                    <textarea
+                        v-model="form.main_complaint"
+                        name="main_complaint"
+                        rows="4"
+                        class="form-control form-control-sm"
+                        :class="{ 'is-invalid': form.errors.main_complaint }"
+                        :placeholder="tt('complaint_ph', 'Descreva a queixa principal...')"
+                        :disabled="isLocked"
+                    ></textarea>
                 </div>
 
                 <div class="col-12 col-xl-4 pmr-risk-wrap">
@@ -1724,21 +1897,47 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
                                 <div class="pmr-risk-switches">
                                     <!-- Próprio: vermelho quando ativo (paciente tem a condição) -->
-                                    <div class="form-check form-switch pmr-risk-switch pmr-risk-self mb-0"
-                                         :class="{ 'pmr-risk-switch--on': form[flag] }">
-                                        <input v-model="form[flag]" type="checkbox" class="form-check-input" role="switch"
-                                               :id="`risk-${flag}-self`" :name="flag" :value="1" :disabled="isLocked">
-                                        <label class="form-check-label pmr-risk-switch-label" :for="`risk-${flag}-self`">
+                                    <div
+                                        class="form-check form-switch pmr-risk-switch pmr-risk-self mb-0"
+                                        :class="{ 'pmr-risk-switch--on': form[flag] }"
+                                    >
+                                        <input
+                                            v-model="form[flag]"
+                                            type="checkbox"
+                                            class="form-check-input"
+                                            role="switch"
+                                            :id="`risk-${flag}-self`"
+                                            :name="flag"
+                                            :value="1"
+                                            :disabled="isLocked"
+                                        />
+                                        <label
+                                            class="form-check-label pmr-risk-switch-label"
+                                            :for="`risk-${flag}-self`"
+                                        >
                                             {{ tt('self', 'Próprio') }}
                                         </label>
                                     </div>
 
                                     <!-- Familiar: amarelo quando ativo (histórico hereditário) -->
-                                    <div class="form-check form-switch pmr-risk-switch pmr-risk-family mb-0"
-                                         :class="{ 'pmr-risk-switch--on': form[`${flag}_family`] }">
-                                        <input v-model="form[`${flag}_family`]" type="checkbox" class="form-check-input" role="switch"
-                                               :id="`risk-${flag}-family`" :name="`${flag}_family`" :value="1" :disabled="isLocked">
-                                        <label class="form-check-label pmr-risk-switch-label" :for="`risk-${flag}-family`">
+                                    <div
+                                        class="form-check form-switch pmr-risk-switch pmr-risk-family mb-0"
+                                        :class="{ 'pmr-risk-switch--on': form[`${flag}_family`] }"
+                                    >
+                                        <input
+                                            v-model="form[`${flag}_family`]"
+                                            type="checkbox"
+                                            class="form-check-input"
+                                            role="switch"
+                                            :id="`risk-${flag}-family`"
+                                            :name="`${flag}_family`"
+                                            :value="1"
+                                            :disabled="isLocked"
+                                        />
+                                        <label
+                                            class="form-check-label pmr-risk-switch-label"
+                                            :for="`risk-${flag}-family`"
+                                        >
                                             {{ tt('family', 'Familiar') }}
                                         </label>
                                     </div>
@@ -1746,10 +1945,12 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
                                 <!-- Botão "+ Outros" aparece apenas sob o glaucomatous (último flag) -->
                                 <div v-if="flag === 'glaucomatous'" class="text-center mt-1">
-                                    <button type="button"
-                                            class="btn btn-link p-0 pmr-toggle-label text-decoration-none"
-                                            style="font-size:.68rem;"
-                                            @click="showOthersHistory = !showOthersHistory">
+                                    <button
+                                        type="button"
+                                        class="btn btn-link p-0 pmr-toggle-label text-decoration-none"
+                                        style="font-size: 0.68rem"
+                                        @click="showOthersHistory = !showOthersHistory"
+                                    >
                                         <i v-if="!showOthersHistory" class="fas fa-plus-circle fa-xs me-1"></i>
                                         <i v-else class="fas fa-minus-circle fa-xs me-1"></i>
                                         {{ tt('others', 'Outros') }}
@@ -1763,10 +1964,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
             <div v-show="showOthersHistory" class="row g-2 mt-1">
                 <div class="col-12">
-                    <input v-model="form.others_history" ref="othersHistoryInput" type="text" name="others_history"
-                           class="form-control form-control-sm"
-                           :placeholder="tt('others_history_ph', 'Outros antecedentes clínicos')"
-                           :disabled="isLocked">
+                    <input
+                        v-model="form.others_history"
+                        ref="othersHistoryInput"
+                        type="text"
+                        name="others_history"
+                        class="form-control form-control-sm"
+                        :placeholder="tt('others_history_ph', 'Outros antecedentes clínicos')"
+                        :disabled="isLocked"
+                    />
                 </div>
             </div>
         </div>
@@ -1777,26 +1983,45 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
              colunas (não v-if): campos preenchidos continuam no submit. -->
         <div v-if="isFreeMode" class="px-3 pt-1 pb-2">
             <label class="pmr-label">{{ tt('free_text_label', 'Evolução / atendimento (texto livre)') }}</label>
-            <textarea v-model="form.observation_general" rows="16"
-                      class="form-control form-control-sm"
-                      :placeholder="tt('free_text_ph', 'Descreva livremente o atendimento...')"
-                      :disabled="isLocked"></textarea>
+            <textarea
+                v-model="form.observation_general"
+                rows="16"
+                class="form-control form-control-sm"
+                :placeholder="tt('free_text_ph', 'Descreva livremente o atendimento...')"
+                :disabled="isLocked"
+            ></textarea>
             <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                 <!-- Modelo pessoal: salva o texto atual como esqueleto pros
                      próximos atendimentos (ex.: HDA:/AP:/AV:/BIO:/FO:/HD:/CD:) -->
-                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none"
-                        :disabled="freeTemplateSaving || isLocked || !(form.observation_general || '').trim()"
-                        @click="saveFreeTextTemplate">
-                    <i class="fas fa-bookmark me-1"></i>{{ tt('free_template_save', 'Salvar como meu modelo de texto livre') }}
+                <button
+                    type="button"
+                    class="btn btn-link btn-sm p-0 text-decoration-none"
+                    :disabled="freeTemplateSaving || isLocked || !(form.observation_general || '').trim()"
+                    @click="saveFreeTextTemplate"
+                >
+                    <i class="fas fa-bookmark me-1"></i
+                    >{{ tt('free_template_save', 'Salvar como meu modelo de texto livre') }}
                 </button>
-                <button v-if="freeTextTemplate" type="button" class="btn btn-link btn-sm p-0 text-decoration-none"
-                        :disabled="isLocked"
-                        @click="applyFreeTextTemplate">
+                <button
+                    v-if="freeTextTemplate"
+                    type="button"
+                    class="btn btn-link btn-sm p-0 text-decoration-none"
+                    :disabled="isLocked"
+                    @click="applyFreeTextTemplate"
+                >
                     <i class="fas fa-file-import me-1"></i>{{ tt('free_template_apply', 'Usar meu modelo') }}
                 </button>
-                <span v-if="freeTemplateSavedFlash" class="badge bg-success-subtle text-success">{{ tt('free_template_saved', 'Modelo salvo!') }}</span>
+                <span v-if="freeTemplateSavedFlash" class="badge bg-success-subtle text-success">{{
+                    tt('free_template_saved', 'Modelo salvo!')
+                }}</span>
                 <small class="text-muted ms-auto">
-                    <i class="fas fa-database me-1"></i>{{ tt('free_text_hint', 'Gravado no campo "Observações" do prontuário — os dados continuam estruturados no histórico do paciente.') }}
+                    <i class="fas fa-database me-1"></i
+                    >{{
+                        tt(
+                            'free_text_hint',
+                            'Gravado no campo "Observações" do prontuário — os dados continuam estruturados no histórico do paciente.',
+                        )
+                    }}
                 </small>
             </div>
         </div>
@@ -1806,27 +2031,35 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             <!-- COLUNA ESQUERDA -->
             <div class="col-12 col-xl-6 pe-xl-2">
                 <div class="pmr-main-panel pmr-main-panel--flow">
-
                     <!-- Vis. cromática / PPC / Cover test -->
                     <div class="pmr-section mb-1" :style="sectionStyle('cromatica_ppc_cover')">
                         <div class="row g-2">
                             <div class="col-4">
                                 <label class="pmr-label">{{ tt('chromatic_vision', 'Vis. cromática') }}</label>
-                                <SearchSelect v-model="form.color_vision_type_id"
-                                              :options="colorVisionTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <SearchSelect
+                                    v-model="form.color_vision_type_id"
+                                    :options="colorVisionTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                             <div class="col-4">
                                 <label class="pmr-label">{{ tt('near_point', 'PPC') }}</label>
-                                <SearchSelect v-model="form.near_point_convergence_id"
-                                              :options="nearPointTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <SearchSelect
+                                    v-model="form.near_point_convergence_id"
+                                    :options="nearPointTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                             <div class="col-4">
                                 <label class="pmr-label">{{ tt('cover_test', 'Cover test') }}</label>
-                                <SearchSelect v-model="form.cover_test_type_id"
-                                              :options="coverTestTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <SearchSelect
+                                    v-model="form.cover_test_type_id"
+                                    :options="coverTestTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                         </div>
                     </div>
@@ -1835,58 +2068,98 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                          linha quando cabem (A/V sem | A/V com | Tonometria) e o que
                          sobra sozinho numa linha ocupa a largura toda — sem vão em
                          branco no meio. Só posição; os campos são os de sempre. -->
-                    <div class="pmr-section pmr-section--inline mb-1" :style="sectionStyle('av_sem_tono')" data-section="av_sem_tono">
+                    <div
+                        class="pmr-section pmr-section--inline mb-1"
+                        :style="sectionStyle('av_sem_tono')"
+                        data-section="av_sem_tono"
+                    >
                         <label class="pmr-label">{{ tt('av_without', 'A/V sem correção') }}</label>
                         <div class="d-flex gap-1 flex-wrap">
                             <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                 <span class="input-group-text pmr-eye-badge">OD</span>
-                                <AcuitySelect v-model="form.visual_acuity_without_correction_right_id"
-                                              :options="visualAcuityTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <AcuitySelect
+                                    v-model="form.visual_acuity_without_correction_right_id"
+                                    :options="visualAcuityTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                             <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                 <span class="input-group-text pmr-eye-badge">OE</span>
-                                <AcuitySelect v-model="form.visual_acuity_without_correction_left_id"
-                                              :options="visualAcuityTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <AcuitySelect
+                                    v-model="form.visual_acuity_without_correction_left_id"
+                                    :options="visualAcuityTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div class="pmr-section pmr-section--inline mb-1" :style="sectionStyle('av_com')" data-section="av_com">
+                    <div
+                        class="pmr-section pmr-section--inline mb-1"
+                        :style="sectionStyle('av_com')"
+                        data-section="av_com"
+                    >
                         <label class="pmr-label">{{ tt('av_with', 'A/V com correção') }}</label>
                         <div class="d-flex gap-1 flex-wrap">
                             <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                 <span class="input-group-text pmr-eye-badge">OD</span>
-                                <AcuitySelect v-model="form.visual_acuity_with_correction_right_id"
-                                              :options="visualAcuityTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <AcuitySelect
+                                    v-model="form.visual_acuity_with_correction_right_id"
+                                    :options="visualAcuityTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                             <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                 <span class="input-group-text pmr-eye-badge">OE</span>
-                                <AcuitySelect v-model="form.visual_acuity_with_correction_left_id"
-                                              :options="visualAcuityTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <AcuitySelect
+                                    v-model="form.visual_acuity_with_correction_left_id"
+                                    :options="visualAcuityTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div class="pmr-section pmr-section--inline pmr-section--tonometry mb-1" :style="sectionStyle('tonometria')" data-section="tonometria">
+                    <div
+                        class="pmr-section pmr-section--inline pmr-section--tonometry mb-1"
+                        :style="sectionStyle('tonometria')"
+                        data-section="tonometria"
+                    >
                         <label class="pmr-label">{{ tt('tonometry', 'Tonometria') }}</label>
                         <div class="d-flex gap-1 align-items-center flex-wrap">
                             <div class="input-group input-group-sm flex-nowrap pmr-tono-eye">
                                 <span class="input-group-text pmr-eye-badge">OD</span>
-                                <input v-model="form.tonometer_right" type="number" name="tonometer_right" step="0.5" min="0"
-                                       class="form-control form-control-sm text-center"
-                                       placeholder="00" :disabled="isLocked" style="min-width:0;"
-                                       @click="$event.target.select()">
+                                <input
+                                    v-model="form.tonometer_right"
+                                    type="number"
+                                    name="tonometer_right"
+                                    step="0.5"
+                                    min="0"
+                                    class="form-control form-control-sm text-center"
+                                    placeholder="00"
+                                    :disabled="isLocked"
+                                    style="min-width: 0"
+                                    @click="$event.target.select()"
+                                />
                             </div>
                             <div class="input-group input-group-sm flex-nowrap pmr-tono-eye">
                                 <span class="input-group-text pmr-eye-badge">OE</span>
-                                <input v-model="form.tonometer_left" type="number" name="tonometer_left" step="0.5" min="0"
-                                       class="form-control form-control-sm text-center"
-                                       placeholder="00" :disabled="isLocked" style="min-width:0;"
-                                       @click="$event.target.select()">
+                                <input
+                                    v-model="form.tonometer_left"
+                                    type="number"
+                                    name="tonometer_left"
+                                    step="0.5"
+                                    min="0"
+                                    class="form-control form-control-sm text-center"
+                                    placeholder="00"
+                                    :disabled="isLocked"
+                                    style="min-width: 0"
+                                    @click="$event.target.select()"
+                                />
                             </div>
                             <!-- Hora + impressão quebram juntas: estreito, fica OD/OE
                                  numa linha e hora/impressão na de baixo. Os campos
@@ -1898,15 +2171,19 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                     step="600"
                                     class="form-control form-control-sm"
                                     :disabled="isLocked"
-                                >
-                                <input type="hidden" name="tonometer_time" :value="tonometryStampedTime">
+                                />
+                                <input type="hidden" name="tonometer_time" :value="tonometryStampedTime" />
                                 <!--
                                     Impressão do laudo de tonometria: salva via storeTonometry no backend
                                     (exige IssueReport — CFM 2.227/2018). Só médico pode emitir o laudo.
                                 -->
-                                <button v-if="isDoctor" type="button" class="btn btn-pink btn-sm flex-shrink-0"
-                                        :title="tt('print_tonometry', 'Imprimir tonometria')"
-                                        @click="printTonometry">
+                                <button
+                                    v-if="isDoctor"
+                                    type="button"
+                                    class="btn btn-pink btn-sm flex-shrink-0"
+                                    :title="tt('print_tonometry', 'Imprimir tonometria')"
+                                    @click="printTonometry"
+                                >
                                     <i class="fas fa-print"></i>
                                 </button>
                             </div>
@@ -1917,37 +2194,122 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     <div class="pmr-section mb-1" :style="sectionStyle('dinamica')">
                         <label class="pmr-label">{{ tt('dynamic', 'Dinâmica') }}</label>
                         <table class="pmr-table">
-                            <thead><tr><th style="width:36px;"></th><th>{{ tt('spherical','Esf.') }}</th><th>{{ tt('cylindrical','Cil.') }}</th><th>{{ tt('axis','Eixo') }}</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th style="width: 36px"></th>
+                                    <th>{{ tt('spherical', 'Esf.') }}</th>
+                                    <th>{{ tt('cylindrical', 'Cil.') }}</th>
+                                    <th>{{ tt('axis', 'Eixo') }}</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 <tr>
                                     <td class="pmr-od">OD</td>
-                                    <td><input v-model="form.dynamic_spherical_right" type="text" inputmode="decimal" name="dynamic_spherical_right" placeholder="0.00"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('spherical', 'dynamic_spherical_right')"
-                                               @keydown.enter.prevent="formatLens('spherical', 'dynamic_spherical_right').then(() => focusNextLensField('dynamic_spherical_right'))"></td>
-                                    <td><input v-model="form.dynamic_cylindrical_right" type="text" inputmode="decimal" name="dynamic_cylindrical_right" placeholder="0.00"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('cylindrical', 'dynamic_cylindrical_right')"
-                                               @keydown.enter.prevent="formatLens('cylindrical', 'dynamic_cylindrical_right').then(() => focusNextLensField('dynamic_cylindrical_right'))"></td>
-                                    <td><input v-model="form.dynamic_axis_right" type="text" inputmode="numeric" name="dynamic_axis_right" placeholder="0º"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('axis', 'dynamic_axis_right')"
-                                               @keydown.enter.prevent="formatLens('axis', 'dynamic_axis_right').then(() => focusNextLensField('dynamic_axis_right'))"></td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_spherical_right"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="dynamic_spherical_right"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('spherical', 'dynamic_spherical_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('spherical', 'dynamic_spherical_right').then(() =>
+                                                    focusNextLensField('dynamic_spherical_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_cylindrical_right"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="dynamic_cylindrical_right"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('cylindrical', 'dynamic_cylindrical_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('cylindrical', 'dynamic_cylindrical_right').then(() =>
+                                                    focusNextLensField('dynamic_cylindrical_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_axis_right"
+                                            type="text"
+                                            inputmode="numeric"
+                                            name="dynamic_axis_right"
+                                            placeholder="0º"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('axis', 'dynamic_axis_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('axis', 'dynamic_axis_right').then(() =>
+                                                    focusNextLensField('dynamic_axis_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td class="pmr-od">OE</td>
-                                    <td><input v-model="form.dynamic_spherical_left" type="text" inputmode="decimal" name="dynamic_spherical_left" placeholder="0.00"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('spherical', 'dynamic_spherical_left')"
-                                               @keydown.enter.prevent="formatLens('spherical', 'dynamic_spherical_left').then(() => focusNextLensField('dynamic_spherical_left'))"></td>
-                                    <td><input v-model="form.dynamic_cylindrical_left" type="text" inputmode="decimal" name="dynamic_cylindrical_left" placeholder="0.00"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('cylindrical', 'dynamic_cylindrical_left')"
-                                               @keydown.enter.prevent="formatLens('cylindrical', 'dynamic_cylindrical_left').then(() => focusNextLensField('dynamic_cylindrical_left'))"></td>
-                                    <td><input v-model="form.dynamic_axis_left" type="text" inputmode="numeric" name="dynamic_axis_left" placeholder="0º"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('axis', 'dynamic_axis_left')"
-                                               @keydown.enter.prevent="formatLens('axis', 'dynamic_axis_left').then(() => focusNextLensField('dynamic_axis_left'))"></td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_spherical_left"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="dynamic_spherical_left"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('spherical', 'dynamic_spherical_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('spherical', 'dynamic_spherical_left').then(() =>
+                                                    focusNextLensField('dynamic_spherical_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_cylindrical_left"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="dynamic_cylindrical_left"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('cylindrical', 'dynamic_cylindrical_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('cylindrical', 'dynamic_cylindrical_left').then(() =>
+                                                    focusNextLensField('dynamic_cylindrical_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_axis_left"
+                                            type="text"
+                                            inputmode="numeric"
+                                            name="dynamic_axis_left"
+                                            placeholder="0º"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('axis', 'dynamic_axis_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('axis', 'dynamic_axis_left').then(() =>
+                                                    focusNextLensField('dynamic_axis_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1957,48 +2319,127 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     <div class="pmr-section mb-1" :style="sectionStyle('estatica')">
                         <label class="pmr-label">{{ tt('static', 'Estática') }}</label>
                         <table class="pmr-table">
-                            <thead><tr><th style="width:36px;"></th><th>{{ tt('spherical','Esf.') }}</th><th>{{ tt('cylindrical','Cil.') }}</th><th>{{ tt('axis','Eixo') }}</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th style="width: 36px"></th>
+                                    <th>{{ tt('spherical', 'Esf.') }}</th>
+                                    <th>{{ tt('cylindrical', 'Cil.') }}</th>
+                                    <th>{{ tt('axis', 'Eixo') }}</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 <tr>
                                     <td class="pmr-od">OD</td>
-                                    <td><input v-model="form.static_spherical_right" type="text" inputmode="decimal" name="static_spherical_right" placeholder="0.00"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('spherical', 'static_spherical_right')"
-                                               @keydown.enter.prevent="formatLens('spherical', 'static_spherical_right').then(() => focusNextLensField('static_spherical_right'))"></td>
-                                    <td><input v-model="form.static_cylindrical_right" type="text" inputmode="decimal" name="static_cylindrical_right" placeholder="0.00"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('cylindrical', 'static_cylindrical_right')"
-                                               @keydown.enter.prevent="formatLens('cylindrical', 'static_cylindrical_right').then(() => focusNextLensField('static_cylindrical_right'))"></td>
-                                    <td><input v-model="form.static_axis_right" type="text" inputmode="numeric" name="static_axis_right" placeholder="0º"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('axis', 'static_axis_right')"
-                                               @keydown.enter.prevent="formatLens('axis', 'static_axis_right').then(() => focusNextLensField('static_axis_right'))"></td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_spherical_right"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="static_spherical_right"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('spherical', 'static_spherical_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('spherical', 'static_spherical_right').then(() =>
+                                                    focusNextLensField('static_spherical_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_cylindrical_right"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="static_cylindrical_right"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('cylindrical', 'static_cylindrical_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('cylindrical', 'static_cylindrical_right').then(() =>
+                                                    focusNextLensField('static_cylindrical_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_axis_right"
+                                            type="text"
+                                            inputmode="numeric"
+                                            name="static_axis_right"
+                                            placeholder="0º"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('axis', 'static_axis_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('axis', 'static_axis_right').then(() =>
+                                                    focusNextLensField('static_axis_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td class="pmr-od">OE</td>
-                                    <td><input v-model="form.static_spherical_left" type="text" inputmode="decimal" name="static_spherical_left" placeholder="0.00"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('spherical', 'static_spherical_left')"
-                                               @keydown.enter.prevent="formatLens('spherical', 'static_spherical_left').then(() => focusNextLensField('static_spherical_left'))"></td>
-                                    <td><input v-model="form.static_cylindrical_left" type="text" inputmode="decimal" name="static_cylindrical_left" placeholder="0.00"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('cylindrical', 'static_cylindrical_left')"
-                                               @keydown.enter.prevent="formatLens('cylindrical', 'static_cylindrical_left').then(() => focusNextLensField('static_cylindrical_left'))"></td>
-                                    <td><input v-model="form.static_axis_left" type="text" inputmode="numeric" name="static_axis_left" placeholder="0º"
-                                               :disabled="isLocked" @click="$event.target.select()"
-                                               @blur="formatLens('axis', 'static_axis_left')"></td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_spherical_left"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="static_spherical_left"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('spherical', 'static_spherical_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('spherical', 'static_spherical_left').then(() =>
+                                                    focusNextLensField('static_spherical_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_cylindrical_left"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="static_cylindrical_left"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('cylindrical', 'static_cylindrical_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('cylindrical', 'static_cylindrical_left').then(() =>
+                                                    focusNextLensField('static_cylindrical_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_axis_left"
+                                            type="text"
+                                            inputmode="numeric"
+                                            name="static_axis_left"
+                                            placeholder="0º"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('axis', 'static_axis_left')"
+                                        />
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-
                 </div>
             </div>
 
             <!-- COLUNA DIREITA -->
             <div class="col-12 col-xl-6 ps-xl-2">
                 <div class="pmr-main-panel" :class="{ 'd-flex flex-column': isCustomMode }">
-
                     <!-- Adição / Longe / Perto + Calc -->
                     <div class="pmr-section mb-1" :style="sectionStyle('adicao')">
                         <!-- Adição, Longe, Perto e botões numa linha só quando cabem (a
@@ -2006,25 +2447,34 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <div class="row g-2 align-items-start">
                             <div class="pmr-lens-field pmr-lens-field--short">
                                 <label class="pmr-label">{{ tt('addition', 'Adição') }}</label>
-                                <SearchSelect v-model="form.addition_type_id"
-                                              :options="additionTypes"
-                                              :placeholder="tt('select', 'Selecione')" :disabled="isLocked" />
+                                <SearchSelect
+                                    v-model="form.addition_type_id"
+                                    :options="additionTypes"
+                                    :placeholder="tt('select', 'Selecione')"
+                                    :disabled="isLocked"
+                                />
                             </div>
                             <div class="pmr-lens-field">
                                 <label class="pmr-label">{{ tt('lens_away', 'Longe') }}</label>
                                 <!-- Multi (Multifocal + Antirreflexo...): numa linha
                                      só, com a quantidade; desmarca no dropdown. -->
-                                <SearchSelect v-model="form.lens_away_ids"
-                                              :options="lenses"
-                                              multiple
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <SearchSelect
+                                    v-model="form.lens_away_ids"
+                                    :options="lenses"
+                                    multiple
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                             <div class="pmr-lens-field">
                                 <label class="pmr-label">{{ tt('lens_near', 'Perto') }}</label>
-                                <SearchSelect v-model="form.lens_near_ids"
-                                              :options="lenses"
-                                              multiple
-                                              :placeholder="'—'" :disabled="isLocked" />
+                                <SearchSelect
+                                    v-model="form.lens_near_ids"
+                                    :options="lenses"
+                                    multiple
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
                             </div>
                             <div class="col-auto">
                                 <!-- Espaço do rótulo: botões na altura dos campos. -->
@@ -2034,21 +2484,28 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                          a adição da presbiopia agora é informada DENTRO
                                          do modal da calculadora (lápis), único lugar que
                                          a consome. O espaço vira o OBS. livre abaixo. -->
-                                    <button type="button" class="btn btn-outline-secondary btn-sm"
-                                            :disabled="isLocked"
-                                            @click="openPresbyopiaCalc"
-                                            :title="tt('calc', 'Calcular presbiopia')">
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        :disabled="isLocked"
+                                        @click="openPresbyopiaCalc"
+                                        :title="tt('calc', 'Calcular presbiopia')"
+                                    >
                                         <i class="fas fa-pencil-alt"></i>
                                     </button>
                                     <!-- Cálculo de lentes de contato (saiu do Gerenciador
                                          de Imagens): só médico, como antes. Assinado:
                                          abre só para consultar o que foi gravado. -->
-                                    <button v-if="isDoctor" type="button" class="btn btn-outline-secondary btn-sm"
-                                            data-contact-lens-open
-                                            :disabled="isLocked && !contactLensRows.length"
-                                            :title="tt('contact_lens_title', 'Cálculo de lentes de contato')"
-                                            :aria-label="tt('contact_lens_title', 'Cálculo de lentes de contato')"
-                                            @click="showContactLensCalc = true">
+                                    <button
+                                        v-if="isDoctor"
+                                        type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        data-contact-lens-open
+                                        :disabled="isLocked && !contactLensRows.length"
+                                        :title="tt('contact_lens_title', 'Cálculo de lentes de contato')"
+                                        :aria-label="tt('contact_lens_title', 'Cálculo de lentes de contato')"
+                                        @click="showContactLensCalc = true"
+                                    >
                                         <i class="fas fa-calculator" aria-hidden="true"></i>
                                     </button>
                                     <!--
@@ -2056,17 +2513,53 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         Admin/secretária da clínica não pode emitir receituário — só visualizar.
                                     -->
                                     <div v-if="isEdit && isDoctor" class="btn-group" role="group">
-                                        <button type="button" class="btn btn-pink btn-sm dropdown-toggle"
-                                                data-bs-toggle="dropdown" aria-expanded="false"
-                                                :disabled="quickActionBusy || isLocked"
-                                                :title="tt('lens_prescription', 'Receituário de óculos')">
+                                        <button
+                                            type="button"
+                                            class="btn btn-pink btn-sm dropdown-toggle"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false"
+                                            :disabled="quickActionBusy || isLocked"
+                                            :title="tt('lens_prescription', 'Receituário de óculos')"
+                                        >
                                             <i class="fas fa-print"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end">
-                                            <li><button type="button" class="dropdown-item" @click="issueLensPrescription('dynamic')">Dinâmica</button></li>
-                                            <li><button type="button" class="dropdown-item" @click="issueLensPrescription('static')">Estática</button></li>
-                                            <li><button type="button" class="dropdown-item" @click="issueLensPrescription('presbyopia_dynamic')">Presb. dinâmica</button></li>
-                                            <li><button type="button" class="dropdown-item" @click="issueLensPrescription('presbyopia')">Presbiopia</button></li>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="issueLensPrescription('dynamic')"
+                                                >
+                                                    Dinâmica
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="issueLensPrescription('static')"
+                                                >
+                                                    Estática
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="issueLensPrescription('presbyopia_dynamic')"
+                                                >
+                                                    Presb. dinâmica
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="issueLensPrescription('presbyopia')"
+                                                >
+                                                    Presbiopia
+                                                </button>
+                                            </li>
                                         </ul>
                                     </div>
                                 </div>
@@ -2077,13 +2570,22 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                  dado: observation_of_lenses. -->
                             <div class="col-12">
                                 <label class="pmr-label">{{ tt('lenses_obs_short', 'OBS.') }}</label>
-                                <textarea v-model="form.observation_of_lenses" name="observation_of_lenses" rows="1"
-                                          class="form-control form-control-sm" :disabled="isLocked"
-                                          :placeholder="tt('lenses_obs_ph', 'Uso contínuo, orientações, preferência de lente…')"></textarea>
+                                <textarea
+                                    v-model="form.observation_of_lenses"
+                                    name="observation_of_lenses"
+                                    rows="1"
+                                    class="form-control form-control-sm"
+                                    :disabled="isLocked"
+                                    :placeholder="
+                                        tt('lenses_obs_ph', 'Uso contínuo, orientações, preferência de lente…')
+                                    "
+                                ></textarea>
                             </div>
                             <!-- Cálculo de lentes de contato vinculado a esta consulta. -->
                             <div v-if="contactLensRows.length" class="col-12" data-contact-lens-summary>
-                                <span class="pmr-label d-block">{{ tt('contact_lens_title', 'Cálculo de lentes de contato') }}</span>
+                                <span class="pmr-label d-block">{{
+                                    tt('contact_lens_title', 'Cálculo de lentes de contato')
+                                }}</span>
                                 <ul class="list-unstyled small mb-0">
                                     <li v-for="row in contactLensRows" :key="row.key">
                                         <span class="text-muted">{{ row.label }}:</span> {{ row.value }}
@@ -2098,15 +2600,25 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <label class="pmr-label">{{ tt('biomicroscopy', 'Biomicroscopia') }}</label>
                         <div class="d-flex gap-1 mb-1">
                             <span class="pmr-eye-inline">OD</span>
-                            <input v-model="form.biomicroscopy_right" type="text" name="biomicroscopy_right"
-                                   class="form-control form-control-sm" :disabled="isLocked"
-                                   @click="$event.target.select()">
+                            <input
+                                v-model="form.biomicroscopy_right"
+                                type="text"
+                                name="biomicroscopy_right"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                @click="$event.target.select()"
+                            />
                         </div>
                         <div class="d-flex gap-1">
                             <span class="pmr-eye-inline">OE</span>
-                            <input v-model="form.biomicroscopy_left" type="text" name="biomicroscopy_left"
-                                   class="form-control form-control-sm" :disabled="isLocked"
-                                   @click="$event.target.select()">
+                            <input
+                                v-model="form.biomicroscopy_left"
+                                type="text"
+                                name="biomicroscopy_left"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                @click="$event.target.select()"
+                            />
                         </div>
                     </div>
 
@@ -2115,32 +2627,51 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <label class="pmr-label">{{ tt('fundoscopy', 'Fundoscopia') }}</label>
                         <div class="d-flex gap-1 mb-1">
                             <span class="pmr-eye-inline">OD</span>
-                            <input v-model="form.fundoscopy_right" type="text" name="fundoscopy_right"
-                                   class="form-control form-control-sm" :disabled="isLocked"
-                                   @click="$event.target.select()">
+                            <input
+                                v-model="form.fundoscopy_right"
+                                type="text"
+                                name="fundoscopy_right"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                @click="$event.target.select()"
+                            />
                         </div>
                         <div class="d-flex gap-1">
                             <span class="pmr-eye-inline">OE</span>
-                            <input v-model="form.fundoscopy_left" type="text" name="fundoscopy_left"
-                                   class="form-control form-control-sm" :disabled="isLocked"
-                                   @click="$event.target.select()">
+                            <input
+                                v-model="form.fundoscopy_left"
+                                type="text"
+                                name="fundoscopy_left"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                @click="$event.target.select()"
+                            />
                         </div>
                     </div>
 
                     <!-- Observação geral -->
                     <div class="pmr-section mb-1" :style="sectionStyle('obs_geral')">
                         <label class="pmr-label">{{ tt('general_obs', 'Observações') }}</label>
-                        <textarea v-model="form.observation_general" name="observation_general" rows="2"
-                                  class="form-control form-control-sm" :disabled="isLocked"></textarea>
+                        <textarea
+                            v-model="form.observation_general"
+                            name="observation_general"
+                            rows="2"
+                            class="form-control form-control-sm"
+                            :disabled="isLocked"
+                        ></textarea>
                     </div>
-
                 </div>
             </div>
         </div>
 
         <!-- Seção colapsável: HDA / Histórico / Diagnóstico / Conduta -->
         <div v-show="!isFreeMode" class="px-3 pb-2">
-            <div class="pmr-collapse-toggle mb-2" data-bs-toggle="collapse" data-bs-target="#pmr-extra-fields" role="button">
+            <div
+                class="pmr-collapse-toggle mb-2"
+                data-bs-toggle="collapse"
+                data-bs-target="#pmr-extra-fields"
+                role="button"
+            >
                 <i class="fas fa-chevron-down me-1 pmr-collapse-icon"></i>
                 <span class="pmr-label mb-0 d-inline">{{ tt('extra_fields', 'Campos adicionais') }}</span>
             </div>
@@ -2155,143 +2686,250 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                 <div class="pmr-field-group mb-3">
                     <div class="pmr-field-group-title">
                         <i class="fas fa-comment-medical me-1"></i>{{ tt('group_anamnesis', 'Anamnese / Histórico') }}
-                        <small class="text-muted fw-normal ms-1">{{ tt('group_anamnesis_hint', 'início da consulta') }}</small>
+                        <small class="text-muted fw-normal ms-1">{{
+                            tt('group_anamnesis_hint', 'início da consulta')
+                        }}</small>
                     </div>
 
-                <div class="row g-2 mb-2">
-                    <div class="col-12">
-                        <label class="pmr-label">{{ tt('hda', 'HDA') }}</label>
-                        <textarea v-model="form.hda" name="hda" rows="2"
-                                  class="form-control form-control-sm" :disabled="isLocked"
-                                  :placeholder="tt('hda_ph', 'História da doença atual')"></textarea>
+                    <div class="row g-2 mb-2">
+                        <div class="col-12">
+                            <label class="pmr-label">{{ tt('hda', 'HDA') }}</label>
+                            <textarea
+                                v-model="form.hda"
+                                name="hda"
+                                rows="2"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                :placeholder="tt('hda_ph', 'História da doença atual')"
+                            ></textarea>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{
+                                tt('ocular_surgical_history', 'Histórico cirúrgico ocular')
+                            }}</label>
+                            <textarea
+                                v-model="form.ocular_surgical_history"
+                                name="ocular_surgical_history"
+                                rows="2"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                            ></textarea>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{ tt('medications_in_use', 'Medicações em uso') }}</label>
+                            <textarea
+                                v-model="form.medications_in_use"
+                                name="medications_in_use"
+                                rows="2"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                            ></textarea>
+                        </div>
                     </div>
-                    <div class="col-12 col-md-6">
-                        <label class="pmr-label">{{ tt('ocular_surgical_history', 'Histórico cirúrgico ocular') }}</label>
-                        <textarea v-model="form.ocular_surgical_history" name="ocular_surgical_history" rows="2"
-                                  class="form-control form-control-sm" :disabled="isLocked"></textarea>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="pmr-label">{{ tt('medications_in_use', 'Medicações em uso') }}</label>
-                        <textarea v-model="form.medications_in_use" name="medications_in_use" rows="2"
-                                  class="form-control form-control-sm" :disabled="isLocked"></textarea>
-                    </div>
-                </div>
 
-                <div class="row g-2 mb-2">
-                    <div class="col-12 col-md-6">
-                        <label class="pmr-label">{{ tt('ocular_motility', 'Motilidade ocular') }}</label>
-                        <input v-model="form.ocular_motility" type="text" name="ocular_motility"
-                               class="form-control form-control-sm" :disabled="isLocked">
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{ tt('ocular_motility', 'Motilidade ocular') }}</label>
+                            <input
+                                v-model="form.ocular_motility"
+                                type="text"
+                                name="ocular_motility"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                            />
+                        </div>
                     </div>
-                </div>
 
-                <!-- Paquimetria / Gonioscopia — movidos da tela principal para cá
+                    <!-- Paquimetria / Gonioscopia — movidos da tela principal para cá
                      (parâmetros específicos, não precisam poluir o prontuário base) -->
-                <div class="row g-2 mb-2">
-                    <div class="col-12 col-md-6">
-                        <label class="pmr-label">{{ tt('pachymetry', 'Paquimetria') }}</label>
-                        <div class="d-flex gap-1">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text pmr-eye-badge">OD</span>
-                                <input v-model="form.pachymetry_right" type="number" name="pachymetry_right" step="1" min="0"
-                                       class="form-control form-control-sm text-center" placeholder="μm" :disabled="isLocked">
-                            </div>
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text pmr-eye-badge">OE</span>
-                                <input v-model="form.pachymetry_left" type="number" name="pachymetry_left" step="1" min="0"
-                                       class="form-control form-control-sm text-center" placeholder="μm" :disabled="isLocked">
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{ tt('pachymetry', 'Paquimetria') }}</label>
+                            <div class="d-flex gap-1">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text pmr-eye-badge">OD</span>
+                                    <input
+                                        v-model="form.pachymetry_right"
+                                        type="number"
+                                        name="pachymetry_right"
+                                        step="1"
+                                        min="0"
+                                        class="form-control form-control-sm text-center"
+                                        placeholder="μm"
+                                        :disabled="isLocked"
+                                    />
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text pmr-eye-badge">OE</span>
+                                    <input
+                                        v-model="form.pachymetry_left"
+                                        type="number"
+                                        name="pachymetry_left"
+                                        step="1"
+                                        min="0"
+                                        class="form-control form-control-sm text-center"
+                                        placeholder="μm"
+                                        :disabled="isLocked"
+                                    />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="pmr-label">{{ tt('gonioscopy', 'Gonioscopia') }}</label>
-                        <div class="d-flex gap-1">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text pmr-eye-badge">OD</span>
-                                <input v-model="form.gonioscopy_right" type="text" name="gonioscopy_right"
-                                       class="form-control form-control-sm" :disabled="isLocked">
-                            </div>
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text pmr-eye-badge">OE</span>
-                                <input v-model="form.gonioscopy_left" type="text" name="gonioscopy_left"
-                                       class="form-control form-control-sm" :disabled="isLocked">
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{ tt('gonioscopy', 'Gonioscopia') }}</label>
+                            <div class="d-flex gap-1">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text pmr-eye-badge">OD</span>
+                                    <input
+                                        v-model="form.gonioscopy_right"
+                                        type="text"
+                                        name="gonioscopy_right"
+                                        class="form-control form-control-sm"
+                                        :disabled="isLocked"
+                                    />
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text pmr-eye-badge">OE</span>
+                                    <input
+                                        v-model="form.gonioscopy_left"
+                                        type="text"
+                                        name="gonioscopy_left"
+                                        class="form-control form-control-sm"
+                                        :disabled="isLocked"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                </div><!-- /grupo Anamnese -->
+                <!-- /grupo Anamnese -->
 
                 <!-- ══ GRUPO 2: Conclusão da consulta ══ -->
                 <div class="pmr-field-group">
                     <div class="pmr-field-group-title">
                         <i class="fas fa-flag-checkered me-1"></i>{{ tt('group_conclusion', 'Conclusão da consulta') }}
-                        <small class="text-muted fw-normal ms-1">{{ tt('group_conclusion_hint', 'diagnóstico e fechamento') }}</small>
+                        <small class="text-muted fw-normal ms-1">{{
+                            tt('group_conclusion_hint', 'diagnóstico e fechamento')
+                        }}</small>
                     </div>
 
-                <div class="row g-2 mb-2">
-                    <div class="col-12">
-                        <label class="pmr-label">{{ tt('cid10', 'CID-10') }}</label>
-                        <input type="hidden" name="diagnosis_cids" :value="serializedCids">
+                    <div class="row g-2 mb-2">
+                        <div class="col-12">
+                            <label class="pmr-label">{{ tt('cid10', 'CID-10') }}</label>
+                            <input type="hidden" name="diagnosis_cids" :value="serializedCids" />
 
-                        <div v-if="selectedCids.length > 0" class="d-flex flex-wrap gap-1 mb-1">
-                            <span v-for="item in selectedCids" :key="item.code"
-                                  class="badge d-inline-flex align-items-center gap-1"
-                                  style="background:#e8f4fd;color:#1a5c8a;font-size:.8rem;font-weight:500;border:1px solid #b8d9f0;padding:.3rem .5rem;">
-                                <span class="fw-semibold">{{ item.code }}</span>
-                                <span class="text-secondary fw-normal" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">– {{ item.description }}</span>
-                                <button type="button" class="btn-close btn-close-sm ms-1" style="font-size:.6rem;"
-                                        :disabled="isLocked" @click="removeCid(item.code)"></button>
-                            </span>
-                        </div>
-
-                        <div class="position-relative">
-                            <div class="input-group input-group-sm">
-                                <input v-model="cidQuery" type="text" class="form-control form-control-sm" autocomplete="off"
-                                       placeholder="Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…"
-                                       :disabled="isLocked"
-                                       @input="searchCid10"
-                                       @keydown.arrow-down.prevent="cidActiveIndex = Math.min(cidActiveIndex + 1, cidResults.length - 1)"
-                                       @keydown.arrow-up.prevent="cidActiveIndex = Math.max(cidActiveIndex - 1, 0)"
-                                       @keydown.enter.prevent="selectActiveCid"
-                                       @keydown.escape="cidOpen = false">
-                                <span v-if="cidSearching" class="input-group-text bg-transparent border-start-0 px-2">
-                                    <span class="spinner-border spinner-border-sm text-secondary" style="width:.8rem;height:.8rem;"></span>
+                            <div v-if="selectedCids.length > 0" class="d-flex flex-wrap gap-1 mb-1">
+                                <span
+                                    v-for="item in selectedCids"
+                                    :key="item.code"
+                                    class="badge d-inline-flex align-items-center gap-1"
+                                    style="
+                                        background: #e8f4fd;
+                                        color: #1a5c8a;
+                                        font-size: 0.8rem;
+                                        font-weight: 500;
+                                        border: 1px solid #b8d9f0;
+                                        padding: 0.3rem 0.5rem;
+                                    "
+                                >
+                                    <span class="fw-semibold">{{ item.code }}</span>
+                                    <span
+                                        class="text-secondary fw-normal"
+                                        style="
+                                            max-width: 260px;
+                                            overflow: hidden;
+                                            text-overflow: ellipsis;
+                                            white-space: nowrap;
+                                        "
+                                        >– {{ item.description }}</span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn-close btn-close-sm ms-1"
+                                        style="font-size: 0.6rem"
+                                        :disabled="isLocked"
+                                        @click="removeCid(item.code)"
+                                    ></button>
                                 </span>
                             </div>
-                            <ul v-if="cidOpen && cidResults.length > 0" class="list-group shadow-sm position-absolute w-100"
-                                style="z-index:1055;top:100%;max-height:260px;overflow-y:auto;">
-                                <li v-for="(item, index) in cidResults" :key="item.id"
-                                    class="list-group-item list-group-item-action py-1 px-2"
-                                    :class="{ active: index === cidActiveIndex }"
-                                    style="cursor:pointer;font-size:.82rem;"
-                                    @mouseenter="cidActiveIndex = index"
-                                    @mousedown.prevent="selectCid(item)">
-                                    <span class="fw-semibold me-1">{{ item.code }}</span>
-                                    <span>– {{ item.description }}</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="row g-2 mb-2">
-                    <div class="col-12 col-md-8">
-                        <label class="pmr-label">{{ tt('clinical_conduct', 'Conduta clínica') }}</label>
-                        <textarea v-model="form.clinical_conduct" name="clinical_conduct" rows="2"
-                                  class="form-control form-control-sm" :disabled="isLocked"
-                                  :placeholder="tt('clinical_conduct_ph', 'Conduta clínica...')"></textarea>
+                            <div class="position-relative">
+                                <div class="input-group input-group-sm">
+                                    <input
+                                        v-model="cidQuery"
+                                        type="text"
+                                        class="form-control form-control-sm"
+                                        autocomplete="off"
+                                        placeholder="Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…"
+                                        :disabled="isLocked"
+                                        @input="searchCid10"
+                                        @keydown.arrow-down.prevent="
+                                            cidActiveIndex = Math.min(cidActiveIndex + 1, cidResults.length - 1)
+                                        "
+                                        @keydown.arrow-up.prevent="cidActiveIndex = Math.max(cidActiveIndex - 1, 0)"
+                                        @keydown.enter.prevent="selectActiveCid"
+                                        @keydown.escape="cidOpen = false"
+                                    />
+                                    <span
+                                        v-if="cidSearching"
+                                        class="input-group-text bg-transparent border-start-0 px-2"
+                                    >
+                                        <span
+                                            class="spinner-border spinner-border-sm text-secondary"
+                                            style="width: 0.8rem; height: 0.8rem"
+                                        ></span>
+                                    </span>
+                                </div>
+                                <ul
+                                    v-if="cidOpen && cidResults.length > 0"
+                                    class="list-group shadow-sm position-absolute w-100"
+                                    style="z-index: 1055; top: 100%; max-height: 260px; overflow-y: auto"
+                                >
+                                    <li
+                                        v-for="(item, index) in cidResults"
+                                        :key="item.id"
+                                        class="list-group-item list-group-item-action py-1 px-2"
+                                        :class="{ active: index === cidActiveIndex }"
+                                        style="cursor: pointer; font-size: 0.82rem"
+                                        @mouseenter="cidActiveIndex = index"
+                                        @mousedown.prevent="selectCid(item)"
+                                    >
+                                        <span class="fw-semibold me-1">{{ item.code }}</span>
+                                        <span>– {{ item.description }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="pmr-label">{{ tt('follow_up_days', 'Retorno') }}</label>
-                        <div class="input-group input-group-sm">
-                            <input v-model="form.follow_up_days" type="number" min="0" name="follow_up_days"
-                                   class="form-control form-control-sm" :disabled="isLocked">
-                            <span class="input-group-text">{{ tt('days', 'dias') }}</span>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-8">
+                            <label class="pmr-label">{{ tt('clinical_conduct', 'Conduta clínica') }}</label>
+                            <textarea
+                                v-model="form.clinical_conduct"
+                                name="clinical_conduct"
+                                rows="2"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                :placeholder="tt('clinical_conduct_ph', 'Conduta clínica...')"
+                            ></textarea>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="pmr-label">{{ tt('follow_up_days', 'Retorno') }}</label>
+                            <div class="input-group input-group-sm">
+                                <input
+                                    v-model="form.follow_up_days"
+                                    type="number"
+                                    min="0"
+                                    name="follow_up_days"
+                                    class="form-control form-control-sm"
+                                    :disabled="isLocked"
+                                />
+                                <span class="input-group-text">{{ tt('days', 'dias') }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                </div><!-- /grupo Conclusão -->
+                <!-- /grupo Conclusão -->
             </div>
         </div>
 
@@ -2305,78 +2943,171 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     confuso e mantém paridade com o Blade original (@if($canSeeQuickActions)).
                 -->
                 <template v-if="isDoctor">
-                    <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Receituário de Medicamentos' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                            :disabled="quickActionBusy || isLocked || form.processing"
-                            @click="withRecord('medication')">
-                        <i class="fas fa-pills" style="font-size:1.6rem;color:#9c27b0;"></i>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Receituário de Medicamentos'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('medication')"
+                    >
+                        <i class="fas fa-pills" style="font-size: 1.6rem; color: #9c27b0"></i>
                         <span class="pmr-doc-img-btn-label visually-hidden">Medicamentos</span>
                     </button>
-                    <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Solicitação de Procedimentos' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                            :disabled="quickActionBusy || isLocked || form.processing"
-                            @click="withRecord('procedures')">
-                        <i class="fas fa-clipboard-list" style="font-size:1.6rem;color:#3f51b5;"></i>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Solicitação de Procedimentos'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('procedures')"
+                    >
+                        <i class="fas fa-clipboard-list" style="font-size: 1.6rem; color: #3f51b5"></i>
                         <span class="pmr-doc-img-btn-label visually-hidden">Procedimentos</span>
                     </button>
-                    <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Receituário de Pterígio' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                            :disabled="quickActionBusy || isLocked || form.processing"
-                            @click="isEdit ? issueQuickAction('pterygium-prescription') : withRecord('pterygium')">
-                        <i class="fas fa-eye-low-vision" style="font-size:1.6rem;color:#ff5722;"></i>
-                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Receituário<br>Pterígio</span>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Receituário de Pterígio'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="isEdit ? issueQuickAction('pterygium-prescription') : withRecord('pterygium')"
+                    >
+                        <i class="fas fa-eye-low-vision" style="font-size: 1.6rem; color: #ff5722"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Receituário<br />Pterígio</span
+                        >
                     </button>
-                    <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Receituário de Catarata' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                            :disabled="quickActionBusy || isLocked || form.processing"
-                            @click="withRecord('cataract')">
-                        <i class="fas fa-eye" style="font-size:1.6rem;color:#00bcd4;"></i>
-                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Receituário<br>Catarata</span>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Receituário de Catarata'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('cataract')"
+                    >
+                        <i class="fas fa-eye" style="font-size: 1.6rem; color: #00bcd4"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Receituário<br />Catarata</span
+                        >
                     </button>
-                    <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Teste do Olhinho' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                            :disabled="quickActionBusy || isLocked || form.processing"
-                            @click="isEdit ? issueQuickAction('test-eye') : withRecord('test_eye')">
-                        <i class="fas fa-baby" style="font-size:1.6rem;color:#e91e63;"></i>
-                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Teste do<br>Olhinho</span>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Teste do Olhinho'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="isEdit ? issueQuickAction('test-eye') : withRecord('test_eye')"
+                    >
+                        <i class="fas fa-baby" style="font-size: 1.6rem; color: #e91e63"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Teste do<br />Olhinho</span
+                        >
                     </button>
-                    <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Mapeamento de Retina' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                            :disabled="quickActionBusy || isLocked || form.processing"
-                            @click="isEdit ? issueQuickAction('retinal-mapping') : withRecord('retinal_mapping')">
-                        <i class="fas fa-bullseye" style="font-size:1.6rem;color:#673ab7;"></i>
-                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Mapeamento<br>de Retina</span>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Mapeamento de Retina'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="isEdit ? issueQuickAction('retinal-mapping') : withRecord('retinal_mapping')"
+                    >
+                        <i class="fas fa-bullseye" style="font-size: 1.6rem; color: #673ab7"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Mapeamento<br />de Retina</span
+                        >
                     </button>
-                    <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Atestado de Comparecimento' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                            :disabled="quickActionBusy || isLocked || form.processing"
-                            @click="withRecord('attendance_certificate')">
-                        <i class="fas fa-user-check" style="font-size:1.6rem;color:#4caf50;"></i>
-                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Atestado<br>Comparecim.</span>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Atestado de Comparecimento'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('attendance_certificate')"
+                    >
+                        <i class="fas fa-user-check" style="font-size: 1.6rem; color: #4caf50"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Atestado<br />Comparecim.</span
+                        >
                     </button>
-                    <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Atestado Médico' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                            :disabled="quickActionBusy || isLocked || form.processing"
-                            @click="withRecord('medical_certificate')">
-                        <i class="fas fa-stethoscope" style="font-size:1.6rem;color:#2196f3;"></i>
-                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Atestado<br>Médico</span>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Atestado Médico'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('medical_certificate')"
+                    >
+                        <i class="fas fa-stethoscope" style="font-size: 1.6rem; color: #2196f3"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Atestado<br />Médico</span
+                        >
                     </button>
                 </template>
 
-                <button v-if="isDoctor && examReports.length > 0" type="button" class="btn pmr-doc-img-btn"
-                        :title="isEdit ? tt('exam_hub_title', 'Laudos de Exame') : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                        :disabled="isLocked || form.processing"
-                        @click="withRecord('exam_hub')">
-                    <i class="fas fa-microscope" style="font-size:1.6rem;color:#03a9f3;"></i>
-                    <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
+                <button
+                    v-if="isDoctor && examReports.length > 0"
+                    type="button"
+                    class="btn pmr-doc-img-btn"
+                    :title="
+                        isEdit
+                            ? tt('exam_hub_title', 'Laudos de Exame')
+                            : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                    "
+                    :disabled="isLocked || form.processing"
+                    @click="withRecord('exam_hub')"
+                >
+                    <i class="fas fa-microscope" style="font-size: 1.6rem; color: #03a9f3"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden" style="white-space: normal; line-height: 1.1"
+                        >Laudos<br />de Exame</span
+                    >
                 </button>
 
                 <!-- Evolução: histórico é por paciente, então abre mesmo em modo
                      create (leitura); gravar exige prontuário salvo + médico. -->
-                <button type="button" class="btn pmr-doc-img-btn"
-                        :title="tt('evolution', 'Evolução')"
-                        @click="openEvolutionModal">
-                    <i class="fas fa-notes-medical" style="font-size:1.6rem;color:#009688;"></i>
+                <button
+                    type="button"
+                    class="btn pmr-doc-img-btn"
+                    :title="tt('evolution', 'Evolução')"
+                    @click="openEvolutionModal"
+                >
+                    <i class="fas fa-notes-medical" style="font-size: 1.6rem; color: #009688"></i>
                     <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('evolution', 'Evolução') }}</span>
                 </button>
 
@@ -2384,38 +3115,64 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                      histórico é por PACIENTE, então abre mesmo em modo
                      create (leitura); solicitar/executar/cancelar exigem
                      prontuário salvo + médico (trava dentro do modal). -->
-                <button type="button" class="btn pmr-doc-img-btn"
-                        :title="tt('procedures', 'Procedimentos')"
-                        @click="showProceduresModal = true">
-                    <i class="fas fa-syringe" style="font-size:1.6rem;color:#7e57c2;"></i>
+                <button
+                    type="button"
+                    class="btn pmr-doc-img-btn"
+                    :title="tt('procedures', 'Procedimentos')"
+                    @click="showProceduresModal = true"
+                >
+                    <i class="fas fa-syringe" style="font-size: 1.6rem; color: #7e57c2"></i>
                     <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('procedures', 'Procedimentos') }}</span>
                 </button>
 
                 <!-- Exames de imagem do módulo Eye Images — consulta durante o
                      atendimento; leitura por paciente, disponível já no create. -->
-                <button v-if="urls.eye_exams" type="button" class="btn pmr-doc-img-btn"
-                        :title="tt('imaging_title', 'Exames de imagem do paciente')"
-                        @click="showImagingModal = true">
-                    <i class="fas fa-x-ray" style="font-size:1.6rem;color:#7b1fa2;"></i>
-                    <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">{{ tt('imaging_exams_short', 'Exames de') }}<br>{{ tt('imaging_exams_short2', 'imagem') }}</span>
+                <button
+                    v-if="urls.eye_exams"
+                    type="button"
+                    class="btn pmr-doc-img-btn"
+                    :title="tt('imaging_title', 'Exames de imagem do paciente')"
+                    @click="showImagingModal = true"
+                >
+                    <i class="fas fa-x-ray" style="font-size: 1.6rem; color: #7b1fa2"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden" style="white-space: normal; line-height: 1.1"
+                        >{{ tt('imaging_exams_short', 'Exames de') }}<br />{{
+                            tt('imaging_exams_short2', 'imagem')
+                        }}</span
+                    >
                 </button>
 
-                <button type="button" class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
-                        :title="isEdit ? tt('documentations', 'Documentações') : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                        :disabled="form.processing"
-                        @click="withRecord('documentations')">
-                    <i class="fas fa-folder-open" style="font-size:1.6rem;color:#0288d1;"></i>
-                    <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('documentations', 'Documentações') }}</span>
+                <button
+                    type="button"
+                    class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
+                    :title="
+                        isEdit
+                            ? tt('documentations', 'Documentações')
+                            : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                    "
+                    :disabled="form.processing"
+                    @click="withRecord('documentations')"
+                >
+                    <i class="fas fa-folder-open" style="font-size: 1.6rem; color: #0288d1"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden">{{
+                        tt('documentations', 'Documentações')
+                    }}</span>
                 </button>
 
                 <!-- Anexo — abre modal com drag-drop + progresso por arquivo -->
-                <button v-if="isDoctor"
-                        type="button"
-                        class="btn pmr-doc-img-btn pmr-doc-annexo"
-                        :title="isEdit ? tt('upload_files', 'Anexar arquivos') : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
-                        :disabled="isLocked || form.processing"
-                        @click="withRecord('upload')">
-                    <i class="fas fa-paperclip" style="font-size:1.6rem;color:#607d8b;"></i>
+                <button
+                    v-if="isDoctor"
+                    type="button"
+                    class="btn pmr-doc-img-btn pmr-doc-annexo"
+                    :title="
+                        isEdit
+                            ? tt('upload_files', 'Anexar arquivos')
+                            : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                    "
+                    :disabled="isLocked || form.processing"
+                    @click="withRecord('upload')"
+                >
+                    <i class="fas fa-paperclip" style="font-size: 1.6rem; color: #607d8b"></i>
                     <span class="pmr-doc-img-btn-label visually-hidden">Anexo</span>
                 </button>
 
@@ -2424,33 +3181,49 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                        Dilatar / Realizar exame: grava, status na Agenda vira
                          Dilatando / Em exame, prontuário segue editável.
                        Finalizar consulta: grava, Atendido, volta pra Agenda. -->
-                <div class="pmr-flow-group ms-auto" role="group" :aria-label="tt('flow_bar_label', 'Andamento do atendimento')">
-                    <button type="submit" class="btn pmr-save-btn pmr-flow-btn pmr-flow-btn--save"
-                            :disabled="form.processing || isLocked"
-                            :title="`${tt('flow_save', 'Salvar')} — ${tt('flow_save_hint', 'Salva o que já foi preenchido e mantém a consulta aberta.')}`">
+                <div
+                    class="pmr-flow-group ms-auto"
+                    role="group"
+                    :aria-label="tt('flow_bar_label', 'Andamento do atendimento')"
+                >
+                    <button
+                        type="submit"
+                        class="btn pmr-save-btn pmr-flow-btn pmr-flow-btn--save"
+                        :disabled="form.processing || isLocked"
+                        :title="`${tt('flow_save', 'Salvar')} — ${tt('flow_save_hint', 'Salva o que já foi preenchido e mantém a consulta aberta.')}`"
+                    >
                         <i class="fas fa-save"></i>
                         <span class="visually-hidden">{{ tt('flow_save', 'Salvar') }}</span>
                     </button>
 
                     <template v-if="flowActive">
-                        <button type="button" class="btn pmr-flow-btn pmr-flow-btn--stage pmr-flow-dilate"
-                                :disabled="form.processing"
-                                :title="`${tt('flow_dilate', 'Dilatar')} — ${tt('flow_dilate_hint', 'Status vira \'Dilatando\' e o prontuário continua aberto pra quando o paciente voltar.')}`"
-                                @click="submit('dilate')">
+                        <button
+                            type="button"
+                            class="btn pmr-flow-btn pmr-flow-btn--stage pmr-flow-dilate"
+                            :disabled="form.processing"
+                            :title="`${tt('flow_dilate', 'Dilatar')} — ${tt('flow_dilate_hint', 'Status vira \'Dilatando\' e o prontuário continua aberto pra quando o paciente voltar.')}`"
+                            @click="submit('dilate')"
+                        >
                             <i class="fas fa-eye-dropper"></i>
                             <span class="visually-hidden">{{ tt('flow_dilate', 'Dilatar') }}</span>
                         </button>
-                        <button type="button" class="btn pmr-flow-btn pmr-flow-btn--stage pmr-flow-exam"
-                                :disabled="form.processing"
-                                :title="`${tt('flow_exam', 'Realizar exame')} — ${tt('flow_exam_hint', 'Status vira \'Em exame\' e o prontuário continua aberto pra quando o paciente voltar.')}`"
-                                @click="submit('exam')">
+                        <button
+                            type="button"
+                            class="btn pmr-flow-btn pmr-flow-btn--stage pmr-flow-exam"
+                            :disabled="form.processing"
+                            :title="`${tt('flow_exam', 'Realizar exame')} — ${tt('flow_exam_hint', 'Status vira \'Em exame\' e o prontuário continua aberto pra quando o paciente voltar.')}`"
+                            @click="submit('exam')"
+                        >
                             <i class="fas fa-stethoscope"></i>
                             <span class="visually-hidden">{{ tt('flow_exam', 'Realizar exame') }}</span>
                         </button>
-                        <button type="button" class="btn pmr-flow-btn pmr-flow-btn--finish pmr-flow-finish"
-                                :disabled="form.processing"
-                                :title="`${tt('flow_finish', 'Finalizar consulta')} — ${tt('flow_finish_hint', 'Atendimento concluído — status vira \'Atendido\'.')}`"
-                                @click="submit('finish')">
+                        <button
+                            type="button"
+                            class="btn pmr-flow-btn pmr-flow-btn--finish pmr-flow-finish"
+                            :disabled="form.processing"
+                            :title="`${tt('flow_finish', 'Finalizar consulta')} — ${tt('flow_finish_hint', 'Atendimento concluído — status vira \'Atendido\'.')}`"
+                            @click="submit('finish')"
+                        >
                             <i class="fas fa-check-double"></i>
                             <span class="visually-hidden">{{ tt('flow_finish', 'Finalizar consulta') }}</span>
                         </button>
@@ -2464,7 +3237,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             <div class="row g-1">
                 <div v-for="f in uploadedFiles" :key="f.id" class="col-auto">
                     <a :href="f.show_url" target="_blank" class="pmr-file-thumb" :title="f.original_name">
-                        <img v-if="f.is_image" :src="f.show_url" :alt="f.original_name">
+                        <img v-if="f.is_image" :src="f.show_url" :alt="f.original_name" />
                         <i v-else class="fas fa-file-alt"></i>
                     </a>
                 </div>
@@ -2476,35 +3249,58 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Documentações: lista -->
     <Teleport to="body">
-        <div v-if="showDocumentationsModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showDocumentationsModal = false">
+        <div
+            v-if="showDocumentationsModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showDocumentationsModal = false"
+        >
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-folder-open me-2" style="color:#0288d1;"></i>{{ tt('documentations', 'Documentações') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-folder-open me-2" style="color: #0288d1"></i
+                            >{{ tt('documentations', 'Documentações') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showDocumentationsModal = false"></button>
                     </div>
                     <div class="modal-body p-2">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
-                                <tr><th>{{ tt('doc_type','Tipo') }}</th><th>{{ tt('doc_title','Título') }}</th><th>{{ tt('doc_date','Data') }}</th><th class="text-end">{{ tt('doc_actions','Ações') }}</th></tr>
+                                <tr>
+                                    <th>{{ tt('doc_type', 'Tipo') }}</th>
+                                    <th>{{ tt('doc_title', 'Título') }}</th>
+                                    <th>{{ tt('doc_date', 'Data') }}</th>
+                                    <th class="text-end">{{ tt('doc_actions', 'Ações') }}</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 <tr v-if="documentations.length === 0">
-                                    <td colspan="4" class="text-center text-muted small py-2">{{ tt('no_documentations', 'Nenhuma documentação registrada.') }}</td>
+                                    <td colspan="4" class="text-center text-muted small py-2">
+                                        {{ tt('no_documentations', 'Nenhuma documentação registrada.') }}
+                                    </td>
                                 </tr>
                                 <tr v-for="doc in documentations" :key="doc.id">
                                     <td>
                                         <span class="badge bg-info-subtle text-info">{{ doc.type_label }}</span>
-                                        <span v-if="doc.is_ai" class="badge bg-info text-dark ms-1"
-                                              :title="doc.ai_workflow_label || 'Gerado por IA'">
+                                        <span
+                                            v-if="doc.is_ai"
+                                            class="badge bg-info text-dark ms-1"
+                                            :title="doc.ai_workflow_label || 'Gerado por IA'"
+                                        >
                                             <i class="ti ti-robot me-1"></i>IA
                                         </span>
                                     </td>
                                     <td>{{ doc.title }}</td>
                                     <td>{{ doc.created_at }}</td>
                                     <td class="text-end">
-                                        <a :href="doc.pdf_url" target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
+                                        <a
+                                            :href="doc.pdf_url"
+                                            target="_blank"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            title="PDF"
+                                        >
                                             <i class="fas fa-file-pdf"></i>
                                         </a>
                                     </td>
@@ -2517,11 +3313,18 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             "Nova documentação" cria via store (exige IssueReport). Admin/secretária
                             só pode listar e baixar PDFs (read-only). Esconder o botão evita 403 ao clicar.
                         -->
-                        <button v-if="isEdit && isDoctor" type="button" class="btn btn-primary btn-sm" @click="openNewDoc">
+                        <button
+                            v-if="isEdit && isDoctor"
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            @click="openNewDoc"
+                        >
                             <i class="fas fa-plus me-1"></i>{{ tt('new_documentation', 'Nova documentação') }}
                         </button>
                         <span v-else></span>
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showDocumentationsModal = false">{{ tt('close','Fechar') }}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showDocumentationsModal = false">
+                            {{ tt('close', 'Fechar') }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2530,41 +3333,74 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Personalizar meu prontuário: visibilidade + ordem das seções por coluna -->
     <Teleport to="body">
-        <div v-if="showLayoutModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showLayoutModal = false">
+        <div
+            v-if="showLayoutModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showLayoutModal = false"
+        >
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-sliders me-2 text-primary"></i>{{ tt('customize_title', 'Personalizar meu prontuário') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-sliders me-2 text-primary"></i
+                            >{{ tt('customize_title', 'Personalizar meu prontuário') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showLayoutModal = false"></button>
                     </div>
                     <div class="modal-body">
                         <p class="text-muted small mb-3">
-                            {{ tt('customize_hint', 'Escolha quais seções aparecem e a ordem em cada coluna. Seções ocultas não perdem dados já preenchidos — apenas saem da sua visualização.') }}
+                            {{
+                                tt(
+                                    'customize_hint',
+                                    'Escolha quais seções aparecem e a ordem em cada coluna. Seções ocultas não perdem dados já preenchidos — apenas saem da sua visualização.',
+                                )
+                            }}
                         </p>
                         <div class="row g-3">
                             <div v-for="col in ['left', 'right']" :key="col" class="col-md-6">
                                 <div class="fw-semibold small mb-2">
-                                    {{ col === 'left' ? tt('left_column', 'Coluna esquerda') : tt('right_column', 'Coluna direita') }}
+                                    {{
+                                        col === 'left'
+                                            ? tt('left_column', 'Coluna esquerda')
+                                            : tt('right_column', 'Coluna direita')
+                                    }}
                                 </div>
-                                <div v-for="(key, index) in sectionLayout[col]" :key="key"
-                                     class="d-flex align-items-center gap-2 border rounded px-2 py-1 mb-1"
-                                     :class="{ 'opacity-50': sectionLayout.hidden.includes(key) }">
-                                    <input type="checkbox" class="form-check-input m-0"
-                                           :checked="!sectionLayout.hidden.includes(key)"
-                                           :id="`layout-${key}`"
-                                           @change="toggleSection(key)">
-                                    <label :for="`layout-${key}`" class="flex-grow-1 small mb-0" style="cursor:pointer;">
+                                <div
+                                    v-for="(key, index) in sectionLayout[col]"
+                                    :key="key"
+                                    class="d-flex align-items-center gap-2 border rounded px-2 py-1 mb-1"
+                                    :class="{ 'opacity-50': sectionLayout.hidden.includes(key) }"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        class="form-check-input m-0"
+                                        :checked="!sectionLayout.hidden.includes(key)"
+                                        :id="`layout-${key}`"
+                                        @change="toggleSection(key)"
+                                    />
+                                    <label
+                                        :for="`layout-${key}`"
+                                        class="flex-grow-1 small mb-0"
+                                        style="cursor: pointer"
+                                    >
                                         {{ sectionLabel(key) }}
                                     </label>
-                                    <button type="button" class="btn btn-sm btn-link p-0 px-1"
-                                            :disabled="index === 0"
-                                            @click="moveSection(col, key, -1)">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link p-0 px-1"
+                                        :disabled="index === 0"
+                                        @click="moveSection(col, key, -1)"
+                                    >
                                         <i class="fas fa-chevron-up"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-link p-0 px-1"
-                                            :disabled="index === sectionLayout[col].length - 1"
-                                            @click="moveSection(col, key, 1)">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link p-0 px-1"
+                                        :disabled="index === sectionLayout[col].length - 1"
+                                        @click="moveSection(col, key, 1)"
+                                    >
                                         <i class="fas fa-chevron-down"></i>
                                     </button>
                                 </div>
@@ -2572,15 +3408,23 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         </div>
                     </div>
                     <div class="modal-footer py-2 d-flex justify-content-between">
-                        <span v-if="layoutSavedFlash" class="badge bg-success-subtle text-success">{{ layoutSavedFlash }}</span>
+                        <span v-if="layoutSavedFlash" class="badge bg-success-subtle text-success">{{
+                            layoutSavedFlash
+                        }}</span>
                         <span v-else></span>
                         <div class="d-flex gap-2">
                             <button type="button" class="btn btn-secondary btn-sm" @click="showLayoutModal = false">
                                 {{ tt('close', 'Fechar') }}
                             </button>
-                            <button type="button" class="btn btn-primary btn-sm" :disabled="layoutSaving" @click="saveMyLayout">
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                :disabled="layoutSaving"
+                                @click="saveMyLayout"
+                            >
                                 <span v-if="layoutSaving" class="spinner-border spinner-border-sm me-1"></span>
-                                <i v-else class="fas fa-floppy-disk me-1"></i>{{ tt('save_my_layout', 'Salvar como meu modelo') }}
+                                <i v-else class="fas fa-floppy-disk me-1"></i
+                                >{{ tt('save_my_layout', 'Salvar como meu modelo') }}
                             </button>
                         </div>
                     </div>
@@ -2591,29 +3435,47 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Evolução: histórico cronológico + texto livre -->
     <Teleport to="body">
-        <div v-if="showEvolutionModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showEvolutionModal = false">
+        <div
+            v-if="showEvolutionModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showEvolutionModal = false"
+        >
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-notes-medical me-2" style="color:#009688;"></i>{{ tt('evolution', 'Evolução') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-notes-medical me-2" style="color: #009688"></i
+                            >{{ tt('evolution', 'Evolução') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showEvolutionModal = false"></button>
                     </div>
                     <div class="modal-body p-3">
                         <!-- Nova evolução: só médico, com prontuário salvo e não assinado -->
                         <div v-if="isDoctor && !isLocked" class="mb-3">
                             <label class="pmr-label">{{ tt('evolution_new', 'Nova evolução') }}</label>
-                            <textarea v-model="evolutionText" rows="4" class="form-control form-control-sm"
-                                      :placeholder="tt('evolution_ph', 'Descreva a evolução clínica do paciente...')"
-                                      :disabled="evolutionBusy || !isEdit"></textarea>
+                            <textarea
+                                v-model="evolutionText"
+                                rows="4"
+                                class="form-control form-control-sm"
+                                :placeholder="tt('evolution_ph', 'Descreva a evolução clínica do paciente...')"
+                                :disabled="evolutionBusy || !isEdit"
+                            ></textarea>
                             <div class="d-flex justify-content-between align-items-center mt-1">
-                                <small v-if="!isEdit" class="text-muted">{{ tt('save_first', 'Salve primeiro o prontuário') }}</small>
+                                <small v-if="!isEdit" class="text-muted">{{
+                                    tt('save_first', 'Salve primeiro o prontuário')
+                                }}</small>
                                 <span v-else></span>
-                                <button type="button" class="btn btn-primary btn-sm"
-                                        :disabled="!isEdit || evolutionBusy || !evolutionText.trim()"
-                                        @click="saveEvolution">
+                                <button
+                                    type="button"
+                                    class="btn btn-primary btn-sm"
+                                    :disabled="!isEdit || evolutionBusy || !evolutionText.trim()"
+                                    @click="saveEvolution"
+                                >
                                     <span v-if="evolutionBusy" class="spinner-border spinner-border-sm me-1"></span>
-                                    <i v-else class="fas fa-plus me-1"></i>{{ tt('evolution_save', 'Registrar evolução') }}
+                                    <i v-else class="fas fa-plus me-1"></i
+                                    >{{ tt('evolution_save', 'Registrar evolução') }}
                                 </button>
                             </div>
                         </div>
@@ -2626,19 +3488,21 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <div v-else class="d-flex flex-column gap-2">
                             <div v-for="ev in evolutions" :key="ev.id" class="border rounded p-2 bg-light">
                                 <div class="d-flex justify-content-between flex-wrap gap-1 mb-1">
-                                    <span class="fw-semibold" style="font-size:.82rem;color:#00695c;">
+                                    <span class="fw-semibold" style="font-size: 0.82rem; color: #00695c">
                                         <i class="fas fa-user-md me-1"></i>{{ ev.doctor_name || '—' }}
                                     </span>
-                                    <span class="text-muted" style="font-size:.78rem;">
+                                    <span class="text-muted" style="font-size: 0.78rem">
                                         <i class="far fa-clock me-1"></i>{{ ev.created_at }}
                                     </span>
                                 </div>
-                                <div style="font-size:.85rem;white-space:pre-wrap;">{{ ev.content }}</div>
+                                <div style="font-size: 0.85rem; white-space: pre-wrap">{{ ev.content }}</div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showEvolutionModal = false">{{ tt('close','Fechar') }}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showEvolutionModal = false">
+                            {{ tt('close', 'Fechar') }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2647,12 +3511,20 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Doc modal (TinyMCE simplificado) -->
     <Teleport to="body">
-        <div v-if="showDocModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showDocModal = false">
+        <div
+            v-if="showDocModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showDocModal = false"
+        >
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-file-prescription me-2"></i>{{ tt('new_documentation','Nova documentação') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-file-prescription me-2"></i
+                            >{{ tt('new_documentation', 'Nova documentação') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showDocModal = false"></button>
                     </div>
                     <div class="modal-body">
@@ -2664,22 +3536,32 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             </div>
                             <template v-if="!docForm.exam_type">
                                 <div class="col-12 col-md-6">
-                                    <label class="pmr-label">{{ tt('select_template','Modelo') }}</label>
-                                    <select v-model="docForm.report_setting_content_id" class="form-select form-select-sm" @change="previewTemplate">
-                                        <option value="">{{ tt('select','Selecione') }}</option>
-                                        <optgroup v-for="group in docTemplates" :key="group.report_setting_id" :label="group.report_setting_title">
-                                            <option v-for="tpl in (group.contents || [])" :key="tpl.id" :value="tpl.id">{{ tpl.label }}</option>
+                                    <label class="pmr-label">{{ tt('select_template', 'Modelo') }}</label>
+                                    <select
+                                        v-model="docForm.report_setting_content_id"
+                                        class="form-select form-select-sm"
+                                        @change="previewTemplate"
+                                    >
+                                        <option value="">{{ tt('select', 'Selecione') }}</option>
+                                        <optgroup
+                                            v-for="group in docTemplates"
+                                            :key="group.report_setting_id"
+                                            :label="group.report_setting_title"
+                                        >
+                                            <option v-for="tpl in group.contents || []" :key="tpl.id" :value="tpl.id">
+                                                {{ tpl.label }}
+                                            </option>
                                         </optgroup>
                                     </select>
                                 </div>
                                 <div class="col-12 col-md-6">
-                                    <label class="pmr-label">{{ tt('doc_title','Título') }}</label>
-                                    <input v-model="docForm.title" type="text" class="form-control form-control-sm">
+                                    <label class="pmr-label">{{ tt('doc_title', 'Título') }}</label>
+                                    <input v-model="docForm.title" type="text" class="form-control form-control-sm" />
                                 </div>
                             </template>
                         </div>
                         <div class="mb-0">
-                            <label class="pmr-label">{{ tt('doc_content','Conteúdo') }}</label>
+                            <label class="pmr-label">{{ tt('doc_content', 'Conteúdo') }}</label>
                             <!-- TinyMCE rich-text editor (paridade com docModalEditor.js do legado) -->
                             <TinyMceEditor
                                 v-if="showDocModal"
@@ -2691,9 +3573,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         </div>
                     </div>
                     <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showDocModal = false">{{ tt('cancel','Cancelar') }}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showDocModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
                         <button type="button" class="btn btn-primary btn-sm" :disabled="docSaving" @click="saveDoc">
-                            <i class="fas fa-save me-1"></i>{{ tt('save_documentation','Salvar documentação') }}
+                            <i class="fas fa-save me-1"></i>{{ tt('save_documentation', 'Salvar documentação') }}
                         </button>
                     </div>
                 </div>
@@ -2703,32 +3587,54 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Medicamentos modal -->
     <Teleport to="body">
-        <div v-if="showMedicationModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showMedicationModal = false">
+        <div
+            v-if="showMedicationModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showMedicationModal = false"
+        >
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-prescription me-2" style="color:#e91e8c;"></i>Receituário de Medicamentos</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-prescription me-2" style="color: #e91e8c"></i>Receituário de Medicamentos
+                        </h6>
                         <button type="button" class="btn-close" @click="showMedicationModal = false"></button>
                     </div>
                     <div class="modal-body">
                         <!-- Abas: Buscar | Recentes | Favoritos -->
                         <ul class="nav nav-pills nav-sm mb-2 gap-1">
                             <li class="nav-item">
-                                <button type="button" class="nav-link py-1 px-2" style="font-size:.8rem;"
-                                        :class="{ active: medTab === 'search' }" @click="medTab = 'search'">
+                                <button
+                                    type="button"
+                                    class="nav-link py-1 px-2"
+                                    style="font-size: 0.8rem"
+                                    :class="{ active: medTab === 'search' }"
+                                    @click="medTab = 'search'"
+                                >
                                     <i class="fas fa-search me-1"></i>Buscar
                                 </button>
                             </li>
                             <li class="nav-item">
-                                <button type="button" class="nav-link py-1 px-2" style="font-size:.8rem;"
-                                        :class="{ active: medTab === 'recents' }" @click="medTab = 'recents'">
+                                <button
+                                    type="button"
+                                    class="nav-link py-1 px-2"
+                                    style="font-size: 0.8rem"
+                                    :class="{ active: medTab === 'recents' }"
+                                    @click="medTab = 'recents'"
+                                >
                                     <i class="fas fa-clock-rotate-left me-1"></i>Recentes
                                 </button>
                             </li>
                             <li class="nav-item">
-                                <button type="button" class="nav-link py-1 px-2" style="font-size:.8rem;"
-                                        :class="{ active: medTab === 'favorites' }" @click="medTab = 'favorites'">
+                                <button
+                                    type="button"
+                                    class="nav-link py-1 px-2"
+                                    style="font-size: 0.8rem"
+                                    :class="{ active: medTab === 'favorites' }"
+                                    @click="medTab = 'favorites'"
+                                >
                                     <i class="fas fa-star me-1"></i>Favoritos
                                 </button>
                             </li>
@@ -2738,51 +3644,98 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <div v-show="medTab === 'search'" class="position-relative mb-2">
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                <input v-model="medSearchQuery" type="text" class="form-control form-control-sm"
-                                       placeholder="Digite ao menos 2 letras…"
-                                       :disabled="prescription.length >= maxMedicines"
-                                       @input="searchMedicines">
+                                <input
+                                    v-model="medSearchQuery"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    placeholder="Digite ao menos 2 letras…"
+                                    :disabled="prescription.length >= maxMedicines"
+                                    @input="searchMedicines"
+                                />
                                 <span v-if="medSearchLoading" class="input-group-text bg-transparent">
-                                    <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                                    <span
+                                        class="spinner-border spinner-border-sm"
+                                        style="width: 0.8rem; height: 0.8rem"
+                                    ></span>
                                 </span>
                             </div>
-                            <ul v-if="medSearchOpen && medSearchResults.length > 0"
+                            <ul
+                                v-if="medSearchOpen && medSearchResults.length > 0"
                                 class="list-group shadow-sm position-absolute w-100"
-                                style="z-index:1080;top:100%;max-height:280px;overflow-y:auto;">
-                                <li v-for="item in medSearchResults" :key="item.id"
-                                    class="list-group-item list-group-item-action py-1 px-2" style="cursor:pointer;font-size:.82rem;"
-                                    @mousedown.prevent="selectMedicine(item)">
-                                    <i v-if="item.is_favorite" class="fas fa-star text-warning me-1" style="font-size:.7rem;"></i>
+                                style="z-index: 1080; top: 100%; max-height: 280px; overflow-y: auto"
+                            >
+                                <li
+                                    v-for="item in medSearchResults"
+                                    :key="item.id"
+                                    class="list-group-item list-group-item-action py-1 px-2"
+                                    style="cursor: pointer; font-size: 0.82rem"
+                                    @mousedown.prevent="selectMedicine(item)"
+                                >
+                                    <i
+                                        v-if="item.is_favorite"
+                                        class="fas fa-star text-warning me-1"
+                                        style="font-size: 0.7rem"
+                                    ></i>
                                     <span class="fw-semibold">{{ item.name }}</span>
-                                    <span v-if="item.presentation" class="text-muted ms-1">({{ item.presentation }})</span>
-                                    <span v-if="item.my_posology" class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">minha posologia</span>
+                                    <span v-if="item.presentation" class="text-muted ms-1"
+                                        >({{ item.presentation }})</span
+                                    >
+                                    <span
+                                        v-if="item.my_posology"
+                                        class="badge bg-primary-subtle text-primary ms-1"
+                                        style="font-size: 0.6rem"
+                                        >minha posologia</span
+                                    >
                                 </li>
                             </ul>
                         </div>
 
                         <!-- Recentes / Favoritos -->
                         <div v-show="medTab !== 'search'" class="mb-2">
-                            <ul v-if="(medTab === 'recents' ? medPresets.recents : medPresets.favorites).length > 0"
-                                class="list-group" style="max-height:220px;overflow-y:auto;">
-                                <li v-for="item in (medTab === 'recents' ? medPresets.recents : medPresets.favorites)" :key="item.id"
+                            <ul
+                                v-if="(medTab === 'recents' ? medPresets.recents : medPresets.favorites).length > 0"
+                                class="list-group"
+                                style="max-height: 220px; overflow-y: auto"
+                            >
+                                <li
+                                    v-for="item in medTab === 'recents' ? medPresets.recents : medPresets.favorites"
+                                    :key="item.id"
                                     class="list-group-item list-group-item-action d-flex align-items-center py-1 px-2"
-                                    style="cursor:pointer;font-size:.82rem;"
-                                    @click="selectMedicine(item)">
+                                    style="cursor: pointer; font-size: 0.82rem"
+                                    @click="selectMedicine(item)"
+                                >
                                     <span class="flex-grow-1">
                                         <span class="fw-semibold">{{ item.name }}</span>
-                                        <span v-if="item.presentation" class="text-muted ms-1">({{ item.presentation }})</span>
-                                        <span v-if="item.my_posology" class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">minha posologia</span>
+                                        <span v-if="item.presentation" class="text-muted ms-1"
+                                            >({{ item.presentation }})</span
+                                        >
+                                        <span
+                                            v-if="item.my_posology"
+                                            class="badge bg-primary-subtle text-primary ms-1"
+                                            style="font-size: 0.6rem"
+                                            >minha posologia</span
+                                        >
                                     </span>
-                                    <button type="button" class="btn btn-sm btn-link p-0"
-                                            :title="item.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
-                                            @click.stop="toggleMedFavorite(item)">
-                                        <i class="fa-star" :class="item.is_favorite ? 'fas text-warning' : 'far text-muted'"></i>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link p-0"
+                                        :title="item.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
+                                        @click.stop="toggleMedFavorite(item)"
+                                    >
+                                        <i
+                                            class="fa-star"
+                                            :class="item.is_favorite ? 'fas text-warning' : 'far text-muted'"
+                                        ></i>
                                     </button>
                                 </li>
                             </ul>
                             <p v-else class="text-muted small mb-0 py-2">
                                 <i class="fas fa-info-circle me-1"></i>
-                                {{ medTab === 'recents' ? 'Medicamentos que você prescrever aparecem aqui.' : 'Marque a estrela num medicamento para tê-lo sempre à mão.' }}
+                                {{
+                                    medTab === 'recents'
+                                        ? 'Medicamentos que você prescrever aparecem aqui.'
+                                        : 'Marque a estrela num medicamento para tê-lo sempre à mão.'
+                                }}
                             </p>
                         </div>
 
@@ -2790,60 +3743,125 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                              na receita sem confirmação do médico) -->
                         <div v-if="selectedMed" class="border rounded p-2 mb-2 bg-light">
                             <div class="d-flex align-items-center gap-2 mb-1">
-                                <span class="fw-semibold" style="font-size:.85rem;">
+                                <span class="fw-semibold" style="font-size: 0.85rem">
                                     {{ selectedMed.name }}
-                                    <span v-if="selectedMed.presentation" class="text-muted">({{ selectedMed.presentation }})</span>
+                                    <span v-if="selectedMed.presentation" class="text-muted"
+                                        >({{ selectedMed.presentation }})</span
+                                    >
                                 </span>
-                                <button type="button" class="btn btn-sm btn-link p-0"
-                                        :title="selectedMed.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
-                                        @click="toggleMedFavorite(selectedMed)">
-                                    <i class="fa-star" :class="selectedMed.is_favorite ? 'fas text-warning' : 'far text-muted'"></i>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-link p-0"
+                                    :title="
+                                        selectedMed.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+                                    "
+                                    @click="toggleMedFavorite(selectedMed)"
+                                >
+                                    <i
+                                        class="fa-star"
+                                        :class="selectedMed.is_favorite ? 'fas text-warning' : 'far text-muted'"
+                                    ></i>
                                 </button>
-                                <button type="button" class="btn-close ms-auto" style="font-size:.6rem;" @click="cancelSelection"></button>
+                                <button
+                                    type="button"
+                                    class="btn-close ms-auto"
+                                    style="font-size: 0.6rem"
+                                    @click="cancelSelection"
+                                ></button>
                             </div>
-                            <label class="pmr-label mb-1" style="font-size:.72rem;">
+                            <label class="pmr-label mb-1" style="font-size: 0.72rem">
                                 Posologia sugerida — revise e edite antes de adicionar
-                                <span v-if="selectedMed.my_posology" class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">sua posologia salva</span>
+                                <span
+                                    v-if="selectedMed.my_posology"
+                                    class="badge bg-primary-subtle text-primary ms-1"
+                                    style="font-size: 0.6rem"
+                                    >sua posologia salva</span
+                                >
                             </label>
-                            <textarea v-model="posologyDraft" class="form-control form-control-sm" rows="3"
-                                      placeholder="Dose, frequência, duração e orientações…"></textarea>
+                            <textarea
+                                v-model="posologyDraft"
+                                class="form-control form-control-sm"
+                                rows="3"
+                                placeholder="Dose, frequência, duração e orientações…"
+                            ></textarea>
                             <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
                                 <button type="button" class="btn btn-primary btn-sm" @click="confirmAddMedicine">
                                     <i class="fas fa-plus me-1"></i>Adicionar à receita
                                 </button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm"
-                                        :disabled="posologySaving" @click="saveMyPosology">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    :disabled="posologySaving"
+                                    @click="saveMyPosology"
+                                >
                                     <span v-if="posologySaving" class="spinner-border spinner-border-sm me-1"></span>
                                     <i v-else class="fas fa-bookmark me-1"></i>Salvar como minha posologia
                                 </button>
-                                <span v-if="posologySavedFlash" class="badge bg-success-subtle text-success">Posologia salva!</span>
+                                <span v-if="posologySavedFlash" class="badge bg-success-subtle text-success"
+                                    >Posologia salva!</span
+                                >
                             </div>
                         </div>
 
-                        <div v-if="prescription.length >= maxMedicines" class="alert alert-warning py-1 px-2 small mb-2">
-                            <i class="fas fa-exclamation-triangle me-1"></i>Limite de {{ maxMedicines }} medicamentos atingido.
+                        <div
+                            v-if="prescription.length >= maxMedicines"
+                            class="alert alert-warning py-1 px-2 small mb-2"
+                        >
+                            <i class="fas fa-exclamation-triangle me-1"></i>Limite de {{ maxMedicines }} medicamentos
+                            atingido.
                         </div>
                         <div v-if="prescription.length > 0" class="mb-2">
-                            <label class="pmr-label mb-1">Medicamentos da receita ({{ prescription.length }}/{{ maxMedicines }})</label>
+                            <label class="pmr-label mb-1"
+                                >Medicamentos da receita ({{ prescription.length }}/{{ maxMedicines }})</label
+                            >
                             <ul class="list-group">
-                                <li v-for="(item, idx) in prescription" :key="`${item.id}-${idx}`"
-                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2" style="font-size:.82rem;">
-                                    <span><span class="badge bg-secondary me-1">{{ idx + 1 }}</span><span class="fw-semibold">{{ item.name }}</span></span>
-                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" @click="removeMedicine(idx)"><i class="fas fa-times"></i></button>
+                                <li
+                                    v-for="(item, idx) in prescription"
+                                    :key="`${item.id}-${idx}`"
+                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
+                                    style="font-size: 0.82rem"
+                                >
+                                    <span
+                                        ><span class="badge bg-secondary me-1">{{ idx + 1 }}</span
+                                        ><span class="fw-semibold">{{ item.name }}</span></span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link text-danger p-0"
+                                        @click="removeMedicine(idx)"
+                                    >
+                                        <i class="fas fa-times"></i>
+                                    </button>
                                 </li>
                             </ul>
                         </div>
                         <label class="pmr-label mb-1">Conteúdo da receita</label>
-                        <textarea v-model="medicineLists" class="form-control form-control-sm" rows="10"
-                                  placeholder="Linhas formatadas aparecem aqui."></textarea>
+                        <textarea
+                            v-model="medicineLists"
+                            class="form-control form-control-sm"
+                            rows="10"
+                            placeholder="Linhas formatadas aparecem aqui."
+                        ></textarea>
                     </div>
                     <div class="modal-footer py-2 d-flex justify-content-between">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="prescription.length === 0 && !medicineLists" @click="clearMedicines">
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            :disabled="prescription.length === 0 && !medicineLists"
+                            @click="clearMedicines"
+                        >
                             <i class="fas fa-eraser me-1"></i>Limpar
                         </button>
                         <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-secondary btn-sm" @click="showMedicationModal = false">{{ tt('cancel','Cancelar') }}</button>
-                            <button type="button" class="btn btn-primary btn-sm" :disabled="quickActionBusy || !medicineLists.trim()" @click="submitMedicationPrescription">
+                            <button type="button" class="btn btn-secondary btn-sm" @click="showMedicationModal = false">
+                                {{ tt('cancel', 'Cancelar') }}
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                :disabled="quickActionBusy || !medicineLists.trim()"
+                                @click="submitMedicationPrescription"
+                            >
                                 <i class="fas fa-print me-1"></i>Emitir Receita
                             </button>
                         </div>
@@ -2855,107 +3873,194 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Procedimentos modal -->
     <Teleport to="body">
-        <div v-if="showProcedureModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showProcedureModal = false">
+        <div
+            v-if="showProcedureModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showProcedureModal = false"
+        >
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-stethoscope me-2" style="color:#03a9f3;"></i>{{ tt('procedure_title','Solicitação de Procedimentos') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-stethoscope me-2" style="color: #03a9f3"></i
+                            >{{ tt('procedure_title', 'Solicitação de Procedimentos') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showProcedureModal = false"></button>
                     </div>
                     <div class="modal-body">
                         <div class="row g-2 mb-2">
                             <div class="col-12 col-md-7">
-                                <label class="pmr-label mb-1">{{ tt('procedure_search_label','Procedimento') }}</label>
+                                <label class="pmr-label mb-1">{{ tt('procedure_search_label', 'Procedimento') }}</label>
                                 <div class="position-relative">
                                     <div class="input-group input-group-sm">
                                         <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                        <input v-model="procSearchQuery" type="text" class="form-control form-control-sm"
-                                               :placeholder="tt('procedure_search_ph','Buscar procedimento...')"
-                                               :disabled="procSelected.length + indSelected.length >= maxProcSolicitations"
-                                               @input="searchProcedures">
+                                        <input
+                                            v-model="procSearchQuery"
+                                            type="text"
+                                            class="form-control form-control-sm"
+                                            :placeholder="tt('procedure_search_ph', 'Buscar procedimento...')"
+                                            :disabled="procSelected.length + indSelected.length >= maxProcSolicitations"
+                                            @input="searchProcedures"
+                                        />
                                         <span v-if="procSearchLoading" class="input-group-text bg-transparent">
-                                            <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                                            <span
+                                                class="spinner-border spinner-border-sm"
+                                                style="width: 0.8rem; height: 0.8rem"
+                                            ></span>
                                         </span>
                                     </div>
-                                    <ul v-if="procSearchOpen && procSearchResults.length > 0"
+                                    <ul
+                                        v-if="procSearchOpen && procSearchResults.length > 0"
                                         class="list-group shadow-sm position-absolute w-100"
-                                        style="z-index:1080;top:100%;max-height:240px;overflow-y:auto;">
-                                        <li v-for="item in procSearchResults" :key="item.id"
-                                            class="list-group-item list-group-item-action py-1 px-2" style="cursor:pointer;font-size:.82rem;"
-                                            @mousedown.prevent="addProcedure(item)">
+                                        style="z-index: 1080; top: 100%; max-height: 240px; overflow-y: auto"
+                                    >
+                                        <li
+                                            v-for="item in procSearchResults"
+                                            :key="item.id"
+                                            class="list-group-item list-group-item-action py-1 px-2"
+                                            style="cursor: pointer; font-size: 0.82rem"
+                                            @mousedown.prevent="addProcedure(item)"
+                                        >
                                             <span class="fw-semibold">{{ item.name }}</span>
-                                            <span v-if="item.code" class="text-muted ms-1 small">({{ item.code }})</span>
+                                            <span v-if="item.code" class="text-muted ms-1 small"
+                                                >({{ item.code }})</span
+                                            >
                                         </li>
                                     </ul>
                                 </div>
                             </div>
                             <div class="col-12 col-md-5">
-                                <label class="pmr-label mb-1">{{ tt('procedure_type_label','Tipo') }}</label>
-                                <SearchSelect v-model="procTypeSelected"
-                                              :options="[
-                                                  { value: 'rotina',      label: tt('procedure_type_rotina','Rotina') },
-                                                  { value: 'urgencia',    label: tt('procedure_type_urgencia','Urgência') },
-                                                  { value: 'controle',    label: tt('procedure_type_controle','Controle') },
-                                                  { value: 'comparativo', label: tt('procedure_type_comparativo','Comparativo') },
-                                              ]"
-                                              :value-key="'value'" :label-key="'label'"
-                                              :placeholder="'—'" />
+                                <label class="pmr-label mb-1">{{ tt('procedure_type_label', 'Tipo') }}</label>
+                                <SearchSelect
+                                    v-model="procTypeSelected"
+                                    :options="[
+                                        { value: 'rotina', label: tt('procedure_type_rotina', 'Rotina') },
+                                        { value: 'urgencia', label: tt('procedure_type_urgencia', 'Urgência') },
+                                        { value: 'controle', label: tt('procedure_type_controle', 'Controle') },
+                                        {
+                                            value: 'comparativo',
+                                            label: tt('procedure_type_comparativo', 'Comparativo'),
+                                        },
+                                    ]"
+                                    :value-key="'value'"
+                                    :label-key="'label'"
+                                    :placeholder="'—'"
+                                />
                             </div>
                         </div>
 
-                        <label class="pmr-label mb-1">{{ tt('procedure_indication_label','Indicação') }}</label>
+                        <label class="pmr-label mb-1">{{ tt('procedure_indication_label', 'Indicação') }}</label>
                         <div class="position-relative mb-2">
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                <input v-model="indSearchQuery" type="text" class="form-control form-control-sm"
-                                       :placeholder="tt('procedure_indication_ph','Buscar indicação...')"
-                                       :disabled="procSelected.length + indSelected.length >= maxProcSolicitations"
-                                       @input="searchIndications">
+                                <input
+                                    v-model="indSearchQuery"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    :placeholder="tt('procedure_indication_ph', 'Buscar indicação...')"
+                                    :disabled="procSelected.length + indSelected.length >= maxProcSolicitations"
+                                    @input="searchIndications"
+                                />
                                 <span v-if="indSearchLoading" class="input-group-text bg-transparent">
-                                    <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                                    <span
+                                        class="spinner-border spinner-border-sm"
+                                        style="width: 0.8rem; height: 0.8rem"
+                                    ></span>
                                 </span>
                             </div>
-                            <ul v-if="indSearchOpen && indSearchResults.length > 0"
+                            <ul
+                                v-if="indSearchOpen && indSearchResults.length > 0"
                                 class="list-group shadow-sm position-absolute w-100"
-                                style="z-index:1080;top:100%;max-height:240px;overflow-y:auto;">
-                                <li v-for="item in indSearchResults" :key="item.id"
-                                    class="list-group-item list-group-item-action py-1 px-2" style="cursor:pointer;font-size:.82rem;"
-                                    @mousedown.prevent="addIndication(item)">{{ item.description }}</li>
+                                style="z-index: 1080; top: 100%; max-height: 240px; overflow-y: auto"
+                            >
+                                <li
+                                    v-for="item in indSearchResults"
+                                    :key="item.id"
+                                    class="list-group-item list-group-item-action py-1 px-2"
+                                    style="cursor: pointer; font-size: 0.82rem"
+                                    @mousedown.prevent="addIndication(item)"
+                                >
+                                    {{ item.description }}
+                                </li>
                             </ul>
                         </div>
 
                         <div v-if="procSelected.length + indSelected.length > 0" class="mb-2">
-                            <label class="pmr-label mb-1">{{ tt('procedure_selected','Selecionados') }} ({{ procSelected.length + indSelected.length }}/{{ maxProcSolicitations }})</label>
+                            <label class="pmr-label mb-1"
+                                >{{ tt('procedure_selected', 'Selecionados') }} ({{
+                                    procSelected.length + indSelected.length
+                                }}/{{ maxProcSolicitations }})</label
+                            >
                             <ul class="list-group">
-                                <li v-for="(item, idx) in procSelected" :key="`p-${item.id}-${idx}`"
-                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2" style="font-size:.82rem;">
-                                    <span><span class="badge bg-info text-dark me-1">P</span><span class="fw-semibold">{{ item.name }}</span>
-                                          <span v-if="item.type" class="text-muted ms-1 small">— {{ item.type_label }}</span></span>
-                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" @click="removeProcedure(idx)"><i class="fas fa-times"></i></button>
+                                <li
+                                    v-for="(item, idx) in procSelected"
+                                    :key="`p-${item.id}-${idx}`"
+                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
+                                    style="font-size: 0.82rem"
+                                >
+                                    <span
+                                        ><span class="badge bg-info text-dark me-1">P</span
+                                        ><span class="fw-semibold">{{ item.name }}</span>
+                                        <span v-if="item.type" class="text-muted ms-1 small"
+                                            >— {{ item.type_label }}</span
+                                        ></span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link text-danger p-0"
+                                        @click="removeProcedure(idx)"
+                                    >
+                                        <i class="fas fa-times"></i>
+                                    </button>
                                 </li>
-                                <li v-for="(item, idx) in indSelected" :key="`i-${item.id}-${idx}`"
-                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2" style="font-size:.82rem;">
+                                <li
+                                    v-for="(item, idx) in indSelected"
+                                    :key="`i-${item.id}-${idx}`"
+                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
+                                    style="font-size: 0.82rem"
+                                >
                                     <span><span class="badge bg-secondary me-1">I</span>{{ item.description }}</span>
-                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" @click="removeIndication(idx)"><i class="fas fa-times"></i></button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link text-danger p-0"
+                                        @click="removeIndication(idx)"
+                                    >
+                                        <i class="fas fa-times"></i>
+                                    </button>
                                 </li>
                             </ul>
                         </div>
 
-                        <label class="pmr-label mb-1">{{ tt('procedure_content','Conteúdo') }}</label>
-                        <textarea v-model="procedureLists" class="form-control form-control-sm" rows="8"
-                                  placeholder="Linhas formatadas aparecem aqui."></textarea>
+                        <label class="pmr-label mb-1">{{ tt('procedure_content', 'Conteúdo') }}</label>
+                        <textarea
+                            v-model="procedureLists"
+                            class="form-control form-control-sm"
+                            rows="8"
+                            placeholder="Linhas formatadas aparecem aqui."
+                        ></textarea>
                     </div>
                     <div class="modal-footer py-2 d-flex justify-content-between">
-                        <button type="button" class="btn btn-outline-secondary btn-sm"
-                                :disabled="procSelected.length === 0 && indSelected.length === 0 && !procedureLists"
-                                @click="clearProcedureSolicitation">
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            :disabled="procSelected.length === 0 && indSelected.length === 0 && !procedureLists"
+                            @click="clearProcedureSolicitation"
+                        >
                             <i class="fas fa-eraser me-1"></i>Limpar
                         </button>
                         <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-secondary btn-sm" @click="showProcedureModal = false">{{ tt('cancel','Cancelar') }}</button>
-                            <button type="button" class="btn btn-primary btn-sm" :disabled="quickActionBusy || !procedureLists.trim()" @click="submitProcedureSolicitation">
-                                <i class="fas fa-print me-1"></i>{{ tt('procedure_emit','Emitir Solicitação') }}
+                            <button type="button" class="btn btn-secondary btn-sm" @click="showProcedureModal = false">
+                                {{ tt('cancel', 'Cancelar') }}
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                :disabled="quickActionBusy || !procedureLists.trim()"
+                                @click="submitProcedureSolicitation"
+                            >
+                                <i class="fas fa-print me-1"></i>{{ tt('procedure_emit', 'Emitir Solicitação') }}
                             </button>
                         </div>
                     </div>
@@ -2966,50 +4071,108 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Catarata modal -->
     <Teleport to="body">
-        <div v-if="showCataractModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showCataractModal = false">
+        <div
+            v-if="showCataractModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showCataractModal = false"
+        >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-eye me-2" style="color:#e91e8c;"></i>{{ tt('cataract_title','Receituário de Catarata') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-eye me-2" style="color: #e91e8c"></i
+                            >{{ tt('cataract_title', 'Receituário de Catarata') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showCataractModal = false"></button>
                     </div>
                     <div class="modal-body">
-                        <label class="pmr-label mb-1">{{ tt('cataract_eye_label','Olho operado') }}</label>
+                        <label class="pmr-label mb-1">{{ tt('cataract_eye_label', 'Olho operado') }}</label>
                         <div class="btn-group w-100 mb-3" role="group">
-                            <input type="radio" class="btn-check" id="cataractEyeRight" value="right" v-model="cataractForm.eye">
-                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeRight">{{ tt('cataract_eye_right','OD') }}</label>
-                            <input type="radio" class="btn-check" id="cataractEyeLeft" value="left" v-model="cataractForm.eye">
-                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeLeft">{{ tt('cataract_eye_left','OE') }}</label>
-                            <input type="radio" class="btn-check" id="cataractEyeBoth" value="both" v-model="cataractForm.eye">
-                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeBoth">{{ tt('cataract_eye_both','AO') }}</label>
+                            <input
+                                type="radio"
+                                class="btn-check"
+                                id="cataractEyeRight"
+                                value="right"
+                                v-model="cataractForm.eye"
+                            />
+                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeRight">{{
+                                tt('cataract_eye_right', 'OD')
+                            }}</label>
+                            <input
+                                type="radio"
+                                class="btn-check"
+                                id="cataractEyeLeft"
+                                value="left"
+                                v-model="cataractForm.eye"
+                            />
+                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeLeft">{{
+                                tt('cataract_eye_left', 'OE')
+                            }}</label>
+                            <input
+                                type="radio"
+                                class="btn-check"
+                                id="cataractEyeBoth"
+                                value="both"
+                                v-model="cataractForm.eye"
+                            />
+                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeBoth">{{
+                                tt('cataract_eye_both', 'AO')
+                            }}</label>
                         </div>
-                        <label class="pmr-label mb-1">{{ tt('cataract_template','Modelo') }}</label>
-                        <SearchSelect v-model="cataractForm.template"
-                                      class="mb-3"
-                                      :options="[
-                                          { value: 'pre_operatorio',        label: tt('cataract_template_pre','Pré-operatório') },
-                                          { value: 'pos_operatorio',        label: tt('cataract_template_pos','Pós-operatório') },
-                                          { value: 'instrucoes_cirurgicas', label: tt('cataract_template_inst','Instruções cirúrgicas') },
-                                      ]"
-                                      :value-key="'value'" :label-key="'label'"
-                                      :clearable="false" />
-                        <div class="row g-2 mb-1" :class="{ 'opacity-75': cataractForm.template !== 'instrucoes_cirurgicas' }">
+                        <label class="pmr-label mb-1">{{ tt('cataract_template', 'Modelo') }}</label>
+                        <SearchSelect
+                            v-model="cataractForm.template"
+                            class="mb-3"
+                            :options="[
+                                { value: 'pre_operatorio', label: tt('cataract_template_pre', 'Pré-operatório') },
+                                { value: 'pos_operatorio', label: tt('cataract_template_pos', 'Pós-operatório') },
+                                {
+                                    value: 'instrucoes_cirurgicas',
+                                    label: tt('cataract_template_inst', 'Instruções cirúrgicas'),
+                                },
+                            ]"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :clearable="false"
+                        />
+                        <div
+                            class="row g-2 mb-1"
+                            :class="{ 'opacity-75': cataractForm.template !== 'instrucoes_cirurgicas' }"
+                        >
                             <div class="col-7">
-                                <label class="pmr-label mb-1">{{ tt('cataract_date','Data') }}</label>
-                                <input v-model="cataractForm.date_surgery" type="text" class="form-control form-control-sm"
-                                       placeholder="dd/mm/aaaa" maxlength="10" @input="formatCataractDate">
+                                <label class="pmr-label mb-1">{{ tt('cataract_date', 'Data') }}</label>
+                                <input
+                                    v-model="cataractForm.date_surgery"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    placeholder="dd/mm/aaaa"
+                                    maxlength="10"
+                                    @input="formatCataractDate"
+                                />
                             </div>
                             <div class="col-5">
-                                <label class="pmr-label mb-1">{{ tt('cataract_hour','Hora') }}</label>
-                                <input v-model="cataractForm.hour_surgery" type="time" class="form-control form-control-sm">
+                                <label class="pmr-label mb-1">{{ tt('cataract_hour', 'Hora') }}</label>
+                                <input
+                                    v-model="cataractForm.hour_surgery"
+                                    type="time"
+                                    class="form-control form-control-sm"
+                                />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showCataractModal = false">{{ tt('cancel','Cancelar') }}</button>
-                        <button type="button" class="btn btn-primary btn-sm" :disabled="quickActionBusy || !cataractForm.eye" @click="submitCataractPrescription">
-                            <i class="fas fa-print me-1"></i>{{ tt('cataract_emit','Emitir') }}
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showCataractModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            :disabled="quickActionBusy || !cataractForm.eye"
+                            @click="submitCataractPrescription"
+                        >
+                            <i class="fas fa-print me-1"></i>{{ tt('cataract_emit', 'Emitir') }}
                         </button>
                     </div>
                 </div>
@@ -3019,16 +4182,24 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Atestado de comparecimento -->
     <Teleport to="body">
-        <div v-if="showAttendanceCertModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showAttendanceCertModal = false">
+        <div
+            v-if="showAttendanceCertModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showAttendanceCertModal = false"
+        >
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-file-signature me-2" style="color:#03a9f3;"></i>{{ tt('attendance_certificate_title','Atestado de Comparecimento') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-file-signature me-2" style="color: #03a9f3"></i
+                            >{{ tt('attendance_certificate_title', 'Atestado de Comparecimento') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showAttendanceCertModal = false"></button>
                     </div>
                     <div class="modal-body">
-                        <label class="pmr-label mb-1">{{ tt('certificate_obs_label','Observações') }}</label>
+                        <label class="pmr-label mb-1">{{ tt('certificate_obs_label', 'Observações') }}</label>
                         <!--
                             TinyMCE rich-text para o atestado: médico pode formatar
                             o texto (negrito, listas, etc.) — o backend renderiza
@@ -3039,13 +4210,20 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <TinyMceEditor
                             v-model="attendanceForm.content"
                             :height="280"
-                            :placeholder="tt('certificate_obs_ph','Observações...')"
+                            :placeholder="tt('certificate_obs_ph', 'Observações...')"
                         />
                     </div>
                     <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showAttendanceCertModal = false">{{ tt('cancel','Cancelar') }}</button>
-                        <button type="button" class="btn btn-primary btn-sm" :disabled="quickActionBusy" @click="submitAttendanceCertificate">
-                            <i class="fas fa-print me-1"></i>{{ tt('certificate_emit','Emitir') }}
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showAttendanceCertModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            :disabled="quickActionBusy"
+                            @click="submitAttendanceCertificate"
+                        >
+                            <i class="fas fa-print me-1"></i>{{ tt('certificate_emit', 'Emitir') }}
                         </button>
                     </div>
                 </div>
@@ -3055,46 +4233,85 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Atestado médico (afastamento) -->
     <Teleport to="body">
-        <div v-if="showMedicalCertModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showMedicalCertModal = false">
+        <div
+            v-if="showMedicalCertModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showMedicalCertModal = false"
+        >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-notes-medical me-2" style="color:#e91e8c;"></i>{{ tt('medical_certificate_title','Atestado Médico') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-notes-medical me-2" style="color: #e91e8c"></i
+                            >{{ tt('medical_certificate_title', 'Atestado Médico') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showMedicalCertModal = false"></button>
                     </div>
                     <div class="modal-body">
                         <div class="row g-2 mb-2">
                             <div class="col-7">
-                                <label class="pmr-label mb-1">{{ tt('medical_cert_days_label','Dias de afastamento') }}</label>
-                                <input v-model.number="medicalForm.days" type="number" min="1" max="365" step="1"
-                                       class="form-control form-control-sm" @input="debouncedRefreshDayExtension">
+                                <label class="pmr-label mb-1">{{
+                                    tt('medical_cert_days_label', 'Dias de afastamento')
+                                }}</label>
+                                <input
+                                    v-model.number="medicalForm.days"
+                                    type="number"
+                                    min="1"
+                                    max="365"
+                                    step="1"
+                                    class="form-control form-control-sm"
+                                    @input="debouncedRefreshDayExtension"
+                                />
                             </div>
                             <div class="col-5">
-                                <label class="pmr-label mb-1">{{ tt('medical_cert_date_label','Data') }}</label>
-                                <input v-model="medicalForm.date" type="text" class="form-control form-control-sm"
-                                       placeholder="dd/mm/aaaa" maxlength="10" @input="formatMedicalCertDate">
-                                <button type="button" class="btn btn-link btn-sm p-0 mt-1" @click="medicalForm.date = ''">
-                                    <small>{{ tt('medical_cert_date_today','Hoje') }}</small>
+                                <label class="pmr-label mb-1">{{ tt('medical_cert_date_label', 'Data') }}</label>
+                                <input
+                                    v-model="medicalForm.date"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    placeholder="dd/mm/aaaa"
+                                    maxlength="10"
+                                    @input="formatMedicalCertDate"
+                                />
+                                <button
+                                    type="button"
+                                    class="btn btn-link btn-sm p-0 mt-1"
+                                    @click="medicalForm.date = ''"
+                                >
+                                    <small>{{ tt('medical_cert_date_today', 'Hoje') }}</small>
                                 </button>
                             </div>
                         </div>
                         <div v-if="medicalForm.daysPreview" class="alert alert-info py-2 px-2 small mb-2">
                             <i class="fas fa-eye me-1"></i>
-                            <strong>{{ tt('medical_cert_days_preview','Pré-visualização') }}:</strong>
+                            <strong>{{ tt('medical_cert_days_preview', 'Pré-visualização') }}:</strong>
                             {{ medicalForm.daysPreview }}
                         </div>
-                        <label class="pmr-label mb-1">{{ tt('certificate_obs_label','Observações') }}</label>
-                        <textarea v-model="medicalForm.content" class="form-control form-control-sm" rows="5" maxlength="5000"
-                                  :placeholder="tt('certificate_obs_ph','Observações...')"></textarea>
+                        <label class="pmr-label mb-1">{{ tt('certificate_obs_label', 'Observações') }}</label>
+                        <textarea
+                            v-model="medicalForm.content"
+                            class="form-control form-control-sm"
+                            rows="5"
+                            maxlength="5000"
+                            :placeholder="tt('certificate_obs_ph', 'Observações...')"
+                        ></textarea>
                         <small class="text-muted d-block mt-1">{{ (medicalForm.content || '').length }}/5000</small>
                     </div>
                     <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showMedicalCertModal = false">{{ tt('cancel','Cancelar') }}</button>
-                        <button type="button" class="btn btn-primary btn-sm"
-                                :disabled="quickActionBusy || !medicalForm.days || medicalForm.days < 1 || medicalForm.days > 365"
-                                @click="submitMedicalCertificate">
-                            <i class="fas fa-print me-1"></i>{{ tt('certificate_emit','Emitir') }}
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showMedicalCertModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            :disabled="
+                                quickActionBusy || !medicalForm.days || medicalForm.days < 1 || medicalForm.days > 365
+                            "
+                            @click="submitMedicalCertificate"
+                        >
+                            <i class="fas fa-print me-1"></i>{{ tt('certificate_emit', 'Emitir') }}
                         </button>
                     </div>
                 </div>
@@ -3104,33 +4321,55 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Exam Hub -->
     <Teleport to="body">
-        <div v-if="showExamHubModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showExamHubModal = false">
+        <div
+            v-if="showExamHubModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showExamHubModal = false"
+        >
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-microscope me-2" style="color:#03a9f3;"></i>{{ tt('exam_hub_title','Laudos de Exame') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-microscope me-2" style="color: #03a9f3"></i
+                            >{{ tt('exam_hub_title', 'Laudos de Exame') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showExamHubModal = false"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="text-muted small mb-3">{{ tt('exam_hub_help','Selecione o exame para emitir o laudo.') }}</p>
+                        <p class="text-muted small mb-3">
+                            {{ tt('exam_hub_help', 'Selecione o exame para emitir o laudo.') }}
+                        </p>
                         <div class="row g-2">
                             <div v-for="exam in examReports" :key="exam.value" class="col-6 col-md-4 col-lg-3">
-                                <button v-if="!exam.subtypes || exam.subtypes.length === 0"
-                                        type="button" class="btn pmr-exam-card w-100 h-100"
-                                        @click="openExamFromHub(exam.value)" :title="exam.label">
+                                <button
+                                    v-if="!exam.subtypes || exam.subtypes.length === 0"
+                                    type="button"
+                                    class="btn pmr-exam-card w-100 h-100"
+                                    @click="openExamFromHub(exam.value)"
+                                    :title="exam.label"
+                                >
                                     <i :class="`fas ${exam.icon} pmr-exam-card-icon`"></i>
                                     <span class="pmr-exam-card-label">{{ exam.label }}</span>
                                 </button>
                                 <div v-else class="dropdown w-100 h-100">
-                                    <button type="button" class="btn pmr-exam-card pmr-exam-card-multi w-100 h-100 dropdown-toggle"
-                                            data-bs-toggle="dropdown" :title="exam.label">
+                                    <button
+                                        type="button"
+                                        class="btn pmr-exam-card pmr-exam-card-multi w-100 h-100 dropdown-toggle"
+                                        data-bs-toggle="dropdown"
+                                        :title="exam.label"
+                                    >
                                         <i :class="`fas ${exam.icon} pmr-exam-card-icon`"></i>
                                         <span class="pmr-exam-card-label">{{ exam.label }}</span>
                                     </button>
                                     <ul class="dropdown-menu">
                                         <li v-for="sub in exam.subtypes" :key="sub.slug">
-                                            <button type="button" class="dropdown-item" @click="openExamFromHub(exam.value, sub.slug)">
+                                            <button
+                                                type="button"
+                                                class="dropdown-item"
+                                                @click="openExamFromHub(exam.value, sub.slug)"
+                                            >
                                                 <i class="fas fa-angle-right me-2 text-muted small"></i>{{ sub.label }}
                                             </button>
                                         </li>
@@ -3140,7 +4379,9 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         </div>
                     </div>
                     <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showExamHubModal = false">{{ tt('cancel','Cancelar') }}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showExamHubModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -3149,16 +4390,28 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Tonometria PDF modal -->
     <Teleport to="body">
-        <div v-if="showTonometryModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @keydown.escape.window="closeTonometry">
-            <div class="modal-dialog modal-xl modal-dialog-centered" style="height:90vh;">
-                <div class="modal-content" style="height:100%;">
+        <div
+            v-if="showTonometryModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @keydown.escape.window="closeTonometry"
+        >
+            <div class="modal-dialog modal-xl modal-dialog-centered" style="height: 90vh">
+                <div class="modal-content" style="height: 100%">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title mb-0"><i class="fas fa-print me-2" style="color:#e91e8c;"></i>{{ tt('print_tonometry','Laudo de Tonômetria') }}</h6>
+                        <h6 class="modal-title mb-0">
+                            <i class="fas fa-print me-2" style="color: #e91e8c"></i
+                            >{{ tt('print_tonometry', 'Laudo de Tonômetria') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="closeTonometry"></button>
                     </div>
-                    <div class="modal-body p-0" style="flex:1;overflow:hidden;">
-                        <iframe :src="tonometryPdfSrc" style="width:100%;height:100%;border:none;display:block;" title="Laudo de Tonômetria"></iframe>
+                    <div class="modal-body p-0" style="flex: 1; overflow: hidden">
+                        <iframe
+                            :src="tonometryPdfSrc"
+                            style="width: 100%; height: 100%; border: none; display: block"
+                            title="Laudo de Tonômetria"
+                        ></iframe>
                     </div>
                 </div>
             </div>
@@ -3167,30 +4420,49 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
     <!-- Presbiopia obs modal -->
     <Teleport to="body">
-        <div v-if="showPresbyopiaObsModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
-             @click.self="showPresbyopiaObsModal = false">
+        <div
+            v-if="showPresbyopiaObsModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showPresbyopiaObsModal = false"
+        >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title"><i class="fas fa-glasses me-2" style="color:#00bcd4;"></i>{{ tt('lenses_obs','Observação de lentes') }}</h6>
+                        <h6 class="modal-title">
+                            <i class="fas fa-glasses me-2" style="color: #00bcd4"></i
+                            >{{ tt('lenses_obs', 'Observação de lentes') }}
+                        </h6>
                         <button type="button" class="btn-close" @click="showPresbyopiaObsModal = false"></button>
                     </div>
                     <div class="modal-body">
                         <!-- Adição da presbiopia — morava na barra como "Add.";
                              agora vive aqui, junto do cálculo que a usa. -->
                         <label class="pmr-label mb-1">{{ tt('presbyopia_addition', 'Adição (D)') }}</label>
-                        <input v-model.number="presbyopiaAddition" type="number" step="0.25"
-                               class="form-control form-control-sm mb-2" style="max-width:140px;"
-                               :placeholder="'ex.: 2.50'">
+                        <input
+                            v-model.number="presbyopiaAddition"
+                            type="number"
+                            step="0.25"
+                            class="form-control form-control-sm mb-2"
+                            style="max-width: 140px"
+                            :placeholder="'ex.: 2.50'"
+                        />
 
                         <label class="pmr-label mb-1">{{ tt('lenses_obs', 'Observação de lentes') }}</label>
-                        <textarea v-model="presbyopiaObsForm.content" class="form-control form-control-sm" rows="6"
-                                  :placeholder="tt('presbyopia_obs_ph','Observações sobre as lentes...')"></textarea>
+                        <textarea
+                            v-model="presbyopiaObsForm.content"
+                            class="form-control form-control-sm"
+                            rows="6"
+                            :placeholder="tt('presbyopia_obs_ph', 'Observações sobre as lentes...')"
+                        ></textarea>
                     </div>
                     <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showPresbyopiaObsModal = false">{{ tt('cancel','Cancelar') }}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showPresbyopiaObsModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
                         <button type="button" class="btn btn-primary btn-sm" @click="confirmPresbyopiaCalc">
-                            <i class="fas fa-check me-1"></i>{{ tt('close','Confirmar') }}
+                            <i class="fas fa-check me-1"></i>{{ tt('close', 'Confirmar') }}
                         </button>
                     </div>
                 </div>
@@ -3199,28 +4471,29 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
     </Teleport>
 
     <!-- Cálculo de lentes de contato (resultado vai para o form; grava ao salvar) -->
-    <ContactLensCalculatorModal :open="showContactLensCalc" :t="i18n"
-                                :model-value="form.contact_lens_calculation" :record="form" :readonly="isLocked"
-                                @close="showContactLensCalc = false"
-                                @apply="applyContactLens" @remove="removeContactLens" />
+    <ContactLensCalculatorModal
+        :open="showContactLensCalc"
+        :t="i18n"
+        :model-value="form.contact_lens_calculation"
+        :record="form"
+        :readonly="isLocked"
+        @close="showContactLensCalc = false"
+        @apply="applyContactLens"
+        @remove="removeContactLens"
+    />
 
     <!-- PDF preview universal -->
     <PdfPreviewModal v-if="showPdfPreview" :url="pdfPreviewUrl" :title="pdfPreviewTitle" @close="closePdfPreview" />
 
     <!-- Modal de upload de anexos (drag-drop + progresso por arquivo) -->
     <MedicalRecordImagingModal
-
         v-if="urls.eye_exams"
-
         :show="showImagingModal"
-
         :fetch-url="urls.eye_exams"
-
         :module-url="urls.eye_images_module ?? ''"
-
         :t="t"
-
-        @close="showImagingModal = false" />
+        @close="showImagingModal = false"
+    />
 
     <MedicalRecordProceduresModal
         :show="showProceduresModal"
@@ -3228,7 +4501,8 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         :is-doctor="isDoctor"
         :is-locked="isLocked"
         :t="t"
-        @close="showProceduresModal = false" />
+        @close="showProceduresModal = false"
+    />
 
     <MedicalRecordFileUploadModal
         v-if="isEdit && urls.store_file"
@@ -3238,34 +4512,44 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         :csrf-token="csrf()"
         @close="showUploadModal = false"
         @uploaded="onFileUploaded"
-        @storage-updated="onStorageUpdated" />
+        @storage-updated="onStorageUpdated"
+    />
 
     <!-- Destino pós-"Salvar": mesmo padrão de cartão (ícone + rótulo + hint)
          do modal de saída do ScheduleFlowGuard — consistência visual entre
          os dois pontos de "e agora, pra onde?" do prontuário. -->
     <Teleport to="body">
-        <div v-if="showSaveDestinationModal" class="modal fade show d-block" tabindex="-1"
-             style="background:rgba(0,0,0,.5);z-index:1080;"
-             @click.self="chooseSaveDestination('continue')"
-             @keydown.escape.window="chooseSaveDestination('continue')">
+        <div
+            v-if="showSaveDestinationModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5); z-index: 1080"
+            @click.self="chooseSaveDestination('continue')"
+            @keydown.escape.window="chooseSaveDestination('continue')"
+        >
             <div class="modal-dialog modal-dialog-centered pmr-save-modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header py-2">
                         <h6 class="modal-title">
-                            <i class="fas fa-circle-check me-2 text-success"></i>{{ tt('save_prompt_title', 'Prontuário salvo!') }}
+                            <i class="fas fa-circle-check me-2 text-success"></i
+                            >{{ tt('save_prompt_title', 'Prontuário salvo!') }}
                         </h6>
                         <button type="button" class="btn-close" @click="chooseSaveDestination('continue')"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="text-muted small mb-3">{{ tt('save_prompt_subtitle', 'O que você quer fazer agora?') }}</p>
+                        <p class="text-muted small mb-3">
+                            {{ tt('save_prompt_subtitle', 'O que você quer fazer agora?') }}
+                        </p>
 
                         <div class="d-grid gap-2">
-                            <button v-for="opt in saveDestinationOptions"
-                                    :key="opt.action"
-                                    type="button"
-                                    class="btn pmr-save-modal-option"
-                                    :class="opt.btn"
-                                    @click="chooseSaveDestination(opt.action)">
+                            <button
+                                v-for="opt in saveDestinationOptions"
+                                :key="opt.action"
+                                type="button"
+                                class="btn pmr-save-modal-option"
+                                :class="opt.btn"
+                                @click="chooseSaveDestination(opt.action)"
+                            >
                                 <span class="pmr-save-modal-option__icon"><i :class="opt.icon"></i></span>
                                 <span class="pmr-save-modal-option__text">
                                     <span class="pmr-save-modal-option__label">{{ opt.label }}</span>

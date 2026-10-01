@@ -7,7 +7,7 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  */
 const props = defineProps({
     status: { type: String, required: true },
-    t:      { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { statusLabel, statusBadge, statusIcon } = useDoctorPayoutFormat(() => props.t);

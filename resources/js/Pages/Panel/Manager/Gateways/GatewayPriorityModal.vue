@@ -3,39 +3,45 @@ import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
-    open:    { type: Boolean, required: true },
-    gateway: { type: Object,  default: null },
-    t:       { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    gateway: { type: Object, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
 
 const priority = ref(1);
-const saving   = ref(false);
-const error    = ref('');
+const saving = ref(false);
+const error = ref('');
 
-watch(() => props.open, (val) => {
-    if (val && props.gateway) {
-        priority.value = props.gateway.priority;
-        error.value    = '';
-    }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val && props.gateway) {
+            priority.value = props.gateway.priority;
+            error.value = '';
+        }
+    },
+);
 
 async function submit() {
     saving.value = true;
-    error.value  = '';
+    error.value = '';
     try {
-        const res  = await fetch(props.gateway.priority_url, {
+        const res = await fetch(props.gateway.priority_url, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
             body: JSON.stringify({ priority: priority.value }),
         });
         const json = await res.json();
-        if (!res.ok) { error.value = json.message ?? props.t.js_error_generic; return; }
+        if (!res.ok) {
+            error.value = json.message ?? props.t.js_error_generic;
+            return;
+        }
         if (window.showSuccessToast) showSuccessToast(json.message);
         emit('close');
         router.reload({ only: ['gateways', 'defaultGateway'] });
@@ -51,7 +57,7 @@ async function submit() {
             v-if="open"
             class="modal fade show d-block"
             tabindex="-1"
-            style="background:rgba(0,0,0,.4)"
+            style="background: rgba(0, 0, 0, 0.4)"
             @click.self="$emit('close')"
         >
             <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -73,7 +79,7 @@ async function submit() {
                                 min="1"
                                 max="999"
                                 required
-                            >
+                            />
                             <div v-if="error" class="alert alert-danger mt-2 py-2 small mb-0">
                                 <i class="ti ti-alert-circle me-1"></i>{{ error }}
                             </div>

@@ -1,31 +1,31 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
-import AppLayout            from '@/Layouts/AppLayout.vue';
-import PageHeader           from '@/Components/Panel/PageHeader.vue';
-import ActionIconGroup      from '@/Components/Panel/ActionIconGroup.vue';
-import ActionIconButton     from '@/Components/Panel/ActionIconButton.vue';
-import ActionDropdown       from '@/Components/Panel/ActionDropdown.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import MedicalRecordDetailDrawer from './MedicalRecordDetailDrawer.vue';
-import PatientInfoSidebar   from './Components/PatientInfoSidebar.vue';
-import PdfPreviewModal      from './Components/PdfPreviewModal.vue';
+import PatientInfoSidebar from './Components/PatientInfoSidebar.vue';
+import PdfPreviewModal from './Components/PdfPreviewModal.vue';
 
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    patient:     { type: Object, required: true },
-    urls:        { type: Object, required: true },
-    t:           { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    patient: { type: Object, required: true },
+    urls: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
     /** Apenas médicos podem criar/editar prontuário (CFM Res. 2.227/2018). */
-    isDoctor:    { type: Boolean, default: false },
+    isDoctor: { type: Boolean, default: false },
 });
 
 // ── Timeline: paginação infinita ────────────────────────────────────────────
-const records      = ref([]);
-const loading      = ref(false);
-const loadingMore  = ref(false);
-const hasMore      = ref(true);
-const nextPage     = ref(1);
-const total        = ref(0);
+const records = ref([]);
+const loading = ref(false);
+const loadingMore = ref(false);
+const hasMore = ref(true);
+const nextPage = ref(1);
+const total = ref(0);
 
 async function loadPage(page = 1) {
     if (page === 1) {
@@ -36,19 +36,19 @@ async function loadPage(page = 1) {
     }
 
     try {
-        const res  = await fetch(`${props.urls.ajax_list}?page=${page}&per_page=10`, {
+        const res = await fetch(`${props.urls.ajax_list}?page=${page}&per_page=10`, {
             headers: { Accept: 'application/json' },
         });
         const json = await res.json();
 
         if (page === 1) records.value = json.data;
-        else            records.value.push(...json.data);
+        else records.value.push(...json.data);
 
-        hasMore.value  = json.has_more;
+        hasMore.value = json.has_more;
         nextPage.value = json.next_page;
-        total.value    = json.total;
+        total.value = json.total;
     } finally {
-        loading.value     = false;
+        loading.value = false;
         loadingMore.value = false;
     }
 }
@@ -56,31 +56,31 @@ async function loadPage(page = 1) {
 onMounted(() => loadPage(1));
 
 // ── Detail drawer ───────────────────────────────────────────────────────────
-const detailOpen   = ref(false);
+const detailOpen = ref(false);
 const detailRecord = ref(null);
 
 function openDetail(record) {
     detailRecord.value = record;
-    detailOpen.value   = true;
+    detailOpen.value = true;
 }
 
 // ── PDF preview modal ───────────────────────────────────────────────────────
 // Em vez de abrir o PDF direto em nova aba (download bruto), exibimos primeiro
 // num iframe dentro de um modal com opção de baixar/abrir externamente.
-const pdfPreviewOpen  = ref(false);
-const pdfPreviewUrl   = ref('');
+const pdfPreviewOpen = ref(false);
+const pdfPreviewUrl = ref('');
 const pdfPreviewTitle = ref('');
 
 function openPdfPreview(record) {
     if (!record?.pdf_url) return;
-    pdfPreviewUrl.value   = record.pdf_url;
+    pdfPreviewUrl.value = record.pdf_url;
     pdfPreviewTitle.value = `Prontuário ${record.code} — ${record.created_at ?? ''}`;
-    pdfPreviewOpen.value  = true;
+    pdfPreviewOpen.value = true;
 }
 
 function closePdfPreview() {
-    pdfPreviewOpen.value  = false;
-    pdfPreviewUrl.value   = '';
+    pdfPreviewOpen.value = false;
+    pdfPreviewUrl.value = '';
     pdfPreviewTitle.value = '';
 }
 
@@ -95,7 +95,7 @@ async function onDelete(record) {
     const res = await fetch(record.destroy_url, {
         method: 'DELETE',
         headers: {
-            'Accept':       'application/json',
+            Accept: 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
         },
     });
@@ -114,7 +114,6 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
 <template>
     <AppLayout :title="t.title ?? 'Prontuários'" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3 page-medical-records">
-
             <!-- Header ocupa a linha toda (padrão das telas raiz do painel) -->
             <PageHeader
                 :title="`${patient.full_name ?? 'Paciente'} — ${t.title ?? 'Prontuários'}`"
@@ -148,7 +147,6 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
 
                 <!-- Coluna principal: timeline -->
                 <div class="col-12 col-md-9 col-lg-10">
-
                     <div class="card">
                         <div class="card-body">
                             <!-- Loading -->
@@ -167,14 +165,12 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
 
                             <!-- Timeline -->
                             <div v-else class="medical-record-timeline">
-                                <div
-                                    v-for="record in records"
-                                    :key="record.id"
-                                    class="timeline-item"
-                                >
+                                <div v-for="record in records" :key="record.id" class="timeline-item">
                                     <div class="d-flex gap-3">
                                         <div class="timeline-marker">
-                                            <i :class="`ti ${record.is_signed ? 'ti-shield-check-filled text-success' : 'ti-file-text text-info'} fs-4`"></i>
+                                            <i
+                                                :class="`ti ${record.is_signed ? 'ti-shield-check-filled text-success' : 'ti-file-text text-info'} fs-4`"
+                                            ></i>
                                         </div>
                                         <div class="flex-grow-1 timeline-content">
                                             <div class="card border-0 shadow-sm">
@@ -182,22 +178,30 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
                                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                                         <div>
                                                             <h6 class="mb-0 fw-semibold">
-                                                                <code class="small text-muted me-2">{{ record.code }}</code>
+                                                                <code class="small text-muted me-2">{{
+                                                                    record.code
+                                                                }}</code>
                                                                 {{ record.created_at }}
                                                             </h6>
                                                             <small v-if="record.doctor_name" class="text-muted">
-                                                                <i class="ti ti-stethoscope me-1"></i>{{ record.doctor_name }}
+                                                                <i class="ti ti-stethoscope me-1"></i
+                                                                >{{ record.doctor_name }}
                                                             </small>
                                                         </div>
                                                         <div class="d-flex gap-1">
-                                                            <span v-if="record.is_signed"
-                                                                  class="badge badge-soft-success rounded text-success border border-success fs-11"
-                                                                  :title="`Assinado em ${record.signed_at}`">
+                                                            <span
+                                                                v-if="record.is_signed"
+                                                                class="badge badge-soft-success rounded text-success border border-success fs-11"
+                                                                :title="`Assinado em ${record.signed_at}`"
+                                                            >
                                                                 <i class="ti ti-shield-check me-1"></i>Assinado
                                                             </span>
-                                                            <span v-if="record.documentations_count > 0"
-                                                                  class="badge badge-soft-info rounded fs-11">
-                                                                <i class="ti ti-paperclip me-1"></i>{{ record.documentations_count }} doc(s)
+                                                            <span
+                                                                v-if="record.documentations_count > 0"
+                                                                class="badge badge-soft-info rounded fs-11"
+                                                            >
+                                                                <i class="ti ti-paperclip me-1"></i
+                                                                >{{ record.documentations_count }} doc(s)
                                                             </span>
                                                         </div>
                                                     </div>
@@ -213,9 +217,16 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
                                                     </div>
 
                                                     <div v-if="record.diagnosis_cids?.length > 0" class="mb-2">
-                                                        <span v-for="(cid, idx) in record.diagnosis_cids" :key="idx"
-                                                              class="badge badge-soft-secondary me-1 fs-11">
-                                                            {{ typeof cid === 'object' ? `${cid.code} ${cid.description ?? ''}` : cid }}
+                                                        <span
+                                                            v-for="(cid, idx) in record.diagnosis_cids"
+                                                            :key="idx"
+                                                            class="badge badge-soft-secondary me-1 fs-11"
+                                                        >
+                                                            {{
+                                                                typeof cid === 'object'
+                                                                    ? `${cid.code} ${cid.description ?? ''}`
+                                                                    : cid
+                                                            }}
                                                         </span>
                                                     </div>
 
@@ -238,7 +249,11 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
                                                             <ActionIconButton
                                                                 v-if="isDoctor"
                                                                 :icon="record.is_locked ? 'ti ti-lock' : 'ti ti-edit'"
-                                                                :title="record.is_locked ? 'Visualizar (assinado)' : 'Editar prontuário'"
+                                                                :title="
+                                                                    record.is_locked
+                                                                        ? 'Visualizar (assinado)'
+                                                                        : 'Editar prontuário'
+                                                                "
                                                                 :href="record.edit_url"
                                                                 variant="default"
                                                             />
@@ -248,13 +263,26 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
                                                                 align="right"
                                                             >
                                                                 <li>
-                                                                    <button type="button" class="dropdown-item" @click="openPdfPreview(record)">
-                                                                        <i class="ti ti-file-search me-2 text-secondary"></i>Visualizar PDF
+                                                                    <button
+                                                                        type="button"
+                                                                        class="dropdown-item"
+                                                                        @click="openPdfPreview(record)"
+                                                                    >
+                                                                        <i
+                                                                            class="ti ti-file-search me-2 text-secondary"
+                                                                        ></i
+                                                                        >Visualizar PDF
                                                                     </button>
                                                                 </li>
-                                                                <li v-if="isDoctor && !record.is_locked"><hr class="dropdown-divider"></li>
                                                                 <li v-if="isDoctor && !record.is_locked">
-                                                                    <button type="button" class="dropdown-item text-danger" @click="onDelete(record)">
+                                                                    <hr class="dropdown-divider" />
+                                                                </li>
+                                                                <li v-if="isDoctor && !record.is_locked">
+                                                                    <button
+                                                                        type="button"
+                                                                        class="dropdown-item text-danger"
+                                                                        @click="onDelete(record)"
+                                                                    >
                                                                         <i class="ti ti-trash me-2"></i>Excluir
                                                                     </button>
                                                                 </li>
@@ -269,7 +297,11 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
 
                                 <!-- Load more -->
                                 <div v-if="hasMore" class="text-center py-3">
-                                    <button class="btn btn-outline-secondary btn-sm" :disabled="loadingMore" @click="loadPage(nextPage)">
+                                    <button
+                                        class="btn btn-outline-secondary btn-sm"
+                                        :disabled="loadingMore"
+                                        @click="loadPage(nextPage)"
+                                    >
                                         <span v-if="loadingMore" class="spinner-border spinner-border-sm me-1"></span>
                                         <i v-else class="ti ti-chevron-down me-1"></i>
                                         Carregar mais
@@ -305,10 +337,24 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
 </template>
 
 <style scoped>
-.patient-info-sticky { position: sticky; top: 1rem; }
-.medical-record-timeline { position: relative; padding-left: 1rem; }
-.timeline-item { position: relative; margin-bottom: 1rem; padding-bottom: 1rem; border-left: 2px solid var(--bs-border-color); padding-left: 1rem; }
-.timeline-item:last-child { border-left-color: transparent; }
+.patient-info-sticky {
+    position: sticky;
+    top: 1rem;
+}
+.medical-record-timeline {
+    position: relative;
+    padding-left: 1rem;
+}
+.timeline-item {
+    position: relative;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-left: 2px solid var(--bs-border-color);
+    padding-left: 1rem;
+}
+.timeline-item:last-child {
+    border-left-color: transparent;
+}
 .timeline-marker {
     position: absolute;
     left: -22px;

@@ -14,11 +14,11 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * lançamento de caixa por guia — valores diferentes por guia: aba Guias.
  */
 const props = defineProps({
-    open:           { type: Boolean, default: false },
-    batch:          { type: Object,  default: null },
-    paymentMethods: { type: Array,   default: () => [] },
-    today:          { type: String,  default: '' },
-    t:              { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    batch: { type: Object, default: null },
+    paymentMethods: { type: Array, default: () => [] },
+    today: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -28,22 +28,25 @@ const FIELDS = ['paid_at', 'payment_method', 'notes'];
 const { tx } = useTrans(() => props.t);
 const { money } = useLocaleFormat();
 
-const preview      = ref(null);
-const loading      = ref(false);
-const form         = ref({ paid_at: '', payment_method: '', notes: '' });
-const fieldErrors  = ref({});
+const preview = ref(null);
+const loading = ref(false);
+const form = ref({ paid_at: '', payment_method: '', notes: '' });
+const fieldErrors = ref({});
 const generalError = ref('');
-const processing   = ref(false);
-const result       = ref(null);
-const rootRef      = ref(null);
-const resultRef    = ref(null);
+const processing = ref(false);
+const result = ref(null);
+const rootRef = ref(null);
+const resultRef = ref(null);
 
-const canConfirm = computed(() => Boolean(preview.value)
-    && preview.value.count > 0
-    && !preview.value.over_limit
-    && !loading.value
-    && !processing.value
-    && !result.value);
+const canConfirm = computed(
+    () =>
+        Boolean(preview.value) &&
+        preview.value.count > 0 &&
+        !preview.value.over_limit &&
+        !loading.value &&
+        !processing.value &&
+        !result.value,
+);
 
 async function loadPreview() {
     loading.value = true;
@@ -59,17 +62,21 @@ async function loadPreview() {
     }
 }
 
-watch(() => props.open, (open) => {
-    if (!open || !props.batch) return;
+watch(
+    () => props.open,
+    (open) => {
+        if (!open || !props.batch) return;
 
-    preview.value      = null;
-    form.value         = { paid_at: props.today, payment_method: props.paymentMethods[0]?.value ?? '', notes: '' };
-    fieldErrors.value  = {};
-    generalError.value = '';
-    result.value       = null;
+        preview.value = null;
+        form.value = { paid_at: props.today, payment_method: props.paymentMethods[0]?.value ?? '', notes: '' };
+        fieldErrors.value = {};
+        generalError.value = '';
+        result.value = null;
 
-    if (props.batch.receipt_preview_url) loadPreview();
-}, { immediate: true });
+        if (props.batch.receipt_preview_url) loadPreview();
+    },
+    { immediate: true },
+);
 
 function requestClose() {
     if (!processing.value) emit('close');
@@ -78,8 +85,8 @@ function requestClose() {
 async function submit() {
     if (!canConfirm.value) return;
 
-    processing.value   = true;
-    fieldErrors.value  = {};
+    processing.value = true;
+    fieldErrors.value = {};
     generalError.value = '';
 
     try {
@@ -92,8 +99,10 @@ async function submit() {
         const errors = validationErrors(error);
 
         if (errors) {
-            fieldErrors.value  = Object.fromEntries(Object.entries(errors).filter(([key]) => FIELDS.includes(key)));
-            generalError.value = firstError(Object.fromEntries(Object.entries(errors).filter(([key]) => !FIELDS.includes(key))));
+            fieldErrors.value = Object.fromEntries(Object.entries(errors).filter(([key]) => FIELDS.includes(key)));
+            generalError.value = firstError(
+                Object.fromEntries(Object.entries(errors).filter(([key]) => !FIELDS.includes(key))),
+            );
         } else {
             generalError.value = props.t.bulk_receipt_failed;
         }
@@ -109,16 +118,22 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
     <CenteredModal :open="open" size="md" :close-label="t.btn_close" @close="requestClose">
         <template #header>
             <h2 class="h5 mb-0 fw-semibold">
-                <i class="ti ti-cash me-2 text-success" aria-hidden="true"></i>{{ tx('batch_receipt_title', { code: batch?.code ?? '' }) }}
+                <i class="ti ti-cash me-2 text-success" aria-hidden="true"></i
+                >{{ tx('batch_receipt_title', { code: batch?.code ?? '' }) }}
             </h2>
         </template>
 
         <form v-if="batch" ref="rootRef" novalidate data-test="batch-receipt-form" @submit.prevent="submit">
             <p class="small text-muted">{{ t.batch_receipt_intro }}</p>
 
-            <div class="border rounded p-2 mb-3 small bg-body-tertiary" aria-live="polite" data-test="batch-receipt-preview">
+            <div
+                class="border rounded p-2 mb-3 small bg-body-tertiary"
+                aria-live="polite"
+                data-test="batch-receipt-preview"
+            >
                 <span v-if="loading" class="d-inline-flex align-items-center gap-2 text-muted">
-                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>{{ t.batch_receipt_loading }}
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span
+                    >{{ t.batch_receipt_loading }}
                 </span>
                 <template v-else-if="preview">
                     <p class="fw-semibold mb-0" data-test="batch-receipt-summary">
@@ -130,11 +145,18 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 </template>
             </div>
 
-            <div v-if="preview?.over_limit" class="alert alert-warning small py-2" role="alert" data-test="batch-receipt-over-limit">
+            <div
+                v-if="preview?.over_limit"
+                class="alert alert-warning small py-2"
+                role="alert"
+                data-test="batch-receipt-over-limit"
+            >
                 {{ tx('batch_receipt_over_limit', { count: preview.count, max: preview.max }) }}
             </div>
 
-            <div v-if="generalError" class="alert alert-danger small py-2" role="alert" data-test="batch-receipt-error">{{ generalError }}</div>
+            <div v-if="generalError" class="alert alert-danger small py-2" role="alert" data-test="batch-receipt-error">
+                {{ generalError }}
+            </div>
 
             <ReceiptFields
                 v-model:paid-at="form.paid_at"
@@ -157,18 +179,35 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     aria-labelledby="billing-batch-receipt-result-title"
                     data-test="batch-receipt-result"
                 >
-                    <h3 id="billing-batch-receipt-result-title" class="h6 fw-semibold">{{ t.bulk_receipt_result_title }}</h3>
-                    <div class="alert alert-success small py-2 mb-2" data-test="batch-receipt-message">{{ result.message }}</div>
+                    <h3 id="billing-batch-receipt-result-title" class="h6 fw-semibold">
+                        {{ t.bulk_receipt_result_title }}
+                    </h3>
+                    <div class="alert alert-success small py-2 mb-2" data-test="batch-receipt-message">
+                        {{ result.message }}
+                    </div>
                     <p class="small mb-0">{{ tx('bulk_receipt_paid_total', { total: money(result.total_paid) }) }}</p>
                 </section>
             </div>
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="processing" data-test="batch-receipt-close" @click="requestClose">
+            <button
+                type="button"
+                class="btn btn-light"
+                :disabled="processing"
+                data-test="batch-receipt-close"
+                @click="requestClose"
+            >
                 {{ result ? t.btn_close : t.btn_cancel }}
             </button>
-            <button v-if="!result" type="button" class="btn btn-success" data-test="batch-receipt-confirm" :disabled="!canConfirm" @click="submit">
+            <button
+                v-if="!result"
+                type="button"
+                class="btn btn-success"
+                data-test="batch-receipt-confirm"
+                :disabled="!canConfirm"
+                @click="submit"
+            >
                 <span v-if="processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                 {{ processing ? t.processing : t.batch_receipt_confirm }}
             </button>

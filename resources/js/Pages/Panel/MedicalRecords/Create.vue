@@ -1,33 +1,33 @@
 <script setup>
 import { ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout              from '@/Layouts/AppLayout.vue';
-import PatientInfoSidebar     from './Components/PatientInfoSidebar.vue';
-import PreviousRecordsCard    from './Components/PreviousRecordsCard.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PatientInfoSidebar from './Components/PatientInfoSidebar.vue';
+import PreviousRecordsCard from './Components/PreviousRecordsCard.vue';
 import MedicalRecordViewModal from './Components/MedicalRecordViewModal.vue';
-import MedicalRecordForm      from './Components/MedicalRecordForm.vue';
-import ScheduleFlowGuard      from './Components/ScheduleFlowGuard.vue';
+import MedicalRecordForm from './Components/MedicalRecordForm.vue';
+import ScheduleFlowGuard from './Components/ScheduleFlowGuard.vue';
 
 defineProps({
-    breadcrumbs:     { type: Array,   default: () => [] },
-    patient:         { type: Object,  required: true },
-    medicalrecord:   { type: Object,  default: null },
-    previousRecords: { type: Array,   default: () => [] },
-    doctors:         { type: Array,   default: () => [] },
-    currentDoctorId: { type: String,  default: null },
+    breadcrumbs: { type: Array, default: () => [] },
+    patient: { type: Object, required: true },
+    medicalrecord: { type: Object, default: null },
+    previousRecords: { type: Array, default: () => [] },
+    doctors: { type: Array, default: () => [] },
+    currentDoctorId: { type: String, default: null },
     canChooseDoctor: { type: Boolean, default: false },
-    isDoctor:        { type: Boolean, default: false },
-    isEdit:          { type: Boolean, default: false },
+    isDoctor: { type: Boolean, default: false },
+    isEdit: { type: Boolean, default: false },
     // Fluxo Agenda ↔ Prontuário (ver ScheduleFlowGuard.vue) — no create chega
     // via ?schedule_id= quando o atendimento é aberto a partir da Agenda.
-    scheduleFlow:    { type: Object,  default: null },
-    catalogs:        { type: Object,  required: true },
-    urls:            { type: Object,  required: true },
-    storage:         { type: Object,  default: () => ({}) },
-    t:               { type: Object,  default: () => ({}) },
+    scheduleFlow: { type: Object, default: null },
+    catalogs: { type: Object, required: true },
+    urls: { type: Object, required: true },
+    storage: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
-const flowGuard  = ref(null);
+const flowGuard = ref(null);
 const recordForm = ref(null);
 
 const viewOpen = ref(false);
@@ -53,10 +53,12 @@ function closeView() {
                     <div class="btn-group" role="group">
                         <!-- Com fluxo de agendamento ativo, sair passa pelo
                              ScheduleFlowGuard (Finalizar/Dilatar/Exame/Continuar). -->
-                        <button v-if="flowGuard?.active"
-                                type="button"
-                                class="btn btn-outline-white btn-sm"
-                                @click="flowGuard.requestExit()">
+                        <button
+                            v-if="flowGuard?.active"
+                            type="button"
+                            class="btn btn-outline-white btn-sm"
+                            @click="flowGuard.requestExit()"
+                        >
                             <i class="fas fa-arrow-left me-1"></i>{{ t.title ?? 'Prontuários' }}
                         </button>
                         <Link v-else :href="urls.list" class="btn btn-outline-white btn-sm">

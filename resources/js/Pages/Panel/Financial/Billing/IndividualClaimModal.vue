@@ -17,45 +17,58 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * num lote para ir à operadora. Fechar com dados digitados pede confirmação.
  */
 const props = defineProps({
-    open:               { type: Boolean, default: false },
-    schedule:           { type: Object,  default: null },
-    covenants:          { type: Array,   default: () => [] },
-    tussCodes:          { type: Array,   default: () => [] },
-    url:                { type: String,  required: true },
-    cid10SearchUrl:     { type: String,  default: '' },
-    procedurePricesUrl: { type: String,  default: '' },
-    t:                  { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    schedule: { type: Object, default: null },
+    covenants: { type: Array, default: () => [] },
+    tussCodes: { type: Array, default: () => [] },
+    url: { type: String, required: true },
+    cid10SearchUrl: { type: String, default: '' },
+    procedurePricesUrl: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const FIELDS = [
-    'schedule_id', 'quantity', 'unit_price', 'due_date', 'tuss_code', 'procedure_description',
-    'authorization_code', 'eye_side', 'clinical_indication', 'notes',
+    'schedule_id',
+    'quantity',
+    'unit_price',
+    'due_date',
+    'tuss_code',
+    'procedure_description',
+    'authorization_code',
+    'eye_side',
+    'clinical_indication',
+    'notes',
 ];
 
 const { tx } = useTrans(() => props.t);
 const { money, number, dateTime } = useLocaleFormat();
 
 const form = useForm({
-    schedule_id:           '',
-    quantity:              1,
-    unit_price:            null,
-    due_date:              '',
-    tuss_code:             '',
+    schedule_id: '',
+    quantity: 1,
+    unit_price: null,
+    due_date: '',
+    tuss_code: '',
     procedure_description: '',
-    authorization_code:    '',
-    eye_side:              '',
-    clinical_indication:   '',
-    notes:                 '',
+    authorization_code: '',
+    eye_side: '',
+    clinical_indication: '',
+    notes: '',
 });
 
-const rootRef           = ref(null);
+const rootRef = ref(null);
 const confirmingDiscard = ref(false);
 
-const otherErrors = computed(() => generalErrors(form.errors, FIELDS.filter((f) => f !== 'schedule_id')));
-const covenant    = computed(() => props.covenants.find((c) => c.id === props.schedule?.covenant_id) ?? null);
-const isTiss      = computed(() => Boolean(covenant.value?.has_ans_registry));
+const otherErrors = computed(() =>
+    generalErrors(
+        form.errors,
+        FIELDS.filter((f) => f !== 'schedule_id'),
+    ),
+);
+const covenant = computed(() => props.covenants.find((c) => c.id === props.schedule?.covenant_id) ?? null);
+const isTiss = computed(() => Boolean(covenant.value?.has_ans_registry));
 
 /** Preço da tabela (procedimento × convênio) — só sugestão, o usuário confirma. */
 const suggested = computed(() => {
@@ -69,46 +82,49 @@ const suggestedText = computed(() => {
 
     return props.schedule?.procedure_name
         ? tx('suggested_price_hint', {
-            procedure: props.schedule.procedure_name,
-            covenant:  props.schedule.covenant_name || props.t.no_covenant,
-            amount:    money(suggested.value),
-        })
+              procedure: props.schedule.procedure_name,
+              covenant: props.schedule.covenant_name || props.t.no_covenant,
+              amount: money(suggested.value),
+          })
         : tx('suggested_price_short', { amount: money(suggested.value) });
 });
 
 const priceDiffers = computed(() => suggested.value !== null && Number(form.unit_price) !== suggested.value);
 
 const total = computed(() => {
-    const qty   = Number(form.quantity || 0);
+    const qty = Number(form.quantity || 0);
     const price = Number(form.unit_price ?? 0);
 
     return qty > 0 && price > 0 ? Math.round(qty * price * 100) / 100 : null;
 });
 
-const priceDescribedBy = computed(() => [
-    'billing-ind-price-hint',
-    form.errors.unit_price ? 'billing-ind-price-error' : null,
-].filter(Boolean).join(' '));
+const priceDescribedBy = computed(() =>
+    ['billing-ind-price-hint', form.errors.unit_price ? 'billing-ind-price-error' : null].filter(Boolean).join(' '),
+);
 
-watch(() => props.open, (open) => {
-    confirmingDiscard.value = false;
-    if (!open || !props.schedule) return;
+watch(
+    () => props.open,
+    (open) => {
+        confirmingDiscard.value = false;
+        if (!open || !props.schedule) return;
 
-    form.defaults({
-        schedule_id:           props.schedule.id,
-        quantity:              1,
-        unit_price:            suggested.value,
-        due_date:              '',
-        tuss_code:             '',
-        procedure_description: '',
-        authorization_code:    '',
-        eye_side:              '',
-        clinical_indication:   '',
-        notes:                 '',
-    });
-    form.reset();
-    form.clearErrors();
-}, { immediate: true });
+        form.defaults({
+            schedule_id: props.schedule.id,
+            quantity: 1,
+            unit_price: suggested.value,
+            due_date: '',
+            tuss_code: '',
+            procedure_description: '',
+            authorization_code: '',
+            eye_side: '',
+            clinical_indication: '',
+            notes: '',
+        });
+        form.reset();
+        form.clearErrors();
+    },
+    { immediate: true },
+);
 
 function requestClose() {
     if (form.processing) return;
@@ -135,8 +151,8 @@ function submit() {
 
     form.post(props.url, {
         preserveScroll: true,
-        preserveState:  true,
-        onSuccess:      () => emit('saved'),
+        preserveState: true,
+        onSuccess: () => emit('saved'),
     });
 }
 
@@ -146,7 +162,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
 <template>
     <OffcanvasPanel :open="open" :width="560" @close="requestClose">
         <template #header>
-            <h2 class="h5 mb-0 fw-semibold"><i class="ti ti-receipt me-2 text-primary" aria-hidden="true"></i>{{ t.individual_title }}</h2>
+            <h2 class="h5 mb-0 fw-semibold">
+                <i class="ti ti-receipt me-2 text-primary" aria-hidden="true"></i>{{ t.individual_title }}
+            </h2>
         </template>
 
         <form v-if="schedule" ref="rootRef" novalidate @submit.prevent="submit">
@@ -164,7 +182,13 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 <span>{{ t.individual_tiss_hint }}</span>
             </div>
 
-            <div v-for="message in otherErrors" :key="message" class="alert alert-danger small py-2" role="alert" data-test="individual-error">
+            <div
+                v-for="message in otherErrors"
+                :key="message"
+                class="alert alert-danger small py-2"
+                role="alert"
+                data-test="individual-error"
+            >
                 {{ message }}
             </div>
 
@@ -182,8 +206,10 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         :class="{ 'is-invalid': form.errors.quantity }"
                         :aria-invalid="form.errors.quantity ? 'true' : 'false'"
                         :aria-describedby="form.errors.quantity ? 'billing-ind-qty-error' : undefined"
-                    >
-                    <div v-if="form.errors.quantity" id="billing-ind-qty-error" class="invalid-feedback">{{ form.errors.quantity }}</div>
+                    />
+                    <div v-if="form.errors.quantity" id="billing-ind-qty-error" class="invalid-feedback">
+                        {{ form.errors.quantity }}
+                    </div>
                 </div>
                 <div class="col-12 col-sm-8">
                     <label for="billing-ind-price" class="form-label">
@@ -199,7 +225,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         :aria-describedby="priceDescribedBy"
                         data-test="individual-price"
                     />
-                    <div v-if="form.errors.unit_price" id="billing-ind-price-error" class="invalid-feedback d-block">{{ form.errors.unit_price }}</div>
+                    <div v-if="form.errors.unit_price" id="billing-ind-price-error" class="invalid-feedback d-block">
+                        {{ form.errors.unit_price }}
+                    </div>
                     <small id="billing-ind-price-hint" class="form-text d-block" data-test="individual-suggested">
                         <template v-if="suggested !== null">
                             <i class="ti ti-table me-1" aria-hidden="true"></i>{{ suggestedText }}
@@ -209,11 +237,18 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                                 class="btn btn-link btn-sm p-0 align-baseline"
                                 data-test="use-suggested"
                                 @click="useSuggested"
-                            >{{ tx('suggested_price_use', { amount: money(suggested) }) }}</button>
+                            >
+                                {{ tx('suggested_price_use', { amount: money(suggested) }) }}
+                            </button>
                         </template>
                         <template v-else>
                             {{ t.suggested_price_none }}
-                            <a v-if="procedurePricesUrl" :href="procedurePricesUrl" target="_blank" rel="noopener noreferrer">
+                            <a
+                                v-if="procedurePricesUrl"
+                                :href="procedurePricesUrl"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
                                 {{ t.price_table_link }}<span class="visually-hidden"> {{ t.new_tab }}</span>
                                 <i class="ti ti-external-link ms-1" aria-hidden="true"></i>
                             </a>
@@ -224,7 +259,12 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     <p class="small mb-0" aria-live="polite" data-test="individual-total">
                         {{ t.claim_total }}: <strong>{{ money(total) }}</strong>
                         <span v-if="total !== null" class="text-muted">
-                            ({{ tx('claim_total_formula', { quantity: number(form.quantity), unit: money(form.unit_price) }) }})
+                            ({{
+                                tx('claim_total_formula', {
+                                    quantity: number(form.quantity),
+                                    unit: money(form.unit_price),
+                                })
+                            }})
                         </span>
                     </p>
                 </div>
@@ -244,14 +284,23 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 </div>
                 <div class="col-12 col-sm-6">
                     <label for="billing-ind-due" class="form-label">{{ t.due_date }}</label>
-                    <input id="billing-ind-due" v-model="form.due_date" type="date" class="form-control"
-                           :class="{ 'is-invalid': form.errors.due_date }">
+                    <input
+                        id="billing-ind-due"
+                        v-model="form.due_date"
+                        type="date"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.due_date }"
+                    />
                     <div v-if="form.errors.due_date" class="invalid-feedback">{{ form.errors.due_date }}</div>
                 </div>
                 <div class="col-12 col-sm-6">
                     <label for="billing-ind-eye" class="form-label">{{ t.eye_side_label }}</label>
-                    <select id="billing-ind-eye" v-model="form.eye_side" class="form-select"
-                            :class="{ 'is-invalid': form.errors.eye_side }">
+                    <select
+                        id="billing-ind-eye"
+                        v-model="form.eye_side"
+                        class="form-select"
+                        :class="{ 'is-invalid': form.errors.eye_side }"
+                    >
                         <option value="">{{ t.eye_side_none }}</option>
                         <option value="OD">{{ t.eye_side_od }}</option>
                         <option value="OE">{{ t.eye_side_oe }}</option>
@@ -272,20 +321,42 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 </div>
                 <div class="col-12">
                     <label for="billing-ind-desc" class="form-label">{{ t.procedure_desc }}</label>
-                    <input id="billing-ind-desc" v-model="form.procedure_description" type="text" maxlength="255" class="form-control"
-                           :class="{ 'is-invalid': form.errors.procedure_description }">
-                    <div v-if="form.errors.procedure_description" class="invalid-feedback">{{ form.errors.procedure_description }}</div>
+                    <input
+                        id="billing-ind-desc"
+                        v-model="form.procedure_description"
+                        type="text"
+                        maxlength="255"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.procedure_description }"
+                    />
+                    <div v-if="form.errors.procedure_description" class="invalid-feedback">
+                        {{ form.errors.procedure_description }}
+                    </div>
                 </div>
                 <div class="col-12">
                     <label for="billing-ind-auth" class="form-label">{{ t.authorization }}</label>
-                    <input id="billing-ind-auth" v-model="form.authorization_code" type="text" maxlength="64" class="form-control"
-                           :class="{ 'is-invalid': form.errors.authorization_code }">
-                    <div v-if="form.errors.authorization_code" class="invalid-feedback">{{ form.errors.authorization_code }}</div>
+                    <input
+                        id="billing-ind-auth"
+                        v-model="form.authorization_code"
+                        type="text"
+                        maxlength="64"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.authorization_code }"
+                    />
+                    <div v-if="form.errors.authorization_code" class="invalid-feedback">
+                        {{ form.errors.authorization_code }}
+                    </div>
                 </div>
                 <div class="col-12">
                     <label for="billing-ind-notes" class="form-label">{{ t.notes_label }}</label>
-                    <textarea id="billing-ind-notes" v-model="form.notes" rows="2" maxlength="2000" class="form-control"
-                              :class="{ 'is-invalid': form.errors.notes }"></textarea>
+                    <textarea
+                        id="billing-ind-notes"
+                        v-model="form.notes"
+                        rows="2"
+                        maxlength="2000"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.notes }"
+                    ></textarea>
                     <div v-if="form.errors.notes" class="invalid-feedback">{{ form.errors.notes }}</div>
                 </div>
             </div>
@@ -293,14 +364,32 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
 
         <template #footer>
             <template v-if="confirmingDiscard">
-                <span class="me-auto small fw-medium" role="alert" data-test="discard-prompt">{{ t.discard_title }}</span>
-                <button type="button" class="btn btn-light" data-test="keep-editing" @click="confirmingDiscard = false">{{ t.btn_keep_editing }}</button>
-                <button type="button" class="btn btn-outline-danger" data-test="discard" @click="requestClose">{{ t.btn_discard }}</button>
+                <span class="me-auto small fw-medium" role="alert" data-test="discard-prompt">{{
+                    t.discard_title
+                }}</span>
+                <button type="button" class="btn btn-light" data-test="keep-editing" @click="confirmingDiscard = false">
+                    {{ t.btn_keep_editing }}
+                </button>
+                <button type="button" class="btn btn-outline-danger" data-test="discard" @click="requestClose">
+                    {{ t.btn_discard }}
+                </button>
             </template>
             <template v-else>
-                <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">{{ t.btn_cancel }}</button>
-                <button type="button" class="btn btn-primary" data-test="create-individual" :disabled="form.processing" @click="submit">
-                    <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">
+                    {{ t.btn_cancel }}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    data-test="create-individual"
+                    :disabled="form.processing"
+                    @click="submit"
+                >
+                    <span
+                        v-if="form.processing"
+                        class="spinner-border spinner-border-sm me-1"
+                        aria-hidden="true"
+                    ></span>
                     {{ form.processing ? t.processing : t.btn_create_individual }}
                 </button>
             </template>

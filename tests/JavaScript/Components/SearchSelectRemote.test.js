@@ -16,12 +16,16 @@ describe('SearchSelect — busca remota', () => {
     beforeEach(() => {
         globalThis.window = globalThis.window ?? {};
         globalThis.window.axios = {
-            get: vi.fn(() => Promise.resolve({
-                data: { data: [
-                    { id: 'p-1', label: 'Maria Silva',  sub_label: 'PAC-001' },
-                    { id: 'p-2', label: 'Maria Santos', sub_label: 'PAC-002' },
-                ] },
-            })),
+            get: vi.fn(() =>
+                Promise.resolve({
+                    data: {
+                        data: [
+                            { id: 'p-1', label: 'Maria Silva', sub_label: 'PAC-001' },
+                            { id: 'p-2', label: 'Maria Santos', sub_label: 'PAC-002' },
+                        ],
+                    },
+                }),
+            ),
         };
     });
 
@@ -29,9 +33,9 @@ describe('SearchSelect — busca remota', () => {
         return mount(SearchSelect, {
             props: {
                 modelValue: null,
-                options:    [],
-                valueKey:   'id',
-                labelKey:   'label',
+                options: [],
+                valueKey: 'id',
+                labelKey: 'label',
                 remoteSearchUrl: '/_routes/search?q=__Q__',
                 ...props,
             },
@@ -91,7 +95,10 @@ describe('SearchSelect — busca remota', () => {
     it('sem remoteSearchUrl mantém comportamento legado (options local)', async () => {
         const wrapper = mountSelect({
             remoteSearchUrl: '',
-            options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+            options: [
+                { id: 'a', label: 'A' },
+                { id: 'b', label: 'B' },
+            ],
         });
 
         wrapper.vm.onSearchChange('a');

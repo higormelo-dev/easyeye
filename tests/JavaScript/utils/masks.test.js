@@ -12,7 +12,7 @@ describe('maskCpf', () => {
         ['12345678901', '123.456.789-01'],
         ['123.456.789-01', '123.456.789-01'],
         ['123456789012345', '123.456.789-01'], // excedente descartado
-        ['12a3.4b5', '123.45'],                // não-dígitos descartados
+        ['12a3.4b5', '123.45'], // não-dígitos descartados
     ])('%s → %s', (input, expected) => {
         expect(maskCpf(input)).toBe(expected);
     });
@@ -40,7 +40,7 @@ describe('maskCnpj alfanumérico (IN RFB 2.229/2024)', () => {
         ['12ABC34501DE35', '12.ABC.345/01DE-35'],
         ['12.abc.345/01de-35', '12.ABC.345/01DE-35'], // minúsculas viram maiúsculas
         ['12ABC', '12.ABC'],
-        ['12ABC34501DEX5', '12.ABC.345/01DE-5'],      // DV nunca aceita letra
+        ['12ABC34501DEX5', '12.ABC.345/01DE-5'], // DV nunca aceita letra
     ])('%s → %s', (input, expected) => {
         expect(maskCnpj(input)).toBe(expected);
     });
@@ -75,8 +75,8 @@ describe('maskPhone', () => {
         ['619', '(61) 9'],
         ['613333', '(61) 3333'],
         ['6133334', '(61) 3333-4'],
-        ['6133334444', '(61) 3333-4444'],       // fixo
-        ['61999998888', '(61) 99999-8888'],     // celular
+        ['6133334444', '(61) 3333-4444'], // fixo
+        ['61999998888', '(61) 99999-8888'], // celular
         ['(61) 99999-8888', '(61) 99999-8888'],
         ['619999988887777', '(61) 99999-8888'], // excedente descartado
     ])('%s → %s', (input, expected) => {
@@ -99,8 +99,14 @@ describe('maskPhone', () => {
     });
 
     it('"+55" digitado caractere a caractere vira número BR sem o DDI', () => {
-        expect(['+', '+5', '+55', '+556', '+5561', '+55619'].map(maskPhone))
-            .toEqual(['+', '+5', '+55', '(6', '(61', '(61) 9']);
+        expect(['+', '+5', '+55', '+556', '+5561', '+55619'].map(maskPhone)).toEqual([
+            '+',
+            '+5',
+            '+55',
+            '(6',
+            '(61',
+            '(61) 9',
+        ]);
     });
 
     it.each([
@@ -162,11 +168,11 @@ describe('isFormattable (valor vindo do servidor)', () => {
     });
 
     it.each([
-        ['phone', '(61) 3333-4444 r.21'],       // ramal
-        ['phone', '6133334444 / 61999998888'],  // dois números
-        ['phone', '33334444'],                  // sem DDD
-        ['phone', '011987654321'],              // prefixo de operadora
-        ['phone', '351912345678'],              // estrangeiro sem "+"
+        ['phone', '(61) 3333-4444 r.21'], // ramal
+        ['phone', '6133334444 / 61999998888'], // dois números
+        ['phone', '33334444'], // sem DDD
+        ['phone', '011987654321'], // prefixo de operadora
+        ['phone', '351912345678'], // estrangeiro sem "+"
         ['cpf', '1234'],
         ['cep', '0131'],
         ['phone', ''],

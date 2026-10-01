@@ -25,10 +25,7 @@ defineEmits(['change']);
         <ul class="pagination pagination-sm mb-0">
             <!-- Previous -->
             <li class="page-item" :class="{ disabled: meta.current_page === 1 }">
-                <button
-                    class="page-link"
-                    @click="$emit('change', meta.current_page - 1)"
-                >
+                <button class="page-link" @click="$emit('change', meta.current_page - 1)">
                     <i class="ti ti-arrow-left"></i>
                 </button>
             </li>
@@ -42,10 +39,7 @@ defineEmits(['change']);
 
             <!-- Next -->
             <li class="page-item" :class="{ disabled: meta.current_page === meta.last_page }">
-                <button
-                    class="page-link"
-                    @click="$emit('change', meta.current_page + 1)"
-                >
+                <button class="page-link" @click="$emit('change', meta.current_page + 1)">
                     <i class="ti ti-arrow-right"></i>
                 </button>
             </li>

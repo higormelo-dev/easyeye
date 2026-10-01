@@ -9,9 +9,9 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat';
  * explícito: negativo não depende só de cor.
  */
 const props = defineProps({
-    rows:    { type: Array,  default: () => [] },  // [{ day (ISO), income, expense, balance, cumulative }]
+    rows: { type: Array, default: () => [] }, // [{ day (ISO), income, expense, balance, cumulative }]
     summary: { type: Object, default: () => ({}) }, // { income, expense, balance }
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { money, signedMoney, date } = useLocaleFormat();
@@ -31,7 +31,11 @@ const c = computed(() => props.t.cashflow ?? {});
         </div>
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle mb-0 cf-day-table">
-                <caption class="visually-hidden">{{ c.by_day }}</caption>
+                <caption class="visually-hidden">
+                    {{
+                        c.by_day
+                    }}
+                </caption>
                 <thead class="table-light">
                     <tr>
                         <th scope="col">{{ c.col_day }}</th>
@@ -43,7 +47,9 @@ const c = computed(() => props.t.cashflow ?? {});
                 </thead>
                 <tbody>
                     <tr v-if="rows.length === 0">
-                        <td colspan="5" class="text-center text-body-secondary py-4" data-test="day-empty">{{ c.no_day_data }}</td>
+                        <td colspan="5" class="text-center text-body-secondary py-4" data-test="day-empty">
+                            {{ c.no_day_data }}
+                        </td>
                     </tr>
                     <tr v-for="row in rows" :key="row.day" data-test="day-row">
                         <th scope="row" class="fw-medium text-body text-nowrap">
@@ -51,17 +57,32 @@ const c = computed(() => props.t.cashflow ?? {});
                         </th>
                         <td class="text-end text-body text-nowrap" data-test="day-income">{{ money(row.income) }}</td>
                         <td class="text-end text-body text-nowrap" data-test="day-expense">{{ money(row.expense) }}</td>
-                        <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="day-balance">{{ signedMoney(row.balance) }}</td>
-                        <td class="text-end fw-semibold text-body text-nowrap" data-test="day-cumulative">{{ signedMoney(row.cumulative) }}</td>
+                        <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="day-balance">
+                            {{ signedMoney(row.balance) }}
+                        </td>
+                        <td class="text-end fw-semibold text-body text-nowrap" data-test="day-cumulative">
+                            {{ signedMoney(row.cumulative) }}
+                        </td>
                     </tr>
                 </tbody>
                 <tfoot v-if="rows.length">
                     <tr data-test="day-totals">
                         <th scope="row">{{ c.footer_total }}</th>
-                        <td class="text-end fw-semibold text-body text-nowrap" data-test="day-total-income">{{ money(summary.income ?? 0) }}</td>
-                        <td class="text-end fw-semibold text-body text-nowrap" data-test="day-total-expense">{{ money(summary.expense ?? 0) }}</td>
-                        <td class="text-end fw-semibold text-body text-nowrap d-none d-lg-table-cell" data-test="day-total-balance">{{ signedMoney(summary.balance ?? 0) }}</td>
-                        <td class="text-end fw-bold text-body text-nowrap" data-test="day-total-cumulative">{{ signedMoney(summary.balance ?? 0) }}</td>
+                        <td class="text-end fw-semibold text-body text-nowrap" data-test="day-total-income">
+                            {{ money(summary.income ?? 0) }}
+                        </td>
+                        <td class="text-end fw-semibold text-body text-nowrap" data-test="day-total-expense">
+                            {{ money(summary.expense ?? 0) }}
+                        </td>
+                        <td
+                            class="text-end fw-semibold text-body text-nowrap d-none d-lg-table-cell"
+                            data-test="day-total-balance"
+                        >
+                            {{ signedMoney(summary.balance ?? 0) }}
+                        </td>
+                        <td class="text-end fw-bold text-body text-nowrap" data-test="day-total-cumulative">
+                            {{ signedMoney(summary.balance ?? 0) }}
+                        </td>
                     </tr>
                 </tfoot>
             </table>

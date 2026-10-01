@@ -10,7 +10,10 @@ import UserTable from '@/Pages/Panel/Users/UserTable.vue';
  */
 
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
-    default: { props: ['title'], template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>' },
+    default: {
+        props: ['title'],
+        template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
@@ -22,20 +25,48 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_name: 'Nome', col_email: 'E-mail', col_role: 'Perfil', col_created_at: 'Cadastro', col_status: 'Status',
-    col_actions: 'Ações', sort_by: 'Ordenar por :column', badge_owner: 'Proprietário', badge_self: 'Você',
-    extra_roles_one: '+:count perfil adicional', extra_roles_other: '+:count perfis adicionais',
-    status_active: 'Ativo', status_inactive: 'Inativo', status_deleted: 'Excluído',
-    btn_edit: 'Editar', btn_restore: 'Restaurar', btn_activate: 'Ativar', btn_deactivate: 'Desativar', btn_delete: 'Excluir',
-    more_actions: 'Mais ações', owner_locked: 'O proprietário da clínica não pode ser alterado nesta tela.',
-    pagination_showing: 'Exibindo', pagination_of: 'de', pagination_suffix: 'usuários',
+    col_name: 'Nome',
+    col_email: 'E-mail',
+    col_role: 'Perfil',
+    col_created_at: 'Cadastro',
+    col_status: 'Status',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    badge_owner: 'Proprietário',
+    badge_self: 'Você',
+    extra_roles_one: '+:count perfil adicional',
+    extra_roles_other: '+:count perfis adicionais',
+    status_active: 'Ativo',
+    status_inactive: 'Inativo',
+    status_deleted: 'Excluído',
+    btn_edit: 'Editar',
+    btn_restore: 'Restaurar',
+    btn_activate: 'Ativar',
+    btn_deactivate: 'Desativar',
+    btn_delete: 'Excluir',
+    more_actions: 'Mais ações',
+    owner_locked: 'O proprietário da clínica não pode ser alterado nesta tela.',
+    pagination_showing: 'Exibindo',
+    pagination_of: 'de',
+    pagination_suffix: 'usuários',
 };
 
 function user(overrides = {}) {
     return {
-        id: 'u1', name: 'BRUNA', email: 'bruna@clinica.test', rule: 'secretary', rule_label: 'Secretária',
-        roles_count: 2, active: true, deleted: false, mode: 'full', is_owner: false, is_self: false,
-        created_at: '2026-09-27T12:00:00-03:00', photo_url: '/team.png', ...overrides,
+        id: 'u1',
+        name: 'BRUNA',
+        email: 'bruna@clinica.test',
+        rule: 'secretary',
+        rule_label: 'Secretária',
+        roles_count: 2,
+        active: true,
+        deleted: false,
+        mode: 'full',
+        is_owner: false,
+        is_self: false,
+        created_at: '2026-09-27T12:00:00-03:00',
+        photo_url: '/team.png',
+        ...overrides,
     };
 }
 
@@ -84,9 +115,17 @@ describe('Users/UserTable', () => {
     });
 
     it('sem perfis adicionais não mostra o selo; com 1, singular', () => {
-        expect(mountTable([user({ roles_count: 0 })]).findAll('tbody td')[2].text()).toBe('Secretária');
+        expect(
+            mountTable([user({ roles_count: 0 })])
+                .findAll('tbody td')[2]
+                .text(),
+        ).toBe('Secretária');
         wrapper.unmount();
-        expect(mountTable([user({ roles_count: 1 })]).findAll('tbody td')[2].text()).toContain('+1 perfil adicional');
+        expect(
+            mountTable([user({ roles_count: 1 })])
+                .findAll('tbody td')[2]
+                .text(),
+        ).toContain('+1 perfil adicional');
     });
 
     it('usuário comum: Editar + menu com Desativar/Excluir, cada ação emite a linha', async () => {
@@ -158,7 +197,10 @@ describe('Users/UserTable', () => {
     });
 
     it('respeita a ordem de colunas salva no navegador', () => {
-        window.localStorage.setItem('access_users_columns_order', JSON.stringify(['cadastro', 'nome', 'perfil', 'email']));
+        window.localStorage.setItem(
+            'access_users_columns_order',
+            JSON.stringify(['cadastro', 'nome', 'perfil', 'email']),
+        );
         const w = mountTable();
 
         expect(headers(w)).toEqual(['Cadastro', 'Nome', 'Perfil', 'E-mail', 'Status', 'Ações']);

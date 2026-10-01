@@ -13,14 +13,14 @@ import GuestLayout from '@/Layouts/GuestLayout.vue';
  * racional do login: troca de contexto de shell guest-app → panel-app).
  */
 const props = defineProps({
-    appName:     { type: String, default: 'EasyEye' },
+    appName: { type: String, default: 'EasyEye' },
     maskedPhone: { type: String, default: '' },
 });
 
-const code     = ref('');
-const busy     = ref(false);
+const code = ref('');
+const busy = ref(false);
 const feedback = ref('');
-const isError  = ref(false);
+const isError = ref(false);
 
 const logoutForm = useForm({});
 
@@ -33,7 +33,7 @@ async function post(url, body) {
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
             body: body ? JSON.stringify(body) : undefined,
         });
@@ -51,7 +51,9 @@ async function confirm() {
     isError.value = !ok;
     feedback.value = data.message ?? (ok ? 'WhatsApp confirmado.' : 'Código inválido ou expirado.');
     if (ok) {
-        setTimeout(() => { window.location.href = '/panel/dashboard'; }, 900);
+        setTimeout(() => {
+            window.location.href = '/panel/dashboard';
+        }, 900);
     }
 }
 
@@ -69,16 +71,13 @@ function logout() {
 <template>
     <Head title="Confirme seu WhatsApp" />
 
-    <GuestLayout
-        :app-name="appName"
-        title="Confirme seu WhatsApp"
-        subtitle="Último passo antes de entrar"
-    >
-        <p class="text-muted mb-1" style="font-size:.9rem;">
+    <GuestLayout :app-name="appName" title="Confirme seu WhatsApp" subtitle="Último passo antes de entrar">
+        <p class="text-muted mb-1" style="font-size: 0.9rem">
             Enviamos um código de 6 dígitos por WhatsApp para
-            <strong>{{ maskedPhone }}</strong>.
+            <strong>{{ maskedPhone }}</strong
+            >.
         </p>
-        <p class="text-muted mb-4" style="font-size:.9rem;">
+        <p class="text-muted mb-4" style="font-size: 0.9rem">
             Digite o código abaixo para concluir seu cadastro e acessar o sistema.
         </p>
 
@@ -94,19 +93,15 @@ function logout() {
                     inputmode="numeric"
                     maxlength="6"
                     class="form-control form-control-lg text-center fw-semibold"
-                    style="letter-spacing:.5em;"
+                    style="letter-spacing: 0.5em"
                     placeholder="000000"
                     autofocus
                     aria-label="Código de verificação do WhatsApp"
-                >
+                />
             </div>
 
             <div class="d-grid mb-3">
-                <button
-                    type="submit"
-                    class="btn btn-primary fw-semibold"
-                    :disabled="busy || code.length !== 6"
-                >
+                <button type="submit" class="btn btn-primary fw-semibold" :disabled="busy || code.length !== 6">
                     <i v-if="busy" class="ti ti-loader-2 ee-spin me-1"></i>
                     Confirmar
                 </button>
@@ -123,7 +118,7 @@ function logout() {
             <button
                 type="button"
                 class="btn btn-link text-muted"
-                style="font-size:.875rem;"
+                style="font-size: 0.875rem"
                 :disabled="logoutForm.processing"
                 @click="logout"
             >

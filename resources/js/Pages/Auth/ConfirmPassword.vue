@@ -28,9 +28,7 @@ function submit() {
         subtitle="Confirme sua identidade"
         :illustration-src="twostepIllustrationImg"
     >
-        <p class="text-muted mb-4" style="font-size:.9rem;">
-            Por segurança, confirme sua senha antes de continuar.
-        </p>
+        <p class="text-muted mb-4" style="font-size: 0.9rem">Por segurança, confirme sua senha antes de continuar.</p>
 
         <div v-if="form.errors.password" class="alert alert-danger mb-3 py-2">
             {{ form.errors.password }}
@@ -38,7 +36,7 @@ function submit() {
 
         <form @submit.prevent="submit" novalidate>
             <div class="mb-4">
-                <label class="form-label">Senha <span style="color:#ef4444;">*</span></label>
+                <label class="form-label">Senha <span style="color: #ef4444">*</span></label>
                 <div class="input-group">
                     <span class="input-group-text bg-white border-end-0"><i class="ti ti-lock text-muted"></i></span>
                     <input
@@ -49,8 +47,13 @@ function submit() {
                         autocomplete="current-password"
                         autofocus
                         required
+                    />
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary border-start-0"
+                        tabindex="-1"
+                        @click="showPassword = !showPassword"
                     >
-                    <button type="button" class="btn btn-outline-secondary border-start-0" tabindex="-1" @click="showPassword = !showPassword">
                         <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                     </button>
                 </div>

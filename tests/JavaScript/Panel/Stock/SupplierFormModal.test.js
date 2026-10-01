@@ -22,7 +22,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 reset: () => Object.assign(form, initial),
-                clearErrors: () => { form.errors = {}; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
                 post: vi.fn(),
                 put: vi.fn(),
             });
@@ -112,7 +114,12 @@ describe('SupplierFormModal — máscaras', () => {
     it('ao só exibir na edição, o form mantém o valor cru gravado (inclusive legado em texto livre)', async () => {
         // O SupplierRequest compara o phone enviado com o gravado para não
         // reescrever legado que o usuário não tocou — depende deste contrato.
-        const w = await mountModal({ id: '1', name: 'Fornecedor', document: '12345678000199', phone: '(61) 3333-4444 r.21' });
+        const w = await mountModal({
+            id: '1',
+            name: 'Fornecedor',
+            document: '12345678000199',
+            phone: '(61) 3333-4444 r.21',
+        });
 
         expect(w.vm.form.document).toBe('12345678000199');
         expect(w.vm.form.phone).toBe('(61) 3333-4444 r.21');

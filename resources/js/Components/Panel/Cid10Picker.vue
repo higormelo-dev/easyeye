@@ -64,45 +64,45 @@ import { usePage } from '@inertiajs/vue3';
 import { useTrans } from '@/composables/useTrans';
 
 const props = defineProps({
-    modelValue:       { type: Array,   default: () => [] },
-    searchUrl:        { type: String,  required: true },
-    mostUsedUrl:      { type: String,  default: '' },
+    modelValue: { type: Array, default: () => [] },
+    searchUrl: { type: String, required: true },
+    mostUsedUrl: { type: String, default: '' },
     allowCustomEntry: { type: Boolean, default: false },
-    creating:         { type: Boolean, default: false },
-    primaryToggle:    { type: Boolean, default: false },
-    disabled:         { type: Boolean, default: false },
-    multiple:         { type: Boolean, default: true },
-    maxItems:         { type: Number,  default: 20 },
-    placeholder:      { type: String,  default: '' },
-    label:            { type: String,  default: '' },
-    inputId:          { type: String,  default: '' },
-    ariaLabelledby:   { type: String,  default: '' },
-    ariaDescribedby:  { type: String,  default: '' },
-    invalid:          { type: Boolean, default: false },
+    creating: { type: Boolean, default: false },
+    primaryToggle: { type: Boolean, default: false },
+    disabled: { type: Boolean, default: false },
+    multiple: { type: Boolean, default: true },
+    maxItems: { type: Number, default: 20 },
+    placeholder: { type: String, default: '' },
+    label: { type: String, default: '' },
+    inputId: { type: String, default: '' },
+    ariaLabelledby: { type: String, default: '' },
+    ariaDescribedby: { type: String, default: '' },
+    invalid: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue', 'create']);
 
 // Fallback (pt_BR) — o texto do idioma do usuário vem de t_ui.cid10.
 const FALLBACK_TEXT = {
-    placeholder:    'Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…',
-    search_label:   'Buscar diagnóstico (CID-10)',
-    suggestions:    'Sugestões de diagnóstico',
-    most_used:      'Mais usados',
-    custom:         'Customizado',
-    create:         "Cadastrar novo diagnóstico: ':term'",
-    primary:        'Diagnóstico principal',
-    mark_primary:   'Marcar como diagnóstico principal',
+    placeholder: 'Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…',
+    search_label: 'Buscar diagnóstico (CID-10)',
+    suggestions: 'Sugestões de diagnóstico',
+    most_used: 'Mais usados',
+    custom: 'Customizado',
+    create: "Cadastrar novo diagnóstico: ':term'",
+    primary: 'Diagnóstico principal',
+    mark_primary: 'Marcar como diagnóstico principal',
     primary_toggle: 'Diagnóstico principal: :item',
-    remove:         'Remover :item',
-    searching:      'Buscando…',
-    results_one:    ':count resultado',
-    results_other:  ':count resultados',
-    no_results:     'Nenhum diagnóstico encontrado.',
+    remove: 'Remover :item',
+    searching: 'Buscando…',
+    results_one: ':count resultado',
+    results_other: ':count resultados',
+    no_results: 'Nenhum diagnóstico encontrado.',
 };
 
-const page   = usePage();
-const text   = computed(() => ({ ...FALLBACK_TEXT, ...(page?.props?.t_ui?.cid10 ?? {}) }));
+const page = usePage();
+const text = computed(() => ({ ...FALLBACK_TEXT, ...(page?.props?.t_ui?.cid10 ?? {}) }));
 const { tx } = useTrans(() => text.value);
 
 const selected = computed({
@@ -110,23 +110,23 @@ const selected = computed({
     set: (v) => emit('update:modelValue', v),
 });
 
-const query           = ref('');
-const results         = ref([]);
+const query = ref('');
+const results = ref([]);
 const mostUsedResults = ref([]);
 const showingMostUsed = ref(false);
-const open            = ref(false);
-const searching       = ref(false);
+const open = ref(false);
+const searching = ref(false);
 const loadingMostUsed = ref(false);
-const activeIndex     = ref(-1);
+const activeIndex = ref(-1);
 // Busca concluída para o termo atual (para anunciar "nenhum encontrado").
-const searched        = ref(false);
+const searched = ref(false);
 
-const rootRef    = ref(null);
-const uid        = useId();
+const rootRef = ref(null);
+const uid = useId();
 const inputDomId = computed(() => props.inputId || `cid10-${uid}`);
-const listboxId  = computed(() => `${inputDomId.value}-listbox`);
-const createId   = computed(() => `${listboxId.value}-create`);
-const optionId   = (index) => `${listboxId.value}-opt-${index}`;
+const listboxId = computed(() => `${inputDomId.value}-listbox`);
+const createId = computed(() => `${listboxId.value}-create`);
+const optionId = (index) => `${listboxId.value}-opt-${index}`;
 
 function csrf() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -157,9 +157,9 @@ function unwrapList(json) {
 const trimmedQuery = computed(() => (query.value || '').trim());
 
 /** Lista exibida no dropdown: "mais usados" (sem digitação) ou busca. */
-const activeList = computed(() => (
-    trimmedQuery.value.length === 0 && showingMostUsed.value ? mostUsedResults.value : results.value
-));
+const activeList = computed(() =>
+    trimmedQuery.value.length === 0 && showingMostUsed.value ? mostUsedResults.value : results.value,
+);
 
 const hasExactMatch = computed(() => {
     const q = trimmedQuery.value.toLowerCase();
@@ -167,9 +167,9 @@ const hasExactMatch = computed(() => {
     return results.value.some((r) => (r.description || '').toLowerCase() === q || (r.code || '').toLowerCase() === q);
 });
 
-const showCreateRow = computed(() => (
-    props.allowCustomEntry && !props.disabled && trimmedQuery.value.length >= 2 && !hasExactMatch.value
-));
+const showCreateRow = computed(
+    () => props.allowCustomEntry && !props.disabled && trimmedQuery.value.length >= 2 && !hasExactMatch.value,
+);
 
 const showingMostUsedList = computed(() => trimmedQuery.value.length === 0 && showingMostUsed.value);
 
@@ -191,17 +191,17 @@ const statusText = computed(() => {
 });
 
 function closeList() {
-    open.value        = false;
+    open.value = false;
     activeIndex.value = -1;
 }
 
 async function search() {
     showingMostUsed.value = false;
-    searched.value        = false;
+    searched.value = false;
     const q = trimmedQuery.value;
     if (q.length < 2 || !props.searchUrl) {
         results.value = [];
-        open.value    = showCreateRow.value;
+        open.value = showCreateRow.value;
         return;
     }
 
@@ -212,13 +212,13 @@ async function search() {
         });
         if (!res.ok) {
             results.value = [];
-            open.value    = showCreateRow.value;
+            open.value = showCreateRow.value;
             return;
         }
         const list = unwrapList(await res.json());
         results.value = list.filter((c) => !selected.value.some((s) => itemId(s) === itemId(c)));
         activeIndex.value = -1;
-        searched.value    = true;
+        searched.value = true;
         open.value = results.value.length > 0 || showCreateRow.value;
     } catch (e) {
         console.error('CID-10 search error:', e);
@@ -240,8 +240,8 @@ async function onFocus() {
         const list = unwrapList(await res.json());
         mostUsedResults.value = list.filter((c) => !selected.value.some((s) => itemId(s) === itemId(c)));
         showingMostUsed.value = true;
-        activeIndex.value     = -1;
-        open.value            = mostUsedResults.value.length > 0;
+        activeIndex.value = -1;
+        open.value = mostUsedResults.value.length > 0;
     } catch (e) {
         console.error('CID-10 mais usados error:', e);
     } finally {
@@ -289,11 +289,11 @@ function selectItem(item) {
     } else if (selected.value.length < props.maxItems && !selected.value.some((s) => itemId(s) === itemId(item))) {
         selected.value = [...selected.value, buildSelectedItem(item)];
     }
-    query.value            = '';
-    results.value          = [];
-    mostUsedResults.value  = [];
-    showingMostUsed.value  = false;
-    searched.value         = false;
+    query.value = '';
+    results.value = [];
+    mostUsedResults.value = [];
+    showingMostUsed.value = false;
+    searched.value = false;
     closeList();
 }
 
@@ -316,8 +316,8 @@ function togglePrimary(id) {
 function triggerCreate() {
     if (props.disabled || props.creating || !trimmedQuery.value) return;
     emit('create', trimmedQuery.value);
-    query.value    = '';
-    results.value  = [];
+    query.value = '';
+    results.value = [];
     searched.value = false;
     closeList();
 }
@@ -348,9 +348,11 @@ function moveActive(delta) {
                 v-for="item in selected"
                 :key="itemId(item)"
                 class="badge cid-chip d-inline-flex align-items-center gap-1 border"
-                :class="primaryToggle && item.is_primary
-                    ? 'bg-warning-subtle text-warning-emphasis border-warning-subtle'
-                    : 'bg-primary-subtle text-primary-emphasis border-primary-subtle'"
+                :class="
+                    primaryToggle && item.is_primary
+                        ? 'bg-warning-subtle text-warning-emphasis border-warning-subtle'
+                        : 'bg-primary-subtle text-primary-emphasis border-primary-subtle'
+                "
                 data-test="cid-chip"
             >
                 <button
@@ -362,7 +364,13 @@ function moveActive(delta) {
                     :aria-pressed="item.is_primary ? 'true' : 'false'"
                     data-test="cid-primary"
                     @click="togglePrimary(itemId(item))"
-                ><i class="fa" :class="item.is_primary ? 'fa-star text-warning' : 'fa-star-o text-body-secondary'" aria-hidden="true"></i></button>
+                >
+                    <i
+                        class="fa"
+                        :class="item.is_primary ? 'fa-star text-warning' : 'fa-star-o text-body-secondary'"
+                        aria-hidden="true"
+                    ></i>
+                </button>
                 <template v-else-if="primaryToggle && item.is_primary">
                     <i class="fa fa-star text-warning cid-chip__star" :title="text.primary" aria-hidden="true"></i>
                     <span class="visually-hidden">{{ text.primary }}</span>
@@ -381,7 +389,10 @@ function moveActive(delta) {
             </span>
         </div>
 
-        <div v-if="!disabled && (multiple ? selected.length < maxItems : selected.length === 0)" class="position-relative">
+        <div
+            v-if="!disabled && (multiple ? selected.length < maxItems : selected.length === 0)"
+            class="position-relative"
+        >
             <div class="input-group input-group-sm">
                 <input
                     :id="inputDomId"
@@ -406,7 +417,7 @@ function moveActive(delta) {
                     @keydown.arrow-up.prevent="moveActive(-1)"
                     @keydown.enter.prevent="selectActive"
                     @keydown.esc="onEscape"
-                >
+                />
                 <span v-if="searching || loadingMostUsed" class="input-group-text bg-transparent border-start-0 px-2">
                     <span class="spinner-border spinner-border-sm text-secondary cid-spinner" aria-hidden="true"></span>
                 </span>
@@ -419,10 +430,13 @@ function moveActive(delta) {
                 :aria-label="showingMostUsedList ? text.most_used : text.suggestions"
                 class="list-group shadow-sm position-absolute w-100 cid-listbox"
             >
-                <li v-if="showingMostUsedList && activeList.length > 0"
+                <li
+                    v-if="showingMostUsedList && activeList.length > 0"
                     class="list-group-item disabled text-body-secondary fw-semibold py-1 px-2 cid-listbox__heading"
                     aria-hidden="true"
-                >{{ text.most_used }}</li>
+                >
+                    {{ text.most_used }}
+                </li>
 
                 <li
                     v-for="(item, index) in activeList"
@@ -437,7 +451,11 @@ function moveActive(delta) {
                 >
                     <span v-if="item.code" class="fw-semibold me-1">{{ item.code }}</span>
                     <span>{{ item.code ? '– ' : '' }}{{ item.description }}</span>
-                    <span v-if="!item.code" class="badge bg-secondary-subtle text-secondary-emphasis ms-1 cid-listbox__badge">{{ text.custom }}</span>
+                    <span
+                        v-if="!item.code"
+                        class="badge bg-secondary-subtle text-secondary-emphasis ms-1 cid-listbox__badge"
+                        >{{ text.custom }}</span
+                    >
                 </li>
 
                 <li
@@ -452,7 +470,11 @@ function moveActive(delta) {
                     @mouseenter="activeIndex = activeList.length"
                     @mousedown.prevent="triggerCreate"
                 >
-                    <span v-if="creating" class="spinner-border spinner-border-sm me-1 cid-spinner" aria-hidden="true"></span>
+                    <span
+                        v-if="creating"
+                        class="spinner-border spinner-border-sm me-1 cid-spinner"
+                        aria-hidden="true"
+                    ></span>
                     <span v-else aria-hidden="true">+</span>
                     {{ tx('create', { term: trimmedQuery }) }}
                 </li>

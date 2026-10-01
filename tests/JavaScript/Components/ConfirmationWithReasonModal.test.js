@@ -12,7 +12,7 @@ function mountModal(props = {}) {
 describe('ConfirmationWithReasonModal (acessibilidade)', () => {
     it('é um diálogo modal nomeado pelo título e descrito pelo aviso', () => {
         const wrapper = mountModal();
-        const dialog  = wrapper.get('[role="dialog"]');
+        const dialog = wrapper.get('[role="dialog"]');
 
         expect(dialog.attributes('aria-modal')).toBe('true');
         expect(wrapper.get(`#${dialog.attributes('aria-labelledby')}`).text()).toContain('Reabrir caixa');
@@ -21,7 +21,7 @@ describe('ConfirmationWithReasonModal (acessibilidade)', () => {
     });
 
     it('rótulo associado ao campo, obrigatório e descrito pela dica e pelo contador', () => {
-        const wrapper  = mountModal();
+        const wrapper = mountModal();
         const textarea = wrapper.get('textarea');
 
         expect(wrapper.get(`label[for="${textarea.attributes('id')}"]`).exists()).toBe(true);
@@ -44,8 +44,8 @@ describe('ConfirmationWithReasonModal (acessibilidade)', () => {
     });
 
     it('erro do servidor aparece dentro do modal com role=alert e ligado ao campo', () => {
-        const wrapper  = mountModal({ error: 'Sem permissão para reabrir.' });
-        const alert    = wrapper.get('[role="alert"]');
+        const wrapper = mountModal({ error: 'Sem permissão para reabrir.' });
+        const alert = wrapper.get('[role="alert"]');
         const textarea = wrapper.get('textarea');
 
         expect(alert.text()).toContain('Sem permissão para reabrir.');

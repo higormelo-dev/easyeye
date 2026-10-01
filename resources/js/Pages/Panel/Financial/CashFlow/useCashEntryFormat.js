@@ -6,22 +6,22 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat';
  * exclusão do Fluxo de Caixa. Textos vêm de `t` (lang/{locale}/financial_cash_flow.php).
  */
 const TYPE_BADGE = {
-    income:  'badge-soft-success border border-success',
+    income: 'badge-soft-success border border-success',
     expense: 'badge-soft-danger border border-danger',
 };
 
 const STATUS_BADGE = {
-    paid:      'badge-soft-success border border-success',
-    pending:   'badge-soft-warning border border-warning',
+    paid: 'badge-soft-success border border-success',
+    pending: 'badge-soft-warning border border-warning',
     cancelled: 'badge-soft-secondary border border-secondary',
 };
 
 const ORIGIN_ICON = {
     schedule: 'ti ti-calendar-event',
-    claim:    'ti ti-file-invoice',
+    claim: 'ti ti-file-invoice',
     purchase: 'ti ti-shopping-cart',
     doctor_payout: 'ti ti-stethoscope',
-    manual:   'ti ti-pencil',
+    manual: 'ti ti-pencil',
 };
 
 const FALLBACK_BADGE = 'badge-soft-secondary border';
@@ -32,13 +32,13 @@ export function useCashEntryFormat(getT) {
 
     const text = () => getT() ?? {};
 
-    const typeLabel   = (type) => text().types?.[type] ?? type;
+    const typeLabel = (type) => text().types?.[type] ?? type;
     const statusLabel = (status) => text().statuses?.[status] ?? status;
     const originLabel = (origin) => text().origins?.[origin] ?? origin;
 
-    const typeBadge   = (type) => TYPE_BADGE[type] ?? FALLBACK_BADGE;
+    const typeBadge = (type) => TYPE_BADGE[type] ?? FALLBACK_BADGE;
     const statusBadge = (status) => STATUS_BADGE[status] ?? FALLBACK_BADGE;
-    const originIcon  = (origin) => ORIGIN_ICON[origin] ?? ORIGIN_ICON.manual;
+    const originIcon = (origin) => ORIGIN_ICON[origin] ?? ORIGIN_ICON.manual;
 
     /** Receita com "+", despesa com "−": a diferença não depende só da cor. */
     function entryAmount(entry) {

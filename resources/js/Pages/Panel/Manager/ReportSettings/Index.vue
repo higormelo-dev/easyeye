@@ -1,36 +1,39 @@
 <script setup>
 import { ref, watch } from 'vue';
-import { router }               from '@inertiajs/vue3';
-import AppLayout                from '@/Layouts/AppLayout.vue';
-import PageHeader               from '@/Components/Panel/PageHeader.vue';
-import SearchInput              from '@/Components/Panel/SearchInput.vue';
-import SearchSelect             from '@/Components/Panel/SearchSelect.vue';
-import ReportSettingTable       from './ReportSettingTable.vue';
-import ReportSettingCards       from './ReportSettingCards.vue';
-import ReportSettingFormModal   from './ReportSettingFormModal.vue';
+import { router } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import ReportSettingTable from './ReportSettingTable.vue';
+import ReportSettingCards from './ReportSettingCards.vue';
+import ReportSettingFormModal from './ReportSettingFormModal.vue';
 import ReportSettingPreviewModal from './ReportSettingPreviewModal.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
     reportSettings: { type: Object, required: true },
-    total:          { type: Number, default: 0 },
-    categories:     { type: Array,  default: () => [] },
-    statuses:       { type: Array,  default: () => [] },
-    paperSizes:     { type: Array,  default: () => [] },
-    fontFamilies:   { type: Array,  default: () => [] },
-    filters:        { type: Object, default: () => ({}) },
-    cardsUrl:       { type: String, required: true },
-    t:              { type: Object, default: () => ({}) },
+    total: { type: Number, default: 0 },
+    categories: { type: Array, default: () => [] },
+    statuses: { type: Array, default: () => [] },
+    paperSizes: { type: Array, default: () => [] },
+    fontFamilies: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    cardsUrl: { type: String, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 // ── View toggle ───────────────────────────────────────────────────────────────
 const view = ref(localStorage.getItem('mgr_report_settings_view') ?? 'table');
-function setView(v) { view.value = v; localStorage.setItem('mgr_report_settings_view', v); }
+function setView(v) {
+    view.value = v;
+    localStorage.setItem('mgr_report_settings_view', v);
+}
 
 // ── Search + filters ──────────────────────────────────────────────────────────
-const search     = ref(props.filters.search      ?? '');
-const statusFilter   = ref(props.filters.status      ?? '');
+const search = ref(props.filters.search ?? '');
+const statusFilter = ref(props.filters.status ?? '');
 const categoryFilter = ref(props.filters.category_id ?? '');
 let searchTimer = null;
 
@@ -40,11 +43,11 @@ function applyFilters() {
         router.get(
             route('manager.report-settings.index'),
             {
-                search:      search.value,
-                status:      statusFilter.value,
+                search: search.value,
+                status: statusFilter.value,
                 category_id: categoryFilter.value,
-                sort:        props.filters.sort,
-                direction:   props.filters.direction,
+                sort: props.filters.sort,
+                direction: props.filters.direction,
             },
             { preserveState: true, preserveScroll: true, replace: true },
         );
@@ -59,8 +62,8 @@ function onSort({ sort, direction }) {
     router.get(
         route('manager.report-settings.index'),
         {
-            search:      search.value,
-            status:      statusFilter.value,
+            search: search.value,
+            status: statusFilter.value,
             category_id: categoryFilter.value,
             sort,
             direction,
@@ -70,22 +73,42 @@ function onSort({ sort, direction }) {
 }
 
 // ── Form modal ────────────────────────────────────────────────────────────────
-const formOpen  = ref(false);
-const recordId  = ref(null);
+const formOpen = ref(false);
+const recordId = ref(null);
 
-function openCreate() { recordId.value = null; formOpen.value = true; }
-function openEdit(id) { recordId.value = id;   formOpen.value = true; }
-function closeForm()  { formOpen.value = false; recordId.value = null; }
+function openCreate() {
+    recordId.value = null;
+    formOpen.value = true;
+}
+function openEdit(id) {
+    recordId.value = id;
+    formOpen.value = true;
+}
+function closeForm() {
+    formOpen.value = false;
+    recordId.value = null;
+}
 
 // ── Preview modal ─────────────────────────────────────────────────────────────
 const previewOpen = ref(false);
-const previewUrl  = ref(null);
+const previewUrl = ref(null);
 
-function openPreview(r) { previewUrl.value = r.preview_url; previewOpen.value = true; }
-function closePreview() { previewOpen.value = false; previewUrl.value = null; }
+function openPreview(r) {
+    previewUrl.value = r.preview_url;
+    previewOpen.value = true;
+}
+function closePreview() {
+    previewOpen.value = false;
+    previewUrl.value = null;
+}
 
 // ── Confirmação destrutiva com reason (LGPD/CFM) ──────────────────────────────
-const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
 
 // ── Publish ───────────────────────────────────────────────────────────────────
 function onPublish(r) {
@@ -127,7 +150,7 @@ async function postActionWithReason(url, method, reason) {
     const res = await fetch(url, {
         method,
         headers: {
-            'Accept':       'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
         },
@@ -145,13 +168,13 @@ async function postActionWithReason(url, method, reason) {
 
 function showToast(msg, type = 'success') {
     if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
-    if (type === 'error'   && window.showErrorToast)   return window.showErrorToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
     alert(msg);
 }
 
 // ── Breadcrumbs ───────────────────────────────────────────────────────────────
 const breadcrumbs = [
-    { label: props.t.breadcrumb_home    ?? 'Dashboard',           url: route('panel.dashboard'), active: false },
+    { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
     { label: props.t.breadcrumb_current ?? 'Modelos de Documento', url: '#', active: true },
 ];
 </script>
@@ -159,7 +182,6 @@ const breadcrumbs = [
 <template>
     <AppLayout :title="t.page_title" :breadcrumbs="breadcrumbs">
         <div>
-
             <!-- ── Page Header ─────────────────────────────────────────────── -->
             <PageHeader
                 :title="t.page_title"
@@ -179,11 +201,7 @@ const breadcrumbs = [
 
             <!-- ── Search + Filters ────────────────────────────────────────── -->
             <div class="d-flex flex-wrap align-items-start gap-2 mb-3">
-                <SearchInput
-                    v-model="search"
-                    :placeholder="t.search_placeholder"
-                    max-width="320px"
-                />
+                <SearchInput v-model="search" :placeholder="t.search_placeholder" max-width="320px" />
 
                 <SearchSelect
                     v-model="statusFilter"
@@ -192,7 +210,7 @@ const breadcrumbs = [
                     :label-key="'label'"
                     :placeholder="t.all_statuses"
                     sm
-                    style="width:200px;"
+                    style="width: 200px"
                 />
 
                 <SearchSelect
@@ -200,7 +218,7 @@ const breadcrumbs = [
                     :options="categories"
                     :placeholder="t.all_categories"
                     sm
-                    style="width:250px;"
+                    style="width: 250px"
                 />
             </div>
 
@@ -231,7 +249,6 @@ const breadcrumbs = [
                 @archive="onArchive"
                 @delete="onDelete"
             />
-
         </div>
 
         <!-- Form offcanvas -->
@@ -247,12 +264,7 @@ const breadcrumbs = [
         />
 
         <!-- Preview modal -->
-        <ReportSettingPreviewModal
-            :open="previewOpen"
-            :preview-url="previewUrl"
-            :t="t"
-            @close="closePreview"
-        />
+        <ReportSettingPreviewModal :open="previewOpen" :preview-url="previewUrl" :t="t" @close="closePreview" />
 
         <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
         <ConfirmationWithReasonModal
@@ -264,6 +276,5 @@ const breadcrumbs = [
             @close="closeReasonModal"
             @confirm="handleReasonConfirm"
         />
-
     </AppLayout>
 </template>

@@ -26,7 +26,9 @@ describe('PeriodFilter', () => {
 
         expect(wrapper.emitted('update:from').at(-1)).toEqual(['2026-02-01']);
         expect(wrapper.emitted('update:to').at(-1)).toEqual(['2026-02-28']);
-        expect(wrapper.emitted('change').at(-1)).toEqual([{ from: '2026-02-01', to: '2026-02-28', preset: 'last_month' }]);
+        expect(wrapper.emitted('change').at(-1)).toEqual([
+            { from: '2026-02-01', to: '2026-02-28', preset: 'last_month' },
+        ]);
         wrapper.unmount();
     });
 
@@ -50,7 +52,9 @@ describe('PeriodFilter', () => {
         expect(wrapper.get('[data-test="period-from"]').attributes('aria-invalid')).toBe('true');
         expect(wrapper.get('[data-test="period-from"]').attributes('aria-describedby')).toBe(error.attributes('id'));
         expect(wrapper.emitted('change')).toBeUndefined();
-        expect(wrapper.emitted('invalid').at(-1)).toEqual([{ reason: 'invalid_range', from: '2026-03-20', to: '2026-03-10' }]);
+        expect(wrapper.emitted('invalid').at(-1)).toEqual([
+            { reason: 'invalid_range', from: '2026-03-20', to: '2026-03-10' },
+        ]);
         wrapper.unmount();
     });
 
@@ -86,7 +90,7 @@ describe('PeriodFilter', () => {
 
     it('ano sendo digitado (Chrome: change a cada dígito) não aplica nem pisca erro; ao sair do campo vira erro', async () => {
         const wrapper = mountFilter();
-        const from    = wrapper.get('[data-test="period-from"]');
+        const from = wrapper.get('[data-test="period-from"]');
 
         for (const partial of ['0002-03-01', '0020-03-01', '0202-03-01']) {
             await from.setValue(partial);

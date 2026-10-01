@@ -13,29 +13,29 @@ describe('AiAssistantPanel — diff visual', () => {
     const baseAi = {
         urls: {
             estimate: '/_routes/panel.ai-runs.estimate',
-            store:    '/_routes/panel.ai-runs.store',
-            show:     '/_routes/panel.ai-runs.show/__ID__',
-            approve:  '/_routes/panel.ai-runs.approve/__ID__',
-            reject:   '/_routes/panel.ai-runs.reject/__ID__',
-            cancel:   '/_routes/panel.ai-runs.cancel/__ID__',
+            store: '/_routes/panel.ai-runs.store',
+            show: '/_routes/panel.ai-runs.show/__ID__',
+            approve: '/_routes/panel.ai-runs.approve/__ID__',
+            reject: '/_routes/panel.ai-runs.reject/__ID__',
+            cancel: '/_routes/panel.ai-runs.cancel/__ID__',
         },
-        balance:          { available: 50 },
-        modes:            [{ value: 'validated' }],
-        workflows:        ['record_assist'],
+        balance: { available: 50 },
+        modes: [{ value: 'validated' }],
+        workflows: ['record_assist'],
         default_workflow: 'record_assist',
         assistant: {
-            title:     'Assistente de IA',
+            title: 'Assistente de IA',
             show_diff: 'Ver edições',
             hide_diff: 'Ocultar edições',
             no_changes: 'Sem alterações pelo médico.',
-            approve:   'Aprovar',
+            approve: 'Aprovar',
         },
         workflow_labels: { record_assist: 'Análise do prontuário' },
     };
 
     const baseContext = {
-        workflow_default:  'record_assist',
-        patient_id:        'p1',
+        workflow_default: 'record_assist',
+        patient_id: 'p1',
         medical_record_id: 'r1',
     };
 
@@ -44,7 +44,8 @@ describe('AiAssistantPanel — diff visual', () => {
             global: {
                 stubs: {
                     OffcanvasPanel: {
-                        template: '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
+                        template:
+                            '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
                         props: ['open', 'width'],
                     },
                 },
@@ -57,7 +58,7 @@ describe('AiAssistantPanel — diff visual', () => {
         globalThis.window = globalThis.window ?? {};
         globalThis.window.axios = {
             post: vi.fn(() => Promise.resolve({ data: { run_id: 'r-abc' } })),
-            get:  vi.fn(() => Promise.resolve({ data: { data: [] } })),
+            get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
         };
     });
 
@@ -89,9 +90,9 @@ describe('AiAssistantPanel — diff visual', () => {
         const wrapper = mountPanel();
         const vm = wrapper.vm;
         vm.runId = 'r-abc';
-        vm.step  = 'review';
+        vm.step = 'review';
         vm.originalDraft = 'rascunho original';
-        vm.reviewText    = 'texto editado pelo médico';
+        vm.reviewText = 'texto editado pelo médico';
 
         await vm.approve();
         await flushPromises();
@@ -107,9 +108,9 @@ describe('AiAssistantPanel — diff visual', () => {
         const wrapper = mountPanel();
         const vm = wrapper.vm;
         vm.runId = 'r-abc';
-        vm.step  = 'review';
+        vm.step = 'review';
         vm.originalDraft = 'mesmo texto';
-        vm.reviewText    = 'mesmo texto';
+        vm.reviewText = 'mesmo texto';
 
         await vm.approve();
         await flushPromises();

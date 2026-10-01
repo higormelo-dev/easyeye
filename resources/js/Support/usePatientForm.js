@@ -16,50 +16,74 @@ export function usePatientForm(catalogs) {
         // Clínico
         covenant_id: '',
         card_number: '',
-        skin_id:     '',
-        iris_id:     '',
-        active:      true,
+        skin_id: '',
+        iris_id: '',
+        active: true,
         // Pessoal
-        name:              '',
-        nickname:          '',
+        name: '',
+        nickname: '',
         national_registry: '',
-        birth_date:        '',
-        gender:            '',
-        marital_status:    '',
-        email:             '',
-        mother_name:       '',
-        father_name:       '',
-        occupation:        '',
+        birth_date: '',
+        gender: '',
+        marital_status: '',
+        email: '',
+        mother_name: '',
+        father_name: '',
+        occupation: '',
         // Documento
-        state_registry:         '',
-        state_registry_agency:  '',
+        state_registry: '',
+        state_registry_agency: '',
         state_registry_initial: '',
-        state_registry_date:    '',
+        state_registry_date: '',
         // Contato
         telephone: '',
         cellphone: '',
-        whatsapp:  false,
+        whatsapp: false,
         // Endereço
-        zipcode:    '',
-        address:    '',
-        number:     '',
+        zipcode: '',
+        address: '',
+        number: '',
         complement: '',
-        district:   '',
-        city:       '',
-        state:      '',
-        country:    'Brasil',
+        district: '',
+        city: '',
+        state: '',
+        country: 'Brasil',
     });
 
     function resetForm() {
         // defaults() pode ter sido movido por loadEditData — restaura o
         // template vazio antes do reset pra não "resetar" pro último paciente.
         form.defaults({
-            covenant_id: '', card_number: '', skin_id: '', iris_id: '', active: true,
-            name: '', nickname: '', national_registry: '', birth_date: '', gender: '',
-            marital_status: '', email: '', mother_name: '', father_name: '', occupation: '',
-            state_registry: '', state_registry_agency: '', state_registry_initial: '', state_registry_date: '',
-            telephone: '', cellphone: '', whatsapp: false,
-            zipcode: '', address: '', number: '', complement: '', district: '', city: '', state: '', country: 'Brasil',
+            covenant_id: '',
+            card_number: '',
+            skin_id: '',
+            iris_id: '',
+            active: true,
+            name: '',
+            nickname: '',
+            national_registry: '',
+            birth_date: '',
+            gender: '',
+            marital_status: '',
+            email: '',
+            mother_name: '',
+            father_name: '',
+            occupation: '',
+            state_registry: '',
+            state_registry_agency: '',
+            state_registry_initial: '',
+            state_registry_date: '',
+            telephone: '',
+            cellphone: '',
+            whatsapp: false,
+            zipcode: '',
+            address: '',
+            number: '',
+            complement: '',
+            district: '',
+            city: '',
+            state: '',
+            country: 'Brasil',
         });
         form.reset();
         form.clearErrors();
@@ -68,9 +92,9 @@ export function usePatientForm(catalogs) {
     async function loadEditData(id) {
         loading.value = true;
         try {
-            const res  = await fetch(route('panel.patients.editData', id));
+            const res = await fetch(route('panel.patients.editData', id));
             const json = await res.json();
-            const d    = json.data;
+            const d = json.data;
             Object.keys(form.data()).forEach((key) => {
                 if (key in d) form[key] = d[key] ?? form[key];
             });
@@ -85,9 +109,7 @@ export function usePatientForm(catalogs) {
     // Laravel manda {field: [msg, ...]} — os `form.errors.xxx` dos templates
     // esperam string única (formato que o Inertia entrega num post/put padrão).
     function flattenErrors(errors) {
-        return Object.fromEntries(
-            Object.entries(errors).map(([key, val]) => [key, Array.isArray(val) ? val[0] : val]),
-        );
+        return Object.fromEntries(Object.entries(errors).map(([key, val]) => [key, Array.isArray(val) ? val[0] : val]));
     }
 
     /**
@@ -98,7 +120,7 @@ export function usePatientForm(catalogs) {
         form.processing = true;
         form.clearErrors();
 
-        const url    = patientId ? route('panel.patients.update', patientId) : route('panel.patients.store');
+        const url = patientId ? route('panel.patients.update', patientId) : route('panel.patients.store');
         const method = patientId ? 'PUT' : 'POST';
 
         try {
@@ -106,7 +128,7 @@ export function usePatientForm(catalogs) {
                 method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept':       'application/json',
+                    Accept: 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
                 body: JSON.stringify(form.data()),
@@ -117,8 +139,8 @@ export function usePatientForm(catalogs) {
                 return {
                     ok: true,
                     patient: {
-                        id:        json.data?.id ?? patientId,
-                        code:      json.data?.attributes?.code ?? null,
+                        id: json.data?.id ?? patientId,
+                        code: json.data?.attributes?.code ?? null,
                         full_name: form.name,
                         cellphone: form.cellphone,
                         telephone: form.telephone,
@@ -143,14 +165,16 @@ export function usePatientForm(catalogs) {
         if (cep.length !== 8) return;
         try {
             const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-            const d   = await res.json();
+            const d = await res.json();
             if (!d.erro) {
-                form.address  = d.logradouro ?? form.address;
-                form.district = d.bairro     ?? form.district;
-                form.city     = d.localidade ?? form.city;
-                form.state    = d.uf         ?? form.state;
+                form.address = d.logradouro ?? form.address;
+                form.district = d.bairro ?? form.district;
+                form.city = d.localidade ?? form.city;
+                form.state = d.uf ?? form.state;
             }
-        } catch { /**/ }
+        } catch {
+            /**/
+        }
     }
 
     const genderOptions = computed(() =>
@@ -164,16 +188,25 @@ export function usePatientForm(catalogs) {
     );
 
     const tabHasErrors = computed(() => ({
-        personal: Object.keys(form.errors).some(k =>
-            ['name', 'nickname', 'national_registry', 'birth_date', 'gender', 'marital_status', 'email', 'mother_name', 'father_name', 'occupation'].includes(k),
+        personal: Object.keys(form.errors).some((k) =>
+            [
+                'name',
+                'nickname',
+                'national_registry',
+                'birth_date',
+                'gender',
+                'marital_status',
+                'email',
+                'mother_name',
+                'father_name',
+                'occupation',
+            ].includes(k),
         ),
-        clinical: Object.keys(form.errors).some(k =>
+        clinical: Object.keys(form.errors).some((k) =>
             ['covenant_id', 'card_number', 'skin_id', 'iris_id'].includes(k),
         ),
-        contact: Object.keys(form.errors).some(k =>
-            ['telephone', 'cellphone', 'whatsapp'].includes(k),
-        ),
-        address: Object.keys(form.errors).some(k =>
+        contact: Object.keys(form.errors).some((k) => ['telephone', 'cellphone', 'whatsapp'].includes(k)),
+        address: Object.keys(form.errors).some((k) =>
             ['zipcode', 'address', 'number', 'complement', 'district', 'city', 'state', 'country'].includes(k),
         ),
     }));
@@ -183,8 +216,9 @@ export function usePatientForm(catalogs) {
     const isBlank = (v) => v === '' || v === null || v === undefined;
 
     const tabIncomplete = computed(() => ({
-        personal: ['name', 'birth_date', 'gender', 'marital_status', 'national_registry', 'email']
-            .some(k => isBlank(form[k])),
+        personal: ['name', 'birth_date', 'gender', 'marital_status', 'national_registry', 'email'].some((k) =>
+            isBlank(form[k]),
+        ),
         clinical: isBlank(form.covenant_id),
         contact: isBlank(form.cellphone),
         address: false,

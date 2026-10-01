@@ -19,25 +19,25 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
  * do backend, ver StockMovementRequest::withValidator()).
  */
 const props = defineProps({
-    open:          { type: Boolean, required: true },
-    routes:        { type: Object,  required: true }, // { store, scan_barcode }
-    products:      { type: Array,   default: () => [] }, // [{ id, name, code, unit, qty_on_hand, requires_lot }]
-    movementTypes: { type: Array,   default: () => [] }, // [{ value, label, direction }]
-    lotsByProduct: { type: Object,  default: () => ({}) }, // { [productId]: [{ id, lot_number, expiry_date, qty_on_hand, is_expired }] }
+    open: { type: Boolean, required: true },
+    routes: { type: Object, required: true }, // { store, scan_barcode }
+    products: { type: Array, default: () => [] }, // [{ id, name, code, unit, qty_on_hand, requires_lot }]
+    movementTypes: { type: Array, default: () => [] }, // [{ value, label, direction }]
+    lotsByProduct: { type: Object, default: () => ({}) }, // { [productId]: [{ id, lot_number, expiry_date, qty_on_hand, is_expired }] }
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const form = useForm({
-    entity_product_id:   '',
-    type:                 '',
-    quantity:             null,
-    unit_cost:            null,
-    stock_lot_id:         '',
-    new_lot_number:       '',
-    new_lot_expiry_date:  '',
-    note:                 '',
-    occurred_at:          '',
+    entity_product_id: '',
+    type: '',
+    quantity: null,
+    unit_cost: null,
+    stock_lot_id: '',
+    new_lot_number: '',
+    new_lot_expiry_date: '',
+    note: '',
+    occurred_at: '',
 });
 
 // GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de estoque"):
@@ -47,8 +47,8 @@ const form = useForm({
 // código de barras resolve pra 1 produto só); se o produto encontrado não
 // está em `products` (ex.: foi desativado entre a leitura e agora), avisa
 // em vez de selecionar um id que o <select> não reconhece.
-const barcodeInput   = ref('');
-const barcodeError   = ref('');
+const barcodeInput = ref('');
+const barcodeError = ref('');
 const barcodeLoading = ref(false);
 
 async function onBarcodeScanned() {
@@ -88,10 +88,10 @@ async function onBarcodeScanned() {
 // ponderado — ver StockService::registerMovement()); em saída é sempre
 // ignorado pelo backend, então nem mostramos o campo pra não confundir.
 const selectedTypeMeta = computed(() => props.movementTypes.find((t) => t.value === form.type) ?? null);
-const isInbound        = computed(() => selectedTypeMeta.value?.direction === 1);
+const isInbound = computed(() => selectedTypeMeta.value?.direction === 1);
 
 const selectedProduct = computed(() => props.products.find((p) => p.id === form.entity_product_id) ?? null);
-const requiresLot      = computed(() => !!selectedProduct.value?.requires_lot);
+const requiresLot = computed(() => !!selectedProduct.value?.requires_lot);
 
 const availableLots = computed(() => props.lotsByProduct[form.entity_product_id] ?? []);
 
@@ -118,11 +118,14 @@ watch(isInbound, (inbound) => {
 });
 
 // Trocar de produto invalida qualquer lote selecionado do produto anterior.
-watch(() => form.entity_product_id, () => {
-    form.stock_lot_id = '';
-    form.new_lot_number = '';
-    form.new_lot_expiry_date = '';
-});
+watch(
+    () => form.entity_product_id,
+    () => {
+        form.stock_lot_id = '';
+        form.new_lot_number = '';
+        form.new_lot_expiry_date = '';
+    },
+);
 
 function reset() {
     form.reset();
@@ -131,9 +134,12 @@ function reset() {
     barcodeError.value = '';
 }
 
-watch(() => props.open, (val) => {
-    if (val) reset();
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val) reset();
+    },
+);
 
 function submit() {
     form.post(props.routes.store, {
@@ -151,9 +157,7 @@ function close() {
 <template>
     <OffcanvasPanel :open="open" :width="520" @close="close">
         <template #header>
-            <h5 class="mb-0 fw-semibold">
-                <i class="ti ti-transfer-in me-2 text-primary"></i>Nova movimentação
-            </h5>
+            <h5 class="mb-0 fw-semibold"><i class="ti ti-transfer-in me-2 text-primary"></i>Nova movimentação</h5>
         </template>
 
         <form @submit.prevent="submit">
@@ -171,9 +175,9 @@ function close() {
                         class="form-control"
                         placeholder="Escaneie ou digite e aperte Enter"
                         @keyup.enter="onBarcodeScanned"
-                    >
+                    />
                     <span v-if="barcodeLoading" class="input-group-text bg-transparent">
-                        <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                        <span class="spinner-border spinner-border-sm" style="width: 0.8rem; height: 0.8rem"></span>
                     </span>
                 </div>
                 <small v-if="barcodeError" class="text-danger d-block mt-1">{{ barcodeError }}</small>
@@ -191,7 +195,9 @@ function close() {
                         {{ p.name }} ({{ p.code }}) — saldo atual: {{ p.qty_on_hand }}
                     </option>
                 </select>
-                <div v-if="form.errors.entity_product_id" class="invalid-feedback">{{ form.errors.entity_product_id }}</div>
+                <div v-if="form.errors.entity_product_id" class="invalid-feedback">
+                    {{ form.errors.entity_product_id }}
+                </div>
                 <small v-if="selectedProduct" class="text-muted d-block mt-1">
                     Saldo atual: <strong>{{ selectedProduct.qty_on_hand }} {{ selectedProduct.unit }}</strong>
                     <span v-if="requiresLot" class="badge badge-soft-info ms-1">Exige lote</span>
@@ -200,11 +206,7 @@ function close() {
 
             <div class="mb-3">
                 <label class="form-label">Tipo <span class="text-danger">*</span></label>
-                <select
-                    v-model="form.type"
-                    class="form-select"
-                    :class="{ 'is-invalid': form.errors.type }"
-                >
+                <select v-model="form.type" class="form-select" :class="{ 'is-invalid': form.errors.type }">
                     <option value="" disabled>Selecione...</option>
                     <option v-for="t in movementTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
                 </select>
@@ -221,13 +223,17 @@ function close() {
                             class="btn"
                             :class="lotMode === 'existing' ? 'btn-primary' : 'btn-outline-secondary'"
                             @click="lotMode = 'existing'"
-                        >Existente</button>
+                        >
+                            Existente
+                        </button>
                         <button
                             type="button"
                             class="btn"
                             :class="lotMode === 'new' ? 'btn-primary' : 'btn-outline-secondary'"
                             @click="lotMode = 'new'"
-                        >Novo lote</button>
+                        >
+                            Novo lote
+                        </button>
                     </div>
                 </div>
 
@@ -244,7 +250,9 @@ function close() {
                             <template v-if="lot.is_expired"> (VENCIDO)</template>
                         </option>
                     </select>
-                    <div v-if="form.errors.stock_lot_id" class="invalid-feedback d-block">{{ form.errors.stock_lot_id }}</div>
+                    <div v-if="form.errors.stock_lot_id" class="invalid-feedback d-block">
+                        {{ form.errors.stock_lot_id }}
+                    </div>
                     <small v-if="selectedProduct && availableLots.length === 0" class="text-danger d-block mt-1">
                         Nenhum lote com saldo pra este produto.
                     </small>
@@ -260,8 +268,10 @@ function close() {
                                 :class="{ 'is-invalid': form.errors.new_lot_number }"
                                 placeholder="Número do lote"
                                 maxlength="100"
-                            >
-                            <div v-if="form.errors.new_lot_number" class="invalid-feedback">{{ form.errors.new_lot_number }}</div>
+                            />
+                            <div v-if="form.errors.new_lot_number" class="invalid-feedback">
+                                {{ form.errors.new_lot_number }}
+                            </div>
                         </div>
                         <div class="col-5">
                             <input
@@ -270,11 +280,15 @@ function close() {
                                 class="form-control"
                                 :class="{ 'is-invalid': form.errors.new_lot_expiry_date }"
                                 placeholder="Validade"
-                            >
-                            <div v-if="form.errors.new_lot_expiry_date" class="invalid-feedback">{{ form.errors.new_lot_expiry_date }}</div>
+                            />
+                            <div v-if="form.errors.new_lot_expiry_date" class="invalid-feedback">
+                                {{ form.errors.new_lot_expiry_date }}
+                            </div>
                         </div>
                     </div>
-                    <small class="text-muted d-block mt-1">Cadastra o lote automaticamente ao registrar esta entrada.</small>
+                    <small class="text-muted d-block mt-1"
+                        >Cadastra o lote automaticamente ao registrar esta entrada.</small
+                    >
                 </template>
             </div>
 
@@ -288,7 +302,7 @@ function close() {
                         min="0"
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.quantity }"
-                    >
+                    />
                     <div v-if="form.errors.quantity" class="invalid-feedback">{{ form.errors.quantity }}</div>
                 </div>
                 <div v-if="isInbound" class="col-md-6">
@@ -301,7 +315,7 @@ function close() {
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.unit_cost }"
                         placeholder="Recalcula o custo médio"
-                    >
+                    />
                     <div v-if="form.errors.unit_cost" class="invalid-feedback">{{ form.errors.unit_cost }}</div>
                 </div>
             </div>
@@ -313,7 +327,7 @@ function close() {
                     type="datetime-local"
                     class="form-control"
                     :class="{ 'is-invalid': form.errors.occurred_at }"
-                >
+                />
                 <div v-if="form.errors.occurred_at" class="invalid-feedback">{{ form.errors.occurred_at }}</div>
                 <small class="text-muted">Vazio = agora. Só pra registrar um fato retroativo.</small>
             </div>
@@ -332,9 +346,7 @@ function close() {
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="form.processing" @click="close">
-                Cancelar
-            </button>
+            <button type="button" class="btn btn-light" :disabled="form.processing" @click="close">Cancelar</button>
             <button type="button" class="btn btn-primary px-4" :disabled="form.processing" @click="submit">
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                 Registrar

@@ -12,9 +12,7 @@ const props = defineProps({
 });
 
 // `entities` é um mapa { id: name }; SearchSelect espera um array de objetos.
-const entityOptions = computed(() =>
-    Object.entries(props.entities).map(([id, name]) => ({ id, name })),
-);
+const entityOptions = computed(() => Object.entries(props.entities).map(([id, name]) => ({ id, name })));
 
 // Resultado de um convite de clínica (aceito/recusado/indisponível), já traduzido.
 const flash = computed(() => usePage().props.flash ?? {});
@@ -49,7 +47,7 @@ function logout() {
 
         <form @submit.prevent="submit" novalidate>
             <div class="mb-4">
-                <label class="form-label">{{ t.select_entity }} <span style="color:#ef4444;">*</span></label>
+                <label class="form-label">{{ t.select_entity }} <span style="color: #ef4444">*</span></label>
                 <SearchSelect
                     v-model="form.entity_user_id"
                     :options="entityOptions"
@@ -71,7 +69,7 @@ function logout() {
             <button
                 type="button"
                 class="btn btn-link text-muted"
-                style="font-size:.875rem;"
+                style="font-size: 0.875rem"
                 :disabled="logoutForm.processing"
                 @click="logout"
             >

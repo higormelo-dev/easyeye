@@ -12,7 +12,7 @@ export function localeSeparators(locale) {
         const parts = new Intl.NumberFormat(locale).formatToParts(1234567.8);
 
         separatorsCache.set(locale, {
-            group:   parts.find((p) => p.type === 'group')?.value ?? '',
+            group: parts.find((p) => p.type === 'group')?.value ?? '',
             decimal: parts.find((p) => p.type === 'decimal')?.value ?? '.',
         });
     }
@@ -67,10 +67,10 @@ export function parseMoneyInput(text, locale, { allowNegative = false } = {}) {
     let fraction = '';
 
     const decimalAt = raw.lastIndexOf(decimal);
-    const groupAt   = group ? raw.lastIndexOf(group) : -1;
+    const groupAt = group ? raw.lastIndexOf(group) : -1;
 
     if (decimalAt >= 0 && decimalAt > groupAt) {
-        integer  = digitsOnly(raw.slice(0, decimalAt));
+        integer = digitsOnly(raw.slice(0, decimalAt));
         fraction = digitsOnly(raw.slice(decimalAt + 1));
     } else if (groupAt >= 0) {
         const tail = raw.slice(groupAt + 1);
@@ -78,7 +78,7 @@ export function parseMoneyInput(text, locale, { allowNegative = false } = {}) {
         if (/^\d{3}$/.test(tail)) {
             integer = digitsOnly(raw);
         } else {
-            integer  = digitsOnly(raw.slice(0, groupAt));
+            integer = digitsOnly(raw.slice(0, groupAt));
             fraction = digitsOnly(tail);
         }
     } else {

@@ -31,12 +31,12 @@ function submit() {
     <Head title="Criar senha — Portal do Paciente" />
 
     <div class="d-flex align-items-center justify-content-center min-vh-100 bg-light px-3">
-        <div class="card shadow-sm border-0" style="max-width: 440px; width: 100%;">
+        <div class="card shadow-sm border-0" style="max-width: 440px; width: 100%">
             <div class="card-body p-4 p-md-5">
                 <div class="text-center mb-4">
                     <div
                         class="rounded-circle d-inline-flex align-items-center justify-content-center bg-success-subtle text-success mb-3"
-                        style="width:56px;height:56px;"
+                        style="width: 56px; height: 56px"
                     >
                         <i class="ti ti-shield-check fs-4"></i>
                     </div>
@@ -61,8 +61,13 @@ function submit() {
                                 autocomplete="new-password"
                                 autofocus
                                 required
+                            />
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                tabindex="-1"
+                                @click="showPassword = !showPassword"
                             >
-                            <button type="button" class="btn btn-outline-secondary" tabindex="-1" @click="showPassword = !showPassword">
                                 <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                             </button>
                         </div>
@@ -77,8 +82,13 @@ function submit() {
                                 class="form-control"
                                 autocomplete="new-password"
                                 required
+                            />
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                tabindex="-1"
+                                @click="showConfirm = !showConfirm"
                             >
-                            <button type="button" class="btn btn-outline-secondary" tabindex="-1" @click="showConfirm = !showConfirm">
                                 <i :class="showConfirm ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                             </button>
                         </div>

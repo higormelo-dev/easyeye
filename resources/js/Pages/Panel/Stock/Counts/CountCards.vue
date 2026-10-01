@@ -1,8 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useCountFormat } from './useCountFormat.js';
 
 /**
@@ -14,10 +14,10 @@ import { useCountFormat } from './useCountFormat.js';
  * O valor digitado mora no pai (Index) — aqui só exibe e emite `count`.
  */
 const props = defineProps({
-    products: { type: Object, required: true },   // paginator Laravel
-    counted:  { type: Object, default: () => ({}) },
-    deltas:   { type: Object, default: () => ({}) },
-    t:        { type: Object, default: () => ({}) },
+    products: { type: Object, required: true }, // paginator Laravel
+    counted: { type: Object, default: () => ({}) },
+    deltas: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['count']);
@@ -27,9 +27,10 @@ const { quantity, unitLabel, differenceBadge } = useCountFormat(() => props.t);
 const rows = computed(() => props.products?.data ?? []);
 
 // Atalho abre em nova aba (a contagem digitada mora nesta): o título avisa.
-const movementsTitle = computed(() => (
-    `${props.t.action_movements ?? 'Ver movimentações do produto'} (${props.t.opens_new_tab ?? 'abre em nova aba'})`
-));
+const movementsTitle = computed(
+    () =>
+        `${props.t.action_movements ?? 'Ver movimentações do produto'} (${props.t.opens_new_tab ?? 'abre em nova aba'})`,
+);
 
 // Mesmo atalho da tabela: Enter leva ao próximo campo "Contado".
 const gridEl = ref(null);
@@ -62,11 +63,14 @@ function focusNextCount(event) {
                         v-if="differenceBadge(deltas[p.id])"
                         :class="differenceBadge(deltas[p.id]).class"
                         class="flex-shrink-0"
-                    >{{ differenceBadge(deltas[p.id]).text }}</span>
+                        >{{ differenceBadge(deltas[p.id]).text }}</span
+                    >
                 </div>
 
                 <div v-if="p.requires_lot" class="mt-1">
-                    <span class="badge badge-soft-info rounded text-info border border-info fs-11">{{ t.requires_lot ?? 'Exige lote' }}</span>
+                    <span class="badge badge-soft-info rounded text-info border border-info fs-11">{{
+                        t.requires_lot ?? 'Exige lote'
+                    }}</span>
                 </div>
 
                 <dl class="small text-muted mt-2 mb-2">
@@ -80,7 +84,9 @@ function focusNextCount(event) {
                     </div>
                 </dl>
 
-                <label :for="`count-card-${p.id}`" class="form-label small fw-semibold mb-1">{{ t.col_counted ?? 'Contado' }}</label>
+                <label :for="`count-card-${p.id}`" class="form-label small fw-semibold mb-1">{{
+                    t.col_counted ?? 'Contado'
+                }}</label>
                 <input
                     :id="`count-card-${p.id}`"
                     type="number"
@@ -93,9 +99,9 @@ function focusNextCount(event) {
                     :value="counted[p.id] ?? ''"
                     @input="emit('count', p.id, $event.target.value)"
                     @keydown.enter.prevent="focusNextCount"
-                >
+                />
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end">
                     <ActionIconButton

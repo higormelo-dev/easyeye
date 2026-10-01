@@ -14,11 +14,11 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * é criado automaticamente pelo BillingService com esse valor e data.
  */
 const props = defineProps({
-    open:           { type: Boolean, default: false },
-    claim:          { type: Object,  default: null },
-    paymentMethods: { type: Array,   default: () => [] },
-    today:          { type: String,  default: '' },
-    t:              { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    claim: { type: Object, default: null },
+    paymentMethods: { type: Array, default: () => [] },
+    today: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -29,14 +29,14 @@ const { tx } = useTrans(() => props.t);
 const { money, locale } = useLocaleFormat();
 
 const form = useForm({
-    paid_amount:    '',
-    paid_at:        '',
+    paid_amount: '',
+    paid_at: '',
     payment_method: '',
-    notes:          '',
+    notes: '',
 });
 
-const rootRef  = ref(null);
-const symbol   = computed(() => currencySymbol(locale.value));
+const rootRef = ref(null);
+const symbol = computed(() => currencySymbol(locale.value));
 const expected = computed(() => Number(props.claim?.receivable_amount ?? 0));
 const otherErrors = computed(() => generalErrors(form.errors, FIELDS));
 
@@ -50,25 +50,29 @@ const partialDifference = computed(() => {
 // Acima do esperado numa guia glosada = glosa revertida (ex.: recurso aceito):
 // o servidor abate essa parte da glosa (Recebido + Glosado não passa do valor).
 const glosaReversed = computed(() => {
-    const paid  = Number(form.paid_amount);
+    const paid = Number(form.paid_amount);
     const glosa = Number(props.claim?.glosa_amount ?? 0);
     if (!(glosa > 0) || !(paid > expected.value)) return null;
 
     return Math.min(paid - expected.value, glosa);
 });
 
-watch(() => props.open, (open) => {
-    if (!open || !props.claim) return;
+watch(
+    () => props.open,
+    (open) => {
+        if (!open || !props.claim) return;
 
-    form.defaults({
-        paid_amount:    expected.value > 0 ? expected.value : '',
-        paid_at:        props.today,
-        payment_method: props.paymentMethods[0]?.value ?? '',
-        notes:          '',
-    });
-    form.reset();
-    form.clearErrors();
-}, { immediate: true });
+        form.defaults({
+            paid_amount: expected.value > 0 ? expected.value : '',
+            paid_at: props.today,
+            payment_method: props.paymentMethods[0]?.value ?? '',
+            notes: '',
+        });
+        form.reset();
+        form.clearErrors();
+    },
+    { immediate: true },
+);
 
 function requestClose() {
     if (!form.processing) emit('close');
@@ -79,8 +83,8 @@ function submit() {
 
     form.post(props.claim.mark_paid_url, {
         preserveScroll: true,
-        preserveState:  true,
-        onSuccess:      () => emit('saved', props.claim),
+        preserveState: true,
+        onSuccess: () => emit('saved', props.claim),
     });
 }
 
@@ -90,7 +94,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
 <template>
     <CenteredModal :open="open" size="md" @close="requestClose">
         <template #header>
-            <h5 class="mb-0 fw-semibold"><i class="ti ti-cash me-2 text-success" aria-hidden="true"></i>{{ t.receipt_title }}</h5>
+            <h5 class="mb-0 fw-semibold">
+                <i class="ti ti-cash me-2 text-success" aria-hidden="true"></i>{{ t.receipt_title }}
+            </h5>
         </template>
 
         <form v-if="claim" ref="rootRef" novalidate @submit.prevent="submit">
@@ -112,7 +118,13 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 </dl>
             </div>
 
-            <div v-for="message in otherErrors" :key="message" class="alert alert-danger small py-2" role="alert" data-test="receipt-error">
+            <div
+                v-for="message in otherErrors"
+                :key="message"
+                class="alert alert-danger small py-2"
+                role="alert"
+                data-test="receipt-error"
+            >
                 {{ message }}
             </div>
 
@@ -137,15 +149,25 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                             :class="{ 'is-invalid': form.errors.paid_amount }"
                             :aria-invalid="form.errors.paid_amount ? 'true' : 'false'"
                             aria-describedby="billing-receipt-amount-hint"
-                        >
+                        />
                         <div v-if="form.errors.paid_amount" class="invalid-feedback">{{ form.errors.paid_amount }}</div>
                     </div>
                     <small id="billing-receipt-amount-hint" class="form-text">{{ t.receipt_paid_amount_hint }}</small>
-                    <small v-if="partialDifference !== null" class="d-block text-warning-emphasis mt-1" data-test="receipt-partial">
-                        <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ tx('receipt_partial_hint', { difference: money(partialDifference) }) }}
+                    <small
+                        v-if="partialDifference !== null"
+                        class="d-block text-warning-emphasis mt-1"
+                        data-test="receipt-partial"
+                    >
+                        <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                        >{{ tx('receipt_partial_hint', { difference: money(partialDifference) }) }}
                     </small>
-                    <small v-if="glosaReversed !== null" class="d-block text-info-emphasis mt-1" data-test="receipt-glosa-reversed">
-                        <i class="ti ti-arrow-back-up me-1" aria-hidden="true"></i>{{ tx('receipt_glosa_reversed_hint', { amount: money(glosaReversed) }) }}
+                    <small
+                        v-if="glosaReversed !== null"
+                        class="d-block text-info-emphasis mt-1"
+                        data-test="receipt-glosa-reversed"
+                    >
+                        <i class="ti ti-arrow-back-up me-1" aria-hidden="true"></i
+                        >{{ tx('receipt_glosa_reversed_hint', { amount: money(glosaReversed) }) }}
                     </small>
                 </div>
                 <div class="col-12 col-sm-6">
@@ -162,7 +184,7 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.paid_at }"
                         :aria-invalid="form.errors.paid_at ? 'true' : 'false'"
-                    >
+                    />
                     <div v-if="form.errors.paid_at" class="invalid-feedback">{{ form.errors.paid_at }}</div>
                 </div>
                 <div class="col-12">
@@ -175,7 +197,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     >
                         <option v-for="m in paymentMethods" :key="m.value" :value="m.value">{{ m.label }}</option>
                     </select>
-                    <div v-if="form.errors.payment_method" class="invalid-feedback">{{ form.errors.payment_method }}</div>
+                    <div v-if="form.errors.payment_method" class="invalid-feedback">
+                        {{ form.errors.payment_method }}
+                    </div>
                 </div>
                 <div class="col-12">
                     <label for="billing-receipt-notes" class="form-label">{{ t.receipt_notes }}</label>
@@ -197,8 +221,16 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">{{ t.btn_cancel }}</button>
-            <button type="button" class="btn btn-success" data-test="confirm-receipt" :disabled="form.processing" @click="submit">
+            <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">
+                {{ t.btn_cancel }}
+            </button>
+            <button
+                type="button"
+                class="btn btn-success"
+                data-test="confirm-receipt"
+                :disabled="form.processing"
+                @click="submit"
+            >
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                 {{ form.processing ? t.processing : t.btn_confirm_receipt }}
             </button>

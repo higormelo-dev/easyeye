@@ -18,79 +18,81 @@ import { usePage } from '@inertiajs/vue3';
  *   loadingLabel – texto do spinner
  */
 const props = defineProps({
-    open:         { type: Boolean, required: true },
-    size:         { type: String,  default: 'lg' },
-    loading:      { type: Boolean, default: false },
-    loadingLabel: { type: String,  default: '' },
+    open: { type: Boolean, required: true },
+    size: { type: String, default: 'lg' },
+    loading: { type: Boolean, default: false },
+    loadingLabel: { type: String, default: '' },
     /** Rótulo acessível do botão fechar; padrão: `t_ui.close` (idioma do usuário). */
-    closeLabel:   { type: String,  default: '' },
+    closeLabel: { type: String, default: '' },
 });
 
 defineEmits(['close']);
 
 // Acessibilidade: o diálogo é nomeado pelo conteúdo do #header (título) e o
 // botão fechar tem rótulo no idioma do usuário (t_ui compartilhado).
-const page    = usePage();
+const page = usePage();
 const titleId = `ee-modal-title-${useId()}`;
 
-const closeText   = computed(() => props.closeLabel || page?.props?.t_ui?.close || 'Fechar');
+const closeText = computed(() => props.closeLabel || page?.props?.t_ui?.close || 'Fechar');
 
 // Foco: ao fechar, volta para quem abriu (botão/linha) — sem isso ia para o
 // <body> e o teclado recomeçava do topo. Só devolve se o foco ficou perdido: a
 // página pode ter movido o foco de propósito (ex.: abrir outro modal).
 let returnFocusTo = null;
 
-watch(() => props.open, (isOpen, wasOpen) => {
-    if (isOpen && !wasOpen) {
-        returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+watch(
+    () => props.open,
+    (isOpen, wasOpen) => {
+        if (isOpen && !wasOpen) {
+            returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-        return;
-    }
+            return;
+        }
 
-    if (!isOpen && wasOpen) {
-        const target = returnFocusTo;
-        returnFocusTo = null;
+        if (!isOpen && wasOpen) {
+            const target = returnFocusTo;
+            returnFocusTo = null;
 
-        nextTick(() => {
-            const active = document.activeElement;
-            if (target?.isConnected && (!active || active === document.body)) target.focus({ preventScroll: true });
-        });
-    }
-});
+            nextTick(() => {
+                const active = document.activeElement;
+                if (target?.isConnected && (!active || active === document.body)) target.focus({ preventScroll: true });
+            });
+        }
+    },
+);
 const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.loading || 'Carregando...');
 </script>
 
 <template>
     <Teleport to="body">
-
         <!-- Backdrop -->
         <transition name="ee-fade">
-            <div v-if="open"
-                 class="ee-modal__backdrop"
-                 @click="$emit('close')" />
+            <div v-if="open" class="ee-modal__backdrop" @click="$emit('close')" />
         </transition>
 
         <!-- Dialog wrapper -->
         <transition name="ee-modal-scale">
-            <div v-if="open"
-                 class="ee-modal__wrap"
-                 role="dialog"
-                 aria-modal="true"
-                 :aria-labelledby="$slots.header ? titleId : undefined"
-                 @click.self="$emit('close')">
-
+            <div
+                v-if="open"
+                class="ee-modal__wrap"
+                role="dialog"
+                aria-modal="true"
+                :aria-labelledby="$slots.header ? titleId : undefined"
+                @click.self="$emit('close')"
+            >
                 <div class="ee-modal__dialog" :class="`ee-modal--${size}`">
-
                     <!-- Header -->
                     <div class="ee-modal__header">
                         <div :id="titleId" class="ee-modal__header-content">
                             <slot name="header" />
                         </div>
-                        <button type="button"
-                                class="btn-close flex-shrink-0"
-                                :aria-label="closeText"
-                                :title="closeText"
-                                @click="$emit('close')" />
+                        <button
+                            type="button"
+                            class="btn-close flex-shrink-0"
+                            :aria-label="closeText"
+                            :title="closeText"
+                            @click="$emit('close')"
+                        />
                     </div>
 
                     <!-- Optional tabs bar -->
@@ -114,11 +116,9 @@ const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.load
                             <slot name="footer" />
                         </div>
                     </template>
-
                 </div>
             </div>
         </transition>
-
     </Teleport>
 </template>
 
@@ -127,7 +127,7 @@ const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.load
 .ee-modal__backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .45);
+    background: rgba(0, 0, 0, 0.45);
     z-index: 1054;
 }
 
@@ -146,8 +146,8 @@ const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.load
 /* ── Dialog box ───────────────────────────────────────────────────────── */
 .ee-modal__dialog {
     background: #fff;
-    border-radius: .5rem;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, .22);
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.22);
     display: flex;
     flex-direction: column;
     max-height: calc(100dvh - 2rem);
@@ -155,14 +155,22 @@ const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.load
     pointer-events: all;
 }
 
-.ee-modal--sm { max-width: 400px; }
-.ee-modal--md { max-width: 540px; }
-.ee-modal--lg { max-width: 660px; }
-.ee-modal--xl { max-width: 900px; }
+.ee-modal--sm {
+    max-width: 400px;
+}
+.ee-modal--md {
+    max-width: 540px;
+}
+.ee-modal--lg {
+    max-width: 660px;
+}
+.ee-modal--xl {
+    max-width: 900px;
+}
 
-:root[data-bs-theme=dark] .ee-modal__dialog {
+:root[data-bs-theme='dark'] .ee-modal__dialog {
     background: #0f1729;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, .5);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Header ───────────────────────────────────────────────────────────── */
@@ -173,7 +181,7 @@ const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.load
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--bs-border-color, #dee2e6);
     flex-shrink: 0;
-    gap: .75rem;
+    gap: 0.75rem;
 }
 
 .ee-modal__header-content {
@@ -184,13 +192,13 @@ const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.load
 /* ── Tabs bar ─────────────────────────────────────────────────────────── */
 .ee-modal__tabs {
     flex-shrink: 0;
-    padding: .75rem 1rem 0;
+    padding: 0.75rem 1rem 0;
 }
 
 .ee-modal__tabs :deep(.nav-link) {
-    font-size: .8125rem;
-    padding: .5rem .75rem;
-    border-radius: .375rem .375rem 0 0;
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem 0.375rem 0 0;
     color: var(--bs-body-color);
 }
 
@@ -205,36 +213,47 @@ const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.load
 .ee-modal__footer {
     display: flex;
     justify-content: flex-end;
-    gap: .75rem;
-    padding: .875rem 1.25rem;
+    gap: 0.75rem;
+    padding: 0.875rem 1.25rem;
     border-top: 1px solid var(--bs-border-color, #dee2e6);
     flex-shrink: 0;
     background: #fff;
 }
 
-:root[data-bs-theme=dark] .ee-modal__footer {
+:root[data-bs-theme='dark'] .ee-modal__footer {
     background: #0f1729;
 }
 
 /* ── Transitions ──────────────────────────────────────────────────────── */
 .ee-fade-enter-active,
-.ee-fade-leave-active  { transition: opacity .2s ease; }
+.ee-fade-leave-active {
+    transition: opacity 0.2s ease;
+}
 .ee-fade-enter-from,
-.ee-fade-leave-to      { opacity: 0; }
+.ee-fade-leave-to {
+    opacity: 0;
+}
 
 .ee-modal-scale-enter-active,
-.ee-modal-scale-leave-active { transition: opacity .2s ease, transform .2s cubic-bezier(.4, 0, .2, 1); }
+.ee-modal-scale-leave-active {
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
 .ee-modal-scale-enter-from,
-.ee-modal-scale-leave-to     { opacity: 0; transform: scale(.95); }
+.ee-modal-scale-leave-to {
+    opacity: 0;
+    transform: scale(0.95);
+}
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
     .ee-modal__dialog {
-        max-height: calc(100dvh - .5rem);
-        border-radius: .375rem;
+        max-height: calc(100dvh - 0.5rem);
+        border-radius: 0.375rem;
     }
     .ee-modal__wrap {
-        padding: .25rem;
+        padding: 0.25rem;
         align-items: flex-end;
     }
 }

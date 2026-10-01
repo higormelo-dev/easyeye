@@ -18,19 +18,20 @@ function mockEntity(overrides = {}) {
     globalThis.fetch = vi.fn(() =>
         Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({
-                data: {
-                    id: 'ent-1',
-                    code: 'ENT-0000000002',
-                    name: 'CLINICA TESTE',
-                    active: true,
-                    telephone: '6133334444',
-                    cellphone: '61999998888',
-                    national_registration: '11222333000181',
-                    zipcode: '01310100',
-                    ...overrides,
-                },
-            }),
+            json: () =>
+                Promise.resolve({
+                    data: {
+                        id: 'ent-1',
+                        code: 'ENT-0000000002',
+                        name: 'CLINICA TESTE',
+                        active: true,
+                        telephone: '6133334444',
+                        cellphone: '61999998888',
+                        national_registration: '11222333000181',
+                        zipcode: '01310100',
+                        ...overrides,
+                    },
+                }),
         }),
     );
 }

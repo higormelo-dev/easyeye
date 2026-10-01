@@ -27,17 +27,21 @@ import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue';
  *     broadcast Redis + Echo. Hoje não há.
  */
 const props = defineProps({
-    show:      { type: Boolean, required: true },
-    storeUrl:  { type: String,  required: true },
-    storage:   { type: Object,  required: true },
-    csrfToken: { type: String,  required: true },
+    show: { type: Boolean, required: true },
+    storeUrl: { type: String, required: true },
+    storage: { type: Object, required: true },
+    csrfToken: { type: String, required: true },
 });
 
 const emit = defineEmits(['close', 'uploaded', 'storage-updated']);
 
 // Estado local da cota — sincronizado com prop, mas atualizado após cada upload
 const quota = reactive({ ...props.storage });
-watch(() => props.storage, (v) => Object.assign(quota, v), { deep: true });
+watch(
+    () => props.storage,
+    (v) => Object.assign(quota, v),
+    { deep: true },
+);
 
 // Lista de itens (cada arquivo selecionado vira um item com estado próprio)
 // Status: 'pending' | 'uploading' | 'success' | 'error' | 'cancelled'
@@ -45,9 +49,7 @@ const items = ref([]);
 
 const dragging = ref(false);
 
-const isFull = computed(() =>
-    !quota.is_unlimited && quota.remaining_bytes !== null && quota.remaining_bytes <= 0
-);
+const isFull = computed(() => !quota.is_unlimited && quota.remaining_bytes !== null && quota.remaining_bytes <= 0);
 
 const quotaColor = computed(() => {
     if (quota.is_unlimited) return 'bg-success';
@@ -63,21 +65,21 @@ const quotaLabel = computed(() => {
     return `${formatBytes(quota.used_bytes)} de ${formatBytes(quota.limit_bytes)} usados`;
 });
 
-const hasActive = computed(() => items.value.some(i => i.status === 'uploading'));
-const allDone = computed(() =>
-    items.value.length > 0 &&
-    items.value.every(i => ['success', 'error', 'cancelled'].includes(i.status))
+const hasActive = computed(() => items.value.some((i) => i.status === 'uploading'));
+const allDone = computed(
+    () => items.value.length > 0 && items.value.every((i) => ['success', 'error', 'cancelled'].includes(i.status)),
 );
 const pendingBytes = computed(() =>
-    items.value
-        .filter(i => i.status === 'pending')
-        .reduce((sum, i) => sum + i.size, 0)
+    items.value.filter((i) => i.status === 'pending').reduce((sum, i) => sum + i.size, 0),
 );
 
 // ──────────────────────────────────────────────────────────────────────────
 // Drag & drop
 // ──────────────────────────────────────────────────────────────────────────
-function onDragOver(e) { e.preventDefault(); dragging.value = true; }
+function onDragOver(e) {
+    e.preventDefault();
+    dragging.value = true;
+}
 function onDragLeave(e) {
     // Só desliga quando sai realmente da zona (não dos filhos)
     if (e.currentTarget.contains(e.relatedTarget)) return;
@@ -99,38 +101,39 @@ function onPickerChange(e) {
 function addFiles(fileList) {
     if (!fileList?.length) return;
 
-    const remainingSlots = quota.max_files_per_batch - items.value.filter(
-        i => ['pending', 'uploading'].includes(i.status)
-    ).length;
+    const remainingSlots =
+        quota.max_files_per_batch - items.value.filter((i) => ['pending', 'uploading'].includes(i.status)).length;
 
-    Array.from(fileList).slice(0, remainingSlots).forEach((file) => {
-        const item = reactive({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-            file,
-            name: file.name,
-            size: file.size,
-            mime: file.type || guessMimeFromName(file.name),
-            ext: extOf(file.name),
-            isImage: /^image\//.test(file.type),
-            previewUrl: /^image\//.test(file.type) ? URL.createObjectURL(file) : null,
-            status: 'pending',
-            progress: 0,
-            error: null,
-            xhr: null,
+    Array.from(fileList)
+        .slice(0, remainingSlots)
+        .forEach((file) => {
+            const item = reactive({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                file,
+                name: file.name,
+                size: file.size,
+                mime: file.type || guessMimeFromName(file.name),
+                ext: extOf(file.name),
+                isImage: /^image\//.test(file.type),
+                previewUrl: /^image\//.test(file.type) ? URL.createObjectURL(file) : null,
+                status: 'pending',
+                progress: 0,
+                error: null,
+                xhr: null,
+            });
+
+            const validation = validateItem(item);
+            if (validation) {
+                item.status = 'error';
+                item.error = validation;
+            }
+
+            items.value.push(item);
         });
-
-        const validation = validateItem(item);
-        if (validation) {
-            item.status = 'error';
-            item.error = validation;
-        }
-
-        items.value.push(item);
-    });
 }
 
 function removeItem(id) {
-    const idx = items.value.findIndex(i => i.id === id);
+    const idx = items.value.findIndex((i) => i.id === id);
     if (idx === -1) return;
     const item = items.value[idx];
     if (item.status === 'uploading') item.xhr?.abort();
@@ -139,7 +142,7 @@ function removeItem(id) {
 }
 
 function cancelItem(id) {
-    const item = items.value.find(i => i.id === id);
+    const item = items.value.find((i) => i.id === id);
     if (item?.status === 'uploading') {
         item.xhr?.abort();
         item.status = 'cancelled';
@@ -148,13 +151,17 @@ function cancelItem(id) {
 }
 
 function retryItem(id) {
-    const item = items.value.find(i => i.id === id);
+    const item = items.value.find((i) => i.id === id);
     if (!item) return;
     item.error = null;
     item.progress = 0;
     item.status = 'pending';
     const validation = validateItem(item);
-    if (validation) { item.status = 'error'; item.error = validation; return; }
+    if (validation) {
+        item.status = 'error';
+        item.error = validation;
+        return;
+    }
     uploadItem(item);
 }
 
@@ -181,7 +188,7 @@ function validateItem(item) {
 // Upload (XHR com progress por arquivo — paralelizado)
 // ──────────────────────────────────────────────────────────────────────────
 function uploadAll() {
-    const pending = items.value.filter(i => i.status === 'pending');
+    const pending = items.value.filter((i) => i.status === 'pending');
     if (!pending.length) return;
 
     // Pré-check de cota agregada (anti-burst): soma todos os pendentes
@@ -229,7 +236,7 @@ function uploadItem(item) {
                 }
                 // Emite arquivo salvo (controller retorna array `files`)
                 if (Array.isArray(data.files)) {
-                    data.files.forEach(f => emit('uploaded', f));
+                    data.files.forEach((f) => emit('uploaded', f));
                 }
             } catch (err) {
                 item.status = 'error';
@@ -283,8 +290,12 @@ function extOf(name) {
 function guessMimeFromName(name) {
     const e = extOf(name);
     const map = {
-        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-        gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        pdf: 'application/pdf',
         doc: 'application/msword',
         docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
@@ -292,23 +303,27 @@ function guessMimeFromName(name) {
 }
 
 function statusLabel(s) {
-    return {
-        pending:   'Aguardando',
-        uploading: 'Enviando…',
-        success:   'Concluído',
-        error:     'Erro',
-        cancelled: 'Cancelado',
-    }[s] ?? s;
+    return (
+        {
+            pending: 'Aguardando',
+            uploading: 'Enviando…',
+            success: 'Concluído',
+            error: 'Erro',
+            cancelled: 'Cancelado',
+        }[s] ?? s
+    );
 }
 
 function statusClass(s) {
-    return {
-        pending:   'text-muted',
-        uploading: 'text-info',
-        success:   'text-success',
-        error:     'text-danger',
-        cancelled: 'text-warning',
-    }[s] ?? '';
+    return (
+        {
+            pending: 'text-muted',
+            uploading: 'text-info',
+            success: 'text-success',
+            error: 'text-danger',
+            cancelled: 'text-warning',
+        }[s] ?? ''
+    );
 }
 
 function iconFor(item) {
@@ -329,37 +344,52 @@ function iconFor(item) {
 function close() {
     if (hasActive.value) {
         if (!confirm('Há uploads em andamento. Cancelar e fechar?')) return;
-        items.value.forEach((i) => { if (i.status === 'uploading') i.xhr?.abort(); });
+        items.value.forEach((i) => {
+            if (i.status === 'uploading') i.xhr?.abort();
+        });
     }
     cleanup();
     emit('close');
 }
 
 function cleanup() {
-    items.value.forEach((i) => { if (i.previewUrl) URL.revokeObjectURL(i.previewUrl); });
+    items.value.forEach((i) => {
+        if (i.previewUrl) URL.revokeObjectURL(i.previewUrl);
+    });
     items.value = [];
     dragging.value = false;
 }
 
 // Limpa previews quando o componente é destruído
 onBeforeUnmount(() => {
-    items.value.forEach((i) => { if (i.previewUrl) URL.revokeObjectURL(i.previewUrl); });
+    items.value.forEach((i) => {
+        if (i.previewUrl) URL.revokeObjectURL(i.previewUrl);
+    });
 });
 
 // Reset ao reabrir
-watch(() => props.show, (v) => { if (v) cleanup(); });
+watch(
+    () => props.show,
+    (v) => {
+        if (v) cleanup();
+    },
+);
 </script>
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="modal fade show d-block" tabindex="-1"
-             style="background: rgba(0, 0, 0, .5);"
-             @click.self="close">
+        <div
+            v-if="show"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="close"
+        >
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
                         <h6 class="modal-title">
-                            <i class="fas fa-paperclip me-2" style="color: #607d8b;"></i>
+                            <i class="fas fa-paperclip me-2" style="color: #607d8b"></i>
                             Anexar arquivos ao prontuário
                         </h6>
                         <button type="button" class="btn-close" @click="close"></button>
@@ -377,18 +407,22 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
                                     {{ quotaLabel }}
                                 </span>
                             </div>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar"
-                                     :class="quotaColor"
-                                     :style="`width: ${quota.is_unlimited ? 0 : quota.percent}%`"
-                                     role="progressbar"
-                                     :aria-valuenow="quota.percent"
-                                     aria-valuemin="0"
-                                     aria-valuemax="100"></div>
+                            <div class="progress" style="height: 6px">
+                                <div
+                                    class="progress-bar"
+                                    :class="quotaColor"
+                                    :style="`width: ${quota.is_unlimited ? 0 : quota.percent}%`"
+                                    role="progressbar"
+                                    :aria-valuenow="quota.percent"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                ></div>
                             </div>
-                            <div v-if="quota.percent >= 80 && !quota.is_unlimited"
-                                 class="small mt-1"
-                                 :class="quota.percent >= 95 ? 'text-danger' : 'text-warning'">
+                            <div
+                                v-if="quota.percent >= 80 && !quota.is_unlimited"
+                                class="small mt-1"
+                                :class="quota.percent >= 95 ? 'text-danger' : 'text-warning'"
+                            >
                                 <i class="fas fa-exclamation-triangle me-1"></i>
                                 <template v-if="quota.percent >= 95">
                                     Armazenamento quase esgotado — considere adquirir um pacote adicional.
@@ -400,39 +434,41 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
                         </div>
 
                         <!-- Zona drag-drop -->
-                        <div class="upload-dropzone"
-                             :class="{ 'is-dragging': dragging, 'is-disabled': isFull }"
-                             @dragover="onDragOver"
-                             @dragleave="onDragLeave"
-                             @drop="onDrop">
-                            <input type="file"
-                                   id="upload-picker"
-                                   multiple
-                                   :accept="quota.accept"
-                                   :disabled="isFull"
-                                   class="d-none"
-                                   @change="onPickerChange">
+                        <div
+                            class="upload-dropzone"
+                            :class="{ 'is-dragging': dragging, 'is-disabled': isFull }"
+                            @dragover="onDragOver"
+                            @dragleave="onDragLeave"
+                            @drop="onDrop"
+                        >
+                            <input
+                                type="file"
+                                id="upload-picker"
+                                multiple
+                                :accept="quota.accept"
+                                :disabled="isFull"
+                                class="d-none"
+                                @change="onPickerChange"
+                            />
                             <div class="upload-dropzone-inner">
                                 <i class="fas fa-cloud-upload-alt upload-dropzone-icon"></i>
                                 <p class="mb-1 fw-semibold">
-                                    <template v-if="isFull">
-                                        Cota esgotada
-                                    </template>
-                                    <template v-else>
-                                        Arraste arquivos aqui
-                                    </template>
+                                    <template v-if="isFull"> Cota esgotada </template>
+                                    <template v-else> Arraste arquivos aqui </template>
                                 </p>
                                 <p class="text-muted small mb-2">
                                     ou
-                                    <label for="upload-picker"
-                                           class="text-primary"
-                                           style="cursor: pointer; text-decoration: underline;">
+                                    <label
+                                        for="upload-picker"
+                                        class="text-primary"
+                                        style="cursor: pointer; text-decoration: underline"
+                                    >
                                         clique para selecionar
                                     </label>
                                 </p>
                                 <p class="text-muted small mb-0">
-                                    Até {{ quota.max_files_per_batch }} arquivos por envio,
-                                    máx. {{ formatBytes(quota.max_file_size_bytes) }} cada<br>
+                                    Até {{ quota.max_files_per_batch }} arquivos por envio, máx.
+                                    {{ formatBytes(quota.max_file_size_bytes) }} cada<br />
                                     Aceitos: JPG, PNG, GIF, WEBP, PDF, DOC, DOCX
                                 </p>
                             </div>
@@ -440,15 +476,13 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
 
                         <!-- Lista de itens -->
                         <div v-if="items.length > 0" class="upload-items mt-3">
-                            <div v-for="item in items"
-                                 :key="item.id"
-                                 class="upload-item"
-                                 :class="`is-${item.status}`">
-
+                            <div v-for="item in items" :key="item.id" class="upload-item" :class="`is-${item.status}`">
                                 <div class="upload-item-thumb">
-                                    <img v-if="item.isImage && item.previewUrl"
-                                         :src="item.previewUrl"
-                                         :alt="item.name">
+                                    <img
+                                        v-if="item.isImage && item.previewUrl"
+                                        :src="item.previewUrl"
+                                        :alt="item.name"
+                                    />
                                     <i v-else :class="iconFor(item)"></i>
                                 </div>
 
@@ -460,23 +494,28 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
                                         </span>
                                     </div>
 
-                                    <div class="progress mt-1" style="height: 4px;">
-                                        <div class="progress-bar"
-                                             :class="{
+                                    <div class="progress mt-1" style="height: 4px">
+                                        <div
+                                            class="progress-bar"
+                                            :class="{
                                                 'bg-info': item.status === 'uploading',
                                                 'bg-success': item.status === 'success',
                                                 'bg-danger': item.status === 'error',
                                                 'bg-warning': item.status === 'cancelled',
                                                 'bg-secondary': item.status === 'pending',
-                                             }"
-                                             :style="`width: ${item.status === 'pending' ? 0 : item.progress}%`"></div>
+                                            }"
+                                            :style="`width: ${item.status === 'pending' ? 0 : item.progress}%`"
+                                        ></div>
                                     </div>
 
                                     <div class="d-flex justify-content-between align-items-center mt-1">
                                         <span class="small" :class="statusClass(item.status)">
                                             <i v-if="item.status === 'success'" class="fas fa-check-circle me-1"></i>
                                             <i v-else-if="item.status === 'error'" class="fas fa-times-circle me-1"></i>
-                                            <i v-else-if="item.status === 'uploading'" class="fas fa-spinner fa-spin me-1"></i>
+                                            <i
+                                                v-else-if="item.status === 'uploading'"
+                                                class="fas fa-spinner fa-spin me-1"
+                                            ></i>
                                             <i v-else-if="item.status === 'cancelled'" class="fas fa-ban me-1"></i>
                                             {{ statusLabel(item.status) }}
                                             <template v-if="item.status === 'uploading'">
@@ -490,25 +529,31 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
                                 </div>
 
                                 <div class="upload-item-actions">
-                                    <button v-if="item.status === 'uploading'"
-                                            type="button"
-                                            class="btn btn-sm btn-link text-warning"
-                                            title="Cancelar"
-                                            @click="cancelItem(item.id)">
+                                    <button
+                                        v-if="item.status === 'uploading'"
+                                        type="button"
+                                        class="btn btn-sm btn-link text-warning"
+                                        title="Cancelar"
+                                        @click="cancelItem(item.id)"
+                                    >
                                         <i class="fas fa-stop-circle"></i>
                                     </button>
-                                    <button v-else-if="item.status === 'error' || item.status === 'cancelled'"
-                                            type="button"
-                                            class="btn btn-sm btn-link text-info"
-                                            title="Tentar novamente"
-                                            @click="retryItem(item.id)">
+                                    <button
+                                        v-else-if="item.status === 'error' || item.status === 'cancelled'"
+                                        type="button"
+                                        class="btn btn-sm btn-link text-info"
+                                        title="Tentar novamente"
+                                        @click="retryItem(item.id)"
+                                    >
                                         <i class="fas fa-redo"></i>
                                     </button>
-                                    <button v-if="item.status !== 'uploading'"
-                                            type="button"
-                                            class="btn btn-sm btn-link text-danger"
-                                            title="Remover"
-                                            @click="removeItem(item.id)">
+                                    <button
+                                        v-if="item.status !== 'uploading'"
+                                        type="button"
+                                        class="btn btn-sm btn-link text-danger"
+                                        title="Remover"
+                                        @click="removeItem(item.id)"
+                                    >
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
@@ -520,7 +565,7 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
                         <div class="me-auto small text-muted">
                             <template v-if="pendingBytes > 0">
                                 <i class="fas fa-clock me-1"></i>
-                                {{ items.filter(i => i.status === 'pending').length }}
+                                {{ items.filter((i) => i.status === 'pending').length }}
                                 arquivo(s) pendente(s) — {{ formatBytes(pendingBytes) }}
                             </template>
                             <template v-else-if="allDone">
@@ -528,17 +573,17 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
                                 Envio finalizado
                             </template>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" @click="close">
-                            Fechar
-                        </button>
-                        <button type="button"
-                                class="btn btn-sm btn-primary"
-                                :disabled="hasActive || pendingBytes === 0 || isFull"
-                                @click="uploadAll">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @click="close">Fechar</button>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-primary"
+                            :disabled="hasActive || pendingBytes === 0 || isFull"
+                            @click="uploadAll"
+                        >
                             <i class="fas fa-upload me-1"></i>
                             Enviar
                             <template v-if="pendingBytes > 0">
-                                ({{ items.filter(i => i.status === 'pending').length }})
+                                ({{ items.filter((i) => i.status === 'pending').length }})
                             </template>
                         </button>
                     </div>
@@ -554,7 +599,7 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
     border-radius: 8px;
     padding: 1.5rem;
     background: #f8fafc;
-    transition: all .18s ease;
+    transition: all 0.18s ease;
     cursor: pointer;
 }
 .upload-dropzone.is-dragging {
@@ -563,7 +608,7 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
     transform: scale(1.005);
 }
 .upload-dropzone.is-disabled {
-    opacity: .55;
+    opacity: 0.55;
     cursor: not-allowed;
     border-color: #e57373;
     background: #fff5f5;
@@ -578,7 +623,7 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
 .upload-dropzone-icon {
     font-size: 2.2rem;
     color: #90a4ae;
-    margin-bottom: .4rem;
+    margin-bottom: 0.4rem;
 }
 .upload-dropzone.is-dragging .upload-dropzone-icon {
     color: #1976d2;
@@ -588,19 +633,25 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
     max-height: 320px;
     overflow-y: auto;
     border-top: 1px solid #eef2f6;
-    padding-top: .5rem;
+    padding-top: 0.5rem;
 }
 .upload-item {
     display: flex;
     align-items: center;
-    gap: .75rem;
-    padding: .55rem .25rem;
+    gap: 0.75rem;
+    padding: 0.55rem 0.25rem;
     border-bottom: 1px solid #f1f4f7;
 }
-.upload-item:last-child { border-bottom: 0; }
-.upload-item.is-success { background: #f5fbf6; }
+.upload-item:last-child {
+    border-bottom: 0;
+}
+.upload-item.is-success {
+    background: #f5fbf6;
+}
 .upload-item.is-error,
-.upload-item.is-cancelled { background: #fff8f8; }
+.upload-item.is-cancelled {
+    background: #fff8f8;
+}
 
 .upload-item-thumb {
     width: 44px;
@@ -630,10 +681,10 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: .5rem;
+    gap: 0.5rem;
 }
 .upload-item-name {
-    font-size: .85rem;
+    font-size: 0.85rem;
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -644,9 +695,9 @@ watch(() => props.show, (v) => { if (v) cleanup(); });
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: .15rem;
+    gap: 0.15rem;
 }
 .upload-item-actions .btn-link {
-    padding: .15rem .4rem;
+    padding: 0.15rem 0.4rem;
 }
 </style>

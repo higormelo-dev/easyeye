@@ -1,9 +1,9 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
 
 /**
@@ -13,11 +13,11 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat';
  * aparece para admin (`canReopen`); quem garante é o servidor.
  */
 const props = defineProps({
-    closes:      { type: Object,  required: true }, // paginator Laravel
-    canReopen:   { type: Boolean, default: false },
-    busyId:      { type: String,  default: null },
-    reopenError: { type: String,  default: '' },
-    t:           { type: Object,  default: () => ({}) },
+    closes: { type: Object, required: true }, // paginator Laravel
+    canReopen: { type: Boolean, default: false },
+    busyId: { type: String, default: null },
+    reopenError: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['reopen']);
@@ -44,7 +44,12 @@ const rows = computed(() => props.closes?.data ?? []);
             </p>
         </div>
 
-        <div v-if="reopenError" class="alert alert-danger small d-flex gap-2 m-3 mb-0" role="alert" data-test="reopen-error">
+        <div
+            v-if="reopenError"
+            class="alert alert-danger small d-flex gap-2 m-3 mb-0"
+            role="alert"
+            data-test="reopen-error"
+        >
             <i class="ti ti-alert-circle mt-1" aria-hidden="true"></i>
             <span>{{ reopenError }}</span>
         </div>
@@ -52,7 +57,11 @@ const rows = computed(() => props.closes?.data ?? []);
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
-                    <caption class="visually-hidden">{{ t.history }}</caption>
+                    <caption class="visually-hidden">
+                        {{
+                            t.history
+                        }}
+                    </caption>
                     <thead>
                         <tr>
                             <th scope="col">{{ t.col_period }}</th>
@@ -61,12 +70,16 @@ const rows = computed(() => props.closes?.data ?? []);
                             <th scope="col" class="text-end">{{ t.col_balance }}</th>
                             <th scope="col" class="d-none d-lg-table-cell">{{ t.col_closed_by }}</th>
                             <th scope="col" class="d-none d-sm-table-cell">{{ t.col_closed_at }}</th>
-                            <th scope="col" class="text-end"><span class="visually-hidden">{{ t.col_actions }}</span></th>
+                            <th scope="col" class="text-end">
+                                <span class="visually-hidden">{{ t.col_actions }}</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-if="rows.length === 0">
-                            <td colspan="7" class="text-center text-muted py-4" data-test="history-empty">{{ t.empty }}</td>
+                            <td colspan="7" class="text-center text-muted py-4" data-test="history-empty">
+                                {{ t.empty }}
+                            </td>
                         </tr>
                         <tr
                             v-for="c in rows"
@@ -76,16 +89,31 @@ const rows = computed(() => props.closes?.data ?? []);
                             :data-test="`close-${c.id}`"
                         >
                             <td>
-                                <span class="text-nowrap fw-medium">{{ periodText(c.period_start, c.period_end) }}</span>
-                                <small v-if="c.notes" class="d-block text-muted cash-close-history__notes" :title="c.notes" data-test="close-notes">
+                                <span class="text-nowrap fw-medium">{{
+                                    periodText(c.period_start, c.period_end)
+                                }}</span>
+                                <small
+                                    v-if="c.notes"
+                                    class="d-block text-muted cash-close-history__notes"
+                                    :title="c.notes"
+                                    data-test="close-notes"
+                                >
                                     <span class="visually-hidden">{{ t.col_notes }}: </span>{{ c.notes }}
                                 </small>
                             </td>
-                            <td class="text-end text-nowrap d-none d-md-table-cell cash-close-history__value">{{ money(c.total_income) }}</td>
-                            <td class="text-end text-nowrap d-none d-md-table-cell cash-close-history__value">{{ money(c.total_expense) }}</td>
-                            <td class="text-end text-nowrap fw-medium cash-close-history__value">{{ signedMoney(c.balance) }}</td>
+                            <td class="text-end text-nowrap d-none d-md-table-cell cash-close-history__value">
+                                {{ money(c.total_income) }}
+                            </td>
+                            <td class="text-end text-nowrap d-none d-md-table-cell cash-close-history__value">
+                                {{ money(c.total_expense) }}
+                            </td>
+                            <td class="text-end text-nowrap fw-medium cash-close-history__value">
+                                {{ signedMoney(c.balance) }}
+                            </td>
                             <td class="small d-none d-lg-table-cell">{{ c.closed_by_name || '—' }}</td>
-                            <td class="small text-muted text-nowrap d-none d-sm-table-cell">{{ dateTime(c.closed_at) }}</td>
+                            <td class="small text-muted text-nowrap d-none d-sm-table-cell">
+                                {{ dateTime(c.closed_at) }}
+                            </td>
                             <td class="text-end text-nowrap">
                                 <ActionIconGroup align="end" gap="tight">
                                     <ActionIconButton

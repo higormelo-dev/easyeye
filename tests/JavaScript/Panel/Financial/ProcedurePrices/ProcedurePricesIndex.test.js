@@ -22,7 +22,9 @@ vi.mock('@inertiajs/vue3', async () => {
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: { props: ['title', 'subtitle', 'total', 'totalLabel'], template: '<div><slot name="actions" /></div>' },
 }));
@@ -44,29 +46,62 @@ vi.mock('@/Components/Panel/CenteredModal.vue', () => ({
 }));
 
 const t = {
-    title: 'Tabela de Preços', subtitle: 'Defina', breadcrumb_financial: 'Financeiro', priced_counter: ':priced de :total com preço',
-    covenant: 'Convênio', covenant_placeholder: 'Selecione', covenant_tiss: 'Com operadora TISS', covenant_cash: 'Recebido no caixa',
-    code: 'Código', procedure: 'Procedimento', price: 'Preço',
-    price_aria: 'Preço de :procedure', empty_hint: 'Deixe em branco', inherited_price: 'Padrão do sistema: :price', row_changed: 'alterado',
-    search_placeholder: 'Buscar', search_clear: 'Limpar busca', filter_label: 'Filtrar', filter_all: 'Todos', filter_priced: 'Com preço',
-    filter_unpriced: 'Sem preço', no_results: 'Nada encontrado.', clear_filters: 'Limpar busca e filtro',
-    charging: 'Cobrar do convênio (guia TISS)', charging_aria: 'Cobrar :procedure do convênio por guia TISS',
+    title: 'Tabela de Preços',
+    subtitle: 'Defina',
+    breadcrumb_financial: 'Financeiro',
+    priced_counter: ':priced de :total com preço',
+    covenant: 'Convênio',
+    covenant_placeholder: 'Selecione',
+    covenant_tiss: 'Com operadora TISS',
+    covenant_cash: 'Recebido no caixa',
+    code: 'Código',
+    procedure: 'Procedimento',
+    price: 'Preço',
+    price_aria: 'Preço de :procedure',
+    empty_hint: 'Deixe em branco',
+    inherited_price: 'Padrão do sistema: :price',
+    row_changed: 'alterado',
+    search_placeholder: 'Buscar',
+    search_clear: 'Limpar busca',
+    filter_label: 'Filtrar',
+    filter_all: 'Todos',
+    filter_priced: 'Com preço',
+    filter_unpriced: 'Sem preço',
+    no_results: 'Nada encontrado.',
+    clear_filters: 'Limpar busca e filtro',
+    charging: 'Cobrar do convênio (guia TISS)',
+    charging_aria: 'Cobrar :procedure do convênio por guia TISS',
     charging_help: 'Marcado: faturado ao convênio por guia; o caixa da chegada não pré-preenche.',
     charging_help_cash: 'Sem operadora TISS: recebido no caixa.',
-    charging_disabled_hint: 'Informe um preço para definir a cobrança.', charging_cash_hint: 'Recebido no caixa.',
+    charging_disabled_hint: 'Informe um preço para definir a cobrança.',
+    charging_cash_hint: 'Recebido no caixa.',
     charging_legacy: ':count marcado(s) para guia.',
-    savebar_label: 'Salvar tabela', save: 'Salvar preços', saving: 'Salvando...', saved: 'Preços atualizados.',
-    save_error: 'Não foi possível salvar os preços.', rows_with_errors: ':count linha(s) com erro.',
-    unsaved: ':count alteração(ões) não salva(s)', no_changes: 'Nenhuma alteração pendente', loading: 'Carregando',
+    savebar_label: 'Salvar tabela',
+    save: 'Salvar preços',
+    saving: 'Salvando...',
+    saved: 'Preços atualizados.',
+    save_error: 'Não foi possível salvar os preços.',
+    rows_with_errors: ':count linha(s) com erro.',
+    unsaved: ':count alteração(ões) não salva(s)',
+    no_changes: 'Nenhuma alteração pendente',
+    loading: 'Carregando',
     leave_confirm: 'Sair com :count alteração(ões)?',
-    no_covenants: 'Cadastre um convênio.', no_covenants_action: 'Cadastrar convênio', no_covenants_ask: 'Peça a um administrador.',
-    no_procedures: 'Nenhum procedimento.', no_procedures_hint: 'Catálogo do sistema.',
-    discard_title: 'Descartar alterações?', discard_body: 'Você tem :count alteração(ões) não salva(s) em :covenant.',
-    discard_confirm: 'Descartar e trocar', discard_cancel: 'Continuar editando',
+    no_covenants: 'Cadastre um convênio.',
+    no_covenants_action: 'Cadastrar convênio',
+    no_covenants_ask: 'Peça a um administrador.',
+    no_procedures: 'Nenhum procedimento.',
+    no_procedures_hint: 'Catálogo do sistema.',
+    discard_title: 'Descartar alterações?',
+    discard_body: 'Você tem :count alteração(ões) não salva(s) em :covenant.',
+    discard_confirm: 'Descartar e trocar',
+    discard_cancel: 'Continuar editando',
 };
 
 // Particular: sem operadora TISS (recebido no caixa). Unimed: com operadora TISS.
-const covenants  = [{ id: 'c1', name: 'Particular', tiss: false }, { id: 'c2', name: 'Unimed', tiss: true }];
+const covenants = [
+    { id: 'c1', name: 'Particular', tiss: false },
+    { id: 'c2', name: 'Unimed', tiss: true },
+];
 const procedures = [
     { id: 'p1', code: '10101012', name: 'Consulta' },
     { id: 'p2', code: '41301250', name: 'Mapeamento de retina' },
@@ -132,7 +167,9 @@ describe('Financial/ProcedurePrices/Index', () => {
 
         expect(empty.find('input[type="checkbox"]').element.checked).toBe(true);
         expect(empty.find('input[type="checkbox"]').element.disabled).toBe(true);
-        expect(empty.find('input[type="checkbox"]').attributes('title')).toBe('Informe um preço para definir a cobrança.');
+        expect(empty.find('input[type="checkbox"]').attributes('title')).toBe(
+            'Informe um preço para definir a cobrança.',
+        );
     });
 
     it('convênio sem operadora TISS (Particular): cobrança desligada e desabilitada com a ajuda "recebido no caixa"', async () => {
@@ -197,7 +234,9 @@ describe('Financial/ProcedurePrices/Index', () => {
         await w.find('.covenant-select').setValue('c2');
 
         expect(router.get).not.toHaveBeenCalled();
-        expect(w.find('[data-test="discard-body"]').text()).toBe('Você tem 1 alteração(ões) não salva(s) em Particular.');
+        expect(w.find('[data-test="discard-body"]').text()).toBe(
+            'Você tem 1 alteração(ões) não salva(s) em Particular.',
+        );
 
         // Foco inicial na ação segura: um Enter reflexo não descarta as edições.
         await nextTick();
@@ -224,9 +263,7 @@ describe('Financial/ProcedurePrices/Index', () => {
             '/_routes/panel.financial.procedure-prices.store',
             {
                 covenant_id: 'c2',
-                items: [
-                    { procedure_id: 'p2', price: 80, charging: true },
-                ],
+                items: [{ procedure_id: 'p2', price: 80, charging: true }],
             },
             expect.objectContaining({ preserveScroll: true }),
         );
@@ -241,8 +278,12 @@ describe('Financial/ProcedurePrices/Index', () => {
         expect(priceInput(row).classes()).toContain('is-invalid');
         expect(priceInput(row).attributes('aria-invalid')).toBe('true');
         expect(row.find('[data-test="row-error"]').text()).toBe('O campo preço deve ser pelo menos 0.');
-        expect(priceInput(row).attributes('aria-describedby')).toBe(row.find('[data-test="row-error"]').attributes('id'));
-        expect(w.find('[data-test="save-error"]').text()).toBe('Não foi possível salvar os preços. 1 linha(s) com erro.');
+        expect(priceInput(row).attributes('aria-describedby')).toBe(
+            row.find('[data-test="row-error"]').attributes('id'),
+        );
+        expect(w.find('[data-test="save-error"]').text()).toBe(
+            'Não foi possível salvar os preços. 1 linha(s) com erro.',
+        );
         expect(document.activeElement).toBe(priceInput(row).element);
     });
 
@@ -257,9 +298,7 @@ describe('Financial/ProcedurePrices/Index', () => {
             expect.any(String),
             {
                 covenant_id: 'c1',
-                items: [
-                    { procedure_id: 'p2', price: 80, charging: false },
-                ],
+                items: [{ procedure_id: 'p2', price: 80, charging: false }],
             },
             expect.any(Object),
         );
@@ -294,9 +333,7 @@ describe('Financial/ProcedurePrices/Index', () => {
             expect.any(String),
             {
                 covenant_id: 'c2',
-                items: [
-                    { procedure_id: 'p1', price: 45, charging: true },
-                ],
+                items: [{ procedure_id: 'p1', price: 45, charging: true }],
             },
             expect.any(Object),
         );
@@ -322,9 +359,7 @@ describe('Financial/ProcedurePrices/Index', () => {
             expect.any(String),
             expect.objectContaining({
                 covenant_id: 'c2',
-                items: [
-                    { procedure_id: 'p2', price: 80, charging: true },
-                ],
+                items: [{ procedure_id: 'p2', price: 80, charging: true }],
             }),
             expect.any(Object),
         );

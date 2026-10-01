@@ -6,21 +6,19 @@ Chart.register(DoughnutController, ArcElement, Legend, Tooltip);
 
 const props = defineProps({
     consumption: { type: Object, default: () => ({}) },
-    t:           { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const PROVIDER_COLORS = {
-    openai:    '#10a37f',
+    openai: '#10a37f',
     anthropic: '#cc785c',
-    gemini:    '#4285f4',
+    gemini: '#4285f4',
 };
 
-const canvas  = ref(null);
+const canvas = ref(null);
 let chartInst = null;
 
-const hasData = computed(() =>
-    Object.values(props.consumption || {}).some(p => (p?.credits ?? 0) > 0),
-);
+const hasData = computed(() => Object.values(props.consumption || {}).some((p) => (p?.credits ?? 0) > 0));
 
 function isDark() {
     return document.documentElement.getAttribute('data-bs-theme') === 'dark';
@@ -28,11 +26,14 @@ function isDark() {
 
 function buildChart() {
     if (!canvas.value || !hasData.value) return;
-    if (chartInst) { chartInst.destroy(); chartInst = null; }
+    if (chartInst) {
+        chartInst.destroy();
+        chartInst = null;
+    }
 
-    const labels  = [];
-    const data    = [];
-    const colors  = [];
+    const labels = [];
+    const data = [];
+    const colors = [];
 
     for (const [providerValue, info] of Object.entries(props.consumption || {})) {
         if (!info || (info.credits ?? 0) <= 0) continue;
@@ -45,12 +46,14 @@ function buildChart() {
         type: 'doughnut',
         data: {
             labels,
-            datasets: [{
-                data,
-                backgroundColor: colors,
-                borderColor: isDark() ? '#0f1729' : '#ffffff',
-                borderWidth: 2,
-            }],
+            datasets: [
+                {
+                    data,
+                    backgroundColor: colors,
+                    borderColor: isDark() ? '#0f1729' : '#ffffff',
+                    borderWidth: 2,
+                },
+            ],
         },
         options: {
             responsive: true,
@@ -73,7 +76,7 @@ function buildChart() {
                     borderColor: isDark() ? '#22334c' : '#e2e8f0',
                     borderWidth: 1,
                     callbacks: {
-                        label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString('pt-BR')} créditos`,
+                        label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toLocaleString('pt-BR')} créditos`,
                     },
                 },
             },
@@ -108,7 +111,7 @@ watch(() => props.consumption, buildChart, { deep: true });
                 <i class="ti ti-mood-empty fs-3 d-block mb-2"></i>
                 {{ t?.kpi?.no_consumption ?? 'Sem consumo nos últimos 30 dias' }}
             </div>
-            <div v-else style="height: 220px;">
+            <div v-else style="height: 220px">
                 <canvas ref="canvas"></canvas>
             </div>
         </div>

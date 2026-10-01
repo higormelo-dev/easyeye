@@ -11,31 +11,31 @@ import Multiselect from '@vueform/multiselect';
 //     que ficam visíveis. As `options` iniciais ainda funcionam como seed.
 //   - remoteMinChars: número mínimo de caracteres para disparar a busca.
 const props = defineProps({
-    modelValue:      { type: [String, Number, Boolean, Array, null], default: null },
-    options:         { type: Array,   default: () => [] },
-    valueKey:        { type: String,  default: 'id' },
-    labelKey:        { type: String,  default: 'name' },
-    placeholder:     { type: String,  default: 'Selecione...' },
-    disabled:        { type: Boolean, default: false },
-    clearable:       { type: Boolean, default: true },
-    searchable:      { type: Boolean, default: true },
-    invalid:         { type: Boolean, default: false },
-    remoteSearchUrl: { type: String,  default: '' },
-    remoteMinChars:  { type: Number,  default: 2 },
+    modelValue: { type: [String, Number, Boolean, Array, null], default: null },
+    options: { type: Array, default: () => [] },
+    valueKey: { type: String, default: 'id' },
+    labelKey: { type: String, default: 'name' },
+    placeholder: { type: String, default: 'Selecione...' },
+    disabled: { type: Boolean, default: false },
+    clearable: { type: Boolean, default: true },
+    searchable: { type: Boolean, default: true },
+    invalid: { type: Boolean, default: false },
+    remoteSearchUrl: { type: String, default: '' },
+    remoteMinChars: { type: Number, default: 2 },
     // Altura máxima da lista aberta (--ms-max-height do @vueform/multiselect;
     // default do tema = 10rem). Listas longas (ex.: acuidade visual) passam
     // um valor maior pra reduzir rolagem.
-    listHeight:      { type: String,  default: '' },
+    listHeight: { type: String, default: '' },
     // Seleção múltipla (mode="multiple" do multiselect): v-model vira ARRAY —
     // características de lente do prontuário (Multifocal + Antirreflexo...).
     // O campo fica numa linha só (não cresce a cada escolha, como os chips do
     // mode="tags" faziam): nomes separados por vírgula + quantidade; a lista
     // inteira fica no title, no texto assistivo e no dropdown (desmarcar).
-    multiple:        { type: Boolean, default: false },
+    multiple: { type: Boolean, default: false },
     // Barra de filtro (busca .input-group-sm + selects lado a lado): sem
     // isso o select sai no tamanho "regular" da lib (~47px) enquanto o
     // input de busca ao lado é "sm" (~31px), destoando de altura.
-    sm:              { type: Boolean, default: false },
+    sm: { type: Boolean, default: false },
 });
 
 // `option-selected` — Onda IOL Lenses: emite o OBJETO completo da opção
@@ -65,16 +65,15 @@ const value = computed({
         // Modo tags: v-model é sempre ARRAY (nunca degrada pra '' — o
         // multiselect em mode="tags" quebra com valor não-array).
         if (props.multiple) {
-            const arr = Array.isArray(v) ? v : (v == null ? [] : [v]);
+            const arr = Array.isArray(v) ? v : v == null ? [] : [v];
             emit('update:modelValue', arr);
             emit('change', arr);
 
             return;
         }
 
-        selectedOption.value = v == null
-            ? null
-            : (effectiveOptions.value.find((o) => o[props.valueKey] === v) ?? selectedOption.value);
+        selectedOption.value =
+            v == null ? null : (effectiveOptions.value.find((o) => o[props.valueKey] === v) ?? selectedOption.value);
         const out = v ?? '';
         emit('update:modelValue', out);
         emit('change', out);
@@ -86,7 +85,9 @@ const value = computed({
 const remoteOptions = ref([]);
 const effectiveOptions = computed(() => {
     const base = props.remoteSearchUrl
-        ? (remoteOptions.value.length ? remoteOptions.value : props.options)
+        ? remoteOptions.value.length
+            ? remoteOptions.value
+            : props.options
         : props.options;
 
     const sel = selectedOption.value;
@@ -138,7 +139,10 @@ function onSearchChange(q) {
 // seleção. A lib usa o mesmo texto para leitores de tela (aria), então a
 // quantidade exibida ao lado pode ficar só visual.
 function multipleLabel(values) {
-    return (values ?? []).map((o) => o?.[props.labelKey]).filter((l) => l != null && l !== '').join(', ');
+    return (values ?? [])
+        .map((o) => o?.[props.labelKey])
+        .filter((l) => l != null && l !== '')
+        .join(', ');
 }
 
 // Lista completa no hover (o rótulo da lib tem pointer-events: none).
@@ -178,7 +182,9 @@ const selectedTitle = computed(() => {
         <template v-if="multiple" #multiplelabel="{ values }">
             <div class="multiselect-multiple-label search-select__summary">
                 <span class="search-select__summary-text">{{ multipleLabel(values) }}</span>
-                <span v-if="values.length > 1" class="search-select__count" aria-hidden="true">{{ values.length }}</span>
+                <span v-if="values.length > 1" class="search-select__count" aria-hidden="true">{{
+                    values.length
+                }}</span>
             </div>
         </template>
     </Multiselect>
@@ -189,18 +195,18 @@ const selectedTitle = computed(() => {
 <style>
 /* Alinha o multiselect ao visual do .form-select (Bootstrap 5). */
 .search-select.multiselect {
-    --ms-radius: .375rem;
+    --ms-radius: 0.375rem;
     --ms-border-color: var(--bs-border-color, #dee2e6);
-    --ms-ring-width: .25rem;
-    --ms-ring-color: rgba(13, 110, 253, .25);
-    --ms-py: .375rem;
-    --ms-px: .75rem;
+    --ms-ring-width: 0.25rem;
+    --ms-ring-color: rgba(13, 110, 253, 0.25);
+    --ms-py: 0.375rem;
+    --ms-px: 0.75rem;
     --ms-font-size: 1rem;
     --ms-line-height: 1.5;
     --ms-option-font-size: 1rem;
     --ms-dropdown-border-color: var(--bs-border-color, #dee2e6);
-    --ms-dropdown-radius: .375rem;
-    min-height: calc(1.5em + .75rem + 2px);
+    --ms-dropdown-radius: 0.375rem;
+    min-height: calc(1.5em + 0.75rem + 2px);
     /* A lib (default.css) seta margin:0 auto no .multiselect base — pensado
        pra centralizar um form isolado, mas dentro de um flex row com
        max-width (barras de filtro) sobra espaço "fantasma" dos dois lados
@@ -214,8 +220,8 @@ const selectedTitle = computed(() => {
    do Bootstrap (SearchInput), pra ficar no padrão quando usado lado a
    lado com a busca numa barra de filtro (ex.: report-settings). */
 .search-select--sm.multiselect {
-    --ms-py: .25rem;
-    --ms-px: .5rem;
+    --ms-py: 0.25rem;
+    --ms-px: 0.5rem;
     --ms-font-size: 14px;
     --ms-line-height: 1.5;
     --ms-option-font-size: 14px;
@@ -233,7 +239,7 @@ const selectedTitle = computed(() => {
 /* Seleção múltipla numa linha: nomes cortados com reticências e a
    quantidade (mesma cor dos antigos chips) sempre visível ao lado. */
 .search-select__summary {
-    gap: .375rem;
+    gap: 0.375rem;
 }
 .search-select__summary-text {
     min-width: 0;
@@ -244,26 +250,26 @@ const selectedTitle = computed(() => {
 /* Múltipla, lista aberta: marcadas com fundo claro + ✓ (em vez do bloco
    verde contínuo do tema) — cada item fica distinto e desmarca no clique. */
 .search-select--multiple.multiselect {
-    --ms-option-bg-selected: rgba(16, 185, 129, .12);
+    --ms-option-bg-selected: rgba(16, 185, 129, 0.12);
     --ms-option-color-selected: var(--bs-body-color, #212529);
-    --ms-option-bg-selected-pointed: rgba(16, 185, 129, .22);
+    --ms-option-bg-selected-pointed: rgba(16, 185, 129, 0.22);
     --ms-option-color-selected-pointed: var(--bs-body-color, #212529);
 }
 .search-select--multiple .multiselect-option.is-selected::after {
     content: '\2713';
     margin-left: auto;
-    padding-left: .5rem;
+    padding-left: 0.5rem;
     color: #10b981;
     font-weight: 700;
 }
 .search-select__count {
     flex-shrink: 0;
     min-width: 1.25rem;
-    padding: 0 .375rem;
+    padding: 0 0.375rem;
     border-radius: 999px;
     background: var(--ms-tag-bg, #10b981);
     color: var(--ms-tag-color, #fff);
-    font-size: .75rem;
+    font-size: 0.75rem;
     font-weight: 600;
     line-height: 1.25rem;
     text-align: center;
@@ -271,12 +277,12 @@ const selectedTitle = computed(() => {
 
 .search-select.multiselect.is-active {
     --ms-border-color: #86b7fe;
-    box-shadow: 0 0 0 .25rem rgba(13, 110, 253, .25);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
 .search-select.multiselect.is-invalid {
     --ms-border-color: #dc3545;
-    --ms-ring-color: rgba(220, 53, 69, .25);
+    --ms-ring-color: rgba(220, 53, 69, 0.25);
 }
 
 /*
@@ -291,7 +297,7 @@ const selectedTitle = computed(() => {
  * Mesma paleta já usada nos inputs (.pmr-form dark, _medical-records.scss)
  * — consistência entre os dois pontos de entrada de dado do sistema.
  */
-:root[data-bs-theme=dark] .search-select.multiselect {
+:root[data-bs-theme='dark'] .search-select.multiselect {
     --ms-bg: #121a26;
     --ms-bg-disabled: #18212f;
     --ms-border-color: #384559;
@@ -318,14 +324,14 @@ const selectedTitle = computed(() => {
     color: #dbe4ef;
 }
 
-:root[data-bs-theme=dark] .search-select.multiselect.is-active {
+:root[data-bs-theme='dark'] .search-select.multiselect.is-active {
     --ms-border-color: var(--primary);
 }
 
-:root[data-bs-theme=dark] .search-select--multiple.multiselect {
-    --ms-option-bg-selected: rgba(16, 185, 129, .18);
+:root[data-bs-theme='dark'] .search-select--multiple.multiselect {
+    --ms-option-bg-selected: rgba(16, 185, 129, 0.18);
     --ms-option-color-selected: #dbe4ef;
-    --ms-option-bg-selected-pointed: rgba(16, 185, 129, .3);
+    --ms-option-bg-selected-pointed: rgba(16, 185, 129, 0.3);
     --ms-option-color-selected-pointed: #fff;
 }
 </style>

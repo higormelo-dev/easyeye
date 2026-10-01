@@ -20,8 +20,12 @@ vi.mock('@inertiajs/vue3', async () => {
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
-vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { props: ['title'], template: '<div><h4>{{ title }}</h4><slot name="actions" /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
+vi.mock('@/Components/Panel/PageHeader.vue', () => ({
+    default: { props: ['title'], template: '<div><h4>{{ title }}</h4><slot name="actions" /></div>' },
+}));
 
 let wrapper;
 

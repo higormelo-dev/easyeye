@@ -1,14 +1,14 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh       from '@/Components/Panel/SortableTh.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
-import { useColumnOrder }  from '@/composables/useColumnOrder.js';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
-import { useTrans }        from '@/composables/useTrans.js';
+import { useTrans } from '@/composables/useTrans.js';
 
 /**
  * Tabela de produtos de estoque no padrão de Patients/PatientTable:
@@ -21,9 +21,9 @@ import { useTrans }        from '@/composables/useTrans.js';
  * stock.manage + feature) já permite a quem vê esta tela.
  */
 const props = defineProps({
-    items:             { type: Object, required: true },   // paginator Laravel
-    filters:           { type: Object, default: () => ({}) },
-    t:                 { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
     movementsIndexUrl: { type: String, default: '' },
 });
 
@@ -36,37 +36,36 @@ const rows = computed(() => props.items?.data ?? []);
 
 // ── Ordenação (padrão = nome A→Z, igual ao backend) ─────────────────────────
 const currentSort = computed(() => props.filters.sort ?? 'name');
-const currentDir  = computed(() => props.filters.direction ?? 'asc');
+const currentDir = computed(() => props.filters.direction ?? 'asc');
 
 // ── Ordem de colunas personalizável ─────────────────────────────────────────
 // sortKey = chave aceita por ProductsController::SORTABLE (null = não ordena).
 const COLUMN_DEFS = computed(() => [
-    { key: 'codigo',    label: props.t.col_code ?? 'Código',             sortKey: 'code' },
-    { key: 'nome',      label: props.t.col_name ?? 'Nome',               sortKey: 'name' },
-    { key: 'categoria', label: props.t.col_category ?? 'Categoria',      sortKey: null },
-    { key: 'unidade',   label: props.t.col_unit ?? 'Unidade',            sortKey: null },
-    { key: 'saldo',     label: props.t.col_qty_on_hand ?? 'Saldo',       sortKey: 'qty_on_hand', numeric: true },
-    { key: 'custo',     label: props.t.col_cost_avg ?? 'Custo médio',    sortKey: 'cost_avg', numeric: true },
-    { key: 'preco',     label: props.t.col_sale_price ?? 'Preço',        sortKey: 'sale_price', numeric: true },
+    { key: 'codigo', label: props.t.col_code ?? 'Código', sortKey: 'code' },
+    { key: 'nome', label: props.t.col_name ?? 'Nome', sortKey: 'name' },
+    { key: 'categoria', label: props.t.col_category ?? 'Categoria', sortKey: null },
+    { key: 'unidade', label: props.t.col_unit ?? 'Unidade', sortKey: null },
+    { key: 'saldo', label: props.t.col_qty_on_hand ?? 'Saldo', sortKey: 'qty_on_hand', numeric: true },
+    { key: 'custo', label: props.t.col_cost_avg ?? 'Custo médio', sortKey: 'cost_avg', numeric: true },
+    { key: 'preco', label: props.t.col_sale_price ?? 'Preço', sortKey: 'sale_price', numeric: true },
 ]);
 // Mesma ordem que a tela sempre teve.
 const DEFAULT_COLUMN_ORDER = ['codigo', 'nome', 'categoria', 'unidade', 'saldo', 'custo', 'preco'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'stock_products_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('stock_products_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 
 // ── Atalhos ─────────────────────────────────────────────────────────────────
@@ -114,7 +113,8 @@ function movementsUrl(product) {
                             :current-dir="currentDir"
                             :title="tx('sort_by', { column: col.label })"
                             @sort="emit('sort', $event)"
-                        >{{ col.label }}</SortableTh>
+                            >{{ col.label }}</SortableTh
+                        >
                         <th v-else :class="{ 'text-end': col.numeric }">{{ col.label }}</th>
                     </template>
                     <th class="text-center">{{ t.col_status ?? 'Status' }}</th>
@@ -141,7 +141,8 @@ function movementsUrl(product) {
                                     v-if="p.is_opm"
                                     class="badge badge-soft-info rounded fs-11"
                                     :title="t.badge_opm_title"
-                                >{{ t.badge_opm ?? 'OPM' }}</span>
+                                    >{{ t.badge_opm ?? 'OPM' }}</span
+                                >
                                 <span
                                     v-if="p.has_expiring_lot"
                                     class="badge badge-soft-warning text-warning rounded fs-11"
@@ -158,7 +159,9 @@ function movementsUrl(product) {
                         <td v-else-if="col.key === 'unidade'" class="text-muted small">{{ p.unit_label ?? '—' }}</td>
 
                         <td v-else-if="col.key === 'saldo'" class="text-end">
-                            <span :class="{ 'text-danger fw-semibold': p.below_minimum }">{{ quantity(p.qty_on_hand) }}</span>
+                            <span :class="{ 'text-danger fw-semibold': p.below_minimum }">{{
+                                quantity(p.qty_on_hand)
+                            }}</span>
                             <i
                                 v-if="p.below_minimum"
                                 class="ti ti-alert-triangle text-danger ms-1"
@@ -177,11 +180,13 @@ function movementsUrl(product) {
                         <span
                             v-if="p.active"
                             class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                        >{{ t.status_active ?? 'Ativo' }}</span>
+                            >{{ t.status_active ?? 'Ativo' }}</span
+                        >
                         <span
                             v-else
                             class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
-                        >{{ t.status_inactive ?? 'Inativo' }}</span>
+                            >{{ t.status_inactive ?? 'Inativo' }}</span
+                        >
                     </td>
 
                     <td class="text-end">
@@ -200,19 +205,36 @@ function movementsUrl(product) {
                             >
                                 <li>
                                     <button type="button" class="dropdown-item rounded-1" @click="emit('edit', p)">
-                                        <i class="ti ti-edit me-1" aria-hidden="true"></i> {{ t.action_edit ?? 'Editar' }}
+                                        <i class="ti ti-edit me-1" aria-hidden="true"></i>
+                                        {{ t.action_edit ?? 'Editar' }}
                                     </button>
                                 </li>
                                 <li>
-                                    <button type="button" class="dropdown-item rounded-1" @click="emit('toggleActive', p)">
-                                        <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`" aria-hidden="true"></i>
-                                        {{ p.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                    <button
+                                        type="button"
+                                        class="dropdown-item rounded-1"
+                                        @click="emit('toggleActive', p)"
+                                    >
+                                        <i
+                                            :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"
+                                            aria-hidden="true"
+                                        ></i>
+                                        {{
+                                            p.active
+                                                ? (t.action_deactivate ?? 'Desativar')
+                                                : (t.action_activate ?? 'Ativar')
+                                        }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+                                <li><hr class="dropdown-divider" /></li>
                                 <li>
-                                    <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', p)">
-                                        <i class="ti ti-trash me-1" aria-hidden="true"></i> {{ t.action_delete ?? 'Excluir' }}
+                                    <button
+                                        type="button"
+                                        class="dropdown-item rounded-1 text-danger"
+                                        @click="emit('delete', p)"
+                                    >
+                                        <i class="ti ti-trash me-1" aria-hidden="true"></i>
+                                        {{ t.action_delete ?? 'Excluir' }}
                                     </button>
                                 </li>
                             </ActionDropdown>

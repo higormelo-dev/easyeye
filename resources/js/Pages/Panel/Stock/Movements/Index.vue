@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
-import AppLayout         from '@/Layouts/AppLayout.vue';
-import PageHeader        from '@/Components/Panel/PageHeader.vue';
-import SearchInput       from '@/Components/Panel/SearchInput.vue';
-import { useViewMode }   from '@/composables/useViewMode.js';
-import MovementTable     from './MovementTable.vue';
-import MovementCards     from './MovementCards.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import { useViewMode } from '@/composables/useViewMode.js';
+import MovementTable from './MovementTable.vue';
+import MovementCards from './MovementCards.vue';
 import MovementFormModal from './MovementFormModal.vue';
 
 /**
@@ -21,16 +21,16 @@ import MovementFormModal from './MovementFormModal.vue';
  * (Nova movimentação).
  */
 const props = defineProps({
-    breadcrumbs:   { type: Array,  default: () => [] },
-    items:         { type: Object, required: true },
-    products:      { type: Array,  default: () => [] },
+    breadcrumbs: { type: Array, default: () => [] },
+    items: { type: Object, required: true },
+    products: { type: Array, default: () => [] },
     lotsByProduct: { type: Object, default: () => ({}) },
-    movementTypes: { type: Array,  default: () => [] },   // tipos manuais (form)
-    filterTypes:   { type: Array,  default: () => [] },   // todos os tipos (filtro)
-    filteredProduct: { type: Object, default: null },     // { id, name } do filtro, mesmo inativo
-    filters:       { type: Object, default: () => ({}) }, // { search, entity_product_id, type, sort, direction }
-    routes:        { type: Object, required: true },
-    t:             { type: Object, default: () => ({}) },
+    movementTypes: { type: Array, default: () => [] }, // tipos manuais (form)
+    filterTypes: { type: Array, default: () => [] }, // todos os tipos (filtro)
+    filteredProduct: { type: Object, default: null }, // { id, name } do filtro, mesmo inativo
+    filters: { type: Object, default: () => ({}) }, // { search, entity_product_id, type, sort, direction }
+    routes: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const SEARCH_DEBOUNCE_MS = 400;
@@ -42,7 +42,12 @@ const flashMessage = computed(() => page.props?.flash?.message ?? null);
 // Cada resposta traz um objeto `flash` novo: um segundo lançamento com a MESMA
 // mensagem volta a mostrar o alerta.
 const flashDismissed = ref(false);
-watch(() => page.props?.flash, () => { flashDismissed.value = false; });
+watch(
+    () => page.props?.flash,
+    () => {
+        flashDismissed.value = false;
+    },
+);
 
 const pageTitle = computed(() => props.t.page_title ?? 'Movimentação de estoque');
 
@@ -50,9 +55,9 @@ const pageTitle = computed(() => props.t.page_title ?? 'Movimentação de estoqu
 const { view, setView } = useViewMode('stock_movements_view');
 
 // ── Busca (debounce), filtros e ordenação — cada um preserva os demais ───────
-const search        = ref(props.filters?.search ?? '');
+const search = ref(props.filters?.search ?? '');
 const productFilter = ref(props.filters?.entity_product_id ?? '');
-const typeFilter    = ref(props.filters?.type ?? '');
+const typeFilter = ref(props.filters?.type ?? '');
 
 // O extrato também tem entradas por compra e consumos de procedimento: o
 // filtro lista todos os tipos (o form continua só com os manuais).
@@ -66,7 +71,7 @@ const productOptions = computed(() => {
     const id = productFilter.value;
     if (!id || props.products.some((p) => p.id === id)) return props.products;
 
-    const row  = (props.items?.data ?? []).find((m) => m.entity_product_id === id);
+    const row = (props.items?.data ?? []).find((m) => m.entity_product_id === id);
     const name = (props.filteredProduct?.id === id ? props.filteredProduct.name : null) ?? row?.product_name ?? '—';
 
     return [...props.products, { id, name }];
@@ -74,11 +79,11 @@ const productOptions = computed(() => {
 
 function currentParams(overrides = {}) {
     return {
-        search:            search.value,
+        search: search.value,
         entity_product_id: productFilter.value,
-        type:              typeFilter.value,
-        sort:              props.filters?.sort,
-        direction:         props.filters?.direction,
+        type: typeFilter.value,
+        sort: props.filters?.sort,
+        direction: props.filters?.direction,
         ...overrides,
     };
 }
@@ -123,7 +128,6 @@ function onSaved() {
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-stock-movements">
-
             <PageHeader
                 :title="pageTitle"
                 :total="items.total ?? 0"
@@ -146,7 +150,11 @@ function onSaved() {
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+            <div
+                v-if="flashMessage && !flashDismissed"
+                class="alert alert-success alert-dismissible mb-3"
+                role="status"
+            >
                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
                 <button
                     type="button"
@@ -191,13 +199,7 @@ function onSaved() {
                 @sort="onSort"
                 @filter-product="onFilterProduct"
             />
-            <MovementCards
-                v-else
-                :items="items"
-                :filters="filters"
-                :t="t"
-                @filter-product="onFilterProduct"
-            />
+            <MovementCards v-else :items="items" :filters="filters" :t="t" @filter-product="onFilterProduct" />
 
             <MovementFormModal
                 :open="formOpen"
@@ -208,7 +210,6 @@ function onSaved() {
                 @close="formOpen = false"
                 @saved="onSaved"
             />
-
         </div>
     </AppLayout>
 </template>

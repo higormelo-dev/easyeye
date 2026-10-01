@@ -1,26 +1,26 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
-import AppLayout            from '@/Layouts/AppLayout.vue';
-import PageHeader           from '@/Components/Panel/PageHeader.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
-import { useTrans }         from '@/composables/useTrans.js';
-import BillingKpis          from './BillingKpis.vue';
-import BillingFlowStepper   from './BillingFlowStepper.vue';
-import BillingFilterBar     from './BillingFilterBar.vue';
-import EligibleTable        from './EligibleTable.vue';
-import ClaimsTable          from './ClaimsTable.vue';
-import BatchesTable         from './BatchesTable.vue';
+import { useTrans } from '@/composables/useTrans.js';
+import BillingKpis from './BillingKpis.vue';
+import BillingFlowStepper from './BillingFlowStepper.vue';
+import BillingFilterBar from './BillingFilterBar.vue';
+import EligibleTable from './EligibleTable.vue';
+import ClaimsTable from './ClaimsTable.vue';
+import BatchesTable from './BatchesTable.vue';
 import IndividualClaimModal from './IndividualClaimModal.vue';
-import BatchFormModal       from './BatchFormModal.vue';
-import ReceiptModal         from './ReceiptModal.vue';
-import DenyClaimModal       from './DenyClaimModal.vue';
-import SubmitBatchModal     from './SubmitBatchModal.vue';
-import ImportReturnModal    from './ImportReturnModal.vue';
-import PendingResultModal   from './PendingResultModal.vue';
-import FixPendingModal      from './FixPendingModal.vue';
-import ClaimsSelectionBar   from './ClaimsSelectionBar.vue';
-import BillingOperations    from './BillingOperations.vue';
+import BatchFormModal from './BatchFormModal.vue';
+import ReceiptModal from './ReceiptModal.vue';
+import DenyClaimModal from './DenyClaimModal.vue';
+import SubmitBatchModal from './SubmitBatchModal.vue';
+import ImportReturnModal from './ImportReturnModal.vue';
+import PendingResultModal from './PendingResultModal.vue';
+import FixPendingModal from './FixPendingModal.vue';
+import ClaimsSelectionBar from './ClaimsSelectionBar.vue';
+import BillingOperations from './BillingOperations.vue';
 import { cleanParams, firstError, pageRows } from './billingHelpers.js';
 import { useClaimSelection } from './useClaimSelection.js';
 
@@ -43,33 +43,33 @@ import { useClaimSelection } from './useClaimSelection.js';
  * ResolveTissOperatorForCovenantAction.
  */
 const props = defineProps({
-    breadcrumbs:        { type: Array,  default: () => [] },
+    breadcrumbs: { type: Array, default: () => [] },
     /** Paginators do Laravel ({ data, links, total... }), um por aba. */
-    eligibleSchedules:  { type: [Object, Array], default: () => ({ data: [] }) },
-    claims:             { type: [Object, Array], default: () => ({ data: [] }) },
-    batches:            { type: [Object, Array], default: () => ({ data: [] }) },
-    kpis:               { type: Object, default: () => ({}) },
-    totals:             { type: Object, default: () => ({}) },
+    eligibleSchedules: { type: [Object, Array], default: () => ({ data: [] }) },
+    claims: { type: [Object, Array], default: () => ({ data: [] }) },
+    batches: { type: [Object, Array], default: () => ({ data: [] }) },
+    kpis: { type: Object, default: () => ({}) },
+    totals: { type: Object, default: () => ({}) },
     /** Busca/ordem aplicadas por aba: { eligible: { search, sort, direction, default_sort, default_direction }, ... }. */
-    lists:              { type: Object, default: () => ({}) },
-    covenants:          { type: Array,  default: () => [] },
-    filteredCovenant:   { type: Object, default: null },
-    filters:            { type: Object, default: () => ({}) },
-    claimStatuses:      { type: Array,  default: () => [] },
-    paymentMethods:     { type: Array,  default: () => [] },
-    today:              { type: String, default: '' },
+    lists: { type: Object, default: () => ({}) },
+    covenants: { type: Array, default: () => [] },
+    filteredCovenant: { type: Object, default: null },
+    filters: { type: Object, default: () => ({}) },
+    claimStatuses: { type: Array, default: () => [] },
+    paymentMethods: { type: Array, default: () => [] },
+    today: { type: String, default: '' },
     /** Recebimento das guias selecionadas (JSON) e o teto de guias por pedido. */
-    bulkReceiptUrl:     { type: String, default: '' },
-    bulkMaxClaims:      { type: Number, default: 200 },
+    bulkReceiptUrl: { type: String, default: '' },
+    bulkMaxClaims: { type: Number, default: 200 },
     storeIndividualUrl: { type: String, required: true },
-    storeBatchUrl:      { type: String, required: true },
-    importReturnUrl:    { type: String, required: true },
-    glosasUrl:          { type: String, default: '' },
+    storeBatchUrl: { type: String, required: true },
+    importReturnUrl: { type: String, required: true },
+    glosasUrl: { type: String, default: '' },
     procedurePricesUrl: { type: String, default: '' },
-    cid10SearchUrl:     { type: String, default: '' },
-    glosaReasons:       { type: Array,  default: () => [] },
-    tussCodes:          { type: Array,  default: () => [] },
-    t:                  { type: Object, default: () => ({}) },
+    cid10SearchUrl: { type: String, default: '' },
+    glosaReasons: { type: Array, default: () => [] },
+    tussCodes: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { tx } = useTrans(() => props.t);
@@ -82,8 +82,8 @@ const activeTab = ref(TAB_KEYS.includes(props.filters.tab) ? props.filters.tab :
 /** Paginator de cada aba (as três vêm em toda resposta). */
 const PAGES = {
     eligible: () => props.eligibleSchedules,
-    claims:   () => props.claims,
-    batches:  () => props.batches,
+    claims: () => props.claims,
+    batches: () => props.batches,
 };
 
 function pageTotal(page) {
@@ -91,9 +91,24 @@ function pageTotal(page) {
 }
 
 const tabs = computed(() => [
-    { key: 'eligible', icon: 'ti ti-list-check',   label: props.t.tab_eligible, count: props.totals.eligible ?? pageTotal(props.eligibleSchedules) },
-    { key: 'claims',   icon: 'ti ti-file-invoice', label: props.t.tab_claims,   count: props.totals.claims ?? pageTotal(props.claims) },
-    { key: 'batches',  icon: 'ti ti-package',      label: props.t.tab_batches,  count: props.totals.batches ?? pageTotal(props.batches) },
+    {
+        key: 'eligible',
+        icon: 'ti ti-list-check',
+        label: props.t.tab_eligible,
+        count: props.totals.eligible ?? pageTotal(props.eligibleSchedules),
+    },
+    {
+        key: 'claims',
+        icon: 'ti ti-file-invoice',
+        label: props.t.tab_claims,
+        count: props.totals.claims ?? pageTotal(props.claims),
+    },
+    {
+        key: 'batches',
+        icon: 'ti ti-package',
+        label: props.t.tab_batches,
+        count: props.totals.batches ?? pageTotal(props.batches),
+    },
 ]);
 
 function setTab(key) {
@@ -109,10 +124,10 @@ function setTab(key) {
         // Sem `props`: mantém as props atuais (reescrever `filters` aqui
         // dispararia os watchers dos filtros com valores antigos).
         router.replace({
-            url:            `${url.pathname}${url.search}`,
-            preserveState:  true,
+            url: `${url.pathname}${url.search}`,
+            preserveState: true,
             preserveScroll: true,
-            flash:          (current) => current,
+            flash: (current) => current,
         });
     } catch {
         // URL indisponível (ex.: ambiente de teste) — a aba local já mudou.
@@ -131,9 +146,12 @@ function onTabKeydown(event, key) {
 }
 
 // Aba que voltou do servidor numa visita (ex.: KPI que abre a aba Guias).
-watch(() => props.filters?.tab, (tab) => {
-    if (TAB_KEYS.includes(tab)) activeTab.value = tab;
-});
+watch(
+    () => props.filters?.tab,
+    (tab) => {
+        if (TAB_KEYS.includes(tab)) activeTab.value = tab;
+    },
+);
 
 /* ───────────────────────── Filtros (na URL, aplicação automática) ───────────────────────── */
 const SEARCH_DEBOUNCE_MS = 400;
@@ -141,17 +159,17 @@ const SEARCH_DEBOUNCE_MS = 400;
 const filtering = ref(false);
 
 const currentParams = computed(() => ({
-    from:         props.filters.from,
-    to:           props.filters.to,
-    covenant_id:  props.filters.covenant_id,
+    from: props.filters.from,
+    to: props.filters.to,
+    covenant_id: props.filters.covenant_id,
     claim_status: props.filters.claim_status,
-    batch_id:     props.filters.batch_id,
-    tab:          activeTab.value,
+    batch_id: props.filters.batch_id,
+    tab: activeTab.value,
 }));
 
 // Busca digitada em cada aba: estado local (o que está no campo), enviado
 // com debounce; o servidor devolve a normalizada em `lists`.
-const searchTerms  = reactive(Object.fromEntries(TAB_KEYS.map((tab) => [tab, props.lists?.[tab]?.search ?? ''])));
+const searchTerms = reactive(Object.fromEntries(TAB_KEYS.map((tab) => [tab, props.lists?.[tab]?.search ?? ''])));
 const searchTimers = {};
 
 /**
@@ -164,12 +182,12 @@ function listParams(sortOverrides = {}) {
     TAB_KEYS.forEach((tab) => {
         const list = props.lists?.[tab] ?? {};
         const sort = sortOverrides[tab]?.sort ?? list.sort;
-        const dir  = sortOverrides[tab]?.direction ?? list.direction;
+        const dir = sortOverrides[tab]?.direction ?? list.direction;
 
         if (searchTerms[tab]) params[`${tab}_search`] = searchTerms[tab];
 
         if (sort && (sort !== list.default_sort || dir !== list.default_direction)) {
-            params[`${tab}_sort`]      = sort;
+            params[`${tab}_sort`] = sort;
             params[`${tab}_direction`] = dir;
         }
     });
@@ -191,11 +209,15 @@ function pageParams(exceptTab) {
 
 function visit(params) {
     router.get(route('panel.financial.billing.index'), cleanParams(params), {
-        preserveState:  true,
+        preserveState: true,
         preserveScroll: true,
-        replace:        true,
-        onStart:        () => { filtering.value = true; },
-        onFinish:       () => { filtering.value = false; },
+        replace: true,
+        onStart: () => {
+            filtering.value = true;
+        },
+        onFinish: () => {
+            filtering.value = false;
+        },
     });
 }
 
@@ -251,9 +273,9 @@ const actionError = ref('');
 // Marcados guardados com a linha (id → atendimento): a seleção atravessa as
 // páginas, a busca e a ordem (o contador mostra o total), e o modal de lote
 // recebe as linhas marcadas de outras páginas junto com as desta.
-const selectedSchedules   = ref({});
+const selectedSchedules = ref({});
 const selectedScheduleIds = computed(() => Object.keys(selectedSchedules.value));
-const eligibleRows        = computed(() => pageRows(props.eligibleSchedules));
+const eligibleRows = computed(() => pageRows(props.eligibleSchedules));
 
 function selectionScope() {
     return [props.filters.from, props.filters.to, props.filters.covenant_id].join('|');
@@ -263,17 +285,20 @@ let lastSelectionScope = selectionScope();
 
 // Período/convênio novos mudam quem é elegível: descarta os marcados que não
 // estão mais na lista (antes ficavam "invisíveis" e iam para o lote).
-watch(() => props.eligibleSchedules, () => {
-    const scope = selectionScope();
-    if (scope === lastSelectionScope) return;
+watch(
+    () => props.eligibleSchedules,
+    () => {
+        const scope = selectionScope();
+        if (scope === lastSelectionScope) return;
 
-    lastSelectionScope = scope;
-    const visible = new Set(eligibleRows.value.map((s) => s.id));
+        lastSelectionScope = scope;
+        const visible = new Set(eligibleRows.value.map((s) => s.id));
 
-    selectedSchedules.value = Object.fromEntries(
-        Object.entries(selectedSchedules.value).filter(([id]) => visible.has(id)),
-    );
-});
+        selectedSchedules.value = Object.fromEntries(
+            Object.entries(selectedSchedules.value).filter(([id]) => visible.has(id)),
+        );
+    },
+);
 
 function toggleSchedule(id) {
     const next = { ...selectedSchedules.value };
@@ -304,7 +329,7 @@ function toggleSelectAll() {
 
 /** Linhas para o modal de lote: a página atual + os marcados de outras páginas. */
 const batchCandidates = computed(() => {
-    const rows    = eligibleRows.value;
+    const rows = eligibleRows.value;
     const visible = new Set(rows.map((s) => s.id));
 
     return [...rows, ...Object.values(selectedSchedules.value).filter((s) => !visible.has(s.id))];
@@ -314,16 +339,23 @@ const batchCandidates = computed(() => {
 // Só guias com 'pay' em allowed_actions; atravessa páginas (o total soma as
 // marcadas de outras páginas); filtros novos descartam o que saiu da lista.
 const {
-    ids:        selectedClaimIds,
-    rows:       selectedClaimRows,
-    count:      selectedClaimCount,
-    total:      selectedClaimTotal,
-    toggle:     toggleClaimSelection,
+    ids: selectedClaimIds,
+    rows: selectedClaimRows,
+    count: selectedClaimCount,
+    total: selectedClaimTotal,
+    toggle: toggleClaimSelection,
     togglePage: toggleClaimPage,
-    clear:      clearClaimSelection,
+    clear: clearClaimSelection,
 } = useClaimSelection(
     () => props.claims,
-    () => [props.filters.from, props.filters.to, props.filters.covenant_id, props.filters.claim_status, props.filters.batch_id].join('|'),
+    () =>
+        [
+            props.filters.from,
+            props.filters.to,
+            props.filters.covenant_id,
+            props.filters.claim_status,
+            props.filters.batch_id,
+        ].join('|'),
 );
 
 const selectionOnOtherPages = computed(() => {
@@ -348,9 +380,9 @@ function onOperationDone(kind) {
 }
 
 /* ───────────────────────── Guia individual / Lote ───────────────────────── */
-const individualOpen     = ref(false);
+const individualOpen = ref(false);
 const individualSchedule = ref(null);
-const batchOpen          = ref(false);
+const batchOpen = ref(false);
 
 function openIndividual(schedule) {
     individualSchedule.value = schedule;
@@ -363,10 +395,10 @@ function onBatchSaved() {
 }
 
 /* ───────────────────────── Recebimento / Glosa ───────────────────────── */
-const receiptOpen  = ref(false);
+const receiptOpen = ref(false);
 const receiptClaim = ref(null);
-const denyOpen     = ref(false);
-const denyClaim    = ref(null);
+const denyOpen = ref(false);
+const denyClaim = ref(null);
 
 function openReceipt(claim) {
     actionError.value = '';
@@ -381,9 +413,9 @@ function openDeny(claim) {
 }
 
 /* ───────────────────────── Enviar lote (com confirmação) ───────────────────────── */
-const submitOpen        = ref(false);
-const submitTarget      = ref(null);
-const submitError       = ref('');
+const submitOpen = ref(false);
+const submitTarget = ref(null);
+const submitError = ref('');
 const submittingBatchId = ref(null);
 
 function askSubmit(batch) {
@@ -396,31 +428,52 @@ function confirmSubmit() {
     const batch = submitTarget.value;
     if (!batch || submittingBatchId.value) return;
 
-    router.post(batch.submit_url, {}, {
-        preserveScroll: true,
-        preserveState:  true,
-        onStart:   () => { submittingBatchId.value = batch.id; submitError.value = ''; },
-        onError:   (errors) => { submitError.value = firstError(errors) || props.t.unexpected_error; },
-        onSuccess: () => { submitOpen.value = false; },
-        onFinish:  () => { submittingBatchId.value = null; },
-    });
+    router.post(
+        batch.submit_url,
+        {},
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => {
+                submittingBatchId.value = batch.id;
+                submitError.value = '';
+            },
+            onError: (errors) => {
+                submitError.value = firstError(errors) || props.t.unexpected_error;
+            },
+            onSuccess: () => {
+                submitOpen.value = false;
+            },
+            onFinish: () => {
+                submittingBatchId.value = null;
+            },
+        },
+    );
 }
 
 /* ───────────────────────── Cancelar guia / lote (motivo obrigatório) ───────────────────────── */
 const CANCEL_REASON_MIN = 10;
 const CANCEL_REASON_MAX = 1000;
 
-const cancelTarget = ref(null);   // { kind: 'claim' | 'batch', row }
+const cancelTarget = ref(null); // { kind: 'claim' | 'batch', row }
 const cancelSaving = ref(false);
-const cancelError  = ref('');
+const cancelError = ref('');
 
 const cancelTexts = computed(() => {
     const target = cancelTarget.value;
     if (!target) return { title: '', message: '', confirm: '' };
 
     return target.kind === 'batch'
-        ? { title: tx('cancel_batch_title', { code: target.row.code }), message: props.t.cancel_batch_message, confirm: props.t.cancel_batch_confirm }
-        : { title: tx('cancel_claim_title', { code: target.row.code }), message: props.t.cancel_claim_message, confirm: props.t.cancel_claim_confirm };
+        ? {
+              title: tx('cancel_batch_title', { code: target.row.code }),
+              message: props.t.cancel_batch_message,
+              confirm: props.t.cancel_batch_confirm,
+          }
+        : {
+              title: tx('cancel_claim_title', { code: target.row.code }),
+              message: props.t.cancel_claim_message,
+              confirm: props.t.cancel_claim_confirm,
+          };
 });
 
 /**
@@ -435,8 +488,8 @@ function restoreRowFocus(kind, id) {
 }
 
 function askCancel(kind, row) {
-    actionError.value  = '';
-    cancelError.value  = '';
+    actionError.value = '';
+    cancelError.value = '';
     cancelTarget.value = { kind, row };
 }
 
@@ -452,21 +505,32 @@ function confirmCancel(reason) {
     const target = cancelTarget.value;
     if (!target || cancelSaving.value) return;
 
-    router.post(target.row.cancel_url, { reason }, {
-        preserveScroll: true,
-        preserveState:  true,
-        onStart:   () => { cancelSaving.value = true; cancelError.value = ''; },
-        onError:   (errors) => { cancelError.value = firstError(errors) || props.t.unexpected_error; },
-        onSuccess: () => {
-            cancelTarget.value = null;
-            restoreRowFocus(target.kind, target.row.id);
+    router.post(
+        target.row.cancel_url,
+        { reason },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => {
+                cancelSaving.value = true;
+                cancelError.value = '';
+            },
+            onError: (errors) => {
+                cancelError.value = firstError(errors) || props.t.unexpected_error;
+            },
+            onSuccess: () => {
+                cancelTarget.value = null;
+                restoreRowFocus(target.kind, target.row.id);
+            },
+            onFinish: () => {
+                cancelSaving.value = false;
+            },
         },
-        onFinish:  () => { cancelSaving.value = false; },
-    });
+    );
 }
 
 /* ───────────────────────── Corrigir pendência (guia TISS fora do lote) ───────────────────────── */
-const fixOpen  = ref(false);
+const fixOpen = ref(false);
 const fixClaim = ref(null);
 
 function openFix(claim) {
@@ -481,9 +545,9 @@ function onFixSaved() {
 }
 
 /* ───────────────────────── Importar retorno / Pré-validação ───────────────────────── */
-const importOpen        = ref(false);
-const checkingClaimId   = ref(null);
-const pendingResult     = ref(null);
+const importOpen = ref(false);
+const checkingClaimId = ref(null);
+const pendingResult = ref(null);
 const pendingResultOpen = ref(false);
 
 async function checkPending(claim) {
@@ -510,20 +574,40 @@ async function checkPending(claim) {
             <PageHeader :title="t.title">
                 <template #actions>
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <button type="button" class="btn btn-primary btn-sm" data-test="header-new-batch" @click="batchOpen = true">
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            data-test="header-new-batch"
+                            @click="batchOpen = true"
+                        >
                             <i class="ti ti-package me-1" aria-hidden="true"></i>{{ t.btn_new_batch }}
                         </button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" data-test="open-import" @click="importOpen = true">
+                        <button
+                            type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            data-test="open-import"
+                            @click="importOpen = true"
+                        >
                             <i class="ti ti-file-upload me-1" aria-hidden="true"></i>{{ t.btn_import_return }}
                         </button>
-                        <Link v-if="glosasUrl" :href="glosasUrl" class="btn btn-outline-secondary btn-sm" data-test="glosas-link">
+                        <Link
+                            v-if="glosasUrl"
+                            :href="glosasUrl"
+                            class="btn btn-outline-secondary btn-sm"
+                            data-test="glosas-link"
+                        >
                             <i class="ti ti-gavel me-1" aria-hidden="true"></i>{{ t.btn_glosas }}
                         </Link>
                     </div>
                 </template>
             </PageHeader>
 
-            <div v-if="actionError" class="alert alert-danger alert-dismissible d-flex align-items-center gap-2 mb-3" role="alert" data-test="action-error">
+            <div
+                v-if="actionError"
+                class="alert alert-danger alert-dismissible d-flex align-items-center gap-2 mb-3"
+                role="alert"
+                data-test="action-error"
+            >
                 <i class="ti ti-alert-triangle" aria-hidden="true"></i>
                 <span>{{ actionError }}</span>
                 <button type="button" class="btn-close" :aria-label="t.dismiss" @click="actionError = ''"></button>

@@ -6,9 +6,9 @@ import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
  * montados por useReportPage() com o período APLICADO.
  */
 defineProps({
-    options: { type: Array,  default: () => [] }, // [{ key, icon, label, href }]
-    title:   { type: String, default: '' },
-    label:   { type: String, default: '' },
+    options: { type: Array, default: () => [] }, // [{ key, icon, label, href }]
+    title: { type: String, default: '' },
+    label: { type: String, default: '' },
 });
 </script>
 

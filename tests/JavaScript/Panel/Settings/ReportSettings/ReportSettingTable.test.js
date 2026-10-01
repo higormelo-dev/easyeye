@@ -10,33 +10,68 @@ import ReportSettingTable from '@/Pages/Panel/Settings/ReportSettings/ReportSett
  */
 
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
-    default: { props: ['title'], template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>' },
+    default: {
+        props: ['title'],
+        template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
         props: ['title', 'icon', 'variant', 'href', 'target', 'inertiaHref'],
         emits: ['click'],
-        template: '<button type="button" class="action" :title="title" :data-href="href ?? inertiaHref" :data-target="target" @click="$emit(\'click\')" />',
+        template:
+            '<button type="button" class="action" :title="title" :data-href="href ?? inertiaHref" :data-target="target" @click="$emit(\'click\')" />',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_title: 'Modelo', col_category: 'Categoria', col_paper: 'Papel', col_blocks: 'Blocos', col_origin: 'Origem',
-    col_updated_at: 'Atualizado em', col_status: 'Status', col_actions: 'Ações', sort_by: 'Ordenar por :column',
-    no_description: 'Sem descrição', block_header: 'Cabeçalho', block_signature: 'Assinatura', block_footer: 'Rodapé',
-    block_on: ':block: incluído', block_off: ':block: não incluído', origin_own: 'Próprio', origin_adopted: 'Adotado',
-    update_available: 'Atualização disponível', status_active: 'Ativo', status_inactive: 'Inativo',
-    action_preview: 'Pré-visualizar', action_edit: 'Editar', action_reimport: 'Reimportar modelo global',
-    action_delete: 'Excluir', more_actions: 'Mais ações',
+    col_title: 'Modelo',
+    col_category: 'Categoria',
+    col_paper: 'Papel',
+    col_blocks: 'Blocos',
+    col_origin: 'Origem',
+    col_updated_at: 'Atualizado em',
+    col_status: 'Status',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    no_description: 'Sem descrição',
+    block_header: 'Cabeçalho',
+    block_signature: 'Assinatura',
+    block_footer: 'Rodapé',
+    block_on: ':block: incluído',
+    block_off: ':block: não incluído',
+    origin_own: 'Próprio',
+    origin_adopted: 'Adotado',
+    update_available: 'Atualização disponível',
+    status_active: 'Ativo',
+    status_inactive: 'Inativo',
+    action_preview: 'Pré-visualizar',
+    action_edit: 'Editar',
+    action_reimport: 'Reimportar modelo global',
+    action_delete: 'Excluir',
+    more_actions: 'Mais ações',
 };
 
 function template(overrides = {}) {
     return {
-        id: 'r1', title: 'Receituário', description: 'Óculos', category: 'Receitas', paper_size: 'A4',
-        show_header: true, show_signature: false, show_footer: true, active: true,
-        is_adopted: true, has_update: true, updated_at: '2026-09-27T12:00:00-03:00', mode: 'full',
-        preview_url: '/rs/r1/preview', edit_url: '/rs/r1/edit', destroy_url: '/rs/r1', reimport_url: '/rs/r1/reimport',
+        id: 'r1',
+        title: 'Receituário',
+        description: 'Óculos',
+        category: 'Receitas',
+        paper_size: 'A4',
+        show_header: true,
+        show_signature: false,
+        show_footer: true,
+        active: true,
+        is_adopted: true,
+        has_update: true,
+        updated_at: '2026-09-27T12:00:00-03:00',
+        mode: 'full',
+        preview_url: '/rs/r1/preview',
+        edit_url: '/rs/r1/edit',
+        destroy_url: '/rs/r1',
+        reimport_url: '/rs/r1/reimport',
         ...overrides,
     };
 }
@@ -64,7 +99,16 @@ describe('Settings/ReportSettings/ReportSettingTable', () => {
         const w = mountTable();
         const ths = w.findAll('thead th');
 
-        expect(ths.map((th) => th.text().trim())).toEqual(['Modelo', 'Categoria', 'Papel', 'Blocos', 'Origem', 'Atualizado em', 'Status', 'Ações']);
+        expect(ths.map((th) => th.text().trim())).toEqual([
+            'Modelo',
+            'Categoria',
+            'Papel',
+            'Blocos',
+            'Origem',
+            'Atualizado em',
+            'Status',
+            'Ações',
+        ]);
         expect(ths[0].attributes('aria-sort')).toBe('ascending');
         expect(ths[3].find('button').exists()).toBe(false); // Blocos
         expect(ths[4].find('button').exists()).toBe(false); // Origem
@@ -84,7 +128,9 @@ describe('Settings/ReportSettings/ReportSettingTable', () => {
         expect(cells[0].text()).toContain('Receituário');
         expect(cells[0].text()).toContain('Óculos');
         expect(cells[3].findAll('.visually-hidden').map((s) => s.text())).toEqual([
-            'Cabeçalho: incluído', 'Assinatura: não incluído', 'Rodapé: incluído',
+            'Cabeçalho: incluído',
+            'Assinatura: não incluído',
+            'Rodapé: incluído',
         ]);
         expect(cells[4].text()).toContain('Adotado');
         expect(cells[4].text()).toContain('Atualização disponível');
@@ -93,7 +139,9 @@ describe('Settings/ReportSettings/ReportSettingTable', () => {
     });
 
     it('modelo próprio e inativo: origem Próprio, sem atualização, sem reimportar', () => {
-        const w = mountTable([template({ is_adopted: false, has_update: false, reimport_url: null, active: false, description: null })]);
+        const w = mountTable([
+            template({ is_adopted: false, has_update: false, reimport_url: null, active: false, description: null }),
+        ]);
         const cells = w.findAll('tbody tr td');
 
         expect(cells[0].text()).toContain('Sem descrição');
@@ -141,9 +189,17 @@ describe('Settings/ReportSettings/ReportSettingTable', () => {
     });
 
     it('respeita a ordem de colunas salva no navegador', () => {
-        window.localStorage.setItem('report_settings_columns_order', JSON.stringify(['atualizado', 'modelo', 'categoria', 'papel', 'blocos', 'origem']));
+        window.localStorage.setItem(
+            'report_settings_columns_order',
+            JSON.stringify(['atualizado', 'modelo', 'categoria', 'papel', 'blocos', 'origem']),
+        );
         const w = mountTable();
 
-        expect(w.findAll('thead th').map((th) => th.text().trim()).slice(0, 2)).toEqual(['Atualizado em', 'Modelo']);
+        expect(
+            w
+                .findAll('thead th')
+                .map((th) => th.text().trim())
+                .slice(0, 2),
+        ).toEqual(['Atualizado em', 'Modelo']);
     });
 });

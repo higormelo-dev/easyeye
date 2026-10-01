@@ -29,8 +29,12 @@ export function adjustPercentLimit(direction) {
 
 /** Percentual (sempre positivo; o sinal vem do tipo) dentro dos limites? */
 export function isValidAdjustPercent(value, direction) {
-    return typeof value === 'number' && Number.isFinite(value)
-        && value >= ADJUST_PERCENT_MIN && value <= adjustPercentLimit(direction);
+    return (
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        value >= ADJUST_PERCENT_MIN &&
+        value <= adjustPercentLimit(direction)
+    );
 }
 
 /**
@@ -42,7 +46,7 @@ export function isValidAdjustPercent(value, direction) {
  * @returns {number}
  */
 export function adjustPrice(price, percent) {
-    const cents  = BigInt(Math.round(Number(price) * 100));
+    const cents = BigInt(Math.round(Number(price) * 100));
     const factor = PERCENT_SCALE + BigInt(Math.round(Number(percent) * 100));
 
     if (cents <= 0n || factor <= 0n) return 0;
@@ -63,7 +67,7 @@ export function adjustPrice(price, percent) {
  */
 export function planAdjustment(entries, percent) {
     const changes = [];
-    let skipped   = 0;
+    let skipped = 0;
 
     for (const { row, index } of entries) {
         if (isBlankPrice(row.price)) {
@@ -72,7 +76,7 @@ export function planAdjustment(entries, percent) {
         }
 
         const from = Number(row.price);
-        const to   = adjustPrice(from, percent);
+        const to = adjustPrice(from, percent);
 
         if (to !== from) changes.push({ index, row, from, to });
     }
@@ -92,8 +96,8 @@ export function planAdjustment(entries, percent) {
  */
 export function planCopy(entries, sourcePrices, { overwrite = false } = {}) {
     const changes = [];
-    let kept      = 0;
-    let missing   = 0;
+    let kept = 0;
+    let missing = 0;
 
     for (const { row, index } of entries) {
         const source = sourcePrices?.[row.procedure_id];
@@ -103,7 +107,7 @@ export function planCopy(entries, sourcePrices, { overwrite = false } = {}) {
             continue;
         }
 
-        const to   = Math.round(Number(source) * 100) / 100;
+        const to = Math.round(Number(source) * 100) / 100;
         const from = isBlankPrice(row.price) ? null : Number(row.price);
 
         if (from === to) continue;

@@ -3,41 +3,39 @@ import { computed } from 'vue';
 
 const props = defineProps({
     subscriptionKpis: { type: Object, required: true },
-    t:                { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 const STATUS_COLORS = {
-    trial:     '#17a2b8',
-    active:    '#28a745',
-    expired:   '#dc3545',
+    trial: '#17a2b8',
+    active: '#28a745',
+    expired: '#dc3545',
     cancelled: '#6c757d',
-    past_due:  '#ffc107',
+    past_due: '#ffc107',
 };
 
 const STATUS_ORDER = ['active', 'trial', 'past_due', 'expired', 'cancelled'];
 
 const STATUS_BADGE = {
-    trial:     'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
-    active:    'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
-    expired:   'badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium',
+    trial: 'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
+    active: 'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
+    expired: 'badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium',
     cancelled: 'badge-soft-secondary rounded fs-13 fw-medium',
-    past_due:  'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
+    past_due: 'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
 };
 
 const STATUS_LABEL = {
-    trial:     'Trial',
-    active:    'Ativo',
-    expired:   'Expirado',
+    trial: 'Trial',
+    active: 'Ativo',
+    expired: 'Expirado',
     cancelled: 'Cancelado',
-    past_due:  'Em atraso',
+    past_due: 'Em atraso',
 };
 
 const counts = computed(() => props.subscriptionKpis.subscriptionCounts ?? {});
-const total  = computed(() => props.subscriptionKpis.totalSubscriptions ?? 0);
+const total = computed(() => props.subscriptionKpis.totalSubscriptions ?? 0);
 
-const maxCount = computed(() =>
-    Math.max(1, ...STATUS_ORDER.map(s => counts.value[s] ?? 0)),
-);
+const maxCount = computed(() => Math.max(1, ...STATUS_ORDER.map((s) => counts.value[s] ?? 0)));
 
 function barWidth(status) {
     const count = counts.value[status] ?? 0;

@@ -10,14 +10,21 @@
  * Não toma decisões sobre que ícones mostrar — apenas estiliza o container.
  */
 defineProps({
-    gap:   { type: String, default: 'normal' }, // tight | normal | wide
-    align: { type: String, default: 'start' },  // start | center | end
-    wrap:  { type: Boolean, default: false },
+    gap: { type: String, default: 'normal' }, // tight | normal | wide
+    align: { type: String, default: 'start' }, // start | center | end
+    wrap: { type: Boolean, default: false },
 });
 </script>
 
 <template>
-    <div :class="['ee-action-group', `ee-action-group--gap-${gap}`, `ee-action-group--align-${align}`, wrap && 'ee-action-group--wrap']">
+    <div
+        :class="[
+            'ee-action-group',
+            `ee-action-group--gap-${gap}`,
+            `ee-action-group--align-${align}`,
+            wrap && 'ee-action-group--wrap',
+        ]"
+    >
         <slot />
     </div>
 </template>
@@ -34,11 +41,23 @@ defineProps({
     row-gap: 4px;
 }
 
-.ee-action-group--gap-tight  { gap: 2px; }
-.ee-action-group--gap-normal { gap: 6px; }
-.ee-action-group--gap-wide   { gap: 12px; }
+.ee-action-group--gap-tight {
+    gap: 2px;
+}
+.ee-action-group--gap-normal {
+    gap: 6px;
+}
+.ee-action-group--gap-wide {
+    gap: 12px;
+}
 
-.ee-action-group--align-start  { justify-content: flex-start; }
-.ee-action-group--align-center { justify-content: center; }
-.ee-action-group--align-end    { justify-content: flex-end; }
+.ee-action-group--align-start {
+    justify-content: flex-start;
+}
+.ee-action-group--align-center {
+    justify-content: center;
+}
+.ee-action-group--align-end {
+    justify-content: flex-end;
+}
 </style>

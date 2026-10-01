@@ -18,7 +18,9 @@ export const LIST_PROPS = ['entries', 'filters'];
 
 /** Tira vazios da query (URL limpa; o servidor usa os padrões). */
 export function withoutEmpty(params) {
-    return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== '' && value !== null && value !== undefined));
+    return Object.fromEntries(
+        Object.entries(params).filter(([, value]) => value !== '' && value !== null && value !== undefined),
+    );
 }
 
 /**
@@ -27,24 +29,24 @@ export function withoutEmpty(params) {
 export function useEntryFilters(props) {
     const applied = () => props.filters ?? {};
 
-    const search    = ref(applied().search ?? '');
-    const type      = ref(applied().type ?? '');
-    const status    = ref(applied().status ?? '');
-    const category  = ref(applied().category_id ?? '');
-    const sort      = ref(applied().sort ?? '');
+    const search = ref(applied().search ?? '');
+    const type = ref(applied().type ?? '');
+    const status = ref(applied().status ?? '');
+    const category = ref(applied().category_id ?? '');
+    const sort = ref(applied().sort ?? '');
     const direction = ref(applied().direction ?? '');
-    const loading   = ref(false);
-    const error     = ref(false);
+    const loading = ref(false);
+    const error = ref(false);
 
     /** Parâmetros da lista na barra (sem período e sem página). */
     function params() {
         return withoutEmpty({
-            search:      String(search.value ?? '').trim(),
-            type:        type.value,
-            status:      status.value,
+            search: String(search.value ?? '').trim(),
+            type: type.value,
+            status: status.value,
             category_id: category.value,
-            sort:        sort.value,
-            direction:   direction.value,
+            sort: sort.value,
+            direction: direction.value,
         });
     }
 
@@ -52,14 +54,16 @@ export function useEntryFilters(props) {
     function appliedKey() {
         const f = applied();
 
-        return JSON.stringify(withoutEmpty({
-            search:      String(f.search ?? '').trim(),
-            type:        f.type ?? '',
-            status:      f.status ?? '',
-            category_id: f.category_id ?? '',
-            sort:        f.sort ?? '',
-            direction:   f.direction ?? '',
-        }));
+        return JSON.stringify(
+            withoutEmpty({
+                search: String(f.search ?? '').trim(),
+                type: f.type ?? '',
+                status: f.status ?? '',
+                category_id: f.category_id ?? '',
+                sort: f.sort ?? '',
+                direction: f.direction ?? '',
+            }),
+        );
     }
 
     // Última combinação pedida: evita visita repetida quando vários watchers
@@ -76,23 +80,39 @@ export function useEntryFilters(props) {
         cancelPending();
 
         const query = params();
-        const key   = JSON.stringify(query);
+        const key = JSON.stringify(query);
         if (key === lastRequested) return;
 
         lastRequested = key;
-        error.value   = false;
+        error.value = false;
 
-        router.get(props.routes?.index ?? '', { from: applied().from, to: applied().to, ...query }, {
-            preserveState:   true,
-            preserveScroll:  true,
-            replace:         true,
-            only:            LIST_PROPS,
-            onStart:         () => { loading.value = true; },
-            onFinish:        () => { loading.value = false; },
-            // Falhou: avisa na lista e deixa repetir a mesma combinação.
-            onHttpException: () => { error.value = true; lastRequested = null; return false; },
-            onNetworkError:  () => { error.value = true; lastRequested = null; return false; },
-        });
+        router.get(
+            props.routes?.index ?? '',
+            { from: applied().from, to: applied().to, ...query },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                only: LIST_PROPS,
+                onStart: () => {
+                    loading.value = true;
+                },
+                onFinish: () => {
+                    loading.value = false;
+                },
+                // Falhou: avisa na lista e deixa repetir a mesma combinação.
+                onHttpException: () => {
+                    error.value = true;
+                    lastRequested = null;
+                    return false;
+                },
+                onNetworkError: () => {
+                    error.value = true;
+                    lastRequested = null;
+                    return false;
+                },
+            },
+        );
     }
 
     watch(search, () => {
@@ -108,26 +128,26 @@ export function useEntryFilters(props) {
     watch(
         () => [applied().type, applied().status, applied().category_id, applied().sort, applied().direction],
         ([newType, newStatus, newCategory, newSort, newDirection]) => {
-            type.value      = newType ?? '';
-            status.value    = newStatus ?? '';
-            category.value  = newCategory ?? '';
-            sort.value      = newSort ?? '';
+            type.value = newType ?? '';
+            status.value = newStatus ?? '';
+            category.value = newCategory ?? '';
+            sort.value = newSort ?? '';
             direction.value = newDirection ?? '';
-            lastRequested   = appliedKey();
+            lastRequested = appliedKey();
         },
     );
 
     /** `sort` do SortableTh. */
     function sortBy({ sort: newSort, direction: newDirection }) {
-        sort.value      = newSort;
+        sort.value = newSort;
         direction.value = newDirection;
         apply();
     }
 
     function clear() {
-        search.value   = '';
-        type.value     = '';
-        status.value   = '';
+        search.value = '';
+        type.value = '';
+        status.value = '';
         category.value = '';
         apply();
     }

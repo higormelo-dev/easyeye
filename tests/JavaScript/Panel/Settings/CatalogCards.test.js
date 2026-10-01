@@ -13,7 +13,11 @@ vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
     default: { template: '<div class="dd"><slot /></div>' },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
-    default: { props: ['title', 'icon'], emits: ['click'], template: '<button type="button" :title="title" @click="$emit(\'click\')" />' },
+    default: {
+        props: ['title', 'icon'],
+        emits: ['click'],
+        template: '<button type="button" :title="title" @click="$emit(\'click\')" />',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
@@ -21,17 +25,34 @@ const columns = [
     { key: 'code', label: 'Código', type: 'code' },
     { key: 'name', label: 'Nome', type: 'text' },
 ];
-const t = { load_error: 'Falha ao carregar.', retry: 'Tentar novamente', action_view: 'Ver detalhes', action_edit: 'Editar', empty_list: 'Nada.' };
+const t = {
+    load_error: 'Falha ao carregar.',
+    retry: 'Tentar novamente',
+    action_view: 'Ver detalhes',
+    action_edit: 'Editar',
+    empty_list: 'Nada.',
+};
 
 let wrapper;
 let successHandler;
 
 function card(overrides = {}) {
-    return { id: 'c1', code: 'CVP-1', name: 'UNIMED', active: true, deleted: false, is_global: false, mode: 'full', ...overrides };
+    return {
+        id: 'c1',
+        code: 'CVP-1',
+        name: 'UNIMED',
+        active: true,
+        deleted: false,
+        is_global: false,
+        mode: 'full',
+        ...overrides,
+    };
 }
 
 function respond(data, meta = { current_page: 1, last_page: 1, total: data.length }) {
-    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data, meta }) }));
+    globalThis.fetch = vi.fn(() =>
+        Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data, meta }) }),
+    );
 }
 
 beforeEach(() => {
@@ -89,7 +110,10 @@ describe('CatalogCards', () => {
         respond([card()], { current_page: 1, last_page: 66, total: 980 });
         const w = await mountCards();
 
-        const labels = w.findAll('.pagination .page-link').map((el) => el.text()).filter(Boolean);
+        const labels = w
+            .findAll('.pagination .page-link')
+            .map((el) => el.text())
+            .filter(Boolean);
 
         expect(labels).toEqual(['1', '2', '3', '…', '66']);
     });
@@ -124,15 +148,39 @@ describe('CatalogCards', () => {
         const w = await mountCards('');
 
         let resolveSlow;
-        globalThis.fetch = vi.fn()
-            .mockImplementationOnce(() => new Promise((r) => { resolveSlow = r; }))
-            .mockImplementationOnce(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: [card({ id: 'new', name: 'NOVO' })], meta: { current_page: 1, last_page: 1, total: 1 } }) }));
+        globalThis.fetch = vi
+            .fn()
+            .mockImplementationOnce(
+                () =>
+                    new Promise((r) => {
+                        resolveSlow = r;
+                    }),
+            )
+            .mockImplementationOnce(() =>
+                Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    json: () =>
+                        Promise.resolve({
+                            data: [card({ id: 'new', name: 'NOVO' })],
+                            meta: { current_page: 1, last_page: 1, total: 1 },
+                        }),
+                }),
+            );
 
         successHandler({ detail: { page: { props: { filters: { search: 'a' } } } } });
         successHandler({ detail: { page: { props: { filters: { search: 'ab' } } } } });
         await flushPromises();
 
-        resolveSlow({ ok: true, status: 200, json: () => Promise.resolve({ data: [card({ id: 'old', name: 'ANTIGO' })], meta: { current_page: 1, last_page: 1, total: 1 } }) });
+        resolveSlow({
+            ok: true,
+            status: 200,
+            json: () =>
+                Promise.resolve({
+                    data: [card({ id: 'old', name: 'ANTIGO' })],
+                    meta: { current_page: 1, last_page: 1, total: 1 },
+                }),
+        });
         await flushPromises();
 
         expect(w.text()).toContain('NOVO');

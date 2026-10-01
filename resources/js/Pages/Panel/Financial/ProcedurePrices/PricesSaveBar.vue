@@ -7,12 +7,12 @@ import { useTrans } from '@/composables/useTrans.js';
  * rolada. O status é uma região aria-live (lida sem roubar o foco).
  */
 const props = defineProps({
-    dirtyCount: { type: Number,  default: 0 },
-    saving:     { type: Boolean, default: false },
-    disabled:   { type: Boolean, default: false },
+    dirtyCount: { type: Number, default: 0 },
+    saving: { type: Boolean, default: false },
+    disabled: { type: Boolean, default: false },
     /** Deixa espaço à direita para o botão flutuante do Assistente de IA. */
-    avoidFab:   { type: Boolean, default: false },
-    t:          { type: Object,  default: () => ({}) },
+    avoidFab: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 
 defineEmits(['save']);
@@ -29,7 +29,12 @@ const { tx } = useTrans(() => props.t);
         data-test="savebar"
     >
         <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="me-auto small d-inline-flex align-items-center gap-1" role="status" aria-live="polite" data-test="dirty-count">
+            <span
+                class="me-auto small d-inline-flex align-items-center gap-1"
+                role="status"
+                aria-live="polite"
+                data-test="dirty-count"
+            >
                 <template v-if="dirtyCount > 0">
                     <i class="ti ti-pencil text-warning" aria-hidden="true"></i>
                     <strong>{{ tx('unsaved', { count: dirtyCount }) }}</strong>
@@ -47,7 +52,8 @@ const { tx } = useTrans(() => props.t);
                 @click="$emit('save')"
             >
                 <span v-if="saving" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-                <i v-else class="ti ti-device-floppy me-1" aria-hidden="true"></i>{{ saving ? tx('saving') : tx('save') }}
+                <i v-else class="ti ti-device-floppy me-1" aria-hidden="true"></i
+                >{{ saving ? tx('saving') : tx('save') }}
             </button>
         </div>
     </div>

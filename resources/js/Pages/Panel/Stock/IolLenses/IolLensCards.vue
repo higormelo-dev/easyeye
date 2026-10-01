@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
-import { useTrans }        from '@/composables/useTrans.js';
+import { useTrans } from '@/composables/useTrans.js';
 
 /**
  * Cards de lentes IOL no padrão de Patients/PatientCards: foto, modelo,
@@ -14,8 +14,8 @@ import { useTrans }        from '@/composables/useTrans.js';
  * endpoint extra.
  */
 const props = defineProps({
-    items:             { type: Object, required: true },   // paginator Laravel
-    t:                 { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    t: { type: Object, default: () => ({}) },
     movementsIndexUrl: { type: String, default: '' },
 });
 
@@ -75,21 +75,25 @@ function movementsUrl(lens) {
                         width="56"
                         height="56"
                         loading="lazy"
-                        style="object-fit:cover;"
-                    >
+                        style="object-fit: cover"
+                    />
                     <span
                         v-else
                         class="rounded bg-body-tertiary border d-inline-flex align-items-center justify-content-center flex-shrink-0 text-body-secondary fs-4"
-                        style="width:56px;height:56px;"
+                        style="width: 56px; height: 56px"
                         aria-hidden="true"
-                    ><i class="ti ti-eye"></i></span>
+                        ><i class="ti ti-eye"></i
+                    ></span>
                     <div class="min-w-0">
                         <h6 class="mb-1 fw-semibold lh-sm text-break">{{ lens.model_name }}</h6>
                         <span
-                            :class="lens.active
-                                ? 'badge badge-soft-success rounded text-success border border-success fs-12'
-                                : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'"
-                        >{{ lens.active ? (t.status_active ?? 'Ativa') : (t.status_inactive ?? 'Inativa') }}</span>
+                            :class="
+                                lens.active
+                                    ? 'badge badge-soft-success rounded text-success border border-success fs-12'
+                                    : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'
+                            "
+                            >{{ lens.active ? (t.status_active ?? 'Ativa') : (t.status_inactive ?? 'Inativa') }}</span
+                        >
                     </div>
                 </div>
 
@@ -119,7 +123,7 @@ function movementsUrl(lens) {
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end" gap="tight">
                     <ActionIconButton
@@ -141,13 +145,22 @@ function movementsUrl(lens) {
                         </li>
                         <li>
                             <button type="button" class="dropdown-item rounded-1" @click="emit('toggleActive', lens)">
-                                <i :class="`ti me-1 ${lens.active ? 'ti-lock-open' : 'ti-lock'}`" aria-hidden="true"></i>
-                                {{ lens.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                <i
+                                    :class="`ti me-1 ${lens.active ? 'ti-lock-open' : 'ti-lock'}`"
+                                    aria-hidden="true"
+                                ></i>
+                                {{
+                                    lens.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar')
+                                }}
                             </button>
                         </li>
-                        <li><hr class="dropdown-divider"></li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li>
-                            <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', lens)">
+                            <button
+                                type="button"
+                                class="dropdown-item rounded-1 text-danger"
+                                @click="emit('delete', lens)"
+                            >
                                 <i class="ti ti-trash me-1" aria-hidden="true"></i> {{ t.action_delete ?? 'Excluir' }}
                             </button>
                         </li>

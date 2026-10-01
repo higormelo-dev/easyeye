@@ -9,23 +9,38 @@ import SupplierTable from '@/Pages/Panel/Stock/Suppliers/SupplierTable.vue';
  */
 
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
-    default: { props: ['title'], template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>' },
+    default: {
+        props: ['title'],
+        template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
         props: ['title', 'icon', 'href', 'inertiaHref', 'variant'],
         emits: ['click'],
-        template: '<button type="button" class="icon-btn" :title="title" :data-href="inertiaHref ?? href" :data-variant="variant" @click="$emit(\'click\')" />',
+        template:
+            '<button type="button" class="icon-btn" :title="title" :data-href="inertiaHref ?? href" :data-variant="variant" @click="$emit(\'click\')" />',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_name: 'Nome', col_phone: 'Telefone', col_document: 'Documento', col_contact: 'Contato',
-    col_email: 'E-mail', col_code: 'Código', col_status: 'Status', col_actions: 'Ações',
-    sort_by: 'Ordenar por :column', status_active: 'Ativo', status_inactive: 'Inativo',
-    action_purchase_orders: 'Pedidos de compra deste fornecedor', action_edit: 'Editar',
-    action_delete: 'Excluir', more_actions: 'Mais ações', empty_list: 'Nenhum fornecedor encontrado.',
+    col_name: 'Nome',
+    col_phone: 'Telefone',
+    col_document: 'Documento',
+    col_contact: 'Contato',
+    col_email: 'E-mail',
+    col_code: 'Código',
+    col_status: 'Status',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    status_active: 'Ativo',
+    status_inactive: 'Inativo',
+    action_purchase_orders: 'Pedidos de compra deste fornecedor',
+    action_edit: 'Editar',
+    action_delete: 'Excluir',
+    more_actions: 'Mais ações',
+    empty_list: 'Nenhum fornecedor encontrado.',
 };
 
 let wrapper;
@@ -35,10 +50,17 @@ afterEach(() => wrapper?.unmount());
 
 function supplier(overrides = {}) {
     return {
-        id: 's1', code: 'FOR-0000000001', name: 'Alfa Óptica', active: true,
-        document: '12345678000199', document_display: '12.345.678/0001-99',
-        phone: '6133334444', phone_display: '(61) 3333-4444',
-        contact_name: 'Ana', email: 'contato@alfa.test', ...overrides,
+        id: 's1',
+        code: 'FOR-0000000001',
+        name: 'Alfa Óptica',
+        active: true,
+        document: '12345678000199',
+        document_display: '12.345.678/0001-99',
+        phone: '6133334444',
+        phone_display: '(61) 3333-4444',
+        contact_name: 'Ana',
+        email: 'contato@alfa.test',
+        ...overrides,
     };
 }
 
@@ -59,7 +81,16 @@ const headerLabels = (w) => w.findAll('thead th').map((th) => th.text());
 
 describe('SupplierTable', () => {
     it('mostra as colunas na ordem padrão (Nome e Telefone primeiro, como em pacientes) e Status/Ações no fim', () => {
-        expect(headerLabels(mountTable())).toEqual(['Nome', 'Telefone', 'Documento', 'Contato', 'E-mail', 'Código', 'Status', 'Ações']);
+        expect(headerLabels(mountTable())).toEqual([
+            'Nome',
+            'Telefone',
+            'Documento',
+            'Contato',
+            'E-mail',
+            'Código',
+            'Status',
+            'Ações',
+        ]);
     });
 
     it('respeita a ordem de colunas salva no navegador', () => {
@@ -114,7 +145,9 @@ describe('SupplierTable', () => {
         const badges = w.findAll('tbody .badge');
 
         expect(badges[0].text()).toBe('Ativo');
-        expect(badges[0].classes()).toEqual(expect.arrayContaining(['badge-soft-success', 'text-success', 'border-success']));
+        expect(badges[0].classes()).toEqual(
+            expect.arrayContaining(['badge-soft-success', 'text-success', 'border-success']),
+        );
         expect(badges[1].text()).toBe('Inativo');
         expect(badges[1].classes()).toEqual(expect.arrayContaining(['badge-soft-danger', 'text-danger']));
     });

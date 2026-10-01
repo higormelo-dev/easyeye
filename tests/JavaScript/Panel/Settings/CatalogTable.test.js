@@ -12,7 +12,11 @@ vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
     default: { template: '<div class="dd"><slot name="trigger" /><slot /></div>' },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
-    default: { props: ['title', 'icon'], emits: ['click'], template: '<button type="button" :title="title" @click="$emit(\'click\')" />' },
+    default: {
+        props: ['title', 'icon'],
+        emits: ['click'],
+        template: '<button type="button" :title="title" @click="$emit(\'click\')" />',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
@@ -23,8 +27,12 @@ const columns = [
 ];
 
 const t = {
-    action_view: 'Ver detalhes', action_edit: 'Editar', action_delete: 'Excluir',
-    action_restore: 'Restaurar', sort_by: 'Ordenar por :column', columns_label: 'Colunas',
+    action_view: 'Ver detalhes',
+    action_edit: 'Editar',
+    action_delete: 'Excluir',
+    action_restore: 'Restaurar',
+    sort_by: 'Ordenar por :column',
+    columns_label: 'Colunas',
 };
 
 let wrapper;
@@ -33,7 +41,17 @@ beforeEach(() => window.localStorage.clear());
 afterEach(() => wrapper?.unmount());
 
 function row(overrides = {}) {
-    return { id: 'a', code: 'CVP-1', name: 'UNIMED', color: '#3699ff', active: true, deleted: false, is_global: false, mode: 'full', ...overrides };
+    return {
+        id: 'a',
+        code: 'CVP-1',
+        name: 'UNIMED',
+        color: '#3699ff',
+        active: true,
+        deleted: false,
+        is_global: false,
+        mode: 'full',
+        ...overrides,
+    };
 }
 
 function mountTable({ rows = [row()], filters = { sort: 'name', dir: 'asc' }, storageKey = 'covenants_view' } = {}) {
@@ -125,6 +143,11 @@ describe('CatalogTable — ordem de colunas personalizada', () => {
         window.localStorage.setItem('covenants_columns_order', JSON.stringify(['name', 'antiga']));
         const w = mountTable();
 
-        expect(w.findAll('thead th').map((th) => th.text()).slice(0, 3)).toEqual(['Código', 'Nome', 'Cor']);
+        expect(
+            w
+                .findAll('thead th')
+                .map((th) => th.text())
+                .slice(0, 3),
+        ).toEqual(['Código', 'Nome', 'Cor']);
     });
 });

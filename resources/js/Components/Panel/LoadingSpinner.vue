@@ -8,8 +8,8 @@
  *   padding – classe de padding vertical (default "py-5")
  */
 defineProps({
-    label:   { type: String, default: 'Carregando...' },
-    color:   { type: String, default: 'primary' },
+    label: { type: String, default: 'Carregando...' },
+    color: { type: String, default: 'primary' },
     padding: { type: String, default: 'py-5' },
 });
 </script>

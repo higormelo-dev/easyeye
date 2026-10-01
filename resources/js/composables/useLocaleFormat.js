@@ -44,7 +44,9 @@ export function useLocaleFormat() {
     function signedMoney(value, currency = 'BRL') {
         if (isBlank(value)) return '—';
 
-        return new Intl.NumberFormat(locale.value, { style: 'currency', currency, signDisplay: 'exceptZero' }).format(Number(value));
+        return new Intl.NumberFormat(locale.value, { style: 'currency', currency, signDisplay: 'exceptZero' }).format(
+            Number(value),
+        );
     }
 
     /** Quantidade de estoque: até `maxDigits` casas, sem zeros à direita (2 → "2", 2.5 → "2,5"). */
@@ -72,7 +74,7 @@ export function useLocaleFormat() {
         if (!value) return '—';
 
         const onlyDate = /^\d{4}-\d{2}-\d{2}$/.test(String(value));
-        const parsed   = onlyDate ? new Date(`${value}T00:00:00`) : new Date(value);
+        const parsed = onlyDate ? new Date(`${value}T00:00:00`) : new Date(value);
         if (Number.isNaN(parsed.getTime())) return String(value);
 
         return new Intl.DateTimeFormat(locale.value, { dateStyle: 'short' }).format(parsed);

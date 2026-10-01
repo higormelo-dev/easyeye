@@ -10,11 +10,11 @@ import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 describe('AiAssistantPanel — bloqueio em 95% de cota', () => {
     const baseUrls = {
         estimate: '/_routes/panel.ai-runs.estimate',
-        store:    '/_routes/panel.ai-runs.store',
-        show:     '/_routes/panel.ai-runs.show/__ID__',
-        approve:  '/_routes/panel.ai-runs.approve/__ID__',
-        reject:   '/_routes/panel.ai-runs.reject/__ID__',
-        cancel:   '/_routes/panel.ai-runs.cancel/__ID__',
+        store: '/_routes/panel.ai-runs.store',
+        show: '/_routes/panel.ai-runs.show/__ID__',
+        approve: '/_routes/panel.ai-runs.approve/__ID__',
+        reject: '/_routes/panel.ai-runs.reject/__ID__',
+        cancel: '/_routes/panel.ai-runs.cancel/__ID__',
     };
 
     function mountPanel(quota) {
@@ -22,7 +22,8 @@ describe('AiAssistantPanel — bloqueio em 95% de cota', () => {
             global: {
                 stubs: {
                     OffcanvasPanel: {
-                        template: '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
+                        template:
+                            '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
                         props: ['open', 'width'],
                     },
                 },
@@ -30,27 +31,27 @@ describe('AiAssistantPanel — bloqueio em 95% de cota', () => {
             props: {
                 open: true,
                 ai: {
-                    urls:    baseUrls,
+                    urls: baseUrls,
                     balance: { available: 10 },
                     quota,
-                    modes:   [{ value: 'validated' }],
+                    modes: [{ value: 'validated' }],
                     workflows: ['record_assist'],
                     default_workflow: 'record_assist',
                     assistant: {
-                        title:                'Assistente de IA',
-                        analyze:              'Analisar com IA',
-                        quota_label:          'Cota mensal',
-                        quota_used:           ':consumed/:quota créditos usados (:percent%)',
-                        quota_warning:        'Atenção: :percent% consumido',
-                        quota_critical:       'Cota quase no limite (:percent%)',
-                        quota_exhausted:      'Cota mensal atingida (:consumed/:quota).',
+                        title: 'Assistente de IA',
+                        analyze: 'Analisar com IA',
+                        quota_label: 'Cota mensal',
+                        quota_used: ':consumed/:quota créditos usados (:percent%)',
+                        quota_warning: 'Atenção: :percent% consumido',
+                        quota_critical: 'Cota quase no limite (:percent%)',
+                        quota_exhausted: 'Cota mensal atingida (:consumed/:quota).',
                         quota_exhausted_hint: 'Cota mensal atingida.',
                     },
                     workflow_labels: { record_assist: 'Análise do prontuário' },
                 },
                 context: {
-                    workflow_default:  'record_assist',
-                    patient_id:        'p1',
+                    workflow_default: 'record_assist',
+                    patient_id: 'p1',
                     medical_record_id: 'r1',
                 },
             },
@@ -61,7 +62,7 @@ describe('AiAssistantPanel — bloqueio em 95% de cota', () => {
         globalThis.window = globalThis.window ?? {};
         globalThis.window.axios = {
             post: vi.fn(() => Promise.resolve({ data: { run_id: 'r-abc' } })),
-            get:  vi.fn(() => Promise.resolve({ data: { data: [] } })),
+            get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
         };
     });
 
@@ -71,7 +72,7 @@ describe('AiAssistantPanel — bloqueio em 95% de cota', () => {
 
         expect(vm.quotaExhausted).toBe(true);
 
-        const analyzeBtn = wrapper.findAll('button').find(b => b.text().includes('Analisar'));
+        const analyzeBtn = wrapper.findAll('button').find((b) => b.text().includes('Analisar'));
         expect(analyzeBtn.attributes('disabled')).toBeDefined();
     });
 

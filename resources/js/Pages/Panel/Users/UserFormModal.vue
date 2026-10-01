@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
-import SearchSelect   from '@/Components/Panel/SearchSelect.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
  * Criar/editar usuário no mesmo painel (OffcanvasPanel) de Pacientes e
@@ -11,36 +11,34 @@ import SearchSelect   from '@/Components/Panel/SearchSelect.vue';
  * (prop `t`).
  */
 const props = defineProps({
-    open:       { type: Boolean, required: true },
-    userId:     { type: String,  default: null },
-    roles:      { type: Object,  default: () => ({}) },
-    isClient:   { type: Boolean, default: true },
-    t:          { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    userId: { type: String, default: null },
+    roles: { type: Object, default: () => ({}) },
+    isClient: { type: Boolean, default: true },
+    t: { type: Object, default: () => ({}) },
     // Própria conta: o backend recusa desativar (EntityUserService::update,
     // 403) — o interruptor fica travado com a explicação.
     lockActive: { type: Boolean, default: false },
 });
 
-const emit    = defineEmits(['close']);
-const isEdit  = computed(() => !!props.userId);
-const title   = computed(() => (isEdit.value
-    ? (props.t.form_title_edit ?? 'Editar usuário')
-    : (props.t.form_title_create ?? 'Novo usuário')));
+const emit = defineEmits(['close']);
+const isEdit = computed(() => !!props.userId);
+const title = computed(() =>
+    isEdit.value ? (props.t.form_title_edit ?? 'Editar usuário') : (props.t.form_title_create ?? 'Novo usuário'),
+);
 const loading = ref(false);
 const loadErr = ref('');
 
 const form = useForm({
-    name:                  '',
-    email:                 '',
-    rule:                  '',
-    active:                true,
-    password:              '',
+    name: '',
+    email: '',
+    rule: '',
+    active: true,
+    password: '',
     password_confirmation: '',
 });
 
-const roleOptions = computed(() =>
-    Object.entries(props.roles).map(([value, label]) => ({ value, label })),
-);
+const roleOptions = computed(() => Object.entries(props.roles).map(([value, label]) => ({ value, label })));
 
 // ── Perfis adicionais (RBAC granular ADITIVO) ───────────────────────────────
 // Só faz sentido em edição: um EntityUser precisa existir (e ter seu id)
@@ -49,7 +47,7 @@ const roleOptions = computed(() =>
 // existe. `availableRoles`/`selectedRoleIds` são estado local (não vêm de
 // prop) porque só existem depois do fetch de edição — nome deliberadamente
 // diferente da prop `roles` (que é o dicionário rule->label do perfil base).
-const availableRoles  = ref([]);
+const availableRoles = ref([]);
 const selectedRoleIds = ref([]);
 
 function toggleRole(id) {
@@ -65,7 +63,7 @@ function resetForm() {
     form.reset();
     form.clearErrors();
     loadErr.value = '';
-    availableRoles.value  = [];
+    availableRoles.value = [];
     selectedRoleIds.value = [];
 }
 
@@ -73,15 +71,15 @@ async function loadEditData(id) {
     loading.value = true;
     loadErr.value = '';
     try {
-        const res  = await fetch(route('panel.accesscontrol.users.show', id), {
+        const res = await fetch(route('panel.accesscontrol.users.show', id), {
             headers: { Accept: 'application/json' },
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.message ?? '');
-        const d    = json.data;
-        form.name   = d.name   ?? '';
-        form.email  = d.email  ?? '';
-        form.rule   = d.rule   ?? '';
+        const d = json.data;
+        form.name = d.name ?? '';
+        form.email = d.email ?? '';
+        form.rule = d.rule ?? '';
         form.active = d.active ?? true;
     } catch {
         loadErr.value = props.t.js_error_load ?? 'Erro ao carregar dados do usuário.';
@@ -94,12 +92,12 @@ async function loadEditData(id) {
     // do `show()` acima) e falha silenciosamente: é uma seção secundária do
     // form, não deve bloquear a edição dos dados principais do usuário.
     try {
-        const res  = await fetch(route('panel.accesscontrol.users.edit', id), {
+        const res = await fetch(route('panel.accesscontrol.users.edit', id), {
             headers: { Accept: 'application/json' },
         });
         const json = await res.json();
         if (res.ok) {
-            availableRoles.value  = json.roles ?? [];
+            availableRoles.value = json.roles ?? [];
             selectedRoleIds.value = json.role_ids ?? [];
         }
     } catch {
@@ -107,12 +105,15 @@ async function loadEditData(id) {
     }
 }
 
-watch(() => props.open, async (val) => {
-    if (val) {
-        resetForm();
-        if (props.userId) await loadEditData(props.userId);
-    }
-});
+watch(
+    () => props.open,
+    async (val) => {
+        if (val) {
+            resetForm();
+            if (props.userId) await loadEditData(props.userId);
+        }
+    },
+);
 
 // UX: perfis adicionais são sincronizados numa chamada PATCH dedicada (ver
 // UsersController::updateRoles()) disparada DEPOIS que o form principal
@@ -157,7 +158,6 @@ function syncRoles() {
         </div>
 
         <form v-else id="user-form" autocomplete="off" @submit.prevent="submit">
-
             <!-- Nome -->
             <div class="mb-3">
                 <label class="form-label fw-semibold" for="ufm_name">
@@ -173,7 +173,7 @@ function syncRoles() {
                     aria-required="true"
                     :aria-invalid="form.errors.name ? 'true' : undefined"
                     autocomplete="off"
-                >
+                />
                 <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
             </div>
 
@@ -192,7 +192,7 @@ function syncRoles() {
                     aria-required="true"
                     :aria-invalid="form.errors.email ? 'true' : undefined"
                     autocomplete="off"
-                >
+                />
                 <div v-if="form.errors.email" class="invalid-feedback">{{ form.errors.email }}</div>
             </div>
 
@@ -224,7 +224,7 @@ function syncRoles() {
                         type="checkbox"
                         :disabled="lockActive"
                         :aria-describedby="lockActive ? 'ufm_active_hint' : undefined"
-                    >
+                    />
                     <label class="form-check-label" for="ufm_active">{{ t.field_active ?? 'Usuário ativo' }}</label>
                 </div>
                 <div v-if="lockActive" id="ufm_active_hint" class="form-text">{{ t.self_protected }}</div>
@@ -232,7 +232,9 @@ function syncRoles() {
 
             <!-- Perfis adicionais (edit only — RBAC granular ADITIVO) -->
             <fieldset v-if="isEdit" class="mb-3">
-                <legend class="form-label fw-semibold fs-6 mb-2">{{ t.field_extra_roles ?? 'Perfis adicionais' }}</legend>
+                <legend class="form-label fw-semibold fs-6 mb-2">
+                    {{ t.field_extra_roles ?? 'Perfis adicionais' }}
+                </legend>
                 <div v-if="availableRoles.length === 0" class="small text-muted">
                     {{ t.extra_roles_empty ?? 'Nenhum perfil customizado cadastrado nesta clínica.' }}
                 </div>
@@ -244,7 +246,7 @@ function syncRoles() {
                             class="form-check-input"
                             :checked="selectedRoleIds.includes(r.id)"
                             @change="toggleRole(r.id)"
-                        >
+                        />
                         <label class="form-check-label small" :for="`ufm_role_${r.id}`">{{ r.name }}</label>
                     </div>
                 </div>
@@ -253,7 +255,7 @@ function syncRoles() {
 
             <!-- Password (create only) -->
             <template v-if="!isEdit">
-                <hr class="my-3">
+                <hr class="my-3" />
                 <div class="alert alert-info small py-2">
                     <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ t.credentials_info }}
                 </div>
@@ -272,7 +274,7 @@ function syncRoles() {
                         aria-required="true"
                         aria-describedby="ufm_password_hint"
                         :class="{ 'is-invalid': form.errors.password }"
-                    >
+                    />
                     <div v-if="form.errors.password" class="invalid-feedback">{{ form.errors.password }}</div>
                     <div id="ufm_password_hint" class="form-text">{{ t.field_password_hint }}</div>
                 </div>
@@ -290,7 +292,7 @@ function syncRoles() {
                         autocomplete="new-password"
                         aria-required="true"
                         :class="{ 'is-invalid': form.errors.password_confirmation }"
-                    >
+                    />
                     <div v-if="form.errors.password_confirmation" class="invalid-feedback">
                         {{ form.errors.password_confirmation }}
                     </div>
@@ -302,13 +304,7 @@ function syncRoles() {
             <button type="button" class="btn btn-light" @click="$emit('close')">
                 {{ t.btn_cancel ?? 'Cancelar' }}
             </button>
-            <button
-                v-if="!loadErr"
-                type="submit"
-                form="user-form"
-                class="btn btn-primary"
-                :disabled="form.processing"
-            >
+            <button v-if="!loadErr" type="submit" form="user-form" class="btn btn-primary" :disabled="form.processing">
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                 {{ isEdit ? (t.btn_save ?? 'Salvar alterações') : (t.btn_create ?? 'Criar usuário') }}
             </button>

@@ -15,15 +15,15 @@ import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
-    icon:        { type: String, required: true },
-    title:       { type: String, default: '' },
-    variant:     { type: String, default: 'default' }, // default | info | success | danger | warning | primary
-    disabled:    { type: Boolean, default: false },
-    href:        { type: String, default: null },       // link nativo (não-SPA)
-    target:      { type: String, default: null },
-    inertiaHref: { type: String, default: null },       // Inertia Link
+    icon: { type: String, required: true },
+    title: { type: String, default: '' },
+    variant: { type: String, default: 'default' }, // default | info | success | danger | warning | primary
+    disabled: { type: Boolean, default: false },
+    href: { type: String, default: null }, // link nativo (não-SPA)
+    target: { type: String, default: null },
+    inertiaHref: { type: String, default: null }, // Inertia Link
     inertiaMethod: { type: String, default: 'get' },
-    as:          { type: String, default: null },       // override: button | a | link
+    as: { type: String, default: null }, // override: button | a | link
 });
 
 const emit = defineEmits(['click']);
@@ -111,7 +111,11 @@ function handleClick(event) {
     font-size: 15px;
     line-height: 1;
     cursor: pointer;
-    transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .12s ease;
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.12s ease;
     text-decoration: none;
 }
 
@@ -131,7 +135,7 @@ function handleClick(event) {
 }
 
 .ee-action-icon--disabled {
-    opacity: .45;
+    opacity: 0.45;
     cursor: not-allowed;
     pointer-events: none;
 }
@@ -147,7 +151,7 @@ function handleClick(event) {
     color: var(--success);
 }
 .ee-action-icon--success:hover:not(.ee-action-icon--disabled) {
-    background: rgba(39, 174, 96, .08);
+    background: rgba(39, 174, 96, 0.08);
     color: var(--success);
 }
 
@@ -163,7 +167,7 @@ function handleClick(event) {
     color: var(--warning);
 }
 .ee-action-icon--warning:hover:not(.ee-action-icon--disabled) {
-    background: rgba(226, 185, 59, .12);
+    background: rgba(226, 185, 59, 0.12);
     color: var(--warning-hover);
 }
 

@@ -22,7 +22,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 reset: () => Object.assign(form, initial),
-                clearErrors: () => { form.errors = {}; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
                 post: vi.fn(),
             });
             forms.push(form);
@@ -38,10 +40,21 @@ const UserInvitationsPending = (await import('@/Pages/Panel/Users/UserInvitation
 
 const T = {
     invitation: {
-        title: 'Convidar quem já usa o EasyEye', intro: 'Informe o e-mail.', email: 'E-mail', rule: 'Perfil nesta clínica',
-        rule_hint: 'Médicos pelo cadastro de médicos.', submit: 'Enviar convite', close: 'Fechar',
-        pending_title: 'Convites pendentes', pending_hint: 'Aguardando.', col_email: 'E-mail', col_rule: 'Perfil',
-        col_sent_at: 'Enviado em', col_expires_at: 'Expira em', cancel: 'Cancelar convite', confirm_cancel: 'Cancelar?',
+        title: 'Convidar quem já usa o EasyEye',
+        intro: 'Informe o e-mail.',
+        email: 'E-mail',
+        rule: 'Perfil nesta clínica',
+        rule_hint: 'Médicos pelo cadastro de médicos.',
+        submit: 'Enviar convite',
+        close: 'Fechar',
+        pending_title: 'Convites pendentes',
+        pending_hint: 'Aguardando.',
+        col_email: 'E-mail',
+        col_rule: 'Perfil',
+        col_sent_at: 'Enviado em',
+        col_expires_at: 'Expira em',
+        cancel: 'Cancelar convite',
+        confirm_cancel: 'Cancelar?',
     },
 };
 
@@ -55,7 +68,15 @@ describe('UserInviteModal', () => {
         const wrapper = mount(UserInviteModal, {
             props: { open: false, roles: { financial: 'Financeiro', secretary: 'Secretária' }, t: T },
             attachTo: document.body,
-            global: { stubs: { teleport: true, SearchSelect: { props: ['options'], template: '<div class="roles">{{ options.map(o => o.label).join(",") }}</div>' } } },
+            global: {
+                stubs: {
+                    teleport: true,
+                    SearchSelect: {
+                        props: ['options'],
+                        template: '<div class="roles">{{ options.map(o => o.label).join(",") }}</div>',
+                    },
+                },
+            },
         });
         await wrapper.setProps({ open: true });
         await flushPromises();
@@ -81,20 +102,33 @@ describe('UserInviteModal', () => {
 
         await wrapper.find('form').trigger('submit');
 
-        expect(form.post).toHaveBeenCalledWith('/_routes/panel.accesscontrol.users.invitations.store', expect.objectContaining({ preserveScroll: true }));
+        expect(form.post).toHaveBeenCalledWith(
+            '/_routes/panel.accesscontrol.users.invitations.store',
+            expect.objectContaining({ preserveScroll: true }),
+        );
         wrapper.unmount();
     });
 });
 
 describe('UserInvitationsPending', () => {
-    const invitations = [{ id: 'inv-9', email: 'maria@example.com', rule: 'Financeiro', sent_at: '2026-09-30T10:00:00-03:00', expires_at: '2026-10-07T10:00:00-03:00' }];
+    const invitations = [
+        {
+            id: 'inv-9',
+            email: 'maria@example.com',
+            rule: 'Financeiro',
+            sent_at: '2026-09-30T10:00:00-03:00',
+            expires_at: '2026-10-07T10:00:00-03:00',
+        },
+    ];
 
     it('lista o e-mail digitado e o perfil', () => {
         const wrapper = mount(UserInvitationsPending, { props: { invitations, t: T } });
 
         expect(wrapper.text()).toContain('maria@example.com');
         expect(wrapper.text()).toContain('Financeiro');
-        expect(wrapper.findAll('th').map((th) => th.text())).toEqual(expect.arrayContaining(['E-mail', 'Perfil', 'Enviado em', 'Expira em']));
+        expect(wrapper.findAll('th').map((th) => th.text())).toEqual(
+            expect.arrayContaining(['E-mail', 'Perfil', 'Enviado em', 'Expira em']),
+        );
     });
 
     it('cancelar pede confirmação', async () => {
@@ -105,6 +139,8 @@ describe('UserInvitationsPending', () => {
         expect(router.delete).not.toHaveBeenCalled();
 
         await wrapper.find('button').trigger('click');
-        expect(router.delete).toHaveBeenCalledWith('/_routes/panel.accesscontrol.users.invitations.destroy/inv-9', { preserveScroll: true });
+        expect(router.delete).toHaveBeenCalledWith('/_routes/panel.accesscontrol.users.invitations.destroy/inv-9', {
+            preserveScroll: true,
+        });
     });
 });

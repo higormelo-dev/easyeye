@@ -17,15 +17,15 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * ignorada e aparece no resultado (aviso ao vivo, com o foco).
  */
 const props = defineProps({
-    open:           { type: Boolean, default: false },
+    open: { type: Boolean, default: false },
     /** Linhas da aba Guias marcadas (de qualquer página). */
-    claims:         { type: Array,   default: () => [] },
-    paymentMethods: { type: Array,   default: () => [] },
-    today:          { type: String,  default: '' },
-    url:            { type: String,  default: '' },
+    claims: { type: Array, default: () => [] },
+    paymentMethods: { type: Array, default: () => [] },
+    today: { type: String, default: '' },
+    url: { type: String, default: '' },
     /** Teto de guias por requisição (servidor). */
-    max:            { type: Number,  default: 200 },
-    t:              { type: Object,  default: () => ({}) },
+    max: { type: Number, default: 200 },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -35,34 +35,40 @@ const FIELDS = ['paid_at', 'payment_method', 'notes'];
 const { tx } = useTrans(() => props.t);
 const { money } = useLocaleFormat();
 
-const rows          = ref([]);
-const amounts       = ref({});
-const form          = ref({ paid_at: '', payment_method: '', notes: '' });
-const fieldErrors   = ref({});
-const rowErrors     = ref({});
+const rows = ref([]);
+const amounts = ref({});
+const form = ref({ paid_at: '', payment_method: '', notes: '' });
+const fieldErrors = ref({});
+const rowErrors = ref({});
 const generalErrors = ref([]);
-const processing    = ref(false);
-const result        = ref(null);
-const rootRef       = ref(null);
-const resultRef     = ref(null);
+const processing = ref(false);
+const result = ref(null);
+const rootRef = ref(null);
+const resultRef = ref(null);
 
-const total     = computed(() => rows.value.reduce((sum, row) => sum + Number(amounts.value[row.id] ?? 0), 0));
+const total = computed(() => rows.value.reduce((sum, row) => sum + Number(amounts.value[row.id] ?? 0), 0));
 const overLimit = computed(() => rows.value.length > props.max);
 
 // A lista é copiada ao abrir: a seleção do Index é limpa depois de gravar e
 // o resultado continua mostrando as guias do pedido.
-watch(() => props.open, (open) => {
-    if (!open) return;
+watch(
+    () => props.open,
+    (open) => {
+        if (!open) return;
 
-    rows.value    = props.claims.map((claim) => ({ ...claim }));
-    amounts.value = Object.fromEntries(rows.value.map((row) => [row.id, Number(row.receivable_amount) > 0 ? Number(row.receivable_amount) : null]));
-    form.value    = { paid_at: props.today, payment_method: props.paymentMethods[0]?.value ?? '', notes: '' };
+        rows.value = props.claims.map((claim) => ({ ...claim }));
+        amounts.value = Object.fromEntries(
+            rows.value.map((row) => [row.id, Number(row.receivable_amount) > 0 ? Number(row.receivable_amount) : null]),
+        );
+        form.value = { paid_at: props.today, payment_method: props.paymentMethods[0]?.value ?? '', notes: '' };
 
-    fieldErrors.value   = {};
-    rowErrors.value     = {};
-    generalErrors.value = [];
-    result.value        = null;
-}, { immediate: true });
+        fieldErrors.value = {};
+        rowErrors.value = {};
+        generalErrors.value = [];
+        result.value = null;
+    },
+    { immediate: true },
+);
 
 function amountId(row) {
     return `billing-bulk-amount-${row.id}`;
@@ -98,12 +104,12 @@ function focusFirstRowError() {
 
 /** 422: campo → campo; `items.N.*` e `claims.<id>` → linha; o resto → aviso geral. */
 function applyServerErrors(errors) {
-    const fields  = {};
-    const byRow   = {};
+    const fields = {};
+    const byRow = {};
     const general = [];
 
     Object.entries(errors).forEach(([key, message]) => {
-        const item  = key.match(/^items\.(\d+)\./);
+        const item = key.match(/^items\.(\d+)\./);
         const claim = key.match(/^claims\.(.+)$/);
         const rowId = item ? rows.value[Number(item[1])]?.id : claim?.[1];
 
@@ -112,15 +118,15 @@ function applyServerErrors(errors) {
         else general.push(message);
     });
 
-    fieldErrors.value   = fields;
-    rowErrors.value     = byRow;
+    fieldErrors.value = fields;
+    rowErrors.value = byRow;
     generalErrors.value = [...general, ...Object.values(byRow)];
 }
 
 async function submit() {
     if (processing.value || result.value || overLimit.value || rows.value.length === 0) return;
 
-    fieldErrors.value   = {};
+    fieldErrors.value = {};
     generalErrors.value = [];
 
     if (!validateRows()) {
@@ -157,7 +163,8 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
     <CenteredModal :open="open" size="xl" :close-label="t.btn_close" @close="requestClose">
         <template #header>
             <h2 class="h5 mb-0 fw-semibold">
-                <i class="ti ti-cash me-2 text-success" aria-hidden="true"></i>{{ tx('bulk_receipt_title', { count: rows.length }) }}
+                <i class="ti ti-cash me-2 text-success" aria-hidden="true"></i
+                >{{ tx('bulk_receipt_title', { count: rows.length }) }}
             </h2>
         </template>
 
@@ -205,7 +212,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                             <td class="text-end text-nowrap d-none d-sm-table-cell">{{ money(row.amount) }}</td>
                             <td class="text-end text-nowrap">{{ money(row.receivable_amount) }}</td>
                             <td class="text-end">
-                                <label :for="amountId(row)" class="visually-hidden">{{ tx('bulk_receipt_amount_label', { code: row.code }) }}</label>
+                                <label :for="amountId(row)" class="visually-hidden">{{
+                                    tx('bulk_receipt_amount_label', { code: row.code })
+                                }}</label>
                                 <MoneyInput
                                     :id="amountId(row)"
                                     v-model="amounts[row.id]"
@@ -214,7 +223,12 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                                     :aria-describedby="rowErrors[row.id] ? `${amountId(row)}-error` : undefined"
                                     data-test="bulk-amount"
                                 />
-                                <div v-if="rowErrors[row.id]" :id="`${amountId(row)}-error`" class="small text-danger-emphasis text-start mt-1" data-test="bulk-row-error">
+                                <div
+                                    v-if="rowErrors[row.id]"
+                                    :id="`${amountId(row)}-error`"
+                                    class="small text-danger-emphasis text-start mt-1"
+                                    data-test="bulk-row-error"
+                                >
                                     {{ rowErrors[row.id] }}
                                 </div>
                             </td>
@@ -243,7 +257,10 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     data-test="bulk-result"
                 >
                     <h3 id="billing-bulk-result-title" class="h6 fw-semibold">{{ t.bulk_receipt_result_title }}</h3>
-                    <div :class="['alert small py-2 mb-2', result.paid?.length ? 'alert-success' : 'alert-info']" data-test="bulk-message">
+                    <div
+                        :class="['alert small py-2 mb-2', result.paid?.length ? 'alert-success' : 'alert-info']"
+                        data-test="bulk-message"
+                    >
                         {{ result.message }}
                     </div>
                     <p v-if="result.paid?.length" class="small mb-2" data-test="bulk-paid-total">
@@ -260,7 +277,13 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="processing" data-test="bulk-close" @click="requestClose">
+            <button
+                type="button"
+                class="btn btn-light"
+                :disabled="processing"
+                data-test="bulk-close"
+                @click="requestClose"
+            >
                 {{ result ? t.btn_close : t.btn_cancel }}
             </button>
             <button

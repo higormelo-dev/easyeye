@@ -10,22 +10,35 @@ import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
  */
 
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
-    default: { props: ['title'], template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>' },
+    default: {
+        props: ['title'],
+        template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
         props: ['title', 'icon', 'variant', 'disabled'],
         emits: ['click'],
-        template: '<button type="button" :title="title" :data-variant="variant" :disabled="disabled" @click="$emit(\'click\')" />',
+        template:
+            '<button type="button" :title="title" :data-variant="variant" :disabled="disabled" @click="$emit(\'click\')" />',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_occurred_at: 'Data', col_product: 'Produto', col_lot: 'Lote', col_quantity: 'Quantidade',
-    col_unit_cost: 'Custo unit.', col_balance_after: 'Saldo após', col_note: 'Observação', col_created_by: 'Por',
-    col_type: 'Tipo', col_actions: 'Ações', sort_by: 'Ordenar por :column',
-    action_filter_product: 'Ver extrato deste produto', empty_list: 'Nenhuma movimentação encontrada.',
+    col_occurred_at: 'Data',
+    col_product: 'Produto',
+    col_lot: 'Lote',
+    col_quantity: 'Quantidade',
+    col_unit_cost: 'Custo unit.',
+    col_balance_after: 'Saldo após',
+    col_note: 'Observação',
+    col_created_by: 'Por',
+    col_type: 'Tipo',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    action_filter_product: 'Ver extrato deste produto',
+    empty_list: 'Nenhuma movimentação encontrada.',
 };
 
 let wrapper;
@@ -35,10 +48,21 @@ afterEach(() => wrapper?.unmount());
 
 function movement(overrides = {}) {
     return {
-        id: 'm1', entity_product_id: 'p1', product_name: 'Colírio', product_code: 'PRD-1',
-        type: 'manual_in', type_label: 'Entrada manual', direction: 1,
-        quantity: 10, unit_cost: 12.5, balance_after: 22.5, lot_number: 'L-01', note: 'doação',
-        created_by_name: 'Ana', occurred_at: '03/09/2026 10:00', occurred_at_iso: '2026-09-03T10:00:00',
+        id: 'm1',
+        entity_product_id: 'p1',
+        product_name: 'Colírio',
+        product_code: 'PRD-1',
+        type: 'manual_in',
+        type_label: 'Entrada manual',
+        direction: 1,
+        quantity: 10,
+        unit_cost: 12.5,
+        balance_after: 22.5,
+        lot_number: 'L-01',
+        note: 'doação',
+        created_by_name: 'Ana',
+        occurred_at: '03/09/2026 10:00',
+        occurred_at_iso: '2026-09-03T10:00:00',
         ...overrides,
     };
 }
@@ -59,14 +83,32 @@ describe('MovementTable', () => {
         const w = mountTable();
 
         expect(headerLabels(w)).toEqual([
-            'Data', 'Produto', 'Lote', 'Quantidade', 'Custo unit.', 'Saldo após', 'Observação', 'Por', 'Tipo', 'Ações',
+            'Data',
+            'Produto',
+            'Lote',
+            'Quantidade',
+            'Custo unit.',
+            'Saldo após',
+            'Observação',
+            'Por',
+            'Tipo',
+            'Ações',
         ]);
     });
 
     it('respeita a ordem salva no navegador e grava a nova ordem', async () => {
         window.localStorage.setItem(
             'stock_movements_columns_order',
-            JSON.stringify(['product', 'occurred_at', 'lot', 'quantity', 'unit_cost', 'balance_after', 'note', 'created_by']),
+            JSON.stringify([
+                'product',
+                'occurred_at',
+                'lot',
+                'quantity',
+                'unit_cost',
+                'balance_after',
+                'note',
+                'created_by',
+            ]),
         );
         const w = mountTable();
 
@@ -76,7 +118,10 @@ describe('MovementTable', () => {
         await w.vm.$nextTick();
 
         expect(headerLabels(w).slice(0, 2)).toEqual(['Data', 'Produto']);
-        expect(JSON.parse(window.localStorage.getItem('stock_movements_columns_order')).slice(0, 2)).toEqual(['occurred_at', 'product']);
+        expect(JSON.parse(window.localStorage.getItem('stock_movements_columns_order')).slice(0, 2)).toEqual([
+            'occurred_at',
+            'product',
+        ]);
     });
 
     it('ordena só pelas colunas da whitelist: inverte a atual e começa ascendente nas outras', async () => {
@@ -98,7 +143,10 @@ describe('MovementTable', () => {
     });
 
     it('formata data/hora, quantidade com sinal e custo no idioma do usuário', () => {
-        const w = mountTable([movement(), movement({ id: 'm2', type: 'loss', direction: -1, quantity: 2.5, unit_cost: null })]);
+        const w = mountTable([
+            movement(),
+            movement({ id: 'm2', type: 'loss', direction: -1, quantity: 2.5, unit_cost: null }),
+        ]);
         const [first, second] = w.findAll('tbody tr');
 
         expect(text(first.findAll('td')[0])).toBe('03/09/2026, 10:00'); // useLocaleFormat::dateTime
@@ -110,7 +158,10 @@ describe('MovementTable', () => {
     });
 
     it('badge do tipo com o rótulo traduzido do backend (type_label) e cor semântica', () => {
-        const w = mountTable([movement(), movement({ id: 'm2', type: 'loss', type_label: 'Perda/quebra', direction: -1 })]);
+        const w = mountTable([
+            movement(),
+            movement({ id: 'm2', type: 'loss', type_label: 'Perda/quebra', direction: -1 }),
+        ]);
         const badges = w.findAll('tbody .badge');
 
         expect(badges[0].text()).toBe('Entrada manual');

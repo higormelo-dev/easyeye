@@ -31,8 +31,8 @@ function mountMenu() {
 }
 
 const trigger = () => wrapper.get('button[aria-haspopup="menu"]');
-const menu    = () => document.querySelector('.dropdown-menu');
-const item    = (name) => document.querySelector(`[data-test="${name}"]`);
+const menu = () => document.querySelector('.dropdown-menu');
+const item = (name) => document.querySelector(`[data-test="${name}"]`);
 
 async function keydown(key) {
     document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
@@ -196,7 +196,10 @@ describe('ActionDropdown (semântica de menu)', () => {
             attachTo: document.body,
             global: { stubs: { transition: true } },
             props: { title: 'Exportar' },
-            slots: { default: '<li><input type="date" data-test="from"></li><li><button type="button" data-test="export">Exportar</button></li>' },
+            slots: {
+                default:
+                    '<li><input type="date" data-test="from"></li><li><button type="button" data-test="export">Exportar</button></li>',
+            },
         });
         await trigger().trigger('click', { detail: 1 });
         await nextTick();

@@ -12,10 +12,10 @@ import { ref, watch, computed, onMounted } from 'vue';
  * Tabs: Informações · Linha do tempo · Metadados.
  */
 const props = defineProps({
-    open:        { type: Boolean, required: true },
-    purchase:    { type: Object,  default: null },
-    permissions: { type: Object,  default: () => ({}) },
-    t:           { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    purchase: { type: Object, default: null },
+    permissions: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'credit', 'cancel', 'fail', 'refund']);
@@ -25,14 +25,17 @@ const detail = ref(null);
 const loading = ref(false);
 const errorMsg = ref('');
 
-watch(() => props.open, async (val) => {
-    if (val && props.purchase?.actions_url?.show) {
-        await loadDetail();
-    } else {
-        detail.value = null;
-        tab.value = 'info';
-    }
-});
+watch(
+    () => props.open,
+    async (val) => {
+        if (val && props.purchase?.actions_url?.show) {
+            await loadDetail();
+        } else {
+            detail.value = null;
+            tab.value = 'info';
+        }
+    },
+);
 
 // O watch é lazy: se o drawer montar já com open === true (ou a primeira
 // abertura não disparar o watch), o fetch nunca rodava e timeline/metadados
@@ -52,7 +55,7 @@ async function loadDetail() {
     try {
         const res = await fetch(showUrl, {
             headers: {
-                'Accept': 'application/json',
+                Accept: 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
             },
             credentials: 'same-origin',
@@ -75,11 +78,11 @@ async function loadDetail() {
 const source = computed(() => detail.value ?? props.purchase ?? {});
 
 const TONE = {
-    credited:        'success',
+    credited: 'success',
     pending_payment: 'warning',
-    cancelled:       'secondary',
-    failed:          'danger',
-    refunded:        'info',
+    cancelled: 'secondary',
+    failed: 'danger',
+    refunded: 'info',
 };
 const headerTone = computed(() => TONE[source.value?.status] ?? 'secondary');
 
@@ -152,14 +155,21 @@ const prettyMetadata = computed(() => {
 
 const allowed = computed(() => detail.value?.allowed ?? props.purchase?.allowed ?? {});
 
-function close() { emit('close'); }
+function close() {
+    emit('close');
+}
 </script>
 
 <template>
     <Teleport to="body">
-        <div v-if="open" class="modal fade show d-block" tabindex="-1"
-             style="background: rgba(15,23,42,.55);" @click.self="close">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable" style="max-width: 720px;">
+        <div
+            v-if="open"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(15, 23, 42, 0.55)"
+            @click.self="close"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable" style="max-width: 720px">
                 <div class="modal-content border-0 shadow-lg">
                     <div class="modal-header py-2 border-0">
                         <h6 class="modal-title d-flex align-items-center gap-2 mb-0">
@@ -180,14 +190,20 @@ function close() { emit('close'); }
                                     <div class="fw-bold text-truncate">{{ source.entity_name ?? '—' }}</div>
                                     <div class="small text-muted text-truncate">
                                         {{ source.package_name }}
-                                        <span v-if="source.package_code">· <code class="text-muted">{{ source.package_code }}</code></span>
+                                        <span v-if="source.package_code"
+                                            >· <code class="text-muted">{{ source.package_code }}</code></span
+                                        >
                                     </div>
                                     <div class="d-flex flex-wrap gap-1 mt-2">
                                         <span class="badge" :class="source.status_badge ?? `text-bg-${headerTone}`">
                                             {{ source.status_label ?? source.status }}
                                         </span>
-                                        <span v-if="isCourtesy" class="badge text-bg-warning-subtle text-warning-emphasis border border-warning-subtle">
-                                            <i class="ti ti-gift me-1"></i>{{ t?.detail?.courtesy ?? 'Cortesia — sem cobrança' }}
+                                        <span
+                                            v-if="isCourtesy"
+                                            class="badge text-bg-warning-subtle text-warning-emphasis border border-warning-subtle"
+                                        >
+                                            <i class="ti ti-gift me-1"></i
+                                            >{{ t?.detail?.courtesy ?? 'Cortesia — sem cobrança' }}
                                         </span>
                                         <span v-else-if="source.kind_label" class="badge text-bg-light border">
                                             {{ source.kind_label }}
@@ -197,7 +213,10 @@ function close() { emit('close'); }
                                 <div class="text-end flex-shrink-0">
                                     <div class="acp-credits lh-1">{{ creditsFmt }}</div>
                                     <div class="small text-muted">{{ t?.detail?.credits ?? 'créditos' }}</div>
-                                    <div class="small mt-1" :class="isCourtesy ? 'text-success fw-semibold' : 'fw-semibold'">
+                                    <div
+                                        class="small mt-1"
+                                        :class="isCourtesy ? 'text-success fw-semibold' : 'fw-semibold'"
+                                    >
                                         {{ isCourtesy ? (t?.detail?.no_charge ?? 'R$ 0,00') : source.amount_formatted }}
                                     </div>
                                 </div>
@@ -212,13 +231,23 @@ function close() { emit('close'); }
                                 </button>
                             </li>
                             <li class="nav-item">
-                                <button class="nav-link" :class="{ active: tab === 'timeline' }" @click="tab = 'timeline'">
+                                <button
+                                    class="nav-link"
+                                    :class="{ active: tab === 'timeline' }"
+                                    @click="tab = 'timeline'"
+                                >
                                     <i class="ti ti-history me-1"></i>{{ t?.detail?.tab_timeline ?? 'Linha do tempo' }}
-                                    <span v-if="events.length" class="badge text-bg-light ms-1">{{ events.length }}</span>
+                                    <span v-if="events.length" class="badge text-bg-light ms-1">{{
+                                        events.length
+                                    }}</span>
                                 </button>
                             </li>
                             <li class="nav-item">
-                                <button class="nav-link" :class="{ active: tab === 'metadata' }" @click="tab = 'metadata'">
+                                <button
+                                    class="nav-link"
+                                    :class="{ active: tab === 'metadata' }"
+                                    @click="tab = 'metadata'"
+                                >
                                     <i class="ti ti-code me-1"></i>{{ t?.detail?.tab_metadata ?? 'Metadados' }}
                                 </button>
                             </li>
@@ -228,9 +257,16 @@ function close() { emit('close'); }
                             <div v-if="loading" class="text-center text-muted py-4">
                                 <i class="ti ti-loader ti-rotate"></i> {{ t?.detail?.loading ?? 'Carregando…' }}
                             </div>
-                            <div v-else-if="errorMsg" class="alert alert-danger small mb-0 d-flex justify-content-between align-items-center gap-2">
+                            <div
+                                v-else-if="errorMsg"
+                                class="alert alert-danger small mb-0 d-flex justify-content-between align-items-center gap-2"
+                            >
                                 <span><i class="ti ti-alert-circle me-1"></i>{{ errorMsg }}</span>
-                                <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" @click="loadDetail">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger flex-shrink-0"
+                                    @click="loadDetail"
+                                >
                                     <i class="ti ti-refresh me-1"></i>{{ t?.detail?.reload ?? 'Recarregar' }}
                                 </button>
                             </div>
@@ -238,20 +274,32 @@ function close() { emit('close'); }
                             <!-- Tab: Informações -->
                             <div v-else-if="tab === 'info'" class="small">
                                 <dl class="row gy-2 mb-0">
-                                    <dt class="col-5 text-muted fw-normal">{{ t?.detail?.requested_at ?? 'Solicitado em' }}</dt>
+                                    <dt class="col-5 text-muted fw-normal">
+                                        {{ t?.detail?.requested_at ?? 'Solicitado em' }}
+                                    </dt>
                                     <dd class="col-7 mb-0">{{ source.created_at ?? '—' }}</dd>
 
-                                    <dt class="col-5 text-muted fw-normal">{{ t?.detail?.requested_by ?? 'Solicitante' }}</dt>
+                                    <dt class="col-5 text-muted fw-normal">
+                                        {{ t?.detail?.requested_by ?? 'Solicitante' }}
+                                    </dt>
                                     <dd class="col-7 mb-0">
                                         {{ source.requested_by ?? '—' }}
-                                        <div v-if="source.requested_email" class="text-muted">{{ source.requested_email }}</div>
+                                        <div v-if="source.requested_email" class="text-muted">
+                                            {{ source.requested_email }}
+                                        </div>
                                     </dd>
 
-                                    <dt class="col-5 text-muted fw-normal">{{ t?.detail?.package_code ?? 'Código do pacote' }}</dt>
-                                    <dd class="col-7 mb-0"><code>{{ source.package_code }}</code></dd>
+                                    <dt class="col-5 text-muted fw-normal">
+                                        {{ t?.detail?.package_code ?? 'Código do pacote' }}
+                                    </dt>
+                                    <dd class="col-7 mb-0">
+                                        <code>{{ source.package_code }}</code>
+                                    </dd>
 
                                     <template v-if="detail?.subscription">
-                                        <dt class="col-5 text-muted fw-normal">{{ t?.detail?.subscription ?? 'Assinatura' }}</dt>
+                                        <dt class="col-5 text-muted fw-normal">
+                                            {{ t?.detail?.subscription ?? 'Assinatura' }}
+                                        </dt>
                                         <dd class="col-7 mb-0">
                                             {{ detail.subscription.plan_name }}
                                             <small class="text-muted d-block">{{ detail.subscription.id }}</small>
@@ -259,17 +307,28 @@ function close() { emit('close'); }
                                     </template>
 
                                     <template v-if="detail?.idempotency_key">
-                                        <dt class="col-5 text-muted fw-normal">{{ t?.detail?.idempotency_key ?? 'Idempotency' }}</dt>
-                                        <dd class="col-7 mb-0"><code class="small">{{ detail.idempotency_key }}</code></dd>
+                                        <dt class="col-5 text-muted fw-normal">
+                                            {{ t?.detail?.idempotency_key ?? 'Idempotency' }}
+                                        </dt>
+                                        <dd class="col-7 mb-0">
+                                            <code class="small">{{ detail.idempotency_key }}</code>
+                                        </dd>
                                     </template>
 
                                     <template v-if="detail?.wallet_after">
-                                        <dt class="col-5 text-muted fw-normal">{{ t?.detail?.wallet_balance ?? 'Saldo carteira' }}</dt>
+                                        <dt class="col-5 text-muted fw-normal">
+                                            {{ t?.detail?.wallet_balance ?? 'Saldo carteira' }}
+                                        </dt>
                                         <dd class="col-7 mb-0">
-                                            <span class="fw-bold">{{ detail.wallet_after.available?.toLocaleString('pt-BR') }}</span> disponíveis
+                                            <span class="fw-bold">{{
+                                                detail.wallet_after.available?.toLocaleString('pt-BR')
+                                            }}</span>
+                                            disponíveis
                                             <small class="text-muted d-block">
-                                                Total comprado: {{ detail.wallet_after.lifetime_purchased?.toLocaleString('pt-BR') }} ·
-                                                consumido: {{ detail.wallet_after.lifetime_consumed?.toLocaleString('pt-BR') }}
+                                                Total comprado:
+                                                {{ detail.wallet_after.lifetime_purchased?.toLocaleString('pt-BR') }} ·
+                                                consumido:
+                                                {{ detail.wallet_after.lifetime_consumed?.toLocaleString('pt-BR') }}
                                             </small>
                                         </dd>
                                     </template>
@@ -279,7 +338,7 @@ function close() { emit('close'); }
                             <!-- Tab: Linha do tempo -->
                             <div v-else-if="tab === 'timeline'">
                                 <div v-if="events.length === 0" class="text-center text-muted py-4">
-                                    <i class="ti ti-history d-block mb-1" style="font-size: 1.5rem; opacity:.5;"></i>
+                                    <i class="ti ti-history d-block mb-1" style="font-size: 1.5rem; opacity: 0.5"></i>
                                     <div class="small">{{ t?.timeline?.empty ?? 'Sem eventos registrados.' }}</div>
                                 </div>
                                 <ol v-else class="acp-timeline list-unstyled mb-0">
@@ -300,9 +359,18 @@ function close() { emit('close'); }
 
                             <!-- Tab: Metadados -->
                             <div v-else-if="tab === 'metadata'">
-                                <pre v-if="prettyMetadata" class="small bg-light p-2 rounded mb-0" style="max-height: 320px; overflow-y: auto;">{{ prettyMetadata }}</pre>
+                                <pre
+                                    v-if="prettyMetadata"
+                                    class="small bg-light p-2 rounded mb-0"
+                                    style="max-height: 320px; overflow-y: auto"
+                                    >{{ prettyMetadata }}</pre>
                                 <div v-else class="text-muted small">
-                                    {{ detail ? (t?.detail?.no_metadata ?? 'Sem metadados.') : (t?.detail?.detail_not_loaded ?? 'Detalhes ainda não carregados — reabra o pedido.') }}
+                                    {{
+                                        detail
+                                            ? (t?.detail?.no_metadata ?? 'Sem metadados.')
+                                            : (t?.detail?.detail_not_loaded ??
+                                              'Detalhes ainda não carregados — reabra o pedido.')
+                                    }}
                                 </div>
                             </div>
                         </div>
@@ -313,26 +381,39 @@ function close() { emit('close'); }
                         <button type="button" class="btn btn-sm btn-outline-secondary me-auto" @click="close">
                             {{ t?.actions?.close ?? 'Fechar' }}
                         </button>
-                        <button v-if="permissions.credit && allowed.credit"
-                                type="button" class="btn btn-sm btn-success"
-                                @click="emit('credit', purchase)">
+                        <button
+                            v-if="permissions.credit && allowed.credit"
+                            type="button"
+                            class="btn btn-sm btn-success"
+                            @click="emit('credit', purchase)"
+                        >
                             <i class="ti ti-check me-1"></i>{{ t?.actions?.credit ?? 'Aprovar e creditar' }}
                         </button>
-                        <button v-if="permissions.cancel && allowed.cancel"
-                                type="button" class="btn btn-sm btn-outline-secondary"
-                                @click="emit('cancel', purchase)">
+                        <button
+                            v-if="permissions.cancel && allowed.cancel"
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            @click="emit('cancel', purchase)"
+                        >
                             <i class="ti ti-x me-1"></i>{{ t?.actions?.cancel ?? 'Cancelar' }}
                         </button>
-                        <button v-if="permissions.fail && allowed.fail"
-                                type="button" class="btn btn-sm btn-outline-warning"
-                                @click="emit('fail', purchase)">
+                        <button
+                            v-if="permissions.fail && allowed.fail"
+                            type="button"
+                            class="btn btn-sm btn-outline-warning"
+                            @click="emit('fail', purchase)"
+                        >
                             <i class="ti ti-alert-triangle me-1"></i>{{ t?.actions?.fail ?? 'Marcar como falha' }}
                         </button>
-                        <button v-if="permissions.refund && allowed.refund"
-                                type="button" class="btn btn-sm btn-outline-danger"
-                                :title="`${t?.actions?.refund ?? 'Reembolsar'} · ${creditsFmt} créditos`"
-                                @click="emit('refund', purchase)">
-                            <i class="ti ti-arrow-back-up me-1"></i>{{ t?.actions?.refund ?? 'Reembolsar (estornar créditos)' }}
+                        <button
+                            v-if="permissions.refund && allowed.refund"
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            :title="`${t?.actions?.refund ?? 'Reembolsar'} · ${creditsFmt} créditos`"
+                            @click="emit('refund', purchase)"
+                        >
+                            <i class="ti ti-arrow-back-up me-1"></i
+                            >{{ t?.actions?.refund ?? 'Reembolsar (estornar créditos)' }}
                         </button>
                     </div>
                 </div>
@@ -347,15 +428,23 @@ function close() { emit('close'); }
     border-bottom: 1px solid var(--bs-border-color);
     border-left: 3px solid var(--bs-secondary);
 }
-.acp-hero--success { border-left-color: var(--bs-success); }
-.acp-hero--warning { border-left-color: var(--bs-warning); }
-.acp-hero--danger  { border-left-color: var(--bs-danger); }
-.acp-hero--info    { border-left-color: var(--bs-info); }
+.acp-hero--success {
+    border-left-color: var(--bs-success);
+}
+.acp-hero--warning {
+    border-left-color: var(--bs-warning);
+}
+.acp-hero--danger {
+    border-left-color: var(--bs-danger);
+}
+.acp-hero--info {
+    border-left-color: var(--bs-info);
+}
 
 .acp-credits {
     font-size: 1.75rem;
     font-weight: 700;
-    letter-spacing: -.02em;
+    letter-spacing: -0.02em;
 }
 
 /* Timeline vertical com linha conectora e bolinhas por status */
@@ -366,9 +455,9 @@ function close() { emit('close'); }
 .acp-timeline::before {
     content: '';
     position: absolute;
-    left: .6rem;
-    top: .35rem;
-    bottom: .35rem;
+    left: 0.6rem;
+    top: 0.35rem;
+    bottom: 0.35rem;
     width: 2px;
     background: var(--bs-border-color);
 }
@@ -376,11 +465,13 @@ function close() { emit('close'); }
     position: relative;
     padding: 0 0 1rem;
 }
-.acp-timeline__item:last-child { padding-bottom: 0; }
+.acp-timeline__item:last-child {
+    padding-bottom: 0;
+}
 .acp-timeline__dot {
     position: absolute;
     left: -1.4rem;
-    top: -.05rem;
+    top: -0.05rem;
     width: 1.4rem;
     height: 1.4rem;
     display: grid;
@@ -388,7 +479,9 @@ function close() { emit('close'); }
     border-radius: 50%;
     background: var(--bs-body-bg);
     border: 2px solid currentColor;
-    font-size: .75rem;
+    font-size: 0.75rem;
 }
-.acp-timeline__body { padding-left: .25rem; }
+.acp-timeline__body {
+    padding-left: 0.25rem;
+}
 </style>

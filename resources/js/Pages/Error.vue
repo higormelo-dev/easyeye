@@ -14,13 +14,41 @@ const props = defineProps({
 });
 
 const CONTENT = {
-    401: { icon: 'ti-lock',            title: 'Sessão necessária',        text: 'Você precisa entrar no sistema para acessar esta página.' },
-    403: { icon: 'ti-shield-lock',     title: 'Acesso negado',            text: 'Seu perfil não tem permissão para acessar esta área. Se você acredita que deveria ter acesso, fale com o administrador da clínica.' },
-    404: { icon: 'ti-map-pin-off',     title: 'Página não encontrada',    text: 'O endereço acessado não existe ou foi movido. Confira o link ou volte para o painel.' },
-    419: { icon: 'ti-clock-pause',     title: 'Sessão expirada',          text: 'Sua sessão expirou por inatividade. Recarregue a página e entre novamente.' },
-    429: { icon: 'ti-hand-stop',       title: 'Muitas tentativas',        text: 'Você fez muitas requisições em pouco tempo. Aguarde alguns instantes e tente de novo.' },
-    500: { icon: 'ti-alert-triangle',  title: 'Erro interno',             text: 'Algo deu errado do nosso lado. Nossa equipe já foi notificada — tente novamente em instantes.' },
-    503: { icon: 'ti-tool',            title: 'Em manutenção',            text: 'O sistema está em manutenção programada. Voltamos em breve.' },
+    401: {
+        icon: 'ti-lock',
+        title: 'Sessão necessária',
+        text: 'Você precisa entrar no sistema para acessar esta página.',
+    },
+    403: {
+        icon: 'ti-shield-lock',
+        title: 'Acesso negado',
+        text: 'Seu perfil não tem permissão para acessar esta área. Se você acredita que deveria ter acesso, fale com o administrador da clínica.',
+    },
+    404: {
+        icon: 'ti-map-pin-off',
+        title: 'Página não encontrada',
+        text: 'O endereço acessado não existe ou foi movido. Confira o link ou volte para o painel.',
+    },
+    419: {
+        icon: 'ti-clock-pause',
+        title: 'Sessão expirada',
+        text: 'Sua sessão expirou por inatividade. Recarregue a página e entre novamente.',
+    },
+    429: {
+        icon: 'ti-hand-stop',
+        title: 'Muitas tentativas',
+        text: 'Você fez muitas requisições em pouco tempo. Aguarde alguns instantes e tente de novo.',
+    },
+    500: {
+        icon: 'ti-alert-triangle',
+        title: 'Erro interno',
+        text: 'Algo deu errado do nosso lado. Nossa equipe já foi notificada — tente novamente em instantes.',
+    },
+    503: {
+        icon: 'ti-tool',
+        title: 'Em manutenção',
+        text: 'O sistema está em manutenção programada. Voltamos em breve.',
+    },
 };
 
 const info = computed(() => CONTENT[props.status] ?? CONTENT[500]);
@@ -83,7 +111,7 @@ function reload() {
     border: 1px solid var(--bs-border-color, #e4e7ec);
     border-radius: 14px;
     padding: 3rem 2rem 2.5rem;
-    box-shadow: 0 8px 30px rgba(16, 24, 40, .06);
+    box-shadow: 0 8px 30px rgba(16, 24, 40, 0.06);
 }
 .ee-error__icon {
     width: 72px;
@@ -92,48 +120,53 @@ function reload() {
     display: grid;
     place-items: center;
     border-radius: 50%;
-    background: rgba(37, 99, 235, .1);
+    background: rgba(37, 99, 235, 0.1);
     color: #2563eb;
     font-size: 2rem;
 }
 .ee-error__status {
-    font-size: .8rem;
+    font-size: 0.8rem;
     font-weight: 700;
-    letter-spacing: .2em;
+    letter-spacing: 0.2em;
     color: var(--bs-secondary-color, #667085);
 }
 .ee-error__title {
     font-size: 1.5rem;
     font-weight: 700;
-    margin: .25rem 0 .5rem;
+    margin: 0.25rem 0 0.5rem;
 }
 .ee-error__text {
-    font-size: .95rem;
+    font-size: 0.95rem;
     line-height: 1.6;
     color: var(--bs-secondary-color, #475467);
     margin-bottom: 1.75rem;
 }
 .ee-error__actions {
     display: flex;
-    gap: .75rem;
+    gap: 0.75rem;
     justify-content: center;
     flex-wrap: wrap;
 }
 .ee-error__btn {
     display: inline-flex;
     align-items: center;
-    gap: .45rem;
-    padding: .55rem 1.15rem;
+    gap: 0.45rem;
+    padding: 0.55rem 1.15rem;
     border-radius: 8px;
-    font-size: .9rem;
+    font-size: 0.9rem;
     font-weight: 600;
     text-decoration: none;
     border: 1px solid transparent;
     cursor: pointer;
-    transition: filter .15s;
+    transition: filter 0.15s;
 }
-.ee-error__btn:hover { filter: brightness(.95); }
-.ee-error__btn--primary { background: #2563eb; color: #fff; }
+.ee-error__btn:hover {
+    filter: brightness(0.95);
+}
+.ee-error__btn--primary {
+    background: #2563eb;
+    color: #fff;
+}
 .ee-error__btn--ghost {
     background: transparent;
     color: var(--bs-body-color, #344054);

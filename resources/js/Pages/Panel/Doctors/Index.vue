@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
-import AppLayout          from '@/Layouts/AppLayout.vue';
-import PageHeader         from '@/Components/Panel/PageHeader.vue';
-import SearchInput        from '@/Components/Panel/SearchInput.vue';
-import DoctorTable        from './DoctorTable.vue';
-import DoctorCards        from './DoctorCards.vue';
-import DoctorFormModal    from './DoctorFormModal.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import DoctorTable from './DoctorTable.vue';
+import DoctorCards from './DoctorCards.vue';
+import DoctorFormModal from './DoctorFormModal.vue';
 import DoctorInvitationsPending from './DoctorInvitationsPending.vue';
 import DoctorDetailDrawer from './DoctorDetailDrawer.vue';
 
@@ -17,13 +17,13 @@ import DoctorDetailDrawer from './DoctorDetailDrawer.vue';
  * Textos vêm de lang/{locale}/doctors.php (prop `t`).
  */
 const props = defineProps({
-    doctors:         { type: Object, required: true },
-    totalDoctors:    { type: Number, default: 0 },
-    genders:         { type: Object, default: () => ({}) },
+    doctors: { type: Object, required: true },
+    totalDoctors: { type: Number, default: 0 },
+    genders: { type: Object, default: () => ({}) },
     maritalStatuses: { type: Object, default: () => ({}) },
-    statesOfBrazil:  { type: Object, default: () => ({}) },
-    filters:         { type: Object, default: () => ({}) },   // { search, sort, direction }
-    t:               { type: Object, default: () => ({}) },
+    statesOfBrazil: { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) }, // { search, sort, direction }
+    t: { type: Object, default: () => ({}) },
     // Convites a médicos que já têm login no EasyEye, aguardando aceite.
     pendingInvitations: { type: Array, default: () => [] },
 });
@@ -72,24 +72,33 @@ function onSort({ sort, direction }) {
 }
 
 // ── CRUD modal ───────────────────────────────────────────────────────────────
-const modalOpen    = ref(false);
+const modalOpen = ref(false);
 const editDoctorId = ref(null);
 
-function openCreate() { editDoctorId.value = null; modalOpen.value = true; }
-function openEdit(id) { editDoctorId.value = id;   modalOpen.value = true; }
-function closeModal()  { modalOpen.value = false; editDoctorId.value = null; }
+function openCreate() {
+    editDoctorId.value = null;
+    modalOpen.value = true;
+}
+function openEdit(id) {
+    editDoctorId.value = id;
+    modalOpen.value = true;
+}
+function closeModal() {
+    modalOpen.value = false;
+    editDoctorId.value = null;
+}
 
 // ── Detail drawer ────────────────────────────────────────────────────────────
-const detailOpen   = ref(false);
+const detailOpen = ref(false);
 const viewDoctorId = ref(null);
 
 function onView(id) {
     viewDoctorId.value = id;
-    detailOpen.value   = true;
+    detailOpen.value = true;
 }
 
 function closeDetail() {
-    detailOpen.value   = false;
+    detailOpen.value = false;
     viewDoctorId.value = null;
 }
 
@@ -118,7 +127,6 @@ const breadcrumbs = computed(() => [
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-doctors">
-
             <PageHeader
                 :title="pageTitle"
                 :total="doctors.total ?? 0"
@@ -131,7 +139,10 @@ const breadcrumbs = computed(() => [
             >
                 <template #actions>
                     <div class="d-flex align-items-center gap-2">
-                        <Link :href="route('panel.doctors.import.index')" class="btn btn-outline-secondary fs-13 btn-md">
+                        <Link
+                            :href="route('panel.doctors.import.index')"
+                            class="btn btn-outline-secondary fs-13 btn-md"
+                        >
                             <i class="ti ti-upload me-1" aria-hidden="true"></i> {{ t.btn_import ?? 'Importar' }}
                         </Link>
                         <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
@@ -171,11 +182,7 @@ const breadcrumbs = computed(() => [
             />
         </div>
 
-        <DoctorInvitationsPending
-            v-if="pendingInvitations.length"
-            :invitations="pendingInvitations"
-            :t="t"
-        />
+        <DoctorInvitationsPending v-if="pendingInvitations.length" :invitations="pendingInvitations" :t="t" />
 
         <DoctorFormModal
             :open="modalOpen"
@@ -187,10 +194,6 @@ const breadcrumbs = computed(() => [
             @close="closeModal"
         />
 
-        <DoctorDetailDrawer
-            :open="detailOpen"
-            :doctor-id="viewDoctorId"
-            @close="closeDetail"
-        />
+        <DoctorDetailDrawer :open="detailOpen" :doctor-id="viewDoctorId" @close="closeDetail" />
     </AppLayout>
 </template>

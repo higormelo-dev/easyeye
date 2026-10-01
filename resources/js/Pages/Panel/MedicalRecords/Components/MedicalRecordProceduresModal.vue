@@ -25,11 +25,11 @@
 import { computed, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
-    show:     { type: Boolean, default: false },
-    urls:     { type: Object,  required: true },
+    show: { type: Boolean, default: false },
+    urls: { type: Object, required: true },
     isDoctor: { type: Boolean, default: false },
     isLocked: { type: Boolean, default: false },
-    t:        { type: Object,  default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
@@ -69,23 +69,23 @@ const STATUS_BADGE = {
 // back-end) — as URLs só existem no payload quando isEdit && record (ver
 // MedicalRecordsController::buildFormUrls()), então checar a URL já cobre
 // "prontuário salvo" sem precisar repetir isEdit como prop.
-const canWrite = computed(() => props.isDoctor && ! props.isLocked && !! props.urls.medicalrecordprocedures_store);
+const canWrite = computed(() => props.isDoctor && !props.isLocked && !!props.urls.medicalrecordprocedures_store);
 
 // ── Listagem (histórico por paciente, cronológico) ──────────────────────
-const loading    = ref(false);
-const loaded     = ref(false);
-const loadError  = ref('');
+const loading = ref(false);
+const loaded = ref(false);
+const loadError = ref('');
 const procedures = ref([]);
 
 async function loadProcedures() {
-    if (! props.urls.medicalrecordprocedures_index) return;
+    if (!props.urls.medicalrecordprocedures_index) return;
     loading.value = true;
     loadError.value = '';
     try {
         const res = await fetch(props.urls.medicalrecordprocedures_index, {
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
         });
-        if (! res.ok) throw new Error(String(res.status));
+        if (!res.ok) throw new Error(String(res.status));
         procedures.value = (await res.json()).data ?? [];
         loaded.value = true;
     } catch (e) {
@@ -96,28 +96,34 @@ async function loadProcedures() {
     }
 }
 
-watch(() => props.show, (open) => {
-    if (open && ! loaded.value) loadProcedures();
-    if (! open) { showNewForm.value = false; markDoneTarget.value = null; }
-});
+watch(
+    () => props.show,
+    (open) => {
+        if (open && !loaded.value) loadProcedures();
+        if (!open) {
+            showNewForm.value = false;
+            markDoneTarget.value = null;
+        }
+    },
+);
 
 // ── Nova solicitação ─────────────────────────────────────────────────────
-const showNewForm       = ref(false);
-const procSearchQuery   = ref('');
+const showNewForm = ref(false);
+const procSearchQuery = ref('');
 const procSearchResults = ref([]);
-const procSearchOpen    = ref(false);
+const procSearchOpen = ref(false);
 const procSearchLoading = ref(false);
 const selectedProcedure = ref(null);
-const newForm           = reactive({ eye: '', solicitation_type: '', notes: '' });
-const requestBusy        = ref(false);
-const requestError       = ref('');
-let searchDebounce       = null;
+const newForm = reactive({ eye: '', solicitation_type: '', notes: '' });
+const requestBusy = ref(false);
+const requestError = ref('');
+let searchDebounce = null;
 
 function searchProcedures() {
     clearTimeout(searchDebounce);
     searchDebounce = setTimeout(async () => {
         const q = procSearchQuery.value.trim();
-        if (q.length < 2 || ! props.urls.procedure_search) {
+        if (q.length < 2 || !props.urls.procedure_search) {
             procSearchResults.value = [];
             procSearchOpen.value = false;
 
@@ -128,7 +134,7 @@ function searchProcedures() {
             const res = await fetch(`${props.urls.procedure_search}?q=${encodeURIComponent(q)}`, {
                 headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
             });
-            if (! res.ok) {
+            if (!res.ok) {
                 procSearchResults.value = [];
                 procSearchOpen.value = false;
 
@@ -165,12 +171,12 @@ function openNewForm() {
 }
 
 async function submitRequest() {
-    if (! selectedProcedure.value) {
+    if (!selectedProcedure.value) {
         requestError.value = tt('procedures_select_first', 'Selecione um procedimento do catálogo.');
 
         return;
     }
-    if (requestBusy.value || ! props.urls.medicalrecordprocedures_store) return;
+    if (requestBusy.value || !props.urls.medicalrecordprocedures_store) return;
 
     requestBusy.value = true;
     requestError.value = '';
@@ -186,8 +192,9 @@ async function submitRequest() {
             }),
         });
         const json = await res.json().catch(() => ({}));
-        if (! res.ok) {
-            requestError.value = json.message ?? tt('procedures_request_error', 'Não foi possível solicitar o procedimento.');
+        if (!res.ok) {
+            requestError.value =
+                json.message ?? tt('procedures_request_error', 'Não foi possível solicitar o procedimento.');
 
             return;
         }
@@ -202,12 +209,12 @@ async function submitRequest() {
 }
 
 // ── Confirmar execução (consumo opcional, pré-preenchido pela BOM) ──────
-const markDoneTarget   = ref(null); // linha da listagem em execução
-const bomLoading       = ref(false);
+const markDoneTarget = ref(null); // linha da listagem em execução
+const bomLoading = ref(false);
 const consumptionItems = ref([]);
-const markDoneNotes    = ref('');
-const markDoneBusy     = ref(false);
-const markDoneError    = ref('');
+const markDoneNotes = ref('');
+const markDoneBusy = ref(false);
+const markDoneError = ref('');
 
 async function openMarkDone(proc) {
     showNewForm.value = false;
@@ -216,7 +223,7 @@ async function openMarkDone(proc) {
     markDoneNotes.value = '';
     consumptionItems.value = [];
 
-    if (! props.urls.procedure_bom_template) return;
+    if (!props.urls.procedure_bom_template) return;
 
     bomLoading.value = true;
     try {
@@ -226,17 +233,17 @@ async function openMarkDone(proc) {
             const json = await res.json();
             consumptionItems.value = (json.data ?? []).map((item) => ({
                 entity_product_id: item.entity_product_id,
-                product_name:      item.product_name,
-                product_code:      item.product_code,
-                unit_label:        item.unit_label,
-                requires_lot:      item.requires_lot,
-                qty_on_hand:       item.qty_on_hand,
-                quantity:          item.quantity,
+                product_name: item.product_name,
+                product_code: item.product_code,
+                unit_label: item.unit_label,
+                requires_lot: item.requires_lot,
+                qty_on_hand: item.qty_on_hand,
+                quantity: item.quantity,
                 // Único lote disponível: pré-seleciona (menos clique); mais
                 // de um, o médico escolhe (FEFO já vem ordenado por
                 // validade — ver MedicalRecordProceduresController::bom()).
                 stock_lot_id: item.lots?.length === 1 ? item.lots[0].id : '',
-                lots:         item.lots ?? [],
+                lots: item.lots ?? [],
             }));
         }
     } catch (e) {
@@ -255,18 +262,21 @@ function removeConsumptionItem(idx) {
 }
 
 async function confirmMarkDone() {
-    if (! markDoneTarget.value || markDoneBusy.value) return;
+    if (!markDoneTarget.value || markDoneBusy.value) return;
 
     for (const item of consumptionItems.value) {
-        if (item.requires_lot && ! item.stock_lot_id) {
+        if (item.requires_lot && !item.stock_lot_id) {
             markDoneError.value = `${tt('procedures_lot_label', 'Lote')}: ${item.product_name ?? ''}`;
 
             return;
         }
     }
 
-    const url = props.urls.medicalrecordprocedure_mark_done_template?.replace('__PROCEDURE_ID__', markDoneTarget.value.id);
-    if (! url) return;
+    const url = props.urls.medicalrecordprocedure_mark_done_template?.replace(
+        '__PROCEDURE_ID__',
+        markDoneTarget.value.id,
+    );
+    if (!url) return;
 
     markDoneBusy.value = true;
     markDoneError.value = '';
@@ -280,13 +290,13 @@ async function confirmMarkDone() {
                     .filter((i) => Number(i.quantity) > 0)
                     .map((i) => ({
                         entity_product_id: i.entity_product_id,
-                        quantity:          Number(i.quantity),
-                        stock_lot_id:      i.stock_lot_id || null,
+                        quantity: Number(i.quantity),
+                        stock_lot_id: i.stock_lot_id || null,
                     })),
             }),
         });
         const json = await res.json().catch(() => ({}));
-        if (! res.ok) {
+        if (!res.ok) {
             markDoneError.value = json.message ?? tt('procedures_done_error', 'Não foi possível confirmar a execução.');
 
             return;
@@ -304,10 +314,10 @@ async function confirmMarkDone() {
 
 // ── Cancelar ─────────────────────────────────────────────────────────────
 async function cancelProcedure(proc) {
-    if (! window.confirm(tt('procedures_cancel_confirm', 'Cancelar esta solicitação de procedimento?'))) return;
+    if (!window.confirm(tt('procedures_cancel_confirm', 'Cancelar esta solicitação de procedimento?'))) return;
 
     const url = props.urls.medicalrecordprocedure_cancel_template?.replace('__PROCEDURE_ID__', proc.id);
-    if (! url) return;
+    if (!url) return;
 
     try {
         const res = await fetch(url, {
@@ -316,7 +326,7 @@ async function cancelProcedure(proc) {
             body: JSON.stringify({}),
         });
         const json = await res.json().catch(() => ({}));
-        if (! res.ok) {
+        if (!res.ok) {
             alert(json.message ?? tt('procedures_cancel_error', 'Não foi possível cancelar o procedimento.'));
 
             return;
@@ -332,16 +342,26 @@ async function cancelProcedure(proc) {
 
 <template>
     <Teleport to="body">
-        <div v-if="show" class="modal fade show d-block" style="background: rgba(15, 23, 42, .45);"
-             role="dialog" aria-modal="true" @click.self="emit('close')">
+        <div
+            v-if="show"
+            class="modal fade show d-block"
+            style="background: rgba(15, 23, 42, 0.45)"
+            role="dialog"
+            aria-modal="true"
+            @click.self="emit('close')"
+        >
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
                         <h5 class="modal-title">
                             <i class="fas fa-syringe me-2 text-primary"></i>{{ tt('procedures', 'Procedimentos') }}
                         </h5>
-                        <button v-if="canWrite && ! showNewForm && ! markDoneTarget" type="button"
-                                class="btn btn-primary btn-sm ms-auto me-2" @click="openNewForm">
+                        <button
+                            v-if="canWrite && !showNewForm && !markDoneTarget"
+                            type="button"
+                            class="btn btn-primary btn-sm ms-auto me-2"
+                            @click="openNewForm"
+                        >
                             <i class="fas fa-plus me-1"></i>{{ tt('procedures_new', 'Solicitar procedimento') }}
                         </button>
                         <button type="button" class="btn-close" @click="emit('close')"></button>
@@ -351,22 +371,37 @@ async function cancelProcedure(proc) {
                         <!-- Nova solicitação -->
                         <div v-if="showNewForm" class="border rounded p-2 mb-3 bg-light">
                             <div class="position-relative mb-2">
-                                <label class="form-label small fw-semibold mb-1">{{ tt('procedures', 'Procedimentos') }}</label>
+                                <label class="form-label small fw-semibold mb-1">{{
+                                    tt('procedures', 'Procedimentos')
+                                }}</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                    <input v-model="procSearchQuery" type="text" class="form-control form-control-sm"
-                                           :placeholder="tt('procedures_search_ph', 'Buscar procedimento no catálogo...')"
-                                           @input="searchProcedures">
+                                    <input
+                                        v-model="procSearchQuery"
+                                        type="text"
+                                        class="form-control form-control-sm"
+                                        :placeholder="tt('procedures_search_ph', 'Buscar procedimento no catálogo...')"
+                                        @input="searchProcedures"
+                                    />
                                     <span v-if="procSearchLoading" class="input-group-text bg-transparent">
-                                        <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                                        <span
+                                            class="spinner-border spinner-border-sm"
+                                            style="width: 0.8rem; height: 0.8rem"
+                                        ></span>
                                     </span>
                                 </div>
-                                <ul v-if="procSearchOpen && procSearchResults.length > 0"
+                                <ul
+                                    v-if="procSearchOpen && procSearchResults.length > 0"
                                     class="list-group shadow-sm position-absolute w-100"
-                                    style="z-index:1080;top:100%;max-height:220px;overflow-y:auto;">
-                                    <li v-for="item in procSearchResults" :key="item.id"
-                                        class="list-group-item list-group-item-action py-1 px-2" style="cursor:pointer;font-size:.82rem;"
-                                        @mousedown.prevent="pickProcedure(item)">
+                                    style="z-index: 1080; top: 100%; max-height: 220px; overflow-y: auto"
+                                >
+                                    <li
+                                        v-for="item in procSearchResults"
+                                        :key="item.id"
+                                        class="list-group-item list-group-item-action py-1 px-2"
+                                        style="cursor: pointer; font-size: 0.82rem"
+                                        @mousedown.prevent="pickProcedure(item)"
+                                    >
                                         <span class="fw-semibold">{{ item.name }}</span>
                                         <span v-if="item.code" class="text-muted ms-1 small">({{ item.code }})</span>
                                     </li>
@@ -375,33 +410,58 @@ async function cancelProcedure(proc) {
 
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
-                                    <label class="form-label small fw-semibold mb-1">{{ tt('procedures_eye_label', 'Olho') }}</label>
+                                    <label class="form-label small fw-semibold mb-1">{{
+                                        tt('procedures_eye_label', 'Olho')
+                                    }}</label>
                                     <select v-model="newForm.eye" class="form-select form-select-sm">
                                         <option value="">—</option>
-                                        <option v-for="o in EYE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+                                        <option v-for="o in EYE_OPTIONS" :key="o.value" :value="o.value">
+                                            {{ o.label }}
+                                        </option>
                                     </select>
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label small fw-semibold mb-1">{{ tt('procedures_type_label', 'Tipo') }}</label>
+                                    <label class="form-label small fw-semibold mb-1">{{
+                                        tt('procedures_type_label', 'Tipo')
+                                    }}</label>
                                     <select v-model="newForm.solicitation_type" class="form-select form-select-sm">
                                         <option value="">—</option>
-                                        <option v-for="o in TYPE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+                                        <option v-for="o in TYPE_OPTIONS" :key="o.value" :value="o.value">
+                                            {{ o.label }}
+                                        </option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="mb-2">
-                                <label class="form-label small fw-semibold mb-1">{{ tt('procedures_notes_label', 'Observações') }}</label>
-                                <textarea v-model="newForm.notes" class="form-control form-control-sm" rows="2"></textarea>
+                                <label class="form-label small fw-semibold mb-1">{{
+                                    tt('procedures_notes_label', 'Observações')
+                                }}</label>
+                                <textarea
+                                    v-model="newForm.notes"
+                                    class="form-control form-control-sm"
+                                    rows="2"
+                                ></textarea>
                             </div>
 
-                            <div v-if="requestError" class="alert alert-danger py-1 px-2 small mb-2">{{ requestError }}</div>
+                            <div v-if="requestError" class="alert alert-danger py-1 px-2 small mb-2">
+                                {{ requestError }}
+                            </div>
 
                             <div class="d-flex justify-content-end gap-2">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @click="showNewForm = false">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    @click="showNewForm = false"
+                                >
                                     {{ tt('confirm_no', 'Cancelar') }}
                                 </button>
-                                <button type="button" class="btn btn-primary btn-sm" :disabled="requestBusy" @click="submitRequest">
+                                <button
+                                    type="button"
+                                    class="btn btn-primary btn-sm"
+                                    :disabled="requestBusy"
+                                    @click="submitRequest"
+                                >
                                     <span v-if="requestBusy" class="spinner-border spinner-border-sm me-1"></span>
                                     {{ tt('procedures_request', 'Solicitar') }}
                                 </button>
@@ -413,55 +473,115 @@ async function cancelProcedure(proc) {
                             <h6 class="mb-2">{{ markDoneTarget.procedure_name }}</h6>
 
                             <div v-if="bomLoading" class="text-center text-muted py-3">
-                                <span class="spinner-border spinner-border-sm me-2"></span>{{ tt('procedures_loading', 'Carregando procedimentos…') }}
+                                <span class="spinner-border spinner-border-sm me-2"></span
+                                >{{ tt('procedures_loading', 'Carregando procedimentos…') }}
                             </div>
 
                             <template v-else>
-                                <div class="small fw-semibold mb-1">{{ tt('procedures_consumption_title', 'Consumo de material (opcional)') }}</div>
-                                <p class="small text-muted">{{ tt('procedures_consumption_hint', 'Sugestão baseada na composição cadastrada deste procedimento — ajuste as quantidades ou remova o que não foi usado.') }}</p>
+                                <div class="small fw-semibold mb-1">
+                                    {{ tt('procedures_consumption_title', 'Consumo de material (opcional)') }}
+                                </div>
+                                <p class="small text-muted">
+                                    {{
+                                        tt(
+                                            'procedures_consumption_hint',
+                                            'Sugestão baseada na composição cadastrada deste procedimento — ajuste as quantidades ou remova o que não foi usado.',
+                                        )
+                                    }}
+                                </p>
 
                                 <div v-if="consumptionItems.length === 0" class="text-muted small mb-2">
                                     {{ tt('procedures_no_bom', 'Sem sugestão de material cadastrada.') }}
                                 </div>
 
-                                <div v-for="(item, idx) in consumptionItems" :key="item.entity_product_id" class="row g-2 align-items-end mb-2">
+                                <div
+                                    v-for="(item, idx) in consumptionItems"
+                                    :key="item.entity_product_id"
+                                    class="row g-2 align-items-end mb-2"
+                                >
                                     <div class="col-12 col-sm-5">
                                         <label class="form-label small mb-1">{{ item.product_name }}</label>
-                                        <div class="small text-muted">{{ item.product_code }} · {{ tt('procedures_qty_label', 'Quantidade') }} disp.: {{ item.qty_on_hand }} {{ item.unit_label }}</div>
+                                        <div class="small text-muted">
+                                            {{ item.product_code }} ·
+                                            {{ tt('procedures_qty_label', 'Quantidade') }} disp.: {{ item.qty_on_hand }}
+                                            {{ item.unit_label }}
+                                        </div>
                                     </div>
                                     <div class="col-6 col-sm-2">
-                                        <label class="form-label small mb-1">{{ tt('procedures_qty_label', 'Quantidade') }}</label>
-                                        <input v-model.number="item.quantity" type="number" min="0" step="any" class="form-control form-control-sm">
+                                        <label class="form-label small mb-1">{{
+                                            tt('procedures_qty_label', 'Quantidade')
+                                        }}</label>
+                                        <input
+                                            v-model.number="item.quantity"
+                                            type="number"
+                                            min="0"
+                                            step="any"
+                                            class="form-control form-control-sm"
+                                        />
                                     </div>
                                     <div v-if="item.requires_lot" class="col-6 col-sm-4">
-                                        <label class="form-label small mb-1">{{ tt('procedures_lot_label', 'Lote') }}</label>
-                                        <select v-model="item.stock_lot_id" class="form-select form-select-sm" :class="{ 'is-invalid': ! item.stock_lot_id }">
+                                        <label class="form-label small mb-1">{{
+                                            tt('procedures_lot_label', 'Lote')
+                                        }}</label>
+                                        <select
+                                            v-model="item.stock_lot_id"
+                                            class="form-select form-select-sm"
+                                            :class="{ 'is-invalid': !item.stock_lot_id }"
+                                        >
                                             <option value="" disabled>—</option>
                                             <option v-for="lot in item.lots" :key="lot.id" :value="lot.id">
-                                                {{ lot.lot_number }}<template v-if="lot.expiry_date"> · vence {{ lot.expiry_date }}</template> ({{ lot.qty_on_hand }})
+                                                {{ lot.lot_number
+                                                }}<template v-if="lot.expiry_date">
+                                                    · vence {{ lot.expiry_date }}</template
+                                                >
+                                                ({{ lot.qty_on_hand }})
                                             </option>
                                         </select>
-                                        <small v-if="item.lots.length === 0" class="text-danger d-block">{{ tt('procedures_lot_none', 'Sem lote com saldo disponível') }}</small>
+                                        <small v-if="item.lots.length === 0" class="text-danger d-block">{{
+                                            tt('procedures_lot_none', 'Sem lote com saldo disponível')
+                                        }}</small>
                                     </div>
                                     <div class="col-6 col-sm-1 text-end">
-                                        <button type="button" class="btn btn-outline-danger btn-sm" :title="tt('procedures_remove_item', 'Remover')" @click="removeConsumptionItem(idx)">
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-danger btn-sm"
+                                            :title="tt('procedures_remove_item', 'Remover')"
+                                            @click="removeConsumptionItem(idx)"
+                                        >
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
                                 </div>
 
                                 <div class="mb-2">
-                                    <label class="form-label small fw-semibold mb-1">{{ tt('procedures_notes_label', 'Observações') }}</label>
-                                    <textarea v-model="markDoneNotes" class="form-control form-control-sm" rows="2"></textarea>
+                                    <label class="form-label small fw-semibold mb-1">{{
+                                        tt('procedures_notes_label', 'Observações')
+                                    }}</label>
+                                    <textarea
+                                        v-model="markDoneNotes"
+                                        class="form-control form-control-sm"
+                                        rows="2"
+                                    ></textarea>
                                 </div>
 
-                                <div v-if="markDoneError" class="alert alert-danger py-1 px-2 small mb-2">{{ markDoneError }}</div>
+                                <div v-if="markDoneError" class="alert alert-danger py-1 px-2 small mb-2">
+                                    {{ markDoneError }}
+                                </div>
 
                                 <div class="d-flex justify-content-end gap-2">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="closeMarkDone">
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        @click="closeMarkDone"
+                                    >
                                         {{ tt('confirm_no', 'Cancelar') }}
                                     </button>
-                                    <button type="button" class="btn btn-success btn-sm" :disabled="markDoneBusy" @click="confirmMarkDone">
+                                    <button
+                                        type="button"
+                                        class="btn btn-success btn-sm"
+                                        :disabled="markDoneBusy"
+                                        @click="confirmMarkDone"
+                                    >
                                         <span v-if="markDoneBusy" class="spinner-border spinner-border-sm me-1"></span>
                                         {{ tt('procedures_mark_done', 'Confirmar execução') }}
                                     </button>
@@ -471,7 +591,8 @@ async function cancelProcedure(proc) {
 
                         <!-- Histórico -->
                         <div v-if="loading" class="text-center text-muted py-5">
-                            <span class="spinner-border spinner-border-sm me-2"></span>{{ tt('procedures_loading', 'Carregando procedimentos…') }}
+                            <span class="spinner-border spinner-border-sm me-2"></span
+                            >{{ tt('procedures_loading', 'Carregando procedimentos…') }}
                         </div>
 
                         <div v-else-if="loadError" class="alert alert-danger py-2 small mb-0">
@@ -479,27 +600,49 @@ async function cancelProcedure(proc) {
                         </div>
 
                         <div v-else-if="procedures.length === 0" class="text-center text-muted py-4">
-                            <i class="fas fa-syringe d-block fs-3 mb-2"></i>{{ tt('procedures_empty', 'Nenhum procedimento registrado para este paciente.') }}
+                            <i class="fas fa-syringe d-block fs-3 mb-2"></i
+                            >{{ tt('procedures_empty', 'Nenhum procedimento registrado para este paciente.') }}
                         </div>
 
                         <ul v-else class="list-group">
                             <li v-for="proc in procedures" :key="proc.id" class="list-group-item">
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="fw-semibold">{{ proc.procedure_name }}</span>
-                                    <span class="badge" :class="STATUS_BADGE[proc.status] ?? 'bg-secondary-subtle text-secondary'">{{ proc.status_label }}</span>
-                                    <span v-if="proc.eye" class="badge bg-light text-dark border">{{ EYE_OPTIONS.find(o => o.value === proc.eye)?.label ?? proc.eye }}</span>
-                                    <span v-if="proc.solicitation_type" class="badge bg-light text-dark border">{{ TYPE_OPTIONS.find(o => o.value === proc.solicitation_type)?.label ?? proc.solicitation_type }}</span>
-                                    <span class="text-muted small ms-auto">{{ proc.doctor_name }} · {{ proc.created_at }}</span>
+                                    <span
+                                        class="badge"
+                                        :class="STATUS_BADGE[proc.status] ?? 'bg-secondary-subtle text-secondary'"
+                                        >{{ proc.status_label }}</span
+                                    >
+                                    <span v-if="proc.eye" class="badge bg-light text-dark border">{{
+                                        EYE_OPTIONS.find((o) => o.value === proc.eye)?.label ?? proc.eye
+                                    }}</span>
+                                    <span v-if="proc.solicitation_type" class="badge bg-light text-dark border">{{
+                                        TYPE_OPTIONS.find((o) => o.value === proc.solicitation_type)?.label ??
+                                        proc.solicitation_type
+                                    }}</span>
+                                    <span class="text-muted small ms-auto"
+                                        >{{ proc.doctor_name }} · {{ proc.created_at }}</span
+                                    >
                                 </div>
                                 <div v-if="proc.notes" class="small text-muted mt-1">{{ proc.notes }}</div>
                                 <div v-if="proc.status === 'done'" class="small text-success mt-1">
-                                    <i class="fas fa-check-circle me-1"></i>{{ proc.executed_by_name }} · {{ proc.executed_at }}
+                                    <i class="fas fa-check-circle me-1"></i>{{ proc.executed_by_name }} ·
+                                    {{ proc.executed_at }}
                                 </div>
                                 <div v-if="canWrite && proc.status === 'requested'" class="d-flex gap-2 mt-2">
-                                    <button type="button" class="btn btn-outline-success btn-sm" @click="openMarkDone(proc)">
-                                        <i class="fas fa-check me-1"></i>{{ tt('procedures_mark_done', 'Confirmar execução') }}
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-success btn-sm"
+                                        @click="openMarkDone(proc)"
+                                    >
+                                        <i class="fas fa-check me-1"></i
+                                        >{{ tt('procedures_mark_done', 'Confirmar execução') }}
                                     </button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm" @click="cancelProcedure(proc)">
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        @click="cancelProcedure(proc)"
+                                    >
                                         <i class="fas fa-ban me-1"></i>{{ tt('procedures_cancel', 'Cancelar') }}
                                     </button>
                                 </div>

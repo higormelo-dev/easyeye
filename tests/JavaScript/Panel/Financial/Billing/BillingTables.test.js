@@ -34,7 +34,12 @@ describe('ClaimsTable', () => {
 
     it('código GUI e nº da guia TISS em colunas próprias; valor, glosa e pago formatados pelo idioma', () => {
         const w = mount(ClaimsTable, {
-            props: { t, claims: [claim({ guide_number: 'GUI-202609-000123', amount: 1234.5, glosa_amount: 50, paid_amount: 0 })] },
+            props: {
+                t,
+                claims: [
+                    claim({ guide_number: 'GUI-202609-000123', amount: 1234.5, glosa_amount: 50, paid_amount: 0 }),
+                ],
+            },
         });
 
         const row = w.find('[data-test="claim-row"]');
@@ -53,13 +58,17 @@ describe('ClaimsTable', () => {
 
         const headers = w.findAll('thead th');
         const secondary = headers.filter((th) => th.classes().includes('d-none'));
-        expect(secondary.map((th) => th.text())).toEqual(expect.arrayContaining([t.col_tiss_number, t.col_covenant, t.col_batch, t.col_glosa, t.col_received]));
+        expect(secondary.map((th) => th.text())).toEqual(
+            expect.arrayContaining([t.col_tiss_number, t.col_covenant, t.col_batch, t.col_glosa, t.col_received]),
+        );
         secondary.forEach((th) => expect(th.classes().some((c) => /^d-(lg|xl)-table-cell$/.test(c))).toBe(true));
     });
 
     it('o código do lote é um botão que emite filter-batch com a guia', async () => {
         const c = claim();
-        const w = mount(ClaimsTable, { props: { t, claims: [c, claim({ id: 'x', batch_id: null, batch_code: null })] } });
+        const w = mount(ClaimsTable, {
+            props: { t, claims: [c, claim({ id: 'x', batch_id: null, batch_code: null })] },
+        });
 
         const [withBatch, withoutBatch] = w.findAll('[data-test="claim-row"]');
         await withBatch.find('[data-test="claim-batch"]').trigger('click');
@@ -122,7 +131,9 @@ describe('ClaimsTable', () => {
         expect(pagination.exists()).toBe(true);
         expect(pagination.text()).toContain('Exibindo 1–1 de 120 guias');
         expect(pagination.find('nav').attributes('aria-label')).toBe('Paginação da aba Guias');
-        expect(pagination.findAll('a.page-link').map((a) => a.attributes('href'))).toContain('/panel/financial/billing?claims_page=2');
+        expect(pagination.findAll('a.page-link').map((a) => a.attributes('href'))).toContain(
+            '/panel/financial/billing?claims_page=2',
+        );
         expect(pagination.find('a[aria-label="Próxima página"]').exists()).toBe(true);
     });
 
@@ -155,7 +166,12 @@ describe('ClaimsTable', () => {
             props: {
                 t,
                 claims: paginate([
-                    claim({ id: 'both', code: 'GUI-1', allowed_actions: ['pay', 'deny', 'cancel', 'fix_pending'], fix_pending: { url: '/fix' } }),
+                    claim({
+                        id: 'both',
+                        code: 'GUI-1',
+                        allowed_actions: ['pay', 'deny', 'cancel', 'fix_pending'],
+                        fix_pending: { url: '/fix' },
+                    }),
                     claim({ id: 'cancel-only', code: 'GUI-2', allowed_actions: ['cancel'] }),
                     claim({ id: 'none', code: 'GUI-3', allowed_actions: ['pay'] }),
                 ]),
@@ -194,10 +210,16 @@ describe('ClaimsTable', () => {
         const w = mount(ClaimsTable, {
             props: {
                 t,
-                claims: paginate([claim({
-                    status: 'cancelled', status_label: 'Cancelado', allowed_actions: [],
-                    cancelled_at: '2026-09-25T10:00:00-03:00', cancelled_by_name: 'Ana Financeiro', cancel_reason: 'Convênio errado no atendimento',
-                })]),
+                claims: paginate([
+                    claim({
+                        status: 'cancelled',
+                        status_label: 'Cancelado',
+                        allowed_actions: [],
+                        cancelled_at: '2026-09-25T10:00:00-03:00',
+                        cancelled_by_name: 'Ana Financeiro',
+                        cancel_reason: 'Convênio errado no atendimento',
+                    }),
+                ]),
             },
         });
 
@@ -233,7 +255,10 @@ describe('BatchesTable', () => {
 
     it('mostra a data de envio (ou "Não enviado") e o período', () => {
         const w = mount(BatchesTable, {
-            props: { t, batches: [batch(), batch({ id: 'b2', submitted_at: '2026-09-21T14:30:00', status: 'submitted' })] },
+            props: {
+                t,
+                batches: [batch(), batch({ id: 'b2', submitted_at: '2026-09-21T14:30:00', status: 'submitted' })],
+            },
         });
 
         const [draft, sent] = w.findAll('[data-test="batch-row"]');
@@ -276,9 +301,16 @@ describe('BatchesTable', () => {
                 batches: paginate([
                     batch({ id: 'draft', allowed_actions: ['submit', 'download_xml', 'cancel'] }),
                     batch({
-                        id: 'gone', code: 'LOT-0009', status: 'cancelled', status_label: 'Cancelado', allowed_actions: [],
-                        included_count: 0, pending_count: 0,
-                        cancelled_at: '2026-09-25T10:00:00-03:00', cancelled_by_name: null, cancel_reason: 'Lote gerado em duplicidade',
+                        id: 'gone',
+                        code: 'LOT-0009',
+                        status: 'cancelled',
+                        status_label: 'Cancelado',
+                        allowed_actions: [],
+                        included_count: 0,
+                        pending_count: 0,
+                        cancelled_at: '2026-09-25T10:00:00-03:00',
+                        cancelled_by_name: null,
+                        cancel_reason: 'Lote gerado em duplicidade',
                     }),
                 ]),
             },
@@ -295,14 +327,21 @@ describe('BatchesTable', () => {
         await draft.find('[data-test="cancel-batch"]').trigger('click');
         expect(w.emitted('cancel')[0][0].id).toBe('draft');
 
-        expect(w.find('[data-test="batch-cancelled-info"]').text()).toContain('Lote cancelado em 25/09/2026 — Motivo: Lote gerado em duplicidade');
+        expect(w.find('[data-test="batch-cancelled-info"]').text()).toContain(
+            'Lote cancelado em 25/09/2026 — Motivo: Lote gerado em duplicidade',
+        );
 
         w.unmount();
     });
 
     it('ordena por Lote/Período/Total, busca e pagina (batches_page)', async () => {
         const w = mount(BatchesTable, {
-            props: { t, batches: paginate([batch()], { total: 60, last_page: 3 }, 'batches_page'), sort: 'total', direction: 'asc' },
+            props: {
+                t,
+                batches: paginate([batch()], { total: 60, last_page: 3 }, 'batches_page'),
+                sort: 'total',
+                direction: 'asc',
+            },
         });
 
         const sortable = w.findAll('thead th[aria-sort]');
@@ -331,7 +370,9 @@ describe('EligibleTable', () => {
         const selectAll = w.find('[data-test="select-all"]');
         expect(selectAll.element.indeterminate).toBe(true);
         expect(selectAll.attributes('aria-label')).toBe(t.eligible_select_all);
-        expect(w.findAll('[data-test="eligible-row"]')[1].find('input').attributes('aria-label')).toContain('Selecionar Ana');
+        expect(w.findAll('[data-test="eligible-row"]')[1].find('input').attributes('aria-label')).toContain(
+            'Selecionar Ana',
+        );
         expect(w.find('[data-test="new-batch"]').text()).toBe('Gerar lote com 1 selecionado(s)');
 
         w.unmount();

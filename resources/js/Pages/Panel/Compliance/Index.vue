@@ -1,14 +1,14 @@
 <script setup>
 import { ref } from 'vue';
-import AppLayout  from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    exports:     { type: Object, required: true },
+    breadcrumbs: { type: Array, default: () => [] },
+    exports: { type: Object, required: true },
 });
 
-const auditForm  = ref({ date_from: '', date_until: '' });
+const auditForm = ref({ date_from: '', date_until: '' });
 const accessForm = ref({ date_from: '', date_until: '' });
 
 function buildUrl(base, params) {
@@ -35,16 +35,27 @@ function buildUrl(base, params) {
                         </div>
                         <div class="card-body">
                             <p class="small text-muted mb-3">
-                                Trilha CUD de todos os models auditáveis (Patient, MedicalRecord, Schedule etc.) no período.
+                                Trilha CUD de todos os models auditáveis (Patient, MedicalRecord, Schedule etc.) no
+                                período.
                             </p>
                             <form class="row g-2">
                                 <div class="col-md-6">
                                     <label class="form-label small mb-1">De *</label>
-                                    <input v-model="auditForm.date_from" type="date" class="form-control form-control-sm" required>
+                                    <input
+                                        v-model="auditForm.date_from"
+                                        type="date"
+                                        class="form-control form-control-sm"
+                                        required
+                                    />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small mb-1">Até *</label>
-                                    <input v-model="auditForm.date_until" type="date" class="form-control form-control-sm" required>
+                                    <input
+                                        v-model="auditForm.date_until"
+                                        type="date"
+                                        class="form-control form-control-sm"
+                                        required
+                                    />
                                 </div>
                                 <div class="col-12 mt-3">
                                     <a
@@ -71,16 +82,27 @@ function buildUrl(base, params) {
                         </div>
                         <div class="card-body">
                             <p class="small text-muted mb-3">
-                                Quem acessou quais prontuários e qual a justificativa LGPD (rastreio para responder Solicitações de Titular).
+                                Quem acessou quais prontuários e qual a justificativa LGPD (rastreio para responder
+                                Solicitações de Titular).
                             </p>
                             <form class="row g-2">
                                 <div class="col-md-6">
                                     <label class="form-label small mb-1">De *</label>
-                                    <input v-model="accessForm.date_from" type="date" class="form-control form-control-sm" required>
+                                    <input
+                                        v-model="accessForm.date_from"
+                                        type="date"
+                                        class="form-control form-control-sm"
+                                        required
+                                    />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small mb-1">Até *</label>
-                                    <input v-model="accessForm.date_until" type="date" class="form-control form-control-sm" required>
+                                    <input
+                                        v-model="accessForm.date_until"
+                                        type="date"
+                                        class="form-control form-control-sm"
+                                        required
+                                    />
                                 </div>
                                 <div class="col-12 mt-3">
                                     <a

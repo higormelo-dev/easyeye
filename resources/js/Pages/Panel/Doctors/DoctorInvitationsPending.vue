@@ -40,7 +40,9 @@ function cancel(invitation) {
                             <th scope="col">{{ t.col_record }}</th>
                             <th scope="col">{{ it.col_sent_at }}</th>
                             <th scope="col">{{ it.col_expires_at }}</th>
-                            <th scope="col" class="text-end"><span class="visually-hidden">{{ it.cancel }}</span></th>
+                            <th scope="col" class="text-end">
+                                <span class="visually-hidden">{{ it.cancel }}</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>

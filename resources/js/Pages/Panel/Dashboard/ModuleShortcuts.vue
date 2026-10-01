@@ -1,66 +1,66 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
 import { useUserPreferences } from '@/composables/useUserPreferences.js';
 
 const props = defineProps({
     // Telas que o usuário pode abrir (PanelDashboardController::buildAccess —
     // mesmas regras das rotas): atalho sem acesso não aparece.
-    access:      { type: Object, default: () => ({}) },
+    access: { type: Object, default: () => ({}) },
     orderLabels: { type: Object, default: () => ({}) },
-    t:           { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 const modules = computed(() => {
     const all = [
         ...(props.access.schedules
-            ? [{
-                key:       'schedule',
-                label:     props.t.module_schedule,
-                icon:      'ti ti-calendar',
-                iconClass: 'module-icon--schedule',
-                url:       route('panel.schedules.index'),
-                soon:      false,
-            }]
-            : []
-        ),
+            ? [
+                  {
+                      key: 'schedule',
+                      label: props.t.module_schedule,
+                      icon: 'ti ti-calendar',
+                      iconClass: 'module-icon--schedule',
+                      url: route('panel.schedules.index'),
+                      soon: false,
+                  },
+              ]
+            : []),
         {
-            key:       'eye-images',
-            label:     props.t.module_eye_images,
-            icon:      'ti ti-eye',
+            key: 'eye-images',
+            label: props.t.module_eye_images,
+            icon: 'ti ti-eye',
             iconClass: 'module-icon',
-            url:       route('panel.eye-images.index'),
-            soon:      false,
+            url: route('panel.eye-images.index'),
+            soon: false,
         },
         ...(props.access.financial
             ? [
-                {
-                    key:       'tiss',
-                    label:     props.t.module_tiss,
-                    icon:      'ti ti-file-invoice',
-                    iconClass: 'module-icon--tiss',
-                    url:       route('panel.financial.billing.index'),
-                    soon:      false,
-                },
-                {
-                    key:       'financial',
-                    label:     props.t.module_financial,
-                    icon:      'ti ti-report-money',
-                    iconClass: 'module-icon--financial',
-                    url:       route('panel.financial.cash-flow.index'),
-                    soon:      false,
-                },
-            ]
-            : []
-        ),
+                  {
+                      key: 'tiss',
+                      label: props.t.module_tiss,
+                      icon: 'ti ti-file-invoice',
+                      iconClass: 'module-icon--tiss',
+                      url: route('panel.financial.billing.index'),
+                      soon: false,
+                  },
+                  {
+                      key: 'financial',
+                      label: props.t.module_financial,
+                      icon: 'ti ti-report-money',
+                      iconClass: 'module-icon--financial',
+                      url: route('panel.financial.cash-flow.index'),
+                      soon: false,
+                  },
+              ]
+            : []),
         {
-            key:       'surgery',
-            label:     props.t.module_surgery,
-            icon:      'ti ti-stethoscope',
+            key: 'surgery',
+            label: props.t.module_surgery,
+            icon: 'ti ti-stethoscope',
             iconClass: 'module-icon--soon',
-            url:       null,
-            soon:      true,
+            url: null,
+            soon: true,
         },
     ];
     return all;
@@ -74,13 +74,13 @@ const modules = computed(() => {
 const { getPreference, savePreference } = useUserPreferences();
 
 const orderedModules = computed(() => {
-    const base  = modules.value;
+    const base = modules.value;
     const saved = getPreference('favorite_shortcuts');
 
     if (!Array.isArray(saved) || saved.length === 0) return base;
 
-    const byKey       = Object.fromEntries(base.map((m) => [m.key, m]));
-    const savedKeys   = saved.map((s) => s.key).filter((k) => byKey[k]);
+    const byKey = Object.fromEntries(base.map((m) => [m.key, m]));
+    const savedKeys = saved.map((s) => s.key).filter((k) => byKey[k]);
     const missingKeys = base.map((m) => m.key).filter((k) => !savedKeys.includes(k));
 
     return [...savedKeys, ...missingKeys].map((key) => ({
@@ -92,7 +92,10 @@ const orderedModules = computed(() => {
 const visibleModules = computed(() => orderedModules.value.filter((m) => !m.hidden));
 
 function persistShortcuts(list) {
-    savePreference('favorite_shortcuts', list.map((m) => ({ key: m.key, hidden: !!m.hidden })));
+    savePreference(
+        'favorite_shortcuts',
+        list.map((m) => ({ key: m.key, hidden: !!m.hidden })),
+    );
 }
 
 function moveShortcut(fromIndex, toIndex) {
@@ -106,9 +109,7 @@ function moveShortcut(fromIndex, toIndex) {
 }
 
 function toggleShortcut(key) {
-    persistShortcuts(orderedModules.value.map((m) => (
-        m.key === key ? { ...m, hidden: !m.hidden } : m
-    )));
+    persistShortcuts(orderedModules.value.map((m) => (m.key === key ? { ...m, hidden: !m.hidden } : m)));
 }
 
 function resetShortcuts() {

@@ -18,27 +18,27 @@
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const messages = {
-    required:    (field)        => `O campo ${field} é obrigatório.`,
-    string:      (field)        => `O campo ${field} deve ser um texto.`,
-    numeric:     (field)        => `O campo ${field} deve ser numérico.`,
-    integer:     (field)        => `O campo ${field} deve ser um inteiro.`,
-    boolean:     (field)        => `O campo ${field} deve ser verdadeiro ou falso.`,
-    uuid:        (field)        => `O campo ${field} deve ser um identificador válido.`,
-    array:       (field)        => `O campo ${field} deve ser uma lista.`,
-    min:         (field, value) => `O campo ${field} deve ser maior ou igual a ${value}.`,
-    minLen:      (field, value) => `O campo ${field} deve ter pelo menos ${value} caracteres.`,
-    minArr:      (field, value) => `O campo ${field} deve conter pelo menos ${value} itens.`,
-    max:         (field, value) => `O campo ${field} deve ser menor ou igual a ${value}.`,
-    maxLen:      (field, value) => `O campo ${field} não pode passar de ${value} caracteres.`,
-    maxArr:      (field, value) => `O campo ${field} não pode conter mais de ${value} itens.`,
+    required: (field) => `O campo ${field} é obrigatório.`,
+    string: (field) => `O campo ${field} deve ser um texto.`,
+    numeric: (field) => `O campo ${field} deve ser numérico.`,
+    integer: (field) => `O campo ${field} deve ser um inteiro.`,
+    boolean: (field) => `O campo ${field} deve ser verdadeiro ou falso.`,
+    uuid: (field) => `O campo ${field} deve ser um identificador válido.`,
+    array: (field) => `O campo ${field} deve ser uma lista.`,
+    min: (field, value) => `O campo ${field} deve ser maior ou igual a ${value}.`,
+    minLen: (field, value) => `O campo ${field} deve ter pelo menos ${value} caracteres.`,
+    minArr: (field, value) => `O campo ${field} deve conter pelo menos ${value} itens.`,
+    max: (field, value) => `O campo ${field} deve ser menor ou igual a ${value}.`,
+    maxLen: (field, value) => `O campo ${field} não pode passar de ${value} caracteres.`,
+    maxArr: (field, value) => `O campo ${field} não pode conter mais de ${value} itens.`,
     date_format: (field, value) => `O campo ${field} deve seguir o formato ${value}.`,
-    in:          (field)        => `O valor selecionado para ${field} é inválido.`,
+    in: (field) => `O valor selecionado para ${field} é inválido.`,
 };
 
 function isEmpty(value) {
     if (value === null || value === undefined) return true;
     if (typeof value === 'string') return value.trim() === '';
-    if (Array.isArray(value))     return value.length === 0;
+    if (Array.isArray(value)) return value.length === 0;
     return false;
 }
 
@@ -67,7 +67,7 @@ function isBooleanLike(value) {
 function matchDateFormat(value, format) {
     if (typeof value !== 'string') return false;
     if (format === 'd/m/Y') return /^\d{2}\/\d{2}\/\d{4}$/.test(value);
-    if (format === 'H:i')   return /^\d{2}:\d{2}$/.test(value);
+    if (format === 'H:i') return /^\d{2}:\d{2}$/.test(value);
     if (format === 'Y-m-d') return /^\d{4}-\d{2}-\d{2}$/.test(value);
     return true; // formato desconhecido — confia no servidor
 }
@@ -78,10 +78,10 @@ function matchDateFormat(value, format) {
  * @returns {string[]} mensagens de erro acumuladas.
  */
 function validateField(label, value, definition) {
-    const errors  = [];
-    const rules   = definition?.rules  || [];
-    const params  = definition?.params || {};
-    const empty   = isEmpty(value);
+    const errors = [];
+    const rules = definition?.rules || [];
+    const params = definition?.params || {};
+    const empty = isEmpty(value);
 
     // Skip nullable/sometimes para valores vazios — rules abaixo só rodam se há valor.
     const isOptional = rules.includes('nullable') || rules.includes('sometimes');
@@ -96,13 +96,13 @@ function validateField(label, value, definition) {
 
     if (empty) return errors; // não-required, sem valor → nada a checar.
 
-    if (rules.includes('numeric') && !isNumericLike(value))   errors.push(messages.numeric(label));
-    if (rules.includes('integer') && !isIntegerLike(value))   errors.push(messages.integer(label));
-    if (rules.includes('boolean') && !isBooleanLike(value))   errors.push(messages.boolean(label));
-    if (rules.includes('uuid')    && (typeof value !== 'string' || !UUID_RE.test(value))) {
+    if (rules.includes('numeric') && !isNumericLike(value)) errors.push(messages.numeric(label));
+    if (rules.includes('integer') && !isIntegerLike(value)) errors.push(messages.integer(label));
+    if (rules.includes('boolean') && !isBooleanLike(value)) errors.push(messages.boolean(label));
+    if (rules.includes('uuid') && (typeof value !== 'string' || !UUID_RE.test(value))) {
         errors.push(messages.uuid(label));
     }
-    if (rules.includes('array') && !Array.isArray(value))     errors.push(messages.array(label));
+    if (rules.includes('array') && !Array.isArray(value)) errors.push(messages.array(label));
     if (rules.includes('string') && typeof value !== 'string' && typeof value !== 'number') {
         errors.push(messages.string(label));
     }
@@ -156,8 +156,8 @@ export function validatePayload(payload, rulesByField, labels = {}) {
         // (ex.: diagnosis_cids). Cliente não introspecta — server valida.
         if ((definition?.rules || []).includes('array')) continue;
 
-        const label  = labels[field] || field;
-        const value  = payload[field];
+        const label = labels[field] || field;
+        const value = payload[field];
         const fieldErrors = validateField(label, value, definition);
 
         if (fieldErrors.length > 0) {

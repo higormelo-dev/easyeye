@@ -1,37 +1,40 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import LoadingSpinner   from '@/Components/Panel/LoadingSpinner.vue';
-import StatusBadge      from '@/Components/Panel/StatusBadge.vue';
-import CardsPagination  from '@/Components/Panel/CardsPagination.vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import LoadingSpinner from '@/Components/Panel/LoadingSpinner.vue';
+import StatusBadge from '@/Components/Panel/StatusBadge.vue';
+import CardsPagination from '@/Components/Panel/CardsPagination.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
-    cardsUrl:      { type: String, required: true },
+    cardsUrl: { type: String, required: true },
     initialSearch: { type: String, default: '' },
-    t:             { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit    = defineEmits(['view', 'edit', 'delete', 'toggleActive']);
-const items   = ref([]);
-const meta    = ref({ current_page: 1, last_page: 1 });
+const emit = defineEmits(['view', 'edit', 'delete', 'toggleActive']);
+const items = ref([]);
+const meta = ref({ current_page: 1, last_page: 1 });
 const loading = ref(false);
 
 async function fetchCards(p = 1) {
     loading.value = true;
     try {
         const params = new URLSearchParams({ page: p, search: props.initialSearch });
-        const json   = await fetch(`${props.cardsUrl}?${params}`).then(r => r.json());
+        const json = await fetch(`${props.cardsUrl}?${params}`).then((r) => r.json());
         items.value = json.data;
-        meta.value  = json.meta;
+        meta.value = json.meta;
     } finally {
         loading.value = false;
     }
 }
 
-watch(() => props.initialSearch, () => fetchCards(1));
+watch(
+    () => props.initialSearch,
+    () => fetchCards(1),
+);
 
 let removeSuccessListener;
 onMounted(() => {
@@ -59,7 +62,7 @@ onUnmounted(() => removeSuccessListener?.());
                     <div class="d-flex align-items-start gap-3">
                         <div
                             class="avatar-sm rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center flex-shrink-0"
-                            style="width:44px;height:44px;"
+                            style="width: 44px; height: 44px"
                         >
                             <i class="ti ti-building text-primary fs-18"></i>
                         </div>
@@ -82,7 +85,9 @@ onUnmounted(() => removeSuccessListener?.());
                                 </span>
                             </div>
                             <address class="small text-muted mb-2">
-                                <div><strong>{{ t.card_code }}</strong> {{ e.code }}</div>
+                                <div>
+                                    <strong>{{ t.card_code }}</strong> {{ e.code }}
+                                </div>
                                 <div v-if="e.city || e.state">
                                     <strong>{{ t.card_location }}</strong>
                                     {{ e.city || '—' }}{{ e.state ? ` / ${e.state}` : '' }}
@@ -107,7 +112,7 @@ onUnmounted(() => removeSuccessListener?.());
                         </div>
                     </div>
 
-                    <hr class="my-2">
+                    <hr class="my-2" />
 
                     <div class="d-flex align-items-center justify-content-between">
                         <ActionIconGroup gap="tight">
@@ -125,22 +130,17 @@ onUnmounted(() => removeSuccessListener?.());
                             />
                         </ActionIconGroup>
                         <ActionIconGroup v-if="e.mode === 'full'" align="end" gap="tight">
-                            <ActionIconButton
-                                icon="ti ti-eye"
-                                :title="t.action_view"
-                                @click="$emit('view', e.id)"
-                            />
-                            <ActionIconButton
-                                icon="ti ti-edit"
-                                :title="t.action_edit"
-                                @click="$emit('edit', e.id)"
-                            />
+                            <ActionIconButton icon="ti ti-eye" :title="t.action_view" @click="$emit('view', e.id)" />
+                            <ActionIconButton icon="ti ti-edit" :title="t.action_edit" @click="$emit('edit', e.id)" />
                             <ActionDropdown
                                 btn-class="ee-action-icon ee-action-icon--default"
                                 icon="ti ti-dots-vertical"
                             >
                                 <li>
-                                    <button class="dropdown-item rounded-1" @click="$emit('toggleActive', e.id, e.active)">
+                                    <button
+                                        class="dropdown-item rounded-1"
+                                        @click="$emit('toggleActive', e.id, e.active)"
+                                    >
                                         <i :class="`ti me-1 ${e.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
                                         {{ e.active ? t.action_deactivate : t.action_activate }}
                                     </button>

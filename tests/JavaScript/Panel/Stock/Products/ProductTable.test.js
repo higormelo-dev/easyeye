@@ -12,28 +12,49 @@ import ProductTable from '@/Pages/Panel/Stock/Products/ProductTable.vue';
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
     default: {
         props: ['title', 'btnClass'],
-        template: '<div class="dd" :data-title="title" :data-btn-class="btnClass"><span class="dd-trigger"><slot name="trigger" /></span><slot /></div>',
+        template:
+            '<div class="dd" :data-title="title" :data-btn-class="btnClass"><span class="dd-trigger"><slot name="trigger" /></span><slot /></div>',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
         props: ['title', 'icon', 'variant', 'inertiaHref'],
         emits: ['click'],
-        template: '<button type="button" class="icon-btn" :title="title" :data-href="inertiaHref" :data-variant="variant" @click="$emit(\'click\')" />',
+        template:
+            '<button type="button" class="icon-btn" :title="title" :data-href="inertiaHref" :data-variant="variant" @click="$emit(\'click\')" />',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_code: 'Código', col_name: 'Nome', col_category: 'Categoria', col_unit: 'Unidade',
-    col_qty_on_hand: 'Saldo', col_cost_avg: 'Custo médio', col_sale_price: 'Preço',
-    col_status: 'Status', col_actions: 'Ações', sort_by: 'Ordenar por :column',
-    status_active: 'Ativo', status_inactive: 'Inativo', below_minimum: 'Abaixo do mínimo',
-    badge_opm: 'OPM', badge_expiring_lot: 'Lote vencendo', expiring_lot_title: 'Vence em :date',
-    action_movements: 'Movimentações do produto', action_edit: 'Editar', action_activate: 'Ativar',
-    action_deactivate: 'Desativar', action_delete: 'Excluir', more_actions: 'Mais ações',
-    empty_list: 'Nenhum produto encontrado.', columns_label: 'Colunas', columns_customize: 'Personalizar colunas',
-    pagination_showing: 'Exibindo', pagination_of: 'de', pagination_suffix: 'produtos',
+    col_code: 'Código',
+    col_name: 'Nome',
+    col_category: 'Categoria',
+    col_unit: 'Unidade',
+    col_qty_on_hand: 'Saldo',
+    col_cost_avg: 'Custo médio',
+    col_sale_price: 'Preço',
+    col_status: 'Status',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    status_active: 'Ativo',
+    status_inactive: 'Inativo',
+    below_minimum: 'Abaixo do mínimo',
+    badge_opm: 'OPM',
+    badge_expiring_lot: 'Lote vencendo',
+    expiring_lot_title: 'Vence em :date',
+    action_movements: 'Movimentações do produto',
+    action_edit: 'Editar',
+    action_activate: 'Ativar',
+    action_deactivate: 'Desativar',
+    action_delete: 'Excluir',
+    more_actions: 'Mais ações',
+    empty_list: 'Nenhum produto encontrado.',
+    columns_label: 'Colunas',
+    columns_customize: 'Personalizar colunas',
+    pagination_showing: 'Exibindo',
+    pagination_of: 'de',
+    pagination_suffix: 'produtos',
 };
 
 const nbsp = (s) => s.replace(/ /g, ' ');
@@ -45,14 +66,35 @@ afterEach(() => wrapper?.unmount());
 
 function product(overrides = {}) {
     return {
-        id: 'p1', code: 'PRD-0000000001', name: 'Colírio X', category_name: 'Colírios', unit: 'un',
-        unit_label: 'Unidade', qty_on_hand: 12, cost_avg: 1234.5, sale_price: 25.9, below_minimum: false,
-        is_opm: false, has_expiring_lot: false, nearest_expiry: null, active: true, ...overrides,
+        id: 'p1',
+        code: 'PRD-0000000001',
+        name: 'Colírio X',
+        category_name: 'Colírios',
+        unit: 'un',
+        unit_label: 'Unidade',
+        qty_on_hand: 12,
+        cost_avg: 1234.5,
+        sale_price: 25.9,
+        below_minimum: false,
+        is_opm: false,
+        has_expiring_lot: false,
+        nearest_expiry: null,
+        active: true,
+        ...overrides,
     };
 }
 
 function paginator(rows, extra = {}) {
-    return { data: rows, total: rows.length, from: 1, to: rows.length, last_page: 1, current_page: 1, links: [], ...extra };
+    return {
+        data: rows,
+        total: rows.length,
+        from: 1,
+        to: rows.length,
+        last_page: 1,
+        current_page: 1,
+        links: [],
+        ...extra,
+    };
 }
 
 function mountTable(rows = [product()], filters = { sort: 'name', direction: 'asc' }, extra = {}) {
@@ -69,7 +111,17 @@ describe('ProductTable', () => {
     it('mantém a ordem de colunas de sempre, com Status e Ações fixos no fim', () => {
         const w = mountTable();
 
-        expect(headerLabels(w)).toEqual(['Código', 'Nome', 'Categoria', 'Unidade', 'Saldo', 'Custo médio', 'Preço', 'Status', 'Ações']);
+        expect(headerLabels(w)).toEqual([
+            'Código',
+            'Nome',
+            'Categoria',
+            'Unidade',
+            'Saldo',
+            'Custo médio',
+            'Preço',
+            'Status',
+            'Ações',
+        ]);
     });
 
     it('respeita a ordem de colunas salva no navegador', () => {
@@ -98,8 +150,8 @@ describe('ProductTable', () => {
         const w = mountTable();
         const ths = w.findAll('thead th');
 
-        await ths[1].find('button').trigger('click');   // Nome (atual asc)
-        await ths[4].find('button').trigger('click');   // Saldo
+        await ths[1].find('button').trigger('click'); // Nome (atual asc)
+        await ths[4].find('button').trigger('click'); // Saldo
 
         expect(w.emitted('sort')).toEqual([
             [{ sort: 'name', direction: 'desc' }],
@@ -118,7 +170,9 @@ describe('ProductTable', () => {
 
     it('destaca saldo abaixo do mínimo com indicador acessível e mostra OPM/lote vencendo', () => {
         // nearest_expiry chega em ISO e é formatado no idioma do usuário.
-        const w = mountTable([product({ below_minimum: true, is_opm: true, has_expiring_lot: true, nearest_expiry: '2026-09-30' })]);
+        const w = mountTable([
+            product({ below_minimum: true, is_opm: true, has_expiring_lot: true, nearest_expiry: '2026-09-30' }),
+        ]);
 
         expect(w.find('[aria-label="Abaixo do mínimo"]').exists()).toBe(true);
         expect(w.text()).toContain('OPM');

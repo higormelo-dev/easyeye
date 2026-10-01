@@ -1,11 +1,11 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
-import AppLayout          from '@/Layouts/AppLayout.vue';
-import PageHeader         from '@/Components/Panel/PageHeader.vue';
-import SearchInput        from '@/Components/Panel/SearchInput.vue';
-import { useViewMode }    from '@/composables/useViewMode.js';
-import { useTrans }       from '@/composables/useTrans.js';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import { useViewMode } from '@/composables/useViewMode.js';
+import { useTrans } from '@/composables/useTrans.js';
 import ReportSettingTable from './ReportSettingTable.vue';
 import ReportSettingCards from './ReportSettingCards.vue';
 
@@ -23,12 +23,12 @@ import ReportSettingCards from './ReportSettingCards.vue';
  * Textos vêm de lang/{locale}/report_settings.php (prop `t`).
  */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    categories:  { type: Array,  default: () => [] },        // [{ id, name }] ativas
-    items:       { type: Object, required: true },           // paginator Laravel (through())
-    filters:     { type: Object, default: () => ({}) },      // { search, category, status, sort, direction } — normalizados
-    t:           { type: Object, default: () => ({}) },
-    urls:        { type: Object, required: true },           // { index, create }
+    breadcrumbs: { type: Array, default: () => [] },
+    categories: { type: Array, default: () => [] }, // [{ id, name }] ativas
+    items: { type: Object, required: true }, // paginator Laravel (through())
+    filters: { type: Object, default: () => ({}) }, // { search, category, status, sort, direction } — normalizados
+    t: { type: Object, default: () => ({}) },
+    urls: { type: Object, required: true }, // { index, create }
 });
 
 const { tx } = useTrans(() => props.t);
@@ -48,25 +48,29 @@ watch([() => page.props?.flash, flashMessage], () => {
 
 const pageTitle = computed(() => props.t.page_title ?? 'Modelos de documentação');
 
-const hasFilters = computed(() => Boolean(
-    props.filters?.search || props.filters?.category || (props.filters?.status && props.filters.status !== 'all'),
-));
+const hasFilters = computed(() =>
+    Boolean(
+        props.filters?.search || props.filters?.category || (props.filters?.status && props.filters.status !== 'all'),
+    ),
+);
 
-const emptyText = computed(() => (hasFilters.value
-    ? (props.t.empty_search ?? 'Nenhum modelo encontrado com estes filtros.')
-    : (props.t.empty_list ?? 'Nenhum modelo cadastrado.')));
+const emptyText = computed(() =>
+    hasFilters.value
+        ? (props.t.empty_search ?? 'Nenhum modelo encontrado com estes filtros.')
+        : (props.t.empty_list ?? 'Nenhum modelo cadastrado.'),
+);
 
 // ── Busca (debounce) + filtros + ordenação — um preserva os outros ──────────
-const search   = ref(props.filters?.search ?? '');
+const search = ref(props.filters?.search ?? '');
 const category = ref(props.filters?.category ?? '');
-const status   = ref(props.filters?.status ?? 'all');
+const status = ref(props.filters?.status ?? 'all');
 
 function currentParams(overrides = {}) {
     return {
-        search:    search.value,
-        category:  category.value,
-        status:    status.value,
-        sort:      props.filters?.sort,
+        search: search.value,
+        category: category.value,
+        status: status.value,
+        sort: props.filters?.sort,
         direction: props.filters?.direction,
         ...overrides,
     };
@@ -114,7 +118,6 @@ function onReimport(item) {
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-report-settings">
-
             <PageHeader
                 :title="pageTitle"
                 :total="items.total ?? 0"
@@ -132,7 +135,11 @@ function onReimport(item) {
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+            <div
+                v-if="flashMessage && !flashDismissed"
+                class="alert alert-success alert-dismissible mb-3"
+                role="status"
+            >
                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
                 <button
                     type="button"

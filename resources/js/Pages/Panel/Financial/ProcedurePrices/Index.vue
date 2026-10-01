@@ -1,16 +1,16 @@
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
-import AppLayout      from '@/Layouts/AppLayout.vue';
-import PageHeader     from '@/Components/Panel/PageHeader.vue';
-import SearchSelect   from '@/Components/Panel/SearchSelect.vue';
-import CenteredModal  from '@/Components/Panel/CenteredModal.vue';
-import MoneyInput     from '@/Components/Panel/MoneyInput.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import CenteredModal from '@/Components/Panel/CenteredModal.vue';
+import MoneyInput from '@/Components/Panel/MoneyInput.vue';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
-import PricesToolbar  from './PricesToolbar.vue';
-import PricesSaveBar  from './PricesSaveBar.vue';
+import PricesToolbar from './PricesToolbar.vue';
+import PricesSaveBar from './PricesSaveBar.vue';
 import PriceAdjustModal from './PriceAdjustModal.vue';
-import PriceCopyModal   from './PriceCopyModal.vue';
+import PriceCopyModal from './PriceCopyModal.vue';
 import { useUnsavedChangesGuard } from './useUnsavedChangesGuard.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
 import { useTrans } from '@/composables/useTrans.js';
@@ -38,17 +38,17 @@ import { formatMoneyInput } from '@/utils/money.js';
  *   do convênio de origem chegam por recarga parcial (only: ['sourcePrices']).
  */
 const props = defineProps({
-    breadcrumbs:        { type: Array,  default: () => [] },
-    covenants:          { type: Array,  default: () => [] },  // [{ id, name, tiss }]
-    procedures:         { type: Array,  default: () => [] },  // [{ id, code, name }]
+    breadcrumbs: { type: Array, default: () => [] },
+    covenants: { type: Array, default: () => [] }, // [{ id, name, tiss }]
+    procedures: { type: Array, default: () => [] }, // [{ id, code, name }]
     selectedCovenantId: { type: String, default: '' },
-    prices:             { type: Object, default: () => ({}) }, // { procedure_id: { price, charging } }
-    inheritedPrices:    { type: Object, default: () => ({}) }, // { procedure_id: price } (padrão do sistema)
+    prices: { type: Object, default: () => ({}) }, // { procedure_id: { price, charging } }
+    inheritedPrices: { type: Object, default: () => ({}) }, // { procedure_id: price } (padrão do sistema)
     // Recarga parcial do "Copiar de outro convênio": { covenant_id, prices: { procedure_id: price } } | null.
-    sourcePrices:       { type: Object, default: null },
-    limits:             { type: Object, default: () => ({}) }, // { max_items } por salvamento
-    links:              { type: Object, default: () => ({}) }, // { covenants: url|null }
-    t:                  { type: Object, default: () => ({}) },
+    sourcePrices: { type: Object, default: null },
+    limits: { type: Object, default: () => ({}) }, // { max_items } por salvamento
+    links: { type: Object, default: () => ({}) }, // { covenants: url|null }
+    t: { type: Object, default: () => ({}) },
 });
 
 const { tx } = useTrans(() => props.t);
@@ -59,55 +59,58 @@ const isBlank = (value) => value === '' || value === null || value === undefined
 
 /** Busca sem acento e sem caixa ("Mapeamento" acha "mapeamento"). */
 function normalize(value) {
-    return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
 }
 
 /* ───────────────────────── Convênio da grade ───────────────────────── */
-const covenantId           = computed(() => props.selectedCovenantId);
-const selectedCovenant     = computed(() => props.covenants.find((c) => String(c.id) === String(covenantId.value)) ?? null);
+const covenantId = computed(() => props.selectedCovenantId);
+const selectedCovenant = computed(() => props.covenants.find((c) => String(c.id) === String(covenantId.value)) ?? null);
 const selectedCovenantName = computed(() => selectedCovenant.value?.name ?? '');
-const covenantTiss         = computed(() => Boolean(selectedCovenant.value?.tiss));
+const covenantTiss = computed(() => Boolean(selectedCovenant.value?.tiss));
 
 /* ───────────────────────── Grade ───────────────────────── */
-const saving    = ref(false);
-const loading   = ref(false);
+const saving = ref(false);
+const loading = ref(false);
 const saveError = ref(null);
 const rowErrors = ref({}); // { index: { price, procedure_id, charging } }
 
 // Ações em lote: aviso "alterado na grade, nada salvo" e preços já carregados
 // dos convênios de origem (covenant_id → { procedure_id: preço }).
-const bulkNotice   = ref('');
-const sourceCache  = ref({});
+const bulkNotice = ref('');
+const sourceCache = ref({});
 
 function buildRows() {
     return props.procedures.map((p) => {
-        const existing  = props.prices?.[p.id] ?? {};
+        const existing = props.prices?.[p.id] ?? {};
         const inherited = props.inheritedPrices?.[p.id];
 
         return {
             procedure_id: p.id,
-            code:         p.code,
-            name:         p.name,
-            price:        isBlank(existing.price) ? null : Number(existing.price),
+            code: p.code,
+            name: p.name,
+            price: isBlank(existing.price) ? null : Number(existing.price),
             // Convênio sem operadora TISS nunca cobra por guia; linha nova de convênio TISS nasce marcada.
-            charging:     covenantTiss.value ? (existing.charging ?? true) : false,
-            inherited:    isBlank(inherited) ? null : Number(inherited),
-            searchKey:    normalize(`${p.code ?? ''} ${p.name ?? ''}`),
+            charging: covenantTiss.value ? (existing.charging ?? true) : false,
+            inherited: isBlank(inherited) ? null : Number(inherited),
+            searchKey: normalize(`${p.code ?? ''} ${p.name ?? ''}`),
         };
     });
 }
 
 const snapshot = (list) => list.map((row) => ({ price: row.price, charging: row.charging }));
 
-const rows     = ref(buildRows());
+const rows = ref(buildRows());
 const baseline = ref(snapshot(rows.value));
 
 function resetGrid() {
-    rows.value        = buildRows();
-    baseline.value    = snapshot(rows.value);
-    rowErrors.value   = {};
-    saveError.value   = null;
-    bulkNotice.value  = '';
+    rows.value = buildRows();
+    baseline.value = snapshot(rows.value);
+    rowErrors.value = {};
+    saveError.value = null;
+    bulkNotice.value = '';
     // Salvou ou trocou de convênio: preços de origem em cache podem estar velhos.
     sourceCache.value = {};
 }
@@ -115,7 +118,10 @@ function resetGrid() {
 // Troca de convênio ou volta do salvar: reconstrói a grade. O convênio também é
 // observado porque, com preços iguais nos dois (ex.: ambos vazios), o Inertia
 // mantém a MESMA referência de 'prices' e o watch de 'prices' sozinho não dispara.
-watch([() => props.prices, () => props.inheritedPrices, () => props.selectedCovenantId, () => props.covenants], resetGrid);
+watch(
+    [() => props.prices, () => props.inheritedPrices, () => props.selectedCovenantId, () => props.covenants],
+    resetGrid,
+);
 
 function sameRow(row, original) {
     const priceA = isBlank(row?.price) ? null : Number(row.price);
@@ -127,13 +133,13 @@ function sameRow(row, original) {
 const dirtyFlags = computed(() => rows.value.map((row, i) => !sameRow(row, baseline.value[i])));
 const dirtyCount = computed(() => dirtyFlags.value.filter(Boolean).length);
 
-const hasPrice    = (row) => !isBlank(row.price) || row.inherited !== null;
+const hasPrice = (row) => !isBlank(row.price) || row.inherited !== null;
 const pricedCount = computed(() => rows.value.filter(hasPrice).length);
 
 // Linhas que o banco ainda marca para cobrança por guia num convênio sem operadora TISS.
-const legacyChargingCount = computed(() => (covenantTiss.value
-    ? 0
-    : props.procedures.filter((p) => props.prices?.[p.id]?.charging === true).length));
+const legacyChargingCount = computed(() =>
+    covenantTiss.value ? 0 : props.procedures.filter((p) => props.prices?.[p.id]?.charging === true).length,
+);
 
 /** Linha com preço que o banco marca para cobrança por guia num convênio sem TISS (salvar corrige). */
 function isLegacyCharging(row) {
@@ -141,11 +147,13 @@ function isLegacyCharging(row) {
 }
 
 // Índices da grade que o Salvar envia: as alteradas + as marcações antigas a corrigir.
-const pendingIndexes = computed(() => rows.value.reduce((list, row, index) => {
-    if (dirtyFlags.value[index] || isLegacyCharging(row)) list.push(index);
+const pendingIndexes = computed(() =>
+    rows.value.reduce((list, row, index) => {
+        if (dirtyFlags.value[index] || isLegacyCharging(row)) list.push(index);
 
-    return list;
-}, []));
+        return list;
+    }, []),
+);
 
 const maxItems = computed(() => Number(props.limits?.max_items) || 0);
 
@@ -154,8 +162,8 @@ const search = ref('');
 const filter = ref('all');
 
 const counts = computed(() => ({
-    all:      rows.value.length,
-    priced:   pricedCount.value,
+    all: rows.value.length,
+    priced: pricedCount.value,
     unpriced: rows.value.length - pricedCount.value,
 }));
 
@@ -170,8 +178,10 @@ const visibleRows = computed(() => {
 
     return rows.value
         .map((row, index) => ({ row, index }))
-        .filter(({ row, index }) => rowErrors.value[index]
-            || ((!term || row.searchKey.includes(term)) && matchesFilter(row, index)));
+        .filter(
+            ({ row, index }) =>
+                rowErrors.value[index] || ((!term || row.searchKey.includes(term)) && matchesFilter(row, index)),
+        );
 });
 
 function clearFilters() {
@@ -235,27 +245,31 @@ function requestCovenantChange(id) {
 let lastLoadToken = 0;
 
 function loadCovenant(id) {
-    const token  = ++lastLoadToken;
+    const token = ++lastLoadToken;
     let switched = false;
 
-    bypass(() => router.get(
-        route('panel.financial.procedure-prices.index'),
-        { covenant_id: id },
-        {
-            preserveState:  true,
-            preserveScroll: true,
-            only:           ['prices', 'inheritedPrices', 'selectedCovenantId'],
-            onStart:   () => { loading.value = true; },
-            onSuccess: (response) => {
-                switched = String(response?.props?.selectedCovenantId ?? '') === String(id);
+    bypass(() =>
+        router.get(
+            route('panel.financial.procedure-prices.index'),
+            { covenant_id: id },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                only: ['prices', 'inheritedPrices', 'selectedCovenantId'],
+                onStart: () => {
+                    loading.value = true;
+                },
+                onSuccess: (response) => {
+                    switched = String(response?.props?.selectedCovenantId ?? '') === String(id);
+                },
+                onFinish: () => {
+                    if (token !== lastLoadToken) return; // substituída por uma troca mais recente
+                    loading.value = false;
+                    if (!switched) resyncCovenantSelect();
+                },
             },
-            onFinish: () => {
-                if (token !== lastLoadToken) return; // substituída por uma troca mais recente
-                loading.value = false;
-                if (!switched) resyncCovenantSelect();
-            },
-        },
-    ));
+        ),
+    );
 }
 
 function confirmDiscard() {
@@ -306,15 +320,18 @@ function save() {
     if (!covenantId.value || pendingIndexes.value.length === 0) return;
 
     if (maxItems.value > 0 && pendingIndexes.value.length > maxItems.value) {
-        saveError.value = tx('too_many_changes', { count: number(pendingIndexes.value.length), max: number(maxItems.value) });
+        saveError.value = tx('too_many_changes', {
+            count: number(pendingIndexes.value.length),
+            max: number(maxItems.value),
+        });
 
         return;
     }
 
-    saving.value    = true;
+    saving.value = true;
     saveError.value = null;
     rowErrors.value = {};
-    sentIndexes     = [...pendingIndexes.value];
+    sentIndexes = [...pendingIndexes.value];
 
     // Semântica explícita por linha: preço informado = grava; null = remove aquele preço.
     const items = sentIndexes.map((index) => {
@@ -322,36 +339,44 @@ function save() {
 
         return {
             procedure_id: r.procedure_id,
-            price:        isBlank(r.price) ? null : r.price,
-            charging:     covenantTiss.value ? Boolean(r.charging) : false,
+            price: isBlank(r.price) ? null : r.price,
+            charging: covenantTiss.value ? Boolean(r.charging) : false,
         };
     });
 
-    bypass(() => router.post(
-        route('panel.financial.procedure-prices.store'),
-        { covenant_id: covenantId.value, items },
-        {
-            preserveScroll: true,
-            // Sucesso: o flash 'success' do servidor aparece no layout.
-            onError: (errors) => {
-                rowErrors.value = mapRowErrors(errors);
-                const invalidRows = Object.keys(rowErrors.value).length;
-                const general     = Object.entries(errors ?? {}).find(([key]) => !key.startsWith('items.'))?.[1];
+    bypass(() =>
+        router.post(
+            route('panel.financial.procedure-prices.store'),
+            { covenant_id: covenantId.value, items },
+            {
+                preserveScroll: true,
+                // Sucesso: o flash 'success' do servidor aparece no layout.
+                onError: (errors) => {
+                    rowErrors.value = mapRowErrors(errors);
+                    const invalidRows = Object.keys(rowErrors.value).length;
+                    const general = Object.entries(errors ?? {}).find(([key]) => !key.startsWith('items.'))?.[1];
 
-                saveError.value = [tx('save_error'), invalidRows ? tx('rows_with_errors', { count: invalidRows }) : null, general]
-                    .filter(Boolean)
-                    .join(' ');
+                    saveError.value = [
+                        tx('save_error'),
+                        invalidRows ? tx('rows_with_errors', { count: invalidRows }) : null,
+                        general,
+                    ]
+                        .filter(Boolean)
+                        .join(' ');
 
-                if (window.showErrorToast) window.showErrorToast(saveError.value);
-                nextTick(() => document.querySelector('.pp-row-invalid [aria-invalid="true"]')?.focus?.());
+                    if (window.showErrorToast) window.showErrorToast(saveError.value);
+                    nextTick(() => document.querySelector('.pp-row-invalid [aria-invalid="true"]')?.focus?.());
+                },
+                onFinish: () => {
+                    saving.value = false;
+                },
             },
-            onFinish: () => { saving.value = false; },
-        },
-    ));
+        ),
+    );
 }
 
 /* ───────────────────────── Ajustar preços em lote (só na grade; nada é salvo) ───────────────────────── */
-const bulkModal  = ref(null); // 'adjust' | 'copy' | null
+const bulkModal = ref(null); // 'adjust' | 'copy' | null
 const allEntries = computed(() => rows.value.map((row, index) => ({ row, index })));
 
 // Convênios de origem da cópia: os da tela (da clínica ou globais), menos o da grade.
@@ -359,7 +384,7 @@ const copySources = computed(() => props.covenants.filter((c) => String(c.id) !=
 
 function openBulk(kind) {
     bulkNotice.value = '';
-    bulkModal.value  = kind;
+    bulkModal.value = kind;
 }
 
 function closeBulk() {
@@ -376,17 +401,17 @@ function applyBulk(changes) {
         delete errors[index];
     }
 
-    rowErrors.value  = errors;
-    bulkModal.value  = null;
+    rowErrors.value = errors;
+    bulkModal.value = null;
     bulkNotice.value = tx('bulk_applied', { count: number(changes.length) });
 }
 
 /* Preços do convênio de origem: recarga parcial (only: ['sourcePrices']), sem rota nova. */
 const sourceRequestedId = ref('');
-const sourceLoading     = ref(false);
-const sourceFailed      = ref(false);
-let sourceToken         = 0;
-let cancelSourceLoad    = null;
+const sourceLoading = ref(false);
+const sourceFailed = ref(false);
+let sourceToken = 0;
+let cancelSourceLoad = null;
 
 function rememberSource(value) {
     if (!value?.covenant_id) return;
@@ -396,37 +421,43 @@ function rememberSource(value) {
 
 watch(() => props.sourcePrices, rememberSource, { immediate: true });
 
-const sourcePriceMap = computed(() => (sourceRequestedId.value ? (sourceCache.value[sourceRequestedId.value] ?? null) : null));
+const sourcePriceMap = computed(() =>
+    sourceRequestedId.value ? (sourceCache.value[sourceRequestedId.value] ?? null) : null,
+);
 
 function loadSourcePrices(id) {
     cancelSourceLoad?.();
-    cancelSourceLoad    = null;
+    cancelSourceLoad = null;
     sourceRequestedId.value = id ? String(id) : '';
-    sourceFailed.value  = false;
+    sourceFailed.value = false;
     sourceLoading.value = false;
 
     if (!id || sourcePriceMap.value) return;
 
     const token = ++sourceToken;
-    let loaded  = false;
+    let loaded = false;
     sourceLoading.value = true;
 
-    bypass(() => router.reload({
-        only:          ['sourcePrices'],
-        data:          { source_covenant_id: id },
-        preserveUrl:   true,
-        onCancelToken: (cancelToken) => { cancelSourceLoad = () => cancelToken?.cancel?.(); },
-        onSuccess:     (response) => {
-            rememberSource(response?.props?.sourcePrices);
-            loaded = String(response?.props?.sourcePrices?.covenant_id ?? '') === String(id);
-        },
-        onFinish: () => {
-            if (token !== sourceToken) return; // substituída por outra escolha
-            cancelSourceLoad    = null;
-            sourceLoading.value = false;
-            sourceFailed.value  = !loaded && !sourcePriceMap.value;
-        },
-    }));
+    bypass(() =>
+        router.reload({
+            only: ['sourcePrices'],
+            data: { source_covenant_id: id },
+            preserveUrl: true,
+            onCancelToken: (cancelToken) => {
+                cancelSourceLoad = () => cancelToken?.cancel?.();
+            },
+            onSuccess: (response) => {
+                rememberSource(response?.props?.sourcePrices);
+                loaded = String(response?.props?.sourcePrices?.covenant_id ?? '') === String(id);
+            },
+            onFinish: () => {
+                if (token !== sourceToken) return; // substituída por outra escolha
+                cancelSourceLoad = null;
+                sourceLoading.value = false;
+                sourceFailed.value = !loaded && !sourcePriceMap.value;
+            },
+        }),
+    );
 }
 
 watch(bulkModal, (kind) => {
@@ -434,11 +465,11 @@ watch(bulkModal, (kind) => {
 
     // Fechou a cópia: nada fica carregando nem marcado como falha.
     cancelSourceLoad?.();
-    cancelSourceLoad        = null;
-    sourceToken            += 1;
+    cancelSourceLoad = null;
+    sourceToken += 1;
     sourceRequestedId.value = '';
-    sourceLoading.value     = false;
-    sourceFailed.value      = false;
+    sourceLoading.value = false;
+    sourceFailed.value = false;
 });
 
 // Botão flutuante do Assistente de IA ocupa o canto inferior direito.
@@ -466,7 +497,12 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
                 <div class="card-body text-center py-5">
                     <i class="ti ti-building-hospital fs-1 text-body-secondary" aria-hidden="true"></i>
                     <p class="fw-semibold mt-2 mb-2">{{ tx('no_covenants') }}</p>
-                    <Link v-if="links.covenants" :href="links.covenants" class="btn btn-primary btn-sm" data-test="link-covenants">
+                    <Link
+                        v-if="links.covenants"
+                        :href="links.covenants"
+                        class="btn btn-primary btn-sm"
+                        data-test="link-covenants"
+                    >
                         <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ tx('no_covenants_action') }}
                     </Link>
                     <p v-else class="small text-body-secondary mb-0">{{ tx('no_covenants_ask') }}</p>
@@ -476,7 +512,12 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
             <template v-else>
                 <div class="card border-0 shadow-sm">
                     <div class="card-body">
-                        <div v-if="saveError" class="alert alert-danger d-flex align-items-start gap-2" role="alert" data-test="save-error">
+                        <div
+                            v-if="saveError"
+                            class="alert alert-danger d-flex align-items-start gap-2"
+                            role="alert"
+                            data-test="save-error"
+                        >
                             <i class="ti ti-alert-circle mt-1" aria-hidden="true"></i><span>{{ saveError }}</span>
                         </div>
 
@@ -498,23 +539,42 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
                                 <span
                                     v-if="selectedCovenant"
                                     class="badge rounded-pill align-self-start border"
-                                    :class="covenantTiss
-                                        ? 'bg-primary-subtle text-primary-emphasis border-primary-subtle'
-                                        : 'bg-secondary-subtle text-secondary-emphasis border-secondary-subtle'"
+                                    :class="
+                                        covenantTiss
+                                            ? 'bg-primary-subtle text-primary-emphasis border-primary-subtle'
+                                            : 'bg-secondary-subtle text-secondary-emphasis border-secondary-subtle'
+                                    "
                                     data-test="covenant-kind"
                                 >
-                                    <i class="ti me-1" :class="covenantTiss ? 'ti-file-invoice' : 'ti-cash'" aria-hidden="true"></i>{{ covenantTiss ? tx('covenant_tiss') : tx('covenant_cash') }}
+                                    <i
+                                        class="ti me-1"
+                                        :class="covenantTiss ? 'ti-file-invoice' : 'ti-cash'"
+                                        aria-hidden="true"
+                                    ></i
+                                    >{{ covenantTiss ? tx('covenant_tiss') : tx('covenant_cash') }}
                                 </span>
                                 <small class="text-body-secondary">{{ tx('empty_hint') }}</small>
                             </div>
                         </div>
 
-                        <div id="pp-charging-help" class="alert alert-info small d-flex align-items-start gap-2" data-test="charging-help">
+                        <div
+                            id="pp-charging-help"
+                            class="alert alert-info small d-flex align-items-start gap-2"
+                            data-test="charging-help"
+                        >
                             <i class="ti ti-info-circle mt-1" aria-hidden="true"></i>
-                            <span><strong>{{ tx('charging') }}:</strong> {{ covenantTiss ? tx('charging_help') : tx('charging_help_cash') }}</span>
+                            <span
+                                ><strong>{{ tx('charging') }}:</strong>
+                                {{ covenantTiss ? tx('charging_help') : tx('charging_help_cash') }}</span
+                            >
                         </div>
 
-                        <div v-if="legacyChargingCount > 0" class="alert alert-warning small d-flex align-items-start gap-2" role="status" data-test="charging-legacy">
+                        <div
+                            v-if="legacyChargingCount > 0"
+                            class="alert alert-warning small d-flex align-items-start gap-2"
+                            role="status"
+                            data-test="charging-legacy"
+                        >
                             <i class="ti ti-alert-triangle mt-1" aria-hidden="true"></i>
                             <span>{{ tx('charging_legacy', { count: legacyChargingCount }) }}</span>
                         </div>
@@ -534,7 +594,9 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
                                         :min-width="240"
                                     >
                                         <template #trigger>
-                                            <i class="ti ti-adjustments-horizontal me-1" aria-hidden="true"></i>{{ tx('bulk_menu') }}<i class="ti ti-chevron-down ms-1" aria-hidden="true"></i>
+                                            <i class="ti ti-adjustments-horizontal me-1" aria-hidden="true"></i
+                                            >{{ tx('bulk_menu')
+                                            }}<i class="ti ti-chevron-down ms-1" aria-hidden="true"></i>
                                         </template>
                                         <li>
                                             <button
@@ -544,7 +606,8 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
                                                 :disabled="loading || saving"
                                                 @click="openBulk('adjust')"
                                             >
-                                                <i class="ti ti-percentage me-1" aria-hidden="true"></i>{{ tx('bulk_adjust') }}
+                                                <i class="ti ti-percentage me-1" aria-hidden="true"></i
+                                                >{{ tx('bulk_adjust') }}
                                             </button>
                                         </li>
                                         <li>
@@ -565,14 +628,30 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
 
                         <!-- Região viva sempre presente: o aviso é lido quando aparece. -->
                         <div role="status" aria-live="polite" data-test="bulk-notice-region">
-                            <div v-if="bulkNotice" class="alert alert-info small d-flex align-items-start gap-2 py-2" data-test="bulk-notice">
+                            <div
+                                v-if="bulkNotice"
+                                class="alert alert-info small d-flex align-items-start gap-2 py-2"
+                                data-test="bulk-notice"
+                            >
                                 <i class="ti ti-info-circle mt-1" aria-hidden="true"></i><span>{{ bulkNotice }}</span>
                             </div>
                         </div>
 
-                        <div class="table-responsive" :class="{ 'pp-loading': loading }" :aria-busy="loading ? 'true' : 'false'">
+                        <div
+                            class="table-responsive"
+                            :class="{ 'pp-loading': loading }"
+                            :aria-busy="loading ? 'true' : 'false'"
+                        >
                             <table class="table table-sm align-middle mb-0">
-                                <caption class="visually-hidden">{{ tx('title') }} — {{ selectedCovenantName }}</caption>
+                                <caption class="visually-hidden">
+                                    {{
+                                        tx('title')
+                                    }}
+                                    —
+                                    {{
+                                        selectedCovenantName
+                                    }}
+                                </caption>
                                 <thead>
                                     <tr>
                                         <th scope="col" class="pp-col-code">{{ tx('code') }}</th>
@@ -591,21 +670,32 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
                                     <tr v-else-if="visibleRows.length === 0" data-test="no-results">
                                         <td colspan="4" class="text-center text-body-secondary py-4">
                                             <p class="mb-2">{{ tx('no_results') }}</p>
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" data-test="clear-filters" @click="clearFilters">
-                                                <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ tx('clear_filters') }}
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-secondary btn-sm"
+                                                data-test="clear-filters"
+                                                @click="clearFilters"
+                                            >
+                                                <i class="ti ti-filter-off me-1" aria-hidden="true"></i
+                                                >{{ tx('clear_filters') }}
                                             </button>
                                         </td>
                                     </tr>
                                     <tr
                                         v-for="entry in visibleRows"
                                         :key="entry.row.procedure_id"
-                                        :class="{ 'pp-row-invalid': rowErrors[entry.index], 'pp-row-dirty': dirtyFlags[entry.index] }"
+                                        :class="{
+                                            'pp-row-invalid': rowErrors[entry.index],
+                                            'pp-row-dirty': dirtyFlags[entry.index],
+                                        }"
                                         :data-procedure="entry.row.procedure_id"
                                         data-test="price-row"
                                     >
                                         <td>
                                             <code>{{ entry.row.code }}</code>
-                                            <span v-if="dirtyFlags[entry.index]" class="visually-hidden"> ({{ tx('row_changed') }})</span>
+                                            <span v-if="dirtyFlags[entry.index]" class="visually-hidden">
+                                                ({{ tx('row_changed') }})</span
+                                            >
                                         </td>
                                         <td>{{ entry.row.name }}</td>
                                         <td>
@@ -634,7 +724,10 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
                                             >
                                                 {{ tx('inherited_price', { price: money(entry.row.inherited) }) }}
                                             </div>
-                                            <div v-if="rowErrors[entry.index]?.procedure_id" class="invalid-feedback d-block text-end">
+                                            <div
+                                                v-if="rowErrors[entry.index]?.procedure_id"
+                                                class="invalid-feedback d-block text-end"
+                                            >
                                                 {{ rowErrors[entry.index].procedure_id }}
                                             </div>
                                         </td>
@@ -644,13 +737,18 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
                                                 type="checkbox"
                                                 class="form-check-input"
                                                 :class="{ 'is-invalid': rowErrors[entry.index]?.charging }"
-                                                :aria-label="tx('charging_aria', { procedure: procedureLabel(entry.row) })"
+                                                :aria-label="
+                                                    tx('charging_aria', { procedure: procedureLabel(entry.row) })
+                                                "
                                                 aria-describedby="pp-charging-help"
                                                 :aria-invalid="rowErrors[entry.index]?.charging ? 'true' : 'false'"
                                                 :title="chargingTitle(entry.row)"
                                                 :disabled="loading || !covenantTiss || isBlank(entry.row.price)"
+                                            />
+                                            <div
+                                                v-if="rowErrors[entry.index]?.charging"
+                                                class="invalid-feedback d-block"
                                             >
-                                            <div v-if="rowErrors[entry.index]?.charging" class="invalid-feedback d-block">
                                                 {{ rowErrors[entry.index].charging }}
                                             </div>
                                         </td>
@@ -697,14 +795,30 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
             <!-- Troca de convênio com alterações não salvas -->
             <CenteredModal :open="pendingCovenantId !== null" size="sm" @close="cancelDiscard">
                 <template #header>
-                    <h2 class="h5 mb-0"><i class="ti ti-alert-triangle me-1 text-warning" aria-hidden="true"></i>{{ tx('discard_title') }}</h2>
+                    <h2 class="h5 mb-0">
+                        <i class="ti ti-alert-triangle me-1 text-warning" aria-hidden="true"></i
+                        >{{ tx('discard_title') }}
+                    </h2>
                 </template>
-                <p class="mb-0" data-test="discard-body">{{ tx('discard_body', { count: dirtyCount, covenant: selectedCovenantName }) }}</p>
+                <p class="mb-0" data-test="discard-body">
+                    {{ tx('discard_body', { count: dirtyCount, covenant: selectedCovenantName }) }}
+                </p>
                 <template #footer>
-                    <button ref="keepEditingButton" type="button" class="btn btn-outline-secondary btn-sm" data-test="discard-cancel" @click="cancelDiscard">
+                    <button
+                        ref="keepEditingButton"
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        data-test="discard-cancel"
+                        @click="cancelDiscard"
+                    >
                         {{ tx('discard_cancel') }}
                     </button>
-                    <button type="button" class="btn btn-warning btn-sm" data-test="discard-confirm" @click="confirmDiscard">
+                    <button
+                        type="button"
+                        class="btn btn-warning btn-sm"
+                        data-test="discard-confirm"
+                        @click="confirmDiscard"
+                    >
                         {{ tx('discard_confirm') }}
                     </button>
                 </template>
@@ -734,7 +848,7 @@ const avoidFab = computed(() => Boolean(page?.props?.aiAssistant?.enabled));
 }
 
 .pp-loading {
-    opacity: .6;
+    opacity: 0.6;
     pointer-events: none;
 }
 

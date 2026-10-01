@@ -1,11 +1,11 @@
 <script setup>
 import { computed, ref } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh       from '@/Components/Panel/SortableTh.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useTrans } from '@/composables/useTrans.js';
 import { useCountFormat } from './useCountFormat.js';
@@ -19,11 +19,11 @@ import { useCountFormat } from './useCountFormat.js';
  * O valor digitado mora no pai (Index) — aqui só exibe e emite `count`.
  */
 const props = defineProps({
-    products: { type: Object, required: true },   // paginator Laravel
-    counted:  { type: Object, default: () => ({}) }, // { [productId]: texto digitado }
-    deltas:   { type: Object, default: () => ({}) }, // { [productId]: contado − sistema | null }
-    filters:  { type: Object, default: () => ({}) },
-    t:        { type: Object, default: () => ({}) },
+    products: { type: Object, required: true }, // paginator Laravel
+    counted: { type: Object, default: () => ({}) }, // { [productId]: texto digitado }
+    deltas: { type: Object, default: () => ({}) }, // { [productId]: contado − sistema | null }
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['sort', 'count']);
@@ -34,38 +34,43 @@ const { quantity, unitLabel, differenceBadge } = useCountFormat(() => props.t);
 const rows = computed(() => props.products?.data ?? []);
 
 // Atalho abre em nova aba (a contagem digitada mora nesta): o título avisa.
-const movementsTitle = computed(() => (
-    `${props.t.action_movements ?? 'Ver movimentações do produto'} (${props.t.opens_new_tab ?? 'abre em nova aba'})`
-));
+const movementsTitle = computed(
+    () =>
+        `${props.t.action_movements ?? 'Ver movimentações do produto'} (${props.t.opens_new_tab ?? 'abre em nova aba'})`,
+);
 
 // ── Ordenação (padrão = o de sempre: nome A→Z) ───────────────────────────────
 const currentSort = computed(() => props.filters.sort ?? 'name');
-const currentDir  = computed(() => props.filters.direction ?? 'asc');
+const currentDir = computed(() => props.filters.direction ?? 'asc');
 
 // ── Ordem de colunas personalizável ──────────────────────────────────────────
 const COLUMN_DEFS = computed(() => [
-    { key: 'product',     label: props.t.col_product ?? 'Produto',              sortKey: 'name' },
-    { key: 'code',        label: props.t.col_code ?? 'Código',                  sortKey: 'code' },
-    { key: 'category',    label: props.t.col_category ?? 'Categoria',           sortKey: 'category' },
-    { key: 'qty_on_hand', label: props.t.col_qty_on_hand ?? 'Saldo do sistema', sortKey: 'qty_on_hand', align: 'text-end' },
+    { key: 'product', label: props.t.col_product ?? 'Produto', sortKey: 'name' },
+    { key: 'code', label: props.t.col_code ?? 'Código', sortKey: 'code' },
+    { key: 'category', label: props.t.col_category ?? 'Categoria', sortKey: 'category' },
+    {
+        key: 'qty_on_hand',
+        label: props.t.col_qty_on_hand ?? 'Saldo do sistema',
+        sortKey: 'qty_on_hand',
+        align: 'text-end',
+    },
 ]);
 const DEFAULT_COLUMN_ORDER = ['product', 'code', 'category', 'qty_on_hand'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'stock_counts_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('stock_counts_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 
 const FIXED_COLUMNS = 3; // Contado, Diferença, Ações
@@ -121,7 +126,8 @@ function focusNextCount(event) {
                         :title="tx('sort_by', { column: col.label })"
                         :class="col.align"
                         @sort="emit('sort', $event)"
-                    >{{ col.label }}</SortableTh>
+                        >{{ col.label }}</SortableTh
+                    >
                     <th>{{ t.col_counted ?? 'Contado' }}</th>
                     <th class="text-center">{{ t.col_difference ?? 'Diferença' }}</th>
                     <th class="text-end">{{ t.col_actions ?? 'Ações' }}</th>
@@ -141,14 +147,17 @@ function focusNextCount(event) {
                             <span
                                 v-if="p.requires_lot"
                                 class="badge badge-soft-info rounded text-info border border-info fs-11 ms-1"
-                            >{{ t.requires_lot ?? 'Exige lote' }}</span>
+                                >{{ t.requires_lot ?? 'Exige lote' }}</span
+                            >
                         </td>
 
                         <td v-else-if="col.key === 'code'">
                             <code class="text-muted small">{{ p.code }}</code>
                         </td>
 
-                        <td v-else-if="col.key === 'category'" class="small text-muted">{{ p.category_name ?? '—' }}</td>
+                        <td v-else-if="col.key === 'category'" class="small text-muted">
+                            {{ p.category_name ?? '—' }}
+                        </td>
 
                         <td v-else-if="col.key === 'qty_on_hand'" class="text-end">
                             {{ quantity(p.qty_on_hand) }}
@@ -169,7 +178,7 @@ function focusNextCount(event) {
                             :aria-label="tx('counted_label', { product: p.name })"
                             @input="emit('count', p.id, $event.target.value)"
                             @keydown.enter.prevent="focusNextCount"
-                        >
+                        />
                     </td>
 
                     <td class="text-center">

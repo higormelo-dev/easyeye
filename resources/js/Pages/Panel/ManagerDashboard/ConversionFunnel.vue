@@ -5,7 +5,7 @@ import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 
 const props = defineProps({
     conversionFunnel: { type: Object, required: true },
-    t:                { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 const cf = computed(() => props.conversionFunnel);
@@ -16,12 +16,15 @@ const cf = computed(() => props.conversionFunnel);
 // devolvido pelo backend (fonte da verdade), não o clicado localmente, para
 // não dessincronizar se o backend cair no default por período inválido.
 const PERIOD_OPTIONS = [7, 30, 60, 90];
-const loadingPeriod  = ref(false);
-const selectedDays   = ref(cf.value.days ?? 90);
+const loadingPeriod = ref(false);
+const selectedDays = ref(cf.value.days ?? 90);
 
-watch(() => cf.value.days, (days) => {
-    if (days) selectedDays.value = days;
-});
+watch(
+    () => cf.value.days,
+    (days) => {
+        if (days) selectedDays.value = days;
+    },
+);
 
 function periodLabel(days) {
     return (props.t.funnel_period_option ?? ':days dias').replace(':days', days);
@@ -36,7 +39,9 @@ function selectPeriod(days) {
         data: { funnel_period: days },
         preserveScroll: true,
         preserveState: true,
-        onFinish: () => { loadingPeriod.value = false; },
+        onFinish: () => {
+            loadingPeriod.value = false;
+        },
     });
 }
 
@@ -54,12 +59,12 @@ function trialRateClass(rate) {
 
 const trialBarWidth = computed(() => {
     if (!cf.value.totalLeads) return 4;
-    return Math.max(4, Math.min(100, Math.round(cf.value.totalTrials / cf.value.totalLeads * 100)));
+    return Math.max(4, Math.min(100, Math.round((cf.value.totalTrials / cf.value.totalLeads) * 100)));
 });
 
 const activeBarWidth = computed(() => {
     if (!cf.value.totalTrials) return 4;
-    return Math.max(4, Math.min(100, Math.round(cf.value.totalActive / cf.value.totalTrials * 100)));
+    return Math.max(4, Math.min(100, Math.round((cf.value.totalActive / cf.value.totalTrials) * 100)));
 });
 </script>
 
@@ -75,7 +80,11 @@ const activeBarWidth = computed(() => {
                 btn-class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13"
             >
                 <template #trigger>
-                    <span v-if="loadingPeriod" class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                    <span
+                        v-if="loadingPeriod"
+                        class="spinner-border spinner-border-sm me-1"
+                        style="width: 0.7rem; height: 0.7rem"
+                    ></span>
                     {{ (t.funnel_period_label ?? 'Últimos :days dias').replace(':days', selectedDays) }}
                     <i class="ti ti-chevron-down ms-1"></i>
                 </template>
@@ -94,10 +103,8 @@ const activeBarWidth = computed(() => {
             </ActionDropdown>
         </div>
         <div class="card-body" :class="{ 'opacity-50 pe-none': loadingPeriod }">
-
             <!-- Etapas do funil -->
             <div class="conv-funnel mb-4">
-
                 <!-- Leads -->
                 <div class="conv-step">
                     <div class="conv-step-header">
@@ -114,7 +121,7 @@ const activeBarWidth = computed(() => {
                         </div>
                     </div>
                     <div class="conv-bar-wrapper">
-                        <div class="conv-bar conv-bar--leads" style="width:100%;"></div>
+                        <div class="conv-bar conv-bar--leads" style="width: 100%"></div>
                     </div>
                 </div>
 
@@ -198,7 +205,6 @@ const activeBarWidth = computed(() => {
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 </template>

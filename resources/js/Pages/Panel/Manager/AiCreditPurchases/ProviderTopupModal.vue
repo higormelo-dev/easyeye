@@ -8,44 +8,47 @@ import { ref, watch, computed } from 'vue';
  * NÃO faz cobrança real — apenas registra para cálculo do saldo estimado.
  */
 const props = defineProps({
-    open:           { type: Boolean, required: true },
-    presetProvider: { type: String,  default: '' },
-    t:              { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    presetProvider: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'submit']);
 
 const PROVIDERS = [
-    { value: 'openai',    label: 'ChatGPT', icon: 'ti ti-brand-openai' },
-    { value: 'anthropic', label: 'Claude',  icon: 'ti ti-message-chatbot' },
-    { value: 'gemini',    label: 'Gemini',  icon: 'ti ti-brand-google' },
+    { value: 'openai', label: 'ChatGPT', icon: 'ti ti-brand-openai' },
+    { value: 'anthropic', label: 'Claude', icon: 'ti ti-message-chatbot' },
+    { value: 'gemini', label: 'Gemini', icon: 'ti ti-brand-google' },
 ];
 
 const form = ref({
-    provider:     'openai',
-    amount_brl:   null,   // o que você pagou (cartão/fatura)
-    amount_usd:   100,    // o que o provedor creditou (base do saldo)
+    provider: 'openai',
+    amount_brl: null, // o que você pagou (cartão/fatura)
+    amount_usd: 100, // o que o provedor creditou (base do saldo)
     topped_up_at: new Date().toISOString().slice(0, 16),
-    reference:    '',
-    note:         '',
+    reference: '',
+    note: '',
 });
 
 const saving = ref(false);
 const errorMessage = ref('');
 
-watch(() => props.open, (val) => {
-    if (val) {
-        form.value = {
-            provider:     props.presetProvider || 'openai',
-            amount_brl:   null,
-            amount_usd:   100,
-            topped_up_at: new Date().toISOString().slice(0, 16),
-            reference:    '',
-            note:         '',
-        };
-        errorMessage.value = '';
-    }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val) {
+            form.value = {
+                provider: props.presetProvider || 'openai',
+                amount_brl: null,
+                amount_usd: 100,
+                topped_up_at: new Date().toISOString().slice(0, 16),
+                reference: '',
+                note: '',
+            };
+            errorMessage.value = '';
+        }
+    },
+);
 
 // Cotação efetiva (R$ por US$) — o que você pagou de fato por dólar.
 const effectiveRate = computed(() => {
@@ -61,11 +64,12 @@ const rateLooksOff = computed(() => {
     return r !== null && (r < 3 || r > 12);
 });
 
-const isValid = computed(() =>
-    form.value.provider
-    && Number(form.value.amount_usd) > 0
-    && Number(form.value.amount_brl) > 0
-    && form.value.topped_up_at,
+const isValid = computed(
+    () =>
+        form.value.provider &&
+        Number(form.value.amount_usd) > 0 &&
+        Number(form.value.amount_brl) > 0 &&
+        form.value.topped_up_at,
 );
 
 function close() {
@@ -76,17 +80,21 @@ function close() {
 async function submit() {
     if (!isValid.value || saving.value) return;
     emit('submit', {
-        provider:     form.value.provider,
-        amount_brl:   Number(form.value.amount_brl),
-        amount_usd:   Number(form.value.amount_usd),
+        provider: form.value.provider,
+        amount_brl: Number(form.value.amount_brl),
+        amount_usd: Number(form.value.amount_usd),
         topped_up_at: form.value.topped_up_at,
-        reference:    form.value.reference || null,
-        note:         form.value.note || null,
+        reference: form.value.reference || null,
+        note: form.value.note || null,
     });
 }
 
-function setSaving(value) { saving.value = value; }
-function setError(msg) { errorMessage.value = msg; }
+function setSaving(value) {
+    saving.value = value;
+}
+function setError(msg) {
+    errorMessage.value = msg;
+}
 
 defineExpose({ setSaving, setError });
 </script>
@@ -96,7 +104,7 @@ defineExpose({ setSaving, setError });
         <div
             v-if="open"
             class="modal fade show d-block"
-            style="background: rgba(0,0,0,0.45);"
+            style="background: rgba(0, 0, 0, 0.45)"
             tabindex="-1"
             @click.self="close"
         >
@@ -109,7 +117,10 @@ defineExpose({ setSaving, setError });
                                 {{ t?.topup?.modal_title ?? 'Registrar recarga no provedor' }}
                             </h5>
                             <small class="text-muted d-block mt-1">
-                                {{ t?.topup?.modal_subtitle ?? 'Registre o valor que você carregou no painel do provedor. NÃO faz cobrança real — apenas atualiza o saldo estimado.' }}
+                                {{
+                                    t?.topup?.modal_subtitle ??
+                                    'Registre o valor que você carregou no painel do provedor. NÃO faz cobrança real — apenas atualiza o saldo estimado.'
+                                }}
                             </small>
                         </div>
                         <button type="button" class="btn-close" :disabled="saving" @click="close"></button>
@@ -117,7 +128,6 @@ defineExpose({ setSaving, setError });
 
                     <form @submit.prevent="submit">
                         <div class="modal-body">
-
                             <div v-if="errorMessage" class="alert alert-danger small mb-3 py-2">
                                 <i class="ti ti-alert-circle me-1"></i>{{ errorMessage }}
                             </div>
@@ -136,11 +146,12 @@ defineExpose({ setSaving, setError });
                                                 type="radio"
                                                 class="btn-check"
                                                 :value="p.value"
-                                                :disabled="saving">
+                                                :disabled="saving"
+                                            />
                                             <label
                                                 class="btn btn-outline-primary flex-fill text-nowrap"
                                                 :for="`topup-prov-${p.value}`"
-                                                style="min-width: 0;"
+                                                style="min-width: 0"
                                             >
                                                 <i :class="p.icon" class="me-1"></i>
                                                 {{ p.label }}
@@ -152,7 +163,8 @@ defineExpose({ setSaving, setError });
                                 <!-- Valor pago (R$) -->
                                 <div class="col-12 col-md-6">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.topup?.amount_brl ?? 'Valor pago (R$)' }} <span class="text-danger">*</span>
+                                        {{ t?.topup?.amount_brl ?? 'Valor pago (R$)' }}
+                                        <span class="text-danger">*</span>
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">R$</span>
@@ -164,15 +176,19 @@ defineExpose({ setSaving, setError });
                                             max="99999999"
                                             class="form-control"
                                             required
-                                            :disabled="saving">
+                                            :disabled="saving"
+                                        />
                                     </div>
-                                    <small class="text-muted">{{ t?.topup?.amount_brl_help ?? 'O que você pagou no cartão/fatura.' }}</small>
+                                    <small class="text-muted">{{
+                                        t?.topup?.amount_brl_help ?? 'O que você pagou no cartão/fatura.'
+                                    }}</small>
                                 </div>
 
                                 <!-- Creditado no provedor (US$) -->
                                 <div class="col-12 col-md-6">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.topup?.amount_usd ?? 'Creditado no provedor (US$)' }} <span class="text-danger">*</span>
+                                        {{ t?.topup?.amount_usd ?? 'Creditado no provedor (US$)' }}
+                                        <span class="text-danger">*</span>
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">$</span>
@@ -184,9 +200,13 @@ defineExpose({ setSaving, setError });
                                             max="1000000"
                                             class="form-control"
                                             required
-                                            :disabled="saving">
+                                            :disabled="saving"
+                                        />
                                     </div>
-                                    <small class="text-muted">{{ t?.topup?.amount_usd_help ?? 'Saldo que o provedor adicionou (alimenta o saldo estimado).' }}</small>
+                                    <small class="text-muted">{{
+                                        t?.topup?.amount_usd_help ??
+                                        'Saldo que o provedor adicionou (alimenta o saldo estimado).'
+                                    }}</small>
                                 </div>
 
                                 <!-- Cotação efetiva -->
@@ -195,14 +215,30 @@ defineExpose({ setSaving, setError });
                                         class="alert d-flex align-items-start gap-2 small mb-0 py-2"
                                         :class="rateLooksOff ? 'alert-warning' : 'alert-light border'"
                                     >
-                                        <i :class="rateLooksOff ? 'ti ti-alert-triangle mt-1' : 'ti ti-exchange text-info mt-1'"></i>
+                                        <i
+                                            :class="
+                                                rateLooksOff
+                                                    ? 'ti ti-alert-triangle mt-1'
+                                                    : 'ti ti-exchange text-info mt-1'
+                                            "
+                                        ></i>
                                         <div>
                                             <div>
                                                 {{ t?.topup?.effective_rate ?? 'Cotação efetiva:' }}
-                                                <strong>US$&nbsp;1,00 = R$&nbsp;{{ effectiveRate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) }}</strong>
+                                                <strong
+                                                    >US$&nbsp;1,00 = R$&nbsp;{{
+                                                        effectiveRate.toLocaleString('pt-BR', {
+                                                            minimumFractionDigits: 2,
+                                                            maximumFractionDigits: 4,
+                                                        })
+                                                    }}</strong
+                                                >
                                             </div>
                                             <div v-if="rateLooksOff" class="text-warning-emphasis mt-1">
-                                                {{ t?.topup?.rate_warning ?? 'Cotação fora do esperado — confira se não inverteu os campos R$ e US$.' }}
+                                                {{
+                                                    t?.topup?.rate_warning ??
+                                                    'Cotação fora do esperado — confira se não inverteu os campos R$ e US$.'
+                                                }}
                                             </div>
                                         </div>
                                     </div>
@@ -211,14 +247,16 @@ defineExpose({ setSaving, setError });
                                 <!-- Data -->
                                 <div class="col-12 col-md-6">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.topup?.topped_up_at ?? 'Data da recarga' }} <span class="text-danger">*</span>
+                                        {{ t?.topup?.topped_up_at ?? 'Data da recarga' }}
+                                        <span class="text-danger">*</span>
                                     </label>
                                     <input
                                         v-model="form.topped_up_at"
                                         type="datetime-local"
                                         class="form-control"
                                         required
-                                        :disabled="saving">
+                                        :disabled="saving"
+                                    />
                                 </div>
 
                                 <!-- Referência -->
@@ -231,9 +269,15 @@ defineExpose({ setSaving, setError });
                                         type="text"
                                         maxlength="120"
                                         class="form-control"
-                                        :placeholder="t?.topup?.reference_placeholder ?? 'Ex.: ch_3MtIxhXKt8, invoice #INV-001'"
-                                        :disabled="saving">
-                                    <small class="text-muted">{{ t?.topup?.reference_help ?? 'ID/comprovante da transação no painel do provedor — útil para auditoria.' }}</small>
+                                        :placeholder="
+                                            t?.topup?.reference_placeholder ?? 'Ex.: ch_3MtIxhXKt8, invoice #INV-001'
+                                        "
+                                        :disabled="saving"
+                                    />
+                                    <small class="text-muted">{{
+                                        t?.topup?.reference_help ??
+                                        'ID/comprovante da transação no painel do provedor — útil para auditoria.'
+                                    }}</small>
                                 </div>
 
                                 <!-- Observação -->
@@ -246,7 +290,8 @@ defineExpose({ setSaving, setError });
                                         rows="2"
                                         maxlength="500"
                                         class="form-control"
-                                        :disabled="saving"></textarea>
+                                        :disabled="saving"
+                                    ></textarea>
                                 </div>
                             </div>
                         </div>

@@ -1,18 +1,18 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout         from '@/Layouts/AppLayout.vue';
-import PageHeader        from '@/Components/Panel/PageHeader.vue';
-import TablePagination   from '@/Components/Panel/TablePagination.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
-import { useTrans }      from '@/composables/useTrans.js';
+import { useTrans } from '@/composables/useTrans.js';
 import ImportReturnModal from '../Billing/ImportReturnModal.vue';
-import { cleanParams }   from '../Billing/billingHelpers.js';
-import GlosaKpis         from './GlosaKpis.vue';
-import GlosaFilterBar    from './GlosaFilterBar.vue';
-import GlosaTable        from './GlosaTable.vue';
-import GlosaDetailPanel  from './GlosaDetailPanel.vue';
-import GlosaActionModal  from './GlosaActionModal.vue';
+import { cleanParams } from '../Billing/billingHelpers.js';
+import GlosaKpis from './GlosaKpis.vue';
+import GlosaFilterBar from './GlosaFilterBar.vue';
+import GlosaTable from './GlosaTable.vue';
+import GlosaDetailPanel from './GlosaDetailPanel.vue';
+import GlosaActionModal from './GlosaActionModal.vue';
 
 /**
  * Conciliação de glosas como fila de trabalho: aba "Pendentes" (abertas e
@@ -30,20 +30,20 @@ import GlosaActionModal  from './GlosaActionModal.vue';
  * Textos: lang/{locale}/financial_glosas.php (+ t.shared, t.import).
  */
 const props = defineProps({
-    breadcrumbs:     { type: Array,  default: () => [] },
-    filters:         { type: Object, required: true },
-    today:           { type: String, default: '' },
-    summary:         { type: Object, required: true },
-    tabCounts:       { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    filters: { type: Object, required: true },
+    today: { type: String, default: '' },
+    summary: { type: Object, required: true },
+    tabCounts: { type: Object, default: () => ({}) },
     /** Paginator do Laravel: { data, current_page, last_page, from, to, total, links, ... }. */
-    glosas:          { type: Object, default: () => ({ data: [] }) },
-    byOperator:      { type: Array,  default: () => [] },
-    operators:       { type: Array,  default: () => [] },
-    statusOptions:   { type: Object, default: () => ({}) },
-    glosaDetail:     { type: Object, default: null },
-    covenants:       { type: Array,  default: () => [] },
+    glosas: { type: Object, default: () => ({ data: [] }) },
+    byOperator: { type: Array, default: () => [] },
+    operators: { type: Array, default: () => [] },
+    statusOptions: { type: Object, default: () => ({}) },
+    glosaDetail: { type: Object, default: null },
+    covenants: { type: Array, default: () => [] },
     importReturnUrl: { type: String, default: '' },
-    t:               { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { money, number } = useLocaleFormat();
@@ -53,15 +53,20 @@ const TAB_KEYS = ['pending', 'resolved', 'all'];
 
 const activeTab = ref(TAB_KEYS.includes(props.filters.tab) ? props.filters.tab : 'pending');
 
-watch(() => props.filters?.tab, (tab) => {
-    if (TAB_KEYS.includes(tab)) activeTab.value = tab;
-});
+watch(
+    () => props.filters?.tab,
+    (tab) => {
+        if (TAB_KEYS.includes(tab)) activeTab.value = tab;
+    },
+);
 
-const tabs = computed(() => [
-    { key: 'pending',  icon: 'ti ti-hourglass-high', label: props.t.tab_pending },
-    { key: 'resolved', icon: 'ti ti-circle-check',   label: props.t.tab_resolved },
-    { key: 'all',      icon: 'ti ti-list',           label: props.t.tab_all },
-].map((tab) => ({ ...tab, count: props.tabCounts?.[tab.key] ?? null })));
+const tabs = computed(() =>
+    [
+        { key: 'pending', icon: 'ti ti-hourglass-high', label: props.t.tab_pending },
+        { key: 'resolved', icon: 'ti ti-circle-check', label: props.t.tab_resolved },
+        { key: 'all', icon: 'ti ti-list', label: props.t.tab_all },
+    ].map((tab) => ({ ...tab, count: props.tabCounts?.[tab.key] ?? null })),
+);
 
 const dueSoonDays = computed(() => Number(props.summary?.due_soon_days ?? 5));
 const tabStatusOptions = computed(() => props.statusOptions?.[activeTab.value] ?? []);
@@ -70,22 +75,26 @@ const tabStatusOptions = computed(() => props.statusOptions?.[activeTab.value] ?
 const filtering = ref(false);
 
 const currentParams = computed(() => ({
-    tab:         activeTab.value,
-    from:        props.filters.from,
-    to:          props.filters.to,
-    status:      props.filters.status,
+    tab: activeTab.value,
+    from: props.filters.from,
+    to: props.filters.to,
+    status: props.filters.status,
     operator_id: props.filters.operator_id,
-    due:         props.filters.due,
-    search:      props.filters.search,
+    due: props.filters.due,
+    search: props.filters.search,
 }));
 
 function visit(params) {
     router.get(route('panel.financial.tiss.glosas.index'), cleanParams(params), {
-        preserveState:  true,
+        preserveState: true,
         preserveScroll: true,
-        replace:        true,
-        onStart:        () => { filtering.value = true; },
-        onFinish:       () => { filtering.value = false; },
+        replace: true,
+        onStart: () => {
+            filtering.value = true;
+        },
+        onFinish: () => {
+            filtering.value = false;
+        },
     });
 }
 
@@ -97,7 +106,8 @@ function applyFilters(patch) {
 
     // Filtros que não existem na aba saem da URL (o servidor também os ignora).
     if (next.tab !== 'pending') next.due = '';
-    if (next.status && Array.isArray(allowed) && !allowed.some((option) => option.value === next.status)) next.status = '';
+    if (next.status && Array.isArray(allowed) && !allowed.some((option) => option.value === next.status))
+        next.status = '';
 
     visit(next);
 }
@@ -136,10 +146,10 @@ const activeKpi = computed(() => {
 });
 
 const KPI_FILTERS = {
-    open:      { tab: 'pending',  status: 'open',      due: '' },
-    appealed:  { tab: 'pending',  status: 'appealed',  due: '' },
-    overdue:   { tab: 'pending',  status: '',          due: 'overdue' },
-    soon:      { tab: 'pending',  status: '',          due: 'soon' },
+    open: { tab: 'pending', status: 'open', due: '' },
+    appealed: { tab: 'pending', status: 'appealed', due: '' },
+    overdue: { tab: 'pending', status: '', due: 'overdue' },
+    soon: { tab: 'pending', status: '', due: 'soon' },
     recovered: { tab: 'resolved', status: 'recovered', due: '' },
 };
 
@@ -162,7 +172,9 @@ const pageStatus = computed(() => {
     return tx('pagination_status', { page: number(props.glosas?.current_page ?? 1), pages: number(pages) });
 });
 
-const hasContextFilter = computed(() => Boolean(props.filters.search || props.filters.status || props.filters.operator_id || props.filters.due));
+const hasContextFilter = computed(() =>
+    Boolean(props.filters.search || props.filters.status || props.filters.operator_id || props.filters.due),
+);
 
 const emptyText = computed(() => {
     if (hasContextFilter.value) return props.t.empty_filtered;
@@ -172,7 +184,7 @@ const emptyText = computed(() => {
 
 /* ───────────────────────── Ações (modal) ───────────────────────── */
 const actionModalRef = ref(null);
-const action         = ref({ kind: null, glosa: null, appeal: null });
+const action = ref({ kind: null, glosa: null, appeal: null });
 
 function openAction(kind, glosa, appeal = null) {
     action.value = { kind, glosa, appeal };
@@ -187,44 +199,49 @@ function closeAction() {
 // (ou `missing`, e o painel avisa que a glosa não foi encontrada).
 const initialDetail = props.glosaDetail ?? null;
 
-const detailOpen    = ref(Boolean(initialDetail));
-const detailId      = ref(initialDetail?.id ?? null);
+const detailOpen = ref(Boolean(initialDetail));
+const detailId = ref(initialDetail?.id ?? null);
 const detailLoading = ref(false);
-const detail        = ref(initialDetail);
+const detail = ref(initialDetail);
 let detailReturnFocus = null;
 
 function loadDetail(id) {
     detailLoading.value = true;
 
     router.reload({
-        only:        ['glosaDetail'],
-        data:        { detail: id },
+        only: ['glosaDetail'],
+        data: { detail: id },
         preserveUrl: true,
-        onFinish:    () => { detailLoading.value = false; },
+        onFinish: () => {
+            detailLoading.value = false;
+        },
     });
 }
 
 function openDetail(glosa) {
     detailReturnFocus = typeof document !== 'undefined' ? document.activeElement : null;
-    detailId.value    = glosa.id;
-    detail.value      = null;
-    detailOpen.value  = true;
+    detailId.value = glosa.id;
+    detail.value = null;
+    detailOpen.value = true;
 
     loadDetail(glosa.id);
 }
 
 function closeDetail() {
     detailOpen.value = false;
-    detailId.value   = null;
+    detailId.value = null;
     nextTick(() => detailReturnFocus?.focus?.());
 }
 
 // Resposta da recarga parcial (ou de uma ação feita com o painel aberto).
 // null depois de outras visitas não apaga o que o painel está mostrando.
-watch(() => props.glosaDetail, (value) => {
-    if (!value || !detailOpen.value) return;
-    if (value.missing || value.id === detailId.value) detail.value = value;
-});
+watch(
+    () => props.glosaDetail,
+    (value) => {
+        if (!value || !detailOpen.value) return;
+        if (value.missing || value.id === detailId.value) detail.value = value;
+    },
+);
 
 function onActionDone() {
     // A ação recarrega a página (back()); com o painel aberto, busca o detalhe atualizado.
@@ -247,11 +264,15 @@ function onKeydown(event) {
     if (detailOpen.value) closeDetail();
 }
 
-watch(() => Boolean(action.value.kind) || detailOpen.value, (anyOpen) => {
-    if (typeof document === 'undefined') return;
-    if (anyOpen) document.addEventListener('keydown', onKeydown);
-    else document.removeEventListener('keydown', onKeydown);
-}, { immediate: true });
+watch(
+    () => Boolean(action.value.kind) || detailOpen.value,
+    (anyOpen) => {
+        if (typeof document === 'undefined') return;
+        if (anyOpen) document.addEventListener('keydown', onKeydown);
+        else document.removeEventListener('keydown', onKeydown);
+    },
+    { immediate: true },
+);
 
 onBeforeUnmount(() => {
     if (typeof document !== 'undefined') document.removeEventListener('keydown', onKeydown);
@@ -298,12 +319,19 @@ onBeforeUnmount(() => {
                         @keydown="onTabKeydown($event, tab.key)"
                     >
                         <i :class="[tab.icon, 'me-1']" aria-hidden="true"></i>{{ tab.label }}
-                        <span v-if="tab.count !== null" class="badge rounded-pill badge-soft-secondary ms-1">{{ tab.count }}</span>
+                        <span v-if="tab.count !== null" class="badge rounded-pill badge-soft-secondary ms-1">{{
+                            tab.count
+                        }}</span>
                     </button>
                 </li>
             </ul>
 
-            <section id="glosas-panel" role="tabpanel" :aria-labelledby="`glosas-tab-${activeTab}`" :aria-busy="filtering ? 'true' : 'false'">
+            <section
+                id="glosas-panel"
+                role="tabpanel"
+                :aria-labelledby="`glosas-tab-${activeTab}`"
+                :aria-busy="filtering ? 'true' : 'false'"
+            >
                 <GlosaFilterBar
                     :filters="filters"
                     :operators="operators"
@@ -318,7 +346,9 @@ onBeforeUnmount(() => {
 
                 <div class="card mb-3">
                     <div class="card-header bg-transparent border-bottom">
-                        <h2 class="h6 mb-0 fw-semibold"><i class="ti ti-gavel me-1 text-primary" aria-hidden="true"></i>{{ listTitle }}</h2>
+                        <h2 class="h6 mb-0 fw-semibold">
+                            <i class="ti ti-gavel me-1 text-primary" aria-hidden="true"></i>{{ listTitle }}
+                        </h2>
                     </div>
                     <GlosaTable
                         :glosas="glosaRows"
@@ -341,13 +371,17 @@ onBeforeUnmount(() => {
                         :next-label="t.pagination_next"
                         data-test="glosas-pagination"
                     />
-                    <p class="visually-hidden" role="status" aria-live="polite" data-test="glosas-page-status">{{ pageStatus }}</p>
+                    <p class="visually-hidden" role="status" aria-live="polite" data-test="glosas-page-status">
+                        {{ pageStatus }}
+                    </p>
                 </div>
 
                 <!-- Resumo por convênio (histórico do período) -->
                 <div v-if="activeTab !== 'pending' && byOperator.length > 0" class="card" data-test="by-operator">
                     <div class="card-header bg-transparent border-bottom">
-                        <h2 class="h6 mb-0 fw-semibold"><i class="ti ti-chart-pie me-1 text-primary" aria-hidden="true"></i>{{ t.by_covenant }}</h2>
+                        <h2 class="h6 mb-0 fw-semibold">
+                            <i class="ti ti-chart-pie me-1 text-primary" aria-hidden="true"></i>{{ t.by_covenant }}
+                        </h2>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">

@@ -1,38 +1,41 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import LoadingSpinner    from '@/Components/Panel/LoadingSpinner.vue';
+import LoadingSpinner from '@/Components/Panel/LoadingSpinner.vue';
 import BillingStateBadge from '@/Components/Panel/BillingStateBadge.vue';
-import CardsPagination   from '@/Components/Panel/CardsPagination.vue';
-import ActionDropdown    from '@/Components/Panel/ActionDropdown.vue';
-import ActionIconButton  from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup   from '@/Components/Panel/ActionIconGroup.vue';
+import CardsPagination from '@/Components/Panel/CardsPagination.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
-    cardsUrl:      { type: String, required: true },
+    cardsUrl: { type: String, required: true },
     initialSearch: { type: String, default: '' },
-    t:             { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['view', 'edit', 'activate', 'trial', 'cancel', 'block']);
 
 const subscriptions = ref([]);
-const meta          = ref({ current_page: 1, last_page: 1 });
-const loading       = ref(false);
+const meta = ref({ current_page: 1, last_page: 1 });
+const loading = ref(false);
 
 async function fetchCards(page = 1) {
     loading.value = true;
     try {
         const params = new URLSearchParams({ page, search: props.initialSearch });
-        const json   = await fetch(`${props.cardsUrl}?${params}`).then(r => r.json());
+        const json = await fetch(`${props.cardsUrl}?${params}`).then((r) => r.json());
         subscriptions.value = json.data;
-        meta.value          = json.meta;
+        meta.value = json.meta;
     } finally {
         loading.value = false;
     }
 }
 
-watch(() => props.initialSearch, () => fetchCards(1));
+watch(
+    () => props.initialSearch,
+    () => fetchCards(1),
+);
 
 let removeSuccessListener;
 onMounted(() => {
@@ -73,7 +76,7 @@ defineExpose({ fetchCards });
                         <div
                             class="avatar-sm rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
                             :class="s.entity_active ? 'bg-success-subtle' : 'bg-danger-subtle'"
-                            style="width:44px;height:44px;"
+                            style="width: 44px; height: 44px"
                         >
                             <i
                                 class="fas fa-file-contract fs-16"
@@ -106,9 +109,7 @@ defineExpose({ fetchCards });
                                 <div v-if="s.next_billing_at">
                                     <strong>Próxima cobrança:</strong> {{ s.next_billing_at }}
                                 </div>
-                                <div v-if="s.trial_ends_at">
-                                    <strong>Trial até:</strong> {{ s.trial_ends_at }}
-                                </div>
+                                <div v-if="s.trial_ends_at"><strong>Trial até:</strong> {{ s.trial_ends_at }}</div>
                             </div>
 
                             <!-- Erro de cobrança -->
@@ -118,20 +119,12 @@ defineExpose({ fetchCards });
                         </div>
                     </div>
 
-                    <hr class="my-2">
+                    <hr class="my-2" />
 
                     <!-- Ações -->
                     <ActionIconGroup align="end" gap="tight">
-                        <ActionIconButton
-                            icon="ti ti-eye"
-                            :title="t.action_view"
-                            @click="$emit('view', s.id)"
-                        />
-                        <ActionIconButton
-                            icon="ti ti-edit"
-                            :title="t.action_edit"
-                            @click="$emit('edit', s.id)"
-                        />
+                        <ActionIconButton icon="ti ti-eye" :title="t.action_view" @click="$emit('view', s.id)" />
+                        <ActionIconButton icon="ti ti-edit" :title="t.action_edit" @click="$emit('edit', s.id)" />
                         <ActionDropdown
                             :min-width="180"
                             btn-class="ee-action-icon ee-action-icon--default"
@@ -152,7 +145,7 @@ defineExpose({ fetchCards });
                                     <i class="ti ti-ban me-1"></i> {{ t.action_cancel }}
                                 </button>
                             </li>
-                            <li><hr class="dropdown-divider my-1"></li>
+                            <li><hr class="dropdown-divider my-1" /></li>
                             <li>
                                 <button class="dropdown-item rounded-1" @click="$emit('block', s)">
                                     <i :class="`ti me-1 ${s.entity_active ? 'ti-lock' : 'ti-lock-open'}`"></i>

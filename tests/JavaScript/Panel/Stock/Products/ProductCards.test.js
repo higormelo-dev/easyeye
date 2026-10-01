@@ -21,13 +21,27 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_code: 'Código', col_category: 'Categoria', col_unit: 'Unidade', col_qty_on_hand: 'Saldo',
-    col_cost_avg: 'Custo médio', col_sale_price: 'Preço', status_active: 'Ativo', status_inactive: 'Inativo',
-    below_minimum: 'Abaixo do mínimo', badge_opm: 'OPM', badge_expiring_lot: 'Lote vencendo',
-    expiring_lot_title: 'Vence em :date', action_movements: 'Movimentações do produto',
-    action_edit: 'Editar', action_activate: 'Ativar', action_deactivate: 'Desativar', action_delete: 'Excluir',
+    col_code: 'Código',
+    col_category: 'Categoria',
+    col_unit: 'Unidade',
+    col_qty_on_hand: 'Saldo',
+    col_cost_avg: 'Custo médio',
+    col_sale_price: 'Preço',
+    status_active: 'Ativo',
+    status_inactive: 'Inativo',
+    below_minimum: 'Abaixo do mínimo',
+    badge_opm: 'OPM',
+    badge_expiring_lot: 'Lote vencendo',
+    expiring_lot_title: 'Vence em :date',
+    action_movements: 'Movimentações do produto',
+    action_edit: 'Editar',
+    action_activate: 'Ativar',
+    action_deactivate: 'Desativar',
+    action_delete: 'Excluir',
     empty_list: 'Nenhum produto encontrado.',
-    pagination_showing: 'Exibindo', pagination_of: 'de', pagination_suffix: 'produtos',
+    pagination_showing: 'Exibindo',
+    pagination_of: 'de',
+    pagination_suffix: 'produtos',
 };
 
 const nbsp = (s) => s.replace(/ /g, ' ');
@@ -37,16 +51,37 @@ afterEach(() => wrapper?.unmount());
 
 function product(overrides = {}) {
     return {
-        id: 'p1', code: 'PRD-1', name: 'Colírio X', category_name: 'Colírios', unit: 'un', unit_label: 'Unidade',
-        qty_on_hand: 3, cost_avg: 10, sale_price: 1500.75, below_minimum: true, is_opm: true,
-        has_expiring_lot: false, nearest_expiry: null, active: false, ...overrides,
+        id: 'p1',
+        code: 'PRD-1',
+        name: 'Colírio X',
+        category_name: 'Colírios',
+        unit: 'un',
+        unit_label: 'Unidade',
+        qty_on_hand: 3,
+        cost_avg: 10,
+        sale_price: 1500.75,
+        below_minimum: true,
+        is_opm: true,
+        has_expiring_lot: false,
+        nearest_expiry: null,
+        active: false,
+        ...overrides,
     };
 }
 
 function mountCards(rows, extra = {}) {
     wrapper = mount(ProductCards, {
         props: {
-            items: { data: rows, total: rows.length, from: 1, to: rows.length, last_page: 1, current_page: 1, links: [], ...extra },
+            items: {
+                data: rows,
+                total: rows.length,
+                from: 1,
+                to: rows.length,
+                last_page: 1,
+                current_page: 1,
+                links: [],
+                ...extra,
+            },
             t,
             movementsIndexUrl: '/stock/movements',
         },
@@ -113,7 +148,9 @@ describe('ProductCards', () => {
         const p = product();
         const w = mountCards([p]);
 
-        expect(w.find('button[title="Movimentações do produto"]').attributes('data-href')).toBe('/stock/movements?entity_product_id=p1');
+        expect(w.find('button[title="Movimentações do produto"]').attributes('data-href')).toBe(
+            '/stock/movements?entity_product_id=p1',
+        );
 
         const items = w.findAll('.dropdown-item');
         expect(items.map((b) => b.text())).toEqual(['Editar', 'Ativar', 'Excluir']);

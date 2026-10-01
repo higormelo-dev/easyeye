@@ -20,22 +20,22 @@ import GuestLayout from '@/Layouts/GuestLayout.vue';
  */
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
-    secret:  { type: String, required: true },
-    qr_svg:  { type: String, required: true },
+    secret: { type: String, required: true },
+    qr_svg: { type: String, required: true },
     otpauth: { type: String, required: true },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
-const step          = ref('setup');   // 'setup' | 'recovery'
+const step = ref('setup'); // 'setup' | 'recovery'
 const recoveryCodes = ref([]);
-const redirectUrl   = ref('');
-const showManual    = ref(false);
-const code          = ref('');
-const busy          = ref(false);
-const feedback      = ref('');
-const isError       = ref(false);
+const redirectUrl = ref('');
+const showManual = ref(false);
+const code = ref('');
+const busy = ref(false);
+const feedback = ref('');
+const isError = ref(false);
 
-const logoutForm     = useForm({});
+const logoutForm = useForm({});
 const regenerateForm = useForm({});
 
 const isSetup = computed(() => step.value === 'setup');
@@ -47,7 +47,7 @@ const formattedSecret = computed(() => {
 
 function setFeedback(message, error = false) {
     feedback.value = message;
-    isError.value  = error;
+    isError.value = error;
 }
 
 async function post(url, body) {
@@ -59,7 +59,7 @@ async function post(url, body) {
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
             body: body ? JSON.stringify(body) : undefined,
         });
@@ -73,7 +73,7 @@ async function post(url, body) {
 }
 
 function errorMessage(status, data) {
-    if (status === 0)   return props.t.network_error ?? 'Erro de rede. Tente novamente.';
+    if (status === 0) return props.t.network_error ?? 'Erro de rede. Tente novamente.';
     if (status === 429) return props.t.too_many_attempts ?? 'Muitas tentativas. Aguarde um minuto e tente novamente.';
     if (status === 401 || status === 419) {
         return props.t.session_expired ?? 'Sua sessão expirou. Recarregue a página e entre novamente.';
@@ -96,21 +96,21 @@ async function confirm() {
     }
 
     recoveryCodes.value = data.recovery_codes ?? [];
-    redirectUrl.value   = data.redirect ?? '/panel/dashboard';
-    code.value          = '';
-    step.value          = 'recovery';
+    redirectUrl.value = data.redirect ?? '/panel/dashboard';
+    code.value = '';
+    step.value = 'recovery';
     setFeedback(data.message ?? props.t.enabled ?? 'Autenticação em dois fatores ativada com sucesso.');
 }
 
 function regenerate() {
     showManual.value = false;
-    code.value       = '';
-    feedback.value   = '';
+    code.value = '';
+    feedback.value = '';
 
     regenerateForm.post('/security/two-factor/setup', {
         preserveScroll: true,
         onSuccess: () => setFeedback(props.t.regenerated ?? 'Novo QR code gerado. Escaneie novamente.'),
-        onError:   () => setFeedback(props.t.network_error ?? 'Erro de rede. Tente novamente.', true),
+        onError: () => setFeedback(props.t.network_error ?? 'Erro de rede. Tente novamente.', true),
     });
 }
 
@@ -151,9 +151,9 @@ async function copyRecoveryCodes() {
 function downloadRecoveryCodes() {
     const text = recoveryCodes.value.join('\n');
     const blob = new Blob([text], { type: 'text/plain' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
     a.download = 'easyeye-recovery-codes.txt';
     document.body.appendChild(a);
     a.click();
@@ -179,13 +179,12 @@ function logout() {
         :title="isSetup ? t.setup_title : t.recovery_title"
         :subtitle="isSetup ? t.setup_subtitle : t.recovery_subtitle"
     >
-
         <!-- ── Etapa: setup (QR + secret manual + código) ─────────────────── -->
         <template v-if="isSetup">
-            <p class="text-muted mb-1" style="font-size:.9rem;">
+            <p class="text-muted mb-1" style="font-size: 0.9rem">
                 {{ t.setup_intro }}
             </p>
-            <p class="text-muted mb-4" style="font-size:.9rem;">
+            <p class="text-muted mb-4" style="font-size: 0.9rem">
                 {{ t.setup_help }}
             </p>
 
@@ -193,7 +192,7 @@ function logout() {
                 <i class="ti me-1" :class="isError ? 'ti-alert-circle' : 'ti-circle-check'"></i> {{ feedback }}
             </div>
 
-            <p class="text-muted mb-2" style="font-size:.9rem;">
+            <p class="text-muted mb-2" style="font-size: 0.9rem">
                 <i class="ti ti-qrcode me-1"></i>{{ t.setup_step_1 }}
             </p>
             <!-- bg-white proposital: o QR precisa de fundo branco também no dark mode -->
@@ -203,7 +202,7 @@ function logout() {
                 <button
                     type="button"
                     class="btn btn-link text-muted p-0 text-decoration-none"
-                    style="font-size:.875rem;"
+                    style="font-size: 0.875rem"
                     :aria-expanded="showManual"
                     @click="showManual = !showManual"
                 >
@@ -214,7 +213,7 @@ function logout() {
                 <div v-if="showManual" class="mt-2">
                     <div
                         class="border rounded bg-body-tertiary p-3 font-monospace fw-semibold text-center text-break user-select-all"
-                        style="letter-spacing:.15em; font-size:1rem;"
+                        style="letter-spacing: 0.15em; font-size: 1rem"
                     >
                         {{ formattedSecret }}
                     </div>
@@ -226,7 +225,7 @@ function logout() {
                 </div>
             </div>
 
-            <p class="text-muted mb-2" style="font-size:.9rem;">
+            <p class="text-muted mb-2" style="font-size: 0.9rem">
                 <i class="ti ti-keyboard me-1"></i>{{ t.setup_step_2 }}
             </p>
 
@@ -239,11 +238,11 @@ function logout() {
                         maxlength="6"
                         autocomplete="one-time-code"
                         class="form-control form-control-lg text-center fw-semibold"
-                        style="letter-spacing:.5em;"
+                        style="letter-spacing: 0.5em"
                         :placeholder="t.code_placeholder"
                         autofocus
                         :aria-label="t.code_aria_label"
-                    >
+                    />
                 </div>
 
                 <div class="d-grid mb-3">
@@ -276,7 +275,7 @@ function logout() {
                 <button
                     type="button"
                     class="btn btn-link text-muted"
-                    style="font-size:.875rem;"
+                    style="font-size: 0.875rem"
                     :disabled="logoutForm.processing"
                     @click="logout"
                 >
@@ -287,7 +286,7 @@ function logout() {
 
         <!-- ── Etapa: recovery codes (única exibição) ─────────────────────── -->
         <template v-else>
-            <p class="text-muted mb-4" style="font-size:.9rem;">
+            <p class="text-muted mb-4" style="font-size: 0.9rem">
                 {{ t.recovery_intro }}
             </p>
 
@@ -301,7 +300,7 @@ function logout() {
 
             <div class="border rounded bg-body-tertiary p-3 mb-3 font-monospace user-select-all">
                 <div class="row row-cols-2 g-2 text-center">
-                    <div v-for="rc in recoveryCodes" :key="rc" class="col fw-semibold" style="letter-spacing:.08em;">
+                    <div v-for="rc in recoveryCodes" :key="rc" class="col fw-semibold" style="letter-spacing: 0.08em">
                         {{ rc }}
                     </div>
                 </div>
@@ -322,6 +321,5 @@ function logout() {
                 </button>
             </div>
         </template>
-
     </GuestLayout>
 </template>

@@ -11,11 +11,11 @@
  *   update:modelValue – quando o valor muda (v-model compat)
  */
 defineProps({
-    modelValue:  { type: String, default: '' },
+    modelValue: { type: String, default: '' },
     placeholder: { type: String, default: 'Buscar...' },
-    maxWidth:    { type: String, default: '380px' },
+    maxWidth: { type: String, default: '380px' },
     /** Rótulo acessível (e dica) do botão de limpar — opcional, traduzido pelo chamador. */
-    clearLabel:  { type: String, default: 'Limpar busca' },
+    clearLabel: { type: String, default: 'Limpar busca' },
     /** Classes do wrapper (padrão 'mb-3'); passe '' ao usar numa barra de filtros flex. */
     wrapperClass: { type: String, default: 'mb-3' },
 });
@@ -36,7 +36,7 @@ defineEmits(['update:modelValue']);
                 :placeholder="placeholder"
                 :aria-label="placeholder"
                 @input="$emit('update:modelValue', $event.target.value)"
-            >
+            />
             <button
                 v-if="modelValue"
                 class="btn btn-outline-secondary border-start-0"

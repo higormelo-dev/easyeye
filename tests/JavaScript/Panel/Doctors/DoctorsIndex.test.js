@@ -10,7 +10,9 @@ import DoctorsIndex from '@/Pages/Panel/Doctors/Index.vue';
  * a ordenação.
  */
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view'],
@@ -26,16 +28,24 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
-vi.mock('@/Pages/Panel/Doctors/DoctorTable.vue', () => ({ default: { props: ['doctors', 't'], template: '<div class="table-stub">{{ doctors.data.length }}</div>' } }));
-vi.mock('@/Pages/Panel/Doctors/DoctorCards.vue', () => ({ default: { props: ['cardsUrl', 'search'], template: '<div class="cards-stub">{{ search }}</div>' } }));
+vi.mock('@/Pages/Panel/Doctors/DoctorTable.vue', () => ({
+    default: { props: ['doctors', 't'], template: '<div class="table-stub">{{ doctors.data.length }}</div>' },
+}));
+vi.mock('@/Pages/Panel/Doctors/DoctorCards.vue', () => ({
+    default: { props: ['cardsUrl', 'search'], template: '<div class="cards-stub">{{ search }}</div>' },
+}));
 vi.mock('@/Pages/Panel/Doctors/DoctorFormModal.vue', () => ({ default: { template: '<div />' } }));
 vi.mock('@/Pages/Panel/Doctors/DoctorDetailDrawer.vue', () => ({ default: { template: '<div />' } }));
 
 const t = {
-    page_title: 'Doctors', total_label: 'Total:', btn_import: 'Import', btn_new: 'New doctor',
+    page_title: 'Doctors',
+    total_label: 'Total:',
+    btn_import: 'Import',
+    btn_new: 'New doctor',
     search_placeholder: 'Search by name...',
 };
 

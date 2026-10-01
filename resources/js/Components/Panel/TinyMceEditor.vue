@@ -13,11 +13,11 @@ import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
  */
 const props = defineProps({
     modelValue: { type: String, default: '' },
-    height:     { type: [Number, String], default: 320 },
-    placeholder:{ type: String, default: '' },
-    disabled:   { type: Boolean, default: false },
+    height: { type: [Number, String], default: 320 },
+    placeholder: { type: String, default: '' },
+    disabled: { type: Boolean, default: false },
     /** Toolbar customizada — se vazio usa default clínico (bold/lista/link/undo). */
-    toolbar:    { type: String, default: '' },
+    toolbar: { type: String, default: '' },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -128,36 +128,46 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     if (editorInstance) {
-        try { editorInstance.remove(); } catch (e) { /* noop */ }
+        try {
+            editorInstance.remove();
+        } catch (e) {
+            /* noop */
+        }
         editorInstance = null;
     }
 });
 
 // Sync externo → editor (quando parent muda o v-model)
-watch(() => props.modelValue, (v) => {
-    if (usingFallback) {
-        if (textareaRef.value && textareaRef.value.value !== (v ?? '')) {
-            textareaRef.value.value = v ?? '';
+watch(
+    () => props.modelValue,
+    (v) => {
+        if (usingFallback) {
+            if (textareaRef.value && textareaRef.value.value !== (v ?? '')) {
+                textareaRef.value.value = v ?? '';
+            }
+            return;
         }
-        return;
-    }
-    if (!editorInstance) return;
-    const current = editorInstance.getContent();
-    if (current === (v ?? '')) return;
-    syncing = true;
-    editorInstance.setContent(v ?? '');
-    syncing = false;
-});
+        if (!editorInstance) return;
+        const current = editorInstance.getContent();
+        if (current === (v ?? '')) return;
+        syncing = true;
+        editorInstance.setContent(v ?? '');
+        syncing = false;
+    },
+);
 
 // Toggle readonly quando disabled muda
-watch(() => props.disabled, (d) => {
-    if (usingFallback) {
-        if (textareaRef.value) textareaRef.value.disabled = d;
-        return;
-    }
-    if (!editorInstance) return;
-    editorInstance.mode.set(d ? 'readonly' : 'design');
-});
+watch(
+    () => props.disabled,
+    (d) => {
+        if (usingFallback) {
+            if (textareaRef.value) textareaRef.value.disabled = d;
+            return;
+        }
+        if (!editorInstance) return;
+        editorInstance.mode.set(d ? 'readonly' : 'design');
+    },
+);
 
 /**
  * Insere HTML na posição do cursor (ou no final, se o editor nunca teve
@@ -170,7 +180,7 @@ function insertContent(html) {
         const el = textareaRef.value;
         if (!el) return;
         const start = el.selectionStart ?? el.value.length;
-        const end   = el.selectionEnd ?? el.value.length;
+        const end = el.selectionEnd ?? el.value.length;
         el.value = el.value.slice(0, start) + html + el.value.slice(end);
         el.focus();
         el.selectionStart = el.selectionEnd = start + html.length;

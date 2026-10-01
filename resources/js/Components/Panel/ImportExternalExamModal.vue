@@ -37,13 +37,13 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import Cid10Picker from '@/Components/Panel/Cid10Picker.vue';
 
 const props = defineProps({
-    open:        { type: Boolean, required: true },
-    patient:     { type: Object,  default: null },
-    doctors:     { type: Array,   default: () => [] },
-    examTypes:   { type: Array,   default: () => [] },
-    equipments:  { type: Array,   default: () => [] },
-    urls:        { type: Object,  default: () => ({}) },
-    presetGroup: { type: Object,  default: null },
+    open: { type: Boolean, required: true },
+    patient: { type: Object, default: null },
+    doctors: { type: Array, default: () => [] },
+    examTypes: { type: Array, default: () => [] },
+    equipments: { type: Array, default: () => [] },
+    urls: { type: Object, default: () => ({}) },
+    presetGroup: { type: Object, default: null },
 });
 
 const presetLocked = ref(false);
@@ -73,10 +73,10 @@ const form = useForm({
 // ── Paciente: pré-selecionado (props.patient) ou busca ──────────────────────
 const hasFixedPatient = computed(() => !!props.patient?.id);
 
-const patientQuery     = ref('');
-const patientResults   = ref([]);
+const patientQuery = ref('');
+const patientResults = ref([]);
 const patientSearching = ref(false);
-const pickedPatient    = ref(null);
+const pickedPatient = ref(null);
 let patientDebounce = null;
 
 function onPatientInput() {
@@ -84,7 +84,10 @@ function onPatientInput() {
     pickedPatient.value = null;
     form.patient_id = '';
     const q = patientQuery.value.trim();
-    if (q.length < 2) { patientResults.value = []; return; }
+    if (q.length < 2) {
+        patientResults.value = [];
+        return;
+    }
     patientDebounce = setTimeout(searchPatients, 350);
 }
 
@@ -103,16 +106,16 @@ async function searchPatients() {
 }
 
 function selectPatient(p) {
-    pickedPatient.value  = p;
-    form.patient_id      = p.id;
-    patientQuery.value   = p.full_name;
+    pickedPatient.value = p;
+    form.patient_id = p.id;
+    patientQuery.value = p.full_name;
     patientResults.value = [];
 }
 
 function clearPickedPatient() {
-    pickedPatient.value  = null;
-    form.patient_id      = '';
-    patientQuery.value   = '';
+    pickedPatient.value = null;
+    form.patient_id = '';
+    patientQuery.value = '';
     patientResults.value = [];
 }
 
@@ -127,12 +130,12 @@ watch(originMode, (mode) => {
 
 // ── Diagnóstico (Cid10Picker embutido — mesmo padrão de DiagnosisManagerModal) ─
 const creatingCustomDiagnosis = ref(false);
-const createDiagnosisError    = ref('');
+const createDiagnosisError = ref('');
 
 async function onCreateDiagnosis(term) {
     if (!props.urls?.diagnosis_store) return;
     creatingCustomDiagnosis.value = true;
-    createDiagnosisError.value    = '';
+    createDiagnosisError.value = '';
     try {
         const { data } = await window.axios.post(props.urls.diagnosis_store, { name: term });
         const created = data?.data;
@@ -161,7 +164,7 @@ function formatBytes(bytes) {
     if (!bytes) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB'];
     const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-    return `${(bytes / (1024 ** i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+    return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 function onFilesChange(e) {
@@ -194,7 +197,9 @@ function syncFormFiles() {
 }
 
 function clearFileItems() {
-    fileItems.value.forEach((i) => { if (i.previewUrl) URL.revokeObjectURL(i.previewUrl); });
+    fileItems.value.forEach((i) => {
+        if (i.previewUrl) URL.revokeObjectURL(i.previewUrl);
+    });
     fileItems.value = [];
 }
 
@@ -210,17 +215,27 @@ function validateClientSide() {
 
 // Erros que não têm campo próprio no template (ex.: "diagnoses", "diagnoses.0").
 const knownFields = [
-    'patient_id', 'exam_id', 'exam_performed_at', 'doctor_id',
-    'entity_integrator_equipment_id', 'external_origin', 'laterality',
+    'patient_id',
+    'exam_id',
+    'exam_performed_at',
+    'doctor_id',
+    'entity_integrator_equipment_id',
+    'external_origin',
+    'laterality',
 ];
-const genericErrors = computed(() => Object.entries(form.errors ?? {})
-    .filter(([key]) => !knownFields.includes(key) && key !== 'files' && !key.startsWith('files.'))
-    .map(([, msg]) => msg));
+const genericErrors = computed(() =>
+    Object.entries(form.errors ?? {})
+        .filter(([key]) => !knownFields.includes(key) && key !== 'files' && !key.startsWith('files.'))
+        .map(([, msg]) => msg),
+);
 
 function submit() {
     clientError.value = '';
     const err = validateClientSide();
-    if (err) { clientError.value = err; return; }
+    if (err) {
+        clientError.value = err;
+        return;
+    }
 
     form.post(props.urls.import_store, {
         forceFormData: true,
@@ -242,39 +257,42 @@ function close() {
 }
 
 // ── Reset ao abrir (mesmo padrão de DiagnosisManagerModal.vue) ─────────────
-watch(() => props.open, (isOpen) => {
-    if (!isOpen) return;
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (!isOpen) return;
 
-    form.clearErrors();
-    clientError.value          = '';
-    createDiagnosisError.value = '';
-    clearFileItems();
-    originMode.value = props.equipments?.length ? 'equipment' : 'manual';
+        form.clearErrors();
+        clientError.value = '';
+        createDiagnosisError.value = '';
+        clearFileItems();
+        originMode.value = props.equipments?.length ? 'equipment' : 'manual';
 
-    form.patient_id                     = props.patient?.id ?? '';
-    form.doctor_id                      = '';
-    form.external_origin                = '';
-    form.laterality                     = null;
-    form.diagnoses                      = [];
-    form.files                          = [];
+        form.patient_id = props.patient?.id ?? '';
+        form.doctor_id = '';
+        form.external_origin = '';
+        form.laterality = null;
+        form.diagnoses = [];
+        form.files = [];
 
-    if (props.presetGroup) {
-        form.exam_id                        = props.presetGroup.examTypeId ?? '';
-        form.exam_performed_at              = props.presetGroup.examPerformedAt ?? todayIso();
-        form.entity_integrator_equipment_id = props.presetGroup.equipmentId ?? '';
-        originMode.value  = props.presetGroup.equipmentId ? 'equipment' : 'manual';
-        presetLocked.value = true;
-    } else {
-        form.exam_id                        = '';
-        form.exam_performed_at              = todayIso();
-        form.entity_integrator_equipment_id = '';
-        presetLocked.value = false;
-    }
+        if (props.presetGroup) {
+            form.exam_id = props.presetGroup.examTypeId ?? '';
+            form.exam_performed_at = props.presetGroup.examPerformedAt ?? todayIso();
+            form.entity_integrator_equipment_id = props.presetGroup.equipmentId ?? '';
+            originMode.value = props.presetGroup.equipmentId ? 'equipment' : 'manual';
+            presetLocked.value = true;
+        } else {
+            form.exam_id = '';
+            form.exam_performed_at = todayIso();
+            form.entity_integrator_equipment_id = '';
+            presetLocked.value = false;
+        }
 
-    pickedPatient.value  = null;
-    patientQuery.value   = '';
-    patientResults.value = [];
-});
+        pickedPatient.value = null;
+        patientQuery.value = '';
+        patientResults.value = [];
+    },
+);
 </script>
 
 <template>
@@ -284,10 +302,12 @@ watch(() => props.open, (isOpen) => {
                 <i class="ti ti-upload me-2 text-primary"></i>
                 {{ presetGroup ? 'Adicionar imagem ao exame' : 'Importar exame externo' }}
             </h5>
-            <p class="text-muted mt-1 mb-0" style="font-size:.8rem;">
-                {{ presetGroup
-                    ? 'A imagem nova entra no mesmo grupo já exibido — tipo, data e equipamento vêm preenchidos.'
-                    : 'Upload manual de exame realizado fora do integrador (ex.: laudo trazido pelo paciente).' }}
+            <p class="text-muted mt-1 mb-0" style="font-size: 0.8rem">
+                {{
+                    presetGroup
+                        ? 'A imagem nova entra no mesmo grupo já exibido — tipo, data e equipamento vêm preenchidos.'
+                        : 'Upload manual de exame realizado fora do integrador (ex.: laudo trazido pelo paciente).'
+                }}
             </p>
         </template>
 
@@ -317,25 +337,32 @@ watch(() => props.open, (isOpen) => {
                     </button>
                 </div>
                 <template v-else>
-                    <input v-model="patientQuery"
-                           type="text"
-                           class="form-control"
-                           :class="{ 'is-invalid': form.errors.patient_id }"
-                           placeholder="Buscar paciente por nome, código ou telefone..."
-                           autocomplete="off"
-                           @input="onPatientInput">
+                    <input
+                        v-model="patientQuery"
+                        type="text"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.patient_id }"
+                        placeholder="Buscar paciente por nome, código ou telefone..."
+                        autocomplete="off"
+                        @input="onPatientInput"
+                    />
                     <span v-if="patientSearching" class="position-absolute top-50 end-0 translate-middle-y me-3">
                         <span class="spinner-border spinner-border-sm text-secondary"></span>
                     </span>
-                    <ul v-if="patientResults.length > 0"
+                    <ul
+                        v-if="patientResults.length > 0"
                         class="list-group position-absolute w-100 shadow-sm"
-                        style="z-index:1060;max-height:220px;overflow-y:auto;">
-                        <li v-for="p in patientResults" :key="p.id"
+                        style="z-index: 1060; max-height: 220px; overflow-y: auto"
+                    >
+                        <li
+                            v-for="p in patientResults"
+                            :key="p.id"
                             class="list-group-item list-group-item-action py-2 px-3"
-                            style="cursor:pointer;"
-                            @mousedown.prevent="selectPatient(p)">
+                            style="cursor: pointer"
+                            @mousedown.prevent="selectPatient(p)"
+                        >
                             <div class="fw-semibold small">{{ p.full_name }}</div>
-                            <div class="text-muted" style="font-size:.75rem;">
+                            <div class="text-muted" style="font-size: 0.75rem">
                                 {{ p.cellphone || p.telephone || '—' }} &bull; {{ p.code }}
                             </div>
                         </li>
@@ -345,8 +372,11 @@ watch(() => props.open, (isOpen) => {
             <div v-if="form.errors.patient_id" class="text-danger small mt-1">{{ form.errors.patient_id }}</div>
         </div>
 
-        <div v-if="presetGroup && presetLocked" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3">
-            <div style="font-size:.82rem;">
+        <div
+            v-if="presetGroup && presetLocked"
+            class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3"
+        >
+            <div style="font-size: 0.82rem">
                 <i class="ti ti-folder-check me-1"></i>
                 <strong>{{ presetGroup.examTypeName || 'Exame' }}</strong>
                 — {{ new Date(form.exam_performed_at + 'T00:00:00').toLocaleDateString('pt-BR') }}
@@ -369,8 +399,13 @@ watch(() => props.open, (isOpen) => {
 
             <div class="col-12 col-sm-6">
                 <label class="form-label fw-semibold">Data do exame <span class="text-danger">*</span></label>
-                <input v-model="form.exam_performed_at" type="date" class="form-control"
-                       :class="{ 'is-invalid': form.errors.exam_performed_at }" :max="todayIso()">
+                <input
+                    v-model="form.exam_performed_at"
+                    type="date"
+                    class="form-control"
+                    :class="{ 'is-invalid': form.errors.exam_performed_at }"
+                    :max="todayIso()"
+                />
                 <div v-if="form.errors.exam_performed_at" class="invalid-feedback d-block">
                     {{ form.errors.exam_performed_at }}
                 </div>
@@ -380,13 +415,19 @@ watch(() => props.open, (isOpen) => {
         <div class="mb-3">
             <label class="form-label fw-semibold d-block">Olho</label>
             <div class="btn-group btn-group-sm" role="group" :class="{ 'is-invalid': form.errors.laterality }">
-                <input type="radio" class="btn-check" id="import-laterality-od" value="1" v-model="form.laterality">
+                <input type="radio" class="btn-check" id="import-laterality-od" value="1" v-model="form.laterality" />
                 <label class="btn btn-outline-primary" for="import-laterality-od">OD</label>
 
-                <input type="radio" class="btn-check" id="import-laterality-oe" value="2" v-model="form.laterality">
+                <input type="radio" class="btn-check" id="import-laterality-oe" value="2" v-model="form.laterality" />
                 <label class="btn btn-outline-danger" for="import-laterality-oe">OE</label>
 
-                <input type="radio" class="btn-check" id="import-laterality-ao" :value="null" v-model="form.laterality">
+                <input
+                    type="radio"
+                    class="btn-check"
+                    id="import-laterality-ao"
+                    :value="null"
+                    v-model="form.laterality"
+                />
                 <label class="btn btn-outline-secondary" for="import-laterality-ao">AO</label>
             </div>
             <div v-if="form.errors.laterality" class="invalid-feedback d-block">{{ form.errors.laterality }}</div>
@@ -405,22 +446,38 @@ watch(() => props.open, (isOpen) => {
         <div v-if="!(presetGroup && presetLocked)" class="mb-3">
             <label class="form-label fw-semibold d-block">Origem do exame</label>
             <div class="btn-group btn-group-sm mb-2" role="group">
-                <input type="radio" class="btn-check" id="import-origin-equipment" value="equipment"
-                       v-model="originMode" :disabled="!equipments.length">
+                <input
+                    type="radio"
+                    class="btn-check"
+                    id="import-origin-equipment"
+                    value="equipment"
+                    v-model="originMode"
+                    :disabled="!equipments.length"
+                />
                 <label class="btn btn-outline-secondary" for="import-origin-equipment">Equipamento cadastrado</label>
 
-                <input type="radio" class="btn-check" id="import-origin-manual" value="manual" v-model="originMode">
+                <input type="radio" class="btn-check" id="import-origin-manual" value="manual" v-model="originMode" />
                 <label class="btn btn-outline-secondary" for="import-origin-manual">Descrever origem</label>
             </div>
 
-            <select v-if="originMode === 'equipment'" v-model="form.entity_integrator_equipment_id"
-                    class="form-select" :class="{ 'is-invalid': form.errors.entity_integrator_equipment_id }">
+            <select
+                v-if="originMode === 'equipment'"
+                v-model="form.entity_integrator_equipment_id"
+                class="form-select"
+                :class="{ 'is-invalid': form.errors.entity_integrator_equipment_id }"
+            >
                 <option value="">Não informado</option>
                 <option v-for="eq in equipments" :key="eq.id" :value="eq.id">{{ eq.name }}</option>
             </select>
-            <input v-else v-model="form.external_origin" type="text" class="form-control"
-                   :class="{ 'is-invalid': form.errors.external_origin }"
-                   placeholder="Ex.: Clínica X, exame trazido pelo paciente..." maxlength="255">
+            <input
+                v-else
+                v-model="form.external_origin"
+                type="text"
+                class="form-control"
+                :class="{ 'is-invalid': form.errors.external_origin }"
+                placeholder="Ex.: Clínica X, exame trazido pelo paciente..."
+                maxlength="255"
+            />
 
             <div v-if="form.errors.entity_integrator_equipment_id" class="invalid-feedback d-block">
                 {{ form.errors.entity_integrator_equipment_id }}
@@ -452,26 +509,46 @@ watch(() => props.open, (isOpen) => {
         <!-- Arquivos -->
         <div class="mb-2">
             <label class="form-label fw-semibold">Arquivos <span class="text-danger">*</span></label>
-            <input type="file" class="form-control" :class="{ 'is-invalid': form.errors.files }"
-                   multiple accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                   @change="onFilesChange">
+            <input
+                type="file"
+                class="form-control"
+                :class="{ 'is-invalid': form.errors.files }"
+                multiple
+                accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                @change="onFilesChange"
+            />
             <div class="form-text">Até 10 arquivos, JPG/PNG/PDF, até 10 MB cada.</div>
             <div v-if="form.errors.files" class="invalid-feedback d-block">{{ form.errors.files }}</div>
 
             <ul v-if="fileItems.length" class="list-group mt-2">
-                <li v-for="(item, idx) in fileItems" :key="item.id"
-                    class="list-group-item d-flex align-items-center gap-2 py-2">
-                    <img v-if="item.previewUrl" :src="item.previewUrl" alt=""
-                         style="width:36px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;">
-                    <i v-else class="fa fa-file-pdf text-danger" style="font-size:1.4rem;width:36px;text-align:center;flex-shrink:0;"></i>
+                <li
+                    v-for="(item, idx) in fileItems"
+                    :key="item.id"
+                    class="list-group-item d-flex align-items-center gap-2 py-2"
+                >
+                    <img
+                        v-if="item.previewUrl"
+                        :src="item.previewUrl"
+                        alt=""
+                        style="width: 36px; height: 36px; object-fit: cover; border-radius: 4px; flex-shrink: 0"
+                    />
+                    <i
+                        v-else
+                        class="fa fa-file-pdf text-danger"
+                        style="font-size: 1.4rem; width: 36px; text-align: center; flex-shrink: 0"
+                    ></i>
                     <div class="flex-grow-1 overflow-hidden">
                         <div class="small fw-semibold text-truncate">{{ item.name }}</div>
-                        <div class="text-muted" style="font-size:.72rem;">{{ formatBytes(item.size) }}</div>
+                        <div class="text-muted" style="font-size: 0.72rem">{{ formatBytes(item.size) }}</div>
                         <div v-if="form.errors[`files.${idx}`]" class="text-danger small">
                             {{ form.errors[`files.${idx}`] }}
                         </div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-link text-danger flex-shrink-0" @click="removeFile(item.id)">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-link text-danger flex-shrink-0"
+                        @click="removeFile(item.id)"
+                    >
                         <i class="fa fa-trash"></i>
                     </button>
                 </li>

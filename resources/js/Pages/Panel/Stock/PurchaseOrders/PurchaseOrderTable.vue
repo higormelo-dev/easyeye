@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh       from '@/Components/Panel/SortableTh.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 import { useTrans } from '@/composables/useTrans.js';
@@ -21,10 +21,10 @@ import { useTrans } from '@/composables/useTrans.js';
  *   recebido parcialmente · Cancelar: qualquer status não terminal.
  */
 const props = defineProps({
-    items:          { type: Object, required: true },   // paginator Laravel
-    filters:        { type: Object, default: () => ({}) },
-    t:              { type: Object, default: () => ({}) },
-    pdfUrlTemplate: { type: String, default: '' },     // rota com __ID__
+    items: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
+    pdfUrlTemplate: { type: String, default: '' }, // rota com __ID__
 });
 
 const emit = defineEmits(['sort', 'edit', 'send', 'receive', 'cancel', 'delete']);
@@ -36,42 +36,41 @@ const rows = computed(() => props.items?.data ?? []);
 
 // ── Ordenação ────────────────────────────────────────────────────────────────
 const currentSort = computed(() => props.filters.sort ?? 'order_date');
-const currentDir  = computed(() => props.filters.direction ?? 'desc');
+const currentDir = computed(() => props.filters.direction ?? 'desc');
 
 // ── Ordem de colunas personalizável ──────────────────────────────────────────
 const COLUMN_DEFS = computed(() => [
-    { key: 'codigo',     label: props.t.col_code ?? 'Código',                           sortKey: 'code' },
-    { key: 'fornecedor', label: props.t.col_supplier ?? 'Fornecedor',                   sortKey: 'supplier_name' },
-    { key: 'data',       label: props.t.col_order_date ?? 'Data',                       sortKey: 'order_date' },
-    { key: 'previsao',   label: props.t.col_expected_delivery ?? 'Previsão de entrega', sortKey: null },
-    { key: 'total',      label: props.t.col_total ?? 'Total',                           sortKey: 'total_amount', end: true },
+    { key: 'codigo', label: props.t.col_code ?? 'Código', sortKey: 'code' },
+    { key: 'fornecedor', label: props.t.col_supplier ?? 'Fornecedor', sortKey: 'supplier_name' },
+    { key: 'data', label: props.t.col_order_date ?? 'Data', sortKey: 'order_date' },
+    { key: 'previsao', label: props.t.col_expected_delivery ?? 'Previsão de entrega', sortKey: null },
+    { key: 'total', label: props.t.col_total ?? 'Total', sortKey: 'total_amount', end: true },
 ]);
 const DEFAULT_COLUMN_ORDER = ['codigo', 'fornecedor', 'data', 'previsao', 'total'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'stock_purchase_orders_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('stock_purchase_orders_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 
 // ── Status e ações por status ────────────────────────────────────────────────
 const STATUS_BADGE = {
-    draft:              'badge-soft-secondary text-secondary border border-secondary',
-    sent:               'badge-soft-info text-info border border-info',
+    draft: 'badge-soft-secondary text-secondary border border-secondary',
+    sent: 'badge-soft-info text-info border border-info',
     partially_received: 'badge-soft-warning text-warning border border-warning',
-    received:           'badge-soft-success text-success border border-success',
-    cancelled:          'badge-soft-danger text-danger border border-danger',
+    received: 'badge-soft-success text-success border border-success',
+    cancelled: 'badge-soft-danger text-danger border border-danger',
 };
 
 /** Rótulo traduzido pelo backend (PurchaseOrderStatus::label()). */
@@ -79,12 +78,12 @@ function statusLabel(po) {
     return po.status_label ?? po.status;
 }
 
-const canEdit    = (po) => Boolean(po.is_editable);
-const canSend    = (po) => po.status === 'draft';
+const canEdit = (po) => Boolean(po.is_editable);
+const canSend = (po) => po.status === 'draft';
 const canReceive = (po) => ['sent', 'partially_received'].includes(po.status);
-const canCancel  = (po) => !['received', 'cancelled'].includes(po.status);
-const canDelete  = (po) => po.status === 'draft';
-const hasMenu    = (po) => canEdit(po) || canCancel(po) || canDelete(po);
+const canCancel = (po) => !['received', 'cancelled'].includes(po.status);
+const canDelete = (po) => po.status === 'draft';
+const hasMenu = (po) => canEdit(po) || canCancel(po) || canDelete(po);
 
 function pdfUrl(po) {
     return props.pdfUrlTemplate ? props.pdfUrlTemplate.replace('__ID__', po.id) : null;
@@ -128,7 +127,8 @@ function pdfUrl(po) {
                             :current-dir="currentDir"
                             :title="tx('sort_by', { column: col.label })"
                             @sort="emit('sort', $event)"
-                        >{{ col.label }}</SortableTh>
+                            >{{ col.label }}</SortableTh
+                        >
                         <th v-else :class="{ 'text-end': col.end }">{{ col.label }}</th>
                     </template>
                     <th class="text-center">{{ t.col_status ?? 'Status' }}</th>
@@ -154,16 +154,21 @@ function pdfUrl(po) {
 
                         <td v-else-if="col.key === 'data'" data-col="data" class="small">{{ date(po.order_date) }}</td>
 
-                        <td v-else-if="col.key === 'previsao'" data-col="previsao" class="text-muted small">{{ date(po.expected_delivery_date) }}</td>
+                        <td v-else-if="col.key === 'previsao'" data-col="previsao" class="text-muted small">
+                            {{ date(po.expected_delivery_date) }}
+                        </td>
 
-                        <td v-else-if="col.key === 'total'" data-col="total" class="text-end">{{ money(po.total_amount) }}</td>
+                        <td v-else-if="col.key === 'total'" data-col="total" class="text-end">
+                            {{ money(po.total_amount) }}
+                        </td>
                     </template>
 
                     <td class="text-center">
                         <span
                             class="badge rounded fs-13 fw-medium"
                             :class="STATUS_BADGE[po.status] ?? 'badge-soft-secondary'"
-                        >{{ statusLabel(po) }}</span>
+                            >{{ statusLabel(po) }}</span
+                        >
                     </td>
 
                     <td class="text-end">
@@ -195,18 +200,31 @@ function pdfUrl(po) {
                             >
                                 <li v-if="canEdit(po)">
                                     <button type="button" class="dropdown-item rounded-1" @click="emit('edit', po)">
-                                        <i class="ti ti-edit me-1" aria-hidden="true"></i> {{ t.action_edit ?? 'Editar' }}
+                                        <i class="ti ti-edit me-1" aria-hidden="true"></i>
+                                        {{ t.action_edit ?? 'Editar' }}
                                     </button>
                                 </li>
-                                <li v-if="canEdit(po) && (canCancel(po) || canDelete(po))"><hr class="dropdown-divider"></li>
+                                <li v-if="canEdit(po) && (canCancel(po) || canDelete(po))">
+                                    <hr class="dropdown-divider" />
+                                </li>
                                 <li v-if="canCancel(po)">
-                                    <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('cancel', po)">
-                                        <i class="ti ti-x me-1" aria-hidden="true"></i> {{ t.action_cancel ?? 'Cancelar pedido' }}
+                                    <button
+                                        type="button"
+                                        class="dropdown-item rounded-1 text-danger"
+                                        @click="emit('cancel', po)"
+                                    >
+                                        <i class="ti ti-x me-1" aria-hidden="true"></i>
+                                        {{ t.action_cancel ?? 'Cancelar pedido' }}
                                     </button>
                                 </li>
                                 <li v-if="canDelete(po)">
-                                    <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', po)">
-                                        <i class="ti ti-trash me-1" aria-hidden="true"></i> {{ t.action_delete ?? 'Excluir' }}
+                                    <button
+                                        type="button"
+                                        class="dropdown-item rounded-1 text-danger"
+                                        @click="emit('delete', po)"
+                                    >
+                                        <i class="ti ti-trash me-1" aria-hidden="true"></i>
+                                        {{ t.action_delete ?? 'Excluir' }}
                                     </button>
                                 </li>
                             </ActionDropdown>

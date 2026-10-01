@@ -6,10 +6,10 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
  * (vindo da listagem) e renderiza as colunas declaradas + metadata.
  */
 const props = defineProps({
-    open:    { type: Boolean, required: true },
-    item:    { type: Object,  default: null },
-    columns: { type: Array,   required: true },
-    t:       { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    item: { type: Object, default: null },
+    columns: { type: Array, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 defineEmits(['close', 'edit']);
@@ -24,11 +24,7 @@ function display(item, col) {
 </script>
 
 <template>
-    <OffcanvasPanel
-        :open="open"
-        :width="440"
-        @close="$emit('close')"
-    >
+    <OffcanvasPanel :open="open" :width="440" @close="$emit('close')">
         <template #header>
             <div>
                 <h5 class="mb-0 fw-semibold">
@@ -95,7 +91,11 @@ function display(item, col) {
                     <div class="detail-row">
                         <span class="detail-label">{{ t.detail_origin ?? 'Origem' }}</span>
                         <span class="detail-value">
-                            {{ item.is_global ? (t.detail_origin_global ?? 'Padrão do sistema') : (t.detail_origin_clinic ?? 'Cadastrado pela clínica') }}
+                            {{
+                                item.is_global
+                                    ? (t.detail_origin_global ?? 'Padrão do sistema')
+                                    : (t.detail_origin_clinic ?? 'Cadastrado pela clínica')
+                            }}
                         </span>
                     </div>
                 </div>
@@ -105,15 +105,26 @@ function display(item, col) {
 </template>
 
 <style scoped>
-.detail-section { margin-bottom: 1.5rem; }
-.detail-table { display: grid; gap: .375rem; }
+.detail-section {
+    margin-bottom: 1.5rem;
+}
+.detail-table {
+    display: grid;
+    gap: 0.375rem;
+}
 .detail-row {
     display: grid;
     grid-template-columns: 150px 1fr;
-    gap: .5rem;
-    font-size: .875rem;
+    gap: 0.5rem;
+    font-size: 0.875rem;
     align-items: baseline;
 }
-.detail-label { font-weight: 600; color: var(--bs-body-color); }
-.detail-value { color: var(--bs-secondary-color); word-break: break-word; }
+.detail-label {
+    font-weight: 600;
+    color: var(--bs-body-color);
+}
+.detail-value {
+    color: var(--bs-secondary-color);
+    word-break: break-word;
+}
 </style>

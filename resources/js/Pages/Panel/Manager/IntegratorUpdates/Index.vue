@@ -1,10 +1,10 @@
 <script setup>
 import { useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import AppLayout        from '@/Layouts/AppLayout.vue';
-import PageHeader       from '@/Components/Panel/PageHeader.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 /**
  * Atualizações do Integrador (Manager SaaS): publica o instalador que os
@@ -19,15 +19,15 @@ const props = defineProps({
 });
 
 const breadcrumbs = [
-    { label: 'Dashboard',                 url: route('manager.dashboard'), active: false },
-    { label: 'Atualizações do Integrador', url: '#',                       active: true  },
+    { label: 'Dashboard', url: route('manager.dashboard'), active: false },
+    { label: 'Atualizações do Integrador', url: '#', active: true },
 ];
 
 const form = useForm({
-    file:      null,
-    version:   '',
-    platform:  'windows',
-    arch:      'x86',
+    file: null,
+    version: '',
+    platform: 'windows',
+    arch: 'x86',
     signature: '',
 });
 
@@ -42,10 +42,9 @@ function submit() {
 }
 
 function toggleActive(update) {
-    useForm({ active: !update.active }).patch(
-        route('manager.integrator-updates.update', update.id),
-        { preserveScroll: true },
-    );
+    useForm({ active: !update.active }).patch(route('manager.integrator-updates.update', update.id), {
+        preserveScroll: true,
+    });
 }
 </script>
 
@@ -65,11 +64,10 @@ function toggleActive(update) {
                     <div class="alert alert-info d-flex align-items-start small py-2 mb-3">
                         <i class="ti ti-info-circle me-2 fs-5"></i>
                         <span>
-                            Antes de publicar, assine o instalador na máquina que guarda a chave
-                            privada: <code>scripts/sign-update.sh &lt;arquivo.msi&gt; &lt;versão&gt; &lt;arch&gt;</code>
-                            (repositório do integrator). Cole abaixo a assinatura que o script imprimir.
-                            Publicar desativa automaticamente as versões anteriores da mesma
-                            plataforma/arquitetura.
+                            Antes de publicar, assine o instalador na máquina que guarda a chave privada:
+                            <code>scripts/sign-update.sh &lt;arquivo.msi&gt; &lt;versão&gt; &lt;arch&gt;</code>
+                            (repositório do integrator). Cole abaixo a assinatura que o script imprimir. Publicar
+                            desativa automaticamente as versões anteriores da mesma plataforma/arquitetura.
                         </span>
                     </div>
 
@@ -161,15 +159,20 @@ function toggleActive(update) {
                                 <td class="text-muted small">{{ new Date(u.created_at).toLocaleString() }}</td>
                                 <td class="fw-medium">{{ u.version }}</td>
                                 <td>{{ u.platform }}</td>
-                                <td><code class="small">{{ u.arch }}</code></td>
-                                <td><code class="small" :title="u.sha256">{{ u.sha256.slice(0, 16) }}…</code></td>
+                                <td>
+                                    <code class="small">{{ u.arch }}</code>
+                                </td>
+                                <td>
+                                    <code class="small" :title="u.sha256">{{ u.sha256.slice(0, 16) }}…</code>
+                                </td>
                                 <td class="text-center">
-                                    <span v-if="u.active"
-                                          class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium">
+                                    <span
+                                        v-if="u.active"
+                                        class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
+                                    >
                                         Ativo
                                     </span>
-                                    <span v-else
-                                          class="badge badge-soft-secondary rounded fs-13 fw-medium">
+                                    <span v-else class="badge badge-soft-secondary rounded fs-13 fw-medium">
                                         Desativado
                                     </span>
                                 </td>

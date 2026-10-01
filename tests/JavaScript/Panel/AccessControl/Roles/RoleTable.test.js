@@ -16,17 +16,26 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
         props: ['title', 'icon', 'variant'],
         emits: ['click'],
-        template: '<button type="button" class="action" :title="title" :data-variant="variant" @click="$emit(\'click\')" />',
+        template:
+            '<button type="button" class="action" :title="title" :data-variant="variant" @click="$emit(\'click\')" />',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_name: 'Perfil', col_permissions: 'Permissões', col_users: 'Usuários', col_created_at: 'Cadastro',
-    col_actions: 'Ações', sort_by: 'Ordenar por :column', no_description: 'Sem descrição',
-    permissions_one: ':count permissão', permissions_other: ':count permissões',
-    users_one: ':count usuário', users_other: ':count usuários',
-    action_edit: 'Editar', action_delete: 'Excluir',
+    col_name: 'Perfil',
+    col_permissions: 'Permissões',
+    col_users: 'Usuários',
+    col_created_at: 'Cadastro',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    no_description: 'Sem descrição',
+    permissions_one: ':count permissão',
+    permissions_other: ':count permissões',
+    users_one: ':count usuário',
+    users_other: ':count usuários',
+    action_edit: 'Editar',
+    action_delete: 'Excluir',
 };
 
 function role(overrides = {}) {
@@ -142,7 +151,10 @@ describe('AccessControl/Roles/RoleTable', () => {
     });
 
     it('respeita a ordem de colunas salva no navegador', () => {
-        window.localStorage.setItem('access_roles_columns_order', JSON.stringify(['usuarios', 'nome', 'cadastro', 'permissoes']));
+        window.localStorage.setItem(
+            'access_roles_columns_order',
+            JSON.stringify(['usuarios', 'nome', 'cadastro', 'permissoes']),
+        );
         const w = mountTable();
 
         expect(headers(w)).toEqual(['Usuários', 'Perfil', 'Cadastro', 'Permissões', 'Ações']);

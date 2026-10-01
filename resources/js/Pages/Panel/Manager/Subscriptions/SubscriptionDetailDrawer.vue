@@ -1,39 +1,39 @@
 <script setup>
 import { ref, watch } from 'vue';
-import OffcanvasPanel    from '@/Components/Panel/OffcanvasPanel.vue';
+import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import BillingStateBadge from '@/Components/Panel/BillingStateBadge.vue';
 
 const props = defineProps({
-    open:           { type: Boolean, required: true },
-    subscriptionId: { type: String,  default: null },
-    t:              { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    subscriptionId: { type: String, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'edit']);
 
-const loading       = ref(false);
-const subscription  = ref(null);
-const activeTab     = ref('overview');
+const loading = ref(false);
+const subscription = ref(null);
+const activeTab = ref('overview');
 
 // Lazy-load invoices & retries
-const invoices        = ref([]);
-const retries         = ref([]);
+const invoices = ref([]);
+const retries = ref([]);
 const invoicesLoading = ref(false);
-const retriesLoading  = ref(false);
-const invoicesLoaded  = ref(false);
-const retriesLoaded   = ref(false);
+const retriesLoading = ref(false);
+const invoicesLoaded = ref(false);
+const retriesLoaded = ref(false);
 
 async function loadDetail(id) {
     loading.value = true;
     subscription.value = null;
-    activeTab.value    = 'overview';
-    invoices.value     = [];
-    retries.value      = [];
+    activeTab.value = 'overview';
+    invoices.value = [];
+    retries.value = [];
     invoicesLoaded.value = false;
-    retriesLoaded.value  = false;
+    retriesLoaded.value = false;
 
     try {
-        const res  = await fetch(route('manager.subscriptions.show', id));
+        const res = await fetch(route('manager.subscriptions.show', id));
         const json = await res.json();
         subscription.value = json.data;
     } finally {
@@ -45,9 +45,9 @@ async function loadInvoices() {
     if (invoicesLoaded.value) return;
     invoicesLoading.value = true;
     try {
-        const res  = await fetch(route('manager.subscriptions.invoices', props.subscriptionId));
+        const res = await fetch(route('manager.subscriptions.invoices', props.subscriptionId));
         const json = await res.json();
-        invoices.value      = json.data ?? [];
+        invoices.value = json.data ?? [];
         invoicesLoaded.value = true;
     } finally {
         invoicesLoading.value = false;
@@ -58,9 +58,9 @@ async function loadRetries() {
     if (retriesLoaded.value) return;
     retriesLoading.value = true;
     try {
-        const res  = await fetch(route('manager.subscriptions.retries', props.subscriptionId));
+        const res = await fetch(route('manager.subscriptions.retries', props.subscriptionId));
         const json = await res.json();
-        retries.value      = json.data ?? [];
+        retries.value = json.data ?? [];
         retriesLoaded.value = true;
     } finally {
         retriesLoading.value = false;
@@ -73,20 +73,17 @@ function switchTab(tab) {
     if (tab === 'retries') loadRetries();
 }
 
-watch(() => props.open, (val) => {
-    if (val && props.subscriptionId) loadDetail(props.subscriptionId);
-    if (!val) subscription.value = null;
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val && props.subscriptionId) loadDetail(props.subscriptionId);
+        if (!val) subscription.value = null;
+    },
+);
 </script>
 
 <template>
-    <OffcanvasPanel
-        :open="open"
-        :width="520"
-        :loading="loading"
-        :loading-label="t.loading"
-        @close="$emit('close')"
-    >
+    <OffcanvasPanel :open="open" :width="520" :loading="loading" :loading-label="t.loading" @close="$emit('close')">
         <!-- Header -->
         <template #header>
             <div class="flex-grow-1 min-w-0">
@@ -103,7 +100,11 @@ watch(() => props.open, (val) => {
                     />
                 </div>
             </div>
-            <button v-if="subscription" class="btn btn-sm btn-outline-primary flex-shrink-0 ms-2" @click="$emit('edit', subscription.id)">
+            <button
+                v-if="subscription"
+                class="btn btn-sm btn-outline-primary flex-shrink-0 ms-2"
+                @click="$emit('edit', subscription.id)"
+            >
                 <i class="ti ti-edit me-1"></i> {{ t.detail_btn_edit }}
             </button>
         </template>
@@ -130,11 +131,7 @@ watch(() => props.open, (val) => {
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button
-                        class="nav-link"
-                        :class="{ active: activeTab === 'retries' }"
-                        @click="switchTab('retries')"
-                    >
+                    <button class="nav-link" :class="{ active: activeTab === 'retries' }" @click="switchTab('retries')">
                         <i class="ti ti-refresh-alert me-1"></i>{{ t.tab_retries }}
                     </button>
                 </li>
@@ -143,16 +140,14 @@ watch(() => props.open, (val) => {
 
         <!-- Body -->
         <template v-if="subscription">
-
             <!-- ── Tab: Visão Geral ──────────────────────────────────────────── -->
             <div v-show="activeTab === 'overview'">
-
                 <!-- Empresa / Plano -->
                 <div class="sdd-section">
                     <table class="table table-sm mb-0">
                         <tbody>
                             <tr>
-                                <th class="ps-0" style="width:45%;">{{ t.detail_entity }}</th>
+                                <th class="ps-0" style="width: 45%">{{ t.detail_entity }}</th>
                                 <td>{{ subscription.entity_name }}</td>
                             </tr>
                             <tr>
@@ -169,15 +164,21 @@ watch(() => props.open, (val) => {
                     <table class="table table-sm mb-0">
                         <tbody>
                             <tr>
-                                <th class="ps-0" style="width:45%;">{{ t.detail_status }}</th>
+                                <th class="ps-0" style="width: 45%">{{ t.detail_status }}</th>
                                 <td>
-                                    <span class="badge" :class="subscription.status_badge">{{ subscription.status_label }}</span>
+                                    <span class="badge" :class="subscription.status_badge">{{
+                                        subscription.status_label
+                                    }}</span>
                                 </td>
                             </tr>
                             <tr>
                                 <th class="ps-0">{{ t.detail_billing_state }}</th>
                                 <td>
-                                    <BillingStateBadge :badge="subscription.billing_state_badge" :label="subscription.billing_state_label" :state="subscription.billing_state" />
+                                    <BillingStateBadge
+                                        :badge="subscription.billing_state_badge"
+                                        :label="subscription.billing_state_label"
+                                        :state="subscription.billing_state"
+                                    />
                                 </td>
                             </tr>
                             <tr v-if="subscription.last_billing_error">
@@ -198,19 +199,25 @@ watch(() => props.open, (val) => {
                     <table class="table table-sm mb-0">
                         <tbody>
                             <tr>
-                                <th class="ps-0" style="width:45%;">{{ t.detail_gateway }}</th>
+                                <th class="ps-0" style="width: 45%">{{ t.detail_gateway }}</th>
                                 <td>
-                                    <span v-if="subscription.gateway" class="badge badge-soft-primary text-uppercase">{{ subscription.gateway }}</span>
+                                    <span v-if="subscription.gateway" class="badge badge-soft-primary text-uppercase">{{
+                                        subscription.gateway
+                                    }}</span>
                                     <span v-else class="text-muted small">{{ t.detail_gateway_empty }}</span>
                                 </td>
                             </tr>
                             <tr v-if="subscription.gateway_customer_id">
                                 <th class="ps-0">{{ t.detail_gateway_customer_id }}</th>
-                                <td><code class="small">{{ subscription.gateway_customer_id }}</code></td>
+                                <td>
+                                    <code class="small">{{ subscription.gateway_customer_id }}</code>
+                                </td>
                             </tr>
                             <tr v-if="subscription.gateway_subscription_id">
                                 <th class="ps-0">{{ t.detail_gateway_subscription_id }}</th>
-                                <td><code class="small">{{ subscription.gateway_subscription_id }}</code></td>
+                                <td>
+                                    <code class="small">{{ subscription.gateway_subscription_id }}</code>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -222,7 +229,7 @@ watch(() => props.open, (val) => {
                     <table class="table table-sm mb-0">
                         <tbody>
                             <tr>
-                                <th class="ps-0" style="width:45%;">{{ t.detail_starts_at }}</th>
+                                <th class="ps-0" style="width: 45%">{{ t.detail_starts_at }}</th>
                                 <td>{{ subscription.starts_at ?? '—' }}</td>
                             </tr>
                             <tr>
@@ -284,17 +291,22 @@ watch(() => props.open, (val) => {
                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                 <span class="fw-semibold small">{{ inv.reference }}</span>
                                 <span class="badge" :class="inv.status_badge">{{ inv.status_label }}</span>
-                                <span v-if="inv.billing_reason" class="badge badge-soft-secondary">{{ inv.billing_reason }}</span>
+                                <span v-if="inv.billing_reason" class="badge badge-soft-secondary">{{
+                                    inv.billing_reason
+                                }}</span>
                             </div>
                             <div class="text-end flex-shrink-0">
                                 <span class="fw-bold text-success">R$ {{ inv.amount }}</span>
-                                <span v-if="inv.gateway_code" class="badge badge-soft-primary ms-1 text-uppercase">{{ inv.gateway_code }}</span>
+                                <span v-if="inv.gateway_code" class="badge badge-soft-primary ms-1 text-uppercase">{{
+                                    inv.gateway_code
+                                }}</span>
                             </div>
                         </div>
                         <div class="card-body py-2 small text-muted">
                             <div class="d-flex flex-wrap gap-3">
                                 <span v-if="inv.period_start">
-                                    <i class="ti ti-calendar me-1"></i>{{ t.invoice_period }} {{ inv.period_start }} – {{ inv.period_end }}
+                                    <i class="ti ti-calendar me-1"></i>{{ t.invoice_period }} {{ inv.period_start }} –
+                                    {{ inv.period_end }}
                                 </span>
                                 <span v-if="inv.due_at">
                                     <i class="ti ti-clock me-1"></i>{{ t.invoice_due_at }} {{ inv.due_at }}
@@ -315,7 +327,9 @@ watch(() => props.open, (val) => {
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
                                         <span class="badge" :class="pay.status_badge">{{ pay.status }}</span>
                                         <span class="text-uppercase">{{ pay.gateway_code }}</span>
-                                        <code v-if="pay.external_payment_id" class="small">{{ pay.external_payment_id }}</code>
+                                        <code v-if="pay.external_payment_id" class="small">{{
+                                            pay.external_payment_id
+                                        }}</code>
                                     </div>
                                     <div class="text-end">
                                         <div class="fw-semibold">R$ {{ pay.amount }}</div>
@@ -361,7 +375,9 @@ watch(() => props.open, (val) => {
                             <tbody>
                                 <tr v-for="retry in retries" :key="retry.id">
                                     <td class="text-center fw-bold">#{{ retry.attempt_number }}</td>
-                                    <td><span class="badge" :class="retry.status_badge">{{ retry.status }}</span></td>
+                                    <td>
+                                        <span class="badge" :class="retry.status_badge">{{ retry.status }}</span>
+                                    </td>
                                     <td class="text-uppercase small">{{ retry.gateway_code ?? '—' }}</td>
                                     <td class="small">{{ retry.scheduled_for }}</td>
                                     <td class="small">{{ retry.executed_at ?? '—' }}</td>
@@ -372,21 +388,22 @@ watch(() => props.open, (val) => {
                     </div>
                 </template>
             </div>
-
         </template>
     </OffcanvasPanel>
 </template>
 
 <style scoped>
-.sdd-section { margin-bottom: 1.25rem; }
+.sdd-section {
+    margin-bottom: 1.25rem;
+}
 .sdd-section__title {
-    font-size: .7rem;
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: 0.06em;
     color: var(--bs-secondary-color);
-    margin-bottom: .5rem;
-    padding-bottom: .25rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
     border-bottom: 1px solid var(--bs-border-color);
 }
 </style>

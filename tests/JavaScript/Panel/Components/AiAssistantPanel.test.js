@@ -17,36 +17,36 @@ describe('AiAssistantPanel', () => {
     const baseAi = {
         urls: {
             estimate: '/_routes/panel.ai-runs.estimate',
-            store:    '/_routes/panel.ai-runs.store',
-            show:     '/_routes/panel.ai-runs.show/__ID__',
-            approve:  '/_routes/panel.ai-runs.approve/__ID__',
-            reject:   '/_routes/panel.ai-runs.reject/__ID__',
-            cancel:   '/_routes/panel.ai-runs.cancel/__ID__',
+            store: '/_routes/panel.ai-runs.store',
+            show: '/_routes/panel.ai-runs.show/__ID__',
+            approve: '/_routes/panel.ai-runs.approve/__ID__',
+            reject: '/_routes/panel.ai-runs.reject/__ID__',
+            cancel: '/_routes/panel.ai-runs.cancel/__ID__',
         },
-        balance:          { available: 50 },
-        modes:            [{ value: 'validated' }],
-        workflows:        ['record_assist'],
+        balance: { available: 50 },
+        modes: [{ value: 'validated' }],
+        workflows: ['record_assist'],
         default_workflow: 'record_assist',
         assistant: {
-            title:    'Assistente de IA',
-            analyze:  'Analisar com IA',
-            cancel:   'Cancelar',
+            title: 'Assistente de IA',
+            analyze: 'Analisar com IA',
+            cancel: 'Cancelar',
             cancelling: 'Cancelando…',
-            cancelled:  'Análise cancelada.',
-            step_generating:    'Gerando análise com :provider…',
-            step_reviewing:     'Revisando com :provider…',
+            cancelled: 'Análise cancelada.',
+            step_generating: 'Gerando análise com :provider…',
+            step_reviewing: 'Revisando com :provider…',
             step_consolidating: 'Consolidando resposta com :provider…',
-            step_starting:      'Iniciando a análise…',
+            step_starting: 'Iniciando a análise…',
             quick_picks: ['Resumir o caso e listar hipóteses diagnósticas'],
         },
         workflow_labels: { record_assist: 'Análise do prontuário' },
     };
 
     const baseContext = {
-        workflow_default:  'record_assist',
-        patient_id:        'p1',
+        workflow_default: 'record_assist',
+        patient_id: 'p1',
         medical_record_id: 'r1',
-        can_insert:        true,
+        can_insert: true,
     };
 
     function mountPanel(propsOverride = {}) {
@@ -54,7 +54,8 @@ describe('AiAssistantPanel', () => {
             global: {
                 stubs: {
                     OffcanvasPanel: {
-                        template: '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
+                        template:
+                            '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
                         props: ['open', 'width'],
                     },
                 },
@@ -72,7 +73,7 @@ describe('AiAssistantPanel', () => {
         globalThis.window = globalThis.window ?? {};
         globalThis.window.axios = {
             post: vi.fn(() => Promise.resolve({ data: { run_id: 'r-abc' } })),
-            get:  vi.fn(() => Promise.resolve({ data: { data: { status: 'reserved' } } })),
+            get: vi.fn(() => Promise.resolve({ data: { data: { status: 'reserved' } } })),
         };
     });
 
@@ -86,7 +87,7 @@ describe('AiAssistantPanel', () => {
             // forçar via runtime.
             const vm = wrapper.vm;
             vm.runId = 'r-abc';
-            vm.step  = 'processing';
+            vm.step = 'processing';
 
             await vm.cancel();
             await flushPromises();
@@ -115,7 +116,7 @@ describe('AiAssistantPanel', () => {
         beforeEach(() => {
             const wrapper = mountPanel();
             // Os helpers são expostos via defineExpose
-            parseStructured        = wrapper.vm.parseStructured;
+            parseStructured = wrapper.vm.parseStructured;
             extractFirstJsonObject = wrapper.vm.extractFirstJsonObject;
         });
 

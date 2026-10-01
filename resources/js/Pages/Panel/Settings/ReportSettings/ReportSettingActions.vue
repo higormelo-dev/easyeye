@@ -1,7 +1,7 @@
 <script setup>
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 /**
  * Ações de um modelo, iguais na tabela e nos cards: pré-visualizar (nova
@@ -11,7 +11,7 @@ import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
  */
 defineProps({
     item: { type: Object, required: true },
-    t:    { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['reimport', 'delete']);
@@ -41,10 +41,11 @@ const emit = defineEmits(['reimport', 'delete']);
                 <template v-if="item.reimport_url">
                     <li>
                         <button type="button" class="dropdown-item rounded-1" @click="emit('reimport', item)">
-                            <i class="ti ti-refresh me-1" aria-hidden="true"></i>{{ t.action_reimport ?? 'Reimportar modelo global' }}
+                            <i class="ti ti-refresh me-1" aria-hidden="true"></i
+                            >{{ t.action_reimport ?? 'Reimportar modelo global' }}
                         </button>
                     </li>
-                    <li><hr class="dropdown-divider"></li>
+                    <li><hr class="dropdown-divider" /></li>
                 </template>
                 <li>
                     <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', item)">

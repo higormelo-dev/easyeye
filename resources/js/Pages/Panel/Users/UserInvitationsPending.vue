@@ -9,7 +9,7 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat';
  */
 const props = defineProps({
     invitations: { type: Array, default: () => [] },
-    t: { type: Object, default: () => ({}) },   // lang access_control (usa `invitation`)
+    t: { type: Object, default: () => ({}) }, // lang access_control (usa `invitation`)
 });
 
 const it = computed(() => props.t.invitation ?? {});
@@ -38,7 +38,9 @@ function cancel(invitation) {
                             <th scope="col">{{ it.col_rule }}</th>
                             <th scope="col">{{ it.col_sent_at }}</th>
                             <th scope="col">{{ it.col_expires_at }}</th>
-                            <th scope="col" class="text-end"><span class="visually-hidden">{{ it.cancel }}</span></th>
+                            <th scope="col" class="text-end">
+                                <span class="visually-hidden">{{ it.cancel }}</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>

@@ -1,14 +1,14 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
-import AppLayout                    from '@/Layouts/AppLayout.vue';
-import PageHeader                   from '@/Components/Panel/PageHeader.vue';
-import SearchInput                  from '@/Components/Panel/SearchInput.vue';
-import TablePagination              from '@/Components/Panel/TablePagination.vue';
-import ActionDropdown               from '@/Components/Panel/ActionDropdown.vue';
-import ActionIconButton             from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup              from '@/Components/Panel/ActionIconGroup.vue';
-import EntityIntegratorFormModal    from './EntityIntegratorFormModal.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import EntityIntegratorFormModal from './EntityIntegratorFormModal.vue';
 import EntityIntegratorDetailDrawer from './EntityIntegratorDetailDrawer.vue';
 
 /**
@@ -20,21 +20,25 @@ import EntityIntegratorDetailDrawer from './EntityIntegratorDetailDrawer.vue';
  *   - Navegação para Equipamentos (próximo nível)
  */
 const props = defineProps({
-    entity:         { type: Object, required: true },   // { id, code, name }
-    userIntegrator: { type: Object, required: true },   // { id, code, name, email }
-    items:          { type: Object, required: true },
-    filters:        { type: Object, default: () => ({}) },
-    t:              { type: Object, default: () => ({}) },
+    entity: { type: Object, required: true }, // { id, code, name }
+    userIntegrator: { type: Object, required: true }, // { id, code, name, email }
+    items: { type: Object, required: true },
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 // ── Breadcrumbs ──────────────────────────────────────────────────────────────
 const breadcrumbs = [
-    { label: props.t.breadcrumb_home     ?? 'Dashboard',           url: route('panel.dashboard'),                                             active: false },
-    { label: props.t.breadcrumb_entities ?? 'Empresas',            url: route('manager.entities.index'),                                      active: false },
-    { label: props.entity.name,                                    url: '#',                                                                  active: false },
-    { label: props.t.breadcrumb_users    ?? 'Usuários Integradores', url: route('manager.entities.user-integrators.index', props.entity.id), active: false },
-    { label: props.userIntegrator.name,                            url: '#',                                                                  active: false },
-    { label: props.t.breadcrumb_current  ?? 'Integradores',        url: '#',                                                                  active: true  },
+    { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: props.t.breadcrumb_entities ?? 'Empresas', url: route('manager.entities.index'), active: false },
+    { label: props.entity.name, url: '#', active: false },
+    {
+        label: props.t.breadcrumb_users ?? 'Usuários Integradores',
+        url: route('manager.entities.user-integrators.index', props.entity.id),
+        active: false,
+    },
+    { label: props.userIntegrator.name, url: '#', active: false },
+    { label: props.t.breadcrumb_current ?? 'Integradores', url: '#', active: true },
 ];
 
 // ── Search server-side com debounce ─────────────────────────────────────────
@@ -52,37 +56,44 @@ watch(search, (val) => {
 });
 
 // ── Form modal ──────────────────────────────────────────────────────────────
-const formOpen    = ref(false);
-const editId      = ref(null);
+const formOpen = ref(false);
+const editId = ref(null);
 const editDataUrl = ref('');
-const updateUrl   = ref('');
+const updateUrl = ref('');
 
 function openCreate() {
-    editId.value      = null;
+    editId.value = null;
     editDataUrl.value = '';
-    updateUrl.value   = '';
-    formOpen.value    = true;
+    updateUrl.value = '';
+    formOpen.value = true;
 }
 
 function openEdit(item) {
-    editId.value      = item.id;
+    editId.value = item.id;
     editDataUrl.value = item.edit_data_url;
-    updateUrl.value   = item.update_url;
-    formOpen.value    = true;
+    updateUrl.value = item.update_url;
+    formOpen.value = true;
 }
 
-function closeForm() { formOpen.value = false; }
-function onSaved()   { formOpen.value = false; router.reload({ only: ['items'] }); }
+function closeForm() {
+    formOpen.value = false;
+}
+function onSaved() {
+    formOpen.value = false;
+    router.reload({ only: ['items'] });
+}
 
 // ── Detail drawer ───────────────────────────────────────────────────────────
 const detailOpen = ref(false);
-const detailUrl  = ref('');
+const detailUrl = ref('');
 
 function openDetail(item) {
-    detailUrl.value  = item.show_url;
+    detailUrl.value = item.show_url;
     detailOpen.value = true;
 }
-function closeDetail() { detailOpen.value = false; }
+function closeDetail() {
+    detailOpen.value = false;
+}
 
 // ── Actions ─────────────────────────────────────────────────────────────────
 function csrf() {
@@ -92,7 +103,7 @@ function csrf() {
 async function toggleActive(item) {
     const res = await fetch(item.activate_url, {
         method: 'PATCH',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
         body: JSON.stringify({ active: !item.active }),
     });
     const json = await res.json();
@@ -104,7 +115,7 @@ async function onDelete(item) {
     if (!confirm(props.t.confirm_delete ?? 'Excluir este integrador?')) return;
     const res = await fetch(item.destroy_url, {
         method: 'DELETE',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
     const json = await res.json();
     toast(json.message, res.ok ? 'success' : 'error');
@@ -115,7 +126,7 @@ async function onRestore(item) {
     if (!confirm(props.t.confirm_restore ?? 'Restaurar este integrador?')) return;
     const res = await fetch(item.restore_url, {
         method: 'PUT',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
     const json = await res.json();
     toast(json.message, res.ok ? 'success' : 'error');
@@ -125,7 +136,7 @@ async function onRestore(item) {
 function toast(msg, type = 'success') {
     if (!msg) return;
     if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
-    if (type === 'error'   && window.showErrorToast)   return window.showErrorToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
     alert(msg);
 }
 </script>
@@ -156,7 +167,7 @@ function toast(msg, type = 'success') {
                 <SearchInput
                     v-model="search"
                     :placeholder="t.search_placeholder ?? 'Buscar...'"
-                    style="min-width: 280px;"
+                    style="min-width: 280px"
                 />
             </div>
 
@@ -167,10 +178,10 @@ function toast(msg, type = 'success') {
                         <thead class="table-light">
                             <tr>
                                 <th>{{ t.col_registered_at ?? 'Cadastro' }}</th>
-                                <th>{{ t.col_code           ?? 'Código' }}</th>
-                                <th>{{ t.col_name           ?? 'Nome' }}</th>
-                                <th>{{ t.col_ip             ?? 'IP' }}</th>
-                                <th>{{ t.col_mac            ?? 'MAC' }}</th>
+                                <th>{{ t.col_code ?? 'Código' }}</th>
+                                <th>{{ t.col_name ?? 'Nome' }}</th>
+                                <th>{{ t.col_ip ?? 'IP' }}</th>
+                                <th>{{ t.col_mac ?? 'MAC' }}</th>
                                 <th class="text-center">{{ t.col_status ?? 'Status' }}</th>
                                 <th class="text-end">{{ t.col_actions ?? 'Ações' }}</th>
                             </tr>
@@ -188,21 +199,30 @@ function toast(msg, type = 'success') {
                                 :class="{ 'table-secondary opacity-75': i.deleted }"
                             >
                                 <td class="text-muted small">{{ i.created_at }}</td>
-                                <td><code class="text-muted small">{{ i.code }}</code></td>
+                                <td>
+                                    <code class="text-muted small">{{ i.code }}</code>
+                                </td>
                                 <td class="fw-medium">{{ i.name }}</td>
-                                <td><code class="small">{{ i.ip || '—' }}</code></td>
-                                <td><code class="small">{{ i.mac || '—' }}</code></td>
+                                <td>
+                                    <code class="small">{{ i.ip || '—' }}</code>
+                                </td>
+                                <td>
+                                    <code class="small">{{ i.mac || '—' }}</code>
+                                </td>
                                 <td class="text-center">
-                                    <span v-if="i.deleted"
-                                          class="badge badge-soft-secondary rounded fs-13 fw-medium">
+                                    <span v-if="i.deleted" class="badge badge-soft-secondary rounded fs-13 fw-medium">
                                         {{ t.status_deleted ?? 'Removido' }}
                                     </span>
-                                    <span v-else-if="i.active"
-                                          class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium">
+                                    <span
+                                        v-else-if="i.active"
+                                        class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
+                                    >
                                         {{ t.status_active ?? 'Ativo' }}
                                     </span>
-                                    <span v-else
-                                          class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium">
+                                    <span
+                                        v-else
+                                        class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
+                                    >
                                         {{ t.status_inactive ?? 'Inativo' }}
                                     </span>
                                 </td>
@@ -238,14 +258,24 @@ function toast(msg, type = 'success') {
                                                 </li>
                                                 <li>
                                                     <button class="dropdown-item rounded-1" @click="toggleActive(i)">
-                                                        <i :class="`ti me-1 ${i.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                                        {{ i.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                                        <i
+                                                            :class="`ti me-1 ${i.active ? 'ti-lock-open' : 'ti-lock'}`"
+                                                        ></i>
+                                                        {{
+                                                            i.active
+                                                                ? (t.action_deactivate ?? 'Desativar')
+                                                                : (t.action_activate ?? 'Ativar')
+                                                        }}
                                                     </button>
                                                 </li>
-                                                <li><hr class="dropdown-divider"></li>
+                                                <li><hr class="dropdown-divider" /></li>
                                                 <li>
-                                                    <button class="dropdown-item rounded-1 text-danger" @click="onDelete(i)">
-                                                        <i class="ti ti-trash me-1"></i> {{ t.action_delete ?? 'Excluir' }}
+                                                    <button
+                                                        class="dropdown-item rounded-1 text-danger"
+                                                        @click="onDelete(i)"
+                                                    >
+                                                        <i class="ti ti-trash me-1"></i>
+                                                        {{ t.action_delete ?? 'Excluir' }}
                                                     </button>
                                                 </li>
                                             </ActionDropdown>

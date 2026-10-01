@@ -1,14 +1,14 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
-import AppLayout                      from '@/Layouts/AppLayout.vue';
-import PageHeader                     from '@/Components/Panel/PageHeader.vue';
-import SearchInput                    from '@/Components/Panel/SearchInput.vue';
-import TablePagination                from '@/Components/Panel/TablePagination.vue';
-import ActionDropdown                 from '@/Components/Panel/ActionDropdown.vue';
-import ActionIconButton               from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup                from '@/Components/Panel/ActionIconGroup.vue';
-import EntityUserIntegratorFormModal  from './EntityUserIntegratorFormModal.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import EntityUserIntegratorFormModal from './EntityUserIntegratorFormModal.vue';
 import EntityUserIntegratorDetailDrawer from './EntityUserIntegratorDetailDrawer.vue';
 
 /**
@@ -20,18 +20,18 @@ import EntityUserIntegratorDetailDrawer from './EntityUserIntegratorDetailDrawer
  *   - Navegação para Integradores (próximo nível da hierarquia)
  */
 const props = defineProps({
-    entity:  { type: Object, required: true },   // { id, code, name }
-    items:   { type: Object, required: true },   // paginator Laravel
+    entity: { type: Object, required: true }, // { id, code, name }
+    items: { type: Object, required: true }, // paginator Laravel
     filters: { type: Object, default: () => ({}) },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 // ── Breadcrumbs ──────────────────────────────────────────────────────────────
 const breadcrumbs = [
-    { label: props.t.breadcrumb_home     ?? 'Dashboard', url: route('panel.dashboard'), active: false },
-    { label: props.t.breadcrumb_entities ?? 'Empresas',  url: route('manager.entities.index'), active: false },
-    { label: props.entity.name,                          url: '#', active: false },
-    { label: props.t.breadcrumb_current  ?? 'Usuários Integradores', url: '#', active: true },
+    { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: props.t.breadcrumb_entities ?? 'Empresas', url: route('manager.entities.index'), active: false },
+    { label: props.entity.name, url: '#', active: false },
+    { label: props.t.breadcrumb_current ?? 'Usuários Integradores', url: '#', active: true },
 ];
 
 // ── Search server-side com debounce ─────────────────────────────────────────
@@ -49,23 +49,23 @@ watch(search, (val) => {
 });
 
 // ── Form modal (criar/editar) ───────────────────────────────────────────────
-const formOpen     = ref(false);
+const formOpen = ref(false);
 const editEntityId = ref(null);
-const editDataUrl  = ref('');
-const updateUrl    = ref('');
+const editDataUrl = ref('');
+const updateUrl = ref('');
 
 function openCreate() {
     editEntityId.value = null;
-    editDataUrl.value  = '';
-    updateUrl.value    = '';
-    formOpen.value     = true;
+    editDataUrl.value = '';
+    updateUrl.value = '';
+    formOpen.value = true;
 }
 
 function openEdit(item) {
     editEntityId.value = item.id;
-    editDataUrl.value  = item.edit_data_url;
-    updateUrl.value    = item.update_url;
-    formOpen.value     = true;
+    editDataUrl.value = item.edit_data_url;
+    updateUrl.value = item.update_url;
+    formOpen.value = true;
 }
 
 function closeForm() {
@@ -79,10 +79,10 @@ function onSaved() {
 
 // ── Detail drawer ───────────────────────────────────────────────────────────
 const detailOpen = ref(false);
-const detailUrl  = ref('');
+const detailUrl = ref('');
 
 function openDetail(item) {
-    detailUrl.value  = item.show_url;
+    detailUrl.value = item.show_url;
     detailOpen.value = true;
 }
 
@@ -99,7 +99,7 @@ async function toggleActive(item) {
     const res = await fetch(item.activate_url, {
         method: 'PATCH',
         headers: {
-            'Accept':       'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': csrf(),
         },
@@ -115,7 +115,7 @@ async function onDelete(item) {
     const res = await fetch(item.destroy_url, {
         method: 'DELETE',
         headers: {
-            'Accept':       'application/json',
+            Accept: 'application/json',
             'X-CSRF-TOKEN': csrf(),
         },
     });
@@ -129,7 +129,7 @@ async function onRestore(item) {
     const res = await fetch(item.restore_url, {
         method: 'PUT',
         headers: {
-            'Accept':       'application/json',
+            Accept: 'application/json',
             'X-CSRF-TOKEN': csrf(),
         },
     });
@@ -141,7 +141,7 @@ async function onRestore(item) {
 function toast(msg, type = 'success') {
     if (!msg) return;
     if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
-    if (type === 'error'   && window.showErrorToast)   return window.showErrorToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
     alert(msg);
 }
 </script>
@@ -149,16 +149,9 @@ function toast(msg, type = 'success') {
 <template>
     <AppLayout :title="t.page_title ?? 'Usuários Integradores'" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader
-                :title="t.page_title ?? 'Usuários Integradores'"
-                :subtitle="entity.name"
-                :total="items.total"
-            >
+            <PageHeader :title="t.page_title ?? 'Usuários Integradores'" :subtitle="entity.name" :total="items.total">
                 <template #actions>
-                    <Link
-                        :href="route('manager.entities.index')"
-                        class="btn btn-outline-secondary btn-sm"
-                    >
+                    <Link :href="route('manager.entities.index')" class="btn btn-outline-secondary btn-sm">
                         <i class="ti ti-arrow-left me-1"></i>{{ t.btn_back ?? 'Voltar' }}
                     </Link>
                     <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
@@ -172,7 +165,7 @@ function toast(msg, type = 'success') {
                 <SearchInput
                     v-model="search"
                     :placeholder="t.search_placeholder ?? 'Buscar...'"
-                    style="min-width: 280px;"
+                    style="min-width: 280px"
                 />
             </div>
 
@@ -183,9 +176,9 @@ function toast(msg, type = 'success') {
                         <thead class="table-light">
                             <tr>
                                 <th>{{ t.col_registered_at ?? 'Cadastro' }}</th>
-                                <th>{{ t.col_code           ?? 'Código' }}</th>
-                                <th>{{ t.col_name           ?? 'Nome' }}</th>
-                                <th>{{ t.col_email          ?? 'E-mail' }}</th>
+                                <th>{{ t.col_code ?? 'Código' }}</th>
+                                <th>{{ t.col_name ?? 'Nome' }}</th>
+                                <th>{{ t.col_email ?? 'E-mail' }}</th>
                                 <th class="text-center">{{ t.col_status ?? 'Status' }}</th>
                                 <th class="text-end">{{ t.col_actions ?? 'Ações' }}</th>
                             </tr>
@@ -203,20 +196,25 @@ function toast(msg, type = 'success') {
                                 :class="{ 'table-secondary opacity-75': u.deleted }"
                             >
                                 <td class="text-muted small">{{ u.created_at }}</td>
-                                <td><code class="text-muted small">{{ u.code }}</code></td>
+                                <td>
+                                    <code class="text-muted small">{{ u.code }}</code>
+                                </td>
                                 <td class="fw-medium">{{ u.name }}</td>
                                 <td class="text-muted">{{ u.email }}</td>
                                 <td class="text-center">
-                                    <span v-if="u.deleted"
-                                          class="badge badge-soft-secondary rounded fs-13 fw-medium">
+                                    <span v-if="u.deleted" class="badge badge-soft-secondary rounded fs-13 fw-medium">
                                         {{ t.status_deleted ?? 'Removido' }}
                                     </span>
-                                    <span v-else-if="u.active"
-                                          class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium">
+                                    <span
+                                        v-else-if="u.active"
+                                        class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
+                                    >
                                         {{ t.status_active ?? 'Ativo' }}
                                     </span>
-                                    <span v-else
-                                          class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium">
+                                    <span
+                                        v-else
+                                        class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
+                                    >
                                         {{ t.status_inactive ?? 'Inativo' }}
                                     </span>
                                 </td>
@@ -254,14 +252,24 @@ function toast(msg, type = 'success') {
                                                 </li>
                                                 <li>
                                                     <button class="dropdown-item rounded-1" @click="toggleActive(u)">
-                                                        <i :class="`ti me-1 ${u.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                                        {{ u.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                                        <i
+                                                            :class="`ti me-1 ${u.active ? 'ti-lock-open' : 'ti-lock'}`"
+                                                        ></i>
+                                                        {{
+                                                            u.active
+                                                                ? (t.action_deactivate ?? 'Desativar')
+                                                                : (t.action_activate ?? 'Ativar')
+                                                        }}
                                                     </button>
                                                 </li>
-                                                <li><hr class="dropdown-divider"></li>
+                                                <li><hr class="dropdown-divider" /></li>
                                                 <li>
-                                                    <button class="dropdown-item rounded-1 text-danger" @click="onDelete(u)">
-                                                        <i class="ti ti-trash me-1"></i> {{ t.action_delete ?? 'Excluir' }}
+                                                    <button
+                                                        class="dropdown-item rounded-1 text-danger"
+                                                        @click="onDelete(u)"
+                                                    >
+                                                        <i class="ti ti-trash me-1"></i>
+                                                        {{ t.action_delete ?? 'Excluir' }}
                                                     </button>
                                                 </li>
                                             </ActionDropdown>

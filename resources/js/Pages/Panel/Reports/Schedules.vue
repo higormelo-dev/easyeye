@@ -1,27 +1,27 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout  from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    doctors:     { type: Array,  default: () => [] },
-    covenants:   { type: Array,  default: () => [] },
-    situations:  { type: Array,  default: () => [] },
-    filters:     { type: Object, default: () => ({}) },
-    schedules:   { type: Array,  default: () => [] },
-    summary:     { type: Object, default: null },
-    byDoctor:    { type: Array,  default: () => [] },
+    breadcrumbs: { type: Array, default: () => [] },
+    doctors: { type: Array, default: () => [] },
+    covenants: { type: Array, default: () => [] },
+    situations: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    schedules: { type: Array, default: () => [] },
+    summary: { type: Object, default: null },
+    byDoctor: { type: Array, default: () => [] },
 });
 
 const form = ref({
-    date_from:   props.filters.date_from   || '',
-    date_until:  props.filters.date_until  || '',
-    doctor_id:   props.filters.doctor_id   || '',
+    date_from: props.filters.date_from || '',
+    date_until: props.filters.date_until || '',
+    doctor_id: props.filters.doctor_id || '',
     covenant_id: props.filters.covenant_id || '',
-    situation:   props.filters.situation   || '',
+    situation: props.filters.situation || '',
 });
 
 function applyFilter() {
@@ -41,11 +41,11 @@ const hasResults = computed(() => props.summary !== null);
                     <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
                         <div class="col-md-2">
                             <label class="form-label small mb-1">De *</label>
-                            <input v-model="form.date_from" type="date" class="form-control" required>
+                            <input v-model="form.date_from" type="date" class="form-control" required />
                         </div>
                         <div class="col-md-2">
                             <label class="form-label small mb-1">Até *</label>
-                            <input v-model="form.date_until" type="date" class="form-control" required>
+                            <input v-model="form.date_until" type="date" class="form-control" required />
                         </div>
                         <div class="col-md-2">
                             <label class="form-label small mb-1">Médico</label>
@@ -57,7 +57,13 @@ const hasResults = computed(() => props.summary !== null);
                         </div>
                         <div class="col-md-2">
                             <label class="form-label small mb-1">Situação</label>
-                            <SearchSelect v-model="form.situation" :options="situations" :value-key="'value'" :label-key="'label'" :placeholder="'Todas'" />
+                            <SearchSelect
+                                v-model="form.situation"
+                                :options="situations"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :placeholder="'Todas'"
+                            />
                         </div>
                         <div class="col-md-2">
                             <button type="submit" class="btn btn-primary w-100">
@@ -158,7 +164,9 @@ const hasResults = computed(() => props.summary !== null);
                                     <td class="text-muted small">{{ s.covenant || '—' }}</td>
                                     <td class="text-muted small">{{ s.visit_type || '—' }}</td>
                                     <td class="text-center">
-                                        <span class="badge badge-soft-secondary rounded fs-11">{{ s.situation_label }}</span>
+                                        <span class="badge badge-soft-secondary rounded fs-11">{{
+                                            s.situation_label
+                                        }}</span>
                                     </td>
                                 </tr>
                             </tbody>

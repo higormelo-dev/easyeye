@@ -18,10 +18,19 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_permissions: 'Permissions', col_users: 'Users', col_created_at: 'Created', no_description: 'No description',
-    permissions_one: ':count permission', permissions_other: ':count permissions',
-    users_one: ':count user', users_other: ':count users', action_edit: 'Edit', action_delete: 'Delete',
-    pagination_showing: 'Showing', pagination_of: 'of', pagination_suffix: 'profiles',
+    col_permissions: 'Permissions',
+    col_users: 'Users',
+    col_created_at: 'Created',
+    no_description: 'No description',
+    permissions_one: ':count permission',
+    permissions_other: ':count permissions',
+    users_one: ':count user',
+    users_other: ':count users',
+    action_edit: 'Edit',
+    action_delete: 'Delete',
+    pagination_showing: 'Showing',
+    pagination_of: 'of',
+    pagination_suffix: 'profiles',
 };
 
 const role = {
@@ -55,17 +64,13 @@ function mountCards(data = [role], extra = {}) {
 describe('AccessControl/Roles/RoleCards', () => {
     it('mostra nome, descrição de apoio e linhas rotuladas no idioma de `t`', () => {
         const w = mountCards();
-        const rows = w.findAll('dl > div').map((row) => (
-            `${row.get('dt').text()} ${row.get('dd').text().replace(/\s+/g, ' ')}`
-        ));
+        const rows = w
+            .findAll('dl > div')
+            .map((row) => `${row.get('dt').text()} ${row.get('dd').text().replace(/\s+/g, ' ')}`);
 
         expect(w.get('h6').text()).toBe('Billing');
         expect(w.text()).toContain('No description');
-        expect(rows).toEqual([
-            'Permissions: 2 permissions · Financial',
-            'Users: 4 users',
-            'Created: 27/09/2026',
-        ]);
+        expect(rows).toEqual(['Permissions: 2 permissions · Financial', 'Users: 4 users', 'Created: 27/09/2026']);
     });
 
     it('mesmas ações da tabela: editar e excluir emitem o perfil', async () => {

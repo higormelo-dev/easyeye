@@ -13,8 +13,13 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_category: 'Categoria', col_qty_on_hand: 'Saldo do sistema', col_counted: 'Contado', requires_lot: 'Exige lote',
-    difference_match: 'Confere', action_movements: 'Ver movimentações do produto', opens_new_tab: 'abre em nova aba',
+    col_category: 'Categoria',
+    col_qty_on_hand: 'Saldo do sistema',
+    col_counted: 'Contado',
+    requires_lot: 'Exige lote',
+    difference_match: 'Confere',
+    action_movements: 'Ver movimentações do produto',
+    opens_new_tab: 'abre em nova aba',
     empty_list: 'Nenhum produto ativo encontrado para contar.',
 };
 
@@ -24,14 +29,27 @@ afterEach(() => wrapper?.unmount());
 
 function product(overrides = {}) {
     return {
-        id: 'p1', name: 'Lente IOL', code: 'PRD-7', unit: 'un', unit_label: 'Unidade', category_name: null,
-        qty_on_hand: 3, requires_lot: false, movements_url: '/stock/movements?entity_product_id=p1', ...overrides,
+        id: 'p1',
+        name: 'Lente IOL',
+        code: 'PRD-7',
+        unit: 'un',
+        unit_label: 'Unidade',
+        category_name: null,
+        qty_on_hand: 3,
+        requires_lot: false,
+        movements_url: '/stock/movements?entity_product_id=p1',
+        ...overrides,
     };
 }
 
 function mountCards({ rows = [product()], counted = {}, deltas = {}, attachTo } = {}) {
     wrapper = mount(CountCards, {
-        props: { products: { data: rows, total: rows.length, last_page: 1, current_page: 1, links: [] }, counted, deltas, t },
+        props: {
+            products: { data: rows, total: rows.length, last_page: 1, current_page: 1, links: [] },
+            counted,
+            deltas,
+            t,
+        },
         attachTo,
     });
 
@@ -43,7 +61,9 @@ describe('CountCards', () => {
         const w = mountCards({ rows: [product(), product({ id: 'p2', name: 'Soro', requires_lot: true })] });
         const cards = w.findAll('.card');
         const first = cards[0].text();
-        const fields = Object.fromEntries(cards[0].findAll('dl > div').map((d) => [d.find('dt').text(), d.find('dd').text()]));
+        const fields = Object.fromEntries(
+            cards[0].findAll('dl > div').map((d) => [d.find('dt').text(), d.find('dd').text()]),
+        );
 
         expect(cards).toHaveLength(2);
         expect(first).toContain('Lente IOL');
@@ -85,7 +105,9 @@ describe('CountCards', () => {
         const w = mountCards({ deltas: { p1: 0 } });
 
         expect(w.find('.badge').text()).toBe('Confere');
-        expect(w.find('a[title="Ver movimentações do produto (abre em nova aba)"]').attributes('target')).toBe('_blank');
+        expect(w.find('a[title="Ver movimentações do produto (abre em nova aba)"]').attributes('target')).toBe(
+            '_blank',
+        );
     });
 
     it('mostra o estado vazio', () => {

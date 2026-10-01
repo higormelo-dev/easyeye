@@ -17,17 +17,17 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * particular não gera glosa na Conciliação).
  */
 const props = defineProps({
-    open:         { type: Boolean, default: false },
-    claim:        { type: Object,  default: null },
-    glosaReasons: { type: Array,   default: () => [] },
-    glosasUrl:    { type: String,  default: '' },
-    t:            { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    claim: { type: Object, default: null },
+    glosaReasons: { type: Array, default: () => [] },
+    glosasUrl: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const FIELDS = ['glosa_amount', 'glosa_code', 'notes'];
-const TYPE_TOTAL   = 'total';
+const TYPE_TOTAL = 'total';
 const TYPE_PARTIAL = 'partial';
 
 const { tx } = useTrans(() => props.t);
@@ -35,52 +35,59 @@ const { money } = useLocaleFormat();
 
 const form = useForm({
     glosa_amount: null,
-    glosa_code:   '',
-    notes:        '',
+    glosa_code: '',
+    notes: '',
 });
 
-const rootRef       = ref(null);
-const doneRef       = ref(null);
-const denyType      = ref(TYPE_TOTAL);
+const rootRef = ref(null);
+const doneRef = ref(null);
+const denyType = ref(TYPE_TOTAL);
 const partialAmount = ref(null);
-const partialError  = ref('');
-const done          = ref(false);
+const partialError = ref('');
+const done = ref(false);
 
 const claimAmount = computed(() => Number(props.claim?.amount ?? 0));
 const otherErrors = computed(() => generalErrors(form.errors, FIELDS));
-const isPartial   = computed(() => denyType.value === TYPE_PARTIAL);
-const glosaValue  = computed(() => (isPartial.value ? Number(partialAmount.value ?? 0) : claimAmount.value));
-const remaining   = computed(() => Math.max(0, Math.round((claimAmount.value - glosaValue.value) * 100) / 100));
+const isPartial = computed(() => denyType.value === TYPE_PARTIAL);
+const glosaValue = computed(() => (isPartial.value ? Number(partialAmount.value ?? 0) : claimAmount.value));
+const remaining = computed(() => Math.max(0, Math.round((claimAmount.value - glosaValue.value) * 100) / 100));
 const amountError = computed(() => partialError.value || form.errors.glosa_amount || '');
 
 // Glosa parcial: o atendimento também volta para "A faturar", mas refaturá-lo
 // antes de receber o restante trava esta guia (o servidor recusa o recebimento).
-const effectHint = computed(() => (isPartial.value && remaining.value > 0
-    ? tx('deny_effect_hint_partial', { remaining: money(remaining.value) })
-    : props.t.deny_effect_hint));
+const effectHint = computed(() =>
+    isPartial.value && remaining.value > 0
+        ? tx('deny_effect_hint_partial', { remaining: money(remaining.value) })
+        : props.t.deny_effect_hint,
+);
 
 /** Link para a Conciliação já filtrada pela guia (busca pelo código GUI). */
 const conciliationUrl = computed(() => withQuery(props.glosasUrl, { search: props.claim?.code }));
 
-const amountDescribedBy = computed(() => [
-    'billing-deny-amount-hint',
-    amountError.value ? 'billing-deny-amount-error' : null,
-].filter(Boolean).join(' '));
+const amountDescribedBy = computed(() =>
+    ['billing-deny-amount-hint', amountError.value ? 'billing-deny-amount-error' : null].filter(Boolean).join(' '),
+);
 
-watch(() => props.open, (open) => {
-    if (!open || !props.claim) return;
+watch(
+    () => props.open,
+    (open) => {
+        if (!open || !props.claim) return;
 
-    done.value          = false;
-    denyType.value      = TYPE_TOTAL;
-    partialAmount.value = null;
-    partialError.value  = '';
+        done.value = false;
+        denyType.value = TYPE_TOTAL;
+        partialAmount.value = null;
+        partialError.value = '';
 
-    form.defaults({ glosa_amount: claimAmount.value, glosa_code: '', notes: '' });
-    form.reset();
-    form.clearErrors();
-}, { immediate: true });
+        form.defaults({ glosa_amount: claimAmount.value, glosa_code: '', notes: '' });
+        form.reset();
+        form.clearErrors();
+    },
+    { immediate: true },
+);
 
-watch(denyType, () => { partialError.value = ''; });
+watch(denyType, () => {
+    partialError.value = '';
+});
 
 function onGlosaReasonSelected(reason) {
     if (reason && !form.notes) form.notes = reason.description;
@@ -119,8 +126,8 @@ function submit() {
 
     form.post(props.claim.mark_denied_url, {
         preserveScroll: true,
-        preserveState:  true,
-        onSuccess:      () => {
+        preserveState: true,
+        onSuccess: () => {
             done.value = true;
             emit('saved', props.claim);
             nextTick(() => doneRef.value?.focus?.());
@@ -135,14 +142,23 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
     <CenteredModal :open="open" size="md" @close="requestClose">
         <template #header>
             <h2 class="h5 mb-0 fw-semibold">
-                <template v-if="done"><i class="ti ti-circle-check me-2 text-success" aria-hidden="true"></i>{{ t.deny_done_title }}</template>
-                <template v-else><i class="ti ti-receipt-off me-2 text-danger" aria-hidden="true"></i>{{ t.deny_title }}</template>
+                <template v-if="done"
+                    ><i class="ti ti-circle-check me-2 text-success" aria-hidden="true"></i
+                    >{{ t.deny_done_title }}</template
+                >
+                <template v-else
+                    ><i class="ti ti-receipt-off me-2 text-danger" aria-hidden="true"></i>{{ t.deny_title }}</template
+                >
             </h2>
         </template>
 
         <div v-if="claim && done" ref="doneRef" tabindex="-1" role="status" data-test="deny-done">
             <p class="mb-0">
-                {{ claim.is_tiss === false ? tx('denied_particular', { code: claim.code }) : tx('denied_next_step', { code: claim.code }) }}
+                {{
+                    claim.is_tiss === false
+                        ? tx('denied_particular', { code: claim.code })
+                        : tx('denied_next_step', { code: claim.code })
+                }}
             </p>
         </div>
 
@@ -151,7 +167,11 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 <dt class="col-5 fw-normal text-muted">{{ t.deny_summary_guide }}</dt>
                 <dd class="col-7 mb-1 fw-semibold">
                     {{ claim.code }}
-                    <small v-if="claim.guide_number && claim.guide_number !== claim.code" class="d-block fw-normal text-muted">{{ claim.guide_number }}</small>
+                    <small
+                        v-if="claim.guide_number && claim.guide_number !== claim.code"
+                        class="d-block fw-normal text-muted"
+                        >{{ claim.guide_number }}</small
+                    >
                 </dd>
                 <dt class="col-5 fw-normal text-muted">{{ t.deny_summary_patient }}</dt>
                 <dd class="col-7 mb-1">{{ claim.patient_name || '—' }}</dd>
@@ -159,18 +179,42 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 <dd class="col-7 mb-0 fw-semibold">{{ money(claim.amount) }}</dd>
             </dl>
 
-            <div v-for="message in otherErrors" :key="message" class="alert alert-danger small py-2" role="alert" data-test="deny-error">
+            <div
+                v-for="message in otherErrors"
+                :key="message"
+                class="alert alert-danger small py-2"
+                role="alert"
+                data-test="deny-error"
+            >
                 {{ message }}
             </div>
 
             <fieldset class="mb-3">
                 <legend class="form-label fs-6 mb-1">{{ t.deny_type_legend }}</legend>
                 <div class="form-check form-check-inline">
-                    <input id="billing-deny-type-total" v-model="denyType" class="form-check-input" type="radio" name="billing-deny-type" value="total" data-test="deny-type-total">
-                    <label class="form-check-label" for="billing-deny-type-total">{{ tx('deny_type_total', { amount: money(claim.amount) }) }}</label>
+                    <input
+                        id="billing-deny-type-total"
+                        v-model="denyType"
+                        class="form-check-input"
+                        type="radio"
+                        name="billing-deny-type"
+                        value="total"
+                        data-test="deny-type-total"
+                    />
+                    <label class="form-check-label" for="billing-deny-type-total">{{
+                        tx('deny_type_total', { amount: money(claim.amount) })
+                    }}</label>
                 </div>
                 <div class="form-check form-check-inline">
-                    <input id="billing-deny-type-partial" v-model="denyType" class="form-check-input" type="radio" name="billing-deny-type" value="partial" data-test="deny-type-partial">
+                    <input
+                        id="billing-deny-type-partial"
+                        v-model="denyType"
+                        class="form-check-input"
+                        type="radio"
+                        name="billing-deny-type"
+                        value="partial"
+                        data-test="deny-type-partial"
+                    />
                     <label class="form-check-label" for="billing-deny-type-partial">{{ t.deny_type_partial }}</label>
                 </div>
             </fieldset>
@@ -190,7 +234,15 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         :aria-describedby="amountDescribedBy"
                         data-test="deny-amount"
                     />
-                    <div v-if="amountError" id="billing-deny-amount-error" class="invalid-feedback d-block" role="alert" data-test="deny-amount-error">{{ amountError }}</div>
+                    <div
+                        v-if="amountError"
+                        id="billing-deny-amount-error"
+                        class="invalid-feedback d-block"
+                        role="alert"
+                        data-test="deny-amount-error"
+                    >
+                        {{ amountError }}
+                    </div>
                     <small id="billing-deny-amount-hint" class="form-text d-block" data-test="deny-remaining">
                         {{ tx('deny_amount_limit', { max: money(claim.amount) }) }}
                         {{ tx('deny_amount_hint', { remaining: money(remaining) }) }}
@@ -208,7 +260,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         aria-labelledby="billing-deny-code-label"
                         @option-selected="onGlosaReasonSelected"
                     />
-                    <div v-if="form.errors.glosa_code" class="invalid-feedback d-block">{{ form.errors.glosa_code }}</div>
+                    <div v-if="form.errors.glosa_code" class="invalid-feedback d-block">
+                        {{ form.errors.glosa_code }}
+                    </div>
                 </div>
                 <div class="col-12">
                     <label for="billing-deny-notes" class="form-label">{{ t.deny_notes }}</label>
@@ -231,15 +285,34 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
 
         <template #footer>
             <template v-if="done">
-                <button type="button" class="btn btn-light" data-test="deny-close" @click="emit('close')">{{ t.btn_close }}</button>
-                <Link v-if="claim && claim.is_tiss !== false && glosasUrl" :href="conciliationUrl" class="btn btn-primary" data-test="open-conciliation">
+                <button type="button" class="btn btn-light" data-test="deny-close" @click="emit('close')">
+                    {{ t.btn_close }}
+                </button>
+                <Link
+                    v-if="claim && claim.is_tiss !== false && glosasUrl"
+                    :href="conciliationUrl"
+                    class="btn btn-primary"
+                    data-test="open-conciliation"
+                >
                     <i class="ti ti-gavel me-1" aria-hidden="true"></i>{{ t.btn_open_conciliation }}
                 </Link>
             </template>
             <template v-else>
-                <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">{{ t.btn_cancel }}</button>
-                <button type="button" class="btn btn-danger" data-test="confirm-deny" :disabled="form.processing" @click="submit">
-                    <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">
+                    {{ t.btn_cancel }}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    data-test="confirm-deny"
+                    :disabled="form.processing"
+                    @click="submit"
+                >
+                    <span
+                        v-if="form.processing"
+                        class="spinner-border spinner-border-sm me-1"
+                        aria-hidden="true"
+                    ></span>
                     {{ form.processing ? t.processing : t.btn_confirm_deny }}
                 </button>
             </template>

@@ -1,14 +1,14 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout          from '@/Layouts/AppLayout.vue';
-import PageHeader         from '@/Components/Panel/PageHeader.vue';
-import SearchInput        from '@/Components/Panel/SearchInput.vue';
-import { useViewMode }    from '@/composables/useViewMode.js';
-import { useTrans }       from '@/composables/useTrans.js';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import { useViewMode } from '@/composables/useViewMode.js';
+import { useTrans } from '@/composables/useTrans.js';
 import { useCountFormat } from './useCountFormat.js';
-import CountTable         from './CountTable.vue';
-import CountCards         from './CountCards.vue';
+import CountTable from './CountTable.vue';
+import CountCards from './CountCards.vue';
 
 /**
  * Contagem física de estoque em MASSA — mesmo layout de Panel/Patients/Index:
@@ -26,12 +26,12 @@ import CountCards         from './CountCards.vue';
  * Item em branco NUNCA vai no envio (não é "contei zero", é "ainda não contei").
  */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    products:    { type: Object, required: true },   // paginator Laravel
-    categories:  { type: Array,  default: () => [] },
-    filters:     { type: Object, default: () => ({}) },   // { search, category_id, sort, direction }
-    routes:      { type: Object, required: true },
-    t:           { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    products: { type: Object, required: true }, // paginator Laravel
+    categories: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) }, // { search, category_id, sort, direction }
+    routes: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const SEARCH_DEBOUNCE_MS = 400;
@@ -43,23 +43,23 @@ const { quantity, signedQuantity } = useCountFormat(() => props.t);
 const pageTitle = computed(() => props.t.page_title ?? 'Contagem de estoque');
 
 // Link "Movimentações" abre em nova aba: o título (dica) também avisa.
-const movementsLinkTitle = computed(() => (
-    `${props.t.btn_movements ?? 'Movimentações'} (${props.t.opens_new_tab ?? 'abre em nova aba'})`
-));
+const movementsLinkTitle = computed(
+    () => `${props.t.btn_movements ?? 'Movimentações'} (${props.t.opens_new_tab ?? 'abre em nova aba'})`,
+);
 
 // ── Alternância tabela/cards (preferência no navegador) ──────────────────────
 const { view, setView } = useViewMode('stock_counts_view');
 
 // ── Busca (debounce), categoria e ordenação — cada um preserva os demais ─────
-const search     = ref(props.filters?.search ?? '');
+const search = ref(props.filters?.search ?? '');
 const categoryId = ref(props.filters?.category_id ?? '');
 
 function currentParams(overrides = {}) {
     return {
-        search:      search.value,
+        search: search.value,
         category_id: categoryId.value,
-        sort:        props.filters?.sort,
-        direction:   props.filters?.direction,
+        sort: props.filters?.sort,
+        direction: props.filters?.direction,
         ...overrides,
     };
 }
@@ -90,7 +90,7 @@ function isTyped(value) {
     return value !== '' && value !== null && value !== undefined;
 }
 
-const typedIds     = computed(() => Object.keys(counted.value).filter((id) => isTyped(counted.value[id])));
+const typedIds = computed(() => Object.keys(counted.value).filter((id) => isTyped(counted.value[id])));
 const touchedCount = computed(() => typedIds.value.length);
 
 function onCount(productId, value) {
@@ -100,29 +100,36 @@ function onCount(productId, value) {
 const rows = computed(() => props.products?.data ?? []);
 
 // Diferença contado − sistema dos produtos da página (null = ainda não contado).
-const deltas = computed(() => Object.fromEntries(rows.value.map((p) => {
-    const value = counted.value[p.id];
-    if (!isTyped(value)) return [p.id, null];
+const deltas = computed(() =>
+    Object.fromEntries(
+        rows.value.map((p) => {
+            const value = counted.value[p.id];
+            if (!isTyped(value)) return [p.id, null];
 
-    return [p.id, Math.round((Number(value) - Number(p.qty_on_hand)) * QUANTITY_PRECISION) / QUANTITY_PRECISION];
-})));
+            return [
+                p.id,
+                Math.round((Number(value) - Number(p.qty_on_hand)) * QUANTITY_PRECISION) / QUANTITY_PRECISION,
+            ];
+        }),
+    ),
+);
 
 // ── Envio ────────────────────────────────────────────────────────────────────
 const submitting = ref(false);
-const result     = ref(null); // { message, variances } | null
-const errorMsg   = ref('');
+const result = ref(null); // { message, variances } | null
+const errorMsg = ref('');
 
-const resultMessage = computed(() => (
-    result.value ? tx('result_applied', { count: result.value.variances?.length ?? 0 }) : ''
-));
+const resultMessage = computed(() =>
+    result.value ? tx('result_applied', { count: result.value.variances?.length ?? 0 }) : '',
+);
 
 async function submit() {
     const sent = typedIds.value.map((id) => [id, counted.value[id]]);
     if (sent.length === 0 || submitting.value) return;
 
     submitting.value = true;
-    errorMsg.value   = '';
-    result.value     = null;
+    errorMsg.value = '';
+    result.value = null;
     try {
         const items = sent.map(([id, value]) => ({ entity_product_id: id, counted_qty: Number(value) }));
         const { data } = await window.axios.post(props.routes.store, { items });
@@ -146,7 +153,6 @@ async function submit() {
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-stock-counts">
-
             <PageHeader
                 :title="pageTitle"
                 :total="products.total ?? 0"
@@ -167,7 +173,8 @@ async function submit() {
                             :title="movementsLinkTitle"
                             class="btn btn-outline-secondary fs-13 btn-md movements-link"
                         >
-                            <i class="ti ti-transfer-in me-1" aria-hidden="true"></i> {{ t.btn_movements ?? 'Movimentações' }}
+                            <i class="ti ti-transfer-in me-1" aria-hidden="true"></i>
+                            {{ t.btn_movements ?? 'Movimentações' }}
                             <i class="ti ti-external-link ms-1" aria-hidden="true"></i>
                             <span class="visually-hidden">({{ t.opens_new_tab ?? 'abre em nova aba' }})</span>
                         </a>
@@ -177,7 +184,11 @@ async function submit() {
                             :disabled="submitting || touchedCount === 0"
                             @click="submit"
                         >
-                            <span v-if="submitting" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                            <span
+                                v-if="submitting"
+                                class="spinner-border spinner-border-sm me-1"
+                                aria-hidden="true"
+                            ></span>
                             <i v-else class="ti ti-clipboard-check me-1" aria-hidden="true"></i>
                             {{ tx('btn_apply', { count: touchedCount }) }}
                         </button>
@@ -214,8 +225,10 @@ async function submit() {
                 {{ resultMessage }}
                 <ul v-if="result.variances?.length" class="mb-0 mt-2 small">
                     <li v-for="v in result.variances" :key="v.entity_product_id">
-                        {{ v.product_name }}: {{ quantity(v.before) }} → {{ quantity(v.counted) }}
-                        (<span :class="v.delta > 0 ? 'text-success' : 'text-danger'">{{ signedQuantity(v.delta) }}</span>)
+                        {{ v.product_name }}: {{ quantity(v.before) }} → {{ quantity(v.counted) }} (<span
+                            :class="v.delta > 0 ? 'text-success' : 'text-danger'"
+                            >{{ signedQuantity(v.delta) }}</span
+                        >)
                     </li>
                 </ul>
                 <button
@@ -237,14 +250,7 @@ async function submit() {
                 @sort="onSort"
                 @count="onCount"
             />
-            <CountCards
-                v-else
-                :products="products"
-                :counted="counted"
-                :deltas="deltas"
-                :t="t"
-                @count="onCount"
-            />
+            <CountCards v-else :products="products" :counted="counted" :deltas="deltas" :t="t" @count="onCount" />
 
             <!-- Lista longa: aplicar também no fim, sem voltar ao topo -->
             <div v-if="rows.length > 0" class="d-flex justify-content-end mt-3">
@@ -259,7 +265,6 @@ async function submit() {
                 </button>
             </div>
             <span v-if="submitting" class="visually-hidden" role="status">{{ t.applying }}</span>
-
         </div>
     </AppLayout>
 </template>

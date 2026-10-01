@@ -18,46 +18,143 @@ vi.mock('@inertiajs/vue3', () => ({
     Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
 }));
 vi.mock('@/Layouts/AppLayout.vue', () => ({
-    default: { props: ['title', 'breadcrumbs'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+    default: {
+        props: ['title', 'breadcrumbs'],
+        template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>',
+    },
 }));
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
-    default: { props: ['title'], template: '<div class="dd" :data-title="title"><span class="dd-trigger"><slot name="trigger" /></span><ul><slot /></ul></div>' },
+    default: {
+        props: ['title'],
+        template:
+            '<div class="dd" :data-title="title"><span class="dd-trigger"><slot name="trigger" /></span><ul><slot /></ul></div>',
+    },
 }));
 
 const t = {
-    loading: 'Loading…', load_error: 'Could not load.', sort_by: 'Sort by :column',
-    export: 'Export', export_title: 'Export the applied period (:from to :to)', export_csv: 'CSV', export_xlsx: 'Excel (.xlsx)', export_pdf: 'PDF',
+    loading: 'Loading…',
+    load_error: 'Could not load.',
+    sort_by: 'Sort by :column',
+    export: 'Export',
+    export_title: 'Export the applied period (:from to :to)',
+    export_csv: 'CSV',
+    export_xlsx: 'Excel (.xlsx)',
+    export_pdf: 'PDF',
     claim_status: { submitted: 'Submitted', paid: 'Paid', denied: 'Denied' },
     covenants: {
-        title: 'Billing by insurer report', period_basis: 'Period by attendance date.', total_label: 'Claims:', kpis_label: 'Period indicators',
-        kpi_claims: 'Claims', kpi_claims_hint: 'Billed claims.', kpi_billed: 'Total billed', kpi_billed_hint: 'Sum billed.',
-        kpi_received: 'Received', kpi_received_hint: 'Paid claims.', kpi_glosa: 'Denied', kpi_glosa_hint: 'Denied amount.',
-        kpi_open: 'Outstanding', kpi_open_hint: 'Awaiting payment.', rate_of_billed: ':percent of billed',
-        by_covenant: 'Consolidated by insurer', col_covenant: 'Insurer', col_billed: 'Billed', col_received: 'Received', col_glosa: 'Denied',
-        col_open: 'Outstanding', col_glosa_rate: '% Denied', col_received_rate: '% Received',
-        claims_count_one: ':count claim', claims_count_other: ':count claims',
-        inactive_badge: 'Inactive', inactive_hint: 'Insurer removed from the registry.',
-        glosa_alert_badge: 'High', glosa_alert_hint: 'Denials above :threshold of billed.',
-        glosa_alert_legend: '"High" = denials above :threshold of billed.', footer_total: 'Total', no_data: 'No billed claims.',
-        toggle_hint: 'Select an insurer to see its claims.', claims_title: ':covenant claims in the period', claims_loading: 'Loading claims…',
-        claims_error: 'Could not load the claims.', claims_retry: 'Try again', claims_empty: 'No claims.', claims_close: 'Close',
-        claims_privacy_note: 'Patient shown by code and initials.', col_guide: 'Claim', col_attendance_date: 'Attendance date',
-        col_patient: 'Patient (code · initials)', col_status: 'Status', col_value: 'Amount', view_in_billing: 'View in billing',
-        view_glosas: 'View denials', pagination_label: 'Claims pagination', pagination_previous: 'Previous page', pagination_next: 'Next page',
+        title: 'Billing by insurer report',
+        period_basis: 'Period by attendance date.',
+        total_label: 'Claims:',
+        kpis_label: 'Period indicators',
+        kpi_claims: 'Claims',
+        kpi_claims_hint: 'Billed claims.',
+        kpi_billed: 'Total billed',
+        kpi_billed_hint: 'Sum billed.',
+        kpi_received: 'Received',
+        kpi_received_hint: 'Paid claims.',
+        kpi_glosa: 'Denied',
+        kpi_glosa_hint: 'Denied amount.',
+        kpi_open: 'Outstanding',
+        kpi_open_hint: 'Awaiting payment.',
+        rate_of_billed: ':percent of billed',
+        by_covenant: 'Consolidated by insurer',
+        col_covenant: 'Insurer',
+        col_billed: 'Billed',
+        col_received: 'Received',
+        col_glosa: 'Denied',
+        col_open: 'Outstanding',
+        col_glosa_rate: '% Denied',
+        col_received_rate: '% Received',
+        claims_count_one: ':count claim',
+        claims_count_other: ':count claims',
+        inactive_badge: 'Inactive',
+        inactive_hint: 'Insurer removed from the registry.',
+        glosa_alert_badge: 'High',
+        glosa_alert_hint: 'Denials above :threshold of billed.',
+        glosa_alert_legend: '"High" = denials above :threshold of billed.',
+        footer_total: 'Total',
+        no_data: 'No billed claims.',
+        toggle_hint: 'Select an insurer to see its claims.',
+        claims_title: ':covenant claims in the period',
+        claims_loading: 'Loading claims…',
+        claims_error: 'Could not load the claims.',
+        claims_retry: 'Try again',
+        claims_empty: 'No claims.',
+        claims_close: 'Close',
+        claims_privacy_note: 'Patient shown by code and initials.',
+        col_guide: 'Claim',
+        col_attendance_date: 'Attendance date',
+        col_patient: 'Patient (code · initials)',
+        col_status: 'Status',
+        col_value: 'Amount',
+        view_in_billing: 'View in billing',
+        view_glosas: 'View denials',
+        pagination_label: 'Claims pagination',
+        pagination_previous: 'Previous page',
+        pagination_next: 'Next page',
         pagination_status: 'Page :current of :last',
     },
     shared: {
         period: {
-            label: 'Period', from: 'From', to: 'To', invalid_range: 'Start must be before end.', invalid_date: 'Invalid date.', after_max: 'Not after :date.',
-            presets: { today: 'Today', yesterday: 'Yesterday', last7: 'Last 7 days', month: 'This month', last_month: 'Last month', year: 'This year', custom: 'Custom' },
+            label: 'Period',
+            from: 'From',
+            to: 'To',
+            invalid_range: 'Start must be before end.',
+            invalid_date: 'Invalid date.',
+            after_max: 'Not after :date.',
+            presets: {
+                today: 'Today',
+                yesterday: 'Yesterday',
+                last7: 'Last 7 days',
+                month: 'This month',
+                last_month: 'Last month',
+                year: 'This year',
+                custom: 'Custom',
+            },
         },
     },
 };
 
 const ROWS = [
-    { covenant_id: 'c-uni', covenant: 'UNIMED', inactive: false, claims: 3, amount: 350, paid: 180, denied: 70, open: 100, glosa_rate: 20, received_rate: 51.4, glosa_alert: true },
-    { covenant_id: 'c-ame', covenant: 'AMIL', inactive: false, claims: 1, amount: 1000, paid: 1000, denied: 0, open: 0, glosa_rate: 0, received_rate: 100, glosa_alert: false },
-    { covenant_id: 'c-old', covenant: 'BRADESCO', inactive: true, claims: 2, amount: 0, paid: 0, denied: 0, open: 0, glosa_rate: null, received_rate: null, glosa_alert: false },
+    {
+        covenant_id: 'c-uni',
+        covenant: 'UNIMED',
+        inactive: false,
+        claims: 3,
+        amount: 350,
+        paid: 180,
+        denied: 70,
+        open: 100,
+        glosa_rate: 20,
+        received_rate: 51.4,
+        glosa_alert: true,
+    },
+    {
+        covenant_id: 'c-ame',
+        covenant: 'AMIL',
+        inactive: false,
+        claims: 1,
+        amount: 1000,
+        paid: 1000,
+        denied: 0,
+        open: 0,
+        glosa_rate: 0,
+        received_rate: 100,
+        glosa_alert: false,
+    },
+    {
+        covenant_id: 'c-old',
+        covenant: 'BRADESCO',
+        inactive: true,
+        claims: 2,
+        amount: 0,
+        paid: 0,
+        denied: 0,
+        open: 0,
+        glosa_rate: null,
+        received_rate: null,
+        glosa_alert: false,
+    },
 ];
 
 function baseProps(overrides = {}) {
@@ -66,12 +163,22 @@ function baseProps(overrides = {}) {
         filters: { from: '2026-09-01', to: '2026-09-26' },
         today: '2026-09-26',
         summary: {
-            total_claims: 1234, total_amount: 1350, total_paid: 1180, total_denied: 70, total_open: 100,
-            glosa_rate: 5.2, received_rate: 87.4, glosa_alert: false,
+            total_claims: 1234,
+            total_amount: 1350,
+            total_paid: 1180,
+            total_denied: 70,
+            total_open: 100,
+            glosa_rate: 5.2,
+            received_rate: 87.4,
+            glosa_alert: false,
         },
         byCovenant: ROWS,
         glosa_alert_threshold: 10,
-        routes: { index: '/reports/covenants', export: '/reports/covenants/export', claims: '/reports/covenants/claims' },
+        routes: {
+            index: '/reports/covenants',
+            export: '/reports/covenants/export',
+            claims: '/reports/covenants/claims',
+        },
         export_formats: ['csv', 'xlsx'],
         t,
         ...overrides,
@@ -79,7 +186,18 @@ function baseProps(overrides = {}) {
 }
 
 const CLAIMS_PAGE = {
-    data: [{ id: 'g1', code: 'GUI-1', attendance_date: '2026-09-05', status: 'paid', patient: 'PAC-0000000001 · J. S.', amount: 200, received: 180, glosa: 20 }],
+    data: [
+        {
+            id: 'g1',
+            code: 'GUI-1',
+            attendance_date: '2026-09-05',
+            status: 'paid',
+            patient: 'PAC-0000000001 · J. S.',
+            amount: 200,
+            received: 180,
+            glosa: 20,
+        },
+    ],
     meta: { current_page: 1, last_page: 1, per_page: 10, total: 1, from: 1, to: 1 },
 };
 
@@ -104,7 +222,14 @@ function mountPage(overrides = {}) {
 const clean = (value) => value.replace(/ | /g, ' ');
 const text = (el) => clean(el.text());
 const brl = (v) => clean(new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v));
-const pct = (v, digits = 1) => clean(new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v / 100));
+const pct = (v, digits = 1) =>
+    clean(
+        new Intl.NumberFormat('pt-BR', {
+            style: 'percent',
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits,
+        }).format(v / 100),
+    );
 const kpiValue = (w, key) => text(w.find(`[data-test="kpi-${key}"]`));
 const kpiCard = (w, key) => w.find(`[data-kpi="${key}"] .kpi-card`);
 const rowNames = (w) => w.findAll('[data-test="covenant-name"]').map((n) => n.text());
@@ -131,7 +256,17 @@ describe('Financial/Reports/Covenants — indicadores', () => {
         expect(kpiCard(mountPage(), 'glosa').classes()).toContain('border-danger');
         wrapper.unmount();
 
-        const w = mountPage({ summary: { total_claims: 1, total_amount: 100, total_paid: 100, total_denied: 0, total_open: 0, glosa_rate: 0, received_rate: 100 } });
+        const w = mountPage({
+            summary: {
+                total_claims: 1,
+                total_amount: 100,
+                total_paid: 100,
+                total_denied: 0,
+                total_open: 0,
+                glosa_rate: 0,
+                received_rate: 100,
+            },
+        });
         expect(kpiCard(w, 'glosa').classes()).toContain('border-secondary');
     });
 });
@@ -145,12 +280,22 @@ describe('Financial/Reports/Covenants — tabela', () => {
         expect(headerTh(w, 'Insurer').attributes('aria-sort')).toBe('none');
         expect(headerTh(w, 'Insurer').attributes('scope')).toBe('col');
         expect(headerButton(w, 'Billed').attributes('title')).toBe('Sort by Billed');
-        expect(w.findAll('thead th').map((th) => th.text())).toEqual(['Insurer', 'Billed', 'Received', 'Denied', 'Outstanding', '% Denied', '% Received']);
+        expect(w.findAll('thead th').map((th) => th.text())).toEqual([
+            'Insurer',
+            'Billed',
+            'Received',
+            'Denied',
+            'Outstanding',
+            '% Denied',
+            '% Received',
+        ]);
 
         for (const label of ['Denied', 'Outstanding', '% Received']) {
             expect(headerTh(w, label).classes()).toEqual(expect.arrayContaining(['d-none', 'd-lg-table-cell']));
         }
-        expect(w.find('[data-test="col-open"]').classes()).toEqual(expect.arrayContaining(['d-none', 'd-lg-table-cell']));
+        expect(w.find('[data-test="col-open"]').classes()).toEqual(
+            expect.arrayContaining(['d-none', 'd-lg-table-cell']),
+        );
     });
 
     it('ordenação no cliente: nome (A–Z) e % Glosa com percentual indefinido sempre por último', async () => {
@@ -190,7 +335,9 @@ describe('Financial/Reports/Covenants — tabela', () => {
         expect(text(amil.find('[data-test="col-glosa-rate"]'))).toBe(pct(0));
         expect(bradesco.find('[data-test="col-glosa-rate"]').text()).toBe('—');
         expect(bradesco.find('[data-test="covenant-inactive"]').text()).toBe('Inactive');
-        expect(bradesco.find('[data-test="covenant-inactive"]').attributes('title')).toBe('Insurer removed from the registry.');
+        expect(bradesco.find('[data-test="covenant-inactive"]').attributes('title')).toBe(
+            'Insurer removed from the registry.',
+        );
         expect(w.find('[data-test="glosa-legend"]').text()).toBe(`"High" = denials above ${pct(10, 0)} of billed.`);
     });
 
@@ -249,7 +396,9 @@ describe('Financial/Reports/Covenants — guias do convênio (linha expansível)
         await flushPromises();
 
         expect(w.findAll('[data-test="covenant-detail"]')).toHaveLength(1);
-        expect(w.find('[data-covenant="c-uni"] [data-test="covenant-toggle"]').attributes('aria-expanded')).toBe('false');
+        expect(w.find('[data-covenant="c-uni"] [data-test="covenant-toggle"]').attributes('aria-expanded')).toBe(
+            'false',
+        );
 
         await w.find('[data-covenant="c-ame"] [data-test="covenant-toggle"]').trigger('click');
         expect(w.find('[data-test="covenant-detail"]').exists()).toBe(false);
@@ -306,7 +455,11 @@ describe('Financial/Reports/Covenants — período e exportação', () => {
         const w = mountPage();
 
         await w.find('[data-test="period-from"]').setValue('2026-08-15');
-        expect(router.get).toHaveBeenCalledWith('/reports/covenants', { from: '2026-08-15', to: '2026-09-26' }, expect.objectContaining({ replace: true }));
+        expect(router.get).toHaveBeenCalledWith(
+            '/reports/covenants',
+            { from: '2026-08-15', to: '2026-09-26' },
+            expect.objectContaining({ replace: true }),
+        );
 
         vi.mocked(router.get).mockClear();
         await w.find('[data-test="period-from"]').setValue('2026-10-15');

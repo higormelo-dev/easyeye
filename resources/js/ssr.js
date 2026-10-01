@@ -9,13 +9,12 @@ import mask from './directives/mask.js';
 
 const appName = 'EasyEye';
 
-createServer(page =>
+createServer((page) =>
     createInertiaApp({
         page,
         render: renderToString,
-        title: (title) => title ? `${appName} — ${title}` : appName,
-        resolve: name =>
-            resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
+        title: (title) => (title ? `${appName} — ${title}` : appName),
+        resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
         setup({ App, props, plugin }) {
             return createSSRApp({ render: () => h(App, props) })
                 .use(plugin)

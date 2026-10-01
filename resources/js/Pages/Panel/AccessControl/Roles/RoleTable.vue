@@ -1,13 +1,13 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh       from '@/Components/Panel/SortableTh.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
-import { useRoleFormat }  from './useRoleFormat.js';
+import { useRoleFormat } from './useRoleFormat.js';
 
 /**
  * Tabela de perfis customizados no padrão de Patients/PatientTable:
@@ -15,9 +15,9 @@ import { useRoleFormat }  from './useRoleFormat.js';
  * "Colunas" (ordem persistida no navegador), Ações fixas no fim.
  */
 const props = defineProps({
-    roles:     { type: Object, required: true },   // paginator Laravel
-    filters:   { type: Object, default: () => ({}) },
-    t:         { type: Object, default: () => ({}) },
+    roles: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
@@ -29,33 +29,32 @@ const rows = computed(() => props.roles?.data ?? []);
 
 // ── Ordenação (padrão = nome A→Z, igual ao backend) ─────────────────────────
 const currentSort = computed(() => props.filters.sort ?? 'name');
-const currentDir  = computed(() => props.filters.direction ?? 'asc');
+const currentDir = computed(() => props.filters.direction ?? 'asc');
 
 // ── Ordem de colunas personalizável ─────────────────────────────────────────
 // sortKey = chave aceita por RolesController::SORTABLE.
 const COLUMN_DEFS = computed(() => [
-    { key: 'nome',       label: props.t.col_name ?? 'Perfil',             sortKey: 'name' },
-    { key: 'permissoes', label: props.t.col_permissions ?? 'Permissões',  sortKey: 'permissions_count' },
-    { key: 'usuarios',   label: props.t.col_users ?? 'Usuários',          sortKey: 'users_count' },
-    { key: 'cadastro',   label: props.t.col_created_at ?? 'Cadastro',     sortKey: 'created_at' },
+    { key: 'nome', label: props.t.col_name ?? 'Perfil', sortKey: 'name' },
+    { key: 'permissoes', label: props.t.col_permissions ?? 'Permissões', sortKey: 'permissions_count' },
+    { key: 'usuarios', label: props.t.col_users ?? 'Usuários', sortKey: 'users_count' },
+    { key: 'cadastro', label: props.t.col_created_at ?? 'Cadastro', sortKey: 'created_at' },
 ]);
 const DEFAULT_COLUMN_ORDER = ['nome', 'permissoes', 'usuarios', 'cadastro'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'access_roles_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('access_roles_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 </script>
 
@@ -95,7 +94,8 @@ const columnMenuLabels = computed(() => ({
                         :current-dir="currentDir"
                         :title="tx('sort_by', { column: col.label })"
                         @sort="emit('sort', $event)"
-                    >{{ col.label }}</SortableTh>
+                        >{{ col.label }}</SortableTh
+                    >
                     <th class="text-end">{{ t.col_actions ?? 'Ações' }}</th>
                 </tr>
             </thead>
@@ -118,7 +118,9 @@ const columnMenuLabels = computed(() => ({
                                     <div
                                         class="small text-truncate"
                                         :class="role.description ? 'text-muted' : 'text-body-secondary fst-italic'"
-                                    >{{ role.description || (t.no_description ?? 'Sem descrição') }}</div>
+                                    >
+                                        {{ role.description || (t.no_description ?? 'Sem descrição') }}
+                                    </div>
                                 </div>
                             </div>
                         </td>
@@ -127,7 +129,9 @@ const columnMenuLabels = computed(() => ({
                             <span class="badge badge-soft-info rounded fs-12 fw-medium">
                                 <i class="ti ti-key me-1" aria-hidden="true"></i>{{ permissionsLabel(role) }}
                             </span>
-                            <div v-if="permissionGroups(role)" class="text-muted small mt-1">{{ permissionGroups(role) }}</div>
+                            <div v-if="permissionGroups(role)" class="text-muted small mt-1">
+                                {{ permissionGroups(role) }}
+                            </div>
                         </td>
 
                         <td v-else-if="col.key === 'usuarios'" class="small">

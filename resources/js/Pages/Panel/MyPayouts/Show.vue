@@ -1,10 +1,10 @@
 <script setup>
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
-import AppLayout     from '@/Layouts/AppLayout.vue';
-import PageHeader    from '@/Components/Panel/PageHeader.vue';
-import FlashMessage  from '@/Pages/Panel/Financial/DoctorPayouts/FlashMessage.vue';
-import PaymentsList  from '@/Pages/Panel/Financial/DoctorPayouts/PaymentsList.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import FlashMessage from '@/Pages/Panel/Financial/DoctorPayouts/FlashMessage.vue';
+import PaymentsList from '@/Pages/Panel/Financial/DoctorPayouts/PaymentsList.vue';
 import StatementView from '@/Pages/Panel/Financial/DoctorPayouts/StatementView.vue';
 import { useDoctorPayoutFormat } from '@/Pages/Panel/Financial/DoctorPayouts/useDoctorPayoutFormat.js';
 
@@ -14,16 +14,16 @@ import { useDoctorPayoutFormat } from '@/Pages/Panel/Financial/DoctorPayouts/use
  * voltar. Pagamentos: só os válidos (data, valor, forma) e o saldo a receber.
  */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    statement:   { type: Object, required: true },   // { payout, groups, adjustments, payments }
-    routes:      { type: Object, required: true },   // { index, pdf }
-    t:           { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    statement: { type: Object, required: true }, // { payout, groups, adjustments, payments }
+    routes: { type: Object, required: true }, // { index, pdf }
+    t: { type: Object, default: () => ({}) },
 });
 
 const { money } = useDoctorPayoutFormat(() => props.t);
 
-const code      = computed(() => props.statement?.payout?.code ?? '');
-const payments  = computed(() => props.statement?.payments ?? []);
+const code = computed(() => props.statement?.payout?.code ?? '');
+const payments = computed(() => props.statement?.payments ?? []);
 const remaining = computed(() => Number(props.statement?.payout?.remaining_amount ?? 0));
 </script>
 
@@ -49,12 +49,22 @@ const remaining = computed(() => Number(props.statement?.payout?.remaining_amoun
             <div class="d-grid gap-3">
                 <StatementView :statement="statement" :t="t" />
 
-                <section v-if="payments.length" class="card mb-0" aria-labelledby="my-payments-title" data-test="my-payments">
+                <section
+                    v-if="payments.length"
+                    class="card mb-0"
+                    aria-labelledby="my-payments-title"
+                    data-test="my-payments"
+                >
                     <div class="card-header d-flex flex-wrap align-items-center gap-2">
                         <h3 id="my-payments-title" class="h6 fw-bold mb-0">
-                            <i class="ti ti-cash-banknote me-1 text-primary" aria-hidden="true"></i>{{ t.payments_title }}
+                            <i class="ti ti-cash-banknote me-1 text-primary" aria-hidden="true"></i
+                            >{{ t.payments_title }}
                         </h3>
-                        <span v-if="remaining > 0" class="ms-auto small fw-medium text-warning-emphasis" data-test="my-balance">
+                        <span
+                            v-if="remaining > 0"
+                            class="ms-auto small fw-medium text-warning-emphasis"
+                            data-test="my-balance"
+                        >
                             {{ t.payment_balance }}: {{ money(remaining) }}
                         </span>
                     </div>

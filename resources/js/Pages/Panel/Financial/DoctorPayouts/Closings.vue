@@ -1,14 +1,14 @@
 <script setup>
 import { computed, useId } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout       from '@/Layouts/AppLayout.vue';
-import PageHeader      from '@/Components/Panel/PageHeader.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useViewMode } from '@/composables/useViewMode.js';
-import ClosingsCards   from './ClosingsCards.vue';
-import ClosingsTable   from './ClosingsTable.vue';
-import FlashMessage    from './FlashMessage.vue';
-import PayoutTabs      from './PayoutTabs.vue';
+import ClosingsCards from './ClosingsCards.vue';
+import ClosingsTable from './ClosingsTable.vue';
+import FlashMessage from './FlashMessage.vue';
+import PayoutTabs from './PayoutTabs.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
 /**
@@ -17,14 +17,14 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * navegador (mesmo paginator nas duas vistas).
  */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    tabs:        { type: Object, default: () => ({}) },
-    payouts:     { type: Object, required: true },                // paginator Laravel
-    filters:     { type: Object, default: () => ({}) },           // { doctor, status }
-    options:     { type: Object, default: () => ({ doctors: [], statuses: [] }) },
-    routes:      { type: Object, required: true },                // { index, show, pdf } — show/pdf com __ID__
-    t:           { type: Object, default: () => ({}) },
-    shared:      { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    tabs: { type: Object, default: () => ({}) },
+    payouts: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) }, // { doctor, status }
+    options: { type: Object, default: () => ({ doctors: [], statuses: [] }) },
+    routes: { type: Object, required: true }, // { index, show, pdf } — show/pdf com __ID__
+    t: { type: Object, default: () => ({}) },
+    shared: { type: Object, default: () => ({}) },
 });
 
 const { doctorLabel, statusLabel } = useDoctorPayoutFormat(() => props.t);
@@ -36,11 +36,15 @@ const ids = { doctor: `dp-closings-doctor-${uid}`, status: `dp-closings-status-$
 const rows = computed(() => props.payouts?.data ?? []);
 
 function applyFilters(patch) {
-    router.get(props.routes.index, {
-        doctor: props.filters.doctor ?? '',
-        status: props.filters.status ?? '',
-        ...patch,
-    }, { preserveState: true, preserveScroll: true });
+    router.get(
+        props.routes.index,
+        {
+            doctor: props.filters.doctor ?? '',
+            status: props.filters.status ?? '',
+            ...patch,
+        },
+        { preserveState: true, preserveScroll: true },
+    );
 }
 </script>
 
@@ -72,7 +76,9 @@ function applyFilters(patch) {
                         @change="applyFilters({ doctor: $event.target.value })"
                     >
                         <option value="">{{ t.all_doctors }}</option>
-                        <option v-for="doctor in options?.doctors ?? []" :key="doctor.id" :value="doctor.id">{{ doctorLabel(doctor) }}</option>
+                        <option v-for="doctor in options?.doctors ?? []" :key="doctor.id" :value="doctor.id">
+                            {{ doctorLabel(doctor) }}
+                        </option>
                     </select>
                 </div>
                 <div class="closings__filter">
@@ -85,7 +91,9 @@ function applyFilters(patch) {
                         @change="applyFilters({ status: $event.target.value })"
                     >
                         <option value="">{{ t.filter_status_all }}</option>
-                        <option v-for="status in options?.statuses ?? []" :key="status" :value="status">{{ statusLabel(status) }}</option>
+                        <option v-for="status in options?.statuses ?? []" :key="status" :value="status">
+                            {{ statusLabel(status) }}
+                        </option>
                     </select>
                 </div>
                 <button
@@ -106,13 +114,7 @@ function applyFilters(patch) {
                 :t="t"
                 :empty-text="t.closings_empty"
             />
-            <ClosingsCards
-                v-else
-                :payouts="rows"
-                :routes="routes"
-                :t="t"
-                :empty-text="t.closings_empty"
-            />
+            <ClosingsCards v-else :payouts="rows" :routes="routes" :t="t" :empty-text="t.closings_empty" />
 
             <TablePagination
                 :data="payouts"

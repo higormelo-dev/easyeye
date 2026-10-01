@@ -18,11 +18,11 @@ import { useTrans } from '@/composables/useTrans.js';
  */
 const props = defineProps({
     /** 'appeal' | 'submit' | 'resolve' | null (fechado) */
-    kind:               { type: String, default: null },
-    glosa:              { type: Object, default: null },
-    appeal:             { type: Object, default: null },
+    kind: { type: String, default: null },
+    glosa: { type: Object, default: null },
+    appeal: { type: Object, default: null },
     appealResponseDays: { type: Number, default: 60 },
-    t:                  { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'done']);
@@ -39,7 +39,9 @@ function glosaStatusLabel(status) {
 
 /** Primeira mensagem de um bag de erros do Inertia (ou texto genérico). */
 function firstError(errors) {
-    const messages = Object.values(errors ?? {}).flat().filter(Boolean);
+    const messages = Object.values(errors ?? {})
+        .flat()
+        .filter(Boolean);
 
     return messages.length ? String(messages[0]) : props.t.action_error;
 }
@@ -47,41 +49,44 @@ function firstError(errors) {
 const modalError = ref(null);
 const submitting = ref(false);
 
-const reasonInput   = ref(null);
+const reasonInput = ref(null);
 const submitConfirm = ref(null);
 const decisionFirst = ref(null);
-let returnFocusTo   = null;
+let returnFocusTo = null;
 
-const appealForm  = useForm({ reason: '' });
+const appealForm = useForm({ reason: '' });
 const resolveForm = useForm({ decision: '', accepted_amount: null, result_notes: '' });
 
 const busy = computed(() => submitting.value || appealForm.processing || resolveForm.processing);
 
-watch(() => props.kind, (kind, previous) => {
-    if (!kind) {
-        nextTick(() => returnFocusTo?.focus?.());
+watch(
+    () => props.kind,
+    (kind, previous) => {
+        if (!kind) {
+            nextTick(() => returnFocusTo?.focus?.());
 
-        return;
-    }
+            return;
+        }
 
-    if (!previous && typeof document !== 'undefined') returnFocusTo = document.activeElement;
+        if (!previous && typeof document !== 'undefined') returnFocusTo = document.activeElement;
 
-    modalError.value = null;
+        modalError.value = null;
 
-    if (kind === 'appeal') {
-        appealForm.reset();
-        appealForm.clearErrors();
-    }
-    if (kind === 'resolve') {
-        resolveForm.reset();
-        resolveForm.clearErrors();
-    }
+        if (kind === 'appeal') {
+            appealForm.reset();
+            appealForm.clearErrors();
+        }
+        if (kind === 'resolve') {
+            resolveForm.reset();
+            resolveForm.clearErrors();
+        }
 
-    nextTick(() => {
-        const target = { appeal: reasonInput, submit: submitConfirm, resolve: decisionFirst }[kind];
-        target?.value?.focus?.();
-    });
-});
+        nextTick(() => {
+            const target = { appeal: reasonInput, submit: submitConfirm, resolve: decisionFirst }[kind];
+            target?.value?.focus?.();
+        });
+    },
+);
 
 /** Fecha; `force` ignora o bloqueio de "processando" (usado no sucesso). */
 function requestClose(force = false) {
@@ -116,7 +121,9 @@ function submitAppeal() {
     appealForm.post(props.glosa.appeal_url, {
         preserveScroll: true,
         onSuccess: succeed,
-        onError:   (errors) => { if (!errors.reason) modalError.value = firstError(errors); },
+        onError: (errors) => {
+            if (!errors.reason) modalError.value = firstError(errors);
+        },
     });
 }
 
@@ -124,28 +131,41 @@ function submitAppeal() {
 function confirmSubmit() {
     modalError.value = null;
 
-    router.post(props.appeal.submit_url, {}, {
-        preserveScroll: true,
-        onStart:   () => { submitting.value = true; },
-        onFinish:  () => { submitting.value = false; },
-        onSuccess: succeed,
-        onError:   (errors) => { modalError.value = firstError(errors); },
-    });
+    router.post(
+        props.appeal.submit_url,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                submitting.value = true;
+            },
+            onFinish: () => {
+                submitting.value = false;
+            },
+            onSuccess: succeed,
+            onError: (errors) => {
+                modalError.value = firstError(errors);
+            },
+        },
+    );
 }
 
 /* Decisão (Enviado → Aceito/Rejeitado) */
-const resolveCeiling  = computed(() => Number(props.glosa?.amount ?? 0));
+const resolveCeiling = computed(() => Number(props.glosa?.amount ?? 0));
 const requestedAmount = computed(() => Number(props.appeal?.requested_amount ?? 0) || resolveCeiling.value);
 
 // Ao escolher "Aceito", sugere o valor solicitado; em "Rejeitado" o valor é descartado.
-watch(() => resolveForm.decision, (decision) => {
-    if (decision === 'accepted' && (resolveForm.accepted_amount === '' || resolveForm.accepted_amount === null)) {
-        resolveForm.accepted_amount = Math.min(requestedAmount.value, resolveCeiling.value);
-    }
-    if (decision === 'rejected') {
-        resolveForm.accepted_amount = null;
-    }
-});
+watch(
+    () => resolveForm.decision,
+    (decision) => {
+        if (decision === 'accepted' && (resolveForm.accepted_amount === '' || resolveForm.accepted_amount === null)) {
+            resolveForm.accepted_amount = Math.min(requestedAmount.value, resolveCeiling.value);
+        }
+        if (decision === 'rejected') {
+            resolveForm.accepted_amount = null;
+        }
+    },
+);
 
 /** Valor em centavos exatos (a coluna é numeric(14,2); 199.995 viraria 200,00 no banco). */
 const hasAtMostCents = (value) => Math.round(value * 100) / 100 === value;
@@ -167,7 +187,7 @@ function validateResolve() {
     }
     if (resolveForm.decision !== 'accepted') return true;
 
-    const raw      = resolveForm.accepted_amount;
+    const raw = resolveForm.accepted_amount;
     const accepted = Number(raw);
     if (raw === '' || raw === null || raw === undefined || Number.isNaN(accepted)) {
         resolveForm.setError('accepted_amount', props.t.accepted_amount_required);
@@ -195,13 +215,13 @@ function submitResolve() {
     if (!validateResolve()) return;
 
     resolveForm
-        .transform((data) => (data.decision === 'rejected'
-            ? { decision: data.decision, result_notes: data.result_notes }
-            : data))
+        .transform((data) =>
+            data.decision === 'rejected' ? { decision: data.decision, result_notes: data.result_notes } : data,
+        )
         .post(props.appeal.resolve_url, {
             preserveScroll: true,
             onSuccess: succeed,
-            onError:   (errors) => {
+            onError: (errors) => {
                 const known = ['decision', 'accepted_amount', 'result_notes'];
                 if (!known.some((key) => errors[key])) modalError.value = firstError(errors);
             },
@@ -213,26 +233,42 @@ function submitResolve() {
     <CenteredModal :open="kind !== null && glosa !== null" size="md" @close="requestClose()">
         <template #header>
             <h2 id="glosa-modal-title" class="h5 mb-0">
-                <template v-if="kind === 'appeal'"><i class="ti ti-message-circle-up me-1 text-warning" aria-hidden="true"></i>{{ t.appeal_title }}</template>
-                <template v-else-if="kind === 'submit'"><i class="ti ti-send me-1 text-info" aria-hidden="true"></i>{{ t.submit_confirm_title }}</template>
-                <template v-else-if="kind === 'resolve'"><i class="ti ti-gavel me-1 text-primary" aria-hidden="true"></i>{{ t.resolve_title }}</template>
+                <template v-if="kind === 'appeal'"
+                    ><i class="ti ti-message-circle-up me-1 text-warning" aria-hidden="true"></i
+                    >{{ t.appeal_title }}</template
+                >
+                <template v-else-if="kind === 'submit'"
+                    ><i class="ti ti-send me-1 text-info" aria-hidden="true"></i>{{ t.submit_confirm_title }}</template
+                >
+                <template v-else-if="kind === 'resolve'"
+                    ><i class="ti ti-gavel me-1 text-primary" aria-hidden="true"></i>{{ t.resolve_title }}</template
+                >
             </h2>
         </template>
 
         <div v-if="glosa">
-            <div v-if="modalError" class="alert alert-danger small d-flex align-items-start gap-2" role="alert" data-test="modal-error">
+            <div
+                v-if="modalError"
+                class="alert alert-danger small d-flex align-items-start gap-2"
+                role="alert"
+                data-test="modal-error"
+            >
                 <i class="ti ti-alert-circle mt-1" aria-hidden="true"></i><span>{{ modalError }}</span>
             </div>
 
             <dl class="row small mb-3 glosa-summary" data-test="modal-summary">
                 <template v-if="appeal">
                     <dt class="col-5 text-muted fw-normal">{{ t.modal_appeal_label }}</dt>
-                    <dd class="col-7 mb-1"><code>{{ appeal.appeal_number }}</code></dd>
+                    <dd class="col-7 mb-1">
+                        <code>{{ appeal.appeal_number }}</code>
+                    </dd>
                 </template>
                 <dt class="col-5 text-muted fw-normal">{{ t.modal_covenant_label }}</dt>
                 <dd class="col-7 mb-1">{{ glosa.operator_name || t.no_covenant }}</dd>
                 <dt class="col-5 text-muted fw-normal">{{ t.modal_guide_label }}</dt>
-                <dd class="col-7 mb-1"><code>{{ glosa.guide_number || '—' }}</code></dd>
+                <dd class="col-7 mb-1">
+                    <code>{{ glosa.guide_number || '—' }}</code>
+                </dd>
                 <dt class="col-5 text-muted fw-normal">{{ t.modal_glosa_label }}</dt>
                 <dd class="col-7 mb-1">{{ glosa.reason_code }} — {{ glosa.reason_text || '—' }}</dd>
                 <dt class="col-5 text-muted fw-normal">{{ t.modal_value_label }}</dt>
@@ -263,14 +299,27 @@ function submitResolve() {
                     :placeholder="t.justification_placeholder"
                     aria-required="true"
                     :aria-invalid="appealForm.errors.reason ? 'true' : 'false'"
-                    :aria-describedby="appealForm.errors.reason ? 'glosa-appeal-reason-error glosa-appeal-reason-hint' : 'glosa-appeal-reason-hint'"
+                    :aria-describedby="
+                        appealForm.errors.reason
+                            ? 'glosa-appeal-reason-error glosa-appeal-reason-hint'
+                            : 'glosa-appeal-reason-hint'
+                    "
                 ></textarea>
-                <div v-if="appealForm.errors.reason" id="glosa-appeal-reason-error" class="invalid-feedback d-block" role="alert" data-test="reason-error">
+                <div
+                    v-if="appealForm.errors.reason"
+                    id="glosa-appeal-reason-error"
+                    class="invalid-feedback d-block"
+                    role="alert"
+                    data-test="reason-error"
+                >
                     {{ appealForm.errors.reason }}
                 </div>
                 <div id="glosa-appeal-reason-hint" class="d-flex justify-content-between mt-1">
                     <small class="text-muted">{{ tx('min_chars_audit_hint', { min: REASON_MIN }) }}</small>
-                    <small :class="reasonLength >= REASON_MIN ? 'text-success' : 'text-muted'" data-test="reason-counter">
+                    <small
+                        :class="reasonLength >= REASON_MIN ? 'text-success' : 'text-muted'"
+                        data-test="reason-counter"
+                    >
                         {{ tx('char_counter', { count: appealForm.reason.length, max: REASON_MAX }) }}
                     </small>
                 </div>
@@ -289,7 +338,9 @@ function submitResolve() {
             <!-- Decisão -->
             <form v-else-if="kind === 'resolve'" id="glosa-resolve-form" novalidate @submit.prevent="submitResolve">
                 <fieldset class="mb-3">
-                    <legend class="form-label fs-6">{{ t.decision_label }} <span class="text-danger" aria-hidden="true">*</span></legend>
+                    <legend class="form-label fs-6">
+                        {{ t.decision_label }} <span class="text-danger" aria-hidden="true">*</span>
+                    </legend>
                     <div class="form-check">
                         <input
                             id="glosa-decision-accepted"
@@ -299,7 +350,7 @@ function submitResolve() {
                             type="radio"
                             name="glosa-decision"
                             value="accepted"
-                        >
+                        />
                         <label class="form-check-label" for="glosa-decision-accepted">{{ t.decision_accepted }}</label>
                     </div>
                     <div class="form-check">
@@ -310,10 +361,12 @@ function submitResolve() {
                             type="radio"
                             name="glosa-decision"
                             value="rejected"
-                        >
+                        />
                         <label class="form-check-label" for="glosa-decision-rejected">{{ t.decision_rejected }}</label>
                     </div>
-                    <div v-if="resolveForm.errors.decision" class="invalid-feedback d-block" role="alert">{{ resolveForm.errors.decision }}</div>
+                    <div v-if="resolveForm.errors.decision" class="invalid-feedback d-block" role="alert">
+                        {{ resolveForm.errors.decision }}
+                    </div>
                 </fieldset>
 
                 <div v-if="resolveForm.decision === 'accepted'" class="mb-3">
@@ -329,7 +382,12 @@ function submitResolve() {
                         :invalid="!!resolveForm.errors.accepted_amount"
                         aria-describedby="glosa-accepted-amount-help"
                     />
-                    <div v-if="resolveForm.errors.accepted_amount" class="invalid-feedback d-block" role="alert" data-test="accepted-error">
+                    <div
+                        v-if="resolveForm.errors.accepted_amount"
+                        class="invalid-feedback d-block"
+                        role="alert"
+                        data-test="accepted-error"
+                    >
                         {{ resolveForm.errors.accepted_amount }}
                     </div>
                     <small id="glosa-accepted-amount-help" class="text-muted">
@@ -347,11 +405,19 @@ function submitResolve() {
                         class="form-control"
                         :class="{ 'is-invalid': resolveForm.errors.result_notes }"
                     ></textarea>
-                    <div v-if="resolveForm.errors.result_notes" class="invalid-feedback d-block">{{ resolveForm.errors.result_notes }}</div>
+                    <div v-if="resolveForm.errors.result_notes" class="invalid-feedback d-block">
+                        {{ resolveForm.errors.result_notes }}
+                    </div>
                 </div>
 
-                <div v-if="resolvePreview" class="alert alert-info small mb-0 py-2" role="status" data-test="resolve-preview">
-                    <i class="ti ti-arrow-right me-1" aria-hidden="true"></i>{{ tx('resolve_preview', { status: resolvePreview }) }}
+                <div
+                    v-if="resolvePreview"
+                    class="alert alert-info small mb-0 py-2"
+                    role="status"
+                    data-test="resolve-preview"
+                >
+                    <i class="ti ti-arrow-right me-1" aria-hidden="true"></i
+                    >{{ tx('resolve_preview', { status: resolvePreview }) }}
                 </div>
             </form>
         </div>
@@ -368,7 +434,11 @@ function submitResolve() {
                 data-test="confirm-appeal"
                 :disabled="appealForm.processing"
             >
-                <span v-if="appealForm.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                <span
+                    v-if="appealForm.processing"
+                    class="spinner-border spinner-border-sm me-1"
+                    aria-hidden="true"
+                ></span>
                 <i v-else class="ti ti-send me-1" aria-hidden="true"></i>
                 {{ appealForm.processing ? t.processing : t.submit_appeal }}
             </button>
@@ -393,7 +463,11 @@ function submitResolve() {
                 data-test="confirm-resolve"
                 :disabled="resolveForm.processing"
             >
-                <span v-if="resolveForm.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                <span
+                    v-if="resolveForm.processing"
+                    class="spinner-border spinner-border-sm me-1"
+                    aria-hidden="true"
+                ></span>
                 <i v-else class="ti ti-check me-1" aria-hidden="true"></i>
                 {{ resolveForm.processing ? t.processing : t.resolve_submit_btn }}
             </button>

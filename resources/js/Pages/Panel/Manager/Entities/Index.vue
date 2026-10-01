@@ -1,26 +1,29 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout          from '@/Layouts/AppLayout.vue';
-import PageHeader         from '@/Components/Panel/PageHeader.vue';
-import SearchInput        from '@/Components/Panel/SearchInput.vue';
-import EntityTable        from './EntityTable.vue';
-import EntityCards        from './EntityCards.vue';
-import EntityFormModal    from './EntityFormModal.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import EntityTable from './EntityTable.vue';
+import EntityCards from './EntityCards.vue';
+import EntityFormModal from './EntityFormModal.vue';
 import EntityDetailDrawer from './EntityDetailDrawer.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
     entities: { type: Object, required: true },
-    total:    { type: Number, default: 0 },
-    filters:  { type: Object, default: () => ({}) },
-    t:        { type: Object, default: () => ({}) },
+    total: { type: Number, default: 0 },
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 // ── View toggle ──────────────────────────────────────────────────────────────
 const view = ref(localStorage.getItem('mgr_entities_view') ?? 'table');
-function setView(v) { view.value = v; localStorage.setItem('mgr_entities_view', v); }
+function setView(v) {
+    view.value = v;
+    localStorage.setItem('mgr_entities_view', v);
+}
 
 // ── Search / sort ─────────────────────────────────────────────────────────────
 const search = ref(props.filters.search ?? '');
@@ -46,22 +49,42 @@ function onSort({ sort, direction }) {
 }
 
 // ── Form modal ────────────────────────────────────────────────────────────────
-const formOpen     = ref(false);
+const formOpen = ref(false);
 const editEntityId = ref(null);
 
-function openCreate() { editEntityId.value = null; formOpen.value = true; }
-function openEdit(id) { editEntityId.value = id;   formOpen.value = true; }
-function closeForm()  { formOpen.value = false; editEntityId.value = null; }
+function openCreate() {
+    editEntityId.value = null;
+    formOpen.value = true;
+}
+function openEdit(id) {
+    editEntityId.value = id;
+    formOpen.value = true;
+}
+function closeForm() {
+    formOpen.value = false;
+    editEntityId.value = null;
+}
 
 // ── Detail drawer ─────────────────────────────────────────────────────────────
 const detailOpen = ref(false);
-const detailId   = ref(null);
+const detailId = ref(null);
 
-function openDetail(id) { detailId.value = id; detailOpen.value = true; }
-function closeDetail()  { detailOpen.value = false; detailId.value = null; }
+function openDetail(id) {
+    detailId.value = id;
+    detailOpen.value = true;
+}
+function closeDetail() {
+    detailOpen.value = false;
+    detailId.value = null;
+}
 
 // ── Actions ───────────────────────────────────────────────────────────────────
-const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
 
 function onDelete(id) {
     openReasonModal({
@@ -91,15 +114,14 @@ function onToggleActive(id, currentActive) {
 }
 
 const breadcrumbs = [
-    { label: props.t.breadcrumb_home    ?? 'Dashboard', url: route('panel.dashboard'), active: false },
-    { label: props.t.breadcrumb_current ?? 'Empresas',  url: '#', active: true },
+    { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: props.t.breadcrumb_current ?? 'Empresas', url: '#', active: true },
 ];
 </script>
 
 <template>
     <AppLayout :title="t.page_title" :breadcrumbs="breadcrumbs">
         <div>
-
             <!-- ── Page Header ──────────────────────────────────────────── -->
             <PageHeader
                 :title="t.page_title"
@@ -118,11 +140,7 @@ const breadcrumbs = [
             </PageHeader>
 
             <!-- ── Search ───────────────────────────────────────────────── -->
-            <SearchInput
-                v-model="search"
-                :placeholder="t.search_placeholder"
-                max-width="380px"
-            />
+            <SearchInput v-model="search" :placeholder="t.search_placeholder" max-width="380px" />
 
             <!-- ── Table / Cards ─────────────────────────────────────────── -->
             <EntityTable
@@ -149,12 +167,7 @@ const breadcrumbs = [
         </div>
 
         <!-- Form offcanvas -->
-        <EntityFormModal
-            :open="formOpen"
-            :entity-id="editEntityId"
-            :t="t"
-            @close="closeForm"
-        />
+        <EntityFormModal :open="formOpen" :entity-id="editEntityId" :t="t" @close="closeForm" />
 
         <!-- Detail drawer -->
         <EntityDetailDrawer
@@ -162,7 +175,12 @@ const breadcrumbs = [
             :entity-id="detailId"
             :t="t"
             @close="closeDetail"
-            @edit="(id) => { closeDetail(); openEdit(id); }"
+            @edit="
+                (id) => {
+                    closeDetail();
+                    openEdit(id);
+                }
+            "
         />
 
         <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->

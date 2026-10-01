@@ -20,12 +20,12 @@ import { usePercent, usePlural } from './useReportPage.js';
  * - % Glosa acima do limiar ganha selo com TEXTO ("Alta"), não só cor.
  */
 const props = defineProps({
-    rows:      { type: Array,  default: () => [] },   // byCovenant
-    summary:   { type: Object, default: () => ({}) },
-    filters:   { type: Object, required: true },      // { from, to } aplicados
-    threshold: { type: Number, default: 10 },         // glosa_alert_threshold (%)
-    claimsUrl: { type: String, default: '' },         // routes.claims
-    t:         { type: Object, default: () => ({}) },
+    rows: { type: Array, default: () => [] }, // byCovenant
+    summary: { type: Object, default: () => ({}) },
+    filters: { type: Object, required: true }, // { from, to } aplicados
+    threshold: { type: Number, default: 10 }, // glosa_alert_threshold (%)
+    claimsUrl: { type: String, default: '' }, // routes.claims
+    t: { type: Object, default: () => ({}) },
 });
 
 /** Chave da linha "Sem convênio" (covenant_id '' — a mesma do BI) no DOM. */
@@ -47,13 +47,13 @@ const { tx } = useTrans(() => props.t.covenants ?? {});
 const { percent } = usePercent();
 const { plural } = usePlural();
 
-const uid       = useId();
+const uid = useId();
 const headingId = `covenants-table-title-${uid}`;
 
 const c = computed(() => props.t.covenants ?? {});
 
 const thresholdText = computed(() => percent(props.threshold, 0));
-const alertHint     = computed(() => tx('glosa_alert_hint', { threshold: thresholdText.value }));
+const alertHint = computed(() => tx('glosa_alert_hint', { threshold: thresholdText.value }));
 
 // ── Ordenação (cliente) ─────────────────────────────────────────────────────
 const sort = ref({ key: 'amount', dir: 'desc' });
@@ -66,8 +66,10 @@ function isBlank(value) {
 
 /** Desempate estável: nome do convênio e depois o id. */
 function tieBreak(a, b) {
-    return collator.value.compare(a.covenant ?? '', b.covenant ?? '')
-        || String(a.covenant_id ?? '').localeCompare(String(b.covenant_id ?? ''));
+    return (
+        collator.value.compare(a.covenant ?? '', b.covenant ?? '') ||
+        String(a.covenant_id ?? '').localeCompare(String(b.covenant_id ?? ''))
+    );
 }
 
 const sortedRows = computed(() => {
@@ -76,7 +78,7 @@ const sortedRows = computed(() => {
 
     return [...props.rows].sort((a, b) => {
         if (key === 'covenant') {
-            return (collator.value.compare(a.covenant ?? '', b.covenant ?? '') * factor) || tieBreak(a, b);
+            return collator.value.compare(a.covenant ?? '', b.covenant ?? '') * factor || tieBreak(a, b);
         }
 
         // Percentual indefinido (sem faturado) sempre por último.
@@ -86,7 +88,7 @@ const sortedRows = computed(() => {
             return isBlank(a[key]) ? 1 : -1;
         }
 
-        return ((Number(a[key]) - Number(b[key])) * factor) || tieBreak(a, b);
+        return (Number(a[key]) - Number(b[key])) * factor || tieBreak(a, b);
     });
 });
 
@@ -100,9 +102,9 @@ const sortTitle = (column) => txRoot('sort_by', { column: c.value[column.label] 
 const expandedKey = ref(null);
 const toggleButtons = new Map();
 
-const rowKey   = (row) => (row.covenant_id ? String(row.covenant_id) : NO_COVENANT_KEY);
+const rowKey = (row) => (row.covenant_id ? String(row.covenant_id) : NO_COVENANT_KEY);
 const detailId = (row) => `covenant-claims-${uid}-${rowKey(row)}`;
-const isOpen   = (row) => expandedKey.value === rowKey(row);
+const isOpen = (row) => expandedKey.value === rowKey(row);
 
 function bindToggle(row) {
     return (element) => {
@@ -124,9 +126,12 @@ async function collapse(row) {
 }
 
 // Período novo sem o convênio aberto: nada fica "expandido" apontando para o vazio.
-watch(() => props.rows, (rows) => {
-    if (expandedKey.value && !rows.some((row) => rowKey(row) === expandedKey.value)) expandedKey.value = null;
-});
+watch(
+    () => props.rows,
+    (rows) => {
+        if (expandedKey.value && !rows.some((row) => rowKey(row) === expandedKey.value)) expandedKey.value = null;
+    },
+);
 
 const claimsCount = (count) => plural(c.value, 'claims_count', count);
 </script>
@@ -142,7 +147,11 @@ const claimsCount = (count) => plural(c.value, 'claims_count', count);
 
         <div class="table-responsive covenants-report__scroll">
             <table class="table table-hover align-middle mb-0 covenants-table">
-                <caption class="visually-hidden">{{ c.by_covenant }}</caption>
+                <caption class="visually-hidden">
+                    {{
+                        c.by_covenant
+                    }}
+                </caption>
                 <thead class="table-light">
                     <tr>
                         <SortableTh
@@ -155,12 +164,19 @@ const claimsCount = (count) => plural(c.value, 'claims_count', count);
                             :current-dir="sort.dir"
                             :title="sortTitle(column)"
                             @sort="onSort"
-                        >{{ c[column.label] }}</SortableTh>
+                            >{{ c[column.label] }}</SortableTh
+                        >
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="rows.length === 0">
-                        <td :colspan="COLUMNS.length" class="text-center text-body-secondary py-5" data-test="covenants-empty">{{ c.no_data }}</td>
+                        <td
+                            :colspan="COLUMNS.length"
+                            class="text-center text-body-secondary py-5"
+                            data-test="covenants-empty"
+                        >
+                            {{ c.no_data }}
+                        </td>
                     </tr>
                     <template v-for="row in sortedRows" :key="rowKey(row)">
                         <tr
@@ -181,21 +197,34 @@ const claimsCount = (count) => plural(c.value, 'claims_count', count);
                                 >
                                     <i class="ti ti-chevron-right covenant-toggle__icon" aria-hidden="true"></i>
                                     <span class="covenant-toggle__text">
-                                        <span class="covenant-toggle__name" data-test="covenant-name">{{ row.covenant }}</span>
+                                        <span class="covenant-toggle__name" data-test="covenant-name">{{
+                                            row.covenant
+                                        }}</span>
                                         <span
                                             v-if="row.inactive"
                                             class="badge badge-soft-secondary border ms-1 fw-normal"
                                             :title="c.inactive_hint"
                                             data-test="covenant-inactive"
-                                        >{{ c.inactive_badge }}</span>
-                                        <span class="d-block small text-body-secondary fw-normal" data-test="covenant-claims">{{ claimsCount(row.claims) }}</span>
+                                            >{{ c.inactive_badge }}</span
+                                        >
+                                        <span
+                                            class="d-block small text-body-secondary fw-normal"
+                                            data-test="covenant-claims"
+                                            >{{ claimsCount(row.claims) }}</span
+                                        >
                                     </span>
                                 </button>
                             </th>
-                            <td class="text-end text-body text-nowrap" data-test="col-amount">{{ money(row.amount) }}</td>
+                            <td class="text-end text-body text-nowrap" data-test="col-amount">
+                                {{ money(row.amount) }}
+                            </td>
                             <td class="text-end text-body text-nowrap" data-test="col-paid">{{ money(row.paid) }}</td>
-                            <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="col-denied">{{ money(row.denied) }}</td>
-                            <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="col-open">{{ money(row.open) }}</td>
+                            <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="col-denied">
+                                {{ money(row.denied) }}
+                            </td>
+                            <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="col-open">
+                                {{ money(row.open) }}
+                            </td>
                             <td class="text-end text-nowrap" data-test="col-glosa-rate">
                                 <span
                                     v-if="row.glosa_alert"
@@ -203,11 +232,17 @@ const claimsCount = (count) => plural(c.value, 'claims_count', count);
                                     :title="alertHint"
                                     data-test="glosa-alert"
                                 >
-                                    <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ percent(row.glosa_rate) }} · {{ c.glosa_alert_badge }}
+                                    <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                                    >{{ percent(row.glosa_rate) }} · {{ c.glosa_alert_badge }}
                                 </span>
                                 <span v-else class="text-body">{{ percent(row.glosa_rate) }}</span>
                             </td>
-                            <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="col-received-rate">{{ percent(row.received_rate) }}</td>
+                            <td
+                                class="text-end text-body text-nowrap d-none d-lg-table-cell"
+                                data-test="col-received-rate"
+                            >
+                                {{ percent(row.received_rate) }}
+                            </td>
                         </tr>
                         <tr v-if="isOpen(row)" class="covenants-table__detail" data-test="covenant-detail">
                             <td :colspan="COLUMNS.length" class="covenants-table__detail-cell">
@@ -227,26 +262,51 @@ const claimsCount = (count) => plural(c.value, 'claims_count', count);
                     <tr class="covenants-table__totals" data-test="covenant-totals">
                         <th scope="row" class="covenants-table__sticky">
                             {{ c.footer_total }}
-                            <span class="d-block small text-body-secondary fw-normal">{{ claimsCount(summary.total_claims ?? 0) }}</span>
+                            <span class="d-block small text-body-secondary fw-normal">{{
+                                claimsCount(summary.total_claims ?? 0)
+                            }}</span>
                         </th>
-                        <td class="text-end text-body text-nowrap" data-test="total-amount">{{ money(summary.total_amount ?? 0) }}</td>
-                        <td class="text-end text-body text-nowrap" data-test="total-paid">{{ money(summary.total_paid ?? 0) }}</td>
-                        <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="total-denied">{{ money(summary.total_denied ?? 0) }}</td>
-                        <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="total-open">{{ money(summary.total_open ?? 0) }}</td>
+                        <td class="text-end text-body text-nowrap" data-test="total-amount">
+                            {{ money(summary.total_amount ?? 0) }}
+                        </td>
+                        <td class="text-end text-body text-nowrap" data-test="total-paid">
+                            {{ money(summary.total_paid ?? 0) }}
+                        </td>
+                        <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="total-denied">
+                            {{ money(summary.total_denied ?? 0) }}
+                        </td>
+                        <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="total-open">
+                            {{ money(summary.total_open ?? 0) }}
+                        </td>
                         <td class="text-end text-nowrap" data-test="total-glosa-rate">
-                            <span v-if="summary.glosa_alert" class="badge badge-soft-danger border border-danger fw-semibold" :title="alertHint">
-                                <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ percent(summary.glosa_rate) }} · {{ c.glosa_alert_badge }}
+                            <span
+                                v-if="summary.glosa_alert"
+                                class="badge badge-soft-danger border border-danger fw-semibold"
+                                :title="alertHint"
+                            >
+                                <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                                >{{ percent(summary.glosa_rate) }} · {{ c.glosa_alert_badge }}
                             </span>
                             <span v-else class="text-body">{{ percent(summary.glosa_rate) }}</span>
                         </td>
-                        <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="total-received-rate">{{ percent(summary.received_rate) }}</td>
+                        <td
+                            class="text-end text-body text-nowrap d-none d-lg-table-cell"
+                            data-test="total-received-rate"
+                        >
+                            {{ percent(summary.received_rate) }}
+                        </td>
                     </tr>
                 </tfoot>
             </table>
         </div>
 
-        <p v-if="rows.length" class="card-footer bg-transparent small text-body-secondary mb-0" data-test="glosa-legend">
-            <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ tx('glosa_alert_legend', { threshold: thresholdText }) }}
+        <p
+            v-if="rows.length"
+            class="card-footer bg-transparent small text-body-secondary mb-0"
+            data-test="glosa-legend"
+        >
+            <i class="ti ti-info-circle me-1" aria-hidden="true"></i
+            >{{ tx('glosa_alert_legend', { threshold: thresholdText }) }}
         </p>
     </section>
 </template>

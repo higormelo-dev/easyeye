@@ -10,13 +10,13 @@ import Cid10Picker from '@/Components/Panel/Cid10Picker.vue';
  * pelo mesmo rótulo.
  */
 const props = defineProps({
-    modelValue:  { type: String, default: '' },
-    searchUrl:   { type: String, required: true },
-    id:          { type: String, required: true },
-    label:       { type: String, default: '' },
+    modelValue: { type: String, default: '' },
+    searchUrl: { type: String, required: true },
+    id: { type: String, required: true },
+    label: { type: String, default: '' },
     placeholder: { type: String, default: '' },
-    hint:        { type: String, default: '' },
-    error:       { type: String, default: '' },
+    hint: { type: String, default: '' },
+    error: { type: String, default: '' },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -25,30 +25,31 @@ const selection = ref([]);
 
 // Valor vindo de fora (reset do formulário): reflete no picker sem perder a
 // descrição do item escolhido quando o código é o mesmo.
-watch(() => props.modelValue, (code) => {
-    const current = selection.value[0]?.code ?? '';
-    if ((code ?? '') === current) return;
+watch(
+    () => props.modelValue,
+    (code) => {
+        const current = selection.value[0]?.code ?? '';
+        if ((code ?? '') === current) return;
 
-    selection.value = code ? [{ code, description: '' }] : [];
-}, { immediate: true });
+        selection.value = code ? [{ code, description: '' }] : [];
+    },
+    { immediate: true },
+);
 
 function onSelect(items) {
     selection.value = Array.isArray(items) ? items.slice(0, 1) : [];
     emit('update:modelValue', selection.value[0]?.code ?? '');
 }
 
-const describedBy = computed(() => [
-    props.hint ? `${props.id}-hint` : null,
-    props.error ? `${props.id}-error` : null,
-].filter(Boolean).join(' ') || undefined);
+const describedBy = computed(
+    () =>
+        [props.hint ? `${props.id}-hint` : null, props.error ? `${props.id}-error` : null].filter(Boolean).join(' ') ||
+        undefined,
+);
 </script>
 
 <template>
-    <div
-        role="group"
-        :aria-labelledby="`${id}-label`"
-        :data-test="`${id}-field`"
-    >
+    <div role="group" :aria-labelledby="`${id}-label`" :data-test="`${id}-field`">
         <label :id="`${id}-label`" :for="`${id}-input`" class="form-label d-block">{{ label }}</label>
         <div :class="{ 'cid-field--invalid': error }">
             <Cid10Picker

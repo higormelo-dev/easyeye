@@ -21,18 +21,27 @@ vi.mock('@inertiajs/vue3', async () => {
         usePage: () => ({ props: { locale: 'pt_BR' } }),
         useForm: (data) => {
             const initial = { ...data };
-            const fields  = Object.keys(data);
+            const fields = Object.keys(data);
             let transformer = (value) => value;
             const form = reactive({
                 ...data,
                 errors: {},
                 processing: false,
                 data: () => Object.fromEntries(fields.map((field) => [field, form[field]])),
-                transform: (callback) => { transformer = callback; return form; },
+                transform: (callback) => {
+                    transformer = callback;
+                    return form;
+                },
                 reset: () => Object.assign(form, initial),
-                clearErrors: () => { form.errors = {}; },
-                post: vi.fn((url, options) => inertia.sent.push({ method: 'post', url, data: transformer(form.data()), options })),
-                put: vi.fn((url, options) => inertia.sent.push({ method: 'put', url, data: transformer(form.data()), options })),
+                clearErrors: () => {
+                    form.errors = {};
+                },
+                post: vi.fn((url, options) =>
+                    inertia.sent.push({ method: 'post', url, data: transformer(form.data()), options }),
+                ),
+                put: vi.fn((url, options) =>
+                    inertia.sent.push({ method: 'put', url, data: transformer(form.data()), options }),
+                ),
             });
             inertia.forms.push(form);
 
@@ -45,7 +54,8 @@ vi.mock('@/Components/Panel/OffcanvasPanel.vue', () => ({
     default: {
         props: ['open', 'width'],
         emits: ['close'],
-        template: '<div v-if="open" class="offcanvas-stub"><header><slot name="header" /></header><slot /><footer><slot name="footer" /></footer></div>',
+        template:
+            '<div v-if="open" class="offcanvas-stub"><header><slot name="header" /></header><slot /><footer><slot name="footer" /></footer></div>',
     },
 }));
 
@@ -68,9 +78,24 @@ const options = {
 const routes = { store: '/doctor-payouts/rules', update: '/doctor-payouts/rules/__ID__' };
 
 const editRule = {
-    id: 'r9', doctor_id: 'd1', doctor_name: 'Dra. Ana Lima', service_type: 'procedure', item_kind: 'procedure', item_id: 'pr1',
-    item_name: 'Facectomia', payer_scope: 'covenant', covenant_id: 'c1', covenant_name: 'Unimed', calculation: 'fixed',
-    percentage: null, fixed_amount: 80, valid_from: '2026-01-01', valid_until: null, active: true, notes: 'Tabela 2026', is_general: false,
+    id: 'r9',
+    doctor_id: 'd1',
+    doctor_name: 'Dra. Ana Lima',
+    service_type: 'procedure',
+    item_kind: 'procedure',
+    item_id: 'pr1',
+    item_name: 'Facectomia',
+    payer_scope: 'covenant',
+    covenant_id: 'c1',
+    covenant_name: 'Unimed',
+    calculation: 'fixed',
+    percentage: null,
+    fixed_amount: 80,
+    valid_from: '2026-01-01',
+    valid_until: null,
+    active: true,
+    notes: 'Tabela 2026',
+    is_general: false,
 };
 
 let wrapper;
@@ -91,10 +116,11 @@ async function mountModal(props = {}) {
 }
 
 const form = () => inertia.forms.at(-1);
-const itemGroups = (w) => w.findAll('#rule_item optgroup').map((group) => ({
-    label: group.attributes('label'),
-    options: group.findAll('option').map((option) => option.text()),
-}));
+const itemGroups = (w) =>
+    w.findAll('#rule_item optgroup').map((group) => ({
+        label: group.attributes('label'),
+        options: group.findAll('option').map((option) => option.text()),
+    }));
 
 async function submit(w) {
     await w.find('[data-test="rule-submit"]').trigger('click');
@@ -108,7 +134,11 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
 
         expect(w.find('header').text()).toBe('New rule');
         expect(w.find('label[for="rule_doctor_id"]').text()).toBe('Doctor');
-        expect(w.findAll('#rule_doctor_id option').map((o) => o.text())).toEqual(['All doctors', 'Dra. Ana Lima', 'Dr. Beto Reis (inactive)']);
+        expect(w.findAll('#rule_doctor_id option').map((o) => o.text())).toEqual([
+            'All doctors',
+            'Dra. Ana Lima',
+            'Dr. Beto Reis (inactive)',
+        ]);
         expect(w.find('label[for="rule_item"]').text()).toBe('Apply to');
         expect(w.find('#rule_percentage').exists()).toBe(true);
         expect(w.find('#rule_fixed_amount').exists()).toBe(false);
@@ -150,7 +180,12 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
     it('"Todos os tipos" (só ao criar): sem item específico e com a dica', async () => {
         const w = await mountModal();
 
-        expect(w.findAll('#rule_service_type option').map((o) => o.attributes('value'))).toEqual(['consultation', 'exam', 'procedure', 'all']);
+        expect(w.findAll('#rule_service_type option').map((o) => o.attributes('value'))).toEqual([
+            'consultation',
+            'exam',
+            'procedure',
+            'all',
+        ]);
 
         await w.find('#rule_service_type').setValue('all');
         expect(w.find('#rule_item').exists()).toBe(false);
@@ -217,8 +252,14 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
         expect(w.find('#rule_covenant_id').exists()).toBe(false);
 
         await w.find('#rule_payer_scope').setValue('covenant');
-        expect(w.findAll('#rule_covenant_id option').map((o) => o.text())).toEqual(['Any insurance', 'Unimed', 'Convênio Prefeitura']);
-        expect(w.find('#rule_covenant_id optgroup[data-group="without_ans"]').attributes('label')).toBe('No ANS registry (treated as private in billing)');
+        expect(w.findAll('#rule_covenant_id option').map((o) => o.text())).toEqual([
+            'Any insurance',
+            'Unimed',
+            'Convênio Prefeitura',
+        ]);
+        expect(w.find('#rule_covenant_id optgroup[data-group="without_ans"]').attributes('label')).toBe(
+            'No ANS registry (treated as private in billing)',
+        );
         expect(w.find('#rule_covenant_id optgroup[data-group="without_ans"]').text()).toContain('Convênio Prefeitura');
 
         await w.find('#rule_covenant_id').setValue('c1');
@@ -239,16 +280,32 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
         expect(w.find('#rule_fixed_amount').exists()).toBe(true);
         expect(w.find('#rule_valid_from').element.value).toBe('2026-01-01');
         expect(w.find('#rule_notes').element.value).toBe('Tabela 2026');
-        expect(w.findAll('#rule_service_type option').map((o) => o.attributes('value'))).toEqual(['consultation', 'exam', 'procedure']);
+        expect(w.findAll('#rule_service_type option').map((o) => o.attributes('value'))).toEqual([
+            'consultation',
+            'exam',
+            'procedure',
+        ]);
 
         const sent = await submit(w);
         expect(sent.method).toBe('put');
         expect(sent.url).toBe('/doctor-payouts/rules/r9');
-        expect(sent.data).toEqual(expect.objectContaining({
-            doctor_id: 'd1', service_type: 'procedure', procedure_id: 'pr1', visit_type_id: null, exam_type_id: null,
-            payer_scope: 'covenant', covenant_id: 'c1', calculation: 'fixed', fixed_amount: 80, percentage: null,
-            valid_from: '2026-01-01', valid_until: null, notes: 'Tabela 2026',
-        }));
+        expect(sent.data).toEqual(
+            expect.objectContaining({
+                doctor_id: 'd1',
+                service_type: 'procedure',
+                procedure_id: 'pr1',
+                visit_type_id: null,
+                exam_type_id: null,
+                payer_scope: 'covenant',
+                covenant_id: 'c1',
+                calculation: 'fixed',
+                fixed_amount: 80,
+                percentage: null,
+                valid_from: '2026-01-01',
+                valid_until: null,
+                notes: 'Tabela 2026',
+            }),
+        );
     });
 
     it('editar regra cujo item saiu das listas (inativo): o item continua selecionado', async () => {
@@ -263,14 +320,16 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
 
         form().errors = {
             procedure_id: 'The chosen item does not match the service type.',
-            valid_from:   'There is already an active rule with the same scope.',
-            percentage:   'The percentage field is required.',
+            valid_from: 'There is already an active rule with the same scope.',
+            percentage: 'The percentage field is required.',
         };
         await nextTick();
 
         expect(w.find('#rule_item').attributes('aria-invalid')).toBe('true');
         expect(w.find('#rule_item_error').text()).toBe('The chosen item does not match the service type.');
-        expect(w.find('#rule_valid_from').attributes('aria-describedby')).toBe('rule_validity_hint rule_valid_from_error');
+        expect(w.find('#rule_valid_from').attributes('aria-describedby')).toBe(
+            'rule_validity_hint rule_valid_from_error',
+        );
         expect(w.find('#rule_valid_from_error').text()).toBe('There is already an active rule with the same scope.');
         expect(w.find('#rule_percentage').classes()).toContain('is-invalid');
         expect(w.find('#rule_percentage_error').text()).toBe('The percentage field is required.');
@@ -323,7 +382,9 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
         await w.find('[data-test="split-add"]').trigger('click');
         await w.find('[data-test="split-add"]').trigger('click');
         await w.findAll('[data-test="split-remove"]')[0].trigger('click');
-        expect(w.findAll('[data-test="split-row"]').map((row) => row.find('[data-test="split-role"]').element.value)).toEqual(['doctor']);
+        expect(
+            w.findAll('[data-test="split-row"]').map((row) => row.find('[data-test="split-role"]').element.value),
+        ).toEqual(['doctor']);
 
         await w.find('[data-test="calculation-fixed"]').setValue(true);
         expect(w.find('[data-test="split-editor"]').exists()).toBe(false);
@@ -358,7 +419,9 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
         await nextTick();
 
         expect(w.find('[data-test="split-error"]').text()).toBe('The shares must add up to 100%.');
-        expect(w.findAll('[data-test="split-row"]')[0].find('[data-test="split-doctor"]').attributes('aria-invalid')).toBe('true');
+        expect(
+            w.findAll('[data-test="split-row"]')[0].find('[data-test="split-doctor"]').attributes('aria-invalid'),
+        ).toBe('true');
         expect(w.findAll('[data-test="split-row"]')[0].text()).toContain('The doctor is invalid.');
 
         const { data } = await submit(w);
@@ -405,7 +468,9 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
 
         const sent = await submit(w);
         expect(sent.method).toBe('post');
-        expect(sent.data).toEqual(expect.objectContaining({ procedure_id: 'pr1', calculation: 'fixed', fixed_amount: 80, valid_from: null }));
+        expect(sent.data).toEqual(
+            expect.objectContaining({ procedure_id: 'pr1', calculation: 'fixed', fixed_amount: 80, valid_from: null }),
+        );
     });
 
     it('"Aplicar a" explica de onde vem a lista (procedimentos) e como vale o tipo de exame', async () => {

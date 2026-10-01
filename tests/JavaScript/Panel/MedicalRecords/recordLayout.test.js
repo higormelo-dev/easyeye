@@ -11,16 +11,23 @@ import { recordColumnOrder } from '@/Pages/Panel/MedicalRecords/Components/recor
  * seções no lugar padrão, não no fim da coluna nem sumidas.
  */
 
-const LEFT  = ['cromatica_ppc_cover', 'av_sem_tono', 'av_com', 'tonometria', 'dinamica', 'estatica'];
+const LEFT = ['cromatica_ppc_cover', 'av_sem_tono', 'av_com', 'tonometria', 'dinamica', 'estatica'];
 const RIGHT = ['adicao', 'biomicroscopia', 'fundoscopia', 'obs_geral'];
 
 describe('recordColumnOrder — "Meu prontuário" salvo antes da mudança', () => {
     it('A/V com correção e Tonometria entram logo depois de A/V sem correção, mesmo com a ordem do médico', () => {
         // Modelo antigo: av_com estava na direita; a Tonometria não era seção; Estática no topo.
-        const savedLeft  = ['estatica', 'cromatica_ppc_cover', 'av_sem_tono', 'dinamica'];
+        const savedLeft = ['estatica', 'cromatica_ppc_cover', 'av_sem_tono', 'dinamica'];
         const savedRight = ['av_com', 'adicao', 'biomicroscopia', 'fundoscopia', 'obs_geral'];
 
-        expect(recordColumnOrder(LEFT, savedLeft)).toEqual(['estatica', 'cromatica_ppc_cover', 'av_sem_tono', 'av_com', 'tonometria', 'dinamica']);
+        expect(recordColumnOrder(LEFT, savedLeft)).toEqual([
+            'estatica',
+            'cromatica_ppc_cover',
+            'av_sem_tono',
+            'av_com',
+            'tonometria',
+            'dinamica',
+        ]);
         expect(recordColumnOrder(RIGHT, savedRight)).toEqual(['adicao', 'biomicroscopia', 'fundoscopia', 'obs_geral']);
     });
 
@@ -30,8 +37,18 @@ describe('recordColumnOrder — "Meu prontuário" salvo antes da mudança', () =
     });
 
     it('modelo já novo: respeita a ordem do médico; ignora chaves desconhecidas e repetidas', () => {
-        expect(recordColumnOrder(LEFT, ['dinamica', 'tonometria', 'av_com', 'x', 'dinamica', 'estatica', 'av_sem_tono', 'cromatica_ppc_cover']))
-            .toEqual(['dinamica', 'tonometria', 'av_com', 'estatica', 'av_sem_tono', 'cromatica_ppc_cover']);
+        expect(
+            recordColumnOrder(LEFT, [
+                'dinamica',
+                'tonometria',
+                'av_com',
+                'x',
+                'dinamica',
+                'estatica',
+                'av_sem_tono',
+                'cromatica_ppc_cover',
+            ]),
+        ).toEqual(['dinamica', 'tonometria', 'av_com', 'estatica', 'av_sem_tono', 'cromatica_ppc_cover']);
     });
 
     it('seção sem antecessora no padrão entra no topo', () => {
@@ -40,17 +57,23 @@ describe('recordColumnOrder — "Meu prontuário" salvo antes da mudança', () =
 });
 
 describe('MedicalRecordForm — organização da coluna esquerda', () => {
-    const source  = readFileSync(resolve(process.cwd(), 'resources/js/Pages/Panel/MedicalRecords/Components/MedicalRecordForm.vue'), 'utf8');
-    const styles  = readFileSync(resolve(process.cwd(), 'resources/css/system/_medical-records.scss'), 'utf8');
-    const left    = source.slice(source.indexOf('<!-- COLUNA ESQUERDA -->'), source.indexOf('<!-- COLUNA DIREITA -->'));
-    const right   = source.slice(source.indexOf('<!-- COLUNA DIREITA -->'));
-    const at      = (block, key) => block.indexOf(`sectionStyle('${key}')`);
+    const source = readFileSync(
+        resolve(process.cwd(), 'resources/js/Pages/Panel/MedicalRecords/Components/MedicalRecordForm.vue'),
+        'utf8',
+    );
+    const styles = readFileSync(resolve(process.cwd(), 'resources/css/system/_medical-records.scss'), 'utf8');
+    const left = source.slice(source.indexOf('<!-- COLUNA ESQUERDA -->'), source.indexOf('<!-- COLUNA DIREITA -->'));
+    const right = source.slice(source.indexOf('<!-- COLUNA DIREITA -->'));
+    const at = (block, key) => block.indexOf(`sectionStyle('${key}')`);
     /** Marcação da seção (do seu <div> até a próxima seção); aceita atributos quebrados em linhas. */
     const sectionIn = (block, key) => {
-        const pos    = at(block, key);
+        const pos = at(block, key);
         const starts = [...block.matchAll(/<div\s+class="pmr-section/g)].map((m) => m.index);
 
-        return block.slice(starts.filter((i) => i < pos).at(-1), starts.find((i) => i > pos));
+        return block.slice(
+            starts.filter((i) => i < pos).at(-1),
+            starts.find((i) => i > pos),
+        );
     };
     const section = (key) => sectionIn(left, key);
 
@@ -92,9 +115,12 @@ describe('MedicalRecordForm — organização da coluna esquerda', () => {
 
     it('os campos continuam os mesmos, uma vez só na tela, e nenhum ficou na coluna direita', () => {
         for (const field of [
-            'visual_acuity_without_correction_right_id', 'visual_acuity_without_correction_left_id',
-            'visual_acuity_with_correction_right_id', 'visual_acuity_with_correction_left_id',
-            'tonometer_right', 'tonometer_left',
+            'visual_acuity_without_correction_right_id',
+            'visual_acuity_without_correction_left_id',
+            'visual_acuity_with_correction_right_id',
+            'visual_acuity_with_correction_left_id',
+            'tonometer_right',
+            'tonometer_left',
         ]) {
             expect(source.split(`v-model="form.${field}"`)).toHaveLength(2);
             expect(left).toContain(`v-model="form.${field}"`);
@@ -113,7 +139,9 @@ describe('MedicalRecordForm — organização da coluna esquerda', () => {
         expect(lens.split('class="pmr-lens-field')).toHaveLength(4); // Adição, Longe, Perto
         expect(lens).toContain('pmr-lens-field--short');
         // Botões na altura dos campos: espaço do rótulo, invisível para leitores de tela.
-        expect(lens).toMatch(/<div class="col-auto">\s*<!--[^>]*-->\s*<span class="pmr-label d-inline-block invisible" aria-hidden="true">/);
+        expect(lens).toMatch(
+            /<div class="col-auto">\s*<!--[^>]*-->\s*<span class="pmr-label d-inline-block invisible" aria-hidden="true">/,
+        );
 
         // Base mínima + crescimento (>= 1, o campo sozinho vai até a borda);
         // a linha quebra só quando falta espaço.
@@ -132,7 +160,10 @@ describe('MedicalRecordForm — organização da coluna esquerda', () => {
     });
 
     it('registro do "Meu prontuário": Tonometria depois de A/V com correção, rótulos pelas traduções', () => {
-        const defs = source.slice(source.indexOf('const SECTION_DEFS'), source.indexOf('];', source.indexOf('const SECTION_DEFS')));
+        const defs = source.slice(
+            source.indexOf('const SECTION_DEFS'),
+            source.indexOf('];', source.indexOf('const SECTION_DEFS')),
+        );
 
         expect(defs).toMatch(/key: 'av_com',\s+col: 'left'/);
         expect(defs).toMatch(/key: 'tonometria',\s+col: 'left',\s+labelKeys: \['tonometry'\]/);

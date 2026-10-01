@@ -1,18 +1,18 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
-import AppLayout          from '@/Layouts/AppLayout.vue';
-import PageHeader         from '@/Components/Panel/PageHeader.vue';
-import PeriodFilter       from '@/Components/Panel/PeriodFilter.vue';
-import KpiCard            from '@/Components/Panel/KpiCard.vue';
-import SearchInput        from '@/Components/Panel/SearchInput.vue';
-import SearchSelect       from '@/Components/Panel/SearchSelect.vue';
-import TablePagination    from '@/Components/Panel/TablePagination.vue';
-import CenteredModal      from '@/Components/Panel/CenteredModal.vue';
-import { useTrans }        from '@/composables/useTrans';
-import CashEntryFormModal  from './CashEntryFormModal.vue';
-import CashFlowTable       from './CashFlowTable.vue';
-import CashFlowCards       from './CashFlowCards.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import PeriodFilter from '@/Components/Panel/PeriodFilter.vue';
+import KpiCard from '@/Components/Panel/KpiCard.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import CenteredModal from '@/Components/Panel/CenteredModal.vue';
+import { useTrans } from '@/composables/useTrans';
+import CashEntryFormModal from './CashEntryFormModal.vue';
+import CashFlowTable from './CashFlowTable.vue';
+import CashFlowCards from './CashFlowCards.vue';
 import { useCashEntryFormat } from './useCashEntryFormat.js';
 
 /**
@@ -22,18 +22,18 @@ import { useCashEntryFormat } from './useCashEntryFormat.js';
  * com totais do conjunto filtrado, lançamento em modal e exclusão confirmada.
  */
 const props = defineProps({
-    breadcrumbs:       { type: Array,   default: () => [] },
-    entries:           { type: Object,  required: true },
-    overview:          { type: Object,  default: () => ({}) },
-    categories:        { type: Array,   default: () => [] },
-    covenants:         { type: Array,   default: () => [] },
-    payment_methods:   { type: Array,   default: () => [] },
+    breadcrumbs: { type: Array, default: () => [] },
+    entries: { type: Object, required: true },
+    overview: { type: Object, default: () => ({}) },
+    categories: { type: Array, default: () => [] },
+    covenants: { type: Array, default: () => [] },
+    payment_methods: { type: Array, default: () => [] },
     // Fechamentos ativos que cruzam o período filtrado ([{ period_start, period_end }]).
-    closed_periods:    { type: Array,   default: () => [] },
-    filters:           { type: Object,  default: () => ({}) },
-    today:             { type: String,  default: '' },
+    closed_periods: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    today: { type: String, default: '' },
     can_edit_schedule: { type: Boolean, default: false },
-    t:                 { type: Object,  default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { tx } = useTrans(() => props.t);
@@ -46,9 +46,9 @@ const ids = {
 };
 
 const SEARCH_DEBOUNCE_MS = 400;
-const STATUSES           = ['pending', 'paid', 'cancelled'];
-const DEFAULT_SORT       = 'entry_date';
-const DEFAULT_DIRECTION  = 'desc';
+const STATUSES = ['pending', 'paid', 'cancelled'];
+const DEFAULT_SORT = 'entry_date';
+const DEFAULT_DIRECTION = 'desc';
 
 // `today` junto: aba aberta de um dia para o outro recebe o dia novo ao salvar/excluir.
 const RELOAD_PROPS = ['entries', 'overview', 'closed_periods', 'today'];
@@ -56,18 +56,21 @@ const RELOAD_PROPS = ['entries', 'overview', 'closed_periods', 'today'];
 const rows = computed(() => props.entries?.data ?? []);
 
 // ── Filtros: estado local (fonte da verdade da barra), aplicados na hora ────
-const period         = ref({ from: props.filters.from ?? '', to: props.filters.to ?? '' });
+const period = ref({ from: props.filters.from ?? '', to: props.filters.to ?? '' });
 
 // O servidor normaliza o período (data inválida → mês atual; início > fim →
 // invertido): a barra passa a mostrar o período que os KPIs/tabela usam.
-watch(() => [props.filters.from, props.filters.to], ([from, to]) => {
-    period.value = { from: from ?? '', to: to ?? '' };
-});
-const search         = ref(props.filters.search ?? '');
-const typeFilter     = ref(props.filters.type ?? '');
-const statusFilter   = ref(props.filters.status ?? '');
+watch(
+    () => [props.filters.from, props.filters.to],
+    ([from, to]) => {
+        period.value = { from: from ?? '', to: to ?? '' };
+    },
+);
+const search = ref(props.filters.search ?? '');
+const typeFilter = ref(props.filters.type ?? '');
+const statusFilter = ref(props.filters.status ?? '');
 const categoryFilter = ref(props.filters.category_id ?? '');
-const loading        = ref(false);
+const loading = ref(false);
 
 function withoutEmpty(values) {
     return Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null && v !== undefined && v !== ''));
@@ -75,20 +78,20 @@ function withoutEmpty(values) {
 
 function queryParams(overrides = {}) {
     const params = {
-        from:        period.value.from,
-        to:          period.value.to,
-        search:      search.value.trim(),
-        type:        typeFilter.value,
-        status:      statusFilter.value,
+        from: period.value.from,
+        to: period.value.to,
+        search: search.value.trim(),
+        type: typeFilter.value,
+        status: statusFilter.value,
         category_id: categoryFilter.value,
-        sort:        props.filters.sort,
-        direction:   props.filters.direction,
+        sort: props.filters.sort,
+        direction: props.filters.direction,
         ...overrides,
     };
 
     // Ordenação padrão fica fora da URL.
     if (params.sort === DEFAULT_SORT && params.direction === DEFAULT_DIRECTION) {
-        params.sort      = '';
+        params.sort = '';
         params.direction = '';
     }
 
@@ -98,15 +101,19 @@ function queryParams(overrides = {}) {
 /** Troca de filtro/ordem: volta para a página 1, mantém o resto e não empilha histórico. */
 function visit(overrides = {}) {
     router.get(route('panel.financial.cash-flow.index'), queryParams(overrides), {
-        preserveState:  true,
+        preserveState: true,
         preserveScroll: true,
-        replace:        true,
-        onStart:        () => { loading.value = true; },
-        onFinish:       () => { loading.value = false; },
+        replace: true,
+        onStart: () => {
+            loading.value = true;
+        },
+        onFinish: () => {
+            loading.value = false;
+        },
     });
 }
 
-let searchTimer       = null;
+let searchTimer = null;
 let skipSearchWatcher = false;
 
 watch(search, () => {
@@ -133,8 +140,8 @@ function onPeriodChange({ from, to }) {
 }
 
 const typeOptions = computed(() => [
-    { value: '',        label: props.t.filter_type_all },
-    { value: 'income',  label: props.t.filter_type_income },
+    { value: '', label: props.t.filter_type_all },
+    { value: 'income', label: props.t.filter_type_income },
     { value: 'expense', label: props.t.filter_type_expense },
 ]);
 
@@ -155,9 +162,9 @@ function onStatusChange(event) {
     visit();
 }
 
-const categoryOptions = computed(() => (typeFilter.value
-    ? props.categories.filter((c) => c.type === typeFilter.value)
-    : props.categories));
+const categoryOptions = computed(() =>
+    typeFilter.value ? props.categories.filter((c) => c.type === typeFilter.value) : props.categories,
+);
 
 function onCategoryChange(value) {
     const next = value ?? '';
@@ -171,7 +178,9 @@ function onSort({ sort, direction }) {
     visit({ sort, direction });
 }
 
-const hasListFilters = computed(() => !!(search.value.trim() || typeFilter.value || statusFilter.value || categoryFilter.value));
+const hasListFilters = computed(
+    () => !!(search.value.trim() || typeFilter.value || statusFilter.value || categoryFilter.value),
+);
 
 /** Limpa busca, tipo, status e categoria; o período escolhido continua. */
 function clearFilters() {
@@ -180,9 +189,9 @@ function clearFilters() {
 
     if (search.value !== '') skipSearchWatcher = true;
 
-    search.value         = '';
-    typeFilter.value     = '';
-    statusFilter.value   = '';
+    search.value = '';
+    typeFilter.value = '';
+    statusFilter.value = '';
     categoryFilter.value = '';
     visit();
 }
@@ -216,38 +225,43 @@ const closeCashHref = computed(() => {
 const reportHref = computed(() => route('panel.financial.reports.cash-flow', periodParams.value));
 
 // ── Aviso de período fechado ────────────────────────────────────────────────
-const closedPeriodsText = computed(() => props.closed_periods
-    .map((p) => `${date(p.period_start)}–${date(p.period_end)}`)
-    .join(', '));
+const closedPeriodsText = computed(() =>
+    props.closed_periods.map((p) => `${date(p.period_start)}–${date(p.period_end)}`).join(', '),
+);
 
 // ── KPIs (overview do servidor, mesmos filtros da tabela) ───────────────────
 const kpis = computed(() => {
     const o = props.overview ?? {};
 
     return [
-        { key: 'received',          tone: 'success',   icon: 'ti ti-arrow-down-left', value: money(o.received ?? 0) },
-        { key: 'receivable',        tone: 'info',      icon: 'ti ti-clock',           value: money(o.receivable ?? 0) },
-        { key: 'paid',              tone: 'danger',    icon: 'ti ti-arrow-up-right',  value: money(o.paid ?? 0) },
-        { key: 'payable',           tone: 'warning',   icon: 'ti ti-clock-pause',     value: money(o.payable ?? 0) },
-        { key: 'realized_balance',  tone: 'primary',   icon: 'ti ti-scale',           value: signedMoney(o.realized_balance ?? 0) },
-        { key: 'projected_balance', tone: 'secondary', icon: 'ti ti-trending-up',     value: signedMoney(o.projected_balance ?? 0) },
+        { key: 'received', tone: 'success', icon: 'ti ti-arrow-down-left', value: money(o.received ?? 0) },
+        { key: 'receivable', tone: 'info', icon: 'ti ti-clock', value: money(o.receivable ?? 0) },
+        { key: 'paid', tone: 'danger', icon: 'ti ti-arrow-up-right', value: money(o.paid ?? 0) },
+        { key: 'payable', tone: 'warning', icon: 'ti ti-clock-pause', value: money(o.payable ?? 0) },
+        { key: 'realized_balance', tone: 'primary', icon: 'ti ti-scale', value: signedMoney(o.realized_balance ?? 0) },
+        {
+            key: 'projected_balance',
+            tone: 'secondary',
+            icon: 'ti ti-trending-up',
+            value: signedMoney(o.projected_balance ?? 0),
+        },
     ].map((kpi) => ({ ...kpi, label: props.t[`kpi_${kpi.key}`], hint: props.t[`kpi_${kpi.key}_hint`] }));
 });
 
 // ── Modal de lançamento ─────────────────────────────────────────────────────
-const formOpen     = ref(false);
+const formOpen = ref(false);
 const editingEntry = ref(null);
 
 function openCreate() {
     editingEntry.value = null;
-    formOpen.value     = true;
+    formOpen.value = true;
 }
 
 function openEdit(entry) {
     if (entry.lock_reason) return;
 
     editingEntry.value = entry;
-    formOpen.value     = true;
+    formOpen.value = true;
 }
 
 /** `keepOpen`: "Salvar e lançar outro" — o modal continua aberto para o próximo. */
@@ -255,7 +269,10 @@ function onSaved({ message = '', entryDate = '', keepOpen = false } = {}) {
     if (!keepOpen) formOpen.value = false;
 
     let text = message;
-    if (entryDate && ((props.filters.from && entryDate < props.filters.from) || (props.filters.to && entryDate > props.filters.to))) {
+    if (
+        entryDate &&
+        ((props.filters.from && entryDate < props.filters.from) || (props.filters.to && entryDate > props.filters.to))
+    ) {
         // Sem este aviso o lançamento "sumia" da lista e era lançado de novo (duplicado).
         text = `${text} ${tx('saved_outside_period', { date: date(entryDate) })}`.trim();
     }
@@ -265,9 +282,9 @@ function onSaved({ message = '', entryDate = '', keepOpen = false } = {}) {
 }
 
 // ── Exclusão com confirmação (resumo do lançamento) ─────────────────────────
-const deleting        = ref(null);
-const deleteBusy      = ref(false);
-const deleteError     = ref('');
+const deleting = ref(null);
+const deleteBusy = ref(false);
+const deleteError = ref('');
 const deleteCancelBtn = ref(null);
 
 function csrf() {
@@ -286,7 +303,7 @@ function askDelete(entry) {
     if (entry.lock_reason) return;
 
     deleteError.value = '';
-    deleting.value    = entry;
+    deleting.value = entry;
 }
 
 function cancelDelete() {
@@ -299,12 +316,12 @@ async function confirmDelete() {
     const entry = deleting.value;
     if (!entry || deleteBusy.value) return;
 
-    deleteBusy.value  = true;
+    deleteBusy.value = true;
     deleteError.value = '';
 
     try {
         const res = await fetch(route('panel.financial.cash-flow.destroy', entry.id), {
-            method:  'DELETE',
+            method: 'DELETE',
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
         });
         const json = await res.json().catch(() => ({}));
@@ -366,7 +383,12 @@ const deletingId = computed(() => (deleteBusy.value ? deleting.value?.id : null)
             </PageHeader>
 
             <!-- Filtros: aplicação automática (busca com debounce) -->
-            <div class="cash-flow-toolbar d-flex flex-wrap align-items-end gap-2 mb-3" role="search" :aria-label="t.filters_label" data-test="filters">
+            <div
+                class="cash-flow-toolbar d-flex flex-wrap align-items-end gap-2 mb-3"
+                role="search"
+                :aria-label="t.filters_label"
+                data-test="filters"
+            >
                 <PeriodFilter
                     compact
                     :from="period.from"
@@ -392,7 +414,9 @@ const deletingId = computed(() => (deleteBusy.value ? deleting.value?.id : null)
                         :aria-pressed="typeFilter === option.value ? 'true' : 'false'"
                         :data-test="`type-${option.value || 'all'}`"
                         @click="setType(option.value)"
-                    >{{ option.label }}</button>
+                    >
+                        {{ option.label }}
+                    </button>
                 </div>
                 <select
                     class="form-select form-select-sm cash-flow-toolbar__select"
@@ -452,23 +476,43 @@ const deletingId = computed(() => (deleteBusy.value ? deleting.value?.id : null)
             </p>
 
             <!-- Período com caixa fechado -->
-            <div v-if="closed_periods.length" class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2" role="status" data-test="closed-banner">
+            <div
+                v-if="closed_periods.length"
+                class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2"
+                role="status"
+                data-test="closed-banner"
+            >
                 <i class="ti ti-lock" aria-hidden="true"></i>
                 <span class="me-auto">{{ tx('closed_banner', { periods: closedPeriodsText }) }}</span>
                 <Link :href="closeCashHref" class="btn btn-sm btn-outline-secondary">{{ t.closed_banner_link }}</Link>
             </div>
 
             <!-- Lista: tabela (md+) e cards (abaixo de md) -->
-            <div class="cash-flow-results" :class="{ 'cash-flow-results--loading': loading }" :aria-busy="loading ? 'true' : 'false'">
+            <div
+                class="cash-flow-results"
+                :class="{ 'cash-flow-results--loading': loading }"
+                :aria-busy="loading ? 'true' : 'false'"
+            >
                 <div v-if="rows.length === 0" class="card">
                     <div class="card-body text-center text-muted py-5" data-test="empty-state">
                         <i class="ti ti-cash-register fs-1 d-block mb-2" aria-hidden="true"></i>
                         <p class="mb-3">{{ hasListFilters ? t.empty_filtered : t.empty }}</p>
                         <div class="d-flex justify-content-center flex-wrap gap-2">
-                            <button type="button" class="btn btn-primary btn-sm" data-test="empty-new-entry" @click="openCreate">
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                data-test="empty-new-entry"
+                                @click="openCreate"
+                            >
                                 <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.new_entry }}
                             </button>
-                            <button v-if="hasListFilters" type="button" class="btn btn-outline-secondary btn-sm" data-test="empty-clear-filters" @click="clearFilters">
+                            <button
+                                v-if="hasListFilters"
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                data-test="empty-clear-filters"
+                                @click="clearFilters"
+                            >
                                 <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear }}
                             </button>
                         </div>
@@ -549,14 +593,25 @@ const deletingId = computed(() => (deleteBusy.value ? deleting.value?.id : null)
                         <dd class="col-7 mb-0 fw-bold">{{ entryAmount(deleting) }}</dd>
                     </dl>
 
-                    <div v-if="deleteError" class="alert alert-danger small d-flex gap-2 mt-3 mb-0" role="alert" data-test="delete-error">
+                    <div
+                        v-if="deleteError"
+                        class="alert alert-danger small d-flex gap-2 mt-3 mb-0"
+                        role="alert"
+                        data-test="delete-error"
+                    >
                         <i class="ti ti-alert-circle mt-1" aria-hidden="true"></i>
                         <span>{{ deleteError }}</span>
                     </div>
                 </template>
 
                 <template #footer>
-                    <button ref="deleteCancelBtn" type="button" class="btn btn-outline-secondary btn-sm" :disabled="deleteBusy" @click="cancelDelete">
+                    <button
+                        ref="deleteCancelBtn"
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        :disabled="deleteBusy"
+                        @click="cancelDelete"
+                    >
                         {{ t.cancel }}
                     </button>
                     <button

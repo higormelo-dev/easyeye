@@ -1,13 +1,13 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import AppLayout        from '@/Layouts/AppLayout.vue';
-import PageHeader       from '@/Components/Panel/PageHeader.vue';
-import SearchInput      from '@/Components/Panel/SearchInput.vue';
-import { useViewMode }  from '@/composables/useViewMode.js';
-import { useTrans }     from '@/composables/useTrans.js';
-import IolLensTable     from './IolLensTable.vue';
-import IolLensCards     from './IolLensCards.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import { useViewMode } from '@/composables/useViewMode.js';
+import { useTrans } from '@/composables/useTrans.js';
+import IolLensTable from './IolLensTable.vue';
+import IolLensCards from './IolLensCards.vue';
 import IolLensFormModal from './IolLensFormModal.vue';
 
 /**
@@ -19,11 +19,11 @@ import IolLensFormModal from './IolLensFormModal.vue';
  * Textos vêm de lang/{locale}/stock_iollenses.php (prop `t`).
  */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    items:       { type: Object, required: true }, // paginator Laravel (through())
-    filters:     { type: Object, default: () => ({}) }, // { search, status, sort, direction } — normalizados
-    routes:      { type: Object, required: true },  // { index, store, search, show, update, destroy, movements_index }
-    t:           { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    items: { type: Object, required: true }, // paginator Laravel (through())
+    filters: { type: Object, default: () => ({}) }, // { search, status, sort, direction } — normalizados
+    routes: { type: Object, required: true }, // { index, store, search, show, update, destroy, movements_index }
+    t: { type: Object, default: () => ({}) },
 });
 
 const { tx } = useTrans(() => props.t);
@@ -50,9 +50,9 @@ const status = ref(props.filters?.status ?? 'all');
 
 function currentParams(overrides = {}) {
     return {
-        search:    search.value,
-        status:    status.value,
-        sort:      props.filters?.sort,
+        search: search.value,
+        status: status.value,
+        sort: props.filters?.sort,
         direction: props.filters?.direction,
         ...overrides,
     };
@@ -128,12 +128,12 @@ async function onToggleActive(lens) {
         props.routes.update.replace('__ID__', lens.id),
         {
             manufacturer: current.manufacturer,
-            model_name:   current.model_name,
-            category:     current.category,
-            diopter_min:  current.diopter_min,
-            diopter_max:  current.diopter_max,
-            price:        current.price,
-            active:       !lens.active,
+            model_name: current.model_name,
+            category: current.category,
+            diopter_min: current.diopter_min,
+            diopter_max: current.diopter_max,
+            price: current.price,
+            active: !lens.active,
         },
         { preserveScroll: true },
     );
@@ -149,7 +149,6 @@ function onDelete(lens) {
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-stock-iollenses">
-
             <PageHeader
                 :title="pageTitle"
                 :total="items.total ?? 0"
@@ -167,7 +166,11 @@ function onDelete(lens) {
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+            <div
+                v-if="flashMessage && !flashDismissed"
+                class="alert alert-success alert-dismissible mb-3"
+                role="status"
+            >
                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
                 <button
                     type="button"

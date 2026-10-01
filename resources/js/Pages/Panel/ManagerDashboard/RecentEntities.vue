@@ -1,19 +1,23 @@
 <script setup>
 const props = defineProps({
     recentEntities: { type: Array, default: () => [] },
-    t:              { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 const SUB_BADGE = {
-    trial:     'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
-    active:    'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
-    expired:   'badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium',
+    trial: 'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
+    active: 'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
+    expired: 'badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium',
     cancelled: 'badge-soft-secondary rounded fs-13 fw-medium',
-    past_due:  'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
+    past_due: 'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
 };
 
 const SUB_LABEL = {
-    trial: 'Trial', active: 'Ativo', expired: 'Expirado', cancelled: 'Cancelado', past_due: 'Em atraso',
+    trial: 'Trial',
+    active: 'Ativo',
+    expired: 'Expirado',
+    cancelled: 'Cancelado',
+    past_due: 'Em atraso',
 };
 
 function scoreClass(score) {
@@ -59,8 +63,16 @@ function formatDate(date) {
                         </td>
                         <td>
                             <template v-if="entity.latest_sub">
-                                <span :class="['badge', SUB_BADGE[entity.latest_sub.status?.value ?? entity.latest_sub.status]]">
-                                    {{ SUB_LABEL[entity.latest_sub.status?.value ?? entity.latest_sub.status] ?? entity.latest_sub.status }}
+                                <span
+                                    :class="[
+                                        'badge',
+                                        SUB_BADGE[entity.latest_sub.status?.value ?? entity.latest_sub.status],
+                                    ]"
+                                >
+                                    {{
+                                        SUB_LABEL[entity.latest_sub.status?.value ?? entity.latest_sub.status] ??
+                                        entity.latest_sub.status
+                                    }}
                                 </span>
                                 <small v-if="entity.latest_sub.plan" class="d-block text-muted mt-1">
                                     {{ entity.latest_sub.plan.name }}
@@ -78,7 +90,7 @@ function formatDate(date) {
                                 </div>
                                 <span
                                     :class="['fw-semibold', `text-score-${scoreClass(entity.activation_score)}`]"
-                                    style="font-size:.8rem;"
+                                    style="font-size: 0.8rem"
                                 >
                                     {{ entity.activation_score }}%
                                 </span>

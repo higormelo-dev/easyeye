@@ -10,32 +10,35 @@ import PeriodFilter from '@/Components/Panel/PeriodFilter.vue';
  * Tudo aplicado na hora: emite `change` com o trecho alterado.
  */
 const props = defineProps({
-    filters:       { type: Object,  default: () => ({}) },
-    operators:     { type: Array,   default: () => [] },
-    statusOptions: { type: Array,   default: () => [] },
-    tab:           { type: String,  default: 'pending' },
-    today:         { type: String,  default: '' },
-    filtering:     { type: Boolean, default: false },
-    t:             { type: Object,  default: () => ({}) },
+    filters: { type: Object, default: () => ({}) },
+    operators: { type: Array, default: () => [] },
+    statusOptions: { type: Array, default: () => [] },
+    tab: { type: String, default: 'pending' },
+    today: { type: String, default: '' },
+    filtering: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['change', 'clear']);
 
 const SEARCH_DEBOUNCE_MS = 400;
 
-const search     = ref(props.filters.search ?? '');
-const status     = ref(props.filters.status ?? '');
+const search = ref(props.filters.search ?? '');
+const status = ref(props.filters.status ?? '');
 const operatorId = ref(props.filters.operator_id ?? '');
 
 let searchTimer = null;
 
 // O servidor devolve os filtros normalizados (status fora da aba → vazio etc.).
 // A busca só é sobrescrita se não houver digitação pendente.
-watch(() => props.filters, (f) => {
-    status.value     = f?.status ?? '';
-    operatorId.value = f?.operator_id ?? '';
-    if (!searchTimer) search.value = f?.search ?? '';
-});
+watch(
+    () => props.filters,
+    (f) => {
+        status.value = f?.status ?? '';
+        operatorId.value = f?.operator_id ?? '';
+        if (!searchTimer) search.value = f?.search ?? '';
+    },
+);
 
 function onSearch(value) {
     search.value = value;
@@ -59,7 +62,12 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
 </script>
 
 <template>
-    <div class="glosa-toolbar d-flex flex-wrap align-items-center gap-2 mb-3" role="group" :aria-label="t.filters_label" data-test="glosa-filters">
+    <div
+        class="glosa-toolbar d-flex flex-wrap align-items-center gap-2 mb-3"
+        role="group"
+        :aria-label="t.filters_label"
+        data-test="glosa-filters"
+    >
         <SearchInput
             :model-value="search"
             :placeholder="t.search_placeholder"
@@ -79,7 +87,9 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
                 @change="emit('change', { status, due: '' })"
             >
                 <option value="">{{ t.filter_status_all }}</option>
-                <option v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                </option>
             </select>
         </div>
 
@@ -92,7 +102,9 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
                 @change="emit('change', { operator_id: operatorId })"
             >
                 <option value="">{{ t.filter_operator_all }}</option>
-                <option v-for="operator in operators" :key="operator.id" :value="operator.id">{{ operator.name }}</option>
+                <option v-for="operator in operators" :key="operator.id" :value="operator.id">
+                    {{ operator.name }}
+                </option>
             </select>
         </div>
 
@@ -110,12 +122,23 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
         </span>
 
         <div class="d-flex align-items-center gap-2 ms-auto">
-            <span class="small text-muted d-inline-flex align-items-center gap-1" role="status" aria-live="polite" data-test="glosa-filtering">
+            <span
+                class="small text-muted d-inline-flex align-items-center gap-1"
+                role="status"
+                aria-live="polite"
+                data-test="glosa-filtering"
+            >
                 <template v-if="filtering">
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>{{ t.filtering }}
                 </template>
             </span>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-test="glosa-clear-filters" :disabled="filtering" @click="emit('clear')">
+            <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                data-test="glosa-clear-filters"
+                :disabled="filtering"
+                @click="emit('clear')"
+            >
                 <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear }}
             </button>
         </div>

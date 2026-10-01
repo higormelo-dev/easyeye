@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
-import AppLayout                   from '@/Layouts/AppLayout.vue';
-import PageHeader                  from '@/Components/Panel/PageHeader.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
@@ -13,18 +13,23 @@ import { useConfirmationWithReason } from '@/composables/useConfirmationWithReas
  * Futuro: política de senha, expiração de sessão, IP allowlist etc.
  */
 const props = defineProps({
-    entity:      { type: Object, required: true },
+    entity: { type: Object, required: true },
     currentUser: { type: Object, required: true },
-    t:           { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const breadcrumbs = [
-    { label: 'Dashboard', url: route('panel.dashboard'),  active: false },
-    { label: 'Configurações', url: '#',                   active: false },
-    { label: props.t.entity_2fa_section ?? 'Segurança',   url: '#', active: true  },
+    { label: 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: 'Configurações', url: '#', active: false },
+    { label: props.t.entity_2fa_section ?? 'Segurança', url: '#', active: true },
 ];
 
-const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
 
 const isEnabled = computed(() => !!props.entity.requires_two_factor);
 
@@ -35,18 +40,16 @@ function toggle() {
         title: enabling
             ? (props.t.entity_2fa_btn_enable ?? 'Ativar 2FA obrigatório')
             : (props.t.entity_2fa_btn_disable ?? 'Desativar 2FA obrigatório'),
-        message: enabling
-            ? (props.t.entity_2fa_reason_enable ?? '')
-            : (props.t.entity_2fa_reason_disable ?? ''),
+        message: enabling ? (props.t.entity_2fa_reason_enable ?? '') : (props.t.entity_2fa_reason_disable ?? ''),
         confirmVariant: enabling ? 'primary' : 'danger',
         async onConfirm(reason) {
             const res = await fetch(route('panel.setting.security.two-factor.toggle'), {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept':       'application/json',
+                    Accept: 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                    'X-Inertia':    'true',
+                    'X-Inertia': 'true',
                 },
                 body: JSON.stringify({ enabled: enabling, reason }),
             });
@@ -65,23 +68,22 @@ function toggle() {
 <template>
     <AppLayout :title="t.entity_2fa_section ?? 'Segurança'" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader
-                :title="t.entity_2fa_section ?? 'Segurança'"
-                :subtitle="entity.name"
-            />
+            <PageHeader :title="t.entity_2fa_section ?? 'Segurança'" :subtitle="entity.name" />
 
             <!-- Card de 2FA por empresa -->
             <div class="card mb-3">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-start gap-3 mb-3">
                         <div class="flex-shrink-0">
-                            <i class="ti ti-shield-lock fs-1"
-                               :class="isEnabled ? 'text-success' : 'text-muted'"></i>
+                            <i class="ti ti-shield-lock fs-1" :class="isEnabled ? 'text-success' : 'text-muted'"></i>
                         </div>
                         <div class="flex-grow-1">
                             <h5 class="fw-semibold mb-1">
                                 {{ t.entity_2fa_label ?? 'Exigir 2FA para todos os usuários' }}
-                                <span v-if="isEnabled" class="badge badge-soft-success rounded text-success border border-success ms-1">
+                                <span
+                                    v-if="isEnabled"
+                                    class="badge badge-soft-success rounded text-success border border-success ms-1"
+                                >
                                     {{ t.status_active ?? 'Ativo' }}
                                 </span>
                                 <span v-else class="badge badge-soft-secondary rounded ms-1">
@@ -92,9 +94,11 @@ function toggle() {
 
                             <p v-if="isEnabled && entity.two_factor_enabled_at" class="small text-muted mb-0">
                                 <i class="ti ti-history me-1"></i>
-                                {{ t.entity_2fa_enabled_at
-                                    ?.replace(':date', entity.two_factor_enabled_at)
-                                    ?.replace(':user', entity.two_factor_enabled_by ?? '—') }}
+                                {{
+                                    t.entity_2fa_enabled_at
+                                        ?.replace(':date', entity.two_factor_enabled_at)
+                                        ?.replace(':user', entity.two_factor_enabled_by ?? '—')
+                                }}
                             </p>
                         </div>
                     </div>

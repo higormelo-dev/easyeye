@@ -2,12 +2,22 @@
 import { computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
-import MoneyInput     from '@/Components/Panel/MoneyInput.vue';
+import MoneyInput from '@/Components/Panel/MoneyInput.vue';
 import RuleSplitEditor from './RuleSplitEditor.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 import {
-    ALL_TYPES, CALCULATIONS, PAYER_SCOPES, SERVICE_TYPES,
-    decodeItem, emptyRuleForm, encodeItem, itemKindsFor, itemOptionsFor, ruleAsTemplate, ruleToForm, rulePayload,
+    ALL_TYPES,
+    CALCULATIONS,
+    PAYER_SCOPES,
+    SERVICE_TYPES,
+    decodeItem,
+    emptyRuleForm,
+    encodeItem,
+    itemKindsFor,
+    itemOptionsFor,
+    ruleAsTemplate,
+    ruleToForm,
+    rulePayload,
 } from './ruleForm.js';
 
 /**
@@ -25,12 +35,12 @@ import {
  * - `template` (duplicar): abre como NOVA regra com os campos de outra.
  */
 const props = defineProps({
-    open:     { type: Boolean, required: true },
-    rule:     { type: Object,  default: null },
-    template: { type: Object,  default: null },
-    options: { type: Object,  default: () => ({}) },   // { doctors, visit_types, procedures, exam_types, covenants }
-    routes:  { type: Object,  required: true },        // { store, update } — update com __ID__
-    t:       { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    rule: { type: Object, default: null },
+    template: { type: Object, default: null },
+    options: { type: Object, default: () => ({}) }, // { doctors, visit_types, procedures, exam_types, covenants }
+    routes: { type: Object, required: true }, // { store, update } — update com __ID__
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
@@ -40,12 +50,12 @@ const { doctorLabel, serviceTypeLabel } = useDoctorPayoutFormat(() => props.t);
 const KIND_LABEL_KEYS = { visit_type: 'form_visit_type', procedure: 'form_procedure', exam_type: 'form_exam_type' };
 
 const isEdit = computed(() => !!props.rule);
-const title  = computed(() => (isEdit.value ? props.t.rules_edit : props.t.rules_new));
+const title = computed(() => (isEdit.value ? props.t.rules_edit : props.t.rules_new));
 
 const form = useForm(emptyRuleForm());
 
 const serviceTypes = computed(() => (isEdit.value ? SERVICE_TYPES : [...SERVICE_TYPES, ALL_TYPES]));
-const isAllTypes   = computed(() => form.service_type === ALL_TYPES);
+const isAllTypes = computed(() => form.service_type === ALL_TYPES);
 
 /** Item da regra em edição: pode ter sido desativado e não vir nas listas. */
 const currentItem = computed(() => {
@@ -55,17 +65,20 @@ const currentItem = computed(() => {
     return { kind: rule.item_kind, id: rule.item_id, name: rule.item_name ?? rule.item_id };
 });
 
-const itemGroups = computed(() => itemKindsFor(form.service_type)
-    .map((kind) => {
-        const options = itemOptionsFor(kind, form.service_type, props.options);
-        const current = currentItem.value;
-        const extra   = current?.kind === kind && !options.some((option) => option.id === current.id)
-            ? [{ id: current.id, name: current.name }]
-            : [];
+const itemGroups = computed(() =>
+    itemKindsFor(form.service_type)
+        .map((kind) => {
+            const options = itemOptionsFor(kind, form.service_type, props.options);
+            const current = currentItem.value;
+            const extra =
+                current?.kind === kind && !options.some((option) => option.id === current.id)
+                    ? [{ id: current.id, name: current.name }]
+                    : [];
 
-        return { kind, label: props.t[KIND_LABEL_KEYS[kind]] ?? kind, options: [...extra, ...options] };
-    })
-    .filter((group) => group.options.length > 0));
+            return { kind, label: props.t[KIND_LABEL_KEYS[kind]] ?? kind, options: [...extra, ...options] };
+        })
+        .filter((group) => group.options.length > 0),
+);
 
 function itemAvailable(value) {
     if (!value) return true;
@@ -75,9 +88,12 @@ function itemAvailable(value) {
     return itemGroups.value.some((group) => group.kind === kind && group.options.some((option) => option.id === id));
 }
 
-watch(() => form.service_type, () => {
-    if (isAllTypes.value || !itemAvailable(form.item)) form.item = '';
-});
+watch(
+    () => form.service_type,
+    () => {
+        if (isAllTypes.value || !itemAvailable(form.item)) form.item = '';
+    },
+);
 
 /**
  * Convênios em dois grupos: com registro ANS e os da clínica sem registro
@@ -94,24 +110,35 @@ const covenantGroups = computed(() => {
     }
 
     return [
-        { key: 'with_ans', label: props.t.covenants_with_ans, options: list.filter((covenant) => !covenant.particular) },
         {
-            key:     'without_ans',
-            label:   props.t.covenants_without_ans,
-            options: list.filter((covenant) => covenant.particular && (covenant.own || covenant.id === rule?.covenant_id)),
+            key: 'with_ans',
+            label: props.t.covenants_with_ans,
+            options: list.filter((covenant) => !covenant.particular),
+        },
+        {
+            key: 'without_ans',
+            label: props.t.covenants_without_ans,
+            options: list.filter(
+                (covenant) => covenant.particular && (covenant.own || covenant.id === rule?.covenant_id),
+            ),
         },
     ].filter((group) => group.options.length > 0);
 });
 
 /** Dica do "Aplicar a": de onde vem a lista de procedimentos / como vale o tipo de exame. */
-const itemHint = computed(() => ({
-    procedure: props.t.form_item_hint_procedure,
-    exam:      props.t.form_item_hint_exam,
-}[form.service_type] ?? ''));
+const itemHint = computed(
+    () =>
+        ({
+            procedure: props.t.form_item_hint_procedure,
+            exam: props.t.form_item_hint_exam,
+        })[form.service_type] ?? '',
+);
 
 const isNewVersion = computed(() => isEdit.value && form.change_mode === 'new');
 
-const itemError = computed(() => form.errors.visit_type_id || form.errors.procedure_id || form.errors.exam_type_id || '');
+const itemError = computed(
+    () => form.errors.visit_type_id || form.errors.procedure_id || form.errors.exam_type_id || '',
+);
 
 const err = (field) => form.errors?.[field] ?? '';
 
@@ -130,7 +157,12 @@ function resetForm() {
     else Object.assign(form, props.template ? ruleAsTemplate(props.template) : emptyRuleForm());
 }
 
-watch(() => props.open, (isOpen) => { if (isOpen) resetForm(); });
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (isOpen) resetForm();
+    },
+);
 
 function submit() {
     if (form.processing) return;
@@ -168,9 +200,13 @@ function submit() {
                         :aria-describedby="describedBy('doctor_id')"
                     >
                         <option value="">{{ t.all_doctors }}</option>
-                        <option v-for="doctor in options.doctors ?? []" :key="doctor.id" :value="doctor.id">{{ doctorLabel(doctor) }}</option>
+                        <option v-for="doctor in options.doctors ?? []" :key="doctor.id" :value="doctor.id">
+                            {{ doctorLabel(doctor) }}
+                        </option>
                     </select>
-                    <div v-if="err('doctor_id')" id="rule_doctor_id_error" class="invalid-feedback d-block">{{ err('doctor_id') }}</div>
+                    <div v-if="err('doctor_id')" id="rule_doctor_id_error" class="invalid-feedback d-block">
+                        {{ err('doctor_id') }}
+                    </div>
                 </div>
 
                 <div class="col-12 col-md-6">
@@ -183,10 +219,16 @@ function submit() {
                         :aria-invalid="err('service_type') ? 'true' : undefined"
                         :aria-describedby="describedBy('service_type', isAllTypes ? 'rule_all_types_hint' : null)"
                     >
-                        <option v-for="type in serviceTypes" :key="type" :value="type">{{ serviceTypeLabel(type) }}</option>
+                        <option v-for="type in serviceTypes" :key="type" :value="type">
+                            {{ serviceTypeLabel(type) }}
+                        </option>
                     </select>
-                    <div v-if="isAllTypes" id="rule_all_types_hint" class="form-text" data-test="all-types-hint">{{ t.form_all_types_hint }}</div>
-                    <div v-if="err('service_type')" id="rule_service_type_error" class="invalid-feedback d-block">{{ err('service_type') }}</div>
+                    <div v-if="isAllTypes" id="rule_all_types_hint" class="form-text" data-test="all-types-hint">
+                        {{ t.form_all_types_hint }}
+                    </div>
+                    <div v-if="err('service_type')" id="rule_service_type_error" class="invalid-feedback d-block">
+                        {{ err('service_type') }}
+                    </div>
                 </div>
 
                 <div v-if="!isAllTypes" class="col-12">
@@ -197,14 +239,31 @@ function submit() {
                         class="form-select"
                         :class="{ 'is-invalid': itemError }"
                         :aria-invalid="itemError ? 'true' : undefined"
-                        :aria-describedby="[itemHint ? 'rule_item_hint' : null, itemError ? 'rule_item_error' : null].filter(Boolean).join(' ') || undefined"
+                        :aria-describedby="
+                            [itemHint ? 'rule_item_hint' : null, itemError ? 'rule_item_error' : null]
+                                .filter(Boolean)
+                                .join(' ') || undefined
+                        "
                     >
                         <option value="">{{ t.form_item_any }}</option>
-                        <optgroup v-for="group in itemGroups" :key="group.kind" :label="group.label" :data-kind="group.kind">
-                            <option v-for="option in group.options" :key="option.id" :value="encodeItem(group.kind, option.id)">{{ option.name }}</option>
+                        <optgroup
+                            v-for="group in itemGroups"
+                            :key="group.kind"
+                            :label="group.label"
+                            :data-kind="group.kind"
+                        >
+                            <option
+                                v-for="option in group.options"
+                                :key="option.id"
+                                :value="encodeItem(group.kind, option.id)"
+                            >
+                                {{ option.name }}
+                            </option>
                         </optgroup>
                     </select>
-                    <div v-if="itemHint" id="rule_item_hint" class="form-text" data-test="item-hint">{{ itemHint }}</div>
+                    <div v-if="itemHint" id="rule_item_hint" class="form-text" data-test="item-hint">
+                        {{ itemHint }}
+                    </div>
                     <div v-if="itemError" id="rule_item_error" class="invalid-feedback d-block">{{ itemError }}</div>
                 </div>
 
@@ -218,9 +277,13 @@ function submit() {
                         :aria-invalid="err('payer_scope') ? 'true' : undefined"
                         :aria-describedby="describedBy('payer_scope')"
                     >
-                        <option v-for="scope in PAYER_SCOPES" :key="scope" :value="scope">{{ t.payer_scopes?.[scope] ?? scope }}</option>
+                        <option v-for="scope in PAYER_SCOPES" :key="scope" :value="scope">
+                            {{ t.payer_scopes?.[scope] ?? scope }}
+                        </option>
                     </select>
-                    <div v-if="err('payer_scope')" id="rule_payer_scope_error" class="invalid-feedback d-block">{{ err('payer_scope') }}</div>
+                    <div v-if="err('payer_scope')" id="rule_payer_scope_error" class="invalid-feedback d-block">
+                        {{ err('payer_scope') }}
+                    </div>
                 </div>
 
                 <div v-if="form.payer_scope === 'covenant'" class="col-12 col-md-6">
@@ -234,11 +297,20 @@ function submit() {
                         :aria-describedby="describedBy('covenant_id')"
                     >
                         <option value="">{{ t.form_covenant_any }}</option>
-                        <optgroup v-for="group in covenantGroups" :key="group.key" :label="group.label" :data-group="group.key">
-                            <option v-for="covenant in group.options" :key="covenant.id" :value="covenant.id">{{ covenant.name }}</option>
+                        <optgroup
+                            v-for="group in covenantGroups"
+                            :key="group.key"
+                            :label="group.label"
+                            :data-group="group.key"
+                        >
+                            <option v-for="covenant in group.options" :key="covenant.id" :value="covenant.id">
+                                {{ covenant.name }}
+                            </option>
                         </optgroup>
                     </select>
-                    <div v-if="err('covenant_id')" id="rule_covenant_id_error" class="invalid-feedback d-block">{{ err('covenant_id') }}</div>
+                    <div v-if="err('covenant_id')" id="rule_covenant_id_error" class="invalid-feedback d-block">
+                        {{ err('covenant_id') }}
+                    </div>
                 </div>
 
                 <fieldset class="col-12">
@@ -254,11 +326,15 @@ function submit() {
                                 name="rule_calculation"
                                 :value="calculation"
                                 :data-test="`calculation-${calculation}`"
-                            >
-                            <label class="btn btn-outline-primary btn-sm" :for="`rule_calculation_${calculation}`">{{ t.calculations?.[calculation] ?? calculation }}</label>
+                            />
+                            <label class="btn btn-outline-primary btn-sm" :for="`rule_calculation_${calculation}`">{{
+                                t.calculations?.[calculation] ?? calculation
+                            }}</label>
                         </template>
                     </div>
-                    <div v-if="err('calculation')" id="rule_calculation_error" class="invalid-feedback d-block">{{ err('calculation') }}</div>
+                    <div v-if="err('calculation')" id="rule_calculation_error" class="invalid-feedback d-block">
+                        {{ err('calculation') }}
+                    </div>
                 </fieldset>
 
                 <div v-if="form.calculation === 'percentage'" class="col-12 col-md-6">
@@ -275,8 +351,10 @@ function submit() {
                         :class="{ 'is-invalid': err('percentage') }"
                         :aria-invalid="err('percentage') ? 'true' : undefined"
                         :aria-describedby="describedBy('percentage')"
-                    >
-                    <div v-if="err('percentage')" id="rule_percentage_error" class="invalid-feedback d-block">{{ err('percentage') }}</div>
+                    />
+                    <div v-if="err('percentage')" id="rule_percentage_error" class="invalid-feedback d-block">
+                        {{ err('percentage') }}
+                    </div>
                 </div>
                 <div v-else class="col-12 col-md-6">
                     <label class="form-label" for="rule_fixed_amount">{{ t.form_fixed_amount }}</label>
@@ -287,7 +365,9 @@ function submit() {
                         :invalid="Boolean(err('fixed_amount'))"
                         :aria-describedby="describedBy('fixed_amount')"
                     />
-                    <div v-if="err('fixed_amount')" id="rule_fixed_amount_error" class="invalid-feedback d-block">{{ err('fixed_amount') }}</div>
+                    <div v-if="err('fixed_amount')" id="rule_fixed_amount_error" class="invalid-feedback d-block">
+                        {{ err('fixed_amount') }}
+                    </div>
                 </div>
 
                 <RuleSplitEditor
@@ -303,12 +383,29 @@ function submit() {
                 <fieldset v-if="isEdit" class="col-12" data-test="change-mode">
                     <legend class="form-label fs-6 mb-2">{{ t.form_change_mode }}</legend>
                     <div class="form-check">
-                        <input id="rule_change_fix" v-model="form.change_mode" type="radio" class="form-check-input" name="rule_change_mode" value="fix" aria-describedby="rule_change_fix_hint">
+                        <input
+                            id="rule_change_fix"
+                            v-model="form.change_mode"
+                            type="radio"
+                            class="form-check-input"
+                            name="rule_change_mode"
+                            value="fix"
+                            aria-describedby="rule_change_fix_hint"
+                        />
                         <label class="form-check-label" for="rule_change_fix">{{ t.form_change_fix }}</label>
                         <div id="rule_change_fix_hint" class="form-text mt-0">{{ t.form_change_fix_hint }}</div>
                     </div>
                     <div class="form-check mt-2">
-                        <input id="rule_change_new" v-model="form.change_mode" type="radio" class="form-check-input" name="rule_change_mode" value="new" aria-describedby="rule_change_new_hint" data-test="change-new">
+                        <input
+                            id="rule_change_new"
+                            v-model="form.change_mode"
+                            type="radio"
+                            class="form-check-input"
+                            name="rule_change_mode"
+                            value="new"
+                            aria-describedby="rule_change_new_hint"
+                            data-test="change-new"
+                        />
                         <label class="form-check-label" for="rule_change_new">{{ t.form_change_new }}</label>
                         <div id="rule_change_new_hint" class="form-text mt-0">{{ t.form_change_new_hint }}</div>
                         <input
@@ -322,8 +419,14 @@ function submit() {
                             :aria-invalid="err('effective_from') ? 'true' : undefined"
                             :aria-describedby="describedBy('effective_from')"
                             data-test="effective-from"
+                        />
+                        <div
+                            v-if="err('effective_from')"
+                            id="rule_effective_from_error"
+                            class="invalid-feedback d-block"
                         >
-                        <div v-if="err('effective_from')" id="rule_effective_from_error" class="invalid-feedback d-block">{{ err('effective_from') }}</div>
+                            {{ err('effective_from') }}
+                        </div>
                     </div>
                 </fieldset>
 
@@ -338,8 +441,10 @@ function submit() {
                         :class="{ 'is-invalid': err('valid_from') }"
                         :aria-invalid="err('valid_from') ? 'true' : undefined"
                         :aria-describedby="describedBy('valid_from', 'rule_validity_hint')"
-                    >
-                    <div v-if="err('valid_from')" id="rule_valid_from_error" class="invalid-feedback d-block">{{ err('valid_from') }}</div>
+                    />
+                    <div v-if="err('valid_from')" id="rule_valid_from_error" class="invalid-feedback d-block">
+                        {{ err('valid_from') }}
+                    </div>
                 </div>
                 <div class="col-6">
                     <label class="form-label" for="rule_valid_until">{{ t.form_valid_until }}</label>
@@ -352,14 +457,22 @@ function submit() {
                         :class="{ 'is-invalid': err('valid_until') }"
                         :aria-invalid="err('valid_until') ? 'true' : undefined"
                         :aria-describedby="describedBy('valid_until', 'rule_validity_hint')"
-                    >
-                    <div v-if="err('valid_until')" id="rule_valid_until_error" class="invalid-feedback d-block">{{ err('valid_until') }}</div>
+                    />
+                    <div v-if="err('valid_until')" id="rule_valid_until_error" class="invalid-feedback d-block">
+                        {{ err('valid_until') }}
+                    </div>
                 </div>
                 <p id="rule_validity_hint" class="col-12 form-text mt-1">{{ t.form_validity_hint }}</p>
 
                 <div class="col-12">
                     <div class="form-check form-switch">
-                        <input id="rule_active" v-model="form.active" type="checkbox" role="switch" class="form-check-input">
+                        <input
+                            id="rule_active"
+                            v-model="form.active"
+                            type="checkbox"
+                            role="switch"
+                            class="form-check-input"
+                        />
                         <label class="form-check-label" for="rule_active">{{ t.form_active }}</label>
                     </div>
                 </div>
@@ -376,14 +489,22 @@ function submit() {
                         :aria-invalid="err('notes') ? 'true' : undefined"
                         :aria-describedby="describedBy('notes')"
                     ></textarea>
-                    <div v-if="err('notes')" id="rule_notes_error" class="invalid-feedback d-block">{{ err('notes') }}</div>
+                    <div v-if="err('notes')" id="rule_notes_error" class="invalid-feedback d-block">
+                        {{ err('notes') }}
+                    </div>
                 </div>
             </div>
         </form>
 
         <template #footer>
             <button type="button" class="btn btn-light" @click="$emit('close')">{{ t.form_cancel }}</button>
-            <button type="button" class="btn btn-primary" :disabled="form.processing" data-test="rule-submit" @click="submit">
+            <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="form.processing"
+                data-test="rule-submit"
+                @click="submit"
+            >
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                 {{ t.form_save }}
             </button>

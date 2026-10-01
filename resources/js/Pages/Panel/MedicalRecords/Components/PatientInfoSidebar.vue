@@ -34,9 +34,9 @@ const genderLabel = computed(() => {
     if (g == null || g === '') return '—';
     const s = String(g).trim().toLowerCase();
     if (s === '1' || s === 'm' || s === 'masculino') return 'Masculino';
-    if (s === '2' || s === 'f' || s === 'feminino')  return 'Feminino';
-    if (s === '3' || s === 'o' || s === 'outro')     return 'Outro';
-    if (s === '9' || s === 'n')                       return 'Não informado';
+    if (s === '2' || s === 'f' || s === 'feminino') return 'Feminino';
+    if (s === '3' || s === 'o' || s === 'outro') return 'Outro';
+    if (s === '9' || s === 'n') return 'Não informado';
     return String(g);
 });
 </script>
@@ -44,8 +44,10 @@ const genderLabel = computed(() => {
 <template>
     <div class="card pmr-patient-card">
         <div class="card-body p-3 text-center">
-            <div class="patient-avatar mx-auto mb-2 d-flex align-items-center justify-content-center text-white fw-bold"
-                 :style="{ background: avatarColor }">
+            <div
+                class="patient-avatar mx-auto mb-2 d-flex align-items-center justify-content-center text-white fw-bold"
+                :style="{ background: avatarColor }"
+            >
                 {{ initials }}
             </div>
             <h6 class="mb-0 fw-semibold" :title="patient.full_name">
@@ -108,7 +110,7 @@ const genderLabel = computed(() => {
  * o texto claro herdado do tema ficava sobre fundo branco.
  */
 .pmr-patient-card {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 .patient-avatar {
     width: 60px;
@@ -117,14 +119,14 @@ const genderLabel = computed(() => {
     font-size: 1.2rem;
 }
 .pmr-patient-info-list .list-group-item {
-    padding: .45rem .75rem;
+    padding: 0.45rem 0.75rem;
     border-color: var(--bs-border-color-translucent);
     background-color: transparent;
-    font-size: .82rem;
+    font-size: 0.82rem;
     line-height: 1.3;
 }
 .pmr-patient-info-list .text-muted {
-    font-size: .78rem;
+    font-size: 0.78rem;
 }
 .pmr-patient-info-list .fw-medium {
     word-break: break-word;

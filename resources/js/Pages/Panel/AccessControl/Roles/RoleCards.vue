@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useRoleFormat } from './useRoleFormat.js';
 
 /**
@@ -12,8 +12,8 @@ import { useRoleFormat } from './useRoleFormat.js';
  * endpoint extra — busca/ordenação/página continuam server-side.
  */
 const props = defineProps({
-    roles:     { type: Object, required: true },   // paginator Laravel
-    t:         { type: Object, default: () => ({}) },
+    roles: { type: Object, required: true }, // paginator Laravel
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
@@ -42,7 +42,9 @@ const rows = computed(() => props.roles?.data ?? []);
                         <p
                             class="small mb-0 role-description"
                             :class="role.description ? 'text-muted' : 'text-body-secondary fst-italic'"
-                        >{{ role.description || (t.no_description ?? 'Sem descrição') }}</p>
+                        >
+                            {{ role.description || (t.no_description ?? 'Sem descrição') }}
+                        </p>
                     </div>
                 </div>
 
@@ -51,7 +53,8 @@ const rows = computed(() => props.roles?.data ?? []);
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_permissions ?? 'Permissões' }}:</dt>
                         <dd class="mb-0 text-break">
-                            {{ permissionsLabel(role) }}<template v-if="permissionGroups(role)"> · {{ permissionGroups(role) }}</template>
+                            {{ permissionsLabel(role)
+                            }}<template v-if="permissionGroups(role)"> · {{ permissionGroups(role) }}</template>
                         </dd>
                     </div>
                     <div class="d-flex gap-1">
@@ -64,7 +67,7 @@ const rows = computed(() => props.roles?.data ?? []);
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end" gap="tight">
                     <ActionIconButton

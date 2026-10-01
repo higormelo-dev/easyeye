@@ -29,12 +29,18 @@ export function useCountFormat(getT) {
     function differenceBadge(delta) {
         if (delta === null || delta === undefined) return null;
         if (delta === 0) {
-            return { text: getT()?.difference_match ?? 'Confere', class: `${BADGE} badge-soft-success text-success border-success` };
+            return {
+                text: getT()?.difference_match ?? 'Confere',
+                class: `${BADGE} badge-soft-success text-success border-success`,
+            };
         }
 
         const variant = delta > 0 ? 'info' : 'danger';
 
-        return { text: signedQuantity(delta), class: `${BADGE} badge-soft-${variant} text-${variant} border-${variant}` };
+        return {
+            text: signedQuantity(delta),
+            class: `${BADGE} badge-soft-${variant} text-${variant} border-${variant}`,
+        };
     }
 
     return { quantity, signedQuantity, unitLabel, differenceBadge };

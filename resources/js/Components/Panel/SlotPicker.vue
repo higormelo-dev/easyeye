@@ -21,20 +21,20 @@
 import { ref, watch, computed, onMounted, onUnmounted, nextTick } from 'vue';
 
 const props = defineProps({
-    modelValue: { type: String,  default: '' },
-    doctorId:   { type: String,  default: '' },
-    scheduleId: { type: String,  default: null },
-    t:          { type: Object,  required: true },
+    modelValue: { type: String, default: '' },
+    doctorId: { type: String, default: '' },
+    scheduleId: { type: String, default: null },
+    t: { type: Object, required: true },
 });
 
 const emit = defineEmits(['update:modelValue', 'slot-selected']);
 
 // ── Internal state ─────────────────────────────────────────────────────────────
-const selectedDate   = ref(new Date().toISOString().substring(0, 10));
-const slots          = ref([]);
-const slotsLoading   = ref(false);
-const hasSchedule    = ref(false);
-const slotInterval   = ref(15);
+const selectedDate = ref(new Date().toISOString().substring(0, 10));
+const slots = ref([]);
+const slotsLoading = ref(false);
+const hasSchedule = ref(false);
+const slotInterval = ref(15);
 const showManualTime = ref(false);
 
 // ── CSRF ───────────────────────────────────────────────────────────────────────
@@ -45,8 +45,8 @@ function generateFallback(date, interval) {
     const result = [];
     let min = 7 * 60;
     while (min < 19 * 60) {
-        const h    = String(Math.floor(min / 60)).padStart(2, '0');
-        const m    = String(min % 60).padStart(2, '0');
+        const h = String(Math.floor(min / 60)).padStart(2, '0');
+        const m = String(min % 60).padStart(2, '0');
         const time = `${h}:${m}`;
         result.push({ time, datetime: `${date}T${time}`, available: true });
         min += interval;
@@ -72,16 +72,16 @@ async function fetchSlots() {
 
         if (!res.ok) throw new Error('slots-fetch-error');
 
-        const json         = await res.json();
+        const json = await res.json();
         slotInterval.value = json.interval ?? 15;
-        hasSchedule.value  = json.has_schedule ?? false;
+        hasSchedule.value = json.has_schedule ?? false;
 
         slots.value = json.has_schedule
             ? (json.slots ?? [])
             : generateFallback(selectedDate.value, json.interval ?? 15);
 
         // Slot selecionado deixou de existir (outro usuário agendou no meio-tempo)
-        if (props.modelValue && !slots.value.some(s => s.datetime === props.modelValue)) {
+        if (props.modelValue && !slots.value.some((s) => s.datetime === props.modelValue)) {
             emit('update:modelValue', '');
         }
     } catch {
@@ -129,10 +129,10 @@ const selectedLabel = computed(() => {
     if (!props.modelValue) return '';
     try {
         const locale = window.sessionLocale ?? 'pt-BR';
-        const raw    = props.modelValue.length === 16 ? props.modelValue + ':00' : props.modelValue;
-        const dt     = new Date(raw);
-        const d      = dt.toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' });
-        const h      = dt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        const raw = props.modelValue.length === 16 ? props.modelValue + ':00' : props.modelValue;
+        const dt = new Date(raw);
+        const d = dt.toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' });
+        const h = dt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
         return `${d} · ${h}`;
     } catch {
         return props.modelValue;
@@ -188,8 +188,8 @@ onUnmounted(() => {
 defineExpose({
     /** Reinicia para novo agendamento. */
     reset(date) {
-        selectedDate.value   = date || new Date().toISOString().substring(0, 10);
-        slots.value          = [];
+        selectedDate.value = date || new Date().toISOString().substring(0, 10);
+        slots.value = [];
         showManualTime.value = false;
         nextTick(fetchSlots);
     },
@@ -204,24 +204,15 @@ defineExpose({
 
 <template>
     <div class="slot-picker">
-
         <!-- ── Seletor de data com navegação prev/next ─────────────────────── -->
         <div class="input-group input-group-sm mb-2">
-            <button type="button"
-                    class="btn btn-outline-secondary"
-                    :disabled="!selectedDate"
-                    @click="addDays(-1)">
+            <button type="button" class="btn btn-outline-secondary" :disabled="!selectedDate" @click="addDays(-1)">
                 <i class="fas fa-chevron-left"></i>
             </button>
 
-            <input v-model="selectedDate"
-                   type="date"
-                   class="form-control text-center fw-semibold">
+            <input v-model="selectedDate" type="date" class="form-control text-center fw-semibold" />
 
-            <button type="button"
-                    class="btn btn-outline-secondary"
-                    :disabled="!selectedDate"
-                    @click="addDays(1)">
+            <button type="button" class="btn btn-outline-secondary" :disabled="!selectedDate" @click="addDays(1)">
                 <i class="fas fa-chevron-right"></i>
             </button>
         </div>
@@ -236,8 +227,7 @@ defineExpose({
         </p>
 
         <!-- ── Carregando ──────────────────────────────────────────────────── -->
-        <div v-else-if="slotsLoading"
-             class="py-1 d-flex align-items-center gap-2">
+        <div v-else-if="slotsLoading" class="py-1 d-flex align-items-center gap-2">
             <span class="spinner-border spinner-border-sm text-primary"></span>
             <span class="text-muted small">{{ t.form_loading_slots }}</span>
         </div>
@@ -245,17 +235,17 @@ defineExpose({
         <!-- ── Grade de horários ───────────────────────────────────────────── -->
         <template v-else-if="slots.length > 0">
             <div class="d-flex flex-wrap gap-1 mt-1">
-                <button v-for="slot in slots"
-                        :key="slot.datetime"
-                        type="button"
-                        class="btn btn-sm px-2 py-1"
-                        style="font-size:.78rem; min-width:52px;"
-                        :class="slotBtnClass(slot)"
-                        :disabled="!slot.available && modelValue !== slot.datetime"
-                        :title="!slot.available && modelValue !== slot.datetime
-                                    ? t.form_slot_occupied
-                                    : slot.time"
-                        @click="selectSlot(slot)">
+                <button
+                    v-for="slot in slots"
+                    :key="slot.datetime"
+                    type="button"
+                    class="btn btn-sm px-2 py-1"
+                    style="font-size: 0.78rem; min-width: 52px"
+                    :class="slotBtnClass(slot)"
+                    :disabled="!slot.available && modelValue !== slot.datetime"
+                    :title="!slot.available && modelValue !== slot.datetime ? t.form_slot_occupied : slot.time"
+                    @click="selectSlot(slot)"
+                >
                     {{ slot.time }}
                 </button>
             </div>
@@ -268,38 +258,43 @@ defineExpose({
         </template>
 
         <!-- ── Sem slots disponíveis ───────────────────────────────────────── -->
-        <p v-else class="text-muted small mb-1">
-            <i class="fas fa-clock me-1"></i>{{ t.form_no_slots }}
-        </p>
+        <p v-else class="text-muted small mb-1"><i class="fas fa-clock me-1"></i>{{ t.form_no_slots }}</p>
 
         <!-- ── Pill do horário selecionado ────────────────────────────────── -->
-        <div v-if="modelValue && !showManualTime"
-             class="mt-2 alert alert-primary py-1 px-2 d-flex align-items-center gap-2 small mb-1 rounded">
+        <div
+            v-if="modelValue && !showManualTime"
+            class="mt-2 alert alert-primary py-1 px-2 d-flex align-items-center gap-2 small mb-1 rounded"
+        >
             <i class="fas fa-check-circle flex-shrink-0"></i>
             <span class="fw-semibold">{{ selectedLabel }}</span>
-            <button type="button"
-                    class="btn-close ms-auto"
-                    style="font-size:.6rem;"
-                    aria-label="Limpar horário"
-                    @click="clearSlot"></button>
+            <button
+                type="button"
+                class="btn-close ms-auto"
+                style="font-size: 0.6rem"
+                aria-label="Limpar horário"
+                @click="clearSlot"
+            ></button>
         </div>
 
         <!-- ── Override manual ────────────────────────────────────────────── -->
         <div class="mt-2">
-            <button type="button"
-                    class="btn btn-link btn-sm p-0 text-muted text-decoration-none"
-                    style="font-size:.78rem;"
-                    @click="showManualTime = !showManualTime">
+            <button
+                type="button"
+                class="btn btn-link btn-sm p-0 text-muted text-decoration-none"
+                style="font-size: 0.78rem"
+                @click="showManualTime = !showManualTime"
+            >
                 <i class="fas fa-pencil-alt me-1"></i>{{ t.form_manual_override }}
             </button>
 
             <div v-if="showManualTime" class="mt-1">
-                <input :value="modelValue"
-                       type="datetime-local"
-                       class="form-control form-control-sm"
-                       @input="onManualInput">
+                <input
+                    :value="modelValue"
+                    type="datetime-local"
+                    class="form-control form-control-sm"
+                    @input="onManualInput"
+                />
             </div>
         </div>
-
     </div>
 </template>

@@ -3,9 +3,9 @@ import { Head, Link } from '@inertiajs/vue3';
 import PatientPortalLayout from '@/Layouts/PatientPortalLayout.vue';
 
 const props = defineProps({
-    appName:       { type: String, default: 'EasyEye' },
-    clinicName:    { type: String, default: '' },
-    documents:     { type: Array, default: () => [] },
+    appName: { type: String, default: 'EasyEye' },
+    clinicName: { type: String, default: '' },
+    documents: { type: Array, default: () => [] },
     lgpdExportUrl: { type: String, required: true },
 });
 
@@ -18,7 +18,10 @@ function typeIcon(type) {
     <Head :title="`${clinicName || 'Clínica'} — Portal do Paciente`" />
 
     <PatientPortalLayout>
-        <Link :href="route('patient-portal.dashboard')" class="small text-decoration-none d-inline-flex align-items-center mb-3">
+        <Link
+            :href="route('patient-portal.dashboard')"
+            class="small text-decoration-none d-inline-flex align-items-center mb-3"
+        >
             <i class="ti ti-arrow-left me-1"></i>Minhas Clínicas
         </Link>
 
@@ -32,8 +35,8 @@ function typeIcon(type) {
         </div>
         <p class="text-muted small mb-4">
             <i class="ti ti-shield-lock me-1"></i>
-            "Baixar meus dados" gera um arquivo com tudo que esta clínica registrou sobre você
-            (LGPD Art. 18) — cadastro, prontuários e exames. Fica registrado como um acesso seu.
+            "Baixar meus dados" gera um arquivo com tudo que esta clínica registrou sobre você (LGPD Art. 18) —
+            cadastro, prontuários e exames. Fica registrado como um acesso seu.
         </p>
 
         <div v-if="documents.length === 0" class="card shadow-sm border-0">
@@ -45,8 +48,10 @@ function typeIcon(type) {
 
         <div v-else class="list-group">
             <div v-for="doc in documents" :key="doc.id" class="list-group-item d-flex align-items-center gap-3">
-                <span class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary flex-shrink-0"
-                      style="width:40px;height:40px;">
+                <span
+                    class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary flex-shrink-0"
+                    style="width: 40px; height: 40px"
+                >
                     <i :class="`ti ${typeIcon(doc.type)}`"></i>
                 </span>
                 <div class="flex-grow-1 min-width-0">
@@ -65,5 +70,7 @@ function typeIcon(type) {
 </template>
 
 <style scoped>
-.min-width-0 { min-width: 0; }
+.min-width-0 {
+    min-width: 0;
+}
 </style>

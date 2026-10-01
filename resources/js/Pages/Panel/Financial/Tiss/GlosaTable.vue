@@ -22,12 +22,12 @@ import {
  */
 const props = defineProps({
     /** Linhas da página atual (`glosas.data` do paginator). */
-    glosas:      { type: Array,   default: () => [] },
-    today:       { type: String,  default: '' },
-    dueSoonDays: { type: Number,  default: 5 },
-    busy:        { type: Boolean, default: false },
-    emptyText:   { type: String,  default: '' },
-    t:           { type: Object,  default: () => ({}) },
+    glosas: { type: Array, default: () => [] },
+    today: { type: String, default: '' },
+    dueSoonDays: { type: Number, default: 5 },
+    busy: { type: Boolean, default: false },
+    emptyText: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['action', 'details']);
@@ -36,24 +36,26 @@ const { tx } = useTrans(() => props.t);
 const { money, date } = useLocaleFormat();
 
 const ACTIONS = {
-    appeal:  { label: 'appeal_btn',         icon: 'ti-message-circle-up', cls: 'btn-outline-warning',   test: 'btn-appeal' },
-    submit:  { label: 'submit_appeal_btn',  icon: 'ti-send',              cls: 'btn-outline-info',      test: 'btn-submit' },
-    resolve: { label: 'resolve_appeal_btn', icon: 'ti-gavel',             cls: 'btn-outline-primary',   test: 'btn-resolve' },
-    details: { label: 'details_btn',        icon: 'ti-list-details',      cls: 'btn-outline-secondary', test: 'btn-details' },
+    appeal: { label: 'appeal_btn', icon: 'ti-message-circle-up', cls: 'btn-outline-warning', test: 'btn-appeal' },
+    submit: { label: 'submit_appeal_btn', icon: 'ti-send', cls: 'btn-outline-info', test: 'btn-submit' },
+    resolve: { label: 'resolve_appeal_btn', icon: 'ti-gavel', cls: 'btn-outline-primary', test: 'btn-resolve' },
+    details: { label: 'details_btn', icon: 'ti-list-details', cls: 'btn-outline-secondary', test: 'btn-details' },
 };
 
-const rows = computed(() => props.glosas.map((glosa) => {
-    const next = nextAction(glosa);
+const rows = computed(() =>
+    props.glosas.map((glosa) => {
+        const next = nextAction(glosa);
 
-    return {
-        glosa,
-        next,
-        action:   ACTIONS[next.kind],
-        ref:      glosaRef(glosa),
-        deadline: deadlineBadge(glosa, props.today, props.dueSoonDays, tx),
-        appeal:   latestAppeal(glosa),
-    };
-}));
+        return {
+            glosa,
+            next,
+            action: ACTIONS[next.kind],
+            ref: glosaRef(glosa),
+            deadline: deadlineBadge(glosa, props.today, props.dueSoonDays, tx),
+            appeal: latestAppeal(glosa),
+        };
+    }),
+);
 
 function runAction(row) {
     if (row.next.kind === 'details') {
@@ -79,7 +81,9 @@ function runAction(row) {
                     <th scope="col">{{ t.col_status }}</th>
                     <th scope="col" class="d-none d-lg-table-cell">{{ t.col_appeal }}</th>
                     <th scope="col" class="text-end">{{ t.col_value }}</th>
-                    <th scope="col" class="text-end"><span class="visually-hidden">{{ t.col_actions }}</span></th>
+                    <th scope="col" class="text-end">
+                        <span class="visually-hidden">{{ t.col_actions }}</span>
+                    </th>
                 </tr>
             </thead>
             <tbody>
@@ -94,9 +98,12 @@ function runAction(row) {
                     <td class="small text-nowrap" data-test="deadline-cell">
                         <template v-if="row.deadline">
                             <span class="badge" :class="row.deadline.cls">
-                                <i class="ti me-1" :class="row.deadline.icon" aria-hidden="true"></i>{{ row.deadline.text }}
+                                <i class="ti me-1" :class="row.deadline.icon" aria-hidden="true"></i
+                                >{{ row.deadline.text }}
                             </span>
-                            <small v-if="row.glosa.deadline" class="text-muted d-block mt-1">{{ date(row.glosa.deadline) }}</small>
+                            <small v-if="row.glosa.deadline" class="text-muted d-block mt-1">{{
+                                date(row.glosa.deadline)
+                            }}</small>
                         </template>
                         <span v-else class="text-muted">{{ row.glosa.deadline ? date(row.glosa.deadline) : '—' }}</span>
                     </td>
@@ -110,7 +117,9 @@ function runAction(row) {
                         >
                             <code class="small">{{ row.glosa.guide_number || t.no_guide }}</code>
                         </button>
-                        <small v-if="row.glosa.claim_code" class="d-block text-muted">{{ tx('claim_code_label', { code: row.glosa.claim_code }) }}</small>
+                        <small v-if="row.glosa.claim_code" class="d-block text-muted">{{
+                            tx('claim_code_label', { code: row.glosa.claim_code })
+                        }}</small>
                     </td>
                     <td class="d-none d-lg-table-cell">{{ row.glosa.operator_name || t.no_covenant }}</td>
                     <td class="small">
@@ -119,18 +128,28 @@ function runAction(row) {
                             class="glosa-reason d-inline-block text-truncate align-middle"
                             :title="row.glosa.reason_text || undefined"
                             data-test="reason-text"
-                        >{{ row.glosa.reason_text || '—' }}</span>
+                            >{{ row.glosa.reason_text || '—' }}</span
+                        >
                     </td>
-                    <td class="d-none d-lg-table-cell small text-muted text-nowrap">{{ date(row.glosa.identified_at) }}</td>
+                    <td class="d-none d-lg-table-cell small text-muted text-nowrap">
+                        {{ date(row.glosa.identified_at) }}
+                    </td>
                     <td class="text-nowrap">
                         <span class="badge fs-11" :class="softBadge(row.glosa.status_color)" data-test="glosa-status">
-                            <i class="ti me-1" :class="GLOSA_ICONS[row.glosa.status] ?? 'ti-point'" aria-hidden="true"></i>{{ row.glosa.status_label }}
+                            <i
+                                class="ti me-1"
+                                :class="GLOSA_ICONS[row.glosa.status] ?? 'ti-point'"
+                                aria-hidden="true"
+                            ></i
+                            >{{ row.glosa.status_label }}
                         </span>
                     </td>
                     <td class="d-none d-lg-table-cell small" data-test="appeal-cell">
                         <template v-if="row.appeal">
                             <code class="small me-1">{{ row.appeal.appeal_number }}</code>
-                            <span class="badge fs-11" :class="softBadge(row.appeal.status_color)">{{ row.appeal.status_label }}</span>
+                            <span class="badge fs-11" :class="softBadge(row.appeal.status_color)">{{
+                                row.appeal.status_label
+                            }}</span>
                             <small v-if="awaitingResponse(row.appeal)" class="text-muted d-block mt-1">
                                 {{ tx('appeal_response_until', { date: date(row.appeal.deadline) }) }}
                             </small>
@@ -151,7 +170,8 @@ function runAction(row) {
                                 :disabled="busy && row.next.kind !== 'details'"
                                 @click="runAction(row)"
                             >
-                                <i class="ti me-1" :class="row.action.icon" aria-hidden="true"></i>{{ t[row.action.label] }}
+                                <i class="ti me-1" :class="row.action.icon" aria-hidden="true"></i
+                                >{{ t[row.action.label] }}
                             </button>
                             <ActionDropdown
                                 v-if="row.next.kind !== 'details'"
@@ -160,7 +180,12 @@ function runAction(row) {
                                 icon="ti ti-dots-vertical"
                             >
                                 <li>
-                                    <button type="button" class="dropdown-item rounded-1" data-test="menu-details" @click="emit('details', row.glosa)">
+                                    <button
+                                        type="button"
+                                        class="dropdown-item rounded-1"
+                                        data-test="menu-details"
+                                        @click="emit('details', row.glosa)"
+                                    >
                                         <i class="ti ti-list-details me-1" aria-hidden="true"></i>{{ t.details_btn }}
                                     </button>
                                 </li>

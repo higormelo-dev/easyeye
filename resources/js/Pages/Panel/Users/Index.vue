@@ -1,14 +1,14 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
-import AppLayout       from '@/Layouts/AppLayout.vue';
-import PageHeader      from '@/Components/Panel/PageHeader.vue';
-import SearchInput     from '@/Components/Panel/SearchInput.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
 import { useViewMode } from '@/composables/useViewMode.js';
-import { useTrans }    from '@/composables/useTrans.js';
-import UserTable       from './UserTable.vue';
-import UserCards       from './UserCards.vue';
-import UserFormModal   from './UserFormModal.vue';
+import { useTrans } from '@/composables/useTrans.js';
+import UserTable from './UserTable.vue';
+import UserCards from './UserCards.vue';
+import UserFormModal from './UserFormModal.vue';
 import UserInviteModal from './UserInviteModal.vue';
 import UserInvitationsPending from './UserInvitationsPending.vue';
 
@@ -20,15 +20,15 @@ import UserInvitationsPending from './UserInvitationsPending.vue';
  * Textos vêm de lang/{locale}/access_control.php (prop `t`).
  */
 const props = defineProps({
-    breadcrumbs: { type: Array,   default: () => [] },
-    users:       { type: Object,  required: true },        // paginator Laravel (through())
-    roles:       { type: Object,  default: () => ({}) },   // perfil base: rule → rótulo
-    isClient:    { type: Boolean, default: true },
-    filters:     { type: Object,  default: () => ({}) },   // { search, sort, direction } — normalizados
-    t:           { type: Object,  default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    users: { type: Object, required: true }, // paginator Laravel (through())
+    roles: { type: Object, default: () => ({}) }, // perfil base: rule → rótulo
+    isClient: { type: Boolean, default: true },
+    filters: { type: Object, default: () => ({}) }, // { search, sort, direction } — normalizados
+    t: { type: Object, default: () => ({}) },
     // Convite a quem já usa o EasyEye: perfis convidáveis + pendentes.
-    invitableRoles:     { type: Object, default: () => ({}) },
-    pendingInvitations: { type: Array,  default: () => [] },
+    invitableRoles: { type: Object, default: () => ({}) },
+    pendingInvitations: { type: Array, default: () => [] },
 });
 
 const inviteOpen = ref(false);
@@ -52,16 +52,22 @@ watch([() => page.props?.flash, flashMessage], () => {
 
 const pageTitle = computed(() => props.t.page_title ?? 'Usuários');
 
-const emptyText = computed(() => (props.filters?.search
-    ? (props.t.empty_search ?? 'Nenhum usuário encontrado para esta busca.')
-    : (props.t.empty ?? 'Nenhum usuário cadastrado.')));
+const emptyText = computed(() =>
+    props.filters?.search
+        ? (props.t.empty_search ?? 'Nenhum usuário encontrado para esta busca.')
+        : (props.t.empty ?? 'Nenhum usuário cadastrado.'),
+);
 
 // ── Busca (debounce) + ordenação — uma preserva a outra ─────────────────────
 const search = ref(props.filters?.search ?? '');
 let searchTimer = null;
 
 function visit(params, options = {}) {
-    router.get(route('panel.accesscontrol.users.index'), params, { preserveState: true, preserveScroll: true, ...options });
+    router.get(route('panel.accesscontrol.users.index'), params, {
+        preserveState: true,
+        preserveScroll: true,
+        ...options,
+    });
 }
 
 watch(search, (value) => {
@@ -79,12 +85,21 @@ function onSort({ sort, direction }) {
 }
 
 // ── Painel criar/editar ─────────────────────────────────────────────────────
-const modalOpen   = ref(false);
+const modalOpen = ref(false);
 const editingUser = ref(null);
 
-function openCreate() { editingUser.value = null; modalOpen.value = true; }
-function openEdit(user) { editingUser.value = user; modalOpen.value = true; }
-function closeModal() { modalOpen.value = false; editingUser.value = null; }
+function openCreate() {
+    editingUser.value = null;
+    modalOpen.value = true;
+}
+function openEdit(user) {
+    editingUser.value = user;
+    modalOpen.value = true;
+}
+function closeModal() {
+    modalOpen.value = false;
+    editingUser.value = null;
+}
 
 // ── Ações da linha/card ─────────────────────────────────────────────────────
 function onDelete(user) {
@@ -110,7 +125,6 @@ function onToggleActive(user) {
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-access-users">
-
             <PageHeader
                 :title="pageTitle"
                 :total="users.total ?? 0"
@@ -123,10 +137,19 @@ function onToggleActive(user) {
             >
                 <template #actions>
                     <div class="d-flex align-items-center gap-2">
-                        <Link :href="route('panel.accesscontrol.roles.index')" class="btn btn-outline-secondary fs-13 btn-md">
-                            <i class="ti ti-shield-lock me-1" aria-hidden="true"></i>{{ t.roles_link ?? 'Perfis e permissões' }}
+                        <Link
+                            :href="route('panel.accesscontrol.roles.index')"
+                            class="btn btn-outline-secondary fs-13 btn-md"
+                        >
+                            <i class="ti ti-shield-lock me-1" aria-hidden="true"></i
+                            >{{ t.roles_link ?? 'Perfis e permissões' }}
                         </Link>
-                        <button v-if="canInvite" type="button" class="btn btn-outline-primary fs-13 btn-md" @click="inviteOpen = true">
+                        <button
+                            v-if="canInvite"
+                            type="button"
+                            class="btn btn-outline-primary fs-13 btn-md"
+                            @click="inviteOpen = true"
+                        >
                             <i class="ti ti-mail-forward me-1" aria-hidden="true"></i>{{ t.invitation?.button }}
                         </button>
                         <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
@@ -136,7 +159,11 @@ function onToggleActive(user) {
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+            <div
+                v-if="flashMessage && !flashDismissed"
+                class="alert alert-success alert-dismissible mb-3"
+                role="status"
+            >
                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
                 <button
                     type="button"
@@ -177,18 +204,9 @@ function onToggleActive(user) {
             />
         </div>
 
-        <UserInvitationsPending
-            v-if="pendingInvitations.length"
-            :invitations="pendingInvitations"
-            :t="t"
-        />
+        <UserInvitationsPending v-if="pendingInvitations.length" :invitations="pendingInvitations" :t="t" />
 
-        <UserInviteModal
-            :open="inviteOpen"
-            :roles="invitableRoles"
-            :t="t"
-            @close="inviteOpen = false"
-        />
+        <UserInviteModal :open="inviteOpen" :roles="invitableRoles" :t="t" @close="inviteOpen = false" />
 
         <UserFormModal
             :open="modalOpen"

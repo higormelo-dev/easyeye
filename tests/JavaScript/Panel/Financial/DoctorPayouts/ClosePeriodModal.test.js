@@ -24,7 +24,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 data: () => Object.fromEntries(fields.map((field) => [field, form[field]])),
-                clearErrors: () => { form.errors = {}; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
                 post: vi.fn(),
             });
             forms.push(form);
@@ -44,8 +46,14 @@ vi.mock('@/Components/Panel/CenteredModal.vue', () => ({
 }));
 
 const preview = {
-    period_start: '2026-09-01', period_end: '2026-09-27', count: 12, charged_cents: 123450, payout_cents: 61725,
-    blocking: 0, warnings: { doctor_mismatch: 2, late_item: 1 }, can_close: true,
+    period_start: '2026-09-01',
+    period_end: '2026-09-27',
+    count: 12,
+    charged_cents: 123450,
+    payout_cents: 61725,
+    blocking: 0,
+    warnings: { doctor_mismatch: 2, late_item: 1 },
+    can_close: true,
 };
 
 let wrapper;
@@ -58,7 +66,15 @@ afterEach(() => {
 
 async function mountModal(props = {}) {
     wrapper = mount(ClosePeriodModal, {
-        props: { open: false, preview, doctorId: 'd1', doctor: doctors[0], action: '/doctor-payouts/closings', t, ...props },
+        props: {
+            open: false,
+            preview,
+            doctorId: 'd1',
+            doctor: doctors[0],
+            action: '/doctor-payouts/closings',
+            t,
+            ...props,
+        },
         attachTo: document.body,
     });
     await wrapper.setProps({ open: true });
@@ -106,15 +122,18 @@ describe('Financial/DoctorPayouts/ClosePeriodModal', () => {
         await w.find('[data-test="close-confirm"]').trigger('click');
 
         const form = forms.at(-1);
-        expect(form.post).toHaveBeenCalledWith('/doctor-payouts/closings', expect.objectContaining({ preserveScroll: true }));
+        expect(form.post).toHaveBeenCalledWith(
+            '/doctor-payouts/closings',
+            expect.objectContaining({ preserveScroll: true }),
+        );
         expect(form.data()).toEqual({
-            doctor_id:             'd1',
-            period_start:          '2026-09-01',
-            period_end:            '2026-09-27',
-            expected_count:         12,
+            doctor_id: 'd1',
+            period_start: '2026-09-01',
+            period_end: '2026-09-27',
+            expected_count: 12,
             expected_charged_cents: 123450,
-            expected_payout_cents:  61725,
-            notes:                  'Conferido com a secretária',
+            expected_payout_cents: 61725,
+            notes: 'Conferido com a secretária',
         });
     });
 
@@ -133,8 +152,8 @@ describe('Financial/DoctorPayouts/ClosePeriodModal', () => {
 
         form.errors = {
             period_start: 'The calculation changed while you were checking it.',
-            doctor_id:    'Select the doctor.',
-            notes:        'Too long.',
+            doctor_id: 'Select the doctor.',
+            notes: 'Too long.',
         };
         await nextTick();
 
@@ -153,7 +172,10 @@ describe('Financial/DoctorPayouts/ClosePeriodModal', () => {
         form.errors = { period_start: 'Old error.' };
 
         await w.setProps({ open: false });
-        await w.setProps({ open: true, preview: { ...preview, count: 13, charged_cents: 140000, payout_cents: 70000 } });
+        await w.setProps({
+            open: true,
+            preview: { ...preview, count: 13, charged_cents: 140000, payout_cents: 70000 },
+        });
         await flushPromises();
 
         expect(w.find('[data-test="close-error"]').exists()).toBe(false);

@@ -12,13 +12,13 @@ import { GLOSA_ICONS, deadlineBadge, glosaRef, nextAction, softBadge } from './g
  * linha do tempo do histórico TISS. O rodapé traz a próxima ação.
  */
 const props = defineProps({
-    open:        { type: Boolean, default: false },
-    loading:     { type: Boolean, default: false },
-    detail:      { type: Object,  default: null },
-    today:       { type: String,  default: '' },
-    dueSoonDays: { type: Number,  default: 5 },
-    busy:        { type: Boolean, default: false },
-    t:           { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    loading: { type: Boolean, default: false },
+    detail: { type: Object, default: null },
+    today: { type: String, default: '' },
+    dueSoonDays: { type: Number, default: 5 },
+    busy: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'action']);
@@ -28,15 +28,15 @@ const { money, date, dateTime } = useLocaleFormat();
 
 const closeRef = ref(null);
 
-const missing  = computed(() => Boolean(props.detail?.missing));
-const glosa    = computed(() => (props.detail && !missing.value ? props.detail : null));
-const next     = computed(() => (glosa.value ? nextAction(glosa.value) : { kind: 'details', appeal: null }));
+const missing = computed(() => Boolean(props.detail?.missing));
+const glosa = computed(() => (props.detail && !missing.value ? props.detail : null));
+const next = computed(() => (glosa.value ? nextAction(glosa.value) : { kind: 'details', appeal: null }));
 const deadline = computed(() => (glosa.value ? deadlineBadge(glosa.value, props.today, props.dueSoonDays, tx) : null));
 
 const ACTIONS = {
-    appeal:  { label: 'appeal_btn',         icon: 'ti-message-circle-up', cls: 'btn-warning' },
-    submit:  { label: 'submit_appeal_btn',  icon: 'ti-send',              cls: 'btn-info' },
-    resolve: { label: 'resolve_appeal_btn', icon: 'ti-gavel',             cls: 'btn-primary' },
+    appeal: { label: 'appeal_btn', icon: 'ti-message-circle-up', cls: 'btn-warning' },
+    submit: { label: 'submit_appeal_btn', icon: 'ti-send', cls: 'btn-info' },
+    resolve: { label: 'resolve_appeal_btn', icon: 'ti-gavel', cls: 'btn-primary' },
 };
 
 const primaryAction = computed(() => ACTIONS[next.value.kind] ?? null);
@@ -48,17 +48,24 @@ const primaryAction = computed(() => ACTIONS[next.value.kind] ?? null);
  */
 const timeline = computed(() => {
     const events = (glosa.value?.timeline ?? []).map((event) => ({
-        id:     event.id,
-        at:     event.changed_at,
-        label:  timelineLabel(event),
+        id: event.id,
+        at: event.changed_at,
+        label: timelineLabel(event),
         reason: event.reason,
-        icon:   event.context === 'appeal' ? 'ti-message-circle-up' : 'ti-gavel',
+        icon: event.context === 'appeal' ? 'ti-message-circle-up' : 'ti-gavel',
     }));
 
     const hasOpening = (glosa.value?.timeline ?? []).some((e) => e.context === 'glosa' && e.current_status === 'open');
 
     if (glosa.value?.identified_at && !hasOpening) {
-        events.unshift({ id: 'identified', at: glosa.value.identified_at, label: props.t.timeline_identified, reason: '', icon: 'ti-flag', dateOnly: true });
+        events.unshift({
+            id: 'identified',
+            at: glosa.value.identified_at,
+            label: props.t.timeline_identified,
+            reason: '',
+            icon: 'ti-flag',
+            dateOnly: true,
+        });
     }
 
     return events;
@@ -67,7 +74,11 @@ const timeline = computed(() => {
 function timelineLabel(event) {
     if (event.context === 'appeal') {
         return event.previous_label
-            ? tx('timeline_appeal_change', { number: event.appeal_number ?? '—', from: event.previous_label, to: event.current_label })
+            ? tx('timeline_appeal_change', {
+                  number: event.appeal_number ?? '—',
+                  from: event.previous_label,
+                  to: event.current_label,
+              })
             : tx('timeline_appeal', { number: event.appeal_number ?? '—', status: event.current_label });
     }
 
@@ -76,9 +87,12 @@ function timelineLabel(event) {
         : tx('timeline_glosa', { status: event.current_label });
 }
 
-watch(() => props.open, (open) => {
-    if (open) nextTick(() => closeRef.value?.focus?.());
-});
+watch(
+    () => props.open,
+    (open) => {
+        if (open) nextTick(() => closeRef.value?.focus?.());
+    },
+);
 
 function runPrimary() {
     if (!glosa.value || !primaryAction.value) return;
@@ -88,10 +102,17 @@ function runPrimary() {
 </script>
 
 <template>
-    <OffcanvasPanel :open="open" :width="640" :loading="loading && !detail" :loading-label="t.detail_loading" @close="emit('close')">
+    <OffcanvasPanel
+        :open="open"
+        :width="640"
+        :loading="loading && !detail"
+        :loading-label="t.detail_loading"
+        @close="emit('close')"
+    >
         <template #header>
             <h2 class="h5 mb-0 fw-semibold" data-test="detail-title">
-                <i class="ti ti-gavel me-2 text-primary" aria-hidden="true"></i>{{ tx('detail_title', { code: glosa ? glosaRef(glosa) : '—' }) }}
+                <i class="ti ti-gavel me-2 text-primary" aria-hidden="true"></i
+                >{{ tx('detail_title', { code: glosa ? glosaRef(glosa) : '—' }) }}
             </h2>
         </template>
 
@@ -108,7 +129,12 @@ function runPrimary() {
                         <dt class="col-5 text-muted fw-normal">{{ t.detail_status }}</dt>
                         <dd class="col-7 mb-1">
                             <span class="badge" :class="softBadge(glosa.status_color)">
-                                <i class="ti me-1" :class="GLOSA_ICONS[glosa.status] ?? 'ti-point'" aria-hidden="true"></i>{{ glosa.status_label }}
+                                <i
+                                    class="ti me-1"
+                                    :class="GLOSA_ICONS[glosa.status] ?? 'ti-point'"
+                                    aria-hidden="true"
+                                ></i
+                                >{{ glosa.status_label }}
                             </span>
                         </dd>
                         <dt class="col-5 text-muted fw-normal">{{ t.modal_covenant_label }}</dt>
@@ -140,10 +166,14 @@ function runPrimary() {
                     <h3 id="glosa-detail-guide" class="h6 fw-semibold mb-2">{{ t.detail_guide }}</h3>
                     <dl class="row small mb-0">
                         <dt class="col-5 text-muted fw-normal">{{ t.guide_provider_number }}</dt>
-                        <dd class="col-7 mb-1"><code>{{ glosa.guide.provider_number || '—' }}</code></dd>
+                        <dd class="col-7 mb-1">
+                            <code>{{ glosa.guide.provider_number || '—' }}</code>
+                        </dd>
                         <template v-if="glosa.guide.operator_number">
                             <dt class="col-5 text-muted fw-normal">{{ t.guide_operator_number }}</dt>
-                            <dd class="col-7 mb-1"><code>{{ glosa.guide.operator_number }}</code></dd>
+                            <dd class="col-7 mb-1">
+                                <code>{{ glosa.guide.operator_number }}</code>
+                            </dd>
                         </template>
                         <template v-if="glosa.guide.claim_code">
                             <dt class="col-5 text-muted fw-normal">{{ t.guide_claim_code }}</dt>
@@ -162,7 +192,8 @@ function runPrimary() {
                 <section class="mb-4" aria-labelledby="glosa-detail-reason" data-test="detail-reason">
                     <h3 id="glosa-detail-reason" class="h6 fw-semibold mb-2">{{ t.detail_reason }}</h3>
                     <p class="small mb-1">
-                        <span class="badge badge-soft-secondary me-1">{{ glosa.reason_code }}</span>{{ glosa.reason_text || '—' }}
+                        <span class="badge badge-soft-secondary me-1">{{ glosa.reason_code }}</span
+                        >{{ glosa.reason_text || '—' }}
                     </p>
                     <p v-if="glosa.resolution_notes" class="small text-muted mb-0">
                         <span class="fw-medium">{{ t.detail_resolution_notes }}:</span> {{ glosa.resolution_notes }}
@@ -174,10 +205,17 @@ function runPrimary() {
                     <h3 id="glosa-detail-appeals" class="h6 fw-semibold mb-2">{{ t.detail_appeals }}</h3>
                     <p v-if="!glosa.appeals?.length" class="small text-muted mb-0">{{ t.no_appeals }}</p>
                     <ul v-else class="list-unstyled mb-0">
-                        <li v-for="appeal in glosa.appeals" :key="appeal.id" class="border rounded p-2 mb-2 small" data-test="detail-appeal">
+                        <li
+                            v-for="appeal in glosa.appeals"
+                            :key="appeal.id"
+                            class="border rounded p-2 mb-2 small"
+                            data-test="detail-appeal"
+                        >
                             <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                                 <code>{{ appeal.appeal_number }}</code>
-                                <span class="badge" :class="softBadge(appeal.status_color)">{{ appeal.status_label }}</span>
+                                <span class="badge" :class="softBadge(appeal.status_color)">{{
+                                    appeal.status_label
+                                }}</span>
                             </div>
                             <dl class="row mb-0">
                                 <template v-if="appeal.created_at">
@@ -215,11 +253,18 @@ function runPrimary() {
                 <section aria-labelledby="glosa-detail-timeline" data-test="detail-timeline">
                     <h3 id="glosa-detail-timeline" class="h6 fw-semibold mb-2">{{ t.detail_timeline }}</h3>
                     <ol class="glosa-timeline list-unstyled mb-0">
-                        <li v-for="event in timeline" :key="event.id" class="glosa-timeline__item small" data-test="timeline-item">
+                        <li
+                            v-for="event in timeline"
+                            :key="event.id"
+                            class="glosa-timeline__item small"
+                            data-test="timeline-item"
+                        >
                             <i class="ti glosa-timeline__icon" :class="event.icon" aria-hidden="true"></i>
                             <div>
                                 <div class="fw-medium">{{ event.label }}</div>
-                                <time class="text-muted d-block" :datetime="event.at">{{ event.dateOnly ? date(event.at) : dateTime(event.at) }}</time>
+                                <time class="text-muted d-block" :datetime="event.at">{{
+                                    event.dateOnly ? date(event.at) : dateTime(event.at)
+                                }}</time>
                                 <div v-if="event.reason" class="text-muted glosa-detail__text">{{ event.reason }}</div>
                             </div>
                         </li>
@@ -229,7 +274,15 @@ function runPrimary() {
         </div>
 
         <template #footer>
-            <button ref="closeRef" type="button" class="btn btn-light btn-sm" data-test="detail-close" @click="emit('close')">{{ t.close }}</button>
+            <button
+                ref="closeRef"
+                type="button"
+                class="btn btn-light btn-sm"
+                data-test="detail-close"
+                @click="emit('close')"
+            >
+                {{ t.close }}
+            </button>
             <button
                 v-if="glosa && primaryAction"
                 type="button"

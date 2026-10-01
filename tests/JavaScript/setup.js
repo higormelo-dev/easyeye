@@ -38,14 +38,18 @@ window.tinymce = {
         const editor = {
             _content: '',
             getContent: () => editor._content,
-            setContent: (v) => { editor._content = v ?? ''; },
+            setContent: (v) => {
+                editor._content = v ?? '';
+            },
             // insertContent/focus/selection: usados por
             // TinyMceEditor::insertContent()/getSelectionHtml() (botões
             // "Inserir imagem"/"Frases rápidas" do Gerenciador de Imagens,
             // benchmark 18/09/2026) — sem eles aqui, chamar insertContent()
             // num teste montado por cima do stub quebra com "is not a
             // function" bem antes de qualquer asserção rodar.
-            insertContent: (html) => { editor._content += html; },
+            insertContent: (html) => {
+                editor._content += html;
+            },
             focus: () => {},
             selection: { getContent: () => '' },
             mode: { set: () => {} },
@@ -82,13 +86,13 @@ vi.mock('@inertiajs/vue3', () => ({
         },
     }),
     router: {
-        get:    vi.fn(),
-        post:   vi.fn(),
-        put:    vi.fn(),
-        patch:  vi.fn(),
+        get: vi.fn(),
+        post: vi.fn(),
+        put: vi.fn(),
+        patch: vi.fn(),
         delete: vi.fn(),
         reload: vi.fn(),
-        visit:  vi.fn(),
+        visit: vi.fn(),
     },
     Link: { template: '<a><slot /></a>', props: ['href'] },
     Head: { template: '<div><slot /></div>' },

@@ -1,42 +1,58 @@
 <script setup>
 import { ref } from 'vue';
-import AppLayout                from '@/Layouts/AppLayout.vue';
-import GatewayCard              from './GatewayCard.vue';
-import GatewayCredentialsModal  from './GatewayCredentialsModal.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import GatewayCard from './GatewayCard.vue';
+import GatewayCredentialsModal from './GatewayCredentialsModal.vue';
 import GatewayEntityAccessModal from './GatewayEntityAccessModal.vue';
-import GatewayPriorityModal     from './GatewayPriorityModal.vue';
+import GatewayPriorityModal from './GatewayPriorityModal.vue';
 import GatewayChangeDefaultModal from './GatewayChangeDefaultModal.vue';
 
 const props = defineProps({
-    gateways:       { type: Array,  default: () => [] },
+    gateways: { type: Array, default: () => [] },
     defaultGateway: { type: Object, default: null },
-    t:              { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
-const breadcrumbs = [
-    { label: props.t.breadcrumb ?? 'Gateways de Pagamento' },
-];
+const breadcrumbs = [{ label: props.t.breadcrumb ?? 'Gateways de Pagamento' }];
 
 // ── Credentials modal ─────────────────────────────────────────────────────────
-const credOpen    = ref(false);
+const credOpen = ref(false);
 const credGateway = ref(null);
 
-function openCredentials(g) { credGateway.value = g; credOpen.value = true; }
-function closeCredentials() { credOpen.value = false; credGateway.value = null; }
+function openCredentials(g) {
+    credGateway.value = g;
+    credOpen.value = true;
+}
+function closeCredentials() {
+    credOpen.value = false;
+    credGateway.value = null;
+}
 
 // ── Entity access modal ───────────────────────────────────────────────────────
-const eaOpen    = ref(false);
+const eaOpen = ref(false);
 const eaGateway = ref(null);
 
-function openEntityAccess(g) { eaGateway.value = g; eaOpen.value = true; }
-function closeEntityAccess() { eaOpen.value = false; eaGateway.value = null; }
+function openEntityAccess(g) {
+    eaGateway.value = g;
+    eaOpen.value = true;
+}
+function closeEntityAccess() {
+    eaOpen.value = false;
+    eaGateway.value = null;
+}
 
 // ── Priority modal ────────────────────────────────────────────────────────────
-const prioOpen    = ref(false);
+const prioOpen = ref(false);
 const prioGateway = ref(null);
 
-function openPriority(g) { prioGateway.value = g; prioOpen.value = true; }
-function closePriority() { prioOpen.value = false; prioGateway.value = null; }
+function openPriority(g) {
+    prioGateway.value = g;
+    prioOpen.value = true;
+}
+function closePriority() {
+    prioOpen.value = false;
+    prioGateway.value = null;
+}
 
 // ── Change default modal ──────────────────────────────────────────────────────
 const defaultOpen = ref(false);
@@ -45,32 +61,29 @@ const defaultOpen = ref(false);
 <template>
     <AppLayout :title="t.title" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-
             <!-- Page subtitle -->
             <p class="text-muted small mb-4" v-html="t.subtitle"></p>
 
             <!-- ── Default gateway banner ──────────────────────────────────────── -->
-            <div
-                v-if="defaultGateway"
-                class="alert gw-default-banner d-flex align-items-center gap-3 py-3 mb-4"
-            >
-                <div class="flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle gw-gold-circle" style="width:42px;height:42px;">
+            <div v-if="defaultGateway" class="alert gw-default-banner d-flex align-items-center gap-3 py-3 mb-4">
+                <div
+                    class="flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle gw-gold-circle"
+                    style="width: 42px; height: 42px"
+                >
                     <i class="ti ti-star fs-20 gw-gold-circle-icon"></i>
                 </div>
                 <div class="flex-grow-1">
-                    <div class="fw-bold mb-0" style="color:var(--heading-color);">{{ t.default_banner_title }}</div>
+                    <div class="fw-bold mb-0" style="color: var(--heading-color)">{{ t.default_banner_title }}</div>
                     <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                        <span class="fw-semibold" style="color:var(--heading-color);">{{ defaultGateway.name }}</span>
-                        <span class="badge text-uppercase gw-gold-badge" style="font-size:.7rem;">{{ defaultGateway.code }}</span>
+                        <span class="fw-semibold" style="color: var(--heading-color)">{{ defaultGateway.name }}</span>
+                        <span class="badge text-uppercase gw-gold-badge" style="font-size: 0.7rem">{{
+                            defaultGateway.code
+                        }}</span>
                         <span class="text-muted small">{{ t.default_banner_subtitle }}</span>
                     </div>
                 </div>
                 <div class="flex-shrink-0">
-                    <button
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary"
-                        @click="defaultOpen = true"
-                    >
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="defaultOpen = true">
                         <i class="ti ti-switch-horizontal me-1"></i>{{ t.default_banner_change }}
                     </button>
                 </div>
@@ -79,18 +92,14 @@ const defaultOpen = ref(false);
             <div
                 v-else
                 class="alert alert-danger d-flex align-items-center gap-3 py-3 mb-4"
-                style="border-radius:10px;"
+                style="border-radius: 10px"
             >
                 <i class="ti ti-alert-octagon fs-22 flex-shrink-0"></i>
                 <div class="flex-grow-1">
                     <strong>{{ t.no_default_title }}</strong>
                     <span class="ms-1 small">{{ t.no_default_subtitle }}</span>
                 </div>
-                <button
-                    type="button"
-                    class="btn btn-sm btn-danger flex-shrink-0"
-                    @click="defaultOpen = true"
-                >
+                <button type="button" class="btn btn-sm btn-danger flex-shrink-0" @click="defaultOpen = true">
                     <i class="ti ti-star me-1"></i>{{ t.no_default_action }}
                 </button>
             </div>
@@ -104,14 +113,16 @@ const defaultOpen = ref(false);
                             <div class="d-flex gap-3 align-items-start">
                                 <div
                                     class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 bg-primary bg-opacity-10"
-                                    style="width:38px;height:38px;"
+                                    style="width: 38px; height: 38px"
                                 >
                                     <i class="ti ti-building-store text-primary fs-18"></i>
                                 </div>
                                 <div>
                                     <p class="fw-semibold mb-1 small">{{ t.ctx_saas_title }}</p>
-                                    <p class="text-muted mb-1" style="font-size:.8rem;" v-html="t.ctx_saas_desc"></p>
-                                    <span class="badge badge-soft-primary" style="font-size:.72rem;">{{ t.ctx_saas_badge }}</span>
+                                    <p class="text-muted mb-1" style="font-size: 0.8rem" v-html="t.ctx_saas_desc"></p>
+                                    <span class="badge badge-soft-primary" style="font-size: 0.72rem">{{
+                                        t.ctx_saas_badge
+                                    }}</span>
                                 </div>
                             </div>
                         </div>
@@ -125,14 +136,16 @@ const defaultOpen = ref(false);
                             <div class="d-flex gap-3 align-items-start">
                                 <div
                                     class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 bg-success bg-opacity-10"
-                                    style="width:38px;height:38px;"
+                                    style="width: 38px; height: 38px"
                                 >
                                     <i class="ti ti-building-hospital text-success fs-18"></i>
                                 </div>
                                 <div>
                                     <p class="fw-semibold mb-1 small">{{ t.ctx_tenant_title }}</p>
-                                    <p class="text-muted mb-1" style="font-size:.8rem;" v-html="t.ctx_tenant_desc"></p>
-                                    <span class="badge badge-soft-success" style="font-size:.72rem;">{{ t.ctx_tenant_badge }}</span>
+                                    <p class="text-muted mb-1" style="font-size: 0.8rem" v-html="t.ctx_tenant_desc"></p>
+                                    <span class="badge badge-soft-success" style="font-size: 0.72rem">{{
+                                        t.ctx_tenant_badge
+                                    }}</span>
                                 </div>
                             </div>
                         </div>
@@ -142,11 +155,7 @@ const defaultOpen = ref(false);
 
             <!-- ── Gateway cards grid ──────────────────────────────────────────── -->
             <div class="row g-3">
-                <div
-                    v-for="gateway in gateways"
-                    :key="gateway.id"
-                    class="col-md-6 col-xl-4"
-                >
+                <div v-for="gateway in gateways" :key="gateway.id" class="col-md-6 col-xl-4">
                     <GatewayCard
                         :gateway="gateway"
                         :t="t"
@@ -165,7 +174,6 @@ const defaultOpen = ref(false);
                     </div>
                 </div>
             </div>
-
         </div>
 
         <!-- ── Modals ──────────────────────────────────────────────────────────── -->
@@ -177,26 +185,11 @@ const defaultOpen = ref(false);
             @close="defaultOpen = false"
         />
 
-        <GatewayCredentialsModal
-            :open="credOpen"
-            :gateway="credGateway"
-            :t="t"
-            @close="closeCredentials"
-        />
+        <GatewayCredentialsModal :open="credOpen" :gateway="credGateway" :t="t" @close="closeCredentials" />
 
-        <GatewayEntityAccessModal
-            :open="eaOpen"
-            :gateway="eaGateway"
-            :t="t"
-            @close="closeEntityAccess"
-        />
+        <GatewayEntityAccessModal :open="eaOpen" :gateway="eaGateway" :t="t" @close="closeEntityAccess" />
 
-        <GatewayPriorityModal
-            :open="prioOpen"
-            :gateway="prioGateway"
-            :t="t"
-            @close="closePriority"
-        />
+        <GatewayPriorityModal :open="prioOpen" :gateway="prioGateway" :t="t" @close="closePriority" />
     </AppLayout>
 </template>
 
@@ -217,16 +210,16 @@ const defaultOpen = ref(false);
     color: #5d4037;
 }
 
-:root[data-bs-theme=dark] .gw-default-banner {
+:root[data-bs-theme='dark'] .gw-default-banner {
     border-color: #d1a936;
 }
-:root[data-bs-theme=dark] .gw-gold-circle {
+:root[data-bs-theme='dark'] .gw-gold-circle {
     background: #a3821f;
 }
-:root[data-bs-theme=dark] .gw-gold-circle-icon {
+:root[data-bs-theme='dark'] .gw-gold-circle-icon {
     color: #fff6df;
 }
-:root[data-bs-theme=dark] .gw-gold-badge {
+:root[data-bs-theme='dark'] .gw-gold-badge {
     background: #a3821f;
     color: #fff6df;
 }

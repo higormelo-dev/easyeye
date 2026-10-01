@@ -25,7 +25,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 reset: () => Object.assign(form, initial),
-                clearErrors: () => { form.errors = {}; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
                 post: vi.fn(),
                 put: vi.fn(),
             });
@@ -48,17 +50,34 @@ vi.mock('@/Components/Panel/OffcanvasPanel.vue', () => ({
     },
 }));
 vi.mock('@/Components/Panel/SearchSelect.vue', () => ({
-    default: { props: ['modelValue', 'options', 'placeholder'], template: '<div class="search-select" :data-placeholder="placeholder" />' },
+    default: {
+        props: ['modelValue', 'options', 'placeholder'],
+        template: '<div class="search-select" :data-placeholder="placeholder" />',
+    },
 }));
 
 const t = {
-    form_title_create: 'New user', form_title_edit: 'Edit user', field_name: 'Full name', field_email: 'E-mail',
-    field_role: 'Access role', field_role_placeholder: 'Select a role', field_active: 'Active user',
-    field_password: 'Password', field_password_confirm: 'Confirm password', field_password_hint: 'Min 8 chars.',
-    field_extra_roles: 'Additional profiles', extra_roles_empty: 'No custom profiles in this clinic yet.',
-    extra_roles_hint: 'Additional administrative permissions.', credentials_info: 'Credentials info.',
-    btn_cancel: 'Cancel', btn_save: 'Save changes', btn_create: 'Create user', close: 'Close', required: 'required',
-    self_protected: 'You cannot deactivate or remove your own account.', js_error_load: 'Error loading user data.',
+    form_title_create: 'New user',
+    form_title_edit: 'Edit user',
+    field_name: 'Full name',
+    field_email: 'E-mail',
+    field_role: 'Access role',
+    field_role_placeholder: 'Select a role',
+    field_active: 'Active user',
+    field_password: 'Password',
+    field_password_confirm: 'Confirm password',
+    field_password_hint: 'Min 8 chars.',
+    field_extra_roles: 'Additional profiles',
+    extra_roles_empty: 'No custom profiles in this clinic yet.',
+    extra_roles_hint: 'Additional administrative permissions.',
+    credentials_info: 'Credentials info.',
+    btn_cancel: 'Cancel',
+    btn_save: 'Save changes',
+    btn_create: 'Create user',
+    close: 'Close',
+    required: 'required',
+    self_protected: 'You cannot deactivate or remove your own account.',
+    js_error_load: 'Error loading user data.',
 };
 
 function jsonResponse(body, ok = true) {
@@ -67,14 +86,31 @@ function jsonResponse(body, ok = true) {
 
 let wrapper;
 
-beforeEach(() => { state.forms.length = 0; state.patch.mockClear(); });
-afterEach(() => { wrapper?.unmount(); vi.unstubAllGlobals(); });
+beforeEach(() => {
+    state.forms.length = 0;
+    state.patch.mockClear();
+});
+afterEach(() => {
+    wrapper?.unmount();
+    vi.unstubAllGlobals();
+});
 
 async function mountModal(props = {}, fetchImpl = null) {
-    vi.stubGlobal('fetch', vi.fn(fetchImpl ?? ((url) => (String(url).includes('.edit')
-        ? jsonResponse({ roles: [{ id: 'r1', name: 'Caixa' }], role_ids: ['r1'] })
-        : jsonResponse({ data: { name: 'BRUNA', email: 'bruna@clinica.test', rule: 'secretary', active: true } })))));
-    wrapper = mount(UserFormModal, { props: { open: false, userId: null, roles: { secretary: 'Secretary' }, t, ...props } });
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(
+            fetchImpl ??
+                ((url) =>
+                    String(url).includes('.edit')
+                        ? jsonResponse({ roles: [{ id: 'r1', name: 'Caixa' }], role_ids: ['r1'] })
+                        : jsonResponse({
+                              data: { name: 'BRUNA', email: 'bruna@clinica.test', rule: 'secretary', active: true },
+                          })),
+        ),
+    );
+    wrapper = mount(UserFormModal, {
+        props: { open: false, userId: null, roles: { secretary: 'Secretary' }, t, ...props },
+    });
     await wrapper.setProps({ open: true });
     await flushPromises();
     await nextTick();
@@ -134,9 +170,11 @@ describe('Users/UserFormModal', () => {
     });
 
     it('sem perfis customizados: aviso traduzido', async () => {
-        const w = await mountModal({ userId: 'u9' }, (url) => (String(url).includes('.edit')
-            ? jsonResponse({ roles: [], role_ids: [] })
-            : jsonResponse({ data: { name: 'BRUNA', email: 'b@c.test', rule: 'secretary', active: true } })));
+        const w = await mountModal({ userId: 'u9' }, (url) =>
+            String(url).includes('.edit')
+                ? jsonResponse({ roles: [], role_ids: [] })
+                : jsonResponse({ data: { name: 'BRUNA', email: 'b@c.test', rule: 'secretary', active: true } }),
+        );
 
         expect(w.text()).toContain('No custom profiles in this clinic yet.');
     });

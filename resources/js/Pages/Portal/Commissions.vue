@@ -1,11 +1,11 @@
 <script setup>
 import { Head } from '@inertiajs/vue3';
-import PortalLayout    from '@/Layouts/PortalLayout.vue';
+import PortalLayout from '@/Layouts/PortalLayout.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
 
 defineProps({
     commissions: { type: Object, required: true },
-    totals:      { type: Object, required: true },
+    totals: { type: Object, required: true },
 });
 </script>
 
@@ -13,9 +13,7 @@ defineProps({
     <Head title="Minhas Comissões — Portal de Parceiros" />
 
     <PortalLayout>
-        <h4 class="fw-bold mb-3">
-            <i class="ti ti-coin me-1 text-warning"></i>Minhas Comissões
-        </h4>
+        <h4 class="fw-bold mb-3"><i class="ti ti-coin me-1 text-warning"></i>Minhas Comissões</h4>
 
         <!-- Totais -->
         <div class="row g-3 mb-3">

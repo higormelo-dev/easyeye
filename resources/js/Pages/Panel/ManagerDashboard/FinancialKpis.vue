@@ -3,18 +3,14 @@ import { computed } from 'vue';
 
 const props = defineProps({
     financialKpis: { type: Object, required: true },
-    t:             { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 const fk = computed(() => props.financialKpis);
 
-const churnVariant = computed(() =>
-    fk.value.churnRate > 5 ? 'churn-high' : 'churn',
-);
+const churnVariant = computed(() => (fk.value.churnRate > 5 ? 'churn-high' : 'churn'));
 
-const riskVariant = computed(() =>
-    fk.value.revenueAtRisk > 0 ? 'risk-high' : 'risk',
-);
+const riskVariant = computed(() => (fk.value.revenueAtRisk > 0 ? 'risk-high' : 'risk'));
 
 function brl(value) {
     return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -23,7 +19,6 @@ function brl(value) {
 
 <template>
     <div class="row g-3 mb-3">
-
         <!-- ARR -->
         <div class="col-6 col-md-3">
             <div class="card stat-card stat-card--arr h-100">
@@ -73,12 +68,18 @@ function brl(value) {
                     </div>
                     <div>
                         <div class="stat-value">
-                            {{ Number(fk.churnRate).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}%
+                            {{
+                                Number(fk.churnRate).toLocaleString('pt-BR', {
+                                    minimumFractionDigits: 1,
+                                    maximumFractionDigits: 1,
+                                })
+                            }}%
                         </div>
                         <div class="stat-label">{{ t.kpi_churn_rate }}</div>
                         <div class="d-flex gap-1 mt-1">
                             <span class="period-badge">
-                                <span class="period-value">{{ fk.cancelledThisMonth }}</span> {{ t.cancelled_this_month }}
+                                <span class="period-value">{{ fk.cancelledThisMonth }}</span>
+                                {{ t.cancelled_this_month }}
                             </span>
                         </div>
                     </div>
@@ -96,12 +97,16 @@ function brl(value) {
                     <div>
                         <div class="stat-value">R$ {{ brl(fk.revenueAtRisk) }}</div>
                         <div class="stat-label">{{ t.kpi_revenue_at_risk }}</div>
-                        <span v-if="fk.revenueAtRisk > 0"
-                              class="badge badge-soft-danger rounded text-danger border border-danger fs-11 fw-medium mt-1">
+                        <span
+                            v-if="fk.revenueAtRisk > 0"
+                            class="badge badge-soft-danger rounded text-danger border border-danger fs-11 fw-medium mt-1"
+                        >
                             <i class="ti ti-alert-triangle me-1"></i>{{ t.past_due ?? 'Em atraso' }}
                         </span>
-                        <span v-else
-                              class="badge badge-soft-success rounded text-success border border-success fs-11 fw-medium mt-1">
+                        <span
+                            v-else
+                            class="badge badge-soft-success rounded text-success border border-success fs-11 fw-medium mt-1"
+                        >
                             <i class="ti ti-circle-check me-1"></i>{{ t.all_clear }}
                         </span>
                     </div>

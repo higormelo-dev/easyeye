@@ -20,7 +20,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 reset: () => Object.assign(form, initial),
-                clearErrors: () => { form.errors = {}; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
                 post: vi.fn(),
                 put: vi.fn(),
             });
@@ -39,16 +41,17 @@ function mockEditData(overrides = {}) {
     globalThis.fetch = vi.fn(() =>
         Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({
-                data: {
-                    name: 'DR TESTE',
-                    national_registry: '12345678909',
-                    telephone: '6133334444',
-                    cellphone: '61999998888',
-                    zipcode: '01310100',
-                    ...overrides,
-                },
-            }),
+            json: () =>
+                Promise.resolve({
+                    data: {
+                        name: 'DR TESTE',
+                        national_registry: '12345678909',
+                        telephone: '6133334444',
+                        cellphone: '61999998888',
+                        zipcode: '01310100',
+                        ...overrides,
+                    },
+                }),
         }),
     );
 }
@@ -80,7 +83,7 @@ describe('DoctorFormModal — máscaras de CPF e telefones', () => {
     it('mascara CPF, celular e telefone enquanto digita, com teclado numérico', async () => {
         const wrapper = await mountOpenModal();
 
-        const cpf       = byPlaceholder(wrapper, '000.000.000-00');
+        const cpf = byPlaceholder(wrapper, '000.000.000-00');
         const cellphone = byPlaceholder(wrapper, '(00) 00000-0000');
         const telephone = byPlaceholder(wrapper, '(00) 0000-0000');
 

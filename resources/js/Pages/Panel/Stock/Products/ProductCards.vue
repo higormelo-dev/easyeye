@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
-import { useTrans }        from '@/composables/useTrans.js';
+import { useTrans } from '@/composables/useTrans.js';
 
 /**
  * Cards de produtos de estoque no padrão de Patients/PatientCards: nome,
@@ -15,8 +15,8 @@ import { useTrans }        from '@/composables/useTrans.js';
  * ações da ProductTable.
  */
 const props = defineProps({
-    items:             { type: Object, required: true },   // paginator Laravel
-    t:                 { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    t: { type: Object, default: () => ({}) },
     movementsIndexUrl: { type: String, default: '' },
 });
 
@@ -46,18 +46,19 @@ function movementsUrl(product) {
                 <div class="d-flex align-items-start justify-content-between gap-2">
                     <h6 class="mb-1 fw-semibold lh-sm text-break">{{ p.name }}</h6>
                     <span
-                        :class="p.active
-                            ? 'badge badge-soft-success rounded text-success border border-success fs-12'
-                            : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'"
-                    >{{ p.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span>
+                        :class="
+                            p.active
+                                ? 'badge badge-soft-success rounded text-success border border-success fs-12'
+                                : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'
+                        "
+                        >{{ p.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span
+                    >
                 </div>
 
                 <div v-if="p.is_opm || p.has_expiring_lot" class="d-flex flex-wrap gap-1 mt-1">
-                    <span
-                        v-if="p.is_opm"
-                        class="badge badge-soft-info rounded fs-11"
-                        :title="t.badge_opm_title"
-                    >{{ t.badge_opm ?? 'OPM' }}</span>
+                    <span v-if="p.is_opm" class="badge badge-soft-info rounded fs-11" :title="t.badge_opm_title">{{
+                        t.badge_opm ?? 'OPM'
+                    }}</span>
                     <span
                         v-if="p.has_expiring_lot"
                         class="badge badge-soft-warning text-warning rounded fs-11"
@@ -72,7 +73,9 @@ function movementsUrl(product) {
                 <dl class="small text-muted mt-2 mb-1">
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_code ?? 'Código' }}:</dt>
-                        <dd class="mb-0"><code class="text-muted">{{ p.code ?? '—' }}</code></dd>
+                        <dd class="mb-0">
+                            <code class="text-muted">{{ p.code ?? '—' }}</code>
+                        </dd>
                     </div>
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_category ?? 'Categoria' }}:</dt>
@@ -105,7 +108,7 @@ function movementsUrl(product) {
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end" gap="tight">
                     <ActionIconButton
@@ -131,9 +134,13 @@ function movementsUrl(product) {
                                 {{ p.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
                             </button>
                         </li>
-                        <li><hr class="dropdown-divider"></li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li>
-                            <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', p)">
+                            <button
+                                type="button"
+                                class="dropdown-item rounded-1 text-danger"
+                                @click="emit('delete', p)"
+                            >
                                 <i class="ti ti-trash me-1" aria-hidden="true"></i> {{ t.action_delete ?? 'Excluir' }}
                             </button>
                         </li>

@@ -15,12 +15,12 @@ import BulkReceiptModal from './BulkReceiptModal.vue';
  * `done` avisa que o servidor gravou (o modal continua aberto com o resultado).
  */
 const props = defineProps({
-    operation:      { type: Object, default: null },
-    paymentMethods: { type: Array,  default: () => [] },
-    today:          { type: String, default: '' },
+    operation: { type: Object, default: null },
+    paymentMethods: { type: Array, default: () => [] },
+    today: { type: String, default: '' },
     bulkReceiptUrl: { type: String, default: '' },
-    bulkMaxClaims:  { type: Number, default: 200 },
-    t:              { type: Object, default: () => ({}) },
+    bulkMaxClaims: { type: Number, default: 200 },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'done']);

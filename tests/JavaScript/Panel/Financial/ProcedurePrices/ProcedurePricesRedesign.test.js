@@ -19,11 +19,13 @@ vi.mock('@inertiajs/vue3', async () => {
     return {
         usePage: () => ({ props: inertia.pageProps }),
         router: {
-            get:  vi.fn(),
+            get: vi.fn(),
             post: vi.fn(),
-            on:   vi.fn((type, callback) => {
+            on: vi.fn((type, callback) => {
                 inertia.handlers[type] = callback;
-                const off = vi.fn(() => { delete inertia.handlers[type]; });
+                const off = vi.fn(() => {
+                    delete inertia.handlers[type];
+                });
                 inertia.off.push(off);
 
                 return off;
@@ -51,24 +53,52 @@ vi.mock('@/Components/Panel/CenteredModal.vue', () => ({
 }));
 
 const t = {
-    title: 'Tabela de Preços', priced_counter: ':priced de :total com preço', covenant: 'Convênio',
-    covenant_tiss: 'Com operadora TISS', covenant_cash: 'Recebido no caixa', code: 'Código', procedure: 'Procedimento',
-    price: 'Preço', price_aria: 'Preço de :procedure', inherited_price: 'Padrão do sistema: :price', row_changed: 'alterado',
-    search_placeholder: 'Buscar por código ou nome', search_clear: 'Limpar busca', filter_label: 'Filtrar procedimentos',
-    filter_all: 'Todos', filter_priced: 'Com preço', filter_unpriced: 'Sem preço',
-    no_results: 'Nenhum procedimento encontrado.', clear_filters: 'Limpar busca e filtro',
-    charging: 'Cobrar do convênio (guia TISS)', charging_aria: 'Cobrar :procedure', charging_help: 'Ajuda TISS.',
-    charging_help_cash: 'Recebido no caixa, sem guia.', charging_disabled_hint: 'Informe um preço.', charging_cash_hint: 'Recebido no caixa.',
+    title: 'Tabela de Preços',
+    priced_counter: ':priced de :total com preço',
+    covenant: 'Convênio',
+    covenant_tiss: 'Com operadora TISS',
+    covenant_cash: 'Recebido no caixa',
+    code: 'Código',
+    procedure: 'Procedimento',
+    price: 'Preço',
+    price_aria: 'Preço de :procedure',
+    inherited_price: 'Padrão do sistema: :price',
+    row_changed: 'alterado',
+    search_placeholder: 'Buscar por código ou nome',
+    search_clear: 'Limpar busca',
+    filter_label: 'Filtrar procedimentos',
+    filter_all: 'Todos',
+    filter_priced: 'Com preço',
+    filter_unpriced: 'Sem preço',
+    no_results: 'Nenhum procedimento encontrado.',
+    clear_filters: 'Limpar busca e filtro',
+    charging: 'Cobrar do convênio (guia TISS)',
+    charging_aria: 'Cobrar :procedure',
+    charging_help: 'Ajuda TISS.',
+    charging_help_cash: 'Recebido no caixa, sem guia.',
+    charging_disabled_hint: 'Informe um preço.',
+    charging_cash_hint: 'Recebido no caixa.',
     charging_legacy: ':count procedimento(s) ainda marcados para guia. Salve para corrigir.',
-    savebar_label: 'Salvar tabela de preços', save: 'Salvar preços', saving: 'Salvando...',
-    unsaved: ':count alteração(ões) não salva(s)', no_changes: 'Nenhuma alteração pendente',
+    savebar_label: 'Salvar tabela de preços',
+    save: 'Salvar preços',
+    saving: 'Salvando...',
+    unsaved: ':count alteração(ões) não salva(s)',
+    no_changes: 'Nenhuma alteração pendente',
     leave_confirm: 'Você tem :count alteração(ões) não salva(s). Sair?',
-    no_covenants: 'Cadastre um convênio antes de definir preços.', no_covenants_action: 'Cadastrar convênio',
-    no_covenants_ask: 'Peça a um administrador.', no_procedures: 'Nenhum procedimento ativo.', no_procedures_hint: 'Catálogo do sistema.',
-    discard_body: ':count em :covenant', discard_confirm: 'Descartar e trocar', discard_cancel: 'Continuar editando',
+    no_covenants: 'Cadastre um convênio antes de definir preços.',
+    no_covenants_action: 'Cadastrar convênio',
+    no_covenants_ask: 'Peça a um administrador.',
+    no_procedures: 'Nenhum procedimento ativo.',
+    no_procedures_hint: 'Catálogo do sistema.',
+    discard_body: ':count em :covenant',
+    discard_confirm: 'Descartar e trocar',
+    discard_cancel: 'Continuar editando',
 };
 
-const covenants  = [{ id: 'c1', name: 'Particular', tiss: false }, { id: 'c2', name: 'Unimed', tiss: true }];
+const covenants = [
+    { id: 'c1', name: 'Particular', tiss: false },
+    { id: 'c2', name: 'Unimed', tiss: true },
+];
 const procedures = [
     { id: 'p1', code: '10101012', name: 'Consulta em consultório' },
     { id: 'p2', code: '41301250', name: 'Mapeamento de retina' },
@@ -202,7 +232,9 @@ describe('busca, filtros e contador', () => {
         await typePrice(rowsOf(w)[3], '70');
         await w.find('[data-test="prices-toolbar"] input[type="text"]').setValue('consulta');
         await w.find('[data-test="save"]').trigger('click');
-        expect(vi.mocked(router.post).mock.calls[0][1].items).toEqual([{ procedure_id: 'p4', price: 70, charging: true }]);
+        expect(vi.mocked(router.post).mock.calls[0][1].items).toEqual([
+            { procedure_id: 'p4', price: 70, charging: true },
+        ]);
         vi.mocked(router.post).mock.calls[0][2].onError({ 'items.0.price': 'Preço inválido.' });
         await nextTick();
 
@@ -282,12 +314,16 @@ describe('barra de salvar e confirmação ao sair', () => {
         expect(fireBefore({ method: 'get', prefetch: true })).toBeUndefined();
 
         let duringSave;
-        vi.mocked(router.post).mockImplementation(() => { duringSave = fireBefore({ method: 'post' }); });
+        vi.mocked(router.post).mockImplementation(() => {
+            duringSave = fireBefore({ method: 'post' });
+        });
         await w.find('[data-test="save"]').trigger('click');
         expect(duringSave).toBeUndefined();
 
         let duringSwitch;
-        vi.mocked(router.get).mockImplementation(() => { duringSwitch = fireBefore({ method: 'get', only: ['prices'] }); });
+        vi.mocked(router.get).mockImplementation(() => {
+            duringSwitch = fireBefore({ method: 'get', only: ['prices'] });
+        });
         await w.find('.covenant-select').setValue('c1');
         await w.find('[data-test="discard-confirm"]').trigger('click');
         expect(duringSwitch).toBeUndefined();
@@ -331,10 +367,16 @@ describe('convênio sem operadora TISS e estados vazios', () => {
     it('avisa quando o banco ainda marca cobrança por guia num convênio sem TISS (salvar corrige)', () => {
         const w = mountPage({
             selectedCovenantId: 'c1',
-            prices: { p1: { price: 150, charging: true }, p2: { price: 90, charging: true }, p3: { price: 10, charging: false } },
+            prices: {
+                p1: { price: 150, charging: true },
+                p2: { price: 90, charging: true },
+                p3: { price: 10, charging: false },
+            },
         });
 
-        expect(w.find('[data-test="charging-legacy"]').text()).toBe('2 procedimento(s) ainda marcados para guia. Salve para corrigir.');
+        expect(w.find('[data-test="charging-legacy"]').text()).toBe(
+            '2 procedimento(s) ainda marcados para guia. Salve para corrigir.',
+        );
         // A grade já mostra desligado (é o que será salvo) — sem contar como alteração.
         expect(rowsOf(w)[0].find('input[type="checkbox"]').element.checked).toBe(false);
         expect(w.find('[data-test="dirty-count"]').text()).toBe('Nenhuma alteração pendente');
@@ -347,7 +389,9 @@ describe('convênio sem operadora TISS e estados vazios', () => {
     it('sem convênio: estado vazio com link para cadastrar (quem tem permissão)', () => {
         const w = mountPage({ covenants: [], selectedCovenantId: '', prices: {} });
 
-        expect(w.find('[data-test="empty-covenants"]').text()).toContain('Cadastre um convênio antes de definir preços.');
+        expect(w.find('[data-test="empty-covenants"]').text()).toContain(
+            'Cadastre um convênio antes de definir preços.',
+        );
         expect(w.find('[data-test="link-covenants"]').attributes('href')).toBe('/panel/setting/covenants');
         expect(w.find('[data-test="savebar"]').exists()).toBe(false);
         expect(w.find('[data-test="priced-counter"]').exists()).toBe(false);

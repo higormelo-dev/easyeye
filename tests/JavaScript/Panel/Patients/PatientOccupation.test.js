@@ -7,13 +7,23 @@ import { reactive } from 'vue';
  * por Pacientes e Agenda (PatientFormSections). Rótulo traduzido via t_ui.
  */
 vi.mock('@inertiajs/vue3', () => ({
-    usePage: () => ({ props: { t_ui: { patient_form: { occupation: 'Occupation', occupation_placeholder: 'E.g.: teacher' } } } }),
+    usePage: () => ({
+        props: { t_ui: { patient_form: { occupation: 'Occupation', occupation_placeholder: 'E.g.: teacher' } } },
+    }),
 }));
 
 const PatientFormSections = (await import('@/Pages/Panel/Patients/PatientFormSections.vue')).default;
 
 function mountSection(errors = {}) {
-    const form = reactive({ name: '', occupation: '', mother_name: '', father_name: '', covenant_id: '', card_number: '', errors });
+    const form = reactive({
+        name: '',
+        occupation: '',
+        mother_name: '',
+        father_name: '',
+        covenant_id: '',
+        card_number: '',
+        errors,
+    });
 
     const wrapper = mount(PatientFormSections, {
         props: { form, section: 'personal' },

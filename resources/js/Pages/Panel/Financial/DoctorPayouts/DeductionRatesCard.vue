@@ -10,21 +10,21 @@ import { DEDUCTION_KINDS, useDoctorPayoutFormat } from './useDoctorPayoutFormat.
  * vigência errada e cadastrar outra; fechamentos já feitos guardam o retrato.
  */
 const props = defineProps({
-    rates:  { type: Array,  default: () => [] },   // [{ id, kind, percentage, valid_from, notes }]
-    routes: { type: Object, required: true },      // { deduction_rate_store, deduction_rate_destroy }
-    today:  { type: String, default: '' },         // Y-m-d; vazio = data local do navegador
-    t:      { type: Object, default: () => ({}) },
+    rates: { type: Array, default: () => [] }, // [{ id, kind, percentage, valid_from, notes }]
+    routes: { type: Object, required: true }, // { deduction_rate_store, deduction_rate_destroy }
+    today: { type: String, default: '' }, // Y-m-d; vazio = data local do navegador
+    t: { type: Object, default: () => ({}) },
 });
 
 const { quantity, date, deductionKindLabel } = useDoctorPayoutFormat(() => props.t);
 
 const uid = useId();
 const ids = {
-    title:      `dp-deductions-title-${uid}`,
-    kind:       `dp-deduction-kind-${uid}`,
+    title: `dp-deductions-title-${uid}`,
+    kind: `dp-deduction-kind-${uid}`,
     percentage: `dp-deduction-percentage-${uid}`,
-    validFrom:  `dp-deduction-from-${uid}`,
-    errors:     `dp-deduction-errors-${uid}`,
+    validFrom: `dp-deduction-from-${uid}`,
+    errors: `dp-deduction-errors-${uid}`,
 };
 
 const form = useForm({ kind: 'tax', percentage: '', valid_from: '', notes: '' });
@@ -40,24 +40,26 @@ function localToday() {
 const groups = computed(() => {
     const today = props.today || localToday();
 
-    return DEDUCTION_KINDS
-        .map((kind) => {
-            const rates   = props.rates.filter((rate) => rate.kind === kind).sort((a, b) => b.valid_from.localeCompare(a.valid_from));
-            const current = rates.find((rate) => rate.valid_from <= today);
+    return DEDUCTION_KINDS.map((kind) => {
+        const rates = props.rates
+            .filter((rate) => rate.kind === kind)
+            .sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+        const current = rates.find((rate) => rate.valid_from <= today);
 
-            return { kind, rates, currentId: current?.id ?? null };
-        })
-        .filter((group) => group.rates.length > 0);
+        return { kind, rates, currentId: current?.id ?? null };
+    }).filter((group) => group.rates.length > 0);
 });
 
-const formError = computed(() => form.errors.valid_from || form.errors.percentage || form.errors.kind || form.errors.notes || '');
+const formError = computed(
+    () => form.errors.valid_from || form.errors.percentage || form.errors.kind || form.errors.notes || '',
+);
 
 function submit() {
     if (form.processing) return;
 
     form.post(props.routes.deduction_rate_store, {
         preserveScroll: true,
-        onSuccess:      () => form.reset('percentage', 'valid_from', 'notes'),
+        onSuccess: () => form.reset('percentage', 'valid_from', 'notes'),
     });
 }
 
@@ -76,7 +78,9 @@ function remove(rate) {
             </h2>
             <p class="small text-muted">{{ t.deductions_intro }}</p>
 
-            <p v-if="groups.length === 0" class="small text-muted mb-3" data-test="deductions-empty">{{ t.deductions_empty }}</p>
+            <p v-if="groups.length === 0" class="small text-muted mb-3" data-test="deductions-empty">
+                {{ t.deductions_empty }}
+            </p>
 
             <ul v-else class="list-unstyled d-grid gap-2 mb-3">
                 <li v-for="group in groups" :key="group.kind" data-test="deduction-group" :data-kind="group.kind">
@@ -91,7 +95,11 @@ function remove(rate) {
                         >
                             <span class="deduction-rates__value">{{ quantity(rate.percentage, 2) }}%</span>
                             <span>{{ t.deduction_valid_from }} {{ date(rate.valid_from) }}</span>
-                            <span v-if="rate.id === group.currentId" class="badge badge-soft-success border border-success fs-11" data-test="deduction-current">
+                            <span
+                                v-if="rate.id === group.currentId"
+                                class="badge badge-soft-success border border-success fs-11"
+                                data-test="deduction-current"
+                            >
                                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ t.active }}
                             </span>
                             <span v-if="rate.notes" class="text-muted text-break">· {{ rate.notes }}</span>
@@ -121,7 +129,9 @@ function remove(rate) {
                         :disabled="form.processing"
                         data-test="deduction-kind"
                     >
-                        <option v-for="kind in DEDUCTION_KINDS" :key="kind" :value="kind">{{ deductionKindLabel(kind) }}</option>
+                        <option v-for="kind in DEDUCTION_KINDS" :key="kind" :value="kind">
+                            {{ deductionKindLabel(kind) }}
+                        </option>
                     </select>
                 </div>
                 <div class="deduction-rates__percentage">
@@ -141,7 +151,7 @@ function remove(rate) {
                         :disabled="form.processing"
                         required
                         data-test="deduction-percentage"
-                    >
+                    />
                 </div>
                 <div class="deduction-rates__field">
                     <label :for="ids.validFrom" class="form-label small mb-1">{{ t.deduction_valid_from }}</label>
@@ -156,12 +166,25 @@ function remove(rate) {
                         :disabled="form.processing"
                         required
                         data-test="deduction-from"
-                    >
+                    />
                 </div>
-                <button type="submit" class="btn btn-outline-primary btn-sm" :disabled="form.processing" data-test="deduction-add">
+                <button
+                    type="submit"
+                    class="btn btn-outline-primary btn-sm"
+                    :disabled="form.processing"
+                    data-test="deduction-add"
+                >
                     <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.deduction_add }}
                 </button>
-                <div v-if="formError" :id="ids.errors" class="w-100 small text-danger" role="alert" data-test="deduction-errors">{{ formError }}</div>
+                <div
+                    v-if="formError"
+                    :id="ids.errors"
+                    class="w-100 small text-danger"
+                    role="alert"
+                    data-test="deduction-errors"
+                >
+                    {{ formError }}
+                </div>
             </form>
         </div>
     </section>

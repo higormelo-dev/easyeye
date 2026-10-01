@@ -31,7 +31,10 @@ const formattedValue = computed(() => {
         :enter="{ opacity: 1, y: 0, transition: { duration: 500, delay: props.delay } }"
         class="kpi-card bg-white p-4 rounded-3 shadow-sm border border-gray-100 d-flex align-items-center gap-3"
     >
-        <div class="kpi-icon-wrapper rounded-circle bg-light d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+        <div
+            class="kpi-icon-wrapper rounded-circle bg-light d-flex align-items-center justify-content-center"
+            style="width: 48px; height: 48px"
+        >
             <i :class="[icon, 'fs-4 text-primary']"></i>
         </div>
 
@@ -45,12 +48,14 @@ const formattedValue = computed(() => {
 <style scoped>
 /* Garantir que o card fique responsivo a eventos de mouse mantendo a elegância */
 .kpi-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
     will-change: transform, opacity; /* Dica ao browser para usar GPU */
 }
 
 .kpi-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
 }
 </style>

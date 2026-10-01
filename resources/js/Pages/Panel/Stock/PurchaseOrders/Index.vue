@@ -1,14 +1,14 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
-import AppLayout          from '@/Layouts/AppLayout.vue';
-import PageHeader         from '@/Components/Panel/PageHeader.vue';
-import SearchInput        from '@/Components/Panel/SearchInput.vue';
-import { useViewMode }    from '@/composables/useViewMode.js';
-import { useTrans }       from '@/composables/useTrans.js';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import { useViewMode } from '@/composables/useViewMode.js';
+import { useTrans } from '@/composables/useTrans.js';
 import PurchaseOrderTable from './PurchaseOrderTable.vue';
 import PurchaseOrderCards from './PurchaseOrderCards.vue';
-import PurchaseOrderFormModal    from './PurchaseOrderFormModal.vue';
+import PurchaseOrderFormModal from './PurchaseOrderFormModal.vue';
 import ReceivePurchaseOrderModal from './ReceivePurchaseOrderModal.vue';
 
 /**
@@ -19,18 +19,18 @@ import ReceivePurchaseOrderModal from './ReceivePurchaseOrderModal.vue';
  * lang/{locale}/stock_purchase_orders.php (prop `t`).
  */
 const props = defineProps({
-    breadcrumbs:   { type: Array,  default: () => [] },
-    items:         { type: Object, required: true },
-    suppliers:     { type: Array,  default: () => [] },
+    breadcrumbs: { type: Array, default: () => [] },
+    items: { type: Object, required: true },
+    suppliers: { type: Array, default: () => [] },
     // Fornecedor filtrado fora de `suppliers` (inativo), já escopado pela clínica: { id, name } | null.
     selectedSupplier: { type: Object, default: null },
     // Opções do filtro de status com rótulo traduzido (PurchaseOrderStatus::label()): [{ value, label }].
-    statuses:      { type: Array,  default: () => [] },
-    products:      { type: Array,  default: () => [] },
+    statuses: { type: Array, default: () => [] },
+    products: { type: Array, default: () => [] },
     lotsByProduct: { type: Object, default: () => ({}) },
-    filters:       { type: Object, default: () => ({}) },   // { search, status, supplier_id, sort, direction }
-    routes:        { type: Object, required: true },
-    t:             { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) }, // { search, status, supplier_id, sort, direction }
+    routes: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { tx } = useTrans(() => props.t);
@@ -42,17 +42,19 @@ const flashMessage = computed(() => page.props?.flash?.message ?? null);
 // o nó que o Vue controla). Nova resposta com flash — mesmo texto repetido
 // numa segunda ação — mostra o aviso de novo.
 const flashDismissed = ref(false);
-watch([flashMessage, () => page.props?.flash], () => { flashDismissed.value = false; });
+watch([flashMessage, () => page.props?.flash], () => {
+    flashDismissed.value = false;
+});
 // Falha de transição (enviar/cancelar/excluir) volta como erro de sessão.
-const statusError  = computed(() => page.props?.errors?.status ?? null);
-const loadError    = ref('');
+const statusError = computed(() => page.props?.errors?.status ?? null);
+const loadError = ref('');
 
 // ── View toggle (preferência no navegador) ───────────────────────────────────
 const { view, setView } = useViewMode('stock_purchase_orders_view');
 
 // ── Busca (debounce), filtros e ordenação — cada um preserva os outros ──────
-const search     = ref(props.filters.search ?? '');
-const status     = ref(props.filters.status ?? 'all');
+const search = ref(props.filters.search ?? '');
+const status = ref(props.filters.status ?? 'all');
 const supplierId = ref(props.filters.supplier_id ?? '');
 let searchTimer = null;
 
@@ -62,11 +64,11 @@ function visit(params, options = {}) {
 
 function currentParams(overrides = {}) {
     return {
-        search:      search.value,
-        status:      status.value,
+        search: search.value,
+        status: status.value,
         supplier_id: supplierId.value,
-        sort:        props.filters.sort,
-        direction:   props.filters.direction,
+        sort: props.filters.sort,
+        direction: props.filters.direction,
         ...overrides,
     };
 }
@@ -88,9 +90,9 @@ function onSort({ sort, direction }) {
 // opção precisa aparecer no select. Com o nome quando o backend o encontrou
 // na clínica (`selectedSupplier`); excluído, de outra clínica ou inexistente
 // (lista vazia) fica com rótulo neutro, sem afirmar nada sobre ele.
-const supplierUnlisted = computed(() => (
-    supplierId.value !== '' && !props.suppliers.some((s) => s.id === supplierId.value)
-));
+const supplierUnlisted = computed(
+    () => supplierId.value !== '' && !props.suppliers.some((s) => s.id === supplierId.value),
+);
 
 const supplierUnlistedLabel = computed(() => {
     const selected = props.selectedSupplier;
@@ -107,7 +109,10 @@ const supplierUnlistedLabel = computed(() => {
 const formOpen = ref(false);
 const editItem = ref(null);
 
-function openCreate() { editItem.value = null; formOpen.value = true; }
+function openCreate() {
+    editItem.value = null;
+    formOpen.value = true;
+}
 
 async function openEdit(po) {
     loadError.value = '';
@@ -120,14 +125,23 @@ async function openEdit(po) {
     }
 }
 
-function onSaved() { formOpen.value = false; router.reload({ only: ['items'] }); }
+function onSaved() {
+    formOpen.value = false;
+    router.reload({ only: ['items'] });
+}
 
 // ── Recebimento ──────────────────────────────────────────────────────────────
 const receiveOpen = ref(false);
 const receivingPo = ref(null);
 
-function openReceive(po) { receivingPo.value = po; receiveOpen.value = true; }
-function onReceived() { receiveOpen.value = false; router.reload({ only: ['items', 'products', 'lotsByProduct'] }); }
+function openReceive(po) {
+    receivingPo.value = po;
+    receiveOpen.value = true;
+}
+function onReceived() {
+    receiveOpen.value = false;
+    router.reload({ only: ['items', 'products', 'lotsByProduct'] });
+}
 
 // ── Transições de status ─────────────────────────────────────────────────────
 function onSend(po) {
@@ -151,7 +165,6 @@ const pageTitle = computed(() => props.t.page_title ?? 'Pedidos de compra');
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-stock-purchase-orders">
-
             <PageHeader
                 :title="pageTitle"
                 :total="items.total ?? 0"
@@ -165,7 +178,8 @@ const pageTitle = computed(() => props.t.page_title ?? 'Pedidos de compra');
                 <template #actions>
                     <div class="d-flex align-items-center gap-2">
                         <Link :href="routes.suppliers_index" class="btn btn-outline-secondary fs-13 btn-md">
-                            <i class="ti ti-truck-delivery me-1" aria-hidden="true"></i> {{ t.btn_suppliers ?? 'Fornecedores' }}
+                            <i class="ti ti-truck-delivery me-1" aria-hidden="true"></i>
+                            {{ t.btn_suppliers ?? 'Fornecedores' }}
                         </Link>
                         <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
                             <i class="ti ti-plus me-1" aria-hidden="true"></i> {{ t.btn_new ?? 'Novo pedido' }}
@@ -174,12 +188,25 @@ const pageTitle = computed(() => props.t.page_title ?? 'Pedidos de compra');
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+            <div
+                v-if="flashMessage && !flashDismissed"
+                class="alert alert-success alert-dismissible mb-3"
+                role="status"
+            >
                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
-                <button type="button" class="btn-close" :aria-label="t.close ?? 'Fechar'" @click="flashDismissed = true"></button>
+                <button
+                    type="button"
+                    class="btn-close"
+                    :aria-label="t.close ?? 'Fechar'"
+                    @click="flashDismissed = true"
+                ></button>
             </div>
 
-            <div v-if="statusError || loadError" class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
+            <div
+                v-if="statusError || loadError"
+                class="alert alert-danger d-flex align-items-center gap-2 mb-3"
+                role="alert"
+            >
                 <i class="ti ti-alert-triangle" aria-hidden="true"></i>
                 <span>{{ statusError ?? loadError }}</span>
             </div>

@@ -25,10 +25,9 @@ window.axios = axios;
 const appName = document.documentElement.dataset.app ?? 'EasyEye';
 
 createInertiaApp({
-    title: (title) => title ? `${appName} — ${title}` : appName,
+    title: (title) => (title ? `${appName} — ${title}` : appName),
 
-    resolve: name =>
-        resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
 
     setup({ el, App, props, plugin }) {
         createSSRApp({ render: () => h(App, props) })

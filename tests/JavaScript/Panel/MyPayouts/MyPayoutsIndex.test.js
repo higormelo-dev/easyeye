@@ -20,15 +20,44 @@ vi.mock('@inertiajs/vue3', async () => {
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
-vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { props: ['title', 'total', 'totalLabel'], template: '<div><span class="total">{{ totalLabel }} {{ total }}</span></div>' } }));
-vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { props: ['data'], template: '<nav class="pagination-stub" />' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
+vi.mock('@/Components/Panel/PageHeader.vue', () => ({
+    default: {
+        props: ['title', 'total', 'totalLabel'],
+        template: '<div><span class="total">{{ totalLabel }} {{ total }}</span></div>',
+    },
+}));
+vi.mock('@/Components/Panel/TablePagination.vue', () => ({
+    default: { props: ['data'], template: '<nav class="pagination-stub" />' },
+}));
 
 const routes = { index: '/my-payouts', show: '/my-payouts/__ID__', pdf: '/my-payouts/__ID__/pdf' };
 
 const PAYOUTS = [
-    { id: 'po2', code: 'RM-000002', period_start: '2026-09-01', period_end: '2026-09-30', items_count: 14, gross_amount: 4200, total_amount: 2520, status: 'closed', paid_at: null },
-    { id: 'po1', code: 'RM-000001', period_start: '2026-08-01', period_end: '2026-08-31', items_count: 1, gross_amount: 300, total_amount: 180, status: 'paid', paid_at: '2026-09-05' },
+    {
+        id: 'po2',
+        code: 'RM-000002',
+        period_start: '2026-09-01',
+        period_end: '2026-09-30',
+        items_count: 14,
+        gross_amount: 4200,
+        total_amount: 2520,
+        status: 'closed',
+        paid_at: null,
+    },
+    {
+        id: 'po1',
+        code: 'RM-000001',
+        period_start: '2026-08-01',
+        period_end: '2026-08-31',
+        items_count: 1,
+        gross_amount: 300,
+        total_amount: 180,
+        status: 'paid',
+        paid_at: '2026-09-05',
+    },
 ];
 
 let wrapper;

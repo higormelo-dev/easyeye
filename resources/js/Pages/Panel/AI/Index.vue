@@ -111,12 +111,15 @@ function dismissMessage() {
 }
 
 const canApproveOrReject = computed(() => selectedRun.value?.status === 'waiting_approval');
-const availableStatuses = computed(() => props.statuses.length
-    ? props.statuses
-    : ['pending', 'reserved', 'running', 'waiting_approval', 'approved', 'rejected', 'failed', 'cancelled']);
+const availableStatuses = computed(() =>
+    props.statuses.length
+        ? props.statuses
+        : ['pending', 'reserved', 'running', 'waiting_approval', 'approved', 'rejected', 'failed', 'cancelled'],
+);
 const statusFilterOptions = computed(() =>
-    availableStatuses.value.map((status) => ({ value: status, label: statusLabel(status) })));
-const paginationLinks = computed(() => Array.isArray(props.runs?.links) ? props.runs.links : []);
+    availableStatuses.value.map((status) => ({ value: status, label: statusLabel(status) })),
+);
+const paginationLinks = computed(() => (Array.isArray(props.runs?.links) ? props.runs.links : []));
 
 const workflowLabel = (workflow) => {
     const key = `workflow_${workflow}`;
@@ -134,26 +137,30 @@ const statusLabel = (status) => {
 };
 
 const statusClass = (status) => {
-    return {
-        pending: 'badge bg-secondary-subtle text-secondary',
-        reserved: 'badge bg-info-subtle text-info',
-        running: 'badge bg-primary-subtle text-primary',
-        waiting_approval: 'badge bg-warning-subtle text-warning',
-        approved: 'badge bg-success-subtle text-success',
-        rejected: 'badge bg-danger-subtle text-danger',
-        failed: 'badge bg-danger-subtle text-danger',
-        cancelled: 'badge bg-dark-subtle text-dark',
-    }[status] ?? 'badge bg-light text-dark';
+    return (
+        {
+            pending: 'badge bg-secondary-subtle text-secondary',
+            reserved: 'badge bg-info-subtle text-info',
+            running: 'badge bg-primary-subtle text-primary',
+            waiting_approval: 'badge bg-warning-subtle text-warning',
+            approved: 'badge bg-success-subtle text-success',
+            rejected: 'badge bg-danger-subtle text-danger',
+            failed: 'badge bg-danger-subtle text-danger',
+            cancelled: 'badge bg-dark-subtle text-dark',
+        }[status] ?? 'badge bg-light text-dark'
+    );
 };
 
 const purchaseStatusClass = (status) => {
-    return {
-        pending_payment: 'badge bg-warning-subtle text-warning',
-        credited: 'badge bg-success-subtle text-success',
-        cancelled: 'badge bg-secondary-subtle text-secondary',
-        failed: 'badge bg-danger-subtle text-danger',
-        refunded: 'badge bg-info-subtle text-info',
-    }[status] ?? 'badge bg-light text-dark';
+    return (
+        {
+            pending_payment: 'badge bg-warning-subtle text-warning',
+            credited: 'badge bg-success-subtle text-success',
+            cancelled: 'badge bg-secondary-subtle text-secondary',
+            failed: 'badge bg-danger-subtle text-danger',
+            refunded: 'badge bg-info-subtle text-info',
+        }[status] ?? 'badge bg-light text-dark'
+    );
 };
 
 function filterByStatus() {
@@ -241,19 +248,11 @@ async function rejectRun() {
         <div class="container-fluid py-3">
             <PageHeader :title="label('title', 'AI')" :total="runs.total" />
 
-            <div
-                v-if="errorMessage"
-                class="alert alert-danger alert-dismissible fade show"
-                role="alert"
-            >
+            <div v-if="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="ti ti-alert-circle me-1"></i>{{ errorMessage }}
                 <button type="button" class="btn-close" aria-label="Close" @click="dismissMessage"></button>
             </div>
-            <div
-                v-if="successMessage"
-                class="alert alert-success alert-dismissible fade show"
-                role="alert"
-            >
+            <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
                 <i class="ti ti-check me-1"></i>{{ successMessage }}
                 <button type="button" class="btn-close" aria-label="Close" @click="dismissMessage"></button>
             </div>
@@ -262,9 +261,16 @@ async function rejectRun() {
                 <div :class="canPurchaseCredits ? 'col-lg-4' : 'col-12'">
                     <div class="border rounded p-3 bg-white h-100">
                         <div class="d-flex flex-column gap-2">
-                            <div><strong>{{ label('credits_available', 'Créditos disponíveis') }}:</strong> {{ balance.available }}</div>
-                            <div><strong>{{ label('credits_reserved', 'Reservados') }}:</strong> {{ balance.reserved }}</div>
-                            <div><strong>{{ label('credits_total', 'Total') }}:</strong> {{ balance.total }}</div>
+                            <div>
+                                <strong>{{ label('credits_available', 'Créditos disponíveis') }}:</strong>
+                                {{ balance.available }}
+                            </div>
+                            <div>
+                                <strong>{{ label('credits_reserved', 'Reservados') }}:</strong> {{ balance.reserved }}
+                            </div>
+                            <div>
+                                <strong>{{ label('credits_total', 'Total') }}:</strong> {{ balance.total }}
+                            </div>
                         </div>
                         <div class="mt-2 text-muted fs-13">{{ label('support_notice') }}</div>
                     </div>
@@ -274,8 +280,12 @@ async function rejectRun() {
                     <div class="border rounded p-3 bg-white h-100">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             <div>
-                                <h6 class="fw-semibold mb-1">{{ label('credit_packages_title', 'Pacotes de créditos IA') }}</h6>
-                                <div class="text-muted fs-13">{{ label('credit_packages_subtitle', 'Créditos extras avulsos.') }}</div>
+                                <h6 class="fw-semibold mb-1">
+                                    {{ label('credit_packages_title', 'Pacotes de créditos IA') }}
+                                </h6>
+                                <div class="text-muted fs-13">
+                                    {{ label('credit_packages_subtitle', 'Créditos extras avulsos.') }}
+                                </div>
                             </div>
                         </div>
 
@@ -294,7 +304,10 @@ async function rejectRun() {
                                         <td class="fw-semibold">{{ pkg.credits }}</td>
                                         <td>
                                             <div class="fw-medium">{{ pkg.name }}</div>
-                                            <div class="text-muted fs-13">{{ pkg.unit_price_formatted }} {{ label('credit_package_unit', 'por crédito') }}</div>
+                                            <div class="text-muted fs-13">
+                                                {{ pkg.unit_price_formatted }}
+                                                {{ label('credit_package_unit', 'por crédito') }}
+                                            </div>
                                         </td>
                                         <td>{{ pkg.price_formatted }}</td>
                                         <td class="text-end">
@@ -305,7 +318,11 @@ async function rejectRun() {
                                                 @click="purchaseCredits(pkg.code)"
                                             >
                                                 <i class="ti ti-credit-card me-1"></i>
-                                                {{ creditPurchaseAutoCredit ? label('credit_package_buy', 'Comprar agora') : label('credit_package_request', 'Solicitar compra') }}
+                                                {{
+                                                    creditPurchaseAutoCredit
+                                                        ? label('credit_package_buy', 'Comprar agora')
+                                                        : label('credit_package_request', 'Solicitar compra')
+                                                }}
                                             </button>
                                         </td>
                                     </tr>
@@ -314,7 +331,9 @@ async function rejectRun() {
                         </div>
 
                         <div class="mt-3" v-if="recentCreditPurchases.length">
-                            <div class="fw-semibold fs-13 mb-1">{{ label('credit_purchase_history', 'Compras recentes') }}</div>
+                            <div class="fw-semibold fs-13 mb-1">
+                                {{ label('credit_purchase_history', 'Compras recentes') }}
+                            </div>
                             <div class="d-flex flex-wrap gap-2">
                                 <span
                                     v-for="purchase in recentCreditPurchases"
@@ -322,11 +341,15 @@ async function rejectRun() {
                                     class="d-inline-flex align-items-center gap-2 border rounded px-2 py-1 fs-13"
                                 >
                                     <span>{{ purchase.credits }} · {{ purchase.amount_formatted }}</span>
-                                    <span :class="purchaseStatusClass(purchase.status)">{{ purchase.status_label }}</span>
+                                    <span :class="purchaseStatusClass(purchase.status)">{{
+                                        purchase.status_label
+                                    }}</span>
                                 </span>
                             </div>
                         </div>
-                        <div v-else class="mt-3 text-muted fs-13">{{ label('credit_purchase_empty', 'Nenhuma compra recente.') }}</div>
+                        <div v-else class="mt-3 text-muted fs-13">
+                            {{ label('credit_purchase_empty', 'Nenhuma compra recente.') }}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -351,18 +374,20 @@ async function rejectRun() {
                             <span v-if="usagePercent !== null" class="ms-1">({{ usagePercent }}%)</span>
                         </span>
                     </div>
-                    <div class="progress" style="height: 12px;">
-                        <div :class="['progress-bar', usageBarClass]"
-                             role="progressbar"
-                             :style="{ width: Math.min(usagePercent ?? 0, 100) + '%' }"
-                             :aria-valuenow="usagePercent ?? 0"
-                             aria-valuemin="0"
-                             aria-valuemax="100"></div>
+                    <div class="progress" style="height: 12px">
+                        <div
+                            :class="['progress-bar', usageBarClass]"
+                            role="progressbar"
+                            :style="{ width: Math.min(usagePercent ?? 0, 100) + '%' }"
+                            :aria-valuenow="usagePercent ?? 0"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        ></div>
                     </div>
                     <div v-if="coveredByPurchased" class="alert alert-info py-1 px-2 mt-2 mb-0 fs-13">
                         <i class="ti ti-wallet me-1" aria-hidden="true"></i>
-                        Cota do plano esgotada. O excedente ({{ quotaOverflow }}) e os próximos usos são cobertos pelos seus
-                        <strong>créditos avulsos/cortesia</strong> ({{ purchasedCredits }} disponíveis).
+                        Cota do plano esgotada. O excedente ({{ quotaOverflow }}) e os próximos usos são cobertos pelos
+                        seus <strong>créditos avulsos/cortesia</strong> ({{ purchasedCredits }} disponíveis).
                     </div>
                 </div>
 
@@ -390,7 +415,9 @@ async function rejectRun() {
                         <div class="border rounded p-2 text-center h-100">
                             <div class="text-muted fs-13">Taxa de aprovação</div>
                             <div class="fs-3 fw-bold text-warning">
-                                <template v-if="analytics.approval?.rate !== null && analytics.approval?.rate !== undefined">
+                                <template
+                                    v-if="analytics.approval?.rate !== null && analytics.approval?.rate !== undefined"
+                                >
                                     {{ analytics.approval.rate }}%
                                 </template>
                                 <template v-else>—</template>
@@ -401,10 +428,15 @@ async function rejectRun() {
                     <!-- Por workflow -->
                     <div class="col-md-6">
                         <h6 class="fw-semibold fs-13 mb-2">Por workflow</h6>
-                        <div v-if="analytics.by_workflow?.length === 0" class="text-muted fs-13">Sem execuções no período.</div>
+                        <div v-if="analytics.by_workflow?.length === 0" class="text-muted fs-13">
+                            Sem execuções no período.
+                        </div>
                         <ul v-else class="list-unstyled mb-0">
-                            <li v-for="row in analytics.by_workflow" :key="row.workflow"
-                                class="d-flex justify-content-between border-bottom py-1 fs-13">
+                            <li
+                                v-for="row in analytics.by_workflow"
+                                :key="row.workflow"
+                                class="d-flex justify-content-between border-bottom py-1 fs-13"
+                            >
                                 <span>{{ workflowDisplayLabel(row.workflow) }}</span>
                                 <span class="text-muted">
                                     {{ row.runs_count }} runs · <strong>{{ row.credits_total }}</strong> créditos
@@ -416,10 +448,15 @@ async function rejectRun() {
                     <!-- Por modo -->
                     <div class="col-md-6">
                         <h6 class="fw-semibold fs-13 mb-2">Por modo de revisão</h6>
-                        <div v-if="analytics.by_mode?.length === 0" class="text-muted fs-13">Sem execuções no período.</div>
+                        <div v-if="analytics.by_mode?.length === 0" class="text-muted fs-13">
+                            Sem execuções no período.
+                        </div>
                         <ul v-else class="list-unstyled mb-0">
-                            <li v-for="row in analytics.by_mode" :key="row.mode"
-                                class="d-flex justify-content-between border-bottom py-1 fs-13">
+                            <li
+                                v-for="row in analytics.by_mode"
+                                :key="row.mode"
+                                class="d-flex justify-content-between border-bottom py-1 fs-13"
+                            >
                                 <span>{{ modeDisplayLabel(row.mode) }}</span>
                                 <span class="text-muted">{{ row.runs_count }} runs</span>
                             </li>
@@ -427,27 +464,46 @@ async function rejectRun() {
                     </div>
 
                     <!-- Onda 3, P4 — Métricas operacionais ─────────────── -->
-                    <div class="col-md-4" v-if="analytics.avg_approve_time_seconds !== null && analytics.avg_approve_time_seconds !== undefined">
+                    <div
+                        class="col-md-4"
+                        v-if="
+                            analytics.avg_approve_time_seconds !== null &&
+                            analytics.avg_approve_time_seconds !== undefined
+                        "
+                    >
                         <div class="border rounded p-3 h-100 bg-white">
-                            <div class="text-muted fs-13 mb-1">{{ label('dashboard_avg_approve_time', 'Tempo médio para aprovar') }}</div>
-                            <div class="fs-3 fw-bold text-primary">{{ formatSeconds(analytics.avg_approve_time_seconds) }}</div>
+                            <div class="text-muted fs-13 mb-1">
+                                {{ label('dashboard_avg_approve_time', 'Tempo médio para aprovar') }}
+                            </div>
+                            <div class="fs-3 fw-bold text-primary">
+                                {{ formatSeconds(analytics.avg_approve_time_seconds) }}
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-4" v-if="analytics.avg_cost_per_record !== null && analytics.avg_cost_per_record !== undefined">
+                    <div
+                        class="col-md-4"
+                        v-if="analytics.avg_cost_per_record !== null && analytics.avg_cost_per_record !== undefined"
+                    >
                         <div class="border rounded p-3 h-100 bg-white">
-                            <div class="text-muted fs-13 mb-1">{{ label('dashboard_avg_cost', 'Custo médio por consulta') }}</div>
+                            <div class="text-muted fs-13 mb-1">
+                                {{ label('dashboard_avg_cost', 'Custo médio por consulta') }}
+                            </div>
                             <div class="fs-3 fw-bold text-info">{{ analytics.avg_cost_per_record }} cr</div>
                         </div>
                     </div>
                     <div class="col-12" v-if="analytics.by_doctor?.length">
-                        <h6 class="fw-semibold fs-13 mb-2">{{ label('dashboard_by_doctor', 'Médicos mais ativos') }}</h6>
+                        <h6 class="fw-semibold fs-13 mb-2">
+                            {{ label('dashboard_by_doctor', 'Médicos mais ativos') }}
+                        </h6>
                         <div class="table-responsive">
                             <table class="table table-sm table-hover align-middle mb-0">
                                 <thead class="table-light">
                                     <tr>
                                         <th>{{ label('dashboard_doctor', 'Médico') }}</th>
                                         <th class="text-end">{{ label('dashboard_approved', 'Aprovados') }}</th>
-                                        <th class="text-end">{{ label('dashboard_avg_credits', 'Créditos médios') }}</th>
+                                        <th class="text-end">
+                                            {{ label('dashboard_avg_credits', 'Créditos médios') }}
+                                        </th>
                                         <th class="text-end">{{ label('dashboard_avg_time', 'Tempo médio') }}</th>
                                     </tr>
                                 </thead>
@@ -456,7 +512,9 @@ async function rejectRun() {
                                         <td class="fs-13">{{ r.doctor_name }}</td>
                                         <td class="text-end">{{ r.approved }}</td>
                                         <td class="text-end">{{ r.avg_credits }}</td>
-                                        <td class="text-end fs-13 text-muted">{{ formatSeconds(r.avg_approve_seconds) }}</td>
+                                        <td class="text-end fs-13 text-muted">
+                                            {{ formatSeconds(r.avg_approve_seconds) }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -526,23 +584,32 @@ async function rejectRun() {
                                         <td>{{ run.created_at }}</td>
                                         <td>
                                             {{ workflowLabel(run.workflow) }}
-                                            <span v-if="run.is_escalation"
-                                                  class="badge bg-info-subtle text-info ms-1"
-                                                  title="Reanálise com modo superior">
+                                            <span
+                                                v-if="run.is_escalation"
+                                                class="badge bg-info-subtle text-info ms-1"
+                                                title="Reanálise com modo superior"
+                                            >
                                                 <i class="ti ti-arrow-up"></i> Reanálise
                                             </span>
                                         </td>
                                         <td>{{ modeLabel(run.mode) }}</td>
-                                        <td><span :class="statusClass(run.status)">{{ statusLabel(run.status) }}</span></td>
+                                        <td>
+                                            <span :class="statusClass(run.status)">{{ statusLabel(run.status) }}</span>
+                                        </td>
                                         <td>{{ run.consumed_credits }}/{{ run.reserved_credits }}</td>
                                         <td class="text-end">
-                                            <button class="btn btn-sm btn-outline-secondary" @click="loadRunDetail(run.id)">
+                                            <button
+                                                class="btn btn-sm btn-outline-secondary"
+                                                @click="loadRunDetail(run.id)"
+                                            >
                                                 <i class="ti ti-eye"></i>
                                             </button>
                                         </td>
                                     </tr>
                                     <tr v-if="runs.data.length === 0">
-                                        <td colspan="6" class="text-center text-muted py-3">{{ label('empty_runs', 'Nenhuma execução encontrada.') }}</td>
+                                        <td colspan="6" class="text-center text-muted py-3">
+                                            {{ label('empty_runs', 'Nenhuma execução encontrada.') }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -570,17 +637,24 @@ async function rejectRun() {
                 </div>
 
                 <div class="col-lg-5">
-                    <div class="border rounded p-3 bg-white" style="min-height: 320px;">
+                    <div class="border rounded p-3 bg-white" style="min-height: 320px">
                         <h6 class="fw-semibold mb-2">{{ label('details', 'Detalhes') }}</h6>
                         <div v-if="detailLoading" class="text-muted">{{ label('loading', 'Carregando') }}...</div>
-                        <div v-else-if="!selectedRun" class="text-muted">{{ label('select_run', 'Selecione uma execução para visualizar.') }}</div>
+                        <div v-else-if="!selectedRun" class="text-muted">
+                            {{ label('select_run', 'Selecione uma execução para visualizar.') }}
+                        </div>
                         <template v-else>
                             <!-- Uma linha só: com quebra de linha entre </strong> e <span>,
                                  o Vue apaga o espaço ("Status:Concluído"). -->
                             <!-- prettier-ignore -->
                             <div class="mb-2"><strong>{{ label('status', 'Status') }}:</strong> <span :class="statusClass(selectedRun.status)">{{ statusLabel(selectedRun.status) }}</span></div>
-                            <div class="mb-2"><strong>{{ label('patient', 'Paciente') }}:</strong> {{ selectedRun.patient || '-' }}</div>
-                            <div class="mb-2"><strong>{{ label('medical_record', 'Prontuário') }}:</strong> {{ selectedRun.medical_record_code || '-' }}</div>
+                            <div class="mb-2">
+                                <strong>{{ label('patient', 'Paciente') }}:</strong> {{ selectedRun.patient || '-' }}
+                            </div>
+                            <div class="mb-2">
+                                <strong>{{ label('medical_record', 'Prontuário') }}:</strong>
+                                {{ selectedRun.medical_record_code || '-' }}
+                            </div>
 
                             <!-- MELHORIA — contexto clínico do exame analisado (só existe no
                                  fluxo de imagem ocular; runs de prontuário/texto não têm exame
@@ -604,15 +678,22 @@ async function rejectRun() {
                                         v-for="(d, i) in selectedRun.exam_context.diagnoses"
                                         :key="i"
                                         class="badge me-1"
-                                        :class="d.is_primary ? 'bg-primary-subtle text-primary' : 'bg-secondary-subtle text-secondary'"
+                                        :class="
+                                            d.is_primary
+                                                ? 'bg-primary-subtle text-primary'
+                                                : 'bg-secondary-subtle text-secondary'
+                                        "
                                         :title="d.is_primary ? label('diagnosis_primary', 'Diagnóstico principal') : ''"
-                                    >{{ d.description }}</span>
+                                        >{{ d.description }}</span
+                                    >
                                 </div>
                             </template>
 
                             <div class="mb-2" v-if="selectedRun.analysis_summary">
                                 <strong>{{ label('analysis_summary', 'Resumo da análise') }}:</strong>
-                                <div class="text-muted fs-13" style="white-space: pre-wrap;">{{ selectedRun.analysis_summary }}</div>
+                                <div class="text-muted fs-13" style="white-space: pre-wrap">
+                                    {{ selectedRun.analysis_summary }}
+                                </div>
                             </div>
 
                             <label class="form-label mt-2">{{ label('editable_draft', 'Rascunho editável') }}</label>
@@ -628,8 +709,10 @@ async function rejectRun() {
                             </div>
 
                             <div class="mt-2" v-if="canApproveOrReject">
-                                <label class="form-label">{{ label('rejection_reason_optional', 'Motivo da rejeição (opcional)') }}</label>
-                                <input v-model="rejectReason" type="text" class="form-control">
+                                <label class="form-label">{{
+                                    label('rejection_reason_optional', 'Motivo da rejeição (opcional)')
+                                }}</label>
+                                <input v-model="rejectReason" type="text" class="form-control" />
                             </div>
                         </template>
                     </div>

@@ -37,8 +37,15 @@ function mountWith(rows) {
 
 function row(overrides) {
     return {
-        id: '1', code: 'FOR-1', name: 'Fornecedor', contact_name: null, active: true,
-        document: null, phone: null, document_display: null, phone_display: null,
+        id: '1',
+        code: 'FOR-1',
+        name: 'Fornecedor',
+        contact_name: null,
+        active: true,
+        document: null,
+        phone: null,
+        document_display: null,
+        phone_display: null,
         ...overrides,
     };
 }
@@ -46,25 +53,33 @@ function row(overrides) {
 function cells(w) {
     return {
         document: w.find('tbody td[data-col="documento"]').text(),
-        phone:    w.find('tbody td[data-col="telefone"]').text(),
+        phone: w.find('tbody td[data-col="telefone"]').text(),
     };
 }
 
 describe('Suppliers/Index — exibição de documento e telefone', () => {
     it('imprime os valores formatados pelo backend', () => {
-        const w = mountWith([row({
-            document: '12345678000199', document_display: '12.345.678/0001-99',
-            phone: '6133334444', phone_display: '(61) 3333-4444',
-        })]);
+        const w = mountWith([
+            row({
+                document: '12345678000199',
+                document_display: '12.345.678/0001-99',
+                phone: '6133334444',
+                phone_display: '(61) 3333-4444',
+            }),
+        ]);
 
         expect(cells(w)).toEqual({ document: '12.345.678/0001-99', phone: '(61) 3333-4444' });
     });
 
     it('não mutila legado com quantidade de dígitos inesperada', () => {
-        const w = mountWith([row({
-            document: 'ISENTO', document_display: 'ISENTO',
-            phone: '(61) 3333-4444 r.21', phone_display: '(61) 3333-4444 r.21',
-        })]);
+        const w = mountWith([
+            row({
+                document: 'ISENTO',
+                document_display: 'ISENTO',
+                phone: '(61) 3333-4444 r.21',
+                phone_display: '(61) 3333-4444 r.21',
+            }),
+        ]);
 
         expect(cells(w)).toEqual({ document: 'ISENTO', phone: '(61) 3333-4444 r.21' });
     });

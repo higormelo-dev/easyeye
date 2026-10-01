@@ -13,14 +13,24 @@ vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
     default: { template: '<div class="dd"><slot /></div>' },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
-    default: { props: ['title', 'icon', 'href'], emits: ['click'], template: '<button type="button" :title="title" @click="$emit(\'click\')" />' },
+    default: {
+        props: ['title', 'icon', 'href'],
+        emits: ['click'],
+        template: '<button type="button" :title="title" @click="$emit(\'click\')" />',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    status_active: 'Ativo', status_inactive: 'Inativo', specialty: 'Especialidade',
-    action_view: 'Visualizar', action_work_schedule: 'Horários de atendimento', action_edit: 'Editar',
-    load_error: 'Falha ao carregar.', retry: 'Tentar novamente', empty_list: 'Nenhum médico encontrado.',
+    status_active: 'Ativo',
+    status_inactive: 'Inativo',
+    specialty: 'Especialidade',
+    action_view: 'Visualizar',
+    action_work_schedule: 'Horários de atendimento',
+    action_edit: 'Editar',
+    load_error: 'Falha ao carregar.',
+    retry: 'Tentar novamente',
+    empty_list: 'Nenhum médico encontrado.',
 };
 
 let wrapper;
@@ -28,14 +38,26 @@ let successHandler;
 
 function doctor(overrides = {}) {
     return {
-        id: 'd1', code: 'MED-1', full_name: 'DRA ANA', record: '12345', record_specialty: 'RETINA',
-        cellphone: '(61) 99999-8888', whatsapp: true, color: '#ff0000', active: false,
-        photo_url: '/img.png', work_schedule_url: '/ws', mode: 'full', ...overrides,
+        id: 'd1',
+        code: 'MED-1',
+        full_name: 'DRA ANA',
+        record: '12345',
+        record_specialty: 'RETINA',
+        cellphone: '(61) 99999-8888',
+        whatsapp: true,
+        color: '#ff0000',
+        active: false,
+        photo_url: '/img.png',
+        work_schedule_url: '/ws',
+        mode: 'full',
+        ...overrides,
     };
 }
 
 function respond(data, meta = { current_page: 1, last_page: 1, total: data.length }) {
-    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data, meta }) }));
+    globalThis.fetch = vi.fn(() =>
+        Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data, meta }) }),
+    );
 }
 
 beforeEach(() => {
@@ -128,15 +150,39 @@ describe('DoctorCards', () => {
         const w = await mountCards('');
 
         let resolveSlow;
-        globalThis.fetch = vi.fn()
-            .mockImplementationOnce(() => new Promise((r) => { resolveSlow = r; }))
-            .mockImplementationOnce(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: [doctor({ id: 'new', full_name: 'NOVO' })], meta: { current_page: 1, last_page: 1, total: 1 } }) }));
+        globalThis.fetch = vi
+            .fn()
+            .mockImplementationOnce(
+                () =>
+                    new Promise((r) => {
+                        resolveSlow = r;
+                    }),
+            )
+            .mockImplementationOnce(() =>
+                Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    json: () =>
+                        Promise.resolve({
+                            data: [doctor({ id: 'new', full_name: 'NOVO' })],
+                            meta: { current_page: 1, last_page: 1, total: 1 },
+                        }),
+                }),
+            );
 
         successHandler({ detail: { page: { props: { filters: { search: 'a' } } } } });
         successHandler({ detail: { page: { props: { filters: { search: 'ab' } } } } });
         await flushPromises();
 
-        resolveSlow({ ok: true, status: 200, json: () => Promise.resolve({ data: [doctor({ id: 'old', full_name: 'ANTIGO' })], meta: { current_page: 1, last_page: 1, total: 1 } }) });
+        resolveSlow({
+            ok: true,
+            status: 200,
+            json: () =>
+                Promise.resolve({
+                    data: [doctor({ id: 'old', full_name: 'ANTIGO' })],
+                    meta: { current_page: 1, last_page: 1, total: 1 },
+                }),
+        });
         await flushPromises();
 
         expect(w.text()).toContain('NOVO');

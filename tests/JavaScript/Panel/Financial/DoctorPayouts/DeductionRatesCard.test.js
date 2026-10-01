@@ -24,7 +24,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 reset: (...fields) => {
-                    (fields.length ? fields : Object.keys(initial)).forEach((field) => { form[field] = initial[field]; });
+                    (fields.length ? fields : Object.keys(initial)).forEach((field) => {
+                        form[field] = initial[field];
+                    });
                 },
                 post: vi.fn(),
             });
@@ -56,7 +58,8 @@ function mountCard(props = {}) {
 
 const form = () => forms.at(-1);
 /** Textos das partes da linha (o espaço entre elas vem do gap do flex, não do texto). */
-const parts = (rate) => [...rate.element.children].filter((el) => el.tagName === 'SPAN').map((el) => el.textContent.trim());
+const parts = (rate) =>
+    [...rate.element.children].filter((el) => el.tagName === 'SPAN').map((el) => el.textContent.trim());
 
 beforeEach(() => {
     vi.mocked(router.delete).mockReset();
@@ -91,7 +94,11 @@ describe('Financial/DoctorPayouts/DeductionRatesCard', () => {
         // Vigência futura não vale hoje; a de janeiro vale.
         expect(tax[0].find('[data-test="deduction-current"]').exists()).toBe(false);
         expect(tax[1].find('[data-test="deduction-current"]').exists()).toBe(true);
-        expect(parts(groups[0].find('[data-test="deduction-rate"]'))).toEqual(['3,49%', 'Valid from 01/06/2025', 'Active']);
+        expect(parts(groups[0].find('[data-test="deduction-rate"]'))).toEqual([
+            '3,49%',
+            'Valid from 01/06/2025',
+            'Active',
+        ]);
     });
 
     it('nova vigência: POST com tipo, taxa e data; sucesso limpa taxa, data e notas (mantém o tipo)', async () => {
@@ -109,11 +116,22 @@ describe('Financial/DoctorPayouts/DeductionRatesCard', () => {
         await w.find('[data-test="deduction-from"]').setValue('2026-10-01');
         await w.find('[data-test="deduction-form"]').trigger('submit');
 
-        expect(form().post).toHaveBeenCalledWith('/doctor-payouts/deduction-rates', expect.objectContaining({ preserveScroll: true }));
-        expect({ kind: form().kind, percentage: form().percentage, valid_from: form().valid_from }).toEqual({ kind: 'admin', percentage: 2.5, valid_from: '2026-10-01' });
+        expect(form().post).toHaveBeenCalledWith(
+            '/doctor-payouts/deduction-rates',
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        expect({ kind: form().kind, percentage: form().percentage, valid_from: form().valid_from }).toEqual({
+            kind: 'admin',
+            percentage: 2.5,
+            valid_from: '2026-10-01',
+        });
 
         form().post.mock.calls[0][1].onSuccess();
-        expect({ kind: form().kind, percentage: form().percentage, valid_from: form().valid_from }).toEqual({ kind: 'admin', percentage: '', valid_from: '' });
+        expect({ kind: form().kind, percentage: form().percentage, valid_from: form().valid_from }).toEqual({
+            kind: 'admin',
+            percentage: '',
+            valid_from: '',
+        });
     });
 
     it('enviando: não reenvia e trava os campos', async () => {

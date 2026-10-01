@@ -20,31 +20,31 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
  * recarregar a página inteira, só a lista de lotes local.
  */
 const props = defineProps({
-    open:       { type: Boolean, required: true },
-    item:       { type: Object,  default: null }, // null = criar; objeto = editar
-    routes:     { type: Object,  required: true }, // { store, update (__ID__), lots_index (__ID__), lots_update (__ID__) }
-    categories: { type: Array,   default: () => [] },
-    units:      { type: Array,   default: () => [] }, // [{ value, label }]
+    open: { type: Boolean, required: true },
+    item: { type: Object, default: null }, // null = criar; objeto = editar
+    routes: { type: Object, required: true }, // { store, update (__ID__), lots_index (__ID__), lots_update (__ID__) }
+    categories: { type: Array, default: () => [] },
+    units: { type: Array, default: () => [] }, // [{ value, label }]
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const isEdit = computed(() => !!props.item);
-const title  = computed(() => isEdit.value ? 'Editar produto' : 'Novo produto');
+const title = computed(() => (isEdit.value ? 'Editar produto' : 'Novo produto'));
 
 const form = useForm({
     product_category_id: null,
-    sku:                  '',
-    barcode:              '',
-    name:                 '',
-    description:          '',
-    unit:                 'un',
-    is_opm:               false,
-    requires_lot:         false,
-    sale_price:           null,
-    min_qty:              0,
-    max_qty:              null,
-    active:               true,
+    sku: '',
+    barcode: '',
+    name: '',
+    description: '',
+    unit: 'un',
+    is_opm: false,
+    requires_lot: false,
+    sale_price: null,
+    min_qty: 0,
+    max_qty: null,
+    active: true,
 });
 
 function reset() {
@@ -52,30 +52,33 @@ function reset() {
     form.clearErrors();
 }
 
-watch(() => props.open, (val) => {
-    if (!val) return;
-    reset();
-    resetLots();
+watch(
+    () => props.open,
+    (val) => {
+        if (!val) return;
+        reset();
+        resetLots();
 
-    if (props.item) {
-        form.product_category_id = props.item.product_category_id ?? null;
-        form.sku                 = props.item.sku ?? '';
-        form.barcode             = props.item.barcode ?? '';
-        form.name                = props.item.name ?? '';
-        form.description         = props.item.description ?? '';
-        form.unit                = props.item.unit ?? 'un';
-        form.is_opm              = !!props.item.is_opm;
-        form.requires_lot        = !!props.item.requires_lot;
-        form.sale_price          = props.item.sale_price ?? null;
-        form.min_qty             = props.item.min_qty ?? 0;
-        form.max_qty             = props.item.max_qty ?? null;
-        form.active              = props.item.active ?? true;
+        if (props.item) {
+            form.product_category_id = props.item.product_category_id ?? null;
+            form.sku = props.item.sku ?? '';
+            form.barcode = props.item.barcode ?? '';
+            form.name = props.item.name ?? '';
+            form.description = props.item.description ?? '';
+            form.unit = props.item.unit ?? 'un';
+            form.is_opm = !!props.item.is_opm;
+            form.requires_lot = !!props.item.requires_lot;
+            form.sale_price = props.item.sale_price ?? null;
+            form.min_qty = props.item.min_qty ?? 0;
+            form.max_qty = props.item.max_qty ?? null;
+            form.active = props.item.active ?? true;
 
-        if (form.requires_lot) {
-            loadLots();
+            if (form.requires_lot) {
+                loadLots();
+            }
         }
-    }
-});
+    },
+);
 
 function submit() {
     if (isEdit.value) {
@@ -97,11 +100,11 @@ function close() {
 }
 
 // ── Lotes (Fase 2) ──────────────────────────────────────────────────────
-const lots        = ref([]);
-const lotsLoading  = ref(false);
-const lotsError    = ref('');
-const lotSaving    = reactive({}); // { [lotId]: boolean }
-const lotErrors    = reactive({}); // { [lotId]: string }
+const lots = ref([]);
+const lotsLoading = ref(false);
+const lotsError = ref('');
+const lotSaving = reactive({}); // { [lotId]: boolean }
+const lotErrors = reactive({}); // { [lotId]: string }
 
 function resetLots() {
     lots.value = [];
@@ -126,7 +129,8 @@ async function loadLots() {
 
 function lotStatus(lot) {
     if (lot.is_expired) return { label: 'Vencido', class: 'badge-soft-danger text-danger' };
-    if (lot.days_to_expiry !== null && lot.days_to_expiry <= 30) return { label: `Vence em ${lot.days_to_expiry}d`, class: 'badge-soft-warning text-warning' };
+    if (lot.days_to_expiry !== null && lot.days_to_expiry <= 30)
+        return { label: `Vence em ${lot.days_to_expiry}d`, class: 'badge-soft-warning text-warning' };
 
     return { label: 'OK', class: 'badge-soft-success text-success' };
 }
@@ -137,16 +141,15 @@ async function saveLot(lot) {
 
     try {
         const { data } = await window.axios.put(props.routes.lots_update.replace('__ID__', lot.id), {
-            lot_number:  lot.lot_number,
+            lot_number: lot.lot_number,
             expiry_date: lot.expiry_date,
-            active:      lot.active,
+            active: lot.active,
         });
 
         Object.assign(lot, data.data);
     } catch (e) {
-        lotErrors[lot.id] = e.response?.data?.errors?.lot_number?.[0]
-            ?? e.response?.data?.message
-            ?? 'Erro ao salvar o lote.';
+        lotErrors[lot.id] =
+            e.response?.data?.errors?.lot_number?.[0] ?? e.response?.data?.message ?? 'Erro ao salvar o lote.';
     } finally {
         lotSaving[lot.id] = false;
     }
@@ -156,9 +159,7 @@ async function saveLot(lot) {
 <template>
     <OffcanvasPanel :open="open" :width="620" @close="close">
         <template #header>
-            <h5 class="mb-0 fw-semibold">
-                <i class="ti ti-package me-2 text-primary"></i>{{ title }}
-            </h5>
+            <h5 class="mb-0 fw-semibold"><i class="ti ti-package me-2 text-primary"></i>{{ title }}</h5>
         </template>
 
         <form @submit.prevent="submit">
@@ -186,7 +187,7 @@ async function saveLot(lot) {
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.name }"
                         maxlength="255"
-                    >
+                    />
                     <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
                 </div>
                 <div class="col-md-4">
@@ -198,7 +199,7 @@ async function saveLot(lot) {
                         :class="{ 'is-invalid': form.errors.sku }"
                         maxlength="100"
                         placeholder="Cód. do fabricante"
-                    >
+                    />
                     <div v-if="form.errors.sku" class="invalid-feedback">{{ form.errors.sku }}</div>
                 </div>
             </div>
@@ -216,7 +217,7 @@ async function saveLot(lot) {
                         :class="{ 'is-invalid': form.errors.barcode }"
                         maxlength="64"
                         placeholder="Escaneie ou digite o EAN/UPC"
-                    >
+                    />
                     <div v-if="form.errors.barcode" class="invalid-feedback">{{ form.errors.barcode }}</div>
                 </div>
                 <div class="col-md-4">
@@ -229,15 +230,13 @@ async function saveLot(lot) {
                         <option :value="null">Sem categoria</option>
                         <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
                     </select>
-                    <div v-if="form.errors.product_category_id" class="invalid-feedback">{{ form.errors.product_category_id }}</div>
+                    <div v-if="form.errors.product_category_id" class="invalid-feedback">
+                        {{ form.errors.product_category_id }}
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Unidade <span class="text-danger">*</span></label>
-                    <select
-                        v-model="form.unit"
-                        class="form-select"
-                        :class="{ 'is-invalid': form.errors.unit }"
-                    >
+                    <select v-model="form.unit" class="form-select" :class="{ 'is-invalid': form.errors.unit }">
                         <option v-for="u in units" :key="u.value" :value="u.value">{{ u.label }}</option>
                     </select>
                     <div v-if="form.errors.unit" class="invalid-feedback">{{ form.errors.unit }}</div>
@@ -267,7 +266,7 @@ async function saveLot(lot) {
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.sale_price }"
                         placeholder="0,00"
-                    >
+                    />
                     <div v-if="form.errors.sale_price" class="invalid-feedback">{{ form.errors.sale_price }}</div>
                 </div>
                 <div class="col-md-4">
@@ -279,7 +278,7 @@ async function saveLot(lot) {
                         min="0"
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.min_qty }"
-                    >
+                    />
                     <div v-if="form.errors.min_qty" class="invalid-feedback">{{ form.errors.min_qty }}</div>
                     <small class="text-muted">Alerta de reposição.</small>
                 </div>
@@ -292,7 +291,7 @@ async function saveLot(lot) {
                         min="0"
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.max_qty }"
-                    >
+                    />
                     <div v-if="form.errors.max_qty" class="invalid-feedback">{{ form.errors.max_qty }}</div>
                 </div>
             </div>
@@ -300,12 +299,7 @@ async function saveLot(lot) {
             <div class="row g-3 mb-2">
                 <div class="col-md-6">
                     <div class="form-check">
-                        <input
-                            id="product_is_opm"
-                            v-model="form.is_opm"
-                            type="checkbox"
-                            class="form-check-input"
-                        >
+                        <input id="product_is_opm" v-model="form.is_opm" type="checkbox" class="form-check-input" />
                         <label class="form-check-label" for="product_is_opm">
                             É OPM (órtese/prótese/material especial)
                         </label>
@@ -318,14 +312,12 @@ async function saveLot(lot) {
                             v-model="form.requires_lot"
                             type="checkbox"
                             class="form-check-input"
-                        >
-                        <label class="form-check-label" for="product_requires_lot">
-                            Exige lote/validade
-                        </label>
+                        />
+                        <label class="form-check-label" for="product_requires_lot"> Exige lote/validade </label>
                     </div>
                     <small class="text-muted d-block">
-                        Toda movimentação deste produto vai exigir um lote. Lotes nascem ao
-                        registrar uma entrada — não são cadastrados aqui.
+                        Toda movimentação deste produto vai exigir um lote. Lotes nascem ao registrar uma entrada — não
+                        são cadastrados aqui.
                     </small>
                 </div>
             </div>
@@ -338,7 +330,7 @@ async function saveLot(lot) {
                         type="checkbox"
                         class="form-check-input"
                         role="switch"
-                    >
+                    />
                     <label class="form-check-label" for="product_active">
                         {{ form.active ? 'Ativo' : 'Inativo' }}
                     </label>
@@ -370,19 +362,31 @@ async function saveLot(lot) {
                     </thead>
                     <tbody>
                         <tr v-for="lot in lots" :key="lot.id">
-                            <td style="min-width:140px;">
-                                <input v-model="lot.lot_number" type="text" class="form-control form-control-sm" maxlength="100">
+                            <td style="min-width: 140px">
+                                <input
+                                    v-model="lot.lot_number"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    maxlength="100"
+                                />
                             </td>
-                            <td style="min-width:150px;">
-                                <input v-model="lot.expiry_date" type="date" class="form-control form-control-sm">
+                            <td style="min-width: 150px">
+                                <input v-model="lot.expiry_date" type="date" class="form-control form-control-sm" />
                             </td>
                             <td class="text-end">{{ lot.qty_on_hand }}</td>
                             <td>
-                                <span class="badge rounded fs-11 fw-medium" :class="lotStatus(lot).class">{{ lotStatus(lot).label }}</span>
+                                <span class="badge rounded fs-11 fw-medium" :class="lotStatus(lot).class">{{
+                                    lotStatus(lot).label
+                                }}</span>
                             </td>
                             <td>
                                 <div class="form-check form-switch mb-0">
-                                    <input v-model="lot.active" type="checkbox" class="form-check-input" role="switch">
+                                    <input
+                                        v-model="lot.active"
+                                        type="checkbox"
+                                        class="form-check-input"
+                                        role="switch"
+                                    />
                                 </div>
                             </td>
                             <td>
@@ -395,7 +399,9 @@ async function saveLot(lot) {
                                     <span v-if="lotSaving[lot.id]" class="spinner-border spinner-border-sm"></span>
                                     <i v-else class="ti ti-device-floppy"></i>
                                 </button>
-                                <div v-if="lotErrors[lot.id]" class="text-danger small mt-1" style="max-width:160px;">{{ lotErrors[lot.id] }}</div>
+                                <div v-if="lotErrors[lot.id]" class="text-danger small mt-1" style="max-width: 160px">
+                                    {{ lotErrors[lot.id] }}
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -404,9 +410,7 @@ async function saveLot(lot) {
         </div>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="form.processing" @click="close">
-                Cancelar
-            </button>
+            <button type="button" class="btn btn-light" :disabled="form.processing" @click="close">Cancelar</button>
             <button type="button" class="btn btn-primary px-4" :disabled="form.processing" @click="submit">
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                 {{ isEdit ? 'Salvar alterações' : 'Cadastrar produto' }}

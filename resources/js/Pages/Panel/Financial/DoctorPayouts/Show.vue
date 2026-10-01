@@ -1,16 +1,16 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
-import AppLayout                   from '@/Layouts/AppLayout.vue';
-import PageHeader                  from '@/Components/Panel/PageHeader.vue';
-import ActionIconButton            from '@/Components/Panel/ActionIconButton.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
-import ReportExportMenu            from '@/Pages/Panel/Financial/Reports/ReportExportMenu.vue';
+import ReportExportMenu from '@/Pages/Panel/Financial/Reports/ReportExportMenu.vue';
 import AdjustmentForm from './AdjustmentForm.vue';
-import FlashMessage   from './FlashMessage.vue';
-import PaymentPanel   from './PaymentPanel.vue';
-import PayoutTabs     from './PayoutTabs.vue';
-import StatementView  from './StatementView.vue';
+import FlashMessage from './FlashMessage.vue';
+import PaymentPanel from './PaymentPanel.vue';
+import PayoutTabs from './PayoutTabs.vue';
+import StatementView from './StatementView.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
 /**
@@ -22,26 +22,26 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * servidor decide as permissões (`permissions`) e revalida tudo.
  */
 const props = defineProps({
-    breadcrumbs:     { type: Array,  default: () => [] },
-    tabs:            { type: Object, default: () => ({}) },
-    statement:       { type: Object, required: true },   // { payout, groups, adjustments, payments }
-    permissions:     { type: Object, default: () => ({}) },
-    payment_methods: { type: Array,  default: () => [] },
-    today:           { type: String, default: '' },
-    reason_limits:   { type: Object, default: () => ({ min: 10, max: 1000 }) },
-    routes:          { type: Object, required: true },
-    t:               { type: Object, default: () => ({}) },
-    shared:          { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    tabs: { type: Object, default: () => ({}) },
+    statement: { type: Object, required: true }, // { payout, groups, adjustments, payments }
+    permissions: { type: Object, default: () => ({}) },
+    payment_methods: { type: Array, default: () => [] },
+    today: { type: String, default: '' },
+    reason_limits: { type: Object, default: () => ({ min: 10, max: 1000 }) },
+    routes: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
+    shared: { type: Object, default: () => ({}) },
 });
 
 const { periodText } = useDoctorPayoutFormat(() => props.t);
 
-const payout      = computed(() => props.statement?.payout ?? {});
-const payments    = computed(() => props.statement?.payments ?? []);
-const can         = computed(() => props.permissions ?? {});
+const payout = computed(() => props.statement?.payout ?? {});
+const payments = computed(() => props.statement?.payments ?? []);
+const can = computed(() => props.permissions ?? {});
 const showPayment = computed(() => payments.value.length > 0 || !!can.value.can_pay);
 // Reabrir é só de admin e só sem pagamento válido (fechamento "Fechado").
-const adminOnly   = computed(() => !can.value.is_admin && payout.value.status === 'closed');
+const adminOnly = computed(() => !can.value.is_admin && payout.value.status === 'closed');
 
 function firstMessage(errors) {
     const first = errors && typeof errors === 'object' ? Object.values(errors)[0] : null;
@@ -50,39 +50,50 @@ function firstMessage(errors) {
 }
 
 // ── Exportação do demonstrativo ─────────────────────────────────────────────
-const exportOptions = computed(() => [
-    { key: 'csv',  icon: 'ti ti-file-type-csv',    label: props.t.export_csv },
-    { key: 'xlsx', icon: 'ti ti-file-spreadsheet', label: props.t.export_xlsx },
-].map((option) => ({ ...option, href: `${props.routes.export}?format=${option.key}` })));
+const exportOptions = computed(() =>
+    [
+        { key: 'csv', icon: 'ti ti-file-type-csv', label: props.t.export_csv },
+        { key: 'xlsx', icon: 'ti ti-file-spreadsheet', label: props.t.export_xlsx },
+    ].map((option) => ({ ...option, href: `${props.routes.export}?format=${option.key}` })),
+);
 
 // ── Remover ajuste (confirmação simples; o servidor recusa se já pago) ──────
-const removingId  = ref(null);
+const removingId = ref(null);
 const actionError = ref('');
 
 function removeAdjustment(adjustment) {
     if (!can.value.can_adjust || removingId.value) return;
     if (!window.confirm(props.t.adjustment_remove_title)) return;
 
-    removingId.value  = adjustment.id;
+    removingId.value = adjustment.id;
     actionError.value = '';
 
     router.delete(props.routes.adjustments_destroy.replace('__ID__', adjustment.id), {
         preserveScroll: true,
-        onError:  (errors) => { actionError.value = firstMessage(errors); },
-        onFinish: () => { removingId.value = null; },
+        onError: (errors) => {
+            actionError.value = firstMessage(errors);
+        },
+        onFinish: () => {
+            removingId.value = null;
+        },
     });
 }
 
 // ── Estornar um pagamento (admin ou financeiro) / reabrir (admin), com motivo ──
 const REASON_ACTIONS = {
-    reverse: { permission: 'can_reverse', title: 'reverse_payment_title', message: 'reverse_payment_hint', confirm: 'reverse_payment' },
-    reopen:  { permission: 'can_reopen',  title: 'reopen_title',          message: 'reopen_hint',          confirm: 'reopen' },
+    reverse: {
+        permission: 'can_reverse',
+        title: 'reverse_payment_title',
+        message: 'reverse_payment_hint',
+        confirm: 'reverse_payment',
+    },
+    reopen: { permission: 'can_reopen', title: 'reopen_title', message: 'reopen_hint', confirm: 'reopen' },
 };
 
 const reasonAction = ref(null);
-const reasonTarget = ref(null);   // pagamento a estornar
-const reasonBusy   = ref(false);
-const reasonError  = ref('');
+const reasonTarget = ref(null); // pagamento a estornar
+const reasonBusy = ref(false);
+const reasonError = ref('');
 
 const reasonConfig = computed(() => REASON_ACTIONS[reasonAction.value] ?? null);
 
@@ -97,7 +108,7 @@ function askReason(action, target = null) {
     if (!config || !can.value[config.permission]) return;
     if (action === 'reverse' && !target?.id) return;
 
-    reasonError.value  = '';
+    reasonError.value = '';
     reasonTarget.value = target;
     reasonAction.value = action;
 }
@@ -112,11 +123,11 @@ function confirmReason(reason) {
     const config = reasonConfig.value;
     if (!config || reasonBusy.value) return;
 
-    reasonBusy.value  = true;
+    reasonBusy.value = true;
     reasonError.value = '';
 
     router.delete(reasonUrl(), {
-        data:           { reason },
+        data: { reason },
         preserveScroll: true,
         onSuccess: (page) => {
             // entity.role nega com redirect + flash de erro (visita Inertia "ok").
@@ -129,8 +140,12 @@ function confirmReason(reason) {
 
             reasonAction.value = null;
         },
-        onError:  (errors) => { reasonError.value = firstMessage(errors); },
-        onFinish: () => { reasonBusy.value = false; },
+        onError: (errors) => {
+            reasonError.value = firstMessage(errors);
+        },
+        onFinish: () => {
+            reasonBusy.value = false;
+        },
     });
 }
 </script>
@@ -156,7 +171,8 @@ function confirmReason(reason) {
                     <i class="ti ti-arrow-left me-1" aria-hidden="true"></i>{{ t.tabs?.closings }}
                 </Link>
                 <Link :href="routes.apuracao" data-test="back-apuracao">
-                    <i class="ti ti-calculator me-1" aria-hidden="true"></i>{{ t.tabs?.apuracao }} · {{ periodText(payout.period_start, payout.period_end) }}
+                    <i class="ti ti-calculator me-1" aria-hidden="true"></i>{{ t.tabs?.apuracao }} ·
+                    {{ periodText(payout.period_start, payout.period_end) }}
                 </Link>
             </div>
 
@@ -200,7 +216,12 @@ function confirmReason(reason) {
                 <div v-if="can.can_reopen || adminOnly" class="card mb-0" data-test="admin-actions">
                     <div class="card-body d-flex flex-wrap gap-4">
                         <div v-if="can.can_reopen" class="show__admin-action">
-                            <button type="button" class="btn btn-outline-danger btn-sm" data-test="reopen-open" @click="askReason('reopen')">
+                            <button
+                                type="button"
+                                class="btn btn-outline-danger btn-sm"
+                                data-test="reopen-open"
+                                @click="askReason('reopen')"
+                            >
                                 <i class="ti ti-lock-open me-1" aria-hidden="true"></i>{{ t.reopen }}
                             </button>
                             <p class="small text-muted mb-0 mt-2">{{ t.reopen_hint }}</p>

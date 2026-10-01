@@ -10,19 +10,19 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * com o grupo inteiro. O servidor revalida (DoctorPayoutRuleRequest).
  */
 const props = defineProps({
-    modelValue:      { type: Array,            default: () => [] },  // [{ role, doctor_id, percentage }]
+    modelValue: { type: Array, default: () => [] }, // [{ role, doctor_id, percentage }]
     groupPercentage: { type: [Number, String], default: '' },
-    doctors:         { type: Array,            default: () => [] },
-    errors:          { type: Object,           default: () => ({}) },
-    disabled:        { type: Boolean,          default: false },
-    t:               { type: Object,           default: () => ({}) },
+    doctors: { type: Array, default: () => [] },
+    errors: { type: Object, default: () => ({}) },
+    disabled: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['update:modelValue']);
 
 const { tx, quantity, doctorLabel } = useDoctorPayoutFormat(() => props.t);
 
-const uid    = useId();
+const uid = useId();
 const legend = `dp-split-legend-${uid}`;
 
 const clinicKeeps = computed(() => {
@@ -31,20 +31,31 @@ const clinicKeeps = computed(() => {
     return props.groupPercentage === '' || Number.isNaN(group) ? null : Math.max(0, 100 - group);
 });
 
-const sum         = computed(() => props.modelValue.reduce((total, participant) => total + (Number(participant.percentage) || 0), 0));
-const sumOk       = computed(() => Math.abs(sum.value - 100) < 0.005);
+const sum = computed(() =>
+    props.modelValue.reduce((total, participant) => total + (Number(participant.percentage) || 0), 0),
+);
+const sumOk = computed(() => Math.abs(sum.value - 100) < 0.005);
 const hasExecutor = computed(() => props.modelValue.some((participant) => participant.role === 'executor'));
 
 function update(index, patch) {
-    emit('update:modelValue', props.modelValue.map((participant, i) => (i === index ? { ...participant, ...patch } : participant)));
+    emit(
+        'update:modelValue',
+        props.modelValue.map((participant, i) => (i === index ? { ...participant, ...patch } : participant)),
+    );
 }
 
 function add() {
-    emit('update:modelValue', [...props.modelValue, { role: hasExecutor.value ? 'doctor' : 'executor', doctor_id: '', percentage: '' }]);
+    emit('update:modelValue', [
+        ...props.modelValue,
+        { role: hasExecutor.value ? 'doctor' : 'executor', doctor_id: '', percentage: '' },
+    ]);
 }
 
 function remove(index) {
-    emit('update:modelValue', props.modelValue.filter((_, i) => i !== index));
+    emit(
+        'update:modelValue',
+        props.modelValue.filter((_, i) => i !== index),
+    );
 }
 
 const errorFor = (index, field) => props.errors?.[`participants.${index}.${field}`] ?? '';
@@ -59,7 +70,12 @@ const errorFor = (index, field) => props.errors?.[`participants.${index}.${field
         </p>
 
         <ul v-if="modelValue.length" class="list-unstyled d-grid gap-2 mb-2">
-            <li v-for="(participant, index) in modelValue" :key="index" class="d-flex flex-wrap align-items-start gap-2" data-test="split-row">
+            <li
+                v-for="(participant, index) in modelValue"
+                :key="index"
+                class="d-flex flex-wrap align-items-start gap-2"
+                data-test="split-row"
+            >
                 <select
                     class="form-select form-select-sm split-editor__role"
                     :value="participant.role"
@@ -84,9 +100,13 @@ const errorFor = (index, field) => props.errors?.[`participants.${index}.${field
                         @change="update(index, { doctor_id: $event.target.value })"
                     >
                         <option value="">{{ t.filter_doctor_placeholder }}</option>
-                        <option v-for="doctor in doctors" :key="doctor.id" :value="doctor.id">{{ doctorLabel(doctor) }}</option>
+                        <option v-for="doctor in doctors" :key="doctor.id" :value="doctor.id">
+                            {{ doctorLabel(doctor) }}
+                        </option>
                     </select>
-                    <div v-if="errorFor(index, 'doctor_id')" class="invalid-feedback d-block">{{ errorFor(index, 'doctor_id') }}</div>
+                    <div v-if="errorFor(index, 'doctor_id')" class="invalid-feedback d-block">
+                        {{ errorFor(index, 'doctor_id') }}
+                    </div>
                 </div>
 
                 <div class="input-group input-group-sm split-editor__percentage">
@@ -103,7 +123,7 @@ const errorFor = (index, field) => props.errors?.[`participants.${index}.${field
                         :aria-label="t.split_percentage"
                         data-test="split-percentage"
                         @input="update(index, { percentage: $event.target.value })"
-                    >
+                    />
                     <span class="input-group-text" aria-hidden="true">%</span>
                 </div>
 
@@ -122,7 +142,13 @@ const errorFor = (index, field) => props.errors?.[`participants.${index}.${field
         </ul>
 
         <div class="d-flex flex-wrap align-items-center gap-3">
-            <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="disabled" data-test="split-add" @click="add">
+            <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                :disabled="disabled"
+                data-test="split-add"
+                @click="add"
+            >
                 <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.split_add }}
             </button>
             <span
@@ -131,10 +157,13 @@ const errorFor = (index, field) => props.errors?.[`participants.${index}.${field
                 :class="sumOk ? 'text-success' : 'text-danger'"
                 role="status"
                 data-test="split-sum"
-            >{{ tx('split_sum', { value: quantity(sum, 2) }) }}</span>
+                >{{ tx('split_sum', { value: quantity(sum, 2) }) }}</span
+            >
         </div>
 
-        <div v-if="errors.participants" class="invalid-feedback d-block" data-test="split-error">{{ errors.participants }}</div>
+        <div v-if="errors.participants" class="invalid-feedback d-block" data-test="split-error">
+            {{ errors.participants }}
+        </div>
     </fieldset>
 </template>
 

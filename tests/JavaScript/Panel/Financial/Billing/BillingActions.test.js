@@ -23,7 +23,12 @@ const pending = claim({
     guide_number: 'GUI-202609-000005',
     patient_name: 'Maria Souza',
     allowed_actions: ['fix_pending'],
-    fix_pending: { url: '/claims/c5/fix-pending', clinical_indication: 'H52.1', beneficiary_card_number: null, authorization_number: 'A1' },
+    fix_pending: {
+        url: '/claims/c5/fix-pending',
+        clinical_indication: 'H52.1',
+        beneficiary_card_number: null,
+        authorization_number: 'A1',
+    },
 });
 
 let wrapper;
@@ -63,13 +68,17 @@ describe('FixPendingModal (corrigir pendência)', () => {
 
     it('422 de campo vai para o campo (aria-invalid + mensagem ligada); erro geral vira alerta', async () => {
         window.axios = {
-            post: vi.fn(() => Promise.reject(axiosError(422, {
-                message: 'The given data was invalid.',
-                errors: {
-                    clinical_indication: ['Informe o CID-10 no padrão da ANS (letra + 2 dígitos, ex.: H40.1).'],
-                    beneficiary_card_number: ['Use no máximo 64 caracteres.'],
-                },
-            }))),
+            post: vi.fn(() =>
+                Promise.reject(
+                    axiosError(422, {
+                        message: 'The given data was invalid.',
+                        errors: {
+                            clinical_indication: ['Informe o CID-10 no padrão da ANS (letra + 2 dígitos, ex.: H40.1).'],
+                            beneficiary_card_number: ['Use no máximo 64 caracteres.'],
+                        },
+                    }),
+                ),
+            ),
         };
         const w = mountModal();
 
@@ -79,17 +88,27 @@ describe('FixPendingModal (corrigir pendência)', () => {
         expect(w.find('#billing-fix-cid-error').text()).toContain('CID-10');
         const card = w.find('[data-test="fix-card"]');
         expect(card.attributes('aria-invalid')).toBe('true');
-        expect(card.attributes('aria-describedby')).toBe('billing-fix-card-hint billing-fix-beneficiary_card_number-error');
+        expect(card.attributes('aria-describedby')).toBe(
+            'billing-fix-card-hint billing-fix-beneficiary_card_number-error',
+        );
         expect(w.find('#billing-fix-beneficiary_card_number-error').text()).toBe('Use no máximo 64 caracteres.');
         expect(w.find('[data-test="fix-error"]').exists()).toBe(false);
     });
 
     it('recusa do servidor (guia já no lote / enviada) aparece como alerta geral, sem resultado', async () => {
         window.axios = {
-            post: vi.fn(() => Promise.reject(axiosError(422, {
-                message: 'A guia GUI-0005 não tem pendência TISS a corrigir.',
-                errors: { status: ['A guia GUI-0005 não tem pendência TISS a corrigir: a guia TISS já entrou no lote ou já foi enviada.'] },
-            }))),
+            post: vi.fn(() =>
+                Promise.reject(
+                    axiosError(422, {
+                        message: 'A guia GUI-0005 não tem pendência TISS a corrigir.',
+                        errors: {
+                            status: [
+                                'A guia GUI-0005 não tem pendência TISS a corrigir: a guia TISS já entrou no lote ou já foi enviada.',
+                            ],
+                        },
+                    }),
+                ),
+            ),
         };
         const w = mountModal();
 
@@ -118,7 +137,12 @@ describe('FixPendingModal (corrigir pendência)', () => {
             attached: false,
             validation: {
                 passes: false,
-                errors: [{ message: 'Número da carteirinha do beneficiário não informado.', suggestion: 'Informe o número.' }],
+                errors: [
+                    {
+                        message: 'Número da carteirinha do beneficiário não informado.',
+                        suggestion: 'Informe o número.',
+                    },
+                ],
                 warnings: [],
                 summary: 'Guia possui pendências que causarão glosa.',
             },
@@ -131,7 +155,9 @@ describe('FixPendingModal (corrigir pendência)', () => {
         await flushPromises();
 
         expect(window.axios.post).toHaveBeenCalledWith('/claims/c5/fix-pending', {
-            clinical_indication: 'H40.1', beneficiary_card_number: '', authorization_number: 'A1',
+            clinical_indication: 'H40.1',
+            beneficiary_card_number: '',
+            authorization_number: 'A1',
         });
         expect(w.find('[role="status"] [data-test="fix-result"]').exists()).toBe(true);
         expect(w.find('[data-test="fix-message"]').classes()).toContain('alert-warning');
@@ -142,7 +168,14 @@ describe('FixPendingModal (corrigir pendência)', () => {
 
     it('Esc e "Fechar" fecham (não durante o envio)', async () => {
         let resolve;
-        window.axios = { post: vi.fn(() => new Promise((r) => { resolve = r; })) };
+        window.axios = {
+            post: vi.fn(
+                () =>
+                    new Promise((r) => {
+                        resolve = r;
+                    }),
+            ),
+        };
         const w = mountModal();
 
         await w.find('[data-test="fix-save"]').trigger('click');
@@ -163,11 +196,16 @@ describe('FixPendingModal (corrigir pendência)', () => {
 
 describe('PreValidationResult', () => {
     it('sem pendência: mensagem de sucesso; com erros/avisos: listas separadas', () => {
-        const ok = mount(PreValidationResult, { props: { t, result: { passes: true, errors: [], warnings: [], summary: 'OK' } } });
+        const ok = mount(PreValidationResult, {
+            props: { t, result: { passes: true, errors: [], warnings: [], summary: 'OK' } },
+        });
         expect(ok.text()).toContain(t.pending_no_issues);
 
         const bad = mount(PreValidationResult, {
-            props: { t, result: { passes: false, errors: [{ message: 'Sem CID' }], warnings: [{ message: 'Sem olho' }] } },
+            props: {
+                t,
+                result: { passes: false, errors: [{ message: 'Sem CID' }], warnings: [{ message: 'Sem olho' }] },
+            },
         });
         expect(bad.find('[data-test="prevalidation-errors"]').text()).toContain('Sem CID');
         expect(bad.find('[data-test="prevalidation-warnings"]').text()).toContain('Sem olho');

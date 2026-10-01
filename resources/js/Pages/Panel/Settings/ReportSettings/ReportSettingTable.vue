@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh      from '@/Components/Panel/SortableTh.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
-import { useColumnOrder }         from '@/composables/useColumnOrder.js';
-import ReportSettingActions       from './ReportSettingActions.vue';
+import { useColumnOrder } from '@/composables/useColumnOrder.js';
+import ReportSettingActions from './ReportSettingActions.vue';
 import { useReportSettingFormat } from './useReportSettingFormat.js';
 
 /**
@@ -15,9 +15,9 @@ import { useReportSettingFormat } from './useReportSettingFormat.js';
  * no navegador), Status/Ações fixos no fim.
  */
 const props = defineProps({
-    items:     { type: Object, required: true },   // paginator Laravel
-    filters:   { type: Object, default: () => ({}) },
-    t:         { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
@@ -29,35 +29,34 @@ const rows = computed(() => props.items?.data ?? []);
 
 // ── Ordenação (padrão = título A→Z, igual ao backend) ───────────────────────
 const currentSort = computed(() => props.filters.sort ?? 'title');
-const currentDir  = computed(() => props.filters.direction ?? 'asc');
+const currentDir = computed(() => props.filters.direction ?? 'asc');
 
 // ── Ordem de colunas personalizável ─────────────────────────────────────────
 // sortKey = chave aceita pelo backend; null = coluna sem ordenação.
 const COLUMN_DEFS = computed(() => [
-    { key: 'modelo',     label: props.t.col_title ?? 'Modelo',             sortKey: 'title' },
-    { key: 'categoria',  label: props.t.col_category ?? 'Categoria',       sortKey: 'category' },
-    { key: 'papel',      label: props.t.col_paper ?? 'Papel',              sortKey: 'paper_size' },
-    { key: 'blocos',     label: props.t.col_blocks ?? 'Blocos',            sortKey: null },
-    { key: 'origem',     label: props.t.col_origin ?? 'Origem',            sortKey: null },
+    { key: 'modelo', label: props.t.col_title ?? 'Modelo', sortKey: 'title' },
+    { key: 'categoria', label: props.t.col_category ?? 'Categoria', sortKey: 'category' },
+    { key: 'papel', label: props.t.col_paper ?? 'Papel', sortKey: 'paper_size' },
+    { key: 'blocos', label: props.t.col_blocks ?? 'Blocos', sortKey: null },
+    { key: 'origem', label: props.t.col_origin ?? 'Origem', sortKey: null },
     { key: 'atualizado', label: props.t.col_updated_at ?? 'Atualizado em', sortKey: 'updated_at' },
 ]);
 const DEFAULT_COLUMN_ORDER = ['modelo', 'categoria', 'papel', 'blocos', 'origem', 'atualizado'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'report_settings_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('report_settings_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 </script>
 
@@ -97,7 +96,8 @@ const columnMenuLabels = computed(() => ({
                             :current-dir="currentDir"
                             :title="tx('sort_by', { column: col.label })"
                             @sort="emit('sort', $event)"
-                        >{{ col.label }}</SortableTh>
+                            >{{ col.label }}</SortableTh
+                        >
                         <th v-else>{{ col.label }}</th>
                     </template>
                     <th class="text-center">{{ t.col_status ?? 'Status' }}</th>
@@ -118,12 +118,16 @@ const columnMenuLabels = computed(() => ({
                             <div
                                 class="small text-truncate"
                                 :class="item.description ? 'text-muted' : 'text-body-secondary fst-italic'"
-                            >{{ item.description || (t.no_description ?? 'Sem descrição') }}</div>
+                            >
+                                {{ item.description || (t.no_description ?? 'Sem descrição') }}
+                            </div>
                         </td>
 
                         <td v-else-if="col.key === 'categoria'" class="small">{{ item.category || '—' }}</td>
 
-                        <td v-else-if="col.key === 'papel'"><code class="small">{{ item.paper_size }}</code></td>
+                        <td v-else-if="col.key === 'papel'">
+                            <code class="small">{{ item.paper_size }}</code>
+                        </td>
 
                         <td v-else-if="col.key === 'blocos'">
                             <span class="d-inline-flex gap-2">
@@ -141,26 +145,34 @@ const columnMenuLabels = computed(() => ({
 
                         <td v-else-if="col.key === 'origem'">
                             <span v-if="item.is_adopted" class="badge badge-soft-info rounded fs-11">
-                                <i class="ti ti-cloud-download me-1" aria-hidden="true"></i>{{ t.origin_adopted ?? 'Adotado' }}
+                                <i class="ti ti-cloud-download me-1" aria-hidden="true"></i
+                                >{{ t.origin_adopted ?? 'Adotado' }}
                             </span>
-                            <span v-else class="badge badge-soft-secondary rounded fs-11">{{ t.origin_own ?? 'Próprio' }}</span>
+                            <span v-else class="badge badge-soft-secondary rounded fs-11">{{
+                                t.origin_own ?? 'Próprio'
+                            }}</span>
                             <span v-if="item.has_update" class="badge badge-soft-warning rounded fs-11 ms-1">
-                                <i class="ti ti-arrow-up-circle me-1" aria-hidden="true"></i>{{ t.update_available ?? 'Atualização disponível' }}
+                                <i class="ti ti-arrow-up-circle me-1" aria-hidden="true"></i
+                                >{{ t.update_available ?? 'Atualização disponível' }}
                             </span>
                         </td>
 
-                        <td v-else-if="col.key === 'atualizado'" class="text-muted small">{{ date(item.updated_at) }}</td>
+                        <td v-else-if="col.key === 'atualizado'" class="text-muted small">
+                            {{ date(item.updated_at) }}
+                        </td>
                     </template>
 
                     <td class="text-center">
                         <span
                             v-if="item.active"
                             class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                        >{{ t.status_active ?? 'Ativo' }}</span>
+                            >{{ t.status_active ?? 'Ativo' }}</span
+                        >
                         <span
                             v-else
                             class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
-                        >{{ t.status_inactive ?? 'Inativo' }}</span>
+                            >{{ t.status_inactive ?? 'Inativo' }}</span
+                        >
                     </td>
 
                     <td class="text-end">

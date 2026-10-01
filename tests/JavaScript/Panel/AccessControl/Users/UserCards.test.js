@@ -21,16 +21,33 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_email: 'E-mail', col_role: 'Role', col_created_at: 'Registered', badge_owner: 'Owner', badge_self: 'You',
-    extra_roles_one: '+:count additional profile', extra_roles_other: '+:count additional profiles',
-    status_active: 'Active', status_inactive: 'Inactive', status_deleted: 'Deleted',
-    btn_edit: 'Edit', btn_restore: 'Restore',
+    col_email: 'E-mail',
+    col_role: 'Role',
+    col_created_at: 'Registered',
+    badge_owner: 'Owner',
+    badge_self: 'You',
+    extra_roles_one: '+:count additional profile',
+    extra_roles_other: '+:count additional profiles',
+    status_active: 'Active',
+    status_inactive: 'Inactive',
+    status_deleted: 'Deleted',
+    btn_edit: 'Edit',
+    btn_restore: 'Restore',
 };
 
 const row = {
-    id: 'u1', name: 'BRUNA', email: 'bruna@clinica.test', rule_label: 'Secretary', roles_count: 1,
-    active: false, deleted: false, mode: 'full', is_owner: false, is_self: true,
-    created_at: '2026-09-27T12:00:00-03:00', photo_url: '/team.png',
+    id: 'u1',
+    name: 'BRUNA',
+    email: 'bruna@clinica.test',
+    rule_label: 'Secretary',
+    roles_count: 1,
+    active: false,
+    deleted: false,
+    mode: 'full',
+    is_owner: false,
+    is_self: true,
+    created_at: '2026-09-27T12:00:00-03:00',
+    photo_url: '/team.png',
 };
 
 let wrapper;
@@ -44,7 +61,11 @@ function mountCards(data = [row]) {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
     wrapper = mount(UserCards, {
-        props: { users: { data, total: data.length, last_page: 1, current_page: 1, links: [] }, t, emptyText: 'No users yet.' },
+        props: {
+            users: { data, total: data.length, last_page: 1, current_page: 1, links: [] },
+            t,
+            emptyText: 'No users yet.',
+        },
     });
 
     return { w: wrapper, fetchSpy };
@@ -53,7 +74,9 @@ function mountCards(data = [row]) {
 describe('Users/UserCards', () => {
     it('mostra os dados do paginator sem nenhuma requisição própria', () => {
         const { w, fetchSpy } = mountCards();
-        const rows = w.findAll('dl > div').map((div) => `${div.get('dt').text()} ${div.get('dd').text().replace(/\s+/g, ' ')}`);
+        const rows = w
+            .findAll('dl > div')
+            .map((div) => `${div.get('dt').text()} ${div.get('dd').text().replace(/\s+/g, ' ')}`);
 
         expect(fetchSpy).not.toHaveBeenCalled();
         expect(w.get('h6').text()).toBe('BRUNA');

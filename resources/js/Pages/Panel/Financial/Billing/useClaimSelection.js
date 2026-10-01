@@ -17,8 +17,8 @@ import { hasAction, pageRows } from './billingHelpers.js';
 export function useClaimSelection(page, scopeKey) {
     const selected = ref({});
 
-    const ids   = computed(() => Object.keys(selected.value));
-    const rows  = computed(() => Object.values(selected.value));
+    const ids = computed(() => Object.keys(selected.value));
+    const rows = computed(() => Object.values(selected.value));
     const count = computed(() => ids.value.length);
     /** Soma do "a receber" (valor − glosa) das marcadas — o padrão do recebimento. */
     const total = computed(() => rows.value.reduce((sum, row) => sum + Number(row.receivable_amount ?? 0), 0));
@@ -41,8 +41,8 @@ export function useClaimSelection(page, scopeKey) {
     /** Cabeçalho: marca/desmarca as pagáveis da página atual (as de outras páginas ficam). */
     function togglePage() {
         const payable = pageRows(page()).filter(isSelectable);
-        const all     = payable.length > 0 && payable.every((row) => selected.value[row.id]);
-        const next    = { ...selected.value };
+        const all = payable.length > 0 && payable.every((row) => selected.value[row.id]);
+        const next = { ...selected.value };
 
         payable.forEach((row) => {
             if (all) delete next[row.id];
@@ -60,8 +60,8 @@ export function useClaimSelection(page, scopeKey) {
 
     watch(page, (current) => {
         const visible = new Map(pageRows(current).map((row) => [row.id, row]));
-        const scope   = scopeKey();
-        let next      = { ...selected.value };
+        const scope = scopeKey();
+        let next = { ...selected.value };
 
         if (scope !== lastScope) {
             lastScope = scope;

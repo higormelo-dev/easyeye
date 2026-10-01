@@ -12,13 +12,13 @@ import { vi } from 'vitest';
 export const forms = [];
 
 export const router = {
-    get:     vi.fn(),
-    post:    vi.fn(),
-    put:     vi.fn(),
-    patch:   vi.fn(),
-    delete:  vi.fn(),
-    reload:  vi.fn(),
-    visit:   vi.fn(),
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+    reload: vi.fn(),
+    visit: vi.fn(),
     replace: vi.fn(),
 };
 
@@ -35,9 +35,9 @@ export function useForm(initial) {
 
     const form = reactive({
         ...initial,
-        errors:     {},
+        errors: {},
         processing: false,
-        lastPost:   null,
+        lastPost: null,
         get isDirty() {
             return keys.some((key) => JSON.stringify(form[key]) !== JSON.stringify(defaults[key]));
         },

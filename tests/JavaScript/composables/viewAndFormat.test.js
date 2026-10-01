@@ -26,8 +26,12 @@ describe('useViewMode', () => {
     });
 
     it('não quebra com storage bloqueado', () => {
-        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
-        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new Error('blocked');
+        });
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('blocked');
+        });
 
         const { view, setView } = useViewMode('x_view', 'cards');
         expect(view.value).toBe('cards');

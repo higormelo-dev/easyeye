@@ -17,10 +17,10 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * permitida: recusa vem como erro geral traduzido.
  */
 const props = defineProps({
-    open:           { type: Boolean, default: false },
-    claim:          { type: Object,  default: null },
-    cid10SearchUrl: { type: String,  default: '' },
-    t:              { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    claim: { type: Object, default: null },
+    cid10SearchUrl: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -28,27 +28,31 @@ const emit = defineEmits(['close', 'saved']);
 const FIELDS = ['clinical_indication', 'beneficiary_card_number', 'authorization_number'];
 
 const form = ref({ clinical_indication: '', beneficiary_card_number: '', authorization_number: '' });
-const errors       = ref({});
+const errors = ref({});
 const generalError = ref('');
-const processing   = ref(false);
-const result       = ref(null);
-const rootRef      = ref(null);
-const resultRef    = ref(null);
+const processing = ref(false);
+const result = ref(null);
+const rootRef = ref(null);
+const resultRef = ref(null);
 
 const fixData = computed(() => props.claim?.fix_pending ?? null);
 
-watch(() => props.open, (open) => {
-    if (!open || !props.claim) return;
+watch(
+    () => props.open,
+    (open) => {
+        if (!open || !props.claim) return;
 
-    form.value = {
-        clinical_indication:     fixData.value?.clinical_indication ?? '',
-        beneficiary_card_number: fixData.value?.beneficiary_card_number ?? '',
-        authorization_number:    fixData.value?.authorization_number ?? '',
-    };
-    errors.value       = {};
-    generalError.value = '';
-    result.value       = null;
-}, { immediate: true });
+        form.value = {
+            clinical_indication: fixData.value?.clinical_indication ?? '',
+            beneficiary_card_number: fixData.value?.beneficiary_card_number ?? '',
+            authorization_number: fixData.value?.authorization_number ?? '',
+        };
+        errors.value = {};
+        generalError.value = '';
+        result.value = null;
+    },
+    { immediate: true },
+);
 
 function describedBy(field, hintId = null) {
     return [hintId, errors.value[field] ? `billing-fix-${field}-error` : null].filter(Boolean).join(' ') || undefined;
@@ -61,7 +65,7 @@ function requestClose() {
 /** 422 do Laravel: erro de campo vai para o campo; o resto (ex.: guia já no lote) vira aviso geral. */
 function applyServerErrors(data) {
     const serverErrors = data?.errors ?? {};
-    const fieldErrors  = {};
+    const fieldErrors = {};
 
     FIELDS.forEach((field) => {
         const message = serverErrors[field];
@@ -70,15 +74,16 @@ function applyServerErrors(data) {
 
     const others = Object.fromEntries(Object.entries(serverErrors).filter(([key]) => !FIELDS.includes(key)));
 
-    errors.value       = fieldErrors;
-    generalError.value = firstError(others) || (Object.keys(fieldErrors).length ? '' : (data?.message || props.t.fix_failed));
+    errors.value = fieldErrors;
+    generalError.value =
+        firstError(others) || (Object.keys(fieldErrors).length ? '' : data?.message || props.t.fix_failed);
 }
 
 async function submit() {
     if (!fixData.value?.url || processing.value) return;
 
-    processing.value   = true;
-    errors.value       = {};
+    processing.value = true;
+    errors.value = {};
     generalError.value = '';
 
     try {
@@ -123,7 +128,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
 
             <p class="small text-muted">{{ t.fix_intro }}</p>
 
-            <div v-if="generalError" class="alert alert-danger small py-2" role="alert" data-test="fix-error">{{ generalError }}</div>
+            <div v-if="generalError" class="alert alert-danger small py-2" role="alert" data-test="fix-error">
+                {{ generalError }}
+            </div>
 
             <div class="row g-3">
                 <div class="col-12">
@@ -150,8 +157,14 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         :aria-invalid="errors.beneficiary_card_number ? 'true' : undefined"
                         :aria-describedby="describedBy('beneficiary_card_number', 'billing-fix-card-hint')"
                         data-test="fix-card"
+                    />
+                    <div
+                        v-if="errors.beneficiary_card_number"
+                        id="billing-fix-beneficiary_card_number-error"
+                        class="invalid-feedback"
                     >
-                    <div v-if="errors.beneficiary_card_number" id="billing-fix-beneficiary_card_number-error" class="invalid-feedback">{{ errors.beneficiary_card_number }}</div>
+                        {{ errors.beneficiary_card_number }}
+                    </div>
                     <small id="billing-fix-card-hint" class="form-text d-block">{{ t.fix_card_number_hint }}</small>
                 </div>
                 <div class="col-12 col-sm-6">
@@ -167,8 +180,14 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         :aria-invalid="errors.authorization_number ? 'true' : undefined"
                         :aria-describedby="describedBy('authorization_number', 'billing-fix-auth-hint')"
                         data-test="fix-auth"
+                    />
+                    <div
+                        v-if="errors.authorization_number"
+                        id="billing-fix-authorization_number-error"
+                        class="invalid-feedback"
                     >
-                    <div v-if="errors.authorization_number" id="billing-fix-authorization_number-error" class="invalid-feedback">{{ errors.authorization_number }}</div>
+                        {{ errors.authorization_number }}
+                    </div>
                     <small id="billing-fix-auth-hint" class="form-text d-block">{{ t.fix_authorization_hint }}</small>
                 </div>
             </div>
@@ -188,7 +207,17 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     data-test="fix-result"
                 >
                     <h3 id="billing-fix-result-title" class="h6 fw-semibold">{{ t.fix_result_title }}</h3>
-                    <div :class="['alert small py-2', result.attached ? 'alert-success' : (result.validation?.errors?.length ? 'alert-warning' : 'alert-info')]" data-test="fix-message">
+                    <div
+                        :class="[
+                            'alert small py-2',
+                            result.attached
+                                ? 'alert-success'
+                                : result.validation?.errors?.length
+                                  ? 'alert-warning'
+                                  : 'alert-info',
+                        ]"
+                        data-test="fix-message"
+                    >
                         {{ result.message }}
                     </div>
                     <PreValidationResult :result="result.validation" :t="t" />
@@ -197,8 +226,22 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="processing" data-test="fix-close" @click="requestClose">{{ t.btn_close }}</button>
-            <button type="button" class="btn btn-primary" :disabled="processing || !fixData" data-test="fix-save" @click="submit">
+            <button
+                type="button"
+                class="btn btn-light"
+                :disabled="processing"
+                data-test="fix-close"
+                @click="requestClose"
+            >
+                {{ t.btn_close }}
+            </button>
+            <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="processing || !fixData"
+                data-test="fix-save"
+                @click="submit"
+            >
                 <span v-if="processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                 {{ processing ? t.processing : t.btn_fix_save }}
             </button>

@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout   from '@/Layouts/AppLayout.vue';
-import PageHeader  from '@/Components/Panel/PageHeader.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import ReportTable from './ReportTable.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 import { useTrans } from '@/composables/useTrans.js';
@@ -19,15 +19,15 @@ import { useTrans } from '@/composables/useTrans.js';
  * do usuário (useLocaleFormat).
  */
 const props = defineProps({
-    breadcrumbs:            { type: Array,  default: () => [] },
-    filters:                { type: Object, required: true },   // { from, to, report, sort, direction, sorts }
-    valuedInventory:        { type: Object, required: true },   // { items, total_value }
-    turnover:               { type: Array,  default: () => [] },
-    consumptionByProcedure: { type: Array,  default: () => [] },
-    purchasesBySupplier:    { type: Array,  default: () => [] },
-    sortable:               { type: Object, default: () => ({}) }, // { <report>: [chaves da whitelist] }
-    routes:                 { type: Object, required: true },
-    t:                      { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    filters: { type: Object, required: true }, // { from, to, report, sort, direction, sorts }
+    valuedInventory: { type: Object, required: true }, // { items, total_value }
+    turnover: { type: Array, default: () => [] },
+    consumptionByProcedure: { type: Array, default: () => [] },
+    purchasesBySupplier: { type: Array, default: () => [] },
+    sortable: { type: Object, default: () => ({}) }, // { <report>: [chaves da whitelist] }
+    routes: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { tx } = useTrans(() => props.t);
@@ -58,20 +58,23 @@ async function onTabKeydown(event, index) {
 
 // ── Período ─────────────────────────────────────────────────────────────────
 const from = ref(props.filters.from);
-const to   = ref(props.filters.to);
+const to = ref(props.filters.to);
 
 // O servidor normaliza (data inválida → padrão, período invertido → trocado).
-watch(() => [props.filters.from, props.filters.to], ([newFrom, newTo]) => {
-    from.value = newFrom;
-    to.value   = newTo;
-});
+watch(
+    () => [props.filters.from, props.filters.to],
+    ([newFrom, newTo]) => {
+        from.value = newFrom;
+        to.value = newTo;
+    },
+);
 
 // Campo apagado/incompleto marca só ele; início depois do fim marca os dois.
 const periodIncomplete = computed(() => !from.value || !to.value);
-const periodInvalid    = computed(() => !periodIncomplete.value && from.value > to.value);
-const fromInvalid      = computed(() => !from.value || periodInvalid.value);
-const toInvalid        = computed(() => !to.value || periodInvalid.value);
-const periodError      = computed(() => {
+const periodInvalid = computed(() => !periodIncomplete.value && from.value > to.value);
+const fromInvalid = computed(() => !from.value || periodInvalid.value);
+const toInvalid = computed(() => !to.value || periodInvalid.value);
+const periodError = computed(() => {
     if (periodIncomplete.value) return props.t.period_required ?? '';
 
     return periodInvalid.value ? (props.t.period_invalid ?? '') : '';
@@ -108,9 +111,10 @@ function isDefaultSort(report) {
  * pela whitelist). Recarregar a página abre na aba `report`.
  */
 function reportQuery(period, report, { sort, direction }) {
-    const others = REPORTS
-        .filter((key) => key !== report && !isDefaultSort(key))
-        .map((key) => [key, { sort: sortOf(key).sort, direction: sortOf(key).direction }]);
+    const others = REPORTS.filter((key) => key !== report && !isDefaultSort(key)).map((key) => [
+        key,
+        { sort: sortOf(key).sort, direction: sortOf(key).direction },
+    ]);
 
     return {
         ...period,
@@ -150,7 +154,9 @@ function isBlank(value) {
 function percent(value) {
     if (isBlank(value)) return '—';
 
-    return new Intl.NumberFormat(locale.value, { style: 'percent', maximumFractionDigits: 1 }).format(Number(value) / 100);
+    return new Intl.NumberFormat(locale.value, { style: 'percent', maximumFractionDigits: 1 }).format(
+        Number(value) / 100,
+    );
 }
 
 const ABC_BADGE = {
@@ -160,42 +166,49 @@ const ABC_BADGE = {
 };
 
 // ── Colunas de cada relatório ───────────────────────────────────────────────
-const inventoryColumns = computed(() => columnsFor('inventory', [
-    { key: 'name',           label: props.t.col_product ?? 'Produto' },
-    { key: 'category_name',  label: props.t.col_category ?? 'Categoria', cellClass: 'small' },
-    { key: 'qty_on_hand',    label: props.t.col_qty_on_hand ?? 'Saldo', align: 'end' },
-    { key: 'cost_avg',       label: props.t.col_cost_avg ?? 'Custo médio', align: 'end' },
-    { key: 'total_value',    label: props.t.col_total_value ?? 'Valor total', align: 'end', cellClass: 'fw-semibold' },
-    { key: 'cumulative_pct', label: props.t.col_cumulative_pct ?? '% acumulado', align: 'end', cellClass: 'small' },
-    { key: 'abc_class',      label: props.t.col_abc_class ?? 'Classe', align: 'center', fixed: true },
-]));
+const inventoryColumns = computed(() =>
+    columnsFor('inventory', [
+        { key: 'name', label: props.t.col_product ?? 'Produto' },
+        { key: 'category_name', label: props.t.col_category ?? 'Categoria', cellClass: 'small' },
+        { key: 'qty_on_hand', label: props.t.col_qty_on_hand ?? 'Saldo', align: 'end' },
+        { key: 'cost_avg', label: props.t.col_cost_avg ?? 'Custo médio', align: 'end' },
+        { key: 'total_value', label: props.t.col_total_value ?? 'Valor total', align: 'end', cellClass: 'fw-semibold' },
+        { key: 'cumulative_pct', label: props.t.col_cumulative_pct ?? '% acumulado', align: 'end', cellClass: 'small' },
+        { key: 'abc_class', label: props.t.col_abc_class ?? 'Classe', align: 'center', fixed: true },
+    ]),
+);
 
-const turnoverColumns = computed(() => columnsFor('turnover', [
-    { key: 'name',           label: props.t.col_product ?? 'Produto' },
-    { key: 'qty_out',        label: props.t.col_qty_out ?? 'Saída no período', align: 'end' },
-    { key: 'qty_on_hand',    label: props.t.col_current_qty ?? 'Saldo atual', align: 'end' },
-    { key: 'turnover_ratio', label: props.t.col_turnover_ratio ?? 'Giro', align: 'end' },
-]));
+const turnoverColumns = computed(() =>
+    columnsFor('turnover', [
+        { key: 'name', label: props.t.col_product ?? 'Produto' },
+        { key: 'qty_out', label: props.t.col_qty_out ?? 'Saída no período', align: 'end' },
+        { key: 'qty_on_hand', label: props.t.col_current_qty ?? 'Saldo atual', align: 'end' },
+        { key: 'turnover_ratio', label: props.t.col_turnover_ratio ?? 'Giro', align: 'end' },
+    ]),
+);
 
-const consumptionColumns = computed(() => columnsFor('consumption', [
-    { key: 'procedure_name', label: props.t.col_procedure ?? 'Procedimento', cellClass: 'fw-medium' },
-    { key: 'doctor_name',    label: props.t.col_doctor ?? 'Médico' },
-    { key: 'executed_at',    label: props.t.col_executed_at ?? 'Executado em', cellClass: 'text-muted small' },
-    { key: 'items',          label: props.t.col_materials ?? 'Materiais' },
-    { key: 'total_cost',     label: props.t.col_total_cost ?? 'Custo total', align: 'end', cellClass: 'fw-semibold' },
-]));
+const consumptionColumns = computed(() =>
+    columnsFor('consumption', [
+        { key: 'procedure_name', label: props.t.col_procedure ?? 'Procedimento', cellClass: 'fw-medium' },
+        { key: 'doctor_name', label: props.t.col_doctor ?? 'Médico' },
+        { key: 'executed_at', label: props.t.col_executed_at ?? 'Executado em', cellClass: 'text-muted small' },
+        { key: 'items', label: props.t.col_materials ?? 'Materiais' },
+        { key: 'total_cost', label: props.t.col_total_cost ?? 'Custo total', align: 'end', cellClass: 'fw-semibold' },
+    ]),
+);
 
-const purchasesColumns = computed(() => columnsFor('purchases', [
-    { key: 'supplier_name', label: props.t.col_supplier ?? 'Fornecedor', cellClass: 'fw-medium' },
-    { key: 'orders_count',  label: props.t.col_orders_count ?? 'Pedidos com recebimento', align: 'end' },
-    { key: 'total_spent',   label: props.t.col_total_spent ?? 'Total gasto', align: 'end', cellClass: 'fw-semibold' },
-]));
+const purchasesColumns = computed(() =>
+    columnsFor('purchases', [
+        { key: 'supplier_name', label: props.t.col_supplier ?? 'Fornecedor', cellClass: 'fw-medium' },
+        { key: 'orders_count', label: props.t.col_orders_count ?? 'Pedidos com recebimento', align: 'end' },
+        { key: 'total_spent', label: props.t.col_total_spent ?? 'Total gasto', align: 'end', cellClass: 'fw-semibold' },
+    ]),
+);
 </script>
 
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-stock-reports">
-
             <PageHeader :title="pageTitle">
                 <template #actions>
                     <div class="d-flex align-items-center gap-2">
@@ -211,7 +224,11 @@ const purchasesColumns = computed(() => columnsFor('purchases', [
             </PageHeader>
 
             <!-- Filtros: período dos relatórios de giro/consumo/compras -->
-            <div class="d-flex align-items-center flex-wrap gap-2 mb-3" role="group" aria-labelledby="stock-reports-period-label">
+            <div
+                class="d-flex align-items-center flex-wrap gap-2 mb-3"
+                role="group"
+                aria-labelledby="stock-reports-period-label"
+            >
                 <span id="stock-reports-period-label" class="small text-muted">{{ t.period_label ?? 'Período:' }}</span>
                 <input
                     id="stock-reports-from"
@@ -223,7 +240,7 @@ const purchasesColumns = computed(() => columnsFor('purchases', [
                     :aria-invalid="fromInvalid ? 'true' : undefined"
                     :aria-describedby="fromInvalid ? 'stock-reports-period-error' : undefined"
                     @change="applyPeriod"
-                >
+                />
                 <span class="text-muted small" aria-hidden="true">{{ t.period_until ?? 'até' }}</span>
                 <input
                     id="stock-reports-to"
@@ -235,8 +252,13 @@ const purchasesColumns = computed(() => columnsFor('purchases', [
                     :aria-invalid="toInvalid ? 'true' : undefined"
                     :aria-describedby="toInvalid ? 'stock-reports-period-error' : undefined"
                     @change="applyPeriod"
+                />
+                <small
+                    v-if="fromInvalid || toInvalid"
+                    id="stock-reports-period-error"
+                    class="text-danger w-100"
+                    role="alert"
                 >
-                <small v-if="fromInvalid || toInvalid" id="stock-reports-period-error" class="text-danger w-100" role="alert">
                     {{ periodError }}
                 </small>
             </div>
@@ -255,7 +277,9 @@ const purchasesColumns = computed(() => columnsFor('purchases', [
                         :tabindex="activeTab === tab.key ? 0 : -1"
                         @click="activeTab = tab.key"
                         @keydown="onTabKeydown($event, index)"
-                    >{{ tab.label }}</button>
+                    >
+                        {{ tab.label }}
+                    </button>
                 </li>
             </ul>
 
@@ -299,7 +323,8 @@ const purchasesColumns = computed(() => columnsFor('purchases', [
                             class="badge rounded border fs-13 fw-medium"
                             :class="ABC_BADGE[row.abc_class]"
                             :title="tx('abc_class_title', { class: row.abc_class })"
-                        >{{ row.abc_class }}</span>
+                            >{{ row.abc_class }}</span
+                        >
                         <span v-else class="text-muted">—</span>
                     </template>
                 </ReportTable>
@@ -357,7 +382,8 @@ const purchasesColumns = computed(() => columnsFor('purchases', [
                     <template #cell-items="{ row }">
                         <ul class="list-unstyled small text-muted mb-0">
                             <li v-for="(item, i) in row.items" :key="i">
-                                {{ item.product_name ?? '—' }}: {{ quantity(item.quantity) }} × {{ money(item.unit_cost) }} = {{ money(item.total_cost) }}
+                                {{ item.product_name ?? '—' }}: {{ quantity(item.quantity) }} ×
+                                {{ money(item.unit_cost) }} = {{ money(item.total_cost) }}
                             </li>
                         </ul>
                     </template>
@@ -388,7 +414,6 @@ const purchasesColumns = computed(() => columnsFor('purchases', [
                 </ReportTable>
                 <small class="text-muted d-block mt-2">{{ t.note_purchases }}</small>
             </section>
-
         </div>
     </AppLayout>
 </template>

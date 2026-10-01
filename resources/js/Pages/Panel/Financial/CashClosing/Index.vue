@@ -1,13 +1,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
-import AppLayout                   from '@/Layouts/AppLayout.vue';
-import PageHeader                  from '@/Components/Panel/PageHeader.vue';
-import PeriodFilter                from '@/Components/Panel/PeriodFilter.vue';
-import CenteredModal               from '@/Components/Panel/CenteredModal.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import PeriodFilter from '@/Components/Panel/PeriodFilter.vue';
+import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
-import { useTrans }        from '@/composables/useTrans';
+import { useTrans } from '@/composables/useTrans';
 import ClosePreview from './ClosePreview.vue';
 import CloseHistory from './CloseHistory.vue';
 
@@ -18,15 +18,15 @@ import CloseHistory from './CloseHistory.vue';
  * a rota exige entity.role:admin e o ReopenCashCloseRequest exige o motivo.
  */
 const props = defineProps({
-    breadcrumbs:    { type: Array,   default: () => [] },
-    closes:         { type: Object,  required: true },
+    breadcrumbs: { type: Array, default: () => [] },
+    closes: { type: Object, required: true },
     // CashClosingService::preview(): summary() + contagens, pendentes, por forma e sobreposição.
-    preview:        { type: Object,  default: () => ({}) },
-    filters:        { type: Object,  default: () => ({}) },
-    last_close_end: { type: String,  default: null },
-    today:          { type: String,  default: '' },
-    can_reopen:     { type: Boolean, default: false },
-    t:              { type: Object,  default: () => ({}) },
+    preview: { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) },
+    last_close_end: { type: String, default: null },
+    today: { type: String, default: '' },
+    can_reopen: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { money, signedMoney, number, date } = useLocaleFormat();
@@ -34,18 +34,18 @@ const { tx } = useTrans(() => props.t);
 
 const uid = useId();
 const ids = {
-    notes:        `cash-close-notes-${uid}`,
+    notes: `cash-close-notes-${uid}`,
     confirmTitle: `cash-close-confirm-title-${uid}`,
 };
 
 const PREVIEW_DEBOUNCE_MS = 400;
 /** Mesmo mínimo/máximo do ReopenCashCloseRequest. */
-const REOPEN_REASON_MIN   = 10;
-const REOPEN_REASON_MAX   = 1000;
+const REOPEN_REASON_MIN = 10;
+const REOPEN_REASON_MAX = 1000;
 
-const from   = ref(props.filters.from ?? '');
-const to     = ref(props.filters.to ?? '');
-const notes  = ref('');
+const from = ref(props.filters.from ?? '');
+const to = ref(props.filters.to ?? '');
+const notes = ref('');
 const errors = ref({});
 
 function firstMessage(errs) {
@@ -68,7 +68,7 @@ function onPeriodInvalid() {
 
 // ── Prévia: recarrega com debounce ──────────────────────────────────────────
 const previewLoading = ref(false);
-let previewTimer     = null;
+let previewTimer = null;
 
 /** A prévia exibida corresponde às datas escolhidas? (senão, não deixa fechar) */
 const previewMatches = computed(() => from.value === props.filters.from && to.value === props.filters.to);
@@ -79,20 +79,24 @@ function refreshPreview() {
         route('panel.financial.cash-closing.index'),
         { from: from.value, to: to.value },
         {
-            preserveState:  true,
+            preserveState: true,
             preserveScroll: true,
-            replace:        true,
-            only:           ['preview', 'filters'],
-            onStart:        () => { previewLoading.value = true; },
-            onFinish:       () => { previewLoading.value = false; },
+            replace: true,
+            only: ['preview', 'filters'],
+            onStart: () => {
+                previewLoading.value = true;
+            },
+            onFinish: () => {
+                previewLoading.value = false;
+            },
         },
     );
 }
 
 function onPeriodChange(range) {
     periodInvalid.value = false;
-    from.value   = range.from;
-    to.value     = range.to;
+    from.value = range.from;
+    to.value = range.to;
     errors.value = {};
 
     clearTimeout(previewTimer);
@@ -104,43 +108,57 @@ function onPeriodChange(range) {
 }
 
 // Servidor normaliza (ex.: limita a hoje): a barra acompanha, sem nova visita.
-watch(() => [props.filters.from, props.filters.to], ([nextFrom, nextTo]) => {
-    if (previewTimer) return;
+watch(
+    () => [props.filters.from, props.filters.to],
+    ([nextFrom, nextTo]) => {
+        if (previewTimer) return;
 
-    from.value = nextFrom ?? '';
-    to.value   = nextTo ?? '';
-});
+        from.value = nextFrom ?? '';
+        to.value = nextTo ?? '';
+    },
+);
 
 onBeforeUnmount(() => clearTimeout(previewTimer));
 
-const hasPending = computed(() => Number(props.preview.pending_count ?? 0) > 0
-    || Number(props.preview.pending ?? 0) > 0
-    || Number(props.preview.pending_expense ?? 0) > 0);
+const hasPending = computed(
+    () =>
+        Number(props.preview.pending_count ?? 0) > 0 ||
+        Number(props.preview.pending ?? 0) > 0 ||
+        Number(props.preview.pending_expense ?? 0) > 0,
+);
 
-const pendingHref = computed(() => route('panel.financial.cash-flow.index', {
-    from: props.filters.from, to: props.filters.to, status: 'pending',
-}));
+const pendingHref = computed(() =>
+    route('panel.financial.cash-flow.index', {
+        from: props.filters.from,
+        to: props.filters.to,
+        status: 'pending',
+    }),
+);
 
-const overlapText = computed(() => (props.preview.overlapping_periods ?? [])
-    .map((p) => periodText(p.period_start, p.period_end))
-    .join(', '));
+const overlapText = computed(() =>
+    (props.preview.overlapping_periods ?? []).map((p) => periodText(p.period_start, p.period_end)).join(', '),
+);
 
-const canClose = computed(() => !periodInvalid.value
-    && !!from.value && !!to.value
-    && previewMatches.value
-    && !previewLoading.value
-    && !props.preview.overlaps);
+const canClose = computed(
+    () =>
+        !periodInvalid.value &&
+        !!from.value &&
+        !!to.value &&
+        previewMatches.value &&
+        !previewLoading.value &&
+        !props.preview.overlaps,
+);
 
 // ── Fechamento: confirmação com resumo antes do POST ────────────────────────
-const confirmOpen   = ref(false);
-const saving        = ref(false);
-const closeError    = ref('');
+const confirmOpen = ref(false);
+const saving = ref(false);
+const closeError = ref('');
 const confirmCancel = ref(null);
 
 function askClose() {
     if (!canClose.value) return;
 
-    closeError.value  = '';
+    closeError.value = '';
     confirmOpen.value = true;
 }
 
@@ -153,9 +171,9 @@ function cancelClose() {
 function confirmClose() {
     if (saving.value) return;
 
-    saving.value     = true;
+    saving.value = true;
     closeError.value = '';
-    errors.value     = {};
+    errors.value = {};
 
     router.post(
         route('panel.financial.cash-closing.store'),
@@ -164,28 +182,30 @@ function confirmClose() {
             preserveScroll: true,
             onSuccess: () => {
                 confirmOpen.value = false;
-                notes.value       = '';
+                notes.value = '';
                 window.showSuccessToast?.(props.t.closed);
             },
             onError: (errs) => {
-                errors.value     = errs ?? {};
+                errors.value = errs ?? {};
                 closeError.value = firstMessage(errs) || props.t.close_error;
             },
-            onFinish: () => { saving.value = false; },
+            onFinish: () => {
+                saving.value = false;
+            },
         },
     );
 }
 
 // ── Reabertura: só admin, com motivo ────────────────────────────────────────
-const reopening   = ref(null);
-const reopenBusy  = ref(false);
+const reopening = ref(null);
+const reopenBusy = ref(false);
 const reopenError = ref('');
 
 function askReopen(close) {
     if (!props.can_reopen) return;
 
     reopenError.value = '';
-    reopening.value   = close;
+    reopening.value = close;
 }
 
 function cancelReopen() {
@@ -198,11 +218,11 @@ function confirmReopen(reason) {
     const close = reopening.value;
     if (!close || reopenBusy.value) return;
 
-    reopenBusy.value  = true;
+    reopenBusy.value = true;
     reopenError.value = '';
 
     router.delete(route('panel.financial.cash-closing.destroy', close.id), {
-        data:           { reason },
+        data: { reason },
         preserveScroll: true,
         onSuccess: (page) => {
             reopening.value = null;
@@ -218,18 +238,22 @@ function confirmReopen(reason) {
             window.showSuccessToast?.(props.t.reopened);
         },
         onError: (errs) => {
-            reopening.value   = null;
+            reopening.value = null;
             reopenError.value = firstMessage(errs) || props.t.reopen_error;
         },
-        onFinish: () => { reopenBusy.value = false; },
+        onFinish: () => {
+            reopenBusy.value = false;
+        },
     });
 }
 
-const reopenMessage = computed(() => (reopening.value
-    ? tx('reopen_message', { from: date(reopening.value.period_start), to: date(reopening.value.period_end) })
-    : ''));
+const reopenMessage = computed(() =>
+    reopening.value
+        ? tx('reopen_message', { from: date(reopening.value.period_start), to: date(reopening.value.period_end) })
+        : '',
+);
 
-const reopenBusyId = computed(() => (reopenBusy.value ? reopening.value?.id ?? null : null));
+const reopenBusyId = computed(() => (reopenBusy.value ? (reopening.value?.id ?? null) : null));
 
 // ── Teclado: Esc fecha o modal aberto; foco inicial em "Cancelar" ───────────
 // (o ConfirmationWithReasonModal compartilhado não trata Esc sozinho)
@@ -240,25 +264,30 @@ function onKeydown(event) {
     else if (reopening.value) cancelReopen();
 }
 
-watch(() => confirmOpen.value || !!reopening.value, async (anyOpen) => {
-    if (!anyOpen) {
-        document.removeEventListener('keydown', onKeydown);
+watch(
+    () => confirmOpen.value || !!reopening.value,
+    async (anyOpen) => {
+        if (!anyOpen) {
+            document.removeEventListener('keydown', onKeydown);
 
-        return;
-    }
+            return;
+        }
 
-    document.addEventListener('keydown', onKeydown);
+        document.addEventListener('keydown', onKeydown);
 
-    if (confirmOpen.value) {
-        await nextTick();
-        confirmCancel.value?.focus();
-    }
-});
+        if (confirmOpen.value) {
+            await nextTick();
+            confirmCancel.value?.focus();
+        }
+    },
+);
 
 onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 
 // ── Links ───────────────────────────────────────────────────────────────────
-const cashFlowHref = computed(() => route('panel.financial.cash-flow.index', { from: props.filters.from, to: props.filters.to }));
+const cashFlowHref = computed(() =>
+    route('panel.financial.cash-flow.index', { from: props.filters.from, to: props.filters.to }),
+);
 
 function periodText(start, end) {
     return `${date(start)} – ${date(end)}`;
@@ -295,10 +324,20 @@ function periodText(start, end) {
                                         @change="onPeriodChange"
                                         @invalid="onPeriodInvalid"
                                     />
-                                    <p v-if="last_close_end" class="small text-muted mt-2 mb-0" data-test="last-close-hint">
-                                        <i class="ti ti-history me-1" aria-hidden="true"></i>{{ tx('last_close_hint', { date: date(last_close_end) }) }}
+                                    <p
+                                        v-if="last_close_end"
+                                        class="small text-muted mt-2 mb-0"
+                                        data-test="last-close-hint"
+                                    >
+                                        <i class="ti ti-history me-1" aria-hidden="true"></i
+                                        >{{ tx('last_close_hint', { date: date(last_close_end) }) }}
                                     </p>
-                                    <div v-if="errors.period_start || errors.period_end" class="small text-danger mt-1" role="alert" data-test="period-server-error">
+                                    <div
+                                        v-if="errors.period_start || errors.period_end"
+                                        class="small text-danger mt-1"
+                                        role="alert"
+                                        data-test="period-server-error"
+                                    >
                                         {{ errors.period_start || errors.period_end }}
                                     </div>
                                 </div>
@@ -311,20 +350,38 @@ function periodText(start, end) {
                                     :t="t"
                                 />
 
-                                <div v-if="preview.overlaps && previewMatches" class="alert alert-warning small d-flex gap-2 mb-0" role="alert" data-test="overlap-warning">
+                                <div
+                                    v-if="preview.overlaps && previewMatches"
+                                    class="alert alert-warning small d-flex gap-2 mb-0"
+                                    role="alert"
+                                    data-test="overlap-warning"
+                                >
                                     <i class="ti ti-alert-triangle mt-1" aria-hidden="true"></i>
                                     <div>
                                         <p class="mb-0">{{ t.overlap_warning }}</p>
-                                        <p v-if="overlapText" class="mb-0 mt-1" data-test="overlap-periods">{{ tx('overlap_periods', { periods: overlapText }) }}</p>
+                                        <p v-if="overlapText" class="mb-0 mt-1" data-test="overlap-periods">
+                                            {{ tx('overlap_periods', { periods: overlapText }) }}
+                                        </p>
                                     </div>
                                 </div>
 
                                 <div>
                                     <label :for="ids.notes" class="form-label">{{ t.notes }}</label>
-                                    <textarea :id="ids.notes" v-model="notes" rows="2" class="form-control" maxlength="2000"></textarea>
+                                    <textarea
+                                        :id="ids.notes"
+                                        v-model="notes"
+                                        rows="2"
+                                        class="form-control"
+                                        maxlength="2000"
+                                    ></textarea>
                                 </div>
 
-                                <button type="submit" class="btn btn-primary w-100" :disabled="!canClose || saving" data-test="close-btn">
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary w-100"
+                                    :disabled="!canClose || saving"
+                                    data-test="close-btn"
+                                >
                                     <i class="ti ti-lock me-1" aria-hidden="true"></i>{{ t.close_btn }}
                                 </button>
                             </form>
@@ -365,30 +422,50 @@ function periodText(start, end) {
                         <dt class="col-6 fw-medium">{{ t.expense }}</dt>
                         <dd class="col-6 mb-1" data-test="confirm-expense">{{ money(preview.expense) }}</dd>
                         <dt class="col-6 fw-medium">{{ t.balance }}</dt>
-                        <dd class="col-6 mb-1 fw-bold" data-test="confirm-balance">{{ signedMoney(preview.balance) }}</dd>
+                        <dd class="col-6 mb-1 fw-bold" data-test="confirm-balance">
+                            {{ signedMoney(preview.balance) }}
+                        </dd>
                         <template v-if="notes">
                             <dt class="col-6 fw-medium">{{ t.notes }}</dt>
                             <dd class="col-6 mb-1 text-break">{{ notes }}</dd>
                         </template>
                     </dl>
 
-                    <div v-if="hasPending" class="alert alert-warning small d-flex gap-2 mt-3 mb-0" role="status" data-test="confirm-pending">
+                    <div
+                        v-if="hasPending"
+                        class="alert alert-warning small d-flex gap-2 mt-3 mb-0"
+                        role="status"
+                        data-test="confirm-pending"
+                    >
                         <i class="ti ti-clock mt-1" aria-hidden="true"></i>
-                        <span>{{ tx('confirm_pending_warning', {
-                            count: number(preview.pending_count ?? 0),
-                            income: money(preview.pending ?? 0),
-                            expense: money(preview.pending_expense ?? 0),
-                        }) }}</span>
+                        <span>{{
+                            tx('confirm_pending_warning', {
+                                count: number(preview.pending_count ?? 0),
+                                income: money(preview.pending ?? 0),
+                                expense: money(preview.pending_expense ?? 0),
+                            })
+                        }}</span>
                     </div>
 
-                    <div v-if="closeError" class="alert alert-danger small d-flex gap-2 mt-3 mb-0" role="alert" data-test="close-error">
+                    <div
+                        v-if="closeError"
+                        class="alert alert-danger small d-flex gap-2 mt-3 mb-0"
+                        role="alert"
+                        data-test="close-error"
+                    >
                         <i class="ti ti-alert-circle mt-1" aria-hidden="true"></i>
                         <span>{{ closeError }}</span>
                     </div>
                 </div>
 
                 <template #footer>
-                    <button ref="confirmCancel" type="button" class="btn btn-outline-secondary btn-sm" :disabled="saving" @click="cancelClose">
+                    <button
+                        ref="confirmCancel"
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        :disabled="saving"
+                        @click="cancelClose"
+                    >
                         {{ t.cancel }}
                     </button>
                     <button

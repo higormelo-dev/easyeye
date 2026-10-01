@@ -35,24 +35,24 @@ import { ref } from 'vue';
  */
 export function useConfirmationWithReason() {
     const state = ref({
-        open:           false,
-        saving:         false,
-        title:          '',
-        message:        '',
-        confirmLabel:   '',
+        open: false,
+        saving: false,
+        title: '',
+        message: '',
+        confirmLabel: '',
         confirmVariant: 'danger',
-        onConfirm:      null,
+        onConfirm: null,
     });
 
     function open(config) {
         state.value = {
-            open:           true,
-            saving:         false,
-            title:          config.title          ?? '',
-            message:        config.message        ?? '',
-            confirmLabel:   config.confirmLabel   ?? '',
+            open: true,
+            saving: false,
+            title: config.title ?? '',
+            message: config.message ?? '',
+            confirmLabel: config.confirmLabel ?? '',
             confirmVariant: config.confirmVariant ?? 'danger',
-            onConfirm:      config.onConfirm,
+            onConfirm: config.onConfirm,
         };
     }
 

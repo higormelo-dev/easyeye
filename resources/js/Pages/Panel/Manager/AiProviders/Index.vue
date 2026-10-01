@@ -1,26 +1,26 @@
 <script setup>
 import { ref, computed } from 'vue';
-import AppLayout  from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 
 const props = defineProps({
-    providers:    { type: Array,  default: () => [] }, // {code,label,enabled,order,configured,model,price_ok}
-    roles:        { type: Object, default: () => ({}) }, // {primary,reviewer,adjudicator}
+    providers: { type: Array, default: () => [] }, // {code,label,enabled,order,configured,model,price_ok}
+    roles: { type: Object, default: () => ({}) }, // {primary,reviewer,adjudicator}
     modelOptions: { type: Object, default: () => ({}) }, // {openai: ['gpt-4o', ...], ...}
-    modelPrices:  { type: Array,  default: () => [] },   // catálogo ai_model_prices
-    modes:        { type: Array,  default: () => [] }, // {value,label,available,needs}
+    modelPrices: { type: Array, default: () => [] }, // catálogo ai_model_prices
+    modes: { type: Array, default: () => [] }, // {value,label,available,needs}
     enabledCount: { type: Number, default: 0 },
-    t:            { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
-const saving  = ref(false);
+const saving = ref(false);
 const testing = ref(null); // code em teste
 const testResults = ref({}); // code -> {ok, message, latency_ms}
 
 // Estado editável dos papéis.
 const form = ref({
-    primary:     props.roles.primary ?? null,
-    reviewer:    props.roles.reviewer ?? null,
+    primary: props.roles.primary ?? null,
+    reviewer: props.roles.reviewer ?? null,
     adjudicator: props.roles.adjudicator ?? null,
 });
 
@@ -33,8 +33,7 @@ function initialModelFor(p) {
     const opts = props.modelOptions[p.code] ?? [];
     return opts.includes(p.model) ? p.model : '';
 }
-const modelForm = ref(Object.fromEntries(
-    props.providers.map(p => [p.code, initialModelFor(p)])));
+const modelForm = ref(Object.fromEntries(props.providers.map((p) => [p.code, initialModelFor(p)])));
 
 // Envia apenas provedores COM select renderizado (configurado + com opções).
 function modelsPayload() {
@@ -47,15 +46,15 @@ function modelsPayload() {
     return out;
 }
 
-const providersByCode = computed(() =>
-    Object.fromEntries(props.providers.map(p => [p.code, p])));
+const providersByCode = computed(() => Object.fromEntries(props.providers.map((p) => [p.code, p])));
 
 // Um provedor só pode ser escolhido se tem credencial no servidor.
-const selectable = computed(() => props.providers.filter(p => p.configured));
+const selectable = computed(() => props.providers.filter((p) => p.configured));
 
 // Papéis definidos (únicos, na ordem principal→revisor→árbitro).
-const assignedCodes = computed(() =>
-    [...new Set([form.value.primary, form.value.reviewer, form.value.adjudicator].filter(Boolean))]);
+const assignedCodes = computed(() => [
+    ...new Set([form.value.primary, form.value.reviewer, form.value.adjudicator].filter(Boolean)),
+]);
 
 // Validação viva (espelha o backend) — o admin vê o problema ANTES de salvar.
 const problems = computed(() => {
@@ -80,15 +79,18 @@ function dupMsg() {
     return t_('error_duplicate_role', 'Cada papel precisa de um provedor diferente.');
 }
 
-const canSave = computed(() => !!form.value.primary
-    && !(form.value.adjudicator && !form.value.reviewer)
-    && !(form.value.reviewer && form.value.reviewer === form.value.primary)
-    && !(form.value.adjudicator && [form.value.primary, form.value.reviewer].includes(form.value.adjudicator)));
+const canSave = computed(
+    () =>
+        !!form.value.primary &&
+        !(form.value.adjudicator && !form.value.reviewer) &&
+        !(form.value.reviewer && form.value.reviewer === form.value.primary) &&
+        !(form.value.adjudicator && [form.value.primary, form.value.reviewer].includes(form.value.adjudicator)),
+);
 
 // Prévia dos modos: escala com o nº de papéis preenchidos.
 const previewModes = computed(() => {
     const n = assignedCodes.value.length;
-    return props.modes.map(m => ({ ...m, available: n >= m.needs }));
+    return props.modes.map((m) => ({ ...m, available: n >= m.needs }));
 });
 
 // Limpar revisor arrasta o árbitro junto (consistência do consenso).
@@ -108,17 +110,17 @@ async function save() {
     saving.value = true;
     try {
         const res = await fetch(route('manager.ai-providers.update'), {
-            method:  'PATCH',
+            method: 'PATCH',
             headers: {
-                Accept:         'application/json',
+                Accept: 'application/json',
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrf(),
             },
             body: JSON.stringify({
-                primary:     form.value.primary,
-                reviewer:    form.value.reviewer || null,
+                primary: form.value.primary,
+                reviewer: form.value.reviewer || null,
                 adjudicator: form.value.adjudicator || null,
-                models:      modelsPayload(),
+                models: modelsPayload(),
             }),
         });
         const json = await res.json();
@@ -129,13 +131,13 @@ async function save() {
         }
         if (json.roles) {
             form.value = {
-                primary:     json.roles.primary ?? null,
-                reviewer:    json.roles.reviewer ?? null,
+                primary: json.roles.primary ?? null,
+                reviewer: json.roles.reviewer ?? null,
                 adjudicator: json.roles.adjudicator ?? null,
             };
         }
         if (Array.isArray(json.providers)) {
-            modelForm.value = Object.fromEntries(json.providers.map(p => [p.code, p.model ?? '']));
+            modelForm.value = Object.fromEntries(json.providers.map((p) => [p.code, p.model ?? '']));
         }
         showToast(json.message, 'success');
     } finally {
@@ -147,9 +149,9 @@ async function testProvider(code) {
     testing.value = code;
     try {
         const res = await fetch(route('manager.ai-providers.test'), {
-            method:  'POST',
+            method: 'POST',
             headers: {
-                Accept:         'application/json',
+                Accept: 'application/json',
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrf(),
             },
@@ -158,25 +160,31 @@ async function testProvider(code) {
         const json = await res.json();
         testResults.value = { ...testResults.value, [code]: json };
     } catch {
-        testResults.value = { ...testResults.value, [code]: { ok: false, message: t_('test_failed', 'Falha ao conectar.') } };
+        testResults.value = {
+            ...testResults.value,
+            [code]: { ok: false, message: t_('test_failed', 'Falha ao conectar.') },
+        };
     } finally {
         testing.value = null;
     }
 }
 
 // ── Catálogo de modelos e preços ─────────────────────────────────────────
-const prices       = ref([...props.modelPrices]);
-const options      = ref({ ...props.modelOptions });
-const priceModal   = ref(false);
-const priceSaving  = ref(false);
+const prices = ref([...props.modelPrices]);
+const options = ref({ ...props.modelOptions });
+const priceModal = ref(false);
+const priceSaving = ref(false);
 const priceEditing = ref(null); // id em edição (null = criar)
-const priceForm    = ref(emptyPriceForm());
+const priceForm = ref(emptyPriceForm());
 
 function emptyPriceForm() {
     return {
-        provider: 'openai', model: '',
-        input_usd_per_million: null, output_usd_per_million: null,
-        reasoning_usd_per_million: null, active: true,
+        provider: 'openai',
+        model: '',
+        input_usd_per_million: null,
+        output_usd_per_million: null,
+        reasoning_usd_per_million: null,
+        active: true,
     };
 }
 
@@ -189,7 +197,8 @@ function openPriceCreate() {
 function openPriceEdit(row) {
     priceEditing.value = row.id;
     priceForm.value = {
-        provider: row.provider, model: row.model,
+        provider: row.provider,
+        model: row.model,
         input_usd_per_million: row.input_usd_per_million,
         output_usd_per_million: row.output_usd_per_million,
         reasoning_usd_per_million: row.reasoning_usd_per_million,
@@ -202,13 +211,11 @@ async function savePrice() {
     priceSaving.value = true;
     try {
         const editing = priceEditing.value;
-        const url = editing
-            ? route('manager.ai-model-prices.update', editing)
-            : route('manager.ai-model-prices.store');
+        const url = editing ? route('manager.ai-model-prices.update', editing) : route('manager.ai-model-prices.store');
         const res = await fetch(url, {
-            method:  editing ? 'PATCH' : 'POST',
+            method: editing ? 'PATCH' : 'POST',
             headers: {
-                Accept:         'application/json',
+                Accept: 'application/json',
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrf(),
             },
@@ -217,7 +224,11 @@ async function savePrice() {
         const json = await res.json();
 
         if (!res.ok) {
-            const detail = json.message ?? Object.values(json.errors ?? {}).flat().join(' ');
+            const detail =
+                json.message ??
+                Object.values(json.errors ?? {})
+                    .flat()
+                    .join(' ');
             showToast(detail || 'Erro', 'error');
             return;
         }
@@ -232,17 +243,17 @@ async function savePrice() {
 
 async function togglePriceActive(row) {
     const res = await fetch(route('manager.ai-model-prices.update', row.id), {
-        method:  'PATCH',
+        method: 'PATCH',
         headers: {
-            Accept:         'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': csrf(),
         },
         body: JSON.stringify({
-            input_usd_per_million:     row.input_usd_per_million,
-            output_usd_per_million:    row.output_usd_per_million,
+            input_usd_per_million: row.input_usd_per_million,
+            output_usd_per_million: row.output_usd_per_million,
             reasoning_usd_per_million: row.reasoning_usd_per_million,
-            active:                    !row.active,
+            active: !row.active,
         }),
     });
     const json = await res.json();
@@ -274,7 +285,7 @@ const roleCards = computed(() => [
         key: 'primary',
         icon: 'ti-bolt',
         title: t_('role_primary', 'Principal (gera a resposta)'),
-        hint:  t_('role_primary_hint', 'Obrigatório. Todo atendimento de IA começa por ele.'),
+        hint: t_('role_primary_hint', 'Obrigatório. Todo atendimento de IA começa por ele.'),
         required: true,
         onChange: null,
     },
@@ -282,7 +293,7 @@ const roleCards = computed(() => [
         key: 'reviewer',
         icon: 'ti-eye-check',
         title: t_('role_reviewer_title', 'Revisor (confere a resposta)'),
-        hint:  t_('role_reviewer_hint', 'Opcional. Com revisor, o modo Validado fica disponível.'),
+        hint: t_('role_reviewer_hint', 'Opcional. Com revisor, o modo Validado fica disponível.'),
         required: false,
         onChange: onReviewerChange,
     },
@@ -290,15 +301,15 @@ const roleCards = computed(() => [
         key: 'adjudicator',
         icon: 'ti-scale',
         title: t_('role_adjudicator_title', 'Árbitro (desempata/consolida)'),
-        hint:  t_('role_adjudicator_hint', 'Opcional. Exige revisor. Habilita o modo Consenso.'),
+        hint: t_('role_adjudicator_hint', 'Opcional. Exige revisor. Habilita o modo Consenso.'),
         required: false,
         onChange: null,
     },
 ]);
 
 const breadcrumbs = [
-    { label: 'Dashboard',                              url: route('manager.dashboard'), active: false },
-    { label: props.t.breadcrumb ?? 'Provedores de IA', url: '#',                        active: true },
+    { label: 'Dashboard', url: route('manager.dashboard'), active: false },
+    { label: props.t.breadcrumb ?? 'Provedores de IA', url: '#', active: true },
 ];
 </script>
 
@@ -307,8 +318,7 @@ const breadcrumbs = [
         <div class="container-fluid py-3">
             <PageHeader :title="t.roles_title ?? 'Papéis do assistente'">
                 <template #actions>
-                    <button type="button" class="btn btn-primary btn-sm"
-                            :disabled="saving || !canSave" @click="save">
+                    <button type="button" class="btn btn-primary btn-sm" :disabled="saving || !canSave" @click="save">
                         <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
                         <i v-else class="ti ti-check me-1"></i>{{ t.save ?? 'Salvar' }}
                     </button>
@@ -319,9 +329,7 @@ const breadcrumbs = [
 
             <!-- Problemas de configuração (validação viva) -->
             <div v-if="problems.length" class="alert alert-warning py-2 small">
-                <div v-for="(p, i) in problems" :key="i">
-                    <i class="ti ti-alert-triangle me-1"></i>{{ p }}
-                </div>
+                <div v-for="(p, i) in problems" :key="i"><i class="ti ti-alert-triangle me-1"></i>{{ p }}</div>
             </div>
 
             <div class="row g-3">
@@ -336,18 +344,30 @@ const breadcrumbs = [
                                         <span v-if="card.required" class="text-danger">*</span>
                                     </h6>
                                     <p class="text-muted small mb-2">{{ card.hint }}</p>
-                                    <select v-model="form[card.key]"
-                                            class="form-select form-select-sm"
-                                            :data-role="card.key"
-                                            @change="card.onChange && card.onChange()">
-                                        <option v-if="!card.required" :value="null">{{ t.role_none ?? '— Nenhum —' }}</option>
+                                    <select
+                                        v-model="form[card.key]"
+                                        class="form-select form-select-sm"
+                                        :data-role="card.key"
+                                        @change="card.onChange && card.onChange()"
+                                    >
+                                        <option v-if="!card.required" :value="null">
+                                            {{ t.role_none ?? '— Nenhum —' }}
+                                        </option>
                                         <option v-for="p in selectable" :key="p.code" :value="p.code">
                                             {{ p.label }} ({{ p.model ?? '—' }})
                                         </option>
                                     </select>
-                                    <div v-if="form[card.key] && providersByCode[form[card.key]] && !providersByCode[form[card.key]].price_ok"
-                                         class="small text-danger mt-2" :title="t.price_missing_hint">
-                                        <i class="ti ti-coin-off me-1"></i>{{ t.price_missing ?? 'Modelo sem preço cadastrado' }}
+                                    <div
+                                        v-if="
+                                            form[card.key] &&
+                                            providersByCode[form[card.key]] &&
+                                            !providersByCode[form[card.key]].price_ok
+                                        "
+                                        class="small text-danger mt-2"
+                                        :title="t.price_missing_hint"
+                                    >
+                                        <i class="ti ti-coin-off me-1"></i
+                                        >{{ t.price_missing ?? 'Modelo sem preço cadastrado' }}
                                     </div>
                                 </div>
                             </div>
@@ -372,44 +392,72 @@ const breadcrumbs = [
                                 <tbody>
                                     <tr v-for="p in providers" :key="p.code">
                                         <td class="fw-semibold">{{ p.label }}</td>
-                                        <td style="min-width: 220px;">
-                                            <select v-if="p.configured && (options[p.code] ?? []).length"
-                                                    v-model="modelForm[p.code]"
-                                                    class="form-select form-select-sm"
-                                                    :data-model-for="p.code"
-                                                    :title="t.model_hint">
-                                                <option value="">{{ t.model_env_fallback ?? 'Padrão do servidor (.env)' }}</option>
-                                                <option v-for="m in options[p.code]" :key="m" :value="m">{{ m }}</option>
+                                        <td style="min-width: 220px">
+                                            <select
+                                                v-if="p.configured && (options[p.code] ?? []).length"
+                                                v-model="modelForm[p.code]"
+                                                class="form-select form-select-sm"
+                                                :data-model-for="p.code"
+                                                :title="t.model_hint"
+                                            >
+                                                <option value="">
+                                                    {{ t.model_env_fallback ?? 'Padrão do servidor (.env)' }}
+                                                </option>
+                                                <option v-for="m in options[p.code]" :key="m" :value="m">
+                                                    {{ m }}
+                                                </option>
                                             </select>
                                             <code v-else class="small">{{ p.model ?? '—' }}</code>
                                         </td>
                                         <td>
-                                            <span v-if="p.configured"
-                                                  class="badge bg-success-subtle text-success border border-success me-1">
-                                                <i class="ti ti-shield-check me-1"></i>{{ t.configured ?? 'Configurado' }}
+                                            <span
+                                                v-if="p.configured"
+                                                class="badge bg-success-subtle text-success border border-success me-1"
+                                            >
+                                                <i class="ti ti-shield-check me-1"></i
+                                                >{{ t.configured ?? 'Configurado' }}
                                             </span>
-                                            <span v-else
-                                                  class="badge bg-danger-subtle text-danger border border-danger me-1"
-                                                  :title="t.no_credential_hint">
-                                                <i class="ti ti-alert-triangle me-1"></i>{{ t.not_configured ?? 'Sem credencial' }}
+                                            <span
+                                                v-else
+                                                class="badge bg-danger-subtle text-danger border border-danger me-1"
+                                                :title="t.no_credential_hint"
+                                            >
+                                                <i class="ti ti-alert-triangle me-1"></i
+                                                >{{ t.not_configured ?? 'Sem credencial' }}
                                             </span>
-                                            <span v-if="p.configured && !p.price_ok"
-                                                  class="badge bg-warning-subtle text-warning border border-warning"
-                                                  :title="t.price_missing_hint">
+                                            <span
+                                                v-if="p.configured && !p.price_ok"
+                                                class="badge bg-warning-subtle text-warning border border-warning"
+                                                :title="t.price_missing_hint"
+                                            >
                                                 <i class="ti ti-coin-off me-1"></i>{{ t.price_missing ?? 'Sem preço' }}
                                             </span>
-                                            <div v-if="testResults[p.code]" class="small mt-1"
-                                                 :class="testResults[p.code].ok ? 'text-success' : 'text-danger'">
-                                                <i class="ti me-1" :class="testResults[p.code].ok ? 'ti-circle-check' : 'ti-circle-x'"></i>
+                                            <div
+                                                v-if="testResults[p.code]"
+                                                class="small mt-1"
+                                                :class="testResults[p.code].ok ? 'text-success' : 'text-danger'"
+                                            >
+                                                <i
+                                                    class="ti me-1"
+                                                    :class="testResults[p.code].ok ? 'ti-circle-check' : 'ti-circle-x'"
+                                                ></i>
                                                 {{ testResults[p.code].message }}
-                                                <span v-if="testResults[p.code].latency_ms">({{ testResults[p.code].latency_ms }} ms)</span>
+                                                <span v-if="testResults[p.code].latency_ms"
+                                                    >({{ testResults[p.code].latency_ms }} ms)</span
+                                                >
                                             </div>
                                         </td>
                                         <td class="text-end">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary"
-                                                    :disabled="!p.configured || testing === p.code"
-                                                    @click="testProvider(p.code)">
-                                                <span v-if="testing === p.code" class="spinner-border spinner-border-sm me-1"></span>
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                :disabled="!p.configured || testing === p.code"
+                                                @click="testProvider(p.code)"
+                                            >
+                                                <span
+                                                    v-if="testing === p.code"
+                                                    class="spinner-border spinner-border-sm me-1"
+                                                ></span>
                                                 <i v-else class="ti ti-plug-connected me-1"></i>
                                                 {{ t.test_connection ?? 'Testar conexão' }}
                                             </button>
@@ -424,7 +472,8 @@ const breadcrumbs = [
                     <div class="card border-0 shadow-sm mt-3">
                         <div class="card-header d-flex justify-content-between align-items-center py-2">
                             <span class="fw-semibold">
-                                <i class="ti ti-tags me-1 text-muted"></i>{{ t.prices_title ?? 'Modelos e preços (catálogo)' }}
+                                <i class="ti ti-tags me-1 text-muted"></i
+                                >{{ t.prices_title ?? 'Modelos e preços (catálogo)' }}
                             </span>
                             <button type="button" class="btn btn-primary btn-sm" @click="openPriceCreate">
                                 <i class="ti ti-plus me-1"></i>{{ t.price_new ?? 'Novo modelo' }}
@@ -448,24 +497,39 @@ const breadcrumbs = [
                                 <tbody>
                                     <tr v-for="row in prices" :key="row.id" :class="{ 'opacity-50': !row.active }">
                                         <td>{{ row.provider_label }}</td>
-                                        <td><code class="small">{{ row.model }}</code></td>
+                                        <td>
+                                            <code class="small">{{ row.model }}</code>
+                                        </td>
                                         <td class="text-end small">US$ {{ row.input_usd_per_million.toFixed(2) }}</td>
                                         <td class="text-end small">US$ {{ row.output_usd_per_million.toFixed(2) }}</td>
                                         <td class="text-center">
-                                            <span class="badge"
-                                                  :class="row.active ? 'bg-success-subtle text-success border border-success' : 'bg-secondary-subtle text-secondary border border-secondary'">
+                                            <span
+                                                class="badge"
+                                                :class="
+                                                    row.active
+                                                        ? 'bg-success-subtle text-success border border-success'
+                                                        : 'bg-secondary-subtle text-secondary border border-secondary'
+                                                "
+                                            >
                                                 {{ row.active ? 'Ativo' : 'Inativo' }}
                                             </span>
                                         </td>
                                         <td class="text-end">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                                    :title="t.edit ?? 'Editar'" @click="openPriceEdit(row)">
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                :title="t.edit ?? 'Editar'"
+                                                @click="openPriceEdit(row)"
+                                            >
                                                 <i class="ti ti-edit"></i>
                                             </button>
-                                            <button type="button" class="btn btn-sm py-0 px-1 ms-1"
-                                                    :class="row.active ? 'btn-outline-danger' : 'btn-outline-success'"
-                                                    :title="row.active ? 'Desativar' : 'Ativar'"
-                                                    @click="togglePriceActive(row)">
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm py-0 px-1 ms-1"
+                                                :class="row.active ? 'btn-outline-danger' : 'btn-outline-success'"
+                                                :title="row.active ? 'Desativar' : 'Ativar'"
+                                                @click="togglePriceActive(row)"
+                                            >
                                                 <i class="ti" :class="row.active ? 'ti-lock' : 'ti-lock-open'"></i>
                                             </button>
                                         </td>
@@ -483,21 +547,33 @@ const breadcrumbs = [
                 <div class="col-12 col-lg-4">
                     <div class="card border-0 shadow-sm">
                         <div class="card-header fw-semibold py-2">
-                            <i class="ti ti-adjustments me-1 text-muted"></i>{{ t.available_modes ?? 'Modos disponíveis' }}
+                            <i class="ti ti-adjustments me-1 text-muted"></i
+                            >{{ t.available_modes ?? 'Modos disponíveis' }}
                         </div>
                         <ul class="list-group list-group-flush">
-                            <li v-for="m in previewModes" :key="m.value"
-                                class="list-group-item d-flex justify-content-between align-items-center">
+                            <li
+                                v-for="m in previewModes"
+                                :key="m.value"
+                                class="list-group-item d-flex justify-content-between align-items-center"
+                            >
                                 <span>
-                                    <i class="ti me-1"
-                                       :class="m.available ? 'ti-circle-check text-success' : 'ti-circle-x text-muted'"></i>
+                                    <i
+                                        class="ti me-1"
+                                        :class="m.available ? 'ti-circle-check text-success' : 'ti-circle-x text-muted'"
+                                    ></i>
                                     {{ m.label }}
                                 </span>
-                                <small class="text-muted">{{ (t.mode_needs ?? 'requer :n provedor(es)').replace(':n', m.needs) }}</small>
+                                <small class="text-muted">{{
+                                    (t.mode_needs ?? 'requer :n provedor(es)').replace(':n', m.needs)
+                                }}</small>
                             </li>
                         </ul>
                         <div class="card-footer small text-muted">
-                            <i class="ti ti-bolt me-1"></i>{{ t.propagation_note ?? 'As alterações entram em vigor imediatamente para todos os clientes.' }}
+                            <i class="ti ti-bolt me-1"></i
+                            >{{
+                                t.propagation_note ??
+                                'As alterações entram em vigor imediatamente para todos os clientes.'
+                            }}
                         </div>
                     </div>
                 </div>
@@ -505,7 +581,12 @@ const breadcrumbs = [
         </div>
 
         <!-- Modal: novo/editar modelo do catálogo -->
-        <div v-if="priceModal" class="modal d-block" style="background: rgba(0,0,0,.4);" @click.self="priceModal = false">
+        <div
+            v-if="priceModal"
+            class="modal d-block"
+            style="background: rgba(0, 0, 0, 0.4)"
+            @click.self="priceModal = false"
+        >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header py-2">
@@ -517,37 +598,72 @@ const breadcrumbs = [
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">{{ t.provider ?? 'Provedor' }}</label>
-                            <select v-model="priceForm.provider" class="form-select form-select-sm" :disabled="!!priceEditing">
+                            <select
+                                v-model="priceForm.provider"
+                                class="form-select form-select-sm"
+                                :disabled="!!priceEditing"
+                            >
                                 <option v-for="p in providers" :key="p.code" :value="p.code">{{ p.label }}</option>
                             </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ t.price_model_name ?? 'Nome do modelo' }}</label>
-                            <input v-model="priceForm.model" type="text" maxlength="120"
-                                   class="form-control form-control-sm" :disabled="!!priceEditing"
-                                   placeholder="gpt-4o-mini">
+                            <input
+                                v-model="priceForm.model"
+                                type="text"
+                                maxlength="120"
+                                class="form-control form-control-sm"
+                                :disabled="!!priceEditing"
+                                placeholder="gpt-4o-mini"
+                            />
                             <div class="form-text">{{ t.price_model_hint }}</div>
                         </div>
                         <div class="row g-2">
                             <div class="col-6">
                                 <label class="form-label">{{ t.price_input ?? 'Entrada (USD/1M)' }}</label>
-                                <input v-model.number="priceForm.input_usd_per_million" type="number"
-                                       min="0" step="0.01" class="form-control form-control-sm" placeholder="0.00">
+                                <input
+                                    v-model.number="priceForm.input_usd_per_million"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    class="form-control form-control-sm"
+                                    placeholder="0.00"
+                                />
                             </div>
                             <div class="col-6">
                                 <label class="form-label">{{ t.price_output ?? 'Saída (USD/1M)' }}</label>
-                                <input v-model.number="priceForm.output_usd_per_million" type="number"
-                                       min="0" step="0.01" class="form-control form-control-sm" placeholder="0.00">
+                                <input
+                                    v-model.number="priceForm.output_usd_per_million"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    class="form-control form-control-sm"
+                                    placeholder="0.00"
+                                />
                             </div>
                             <div class="col-6">
                                 <label class="form-label">{{ t.price_reasoning ?? 'Raciocínio (opcional)' }}</label>
-                                <input v-model.number="priceForm.reasoning_usd_per_million" type="number"
-                                       min="0" step="0.01" class="form-control form-control-sm" placeholder="—">
+                                <input
+                                    v-model.number="priceForm.reasoning_usd_per_million"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    class="form-control form-control-sm"
+                                    placeholder="—"
+                                />
                             </div>
                             <div class="col-6 d-flex align-items-end">
                                 <div class="form-check form-switch mb-1">
-                                    <input id="priceActive" v-model="priceForm.active" class="form-check-input" type="checkbox" role="switch">
-                                    <label class="form-check-label small" for="priceActive">{{ t.price_active ?? 'Ativo' }}</label>
+                                    <input
+                                        id="priceActive"
+                                        v-model="priceForm.active"
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        role="switch"
+                                    />
+                                    <label class="form-check-label small" for="priceActive">{{
+                                        t.price_active ?? 'Ativo'
+                                    }}</label>
                                 </div>
                             </div>
                         </div>
@@ -556,9 +672,17 @@ const breadcrumbs = [
                         <button type="button" class="btn btn-outline-secondary btn-sm" @click="priceModal = false">
                             {{ t.cancel ?? 'Cancelar' }}
                         </button>
-                        <button type="button" class="btn btn-primary btn-sm"
-                                :disabled="priceSaving || !priceForm.model || priceForm.input_usd_per_million === null || priceForm.output_usd_per_million === null"
-                                @click="savePrice">
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            :disabled="
+                                priceSaving ||
+                                !priceForm.model ||
+                                priceForm.input_usd_per_million === null ||
+                                priceForm.output_usd_per_million === null
+                            "
+                            @click="savePrice"
+                        >
                             <span v-if="priceSaving" class="spinner-border spinner-border-sm me-1"></span>
                             {{ t.save ?? 'Salvar' }}
                         </button>

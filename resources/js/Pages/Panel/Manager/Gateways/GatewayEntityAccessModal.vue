@@ -2,42 +2,45 @@
 import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
-    open:    { type: Boolean, required: true },
-    gateway: { type: Object,  default: null },
-    t:       { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    gateway: { type: Object, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
 
-const entities    = ref([]);
-const loading     = ref(false);
-const loadError   = ref('');
-const search      = ref('');
-const reloadPage  = ref(false); // true if any toggle happened
+const entities = ref([]);
+const loading = ref(false);
+const loadError = ref('');
+const search = ref('');
+const reloadPage = ref(false); // true if any toggle happened
 
 const filtered = computed(() => {
     const q = search.value.toLowerCase().trim();
     if (!q) return entities.value;
-    return entities.value.filter(e =>
-        e.name.toLowerCase().includes(q) || e.code.toLowerCase().includes(q)
-    );
+    return entities.value.filter((e) => e.name.toLowerCase().includes(q) || e.code.toLowerCase().includes(q));
 });
 
-watch(() => props.open, async (val) => {
-    if (val && props.gateway) {
-        search.value    = '';
-        reloadPage.value = false;
-        await loadEntities();
-    }
-    if (!val) { entities.value = []; }
-});
+watch(
+    () => props.open,
+    async (val) => {
+        if (val && props.gateway) {
+            search.value = '';
+            reloadPage.value = false;
+            await loadEntities();
+        }
+        if (!val) {
+            entities.value = [];
+        }
+    },
+);
 
 async function loadEntities() {
-    loading.value   = true;
+    loading.value = true;
     loadError.value = '';
-    entities.value  = [];
+    entities.value = [];
     try {
-        const res  = await fetch(props.gateway.entity_access_url);
+        const res = await fetch(props.gateway.entity_access_url);
         const json = await res.json();
         if (!res.ok) throw new Error(json.message);
         entities.value = json.data ?? [];
@@ -52,11 +55,11 @@ async function toggle(entity) {
     const prev = entity.enabled;
     entity.enabled = !entity.enabled; // optimistic
     try {
-        const res  = await fetch(entity.toggle_url, {
+        const res = await fetch(entity.toggle_url, {
             method: 'PATCH',
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
         });
         const json = await res.json();
@@ -65,7 +68,7 @@ async function toggle(entity) {
             if (window.showErrorToast) showErrorToast(json.message ?? props.t.js_error_generic);
             return;
         }
-        entity.enabled   = json.enabled;
+        entity.enabled = json.enabled;
         reloadPage.value = true;
         if (window.showSuccessToast) showSuccessToast(json.message);
     } catch {
@@ -90,7 +93,7 @@ function handleClose() {
             v-if="open"
             class="modal fade show d-block"
             tabindex="-1"
-            style="background:rgba(0,0,0,.4)"
+            style="background: rgba(0, 0, 0, 0.4)"
             @click.self="handleClose"
         >
             <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
@@ -118,7 +121,7 @@ function handleClose() {
                                 type="text"
                                 class="form-control form-control-sm"
                                 :placeholder="t.modal_ea_search_ph"
-                            >
+                            />
                         </div>
 
                         <!-- Loading -->
@@ -146,7 +149,9 @@ function handleClose() {
                             >
                                 <div>
                                     <span class="fw-semibold small">{{ entity.name }}</span>
-                                    <span class="badge badge-soft-secondary ms-2" style="font-size:.7rem;">{{ entity.code }}</span>
+                                    <span class="badge badge-soft-secondary ms-2" style="font-size: 0.7rem">{{
+                                        entity.code
+                                    }}</span>
                                 </div>
                                 <div class="form-check form-switch mb-0">
                                     <input
@@ -156,7 +161,7 @@ function handleClose() {
                                         :checked="entity.enabled"
                                         :title="entity.enabled ? t.modal_ea_disable : t.modal_ea_enable"
                                         @change="toggle(entity)"
-                                    >
+                                    />
                                 </div>
                             </div>
                         </template>

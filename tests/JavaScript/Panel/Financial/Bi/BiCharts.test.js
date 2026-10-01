@@ -19,8 +19,8 @@ vi.mock('chart.js', () => {
         static register = vi.fn();
 
         constructor(canvas, config) {
-            this.canvas  = canvas;
-            this.config  = config;
+            this.canvas = canvas;
+            this.config = config;
             this.destroy = vi.fn();
             charts.instances.push(this);
         }
@@ -29,15 +29,35 @@ vi.mock('chart.js', () => {
 
     return {
         Chart,
-        BarController: part, BarElement: part, LineController: part, LineElement: part, PointElement: part,
-        CategoryScale: part, LinearScale: part, Legend: part, Tooltip: part, DoughnutController: part, ArcElement: part,
+        BarController: part,
+        BarElement: part,
+        LineController: part,
+        LineElement: part,
+        PointElement: part,
+        CategoryScale: part,
+        LinearScale: part,
+        Legend: part,
+        Tooltip: part,
+        DoughnutController: part,
+        ArcElement: part,
     };
 });
 
 const t = {
-    trend_chart_aria: ':from–:to :income :expense :balance', col_month: 'Month', col_income: 'Revenue',
-    col_expense: 'Expenses', col_balance: 'Balance', monthly_trend: 'Trend', see_data: 'View data', hide_data: 'Hide data',
-    schedule_chart_aria: ':total: :items', schedule_mix: 'Mix', col_status: 'Status', col_quantity: 'Count', col_share: 'Share', col_total: 'Total',
+    trend_chart_aria: ':from–:to :income :expense :balance',
+    col_month: 'Month',
+    col_income: 'Revenue',
+    col_expense: 'Expenses',
+    col_balance: 'Balance',
+    monthly_trend: 'Trend',
+    see_data: 'View data',
+    hide_data: 'Hide data',
+    schedule_chart_aria: ':total: :items',
+    schedule_mix: 'Mix',
+    col_status: 'Status',
+    col_quantity: 'Count',
+    col_share: 'Share',
+    col_total: 'Total',
 };
 
 const rows = [
@@ -51,8 +71,20 @@ const slices = [
 ];
 
 const THEME = {
-    light: { '--bs-success': '#198754', '--bs-danger': '#dc3545', '--bs-primary': '#0d6efd', '--bs-secondary-color': '#6c757d', '--bs-card-bg': '#ffffff' },
-    dark:  { '--bs-success': '#75b798', '--bs-danger': '#ea868f', '--bs-primary': '#6ea8fe', '--bs-secondary-color': '#a7acb1', '--bs-card-bg': '#212529' },
+    light: {
+        '--bs-success': '#198754',
+        '--bs-danger': '#dc3545',
+        '--bs-primary': '#0d6efd',
+        '--bs-secondary-color': '#6c757d',
+        '--bs-card-bg': '#ffffff',
+    },
+    dark: {
+        '--bs-success': '#75b798',
+        '--bs-danger': '#ea868f',
+        '--bs-primary': '#6ea8fe',
+        '--bs-secondary-color': '#a7acb1',
+        '--bs-card-bg': '#212529',
+    },
 };
 
 let wrapper;
@@ -70,7 +102,11 @@ beforeEach(() => {
     vi.spyOn(window, 'getComputedStyle').mockImplementation(() => ({
         getPropertyValue: (name) => THEME[theme][name] ?? '',
     }));
-    window.matchMedia = vi.fn(() => ({ matches: reducedMotion, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    window.matchMedia = vi.fn(() => ({
+        matches: reducedMotion,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+    }));
 });
 
 afterEach(() => {
@@ -111,7 +147,8 @@ describe('TrendBarChart', () => {
         reducedMotion = true;
         wrapper = mount(TrendBarChart, { props: { rows, t }, attachTo: document.body });
         const { options, data } = charts.instances[0].config;
-        const label = (datasetIndex, y) => options.plugins.tooltip.callbacks.label({ dataset: data.datasets[datasetIndex], parsed: { y } });
+        const label = (datasetIndex, y) =>
+            options.plugins.tooltip.callbacks.label({ dataset: data.datasets[datasetIndex], parsed: { y } });
 
         expect(options.animation).toBe(false);
         expect(label(0, 300).replace(/\u00a0/g, ' ')).toBe(' Revenue: R$ 300,00');
@@ -148,14 +185,21 @@ describe('DonutChart', () => {
     it('aria-label resume todas as fatias e "Ver dados" mostra quantidade e participação', async () => {
         wrapper = mount(DonutChart, { props: { slices, t }, attachTo: document.body });
 
-        expect(wrapper.find('[data-test="donut-chart"]').attributes('aria-label')).toBe('4: Attended: 3 (75%); No-show: 1 (25%)');
+        expect(wrapper.find('[data-test="donut-chart"]').attributes('aria-label')).toBe(
+            '4: Attended: 3 (75%); No-show: 1 (25%)',
+        );
 
         const toggle = wrapper.find('[data-test="donut-toggle-data"]');
         await toggle.trigger('click');
 
         expect(toggle.attributes('aria-expanded')).toBe('true');
         expect(wrapper.find('[data-test="donut-data"]').isVisible()).toBe(true);
-        expect(wrapper.findAll('[data-test="donut-row"]')[1].findAll('th, td').map((c) => c.text())).toEqual(['No-show', '1', '25%']);
+        expect(
+            wrapper
+                .findAll('[data-test="donut-row"]')[1]
+                .findAll('th, td')
+                .map((c) => c.text()),
+        ).toEqual(['No-show', '1', '25%']);
         expect(wrapper.find('tfoot').text()).toContain('4');
     });
 

@@ -15,16 +15,16 @@ import { usePage } from '@inertiajs/vue3';
  * por executar a ação (fetch) e fechar via prop `open=false`.
  */
 const props = defineProps({
-    open:      { type: Boolean, required: true },
-    title:     { type: String,  default: '' },
-    message:   { type: String,  default: '' },
+    open: { type: Boolean, required: true },
+    title: { type: String, default: '' },
+    message: { type: String, default: '' },
     confirmLabel: { type: String, default: '' },
-    confirmVariant: { type: String, default: 'danger' },  // danger | warning | primary
-    saving:    { type: Boolean, default: false },
-    minLength: { type: Number,  default: 20 },
-    maxLength: { type: Number,  default: 1000 },
+    confirmVariant: { type: String, default: 'danger' }, // danger | warning | primary
+    saving: { type: Boolean, default: false },
+    minLength: { type: Number, default: 20 },
+    maxLength: { type: Number, default: 1000 },
     /** Erro do servidor para mostrar dentro do modal (role=alert), opcional. */
-    error:     { type: String,  default: '' },
+    error: { type: String, default: '' },
 });
 
 const emit = defineEmits(['close', 'confirm']);
@@ -32,17 +32,17 @@ const emit = defineEmits(['close', 'confirm']);
 const page = usePage();
 const t = computed(() => page.props.t_hardening ?? {});
 
-const reason   = ref('');
+const reason = ref('');
 const textarea = ref(null);
 
-const length      = computed(() => reason.value.trim().length);
-const isValid     = computed(() => length.value >= props.minLength);
-const isTooLong   = computed(() => reason.value.length > props.maxLength);
-const canSubmit   = computed(() => isValid.value && !isTooLong.value && !props.saving);
+const length = computed(() => reason.value.trim().length);
+const isValid = computed(() => length.value >= props.minLength);
+const isTooLong = computed(() => reason.value.length > props.maxLength);
+const canSubmit = computed(() => isValid.value && !isTooLong.value && !props.saving);
 
 const counterClass = computed(() => {
     if (isTooLong.value) return 'text-danger';
-    if (isValid.value)   return 'text-success';
+    if (isValid.value) return 'text-success';
     return 'text-muted';
 });
 
@@ -56,27 +56,31 @@ const counterText = computed(() => {
 // Ao fechar, o foco volta para quem abriu (se ficou perdido no <body>).
 let returnFocusTo = null;
 
-watch(() => props.open, async (val, wasOpen) => {
-    if (val) {
-        if (!wasOpen && typeof document !== 'undefined') {
-            returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+watch(
+    () => props.open,
+    async (val, wasOpen) => {
+        if (val) {
+            if (!wasOpen && typeof document !== 'undefined') {
+                returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            }
+            reason.value = '';
+            await nextTick();
+            textarea.value?.focus();
+
+            return;
         }
-        reason.value = '';
-        await nextTick();
-        textarea.value?.focus();
 
-        return;
-    }
+        if (wasOpen) {
+            const target = returnFocusTo;
+            returnFocusTo = null;
+            await nextTick();
 
-    if (wasOpen) {
-        const target = returnFocusTo;
-        returnFocusTo = null;
-        await nextTick();
-
-        const active = document.activeElement;
-        if (target?.isConnected && (!active || active === document.body)) target.focus({ preventScroll: true });
-    }
-}, { immediate: true });
+            const active = document.activeElement;
+            if (target?.isConnected && (!active || active === document.body)) target.focus({ preventScroll: true });
+        }
+    },
+    { immediate: true },
+);
 
 function close() {
     if (props.saving) return;
@@ -93,12 +97,12 @@ const btnClass = computed(() => `btn btn-${props.confirmVariant} btn-sm`);
 // Acessibilidade: diálogo nomeado pelo título, campo ligado ao rótulo, dica e contador.
 const uid = useId();
 const ids = {
-    title:   `reason-modal-title-${uid}`,
+    title: `reason-modal-title-${uid}`,
     message: `reason-modal-message-${uid}`,
-    reason:  `reason-modal-reason-${uid}`,
-    hint:    `reason-modal-hint-${uid}`,
+    reason: `reason-modal-reason-${uid}`,
+    hint: `reason-modal-hint-${uid}`,
     counter: `reason-modal-counter-${uid}`,
-    error:   `reason-modal-error-${uid}`,
+    error: `reason-modal-error-${uid}`,
 };
 
 const describedBy = computed(() => [ids.hint, ids.counter, props.error ? ids.error : null].filter(Boolean).join(' '));
@@ -113,7 +117,7 @@ const describedBy = computed(() => [ids.hint, ids.counter, props.error ? ids.err
         aria-modal="true"
         :aria-labelledby="ids.title"
         :aria-describedby="ids.message"
-        style="background: rgba(0,0,0,.55);"
+        style="background: rgba(0, 0, 0, 0.55)"
         @click.self="close"
         @keydown.esc.stop="close"
     >
@@ -139,7 +143,12 @@ const describedBy = computed(() => [ids.hint, ids.counter, props.error ? ids.err
                         <i class="ti ti-info-circle me-2 fs-5 mt-1" aria-hidden="true"></i>
                         <div>
                             <strong v-if="message">{{ message }}</strong>
-                            <p class="mb-0 mt-1">{{ t.modal_warning ?? 'Esta ação é registrada no log de auditoria e não pode ser desfeita silenciosamente.' }}</p>
+                            <p class="mb-0 mt-1">
+                                {{
+                                    t.modal_warning ??
+                                    'Esta ação é registrada no log de auditoria e não pode ser desfeita silenciosamente.'
+                                }}
+                            </p>
                         </div>
                     </div>
 
@@ -168,27 +177,22 @@ const describedBy = computed(() => [ids.hint, ids.counter, props.error ? ids.err
                         <small :id="ids.counter" :class="counterClass" aria-live="polite">{{ counterText }}</small>
                     </div>
 
-                    <div v-if="error" :id="ids.error" class="alert alert-danger small d-flex gap-2 mt-3 mb-0" role="alert">
+                    <div
+                        v-if="error"
+                        :id="ids.error"
+                        class="alert alert-danger small d-flex gap-2 mt-3 mb-0"
+                        role="alert"
+                    >
                         <i class="ti ti-alert-circle mt-1" aria-hidden="true"></i>
                         <span>{{ error }}</span>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <button
-                        type="button"
-                        class="btn btn-outline-secondary btn-sm"
-                        :disabled="saving"
-                        @click="close"
-                    >
+                    <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="saving" @click="close">
                         {{ t.modal_cancel ?? 'Cancelar' }}
                     </button>
-                    <button
-                        type="button"
-                        :class="btnClass"
-                        :disabled="!canSubmit"
-                        @click="submit"
-                    >
+                    <button type="button" :class="btnClass" :disabled="!canSubmit" @click="submit">
                         <span v-if="saving" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                         <i v-else class="ti ti-check me-1" aria-hidden="true"></i>
                         {{ confirmLabel || t.modal_confirm || 'Confirmar' }}

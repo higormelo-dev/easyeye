@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
-import ActionIconButton  from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup   from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 import PayoutStatusBadge from './PayoutStatusBadge.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
@@ -10,9 +10,9 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * rolagem horizontal no celular. Usa o MESMO paginator da tabela.
  */
 const props = defineProps({
-    payouts:   { type: Array,  default: () => [] },
-    routes:    { type: Object, required: true },   // { show, pdf } com __ID__
-    t:         { type: Object, default: () => ({}) },
+    payouts: { type: Array, default: () => [] },
+    routes: { type: Object, required: true }, // { show, pdf } com __ID__
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
@@ -30,7 +30,13 @@ const rows = computed(() => props.payouts ?? []);
     </div>
 
     <ul v-else class="row g-3 list-unstyled mb-0" :aria-label="t.closings_title">
-        <li v-for="payout in rows" :key="payout.id" class="col-12 col-sm-6 col-xl-4" data-test="closing-card" :data-id="payout.id">
+        <li
+            v-for="payout in rows"
+            :key="payout.id"
+            class="col-12 col-sm-6 col-xl-4"
+            data-test="closing-card"
+            :data-id="payout.id"
+        >
             <div class="card card-body h-100 mb-0">
                 <div class="d-flex align-items-start justify-content-between gap-2">
                     <div>
@@ -40,7 +46,9 @@ const rows = computed(() => props.payouts ?? []);
                             class="badge badge-soft-purple border rounded fs-11 fw-medium"
                             :title="t.complementary_hint"
                             data-test="complementary"
-                        >{{ t.complementary }}<span class="visually-hidden">: {{ t.complementary_hint }}</span></span>
+                            >{{ t.complementary
+                            }}<span class="visually-hidden">: {{ t.complementary_hint }}</span></span
+                        >
                     </div>
                     <PayoutStatusBadge :status="payout.status" :t="t" />
                 </div>
@@ -48,7 +56,12 @@ const rows = computed(() => props.payouts ?? []);
                 <dl class="small text-muted mt-3 mb-2">
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_doctor }}:</dt>
-                        <dd class="mb-0 text-break">{{ payout.doctor_name }}<template v-if="payout.doctor_record"> · {{ t.statement_record }} {{ payout.doctor_record }}</template></dd>
+                        <dd class="mb-0 text-break">
+                            {{ payout.doctor_name
+                            }}<template v-if="payout.doctor_record">
+                                · {{ t.statement_record }} {{ payout.doctor_record }}</template
+                            >
+                        </dd>
                     </div>
                     <div class="d-flex gap-1">
                         <dt class="fw-semibold">{{ t.col_period }}:</dt>
@@ -64,8 +77,16 @@ const rows = computed(() => props.payouts ?? []);
                             <template v-if="payout.status === 'cancelled'">{{ t.none }}</template>
                             <template v-else>
                                 {{ money(payout.paid_amount ?? 0) }}
-                                <span v-if="Number(payout.remaining_amount ?? 0) > 0" class="text-warning-emphasis" data-test="closing-balance"> · {{ tx('balance_line', { value: money(payout.remaining_amount) }) }}</span>
-                                <span v-if="payout.paid_at" class="text-muted"> · {{ tx('last_payment_on', { date: date(payout.paid_at) }) }}</span>
+                                <span
+                                    v-if="Number(payout.remaining_amount ?? 0) > 0"
+                                    class="text-warning-emphasis"
+                                    data-test="closing-balance"
+                                >
+                                    · {{ tx('balance_line', { value: money(payout.remaining_amount) }) }}</span
+                                >
+                                <span v-if="payout.paid_at" class="text-muted">
+                                    · {{ tx('last_payment_on', { date: date(payout.paid_at) }) }}</span
+                                >
                             </template>
                         </dd>
                     </div>

@@ -14,10 +14,19 @@ vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { template: 
 
 const t = { more_actions: 'More actions', columns_label: 'Columns', columns_customize: 'Customize columns' };
 const items = {
-    data: [{
-        id: 'p1', code: 'PC-1', supplier_name: 'Alfa', status: 'draft', status_label: 'Draft', is_editable: true,
-        order_date: '2026-09-01', expected_delivery_date: null, total_amount: 10,
-    }],
+    data: [
+        {
+            id: 'p1',
+            code: 'PC-1',
+            supplier_name: 'Alfa',
+            status: 'draft',
+            status_label: 'Draft',
+            is_editable: true,
+            order_date: '2026-09-01',
+            expected_delivery_date: null,
+            total_amount: 10,
+        },
+    ],
     total: 1,
 };
 

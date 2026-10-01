@@ -11,23 +11,28 @@ import { router } from '@inertiajs/vue3';
  * a visita (sucesso, erro ou recusa por permissão).
  */
 const props = defineProps({
-    settings: { type: Object, default: () => ({}) },   // { doctor_payouts_visible, can_manage }
-    action:   { type: String, required: true },        // routes.settings (PATCH)
-    t:        { type: Object, default: () => ({}) },
+    settings: { type: Object, default: () => ({}) }, // { doctor_payouts_visible, can_manage }
+    action: { type: String, required: true }, // routes.settings (PATCH)
+    t: { type: Object, default: () => ({}) },
 });
 
 const uid = useId();
 const ids = {
-    title:  `dp-settings-title-${uid}`,
+    title: `dp-settings-title-${uid}`,
     toggle: `dp-settings-visible-${uid}`,
-    hint:   `dp-settings-hint-${uid}`,
-    admin:  `dp-settings-admin-${uid}`,
+    hint: `dp-settings-hint-${uid}`,
+    admin: `dp-settings-admin-${uid}`,
 };
 
 const visible = ref(Boolean(props.settings.doctor_payouts_visible));
-const saving  = ref(false);
+const saving = ref(false);
 
-watch(() => props.settings.doctor_payouts_visible, (value) => { visible.value = Boolean(value); });
+watch(
+    () => props.settings.doctor_payouts_visible,
+    (value) => {
+        visible.value = Boolean(value);
+    },
+);
 
 function save(event) {
     if (!props.settings.can_manage || saving.value) return;
@@ -35,15 +40,21 @@ function save(event) {
     const next = Boolean(event.target.checked);
     visible.value = next;
 
-    router.patch(props.action, { doctor_payouts_visible: next }, {
-        preserveScroll: true,
-        preserveState:  true,
-        onStart:  () => { saving.value = true; },
-        onFinish: () => {
-            saving.value  = false;
-            visible.value = Boolean(props.settings.doctor_payouts_visible);
+    router.patch(
+        props.action,
+        { doctor_payouts_visible: next },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => {
+                saving.value = true;
+            },
+            onFinish: () => {
+                saving.value = false;
+                visible.value = Boolean(props.settings.doctor_payouts_visible);
+            },
         },
-    });
+    );
 }
 </script>
 
@@ -64,14 +75,19 @@ function save(event) {
                     :aria-describedby="settings.can_manage ? ids.hint : `${ids.hint} ${ids.admin}`"
                     data-test="settings-visible"
                     @change="save"
-                >
+                />
                 <label :for="ids.toggle" class="form-check-label fw-medium">{{ t.settings_visible }}</label>
                 <span v-if="saving" class="spinner-border spinner-border-sm ms-2 text-muted" role="status">
                     <span class="visually-hidden">{{ t.settings_title }}</span>
                 </span>
             </div>
             <p :id="ids.hint" class="small text-muted mb-0">{{ t.settings_visible_hint }}</p>
-            <p v-if="!settings.can_manage" :id="ids.admin" class="small text-muted mb-0 mt-1" data-test="settings-admin-only">
+            <p
+                v-if="!settings.can_manage"
+                :id="ids.admin"
+                class="small text-muted mb-0 mt-1"
+                data-test="settings-admin-only"
+            >
                 <i class="ti ti-shield-lock me-1" aria-hidden="true"></i>{{ t.admin_only }}
             </p>
         </div>

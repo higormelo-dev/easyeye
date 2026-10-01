@@ -22,7 +22,7 @@ export function useAnimatedNumber(sourceValue, duration = 1.2) {
             snap: { value: 1 }, // Arredonda para inteiros
             onUpdate: function () {
                 displayValue.value = Math.round(this.targets()[0].value);
-            }
+            },
         });
     };
 
@@ -31,9 +31,12 @@ export function useAnimatedNumber(sourceValue, duration = 1.2) {
         ctx = gsap.context(() => animateTo(initialVal));
     });
 
-    watch(() => (typeof sourceValue === 'number' ? sourceValue : sourceValue.value), (newVal) => {
-        animateTo(newVal);
-    });
+    watch(
+        () => (typeof sourceValue === 'number' ? sourceValue : sourceValue.value),
+        (newVal) => {
+            animateTo(newVal);
+        },
+    );
 
     onUnmounted(() => {
         if (ctx) ctx.revert(); // Previne Memory Leaks no Inertia.js ao trocar de página

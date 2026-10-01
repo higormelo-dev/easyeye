@@ -18,10 +18,10 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * mesmo, num aviso ao vivo; o Index recarrega a lista (`saved`).
  */
 const props = defineProps({
-    open:  { type: Boolean, default: false },
-    batch: { type: Object,  default: null },
-    mode:  { type: String,  default: 'add' },
-    t:     { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    batch: { type: Object, default: null },
+    mode: { type: String, default: 'add' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -29,21 +29,25 @@ const emit = defineEmits(['close', 'saved']);
 const { tx } = useTrans(() => props.t);
 const { money, date } = useLocaleFormat();
 
-const claims     = ref([]);
-const total      = ref(0);
-const selected   = ref([]);
-const loading    = ref(false);
+const claims = ref([]);
+const total = ref(0);
+const selected = ref([]);
+const loading = ref(false);
 const processing = ref(false);
-const errors     = ref([]);
-const result     = ref(null);
-const rootRef    = ref(null);
-const resultRef  = ref(null);
-const allRef     = ref(null);
+const errors = ref([]);
+const result = ref(null);
+const rootRef = ref(null);
+const resultRef = ref(null);
+const allRef = ref(null);
 
-const isAdd       = computed(() => props.mode !== 'reprocess');
-const title       = computed(() => tx(isAdd.value ? 'add_claims_title' : 'reprocess_title', { code: props.batch?.code ?? '' }));
+const isAdd = computed(() => props.mode !== 'reprocess');
+const title = computed(() =>
+    tx(isAdd.value ? 'add_claims_title' : 'reprocess_title', { code: props.batch?.code ?? '' }),
+);
 const allSelected = computed(() => claims.value.length > 0 && selected.value.length === claims.value.length);
-const canConfirm  = computed(() => !processing.value && !loading.value && !result.value && (isAdd.value ? selected.value.length > 0 : true));
+const canConfirm = computed(
+    () => !processing.value && !loading.value && !result.value && (isAdd.value ? selected.value.length > 0 : true),
+);
 
 watchEffect(() => {
     if (allRef.value) allRef.value.indeterminate = selected.value.length > 0 && !allSelected.value;
@@ -55,7 +59,7 @@ async function loadClaims() {
     try {
         const { data } = await window.axios.get(props.batch.attachable_claims_url);
         claims.value = data?.data ?? [];
-        total.value  = Number(data?.total ?? claims.value.length);
+        total.value = Number(data?.total ?? claims.value.length);
     } catch (error) {
         errors.value = Object.values(validationErrors(error) ?? {}).slice(0, 1);
         if (!errors.value.length) errors.value = [props.t.add_claims_load_failed];
@@ -64,20 +68,26 @@ async function loadClaims() {
     }
 }
 
-watch(() => props.open, (open) => {
-    if (!open || !props.batch) return;
+watch(
+    () => props.open,
+    (open) => {
+        if (!open || !props.batch) return;
 
-    claims.value   = [];
-    total.value    = 0;
-    selected.value = [];
-    errors.value   = [];
-    result.value   = null;
+        claims.value = [];
+        total.value = 0;
+        selected.value = [];
+        errors.value = [];
+        result.value = null;
 
-    if (isAdd.value && props.batch.attachable_claims_url) loadClaims();
-}, { immediate: true });
+        if (isAdd.value && props.batch.attachable_claims_url) loadClaims();
+    },
+    { immediate: true },
+);
 
 function toggle(id) {
-    selected.value = selected.value.includes(id) ? selected.value.filter((value) => value !== id) : [...selected.value, id];
+    selected.value = selected.value.includes(id)
+        ? selected.value.filter((value) => value !== id)
+        : [...selected.value, id];
 }
 
 function toggleAll() {
@@ -99,7 +109,7 @@ async function submit() {
     if (!canConfirm.value) return;
 
     processing.value = true;
-    errors.value     = [];
+    errors.value = [];
 
     try {
         const { data } = isAdd.value
@@ -124,14 +134,24 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
     <CenteredModal :open="open" size="lg" :close-label="t.btn_close" @close="requestClose">
         <template #header>
             <h2 class="h5 mb-0 fw-semibold">
-                <i :class="['ti me-2 text-primary', isAdd ? 'ti-package-import' : 'ti-refresh']" aria-hidden="true"></i>{{ title }}
+                <i :class="['ti me-2 text-primary', isAdd ? 'ti-package-import' : 'ti-refresh']" aria-hidden="true"></i
+                >{{ title }}
             </h2>
         </template>
 
         <!-- Foco inicial no conteúdo (a lista ainda carrega): Tab segue para os controles. -->
-        <div v-if="batch" ref="rootRef" tabindex="-1" data-autofocus class="billing-dialog-body" data-test="add-claims-modal">
+        <div
+            v-if="batch"
+            ref="rootRef"
+            tabindex="-1"
+            data-autofocus
+            class="billing-dialog-body"
+            data-test="add-claims-modal"
+        >
             <p v-if="isAdd" class="small text-muted">{{ t.add_claims_intro }}</p>
-            <p v-else class="small text-muted" data-test="reprocess-intro">{{ tx('reprocess_intro', { count: batch.pending_count ?? 0 }) }}</p>
+            <p v-else class="small text-muted" data-test="reprocess-intro">
+                {{ tx('reprocess_intro', { count: batch.pending_count ?? 0 }) }}
+            </p>
 
             <div v-if="errors.length" class="alert alert-danger small py-2" role="alert" data-test="add-claims-error">
                 <ul class="mb-0 ps-3">
@@ -143,7 +163,11 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 <p v-if="loading" class="d-flex align-items-center gap-2 small text-muted" role="status">
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>{{ t.add_claims_loading }}
                 </p>
-                <p v-else-if="claims.length === 0 && !errors.length" class="small text-muted text-center py-3 mb-0" data-test="add-claims-empty">
+                <p
+                    v-else-if="claims.length === 0 && !errors.length"
+                    class="small text-muted text-center py-3 mb-0"
+                    data-test="add-claims-empty"
+                >
                     {{ t.add_claims_empty }}
                 </p>
                 <template v-else-if="claims.length">
@@ -157,24 +181,38 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                                 data-test="add-claims-all"
                                 :checked="allSelected"
                                 @change="toggleAll"
-                            >
-                            <label for="billing-add-claims-all" class="form-check-label small">{{ t.add_claims_select_all }}</label>
+                            />
+                            <label for="billing-add-claims-all" class="form-check-label small">{{
+                                t.add_claims_select_all
+                            }}</label>
                         </div>
-                        <span class="small text-muted" aria-live="polite" data-test="add-claims-count">{{ tx('add_claims_selected', { count: selected.length }) }}</span>
+                        <span class="small text-muted" aria-live="polite" data-test="add-claims-count">{{
+                            tx('add_claims_selected', { count: selected.length })
+                        }}</span>
                     </div>
                     <p v-if="total > claims.length" class="small text-muted" data-test="add-claims-truncated">
                         {{ tx('add_claims_truncated', { shown: claims.length, total }) }}
                     </p>
                     <ul class="list-group billing-add-claims__list" data-test="add-claims-list">
-                        <li v-for="claim in claims" :key="claim.id" class="list-group-item d-flex align-items-start gap-2" data-test="add-claims-item">
+                        <li
+                            v-for="claim in claims"
+                            :key="claim.id"
+                            class="list-group-item d-flex align-items-start gap-2"
+                            data-test="add-claims-item"
+                        >
                             <input
                                 :id="`billing-add-claim-${claim.id}`"
                                 type="checkbox"
                                 class="form-check-input mt-1 flex-shrink-0"
                                 :checked="selected.includes(claim.id)"
-                                :aria-label="tx('add_claims_select_row', { code: claim.code, patient: claim.patient_name || '—' })"
+                                :aria-label="
+                                    tx('add_claims_select_row', {
+                                        code: claim.code,
+                                        patient: claim.patient_name || '—',
+                                    })
+                                "
                                 @change="toggle(claim.id)"
-                            >
+                            />
                             <label :for="`billing-add-claim-${claim.id}`" class="flex-grow-1 small mb-0">
                                 <span class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="fw-semibold">{{ claim.code }}</span>
@@ -185,7 +223,8 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                                 <span class="d-flex flex-wrap gap-1 mt-1">
                                     <span class="badge badge-soft-secondary">{{ originLabel(claim) }}</span>
                                     <span v-if="claim.has_errors" class="badge badge-soft-warning">
-                                        <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ t.pending_badge }}
+                                        <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                                        >{{ t.pending_badge }}
                                     </span>
                                 </span>
                             </label>
@@ -210,12 +249,31 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
         </div>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="processing" data-test="add-claims-close" @click="requestClose">
+            <button
+                type="button"
+                class="btn btn-light"
+                :disabled="processing"
+                data-test="add-claims-close"
+                @click="requestClose"
+            >
                 {{ result ? t.btn_close : t.btn_cancel }}
             </button>
-            <button v-if="!result" type="button" class="btn btn-primary" data-test="add-claims-confirm" :disabled="!canConfirm" @click="submit">
+            <button
+                v-if="!result"
+                type="button"
+                class="btn btn-primary"
+                data-test="add-claims-confirm"
+                :disabled="!canConfirm"
+                @click="submit"
+            >
                 <span v-if="processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-                {{ processing ? t.processing : (isAdd ? tx('add_claims_confirm', { count: selected.length }) : t.reprocess_confirm) }}
+                {{
+                    processing
+                        ? t.processing
+                        : isAdd
+                          ? tx('add_claims_confirm', { count: selected.length })
+                          : t.reprocess_confirm
+                }}
             </button>
         </template>
     </CenteredModal>

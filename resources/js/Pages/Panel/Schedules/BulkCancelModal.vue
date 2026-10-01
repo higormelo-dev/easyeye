@@ -2,41 +2,44 @@
 import { ref, watch, nextTick } from 'vue';
 
 const props = defineProps({
-    open:        { type: Boolean, required: true },
-    selectedIds: { type: Array,   default: () => [] },
-    t:           { type: Object,  required: true },
+    open: { type: Boolean, required: true },
+    selectedIds: { type: Array, default: () => [] },
+    t: { type: Object, required: true },
 });
 
 const emit = defineEmits(['close', 'done']);
 
-const notes    = ref('');
-const saving   = ref(false);
+const notes = ref('');
+const saving = ref(false);
 const errorMsg = ref('');
-let   bsModal  = null;
+let bsModal = null;
 
-watch(() => props.open, async (val) => {
-    if (val) {
-        notes.value    = '';
-        errorMsg.value = '';
-        saving.value   = false;
-        await nextTick();
-        if (! bsModal) bsModal = new bootstrap.Modal(document.getElementById('bulkCancelModal'));
-        bsModal.show();
-    } else {
-        bsModal?.hide();
-    }
-});
+watch(
+    () => props.open,
+    async (val) => {
+        if (val) {
+            notes.value = '';
+            errorMsg.value = '';
+            saving.value = false;
+            await nextTick();
+            if (!bsModal) bsModal = new bootstrap.Modal(document.getElementById('bulkCancelModal'));
+            bsModal.show();
+        } else {
+            bsModal?.hide();
+        }
+    },
+);
 
 async function onConfirm() {
     if (saving.value || props.selectedIds.length === 0) return;
-    saving.value   = true;
+    saving.value = true;
     errorMsg.value = '';
 
     const res = await fetch(route('panel.schedules.bulk-update'), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Accept':       'application/json',
+            Accept: 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
         },
         body: JSON.stringify({ ids: props.selectedIds, situation: 9, notes: notes.value || null }),
@@ -52,15 +55,14 @@ async function onConfirm() {
     }
 }
 
-function onHidden() { emit('close'); }
+function onHidden() {
+    emit('close');
+}
 </script>
 
 <template>
     <Teleport to="body">
-        <div id="bulkCancelModal"
-             class="modal fade"
-             tabindex="-1"
-             @hidden.bs.modal="onHidden">
+        <div id="bulkCancelModal" class="modal fade" tabindex="-1" @hidden.bs.modal="onHidden">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -88,10 +90,12 @@ function onHidden() { emit('close'); }
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                             {{ t.reschedule_cancel }}
                         </button>
-                        <button type="button"
-                                class="btn btn-danger"
-                                :disabled="saving || selectedIds.length === 0"
-                                @click="onConfirm">
+                        <button
+                            type="button"
+                            class="btn btn-danger"
+                            :disabled="saving || selectedIds.length === 0"
+                            @click="onConfirm"
+                        >
                             <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
                             {{ saving ? t.saving : t.btn_bulk_cancel }}
                         </button>

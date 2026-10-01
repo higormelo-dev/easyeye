@@ -1,24 +1,26 @@
 <script setup>
 import { computed } from 'vue';
-import SortableTh      from '@/Components/Panel/SortableTh.vue';
-import StatusBadge     from '@/Components/Panel/StatusBadge.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import StatusBadge from '@/Components/Panel/StatusBadge.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
-import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
-    plans:   { type: Object, required: true },
+    plans: { type: Object, required: true },
     filters: { type: Object, default: () => ({}) },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['sort', 'view', 'edit', 'delete', 'toggleActive']);
 
 const currentSort = computed(() => props.filters.sort ?? 'sort_order');
-const currentDir  = computed(() => props.filters.direction ?? 'asc');
+const currentDir = computed(() => props.filters.direction ?? 'asc');
 
-function onSort(payload) { emit('sort', payload); }
+function onSort(payload) {
+    emit('sort', payload);
+}
 </script>
 
 <template>
@@ -30,19 +32,31 @@ function onSort(payload) { emit('sort', payload); }
                         col-key="sort_order"
                         :current-sort="currentSort"
                         :current-dir="currentDir"
-                        style="width:70px;"
+                        style="width: 70px"
                         @sort="onSort"
-                    >{{ t.col_order }}</SortableTh>
+                        >{{ t.col_order }}</SortableTh
+                    >
                     <SortableTh col-key="name" :current-sort="currentSort" :current-dir="currentDir" @sort="onSort">
                         {{ t.col_name }}
                     </SortableTh>
                     <SortableTh col-key="price" :current-sort="currentSort" :current-dir="currentDir" @sort="onSort">
                         {{ t.col_price }}
                     </SortableTh>
-                    <SortableTh col-key="billing_cycle" :current-sort="currentSort" :current-dir="currentDir" @sort="onSort">
+                    <SortableTh
+                        col-key="billing_cycle"
+                        :current-sort="currentSort"
+                        :current-dir="currentDir"
+                        @sort="onSort"
+                    >
                         {{ t.col_cycle }}
                     </SortableTh>
-                    <SortableTh col-key="active" :current-sort="currentSort" :current-dir="currentDir" class="text-center" @sort="onSort">
+                    <SortableTh
+                        col-key="active"
+                        :current-sort="currentSort"
+                        :current-dir="currentDir"
+                        class="text-center"
+                        @sort="onSort"
+                    >
                         {{ t.col_status }}
                     </SortableTh>
                     <th class="text-end">{{ t.col_actions }}</th>
@@ -62,12 +76,14 @@ function onSort(payload) { emit('sort', payload); }
                         <span class="badge badge-soft-secondary rounded fs-12">{{ p.sort_order }}</span>
                     </td>
                     <td>
-                        <div class="fw-medium" style="font-size:.875rem;">{{ p.name }}</div>
+                        <div class="fw-medium" style="font-size: 0.875rem">{{ p.name }}</div>
                         <div
                             v-if="p.description"
                             class="text-muted text-truncate"
-                            style="font-size:.75rem;max-width:280px;"
-                        >{{ p.description }}</div>
+                            style="font-size: 0.75rem; max-width: 280px"
+                        >
+                            {{ p.description }}
+                        </div>
                     </td>
                     <td class="fw-semibold">{{ p.price }}</td>
                     <td>
@@ -82,11 +98,7 @@ function onSort(payload) { emit('sort', payload); }
                     </td>
                     <td class="text-end">
                         <ActionIconGroup align="end" gap="tight">
-                            <ActionIconButton
-                                icon="ti ti-eye"
-                                :title="t.action_view"
-                                @click="$emit('view', p.id)"
-                            />
+                            <ActionIconButton icon="ti ti-eye" :title="t.action_view" @click="$emit('view', p.id)" />
                             <ActionDropdown
                                 btn-class="ee-action-icon ee-action-icon--default"
                                 icon="ti ti-dots-vertical"
@@ -97,12 +109,15 @@ function onSort(payload) { emit('sort', payload); }
                                     </button>
                                 </li>
                                 <li>
-                                    <button class="dropdown-item rounded-1" @click="$emit('toggleActive', p.id, p.active)">
+                                    <button
+                                        class="dropdown-item rounded-1"
+                                        @click="$emit('toggleActive', p.id, p.active)"
+                                    >
                                         <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
                                         {{ p.active ? t.action_deactivate : t.action_activate }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+                                <li><hr class="dropdown-divider" /></li>
                                 <li>
                                     <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', p.id)">
                                         <i class="ti ti-trash me-1"></i> {{ t.action_delete }}

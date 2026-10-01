@@ -1,16 +1,25 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { Chart, LineElement, PointElement, LineController, CategoryScale, LinearScale, Filler, Tooltip } from 'chart.js';
+import {
+    Chart,
+    LineElement,
+    PointElement,
+    LineController,
+    CategoryScale,
+    LinearScale,
+    Filler,
+    Tooltip,
+} from 'chart.js';
 
 Chart.register(LineElement, PointElement, LineController, CategoryScale, LinearScale, Filler, Tooltip);
 
 const props = defineProps({
-    mrrTrend:      { type: Object, required: true },
+    mrrTrend: { type: Object, required: true },
     financialKpis: { type: Object, required: true },
-    t:             { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
-const canvas  = ref(null);
+const canvas = ref(null);
 let chartInst = null;
 
 function isDark() {
@@ -25,7 +34,10 @@ function palette() {
 
 function buildChart() {
     if (!canvas.value) return;
-    if (chartInst) { chartInst.destroy(); chartInst = null; }
+    if (chartInst) {
+        chartInst.destroy();
+        chartInst = null;
+    }
 
     const p = palette();
 
@@ -33,20 +45,22 @@ function buildChart() {
         type: 'line',
         data: {
             labels: props.mrrTrend.labels,
-            datasets: [{
-                label: props.t.chart_mrr_label,
-                data: props.mrrTrend.values,
-                borderColor: p.line,
-                backgroundColor: p.bg,
-                borderWidth: 2.5,
-                pointBackgroundColor: p.line,
-                pointBorderColor: p.point,
-                pointBorderWidth: 2,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                fill: true,
-                tension: 0.4,
-            }],
+            datasets: [
+                {
+                    label: props.t.chart_mrr_label,
+                    data: props.mrrTrend.values,
+                    borderColor: p.line,
+                    backgroundColor: p.bg,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: p.line,
+                    pointBorderColor: p.point,
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.4,
+                },
+            ],
         },
         options: {
             responsive: true,
@@ -61,7 +75,7 @@ function buildChart() {
                     borderColor: p.grid,
                     borderWidth: 1,
                     callbacks: {
-                        label: ctx => ' R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 0 }),
+                        label: (ctx) => ' R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 0 }),
                     },
                 },
             },
@@ -75,7 +89,7 @@ function buildChart() {
                     ticks: {
                         color: p.text,
                         font: { size: 11 },
-                        callback: v => v >= 1000 ? 'R$ ' + (v / 1000).toFixed(0) + 'k' : 'R$ ' + v,
+                        callback: (v) => (v >= 1000 ? 'R$ ' + (v / 1000).toFixed(0) + 'k' : 'R$ ' + v),
                     },
                     beginAtZero: true,
                 },
@@ -109,7 +123,7 @@ watch(() => props.mrrTrend, buildChart, { deep: true });
             </span>
         </div>
         <div class="card-body">
-            <canvas ref="canvas" style="height:240px;max-height:240px;"></canvas>
+            <canvas ref="canvas" style="height: 240px; max-height: 240px"></canvas>
         </div>
     </div>
 </template>

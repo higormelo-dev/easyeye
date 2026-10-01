@@ -10,11 +10,11 @@ import { useTrans } from '@/composables/useTrans.js';
  * filtro. Números do servidor (TissGlosasController::summary).
  */
 const props = defineProps({
-    summary: { type: Object,  default: () => ({}) },
+    summary: { type: Object, default: () => ({}) },
     /** open | appealed | overdue | soon | recovered | null */
-    active:  { type: String,  default: null },
+    active: { type: String, default: null },
     loading: { type: Boolean, default: false },
-    t:       { type: Object,  default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['toggle']);

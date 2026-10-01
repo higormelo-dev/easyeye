@@ -13,16 +13,16 @@ import { Link, usePage } from '@inertiajs/vue3';
  * wrapper, sem sidebar pesada.
  */
 const props = defineProps({
-    title:    { type: String, default: '' },
+    title: { type: String, default: '' },
 });
 
 const page = usePage();
 const partner = computed(() => page.props?.partner ?? null);
-const flash   = computed(() => page.props?.flash ?? {});
+const flash = computed(() => page.props?.flash ?? {});
 
 // User dropdown
 const showUserMenu = ref(false);
-const userMenuEl   = ref(null);
+const userMenuEl = ref(null);
 
 function handleClickOutside(e) {
     if (userMenuEl.value && !userMenuEl.value.contains(e.target)) {
@@ -34,12 +34,12 @@ onMounted(() => document.addEventListener('click', handleClickOutside));
 onUnmounted(() => document.removeEventListener('click', handleClickOutside));
 
 const flashSuccess = computed(() => flash.value?.success);
-const flashError   = computed(() => flash.value?.error);
+const flashError = computed(() => flash.value?.error);
 
 function isActive(routeNameStart) {
     const current = page.props?.ziggy?.location ?? '';
     if (routeNameStart === 'portal.dashboard') return current.includes('/portal/dashboard');
-    if (routeNameStart === 'portal.leads')     return current.includes('/portal/leads');
+    if (routeNameStart === 'portal.leads') return current.includes('/portal/leads');
     if (routeNameStart === 'portal.commissions') return current.includes('/portal/commissions');
     return false;
 }
@@ -50,7 +50,7 @@ function isActive(routeNameStart) {
         <!-- Navbar -->
         <nav
             class="navbar navbar-expand-lg navbar-dark py-2"
-            style="background: linear-gradient(135deg, #26a69a 0%, #1565c0 100%);"
+            style="background: linear-gradient(135deg, #26a69a 0%, #1565c0 100%)"
         >
             <div class="container-fluid px-4">
                 <Link :href="route('portal.dashboard')" class="navbar-brand fw-semibold">
@@ -95,20 +95,23 @@ function isActive(routeNameStart) {
                         <button
                             type="button"
                             class="btn btn-link text-white d-flex align-items-center gap-2"
-                            style="text-decoration:none;"
+                            style="text-decoration: none"
                             @click.stop="showUserMenu = !showUserMenu"
                         >
-                            <span class="rounded-circle d-flex align-items-center justify-content-center bg-white bg-opacity-25" style="width: 32px; height: 32px;">
+                            <span
+                                class="rounded-circle d-flex align-items-center justify-content-center bg-white bg-opacity-25"
+                                style="width: 32px; height: 32px"
+                            >
                                 <i class="ti ti-user"></i>
                             </span>
                             <span class="d-none d-md-inline">{{ partner.name }}</span>
-                            <i class="ti ti-chevron-down" style="font-size: 12px;"></i>
+                            <i class="ti ti-chevron-down" style="font-size: 12px"></i>
                         </button>
 
                         <ul
                             v-if="showUserMenu"
                             class="dropdown-menu dropdown-menu-end show position-absolute"
-                            style="right: 0; top: 100%;"
+                            style="right: 0; top: 100%"
                         >
                             <li class="dropdown-item-text small text-muted">
                                 <i class="ti ti-mail me-1"></i>{{ partner.email }}
@@ -116,7 +119,7 @@ function isActive(routeNameStart) {
                             <li v-if="partner.code" class="dropdown-item-text small text-muted">
                                 <i class="ti ti-id me-1"></i><code>{{ partner.code }}</code>
                             </li>
-                            <li><hr class="dropdown-divider"></li>
+                            <li><hr class="dropdown-divider" /></li>
                             <li>
                                 <Link
                                     :href="route('logout')"

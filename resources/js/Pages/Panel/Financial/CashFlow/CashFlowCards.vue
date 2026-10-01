@@ -8,17 +8,16 @@ import { useCashEntryFormat } from './useCashEntryFormat.js';
  * tabela, sem rolagem horizontal no celular do balcão.
  */
 const props = defineProps({
-    rows:     { type: Array,  default: () => [] },
+    rows: { type: Array, default: () => [] },
     overview: { type: Object, default: () => ({}) },
-    busyId:   { type: String, default: null },
-    t:        { type: Object, default: () => ({}) },
+    busyId: { type: String, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['edit', 'delete']);
 
-const {
-    date, typeLabel, statusLabel, originLabel, typeBadge, statusBadge, originIcon, entryAmount,
-} = useCashEntryFormat(() => props.t);
+const { date, typeLabel, statusLabel, originLabel, typeBadge, statusBadge, originIcon, entryAmount } =
+    useCashEntryFormat(() => props.t);
 </script>
 
 <template>
@@ -43,17 +42,27 @@ const {
                         <span class="fw-bold text-body text-nowrap cash-flow-card__amount" data-test="amount">
                             <i
                                 class="ti me-1"
-                                :class="entry.type === 'expense' ? 'ti-arrow-up-right text-danger' : 'ti-arrow-down-left text-success'"
+                                :class="
+                                    entry.type === 'expense'
+                                        ? 'ti-arrow-up-right text-danger'
+                                        : 'ti-arrow-down-left text-success'
+                                "
                                 aria-hidden="true"
-                            ></i>{{ entryAmount(entry) }}
+                            ></i
+                            >{{ entryAmount(entry) }}
                         </span>
                     </div>
 
                     <div class="d-flex flex-wrap gap-1 mt-2">
-                        <span class="badge rounded fs-11 fw-medium" :class="typeBadge(entry.type)">{{ typeLabel(entry.type) }}</span>
-                        <span class="badge rounded fs-11 fw-medium" :class="statusBadge(entry.status)">{{ statusLabel(entry.status) }}</span>
+                        <span class="badge rounded fs-11 fw-medium" :class="typeBadge(entry.type)">{{
+                            typeLabel(entry.type)
+                        }}</span>
+                        <span class="badge rounded fs-11 fw-medium" :class="statusBadge(entry.status)">{{
+                            statusLabel(entry.status)
+                        }}</span>
                         <span class="badge rounded badge-soft-secondary border fs-11 fw-medium">
-                            <i :class="originIcon(entry.origin)" class="me-1" aria-hidden="true"></i>{{ originLabel(entry.origin) }}
+                            <i :class="originIcon(entry.origin)" class="me-1" aria-hidden="true"></i
+                            >{{ originLabel(entry.origin) }}
                         </span>
                     </div>
 

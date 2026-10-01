@@ -12,11 +12,11 @@ import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 describe('AiAssistantPanel — quick picks categorizados', () => {
     const baseUrls = {
         estimate: '/_routes/panel.ai-runs.estimate',
-        store:    '/_routes/panel.ai-runs.store',
-        show:     '/_routes/panel.ai-runs.show/__ID__',
-        approve:  '/_routes/panel.ai-runs.approve/__ID__',
-        reject:   '/_routes/panel.ai-runs.reject/__ID__',
-        cancel:   '/_routes/panel.ai-runs.cancel/__ID__',
+        store: '/_routes/panel.ai-runs.store',
+        show: '/_routes/panel.ai-runs.show/__ID__',
+        approve: '/_routes/panel.ai-runs.approve/__ID__',
+        reject: '/_routes/panel.ai-runs.reject/__ID__',
+        cancel: '/_routes/panel.ai-runs.cancel/__ID__',
     };
 
     function mountPanel(quickPicks, overrides = {}) {
@@ -24,7 +24,8 @@ describe('AiAssistantPanel — quick picks categorizados', () => {
             global: {
                 stubs: {
                     OffcanvasPanel: {
-                        template: '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
+                        template:
+                            '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
                         props: ['open', 'width'],
                     },
                 },
@@ -32,22 +33,22 @@ describe('AiAssistantPanel — quick picks categorizados', () => {
             props: {
                 open: true,
                 ai: {
-                    urls:    baseUrls,
+                    urls: baseUrls,
                     balance: { available: 50 },
-                    modes:   [{ value: 'validated' }],
+                    modes: [{ value: 'validated' }],
                     workflows: ['record_assist'],
                     default_workflow: 'record_assist',
                     assistant: {
-                        title:      'Assistente de IA',
-                        analyze:    'Analisar',
+                        title: 'Assistente de IA',
+                        analyze: 'Analisar',
                         quick_picks_label: 'Sugestões rápidas',
                         quick_picks: quickPicks,
                     },
                     workflow_labels: { record_assist: 'Análise do prontuário' },
                 },
                 context: {
-                    workflow_default:  'record_assist',
-                    patient_id:        'p1',
+                    workflow_default: 'record_assist',
+                    patient_id: 'p1',
                     medical_record_id: 'r1',
                 },
                 ...overrides,
@@ -59,28 +60,29 @@ describe('AiAssistantPanel — quick picks categorizados', () => {
         globalThis.window = globalThis.window ?? {};
         globalThis.window.axios = {
             post: vi.fn(() => Promise.resolve({ data: { run_id: 'r-abc' } })),
-            get:  vi.fn(() => Promise.resolve({ data: { data: [] } })),
+            get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
         };
     });
 
     it('formato categorizado: renderiza select com as categorias', () => {
         const wrapper = mountPanel({
-            'Geral':    ['prompt geral 1', 'prompt geral 2'],
-            'Glaucoma': ['prompt glaucoma 1'],
+            Geral: ['prompt geral 1', 'prompt geral 2'],
+            Glaucoma: ['prompt glaucoma 1'],
         });
 
         // Categorias viram <option> dentro do select compacto (layout enxuto).
-        const options = wrapper.find('[data-test="quick-picks-category-select"]')
+        const options = wrapper
+            .find('[data-test="quick-picks-category-select"]')
             .findAll('option')
-            .map(o => o.text());
+            .map((o) => o.text());
         expect(options).toContain('Geral');
         expect(options).toContain('Glaucoma');
     });
 
     it('formato categorizado: ativa a primeira categoria por default e mostra seus prompts', () => {
         const wrapper = mountPanel({
-            'Geral':    ['prompt geral 1', 'prompt geral 2'],
-            'Glaucoma': ['prompt glaucoma 1'],
+            Geral: ['prompt geral 1', 'prompt geral 2'],
+            Glaucoma: ['prompt glaucoma 1'],
         });
 
         const html = wrapper.html();
@@ -91,8 +93,8 @@ describe('AiAssistantPanel — quick picks categorizados', () => {
 
     it('formato categorizado: trocar categoria muda a lista de prompts', async () => {
         const wrapper = mountPanel({
-            'Geral':    ['prompt geral 1'],
-            'Glaucoma': ['prompt glaucoma 1', 'prompt glaucoma 2'],
+            Geral: ['prompt geral 1'],
+            Glaucoma: ['prompt glaucoma 1', 'prompt glaucoma 2'],
         });
 
         const categorySelect = wrapper.find('[data-test="quick-picks-category-select"]');
@@ -107,10 +109,10 @@ describe('AiAssistantPanel — quick picks categorizados', () => {
 
     it('formato categorizado: click no prompt seta user_prompt', async () => {
         const wrapper = mountPanel({
-            'Geral': ['prompt geral 1'],
+            Geral: ['prompt geral 1'],
         });
 
-        const promptBtn = wrapper.findAll('button').find(b => b.text() === 'prompt geral 1');
+        const promptBtn = wrapper.findAll('button').find((b) => b.text() === 'prompt geral 1');
         await promptBtn.trigger('click');
         await wrapper.vm.$nextTick();
 
@@ -121,7 +123,7 @@ describe('AiAssistantPanel — quick picks categorizados', () => {
     it('formato legado (string[]) renderiza lista plana sem chips de categoria', () => {
         const wrapper = mountPanel(['prompt 1', 'prompt 2', 'prompt 3']);
 
-        const buttonsText = wrapper.findAll('button').map(b => b.text());
+        const buttonsText = wrapper.findAll('button').map((b) => b.text());
         expect(buttonsText).toContain('prompt 1');
         expect(buttonsText).toContain('prompt 2');
         expect(buttonsText).toContain('prompt 3');

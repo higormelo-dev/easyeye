@@ -13,16 +13,16 @@ export function useReportSettingFormat(getT) {
     const { date } = useLocaleFormat();
 
     const BLOCKS = [
-        { key: 'show_header',    labelKey: 'block_header',    icon: 'ti ti-layout-navbar' },
+        { key: 'show_header', labelKey: 'block_header', icon: 'ti ti-layout-navbar' },
         { key: 'show_signature', labelKey: 'block_signature', icon: 'ti ti-signature' },
-        { key: 'show_footer',    labelKey: 'block_footer',    icon: 'ti ti-layout-bottombar' },
+        { key: 'show_footer', labelKey: 'block_footer', icon: 'ti ti-layout-bottombar' },
     ];
 
     /** @returns {Array<{ key: string, icon: string, on: boolean, label: string, text: string }>} */
     function blocks(item) {
         return BLOCKS.map(({ key, labelKey, icon }) => {
             const label = tx(labelKey);
-            const on    = !!item[key];
+            const on = !!item[key];
 
             return { key, icon, on, label, text: tx(on ? 'block_on' : 'block_off', { block: label }) };
         });

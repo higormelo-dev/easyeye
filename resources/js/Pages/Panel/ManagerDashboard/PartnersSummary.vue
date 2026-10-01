@@ -1,23 +1,23 @@
 <script setup>
 const props = defineProps({
     partnersSummary: { type: Object, required: true },
-    t:               { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 const LEAD_STATUS_BADGE = {
-    new:       'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
+    new: 'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
     contacted: 'badge-soft-primary rounded text-primary border border-primary fs-13 fw-medium',
-    trial:     'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
+    trial: 'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
     converted: 'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
-    lost:      'badge-soft-secondary rounded fs-13 fw-medium',
+    lost: 'badge-soft-secondary rounded fs-13 fw-medium',
 };
 
 const LEAD_STATUS_LABEL = {
-    new:       'Novo',
+    new: 'Novo',
     contacted: 'Contatado',
-    trial:     'Trial',
+    trial: 'Trial',
     converted: 'Convertido',
-    lost:      'Perdido',
+    lost: 'Perdido',
 };
 
 const LEAD_STATUS_ORDER = ['new', 'contacted', 'trial', 'converted', 'lost'];
@@ -36,7 +36,6 @@ function brl(value) {
             </a>
         </div>
         <div class="card-body">
-
             <!-- Mini KPIs -->
             <div class="row g-2 mb-3">
                 <div class="col-4">
@@ -67,7 +66,7 @@ function brl(value) {
                             <i class="ti ti-cash"></i>
                         </div>
                         <div>
-                            <div class="mini-value" style="font-size:1rem;">
+                            <div class="mini-value" style="font-size: 1rem">
                                 R$ {{ brl(partnersSummary.pendingCommissions) }}
                             </div>
                             <div class="mini-label">{{ t.commissions_pending }}</div>
@@ -77,7 +76,10 @@ function brl(value) {
             </div>
 
             <!-- Funil de Leads -->
-            <h6 class="text-muted fw-semibold mb-2" style="font-size:.8125rem;text-transform:uppercase;letter-spacing:.04em;">
+            <h6
+                class="text-muted fw-semibold mb-2"
+                style="font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em"
+            >
                 {{ t.leads_funnel }}
             </h6>
             <div
@@ -86,24 +88,24 @@ function brl(value) {
                 class="d-flex align-items-center justify-content-between py-1"
             >
                 <span :class="['badge', LEAD_STATUS_BADGE[status]]">{{ LEAD_STATUS_LABEL[status] }}</span>
-                <span class="fw-bold" style="font-size:.875rem;">
+                <span class="fw-bold" style="font-size: 0.875rem">
                     {{ partnersSummary.leadsByStatus?.[status] ?? 0 }}
                 </span>
             </div>
 
             <!-- Referrals -->
-            <hr class="my-3">
+            <hr class="my-3" />
             <div class="d-flex align-items-center justify-content-between">
                 <div>
                     <i class="ti ti-share me-1 text-primary"></i>
-                    <span class="fw-semibold" style="font-size:.875rem;">{{ t.referral_codes }}</span>
+                    <span class="fw-semibold" style="font-size: 0.875rem">{{ t.referral_codes }}</span>
                 </div>
                 <span class="fw-bold">{{ partnersSummary.activeReferralCodes }}</span>
             </div>
             <div class="d-flex align-items-center justify-content-between mt-1">
                 <div>
                     <i class="ti ti-arrow-right me-1 text-success"></i>
-                    <span class="fw-semibold" style="font-size:.875rem;">{{ t.referral_events }}</span>
+                    <span class="fw-semibold" style="font-size: 0.875rem">{{ t.referral_events }}</span>
                 </div>
                 <span class="fw-bold">{{ partnersSummary.totalReferralEvents }}</span>
             </div>

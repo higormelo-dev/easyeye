@@ -1,6 +1,6 @@
 <script setup>
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 import { useCashEntryFormat } from './useCashEntryFormat.js';
 
 /**
@@ -10,9 +10,9 @@ import { useCashEntryFormat } from './useCashEntryFormat.js';
  * dezenas de "Editar" iguais para o leitor de tela.
  */
 const props = defineProps({
-    entry: { type: Object,  required: true },
-    busy:  { type: Boolean, default: false },
-    t:     { type: Object,  default: () => ({}) },
+    entry: { type: Object, required: true },
+    busy: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['edit', 'delete']);

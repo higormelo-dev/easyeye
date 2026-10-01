@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 /**
  * Cards de médicos no padrão de Patients/PatientCards: foto, nome, status,
@@ -15,16 +15,16 @@ import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
  */
 const props = defineProps({
     cardsUrl: { type: String, required: true },
-    search:   { type: String, default: '' },
-    t:        { type: Object, default: () => ({}) },
+    search: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['view', 'edit', 'delete', 'toggleActive']);
 
 const doctors = ref([]);
-const meta    = ref({ current_page: 1, last_page: 1, total: 0 });
+const meta = ref({ current_page: 1, last_page: 1, total: 0 });
 const loading = ref(false);
-const failed  = ref(false);
+const failed = ref(false);
 
 // Busca efetivamente carregada — NÃO comparar com props.search: no Inertia 3
 // o prop do filho já foi atualizado quando o evento `success` dispara.
@@ -34,24 +34,24 @@ let requestSeq = 0;
 
 async function fetchCards(page = 1, search = loadedSearch) {
     const seq = ++requestSeq;
-    loadedSearch  = search ?? '';
+    loadedSearch = search ?? '';
     loading.value = true;
-    failed.value  = false;
+    failed.value = false;
     try {
         const params = new URLSearchParams({ page, search: search ?? '' });
-        const res    = await fetch(`${props.cardsUrl}?${params}`, {
+        const res = await fetch(`${props.cardsUrl}?${params}`, {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const json    = await res.json();
+        const json = await res.json();
         if (seq !== requestSeq) return;
         doctors.value = json.data ?? [];
-        meta.value    = json.meta ?? { current_page: 1, last_page: 1, total: 0 };
+        meta.value = json.meta ?? { current_page: 1, last_page: 1, total: 0 };
     } catch {
         if (seq !== requestSeq) return;
         doctors.value = [];
-        failed.value  = true;
+        failed.value = true;
     } finally {
         if (seq === requestSeq) loading.value = false;
     }
@@ -114,11 +114,7 @@ onUnmounted(() => removeSuccessListener?.());
         </div>
 
         <div v-else class="row g-3">
-            <div
-                v-for="d in doctors"
-                :key="d.id"
-                class="col-12 col-sm-6 col-md-4 col-lg-4 col-xl-3"
-            >
+            <div v-for="d in doctors" :key="d.id" class="col-12 col-sm-6 col-md-4 col-lg-4 col-xl-3">
                 <div class="card card-body h-100">
                     <div class="row align-items-center">
                         <div class="col-3 text-center">
@@ -127,12 +123,17 @@ onUnmounted(() => removeSuccessListener?.());
                                     :src="d.photo_url"
                                     :alt="d.full_name"
                                     class="img-fluid rounded-circle"
-                                    style="width:56px;height:56px;object-fit:cover;"
-                                >
+                                    style="width: 56px; height: 56px; object-fit: cover"
+                                />
                                 <span
                                     v-if="d.color"
                                     class="position-absolute bottom-0 end-0 rounded-circle"
-                                    :style="{ background: d.color, width: '14px', height: '14px', border: '2px solid var(--bs-body-bg)' }"
+                                    :style="{
+                                        background: d.color,
+                                        width: '14px',
+                                        height: '14px',
+                                        border: '2px solid var(--bs-body-bg)',
+                                    }"
                                     aria-hidden="true"
                                 ></span>
                             </div>
@@ -140,32 +141,45 @@ onUnmounted(() => removeSuccessListener?.());
                         <div class="col-9">
                             <h6 class="mb-1 fw-semibold lh-sm text-break">{{ d.full_name }}</h6>
                             <span
-                                :class="d.active
-                                    ? 'badge badge-soft-success rounded text-success border border-success fs-12'
-                                    : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'"
-                            >{{ d.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span>
+                                :class="
+                                    d.active
+                                        ? 'badge badge-soft-success rounded text-success border border-success fs-12'
+                                        : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'
+                                "
+                                >{{ d.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span
+                            >
                         </div>
                     </div>
 
                     <dl class="small text-muted mt-2 mb-1">
-                        <div class="d-flex gap-1"><dt class="fw-semibold">{{ t.col_code ?? 'Código' }}:</dt><dd class="mb-0">{{ d.code }}</dd></div>
-                        <div class="d-flex gap-1"><dt class="fw-semibold">{{ t.col_record ?? 'CRM' }}:</dt><dd class="mb-0">{{ d.record ?? '—' }}</dd></div>
-                        <div class="d-flex gap-1"><dt class="fw-semibold">{{ t.specialty ?? 'Especialidade' }}:</dt><dd class="mb-0">{{ d.record_specialty ?? '—' }}</dd></div>
+                        <div class="d-flex gap-1">
+                            <dt class="fw-semibold">{{ t.col_code ?? 'Código' }}:</dt>
+                            <dd class="mb-0">{{ d.code }}</dd>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <dt class="fw-semibold">{{ t.col_record ?? 'CRM' }}:</dt>
+                            <dd class="mb-0">{{ d.record ?? '—' }}</dd>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <dt class="fw-semibold">{{ t.specialty ?? 'Especialidade' }}:</dt>
+                            <dd class="mb-0">{{ d.record_specialty ?? '—' }}</dd>
+                        </div>
                         <div class="d-flex gap-1">
                             <dt class="fw-semibold">{{ t.col_phone ?? 'Telefone' }}:</dt>
                             <dd class="mb-0">
                                 <i
                                     v-if="d.whatsapp"
                                     class="fab fa-whatsapp text-success me-1"
-                                role="img"
+                                    role="img"
                                     :title="t.whatsapp ?? 'WhatsApp'"
                                     :aria-label="t.whatsapp ?? 'WhatsApp'"
-                                ></i>{{ d.cellphone ?? '—' }}
+                                ></i
+                                >{{ d.cellphone ?? '—' }}
                             </dd>
                         </div>
                     </dl>
 
-                    <hr class="my-2 mt-auto">
+                    <hr class="my-2 mt-auto" />
 
                     <ActionIconGroup align="end" gap="tight">
                         <template v-if="d.mode === 'view_only' || d.mode === 'full'">
@@ -193,12 +207,19 @@ onUnmounted(() => removeSuccessListener?.());
                                     </button>
                                 </li>
                                 <li>
-                                    <button class="dropdown-item rounded-1" @click="emit('toggleActive', d.id, d.active)">
+                                    <button
+                                        class="dropdown-item rounded-1"
+                                        @click="emit('toggleActive', d.id, d.active)"
+                                    >
                                         <i :class="`ti me-1 ${d.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                        {{ d.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                        {{
+                                            d.active
+                                                ? (t.action_deactivate ?? 'Desativar')
+                                                : (t.action_activate ?? 'Ativar')
+                                        }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+                                <li><hr class="dropdown-divider" /></li>
                                 <li>
                                     <button class="dropdown-item rounded-1 text-danger" @click="emit('delete', d.id)">
                                         <i class="ti ti-trash me-1"></i> {{ t.action_delete ?? 'Excluir' }}
@@ -211,10 +232,19 @@ onUnmounted(() => removeSuccessListener?.());
             </div>
         </div>
 
-        <nav v-if="meta.last_page > 1" class="d-flex justify-content-center mt-3" :aria-label="t.pagination_label ?? 'Paginação'">
+        <nav
+            v-if="meta.last_page > 1"
+            class="d-flex justify-content-center mt-3"
+            :aria-label="t.pagination_label ?? 'Paginação'"
+        >
             <ul class="pagination pagination-sm mb-0">
                 <li class="page-item" :class="{ disabled: meta.current_page === 1 }">
-                    <button type="button" class="page-link" :aria-label="t.pagination_previous ?? 'Anterior'" @click="goTo(meta.current_page - 1)">
+                    <button
+                        type="button"
+                        class="page-link"
+                        :aria-label="t.pagination_previous ?? 'Anterior'"
+                        @click="goTo(meta.current_page - 1)"
+                    >
                         <i class="ti ti-arrow-left text-body" aria-hidden="true"></i>
                     </button>
                 </li>
@@ -231,10 +261,17 @@ onUnmounted(() => removeSuccessListener?.());
                         class="page-link"
                         :aria-current="p === meta.current_page ? 'page' : undefined"
                         @click="goTo(p)"
-                    >{{ p }}</button>
+                    >
+                        {{ p }}
+                    </button>
                 </li>
                 <li class="page-item" :class="{ disabled: meta.current_page === meta.last_page }">
-                    <button type="button" class="page-link" :aria-label="t.pagination_next ?? 'Próxima'" @click="goTo(meta.current_page + 1)">
+                    <button
+                        type="button"
+                        class="page-link"
+                        :aria-label="t.pagination_next ?? 'Próxima'"
+                        @click="goTo(meta.current_page + 1)"
+                    >
                         <i class="ti ti-arrow-right text-body" aria-hidden="true"></i>
                     </button>
                 </li>

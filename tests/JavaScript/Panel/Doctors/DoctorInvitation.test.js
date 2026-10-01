@@ -26,7 +26,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 reset: () => Object.assign(form, initial),
-                clearErrors: () => { form.errors = {}; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
                 post: vi.fn(),
                 put: vi.fn(),
             });
@@ -38,7 +40,10 @@ vi.mock('@inertiajs/vue3', async () => {
 });
 
 vi.mock('@/Layouts/GuestLayout.vue', () => ({
-    default: { props: ['title', 'subtitle'], template: '<div><h4 class="title">{{ title }}</h4><p class="subtitle">{{ subtitle }}</p><slot /></div>' },
+    default: {
+        props: ['title', 'subtitle'],
+        template: '<div><h4 class="title">{{ title }}</h4><p class="subtitle">{{ subtitle }}</p><slot /></div>',
+    },
 }));
 
 const { router } = await import('@inertiajs/vue3');
@@ -47,10 +52,16 @@ const DoctorInvitationsPending = (await import('@/Pages/Panel/Doctors/DoctorInvi
 const DoctorInvitationPage = (await import('@/Pages/Auth/ClinicInvitation.vue')).default;
 
 const T = {
-    col_name: 'Nome', col_record: 'CRM',
+    col_name: 'Nome',
+    col_record: 'CRM',
     invitation: {
-        send_button: 'Enviar convite', pending_title: 'Convites pendentes', pending_hint: 'Aguardando.',
-        col_sent_at: 'Enviado em', col_expires_at: 'Expira em', cancel: 'Cancelar convite', confirm_cancel: 'Cancelar?',
+        send_button: 'Enviar convite',
+        pending_title: 'Convites pendentes',
+        pending_hint: 'Aguardando.',
+        col_sent_at: 'Enviado em',
+        col_expires_at: 'Expira em',
+        cancel: 'Cancelar convite',
+        confirm_cancel: 'Cancelar?',
     },
 };
 
@@ -90,13 +101,24 @@ describe('DoctorFormModal — médico que já tem login no EasyEye', () => {
         expect(alert.text()).toContain('já possui cadastro no EasyEye');
 
         await alert.find('button').trigger('click');
-        expect(form.post).toHaveBeenCalledWith('/_routes/panel.doctors.invitations.store', expect.objectContaining({ preserveScroll: true }));
+        expect(form.post).toHaveBeenCalledWith(
+            '/_routes/panel.doctors.invitations.store',
+            expect.objectContaining({ preserveScroll: true }),
+        );
         wrapper.unmount();
     });
 });
 
 describe('DoctorInvitationsPending', () => {
-    const invitations = [{ id: 'inv-1', name: 'JOAO', record: 'CRM-1', sent_at: '2026-09-30T10:00:00-03:00', expires_at: '2026-10-07T10:00:00-03:00' }];
+    const invitations = [
+        {
+            id: 'inv-1',
+            name: 'JOAO',
+            record: 'CRM-1',
+            sent_at: '2026-09-30T10:00:00-03:00',
+            expires_at: '2026-10-07T10:00:00-03:00',
+        },
+    ];
 
     it('lista nome/CRM digitados pela clínica e datas no formato do idioma', () => {
         const wrapper = mount(DoctorInvitationsPending, { props: { invitations, t: T } });
@@ -104,7 +126,9 @@ describe('DoctorInvitationsPending', () => {
         expect(wrapper.find('h2').text()).toContain('Convites pendentes');
         expect(wrapper.text()).toContain('JOAO');
         expect(wrapper.text()).toContain('CRM-1');
-        expect(wrapper.findAll('th').map((th) => th.text())).toEqual(expect.arrayContaining(['Nome', 'CRM', 'Enviado em', 'Expira em']));
+        expect(wrapper.findAll('th').map((th) => th.text())).toEqual(
+            expect.arrayContaining(['Nome', 'CRM', 'Enviado em', 'Expira em']),
+        );
     });
 
     it('cancelar pede confirmação; só apaga quando confirmado', async () => {
@@ -118,15 +142,33 @@ describe('DoctorInvitationsPending', () => {
 
         confirm.mockReturnValueOnce(true);
         await wrapper.find('button').trigger('click');
-        expect(router.delete).toHaveBeenCalledWith('/_routes/panel.doctors.invitations.destroy/inv-1', { preserveScroll: true });
+        expect(router.delete).toHaveBeenCalledWith('/_routes/panel.doctors.invitations.destroy/inv-1', {
+            preserveScroll: true,
+        });
     });
 });
 
 describe('Auth/ClinicInvitation — resposta do convidado', () => {
-    const page = { title: 'Convite para atender em :clinic', intro: ':clinic convidou você.', note: 'Nada muda.', accept: 'Aceitar convite', decline: 'Recusar', closed: 'Indisponível.', back: 'Minhas clínicas' };
-    const mountPage = (props = {}) => mount(DoctorInvitationPage, {
-        props: { clinicName: 'CLÍNICA B', open: true, acceptUrl: '/aceitar?signature=a', declineUrl: '/recusar?signature=b', t: page, ...props },
-    });
+    const page = {
+        title: 'Convite para atender em :clinic',
+        intro: ':clinic convidou você.',
+        note: 'Nada muda.',
+        accept: 'Aceitar convite',
+        decline: 'Recusar',
+        closed: 'Indisponível.',
+        back: 'Minhas clínicas',
+    };
+    const mountPage = (props = {}) =>
+        mount(DoctorInvitationPage, {
+            props: {
+                clinicName: 'CLÍNICA B',
+                open: true,
+                acceptUrl: '/aceitar?signature=a',
+                declineUrl: '/recusar?signature=b',
+                t: page,
+                ...props,
+            },
+        });
 
     it('mostra só o nome da clínica e envia aceitar/recusar para os links assinados', async () => {
         const wrapper = mountPage();

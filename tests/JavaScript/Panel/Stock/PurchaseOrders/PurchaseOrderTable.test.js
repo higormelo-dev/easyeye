@@ -10,22 +10,37 @@ import PurchaseOrderTable from '@/Pages/Panel/Stock/PurchaseOrders/PurchaseOrder
  */
 
 vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
-    default: { props: ['title'], template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>' },
+    default: {
+        props: ['title'],
+        template: '<div class="dd" :data-title="title"><slot name="trigger" /><slot /></div>',
+    },
 }));
 vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
         props: ['title', 'icon', 'href', 'variant'],
         emits: ['click'],
-        template: '<button type="button" class="icon-btn" :title="title" :data-href="href" :data-variant="variant" @click="$emit(\'click\')" />',
+        template:
+            '<button type="button" class="icon-btn" :title="title" :data-href="href" :data-variant="variant" @click="$emit(\'click\')" />',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_code: 'Código', col_supplier: 'Fornecedor', col_order_date: 'Data', col_expected_delivery: 'Previsão de entrega',
-    col_total: 'Total', col_status: 'Status', col_actions: 'Ações', sort_by: 'Ordenar por :column',
-    action_pdf: 'Baixar PDF', action_send: 'Enviar ao fornecedor', action_receive: 'Receber', action_edit: 'Editar',
-    action_cancel: 'Cancelar pedido', action_delete: 'Excluir', more_actions: 'Mais ações',
+    col_code: 'Código',
+    col_supplier: 'Fornecedor',
+    col_order_date: 'Data',
+    col_expected_delivery: 'Previsão de entrega',
+    col_total: 'Total',
+    col_status: 'Status',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    action_pdf: 'Baixar PDF',
+    action_send: 'Enviar ao fornecedor',
+    action_receive: 'Receber',
+    action_edit: 'Editar',
+    action_cancel: 'Cancelar pedido',
+    action_delete: 'Excluir',
+    more_actions: 'Mais ações',
     empty_list: 'Nenhum pedido de compra encontrado.',
 };
 
@@ -36,8 +51,15 @@ afterEach(() => wrapper?.unmount());
 
 function po(overrides = {}) {
     return {
-        id: 'p1', code: 'PC-0000000001', supplier_name: 'Alfa Óptica', status: 'draft', status_label: 'Rascunho',
-        is_editable: true, order_date: '2026-09-01', expected_delivery_date: null, total_amount: 1234.5,
+        id: 'p1',
+        code: 'PC-0000000001',
+        supplier_name: 'Alfa Óptica',
+        status: 'draft',
+        status_label: 'Rascunho',
+        is_editable: true,
+        order_date: '2026-09-01',
+        expected_delivery_date: null,
+        total_amount: 1234.5,
         ...overrides,
     };
 }
@@ -62,7 +84,15 @@ const menuItems = (w) => w.findAll('tbody .dd .dropdown-item').map((b) => b.text
 
 describe('PurchaseOrderTable', () => {
     it('mostra as colunas na ordem padrão com Status/Ações no fim', () => {
-        expect(headerLabels(mountTable())).toEqual(['Código', 'Fornecedor', 'Data', 'Previsão de entrega', 'Total', 'Status', 'Ações']);
+        expect(headerLabels(mountTable())).toEqual([
+            'Código',
+            'Fornecedor',
+            'Data',
+            'Previsão de entrega',
+            'Total',
+            'Status',
+            'Ações',
+        ]);
     });
 
     it('respeita a ordem de colunas salva no navegador', () => {
@@ -111,12 +141,15 @@ describe('PurchaseOrderTable', () => {
         ['partially_received', 'badge-soft-warning', 'Recebido parcialmente'],
         ['received', 'badge-soft-success', 'Recebido'],
         ['cancelled', 'badge-soft-danger', 'Cancelado'],
-    ])('status %s usa badge semântico com o rótulo traduzido do backend (status_label)', (status, badgeClass, label) => {
-        const badge = mountTable([po({ status, status_label: label })]).find('tbody .badge');
+    ])(
+        'status %s usa badge semântico com o rótulo traduzido do backend (status_label)',
+        (status, badgeClass, label) => {
+            const badge = mountTable([po({ status, status_label: label })]).find('tbody .badge');
 
-        expect(badge.text()).toBe(label);
-        expect(badge.classes()).toEqual(expect.arrayContaining([badgeClass, 'border', 'rounded']));
-    });
+            expect(badge.text()).toBe(label);
+            expect(badge.classes()).toEqual(expect.arrayContaining([badgeClass, 'border', 'rounded']));
+        },
+    );
 
     it.each([
         ['draft', true, ['Baixar PDF', 'Enviar ao fornecedor'], ['Editar', 'Cancelar pedido', 'Excluir']],

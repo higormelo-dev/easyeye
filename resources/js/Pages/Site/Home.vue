@@ -1,10 +1,10 @@
 <template>
     <Head>
         <title>{{ t.meta.title }}</title>
-        <meta name="description" :content="t.meta.description">
+        <meta name="description" :content="t.meta.description" />
 
         <!-- Canonical -->
-        <link rel="canonical" :href="seo.canonicalUrl">
+        <link rel="canonical" :href="seo.canonicalUrl" />
 
         <!-- hreflang (multi-idioma) -->
         <link
@@ -13,31 +13,31 @@
             rel="alternate"
             :hreflang="alt.default ? 'x-default' : alt.code"
             :href="alt.url"
-        >
+        />
         <link
             v-for="alt in seo.alternateLocales"
             :key="'h-' + alt.code"
             rel="alternate"
             :hreflang="alt.code"
             :href="alt.url"
-        >
+        />
 
         <!-- Open Graph -->
-        <meta property="og:title" :content="t.meta.og_title">
-        <meta property="og:description" :content="t.meta.og_description">
-        <meta property="og:type" content="website">
-        <meta property="og:url" :content="seo.canonicalUrl">
-        <meta property="og:image" :content="seo.ogImage">
-        <meta property="og:image:width" content="1200">
-        <meta property="og:image:height" content="630">
-        <meta property="og:locale" :content="seo.currentLocale">
-        <meta property="og:site_name" :content="appName">
+        <meta property="og:title" :content="t.meta.og_title" />
+        <meta property="og:description" :content="t.meta.og_description" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" :content="seo.canonicalUrl" />
+        <meta property="og:image" :content="seo.ogImage" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:locale" :content="seo.currentLocale" />
+        <meta property="og:site_name" :content="appName" />
 
         <!-- Twitter Cards -->
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" :content="t.meta.og_title">
-        <meta name="twitter:description" :content="t.meta.og_description">
-        <meta name="twitter:image" :content="seo.ogImage">
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" :content="t.meta.og_title" />
+        <meta name="twitter:description" :content="t.meta.og_description" />
+        <meta name="twitter:image" :content="seo.ogImage" />
 
         <!-- JSON-LD Structured Data -->
         <component
@@ -50,11 +50,10 @@
 
         <!-- Imagem do hero (LCP). A Inter vem no <head> do app.blade.php (HTML inicial);
              ícones: Tabler, via site.js. -->
-        <link v-if="heroSrc" rel="preload" as="image" type="image/webp" :href="heroSrc">
+        <link v-if="heroSrc" rel="preload" as="image" type="image/webp" :href="heroSrc" />
     </Head>
 
     <SiteLayout :t="t" :routes="routes" :app-name="appName" :has-hero="true">
-
         <!-- ═══════════════════ HERO ═══════════════════ -->
         <section class="hero">
             <div class="hero-blob hero-blob-1" aria-hidden="true"></div>
@@ -67,7 +66,7 @@
                             {{ t.hero.badge }}
                         </div>
                         <h1 class="hero-title">
-                            {{ t.hero.title }}<br>
+                            {{ t.hero.title }}<br />
                             <em>{{ t.hero.title_em }}</em>
                         </h1>
                         <p class="hero-sub">{{ t.hero.subtitle }}</p>
@@ -110,7 +109,7 @@
                                     :height="heroImageHeight"
                                     fetchpriority="high"
                                     decoding="async"
-                                >
+                                />
                             </figure>
                             <!-- Marcas decorativas: a captura permanece plana e visível. -->
                             <div class="hero-calibration" aria-hidden="true">
@@ -138,7 +137,9 @@
                                 </div>
                             </div>
                             <div class="hero-float-card card-bottom">
-                                <div class="icon icon-orange"><i class="ti ti-report-medical" aria-hidden="true"></i></div>
+                                <div class="icon icon-orange">
+                                    <i class="ti ti-report-medical" aria-hidden="true"></i>
+                                </div>
                                 <div>
                                     <div class="hero-float-lbl">{{ t.hero.card_bot_lbl }}</div>
                                     <div class="hero-float-val">{{ t.hero.card_bot_val }}</div>
@@ -158,8 +159,15 @@
             <div class="container">
                 <div class="metrics-grid">
                     <div v-for="metric in t.metrics" :key="metric.value" class="metric-item">
-                        <div class="metric-value" :data-amount="metric.amount" :data-decimals="metric.decimals"
-                             :data-prefix="metric.prefix" :data-suffix="metric.suffix">{{ metric.value }}</div>
+                        <div
+                            class="metric-value"
+                            :data-amount="metric.amount"
+                            :data-decimals="metric.decimals"
+                            :data-prefix="metric.prefix"
+                            :data-suffix="metric.suffix"
+                        >
+                            {{ metric.value }}
+                        </div>
                         <div class="metric-label">{{ metric.label }}</div>
                     </div>
                 </div>
@@ -199,17 +207,16 @@
                 </div>
 
                 <!-- O visitante escolhe a captura e pode examiná-la no próprio ritmo. -->
-                <div
-                    class="demo-tabs"
-                    role="tablist"
-                    :aria-label="t.demo.title"
-                    @keydown="onDemoTabKeydown"
-                >
+                <div class="demo-tabs" role="tablist" :aria-label="t.demo.title" @keydown="onDemoTabKeydown">
                     <button
                         v-for="(tab, i) in demoTabs"
                         :id="`demo-tab-${tab.key}`"
                         :key="tab.key"
-                        :ref="(el) => { demoTabEls[i] = el; }"
+                        :ref="
+                            (el) => {
+                                demoTabEls[i] = el;
+                            }
+                        "
                         type="button"
                         role="tab"
                         :aria-selected="activeDemoTab === i ? 'true' : 'false'"
@@ -250,7 +257,7 @@
                                 :height="DEMO_SIZES[tab.key]?.[1]"
                                 loading="lazy"
                                 decoding="async"
-                            >
+                            />
                         </figure>
                         <p class="demo-caption">
                             {{ tab.caption }}
@@ -275,7 +282,12 @@
                     <p class="section-sub">{{ t.audiences.subtitle }}</p>
                 </div>
                 <div class="audiences-grid">
-                    <article v-for="group in t.audiences.groups" :key="group.key" class="audience-card" :data-test="`audience-${group.key}`">
+                    <article
+                        v-for="group in t.audiences.groups"
+                        :key="group.key"
+                        class="audience-card"
+                        :data-test="`audience-${group.key}`"
+                    >
                         <div class="audience-icon"><i :class="'ti ' + group.icon" aria-hidden="true"></i></div>
                         <h3>{{ group.title }}</h3>
                         <p class="audience-for">{{ group.audience }}</p>
@@ -285,19 +297,31 @@
                                     <i class="ti ti-check" aria-hidden="true"></i>
                                     <span>
                                         {{ item.text }}
-                                        <span v-if="availability(item.feature)" class="audience-plan" data-test="audience-plan">{{ availability(item.feature) }}</span>
+                                        <span
+                                            v-if="availability(item.feature)"
+                                            class="audience-plan"
+                                            data-test="audience-plan"
+                                            >{{ availability(item.feature) }}</span
+                                        >
                                     </span>
                                 </li>
                             </template>
                         </ul>
                         <details v-if="offeredItems(group).length > 2" class="audience-details">
-                            <summary>{{ t.audiences.more?.replace(':audience', group.title.toLocaleLowerCase()) }}</summary>
+                            <summary>
+                                {{ t.audiences.more?.replace(':audience', group.title.toLocaleLowerCase()) }}
+                            </summary>
                             <ul class="audience-list">
                                 <li v-for="item in offeredItems(group).slice(2)" :key="item.text">
                                     <i class="ti ti-check" aria-hidden="true"></i>
                                     <span>
                                         {{ item.text }}
-                                        <span v-if="availability(item.feature)" class="audience-plan" data-test="audience-plan">{{ availability(item.feature) }}</span>
+                                        <span
+                                            v-if="availability(item.feature)"
+                                            class="audience-plan"
+                                            data-test="audience-plan"
+                                            >{{ availability(item.feature) }}</span
+                                        >
                                     </span>
                                 </li>
                             </ul>
@@ -313,7 +337,9 @@
                 >
                     <h3 :id="`audience-flow-${group.key}`" class="audience-flow-label">{{ group.flow_label }}</h3>
                     <ol class="audience-flow-steps">
-                        <li v-for="(step, stepIndex) in group.flow" :key="step" :style="{ '--step': stepIndex }"><span>{{ step }}</span></li>
+                        <li v-for="(step, stepIndex) in group.flow" :key="step" :style="{ '--step': stepIndex }">
+                            <span>{{ step }}</span>
+                        </li>
                     </ol>
                 </aside>
             </div>
@@ -344,7 +370,9 @@
                 <template v-else>
                     <p class="pricing-included">
                         <i class="ti ti-circle-check" aria-hidden="true"></i>
-                        <span><strong>{{ t.pricing.included_all_label }}:</strong> {{ t.pricing.included_all }}</span>
+                        <span
+                            ><strong>{{ t.pricing.included_all_label }}:</strong> {{ t.pricing.included_all }}</span
+                        >
                     </p>
 
                     <PricingPlans
@@ -356,7 +384,12 @@
                         :locale="seo.currentLocale || 'pt-BR'"
                     />
 
-                    <aside id="creditos-ia" class="pricing-credit-note" aria-labelledby="pricing-credit-title" tabindex="-1">
+                    <aside
+                        id="creditos-ia"
+                        class="pricing-credit-note"
+                        aria-labelledby="pricing-credit-title"
+                        tabindex="-1"
+                    >
                         <div class="pricing-credit-heading">
                             <h3 id="pricing-credit-title">
                                 <i class="ti ti-info-circle" aria-hidden="true"></i>
@@ -408,7 +441,7 @@
                             height="444"
                             loading="lazy"
                             decoding="async"
-                        >
+                        />
                     </figure>
                 </div>
             </div>
@@ -449,11 +482,17 @@
             <div class="container">
                 <div class="testimonials-header text-center">
                     <h2 class="section-title">{{ t.testimonials.title }}</h2>
-                    <p v-if="t.testimonials.context" class="section-sub testimonials-context">{{ t.testimonials.context }}</p>
+                    <p v-if="t.testimonials.context" class="section-sub testimonials-context">
+                        {{ t.testimonials.context }}
+                    </p>
                 </div>
                 <div class="testimonials-grid">
                     <div v-for="testimonial in t.testimonials.items" :key="testimonial.name" class="testimonial-card">
-                        <div class="testimonial-stars" role="img" :aria-label="t.testimonials.rating?.replace(':stars', testimonial.stars)">
+                        <div
+                            class="testimonial-stars"
+                            role="img"
+                            :aria-label="t.testimonials.rating?.replace(':stars', testimonial.stars)"
+                        >
                             <svg
                                 v-for="s in 5"
                                 :key="s"
@@ -461,7 +500,11 @@
                                 viewBox="0 0 24 24"
                                 aria-hidden="true"
                                 focusable="false"
-                            ><path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55L2.48 9.42l6.58-.96z" /></svg>
+                            >
+                                <path
+                                    d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55L2.48 9.42l6.58-.96z"
+                                />
+                            </svg>
                         </div>
                         <p class="testimonial-text">{{ testimonial.text }}</p>
                         <div class="testimonial-author">
@@ -561,14 +604,23 @@
                             </div>
                             <div>
                                 <h3>{{ minTrial ? t.contact.trial.title : t.contact.trial.title_no_trial }}</h3>
-                                <p>{{ minTrial ? t.contact.trial.desc?.replace(':days', minTrial) : t.contact.trial.desc_no_trial }}</p>
+                                <p>
+                                    {{
+                                        minTrial
+                                            ? t.contact.trial.desc?.replace(':days', minTrial)
+                                            : t.contact.trial.desc_no_trial
+                                    }}
+                                </p>
                                 <a :href="signupHref">
                                     {{ signupLabel }} <i class="ti ti-arrow-right" aria-hidden="true"></i>
                                 </a>
                             </div>
                         </div>
 
-                        <div v-if="t.contact.aside?.quote_text && t.contact.aside?.quote_author" class="contact-aside-quote">
+                        <div
+                            v-if="t.contact.aside?.quote_text && t.contact.aside?.quote_author"
+                            class="contact-aside-quote"
+                        >
                             <p>"{{ t.contact.aside.quote_text }}"</p>
                             <span>{{ t.contact.aside.quote_author }}</span>
                         </div>
@@ -599,12 +651,21 @@
         <section class="cta-final">
             <div class="container">
                 <h2>{{ t.cta.title }}</h2>
-                <p class="cta-final-sub">{{ minTrial ? t.cta.subtitle_trial?.replace(':days', minTrial) : t.cta.subtitle }}</p>
+                <p class="cta-final-sub">
+                    {{ minTrial ? t.cta.subtitle_trial?.replace(':days', minTrial) : t.cta.subtitle }}
+                </p>
                 <div class="cta-final-btns">
                     <a :href="signupHref" class="btn btn-primary btn-lg">
-                        {{ minTrial ? t.cta.primary : t.pricing.contact_cta }} <i class="ti ti-arrow-right" aria-hidden="true"></i>
+                        {{ minTrial ? t.cta.primary : t.pricing.contact_cta }}
+                        <i class="ti ti-arrow-right" aria-hidden="true"></i>
                     </a>
-                    <a v-if="minTrial" :href="salesHref" target="_blank" rel="noopener noreferrer" class="btn btn-outline-white btn-lg">
+                    <a
+                        v-if="minTrial"
+                        :href="salesHref"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="btn btn-outline-white btn-lg"
+                    >
                         <i class="ti ti-message-dots" aria-hidden="true"></i> {{ t.cta.secondary }}
                     </a>
                 </div>
@@ -613,12 +674,16 @@
         </section>
 
         <!-- O CTA fixo recolhe quando outra ação de cadastro ou contato está visível. -->
-        <div class="mobile-cta" :class="{ 'is-visible': showMobileCta }" :aria-hidden="showMobileCta ? 'false' : 'true'" data-test="mobile-cta">
+        <div
+            class="mobile-cta"
+            :class="{ 'is-visible': showMobileCta }"
+            :aria-hidden="showMobileCta ? 'false' : 'true'"
+            data-test="mobile-cta"
+        >
             <a :href="signupHref" class="btn btn-primary" :tabindex="showMobileCta ? 0 : -1">
                 {{ signupLabel }} <i class="ti ti-arrow-right" aria-hidden="true"></i>
             </a>
         </div>
-
     </SiteLayout>
 </template>
 
@@ -689,7 +754,7 @@ function onDemoTabKeydown(event) {
 }
 
 // ─── FUNCIONALIDADES POR PÚBLICO ───
-const audienceFlows = computed(() => (props.t?.audiences?.groups ?? []).filter(group => group.flow?.length));
+const audienceFlows = computed(() => (props.t?.audiences?.groups ?? []).filter((group) => group.flow?.length));
 
 // Planos que incluem cada funcionalidade (booleanas); "Disponível no …" só
 // quando nem todos incluem. Sem planos cadastrados, nada é afirmado.
@@ -701,7 +766,9 @@ const listFormat = computed(() => {
     }
 });
 function plansWith(featureKey) {
-    return props.plans.filter((plan) => (plan.features ?? []).some((f) => f.key === featureKey && f.enabled && !f.is_none));
+    return props.plans.filter((plan) =>
+        (plan.features ?? []).some((f) => f.key === featureKey && f.enabled && !f.is_none),
+    );
 }
 function isOffered(featureKey) {
     return !featureKey || !props.plans.length || plansWith(featureKey).length > 0;
@@ -726,9 +793,9 @@ function toggleFaq(i) {
 
 // ─── PLANOS ───
 // A mesma configuração efetiva usada pelo cadastro e início da assinatura.
-const minTrial = computed(() => props.plans.length && props.trialDays > 0 ? props.trialDays : null);
-const signupHref = computed(() => minTrial.value ? props.routes.register : salesHref);
-const signupLabel = computed(() => minTrial.value ? props.t.hero.cta_primary : props.t.pricing.contact_cta);
+const minTrial = computed(() => (props.plans.length && props.trialDays > 0 ? props.trialDays : null));
+const signupHref = computed(() => (minTrial.value ? props.routes.register : salesHref));
+const signupLabel = computed(() => (minTrial.value ? props.t.hero.cta_primary : props.t.pricing.contact_cta));
 
 // ─── CTA FIXO NO CELULAR ───
 const showMobileCta = ref(false);
@@ -739,7 +806,9 @@ function watchMobileCta() {
 
     // Evita duas ações equivalentes ao mesmo tempo, inclusive nos cartões dos planos.
     const blockers = new Set();
-    const targets = document.querySelectorAll('.hero, #contato, .cta-final, footer, .pricing-cta a, .pricing-integrator-cta');
+    const targets = document.querySelectorAll(
+        '.hero, #contato, .cta-final, footer, .pricing-cta a, .pricing-integrator-cta',
+    );
     ctaObserver = new IntersectionObserver((entries) => {
         entries.forEach((entry) => (entry.isIntersecting ? blockers.add(entry.target) : blockers.delete(entry.target)));
         showMobileCta.value = blockers.size === 0;
@@ -758,11 +827,14 @@ function playTissFlowOnView(reduceMotion) {
     if (!flow || reduceMotion || !('IntersectionObserver' in window)) return;
 
     tissFlow.value = 'armed';
-    flowObserver = new IntersectionObserver((entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        tissFlow.value = 'played';
-        flowObserver.disconnect();
-    }, { threshold: 0.6 });
+    flowObserver = new IntersectionObserver(
+        (entries) => {
+            if (!entries.some((entry) => entry.isIntersecting)) return;
+            tissFlow.value = 'played';
+            flowObserver.disconnect();
+        },
+        { threshold: 0.6 },
+    );
     flowObserver.observe(flow);
 }
 

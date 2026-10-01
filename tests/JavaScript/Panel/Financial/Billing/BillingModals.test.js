@@ -11,7 +11,10 @@ import { t, claim, batch, schedule, brl, norm } from './support/fixtures.js';
 
 vi.mock('@inertiajs/vue3', async () => (await import('./support/inertiaMock.js')).buildInertiaMock());
 vi.mock('@/Components/Panel/SearchSelect.vue', () => ({
-    default: { props: ['modelValue', 'options', 'placeholder', 'invalid'], template: '<div class="search-select-stub" />' },
+    default: {
+        props: ['modelValue', 'options', 'placeholder', 'invalid'],
+        template: '<div class="search-select-stub" />',
+    },
 }));
 // Cid10Picker real busca na API; o stub devolve uma seleção ao clicar.
 vi.mock('@/Components/Panel/Cid10Picker.vue', () => ({
@@ -180,7 +183,12 @@ describe('SubmitBatchModal (confirmação de envio)', () => {
 describe('DenyClaimModal (glosa total/parcial)', () => {
     function mountDeny(claimOverrides = {}) {
         wrapper = mount(DenyClaimModal, {
-            props: { open: true, claim: claim({ amount: 200, ...claimOverrides }), glosasUrl: '/financial/tiss/glosas', t },
+            props: {
+                open: true,
+                claim: claim({ amount: 200, ...claimOverrides }),
+                glosasUrl: '/financial/tiss/glosas',
+                t,
+            },
             global,
             attachTo: document.body,
         });
@@ -222,7 +230,9 @@ describe('DenyClaimModal (glosa total/parcial)', () => {
         await input.setValue('250,00');
         await w.find('[data-test="confirm-deny"]').trigger('click');
         expect(lastForm().post).not.toHaveBeenCalled();
-        expect(norm(w.find('[data-test="deny-amount-error"]').text())).toBe(norm(`O valor glosado não pode ser maior que o valor da guia (${brl(200)}).`));
+        expect(norm(w.find('[data-test="deny-amount-error"]').text())).toBe(
+            norm(`O valor glosado não pode ser maior que o valor da guia (${brl(200)}).`),
+        );
 
         await input.setValue('50,00');
         expect(norm(w.find('[data-test="deny-remaining"]').text())).toContain(norm(brl(150)));
@@ -242,7 +252,9 @@ describe('DenyClaimModal (glosa total/parcial)', () => {
         expect(w.emitted('saved')).toHaveLength(1);
         expect(w.find('[data-test="deny-done"]').attributes('role')).toBe('status');
         expect(w.find('[data-test="deny-done"]').text()).toContain('Próximo passo');
-        expect(w.find('[data-test="open-conciliation"]').attributes('href')).toBe('/financial/tiss/glosas?search=GUI-0001');
+        expect(w.find('[data-test="open-conciliation"]').attributes('href')).toBe(
+            '/financial/tiss/glosas?search=GUI-0001',
+        );
         expect(w.find('[data-test="confirm-deny"]').exists()).toBe(false);
     });
 
@@ -305,8 +317,12 @@ describe('BatchFormModal', () => {
         const form = lastForm();
 
         expect(form.covenant_id).toBe('cov-1');
-        expect(w.find('[data-test="batch-summary"]').text()).toContain('1 atendimento(s) marcado(s) deste convênio entrarão no lote.');
-        expect(w.find('[data-test="batch-excluded"]').text()).toContain('1 marcado(s) de outro convênio ficarão de fora.');
+        expect(w.find('[data-test="batch-summary"]').text()).toContain(
+            '1 atendimento(s) marcado(s) deste convênio entrarão no lote.',
+        );
+        expect(w.find('[data-test="batch-excluded"]').text()).toContain(
+            '1 marcado(s) de outro convênio ficarão de fora.',
+        );
 
         form.unit_price = 150;
         await nextTick();
@@ -324,23 +340,41 @@ describe('BatchFormModal', () => {
     });
 
     it('pré-preenche o valor unitário quando os atendimentos do lote têm o mesmo preço na tabela', async () => {
-        const w = mountBatch(['s1', 's2'], [
-            schedule({ id: 's1', covenant_id: 'cov-1', suggested_price: 150 }),
-            schedule({ id: 's2', covenant_id: 'cov-1', suggested_price: 150 }),
-        ]);
+        const w = mountBatch(
+            ['s1', 's2'],
+            [
+                schedule({ id: 's1', covenant_id: 'cov-1', suggested_price: 150 }),
+                schedule({ id: 's2', covenant_id: 'cov-1', suggested_price: 150 }),
+            ],
+        );
         const form = lastForm();
 
         expect(form.unit_price).toBe(150);
         expect(form.isDirty).toBe(false);
-        expect(norm(w.find('[data-test="batch-suggested"]').text())).toContain(norm(`Preço da tabela para os atendimentos do lote: ${brl(150)}.`));
+        expect(norm(w.find('[data-test="batch-suggested"]').text())).toContain(
+            norm(`Preço da tabela para os atendimentos do lote: ${brl(150)}.`),
+        );
         expect(w.find('#billing-batch-price').element.value).toBe('150,00');
     });
 
     it('preços diferentes na tabela: avisa a faixa e não pré-preenche', async () => {
-        const w = mountBatch([], [
-            schedule({ id: 's1', covenant_id: 'cov-1', date_time: '2026-09-10T09:00:00-03:00', suggested_price: 150 }),
-            schedule({ id: 's2', covenant_id: 'cov-1', date_time: '2026-09-11T09:00:00-03:00', suggested_price: 180 }),
-        ]);
+        const w = mountBatch(
+            [],
+            [
+                schedule({
+                    id: 's1',
+                    covenant_id: 'cov-1',
+                    date_time: '2026-09-10T09:00:00-03:00',
+                    suggested_price: 150,
+                }),
+                schedule({
+                    id: 's2',
+                    covenant_id: 'cov-1',
+                    date_time: '2026-09-11T09:00:00-03:00',
+                    suggested_price: 180,
+                }),
+            ],
+        );
         const form = lastForm();
 
         form.covenant_id = 'cov-1';
@@ -442,7 +476,9 @@ describe('IndividualClaimModal', () => {
 
         expect(form.unit_price).toBe(150);
         expect(w.find('#billing-ind-price').element.value).toBe('150,00');
-        expect(norm(w.find('[data-test="individual-suggested"]').text())).toContain(norm(`Preço da tabela (CONSULTA × Unimed): ${brl(150)}.`));
+        expect(norm(w.find('[data-test="individual-suggested"]').text())).toContain(
+            norm(`Preço da tabela (CONSULTA × Unimed): ${brl(150)}.`),
+        );
 
         // Nada digitado: fecha sem pedir confirmação.
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));

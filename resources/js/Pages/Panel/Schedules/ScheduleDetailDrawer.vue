@@ -3,21 +3,21 @@ import { ref, watch } from 'vue';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 
 const props = defineProps({
-    open:       { type: Boolean, required: true },
+    open: { type: Boolean, required: true },
     scheduleId: { type: [String, Number], default: null },
-    t:          { type: Object,  default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 defineEmits(['close']);
 
-const loading  = ref(false);
+const loading = ref(false);
 const schedule = ref(null);
 
 async function loadDetail(id) {
-    loading.value  = true;
+    loading.value = true;
     schedule.value = null;
     try {
-        const res  = await fetch(route('panel.schedules.show', id), {
+        const res = await fetch(route('panel.schedules.show', id), {
             headers: { Accept: 'application/json' },
         });
         const json = await res.json();
@@ -27,10 +27,13 @@ async function loadDetail(id) {
     }
 }
 
-watch(() => props.open, (val) => {
-    if (val && props.scheduleId) loadDetail(props.scheduleId);
-    if (!val) schedule.value = null;
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val && props.scheduleId) loadDetail(props.scheduleId);
+        if (!val) schedule.value = null;
+    },
+);
 
 // ── Copiar código (SDL/PAC/DOC) ─────────────────────────────────────────────
 // Copia só prefixo + número sem zeros à esquerda (SDL-741 em vez de
@@ -67,7 +70,9 @@ function copyCode(field, code) {
     if (!code) return;
     navigator.clipboard.writeText(shortCode(code)).then(() => {
         copiedField.value = field;
-        setTimeout(() => { if (copiedField.value === field) copiedField.value = null; }, 2000);
+        setTimeout(() => {
+            if (copiedField.value === field) copiedField.value = null;
+        }, 2000);
     });
 }
 
@@ -75,7 +80,9 @@ function copyNumericCode(field, code) {
     if (!code) return;
     navigator.clipboard.writeText(numericCode(code)).then(() => {
         copiedField.value = field;
-        setTimeout(() => { if (copiedField.value === field) copiedField.value = null; }, 2000);
+        setTimeout(() => {
+            if (copiedField.value === field) copiedField.value = null;
+        }, 2000);
     });
 }
 </script>
@@ -94,7 +101,7 @@ function copyNumericCode(field, code) {
                 <div
                     v-if="schedule"
                     class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                    style="width:64px;height:64px;"
+                    style="width: 64px; height: 64px"
                     :style="{
                         background: (schedule.doctor_color ?? '#6c757d') + '22',
                         border: `2px solid ${schedule.doctor_color ?? '#6c757d'}`,
@@ -104,14 +111,18 @@ function copyNumericCode(field, code) {
                 </div>
                 <div class="min-width-0 flex-grow-1">
                     <h5 class="mb-0 fw-semibold text-truncate">
-                        {{ schedule?.patient_name ?? (t.drawer_loading ?? 'Carregando...') }}
+                        {{ schedule?.patient_name ?? t.drawer_loading ?? 'Carregando...' }}
                     </h5>
                     <div v-if="schedule" class="d-flex align-items-center gap-2 flex-wrap mt-1">
                         <code v-if="schedule.patient_code" class="text-muted small">{{ schedule.patient_code }}</code>
-                        <span class="badge rounded-pill" :class="schedule.situation_badge" style="font-size:.7rem;">
+                        <span class="badge rounded-pill" :class="schedule.situation_badge" style="font-size: 0.7rem">
                             <i class="fas me-1" :class="schedule.situation_icon"></i>{{ schedule.situation_label }}
                         </span>
-                        <span v-if="!schedule.patient_is_registered" class="badge bg-secondary rounded-pill" style="font-size:.7rem;">
+                        <span
+                            v-if="!schedule.patient_is_registered"
+                            class="badge bg-secondary rounded-pill"
+                            style="font-size: 0.7rem"
+                        >
                             {{ t.drawer_unregistered ?? 'Sem cadastro' }}
                         </span>
                     </div>
@@ -121,7 +132,6 @@ function copyNumericCode(field, code) {
 
         <!-- ── Body ───────────────────────────────────────────────────────── -->
         <template v-if="schedule">
-
             <!-- Identificação -->
             <div class="detail-section">
                 <div class="detail-section__title">
@@ -177,10 +187,12 @@ function copyNumericCode(field, code) {
                         <span class="detail-label">{{ t.drawer_label_name ?? 'Nome' }}</span>
                         <span class="detail-value">
                             {{ schedule.patient_name ?? '—' }}
-                            <a v-if="schedule.medical_records_url"
-                               :href="schedule.medical_records_url"
-                               class="ms-2 small text-decoration-none"
-                               :title="schedule.patient_code">
+                            <a
+                                v-if="schedule.medical_records_url"
+                                :href="schedule.medical_records_url"
+                                class="ms-2 small text-decoration-none"
+                                :title="schedule.patient_code"
+                            >
                                 <i class="ti ti-stethoscope"></i>
                             </a>
                         </span>
@@ -200,7 +212,10 @@ function copyNumericCode(field, code) {
                             <button
                                 type="button"
                                 class="btn btn-xs btn-outline-secondary"
-                                :title="t.drawer_copy_patient_id_numeric ?? 'Copiar ID do paciente (só números) para o programa do aparelho'"
+                                :title="
+                                    t.drawer_copy_patient_id_numeric ??
+                                    'Copiar ID do paciente (só números) para o programa do aparelho'
+                                "
                                 @click="copyNumericCode('patient-num', schedule.patient_code)"
                             >
                                 <i v-if="copiedField === 'patient-num'" class="ti ti-check text-success"></i>
@@ -284,7 +299,9 @@ function copyNumericCode(field, code) {
                         <span class="detail-value text-prewrap">{{ schedule.notes }}</span>
                     </div>
                     <div v-if="schedule.cancellation_reason" class="detail-row">
-                        <span class="detail-label text-danger">{{ t.show_cancel_reason ?? 'Motivo do cancelamento' }}</span>
+                        <span class="detail-label text-danger">{{
+                            t.show_cancel_reason ?? 'Motivo do cancelamento'
+                        }}</span>
                         <span class="detail-value text-danger text-prewrap">{{ schedule.cancellation_reason }}</span>
                     </div>
                 </div>
@@ -304,7 +321,11 @@ function copyNumericCode(field, code) {
                         <span class="detail-label">{{ t.drawer_label_cellphone ?? 'Celular' }}</span>
                         <span class="detail-value">
                             {{ schedule.cellphone }}
-                            <span v-if="schedule.cellphone_whatsapp" class="badge bg-success-subtle text-success border border-success ms-1 rounded-pill" style="font-size:.65rem;">
+                            <span
+                                v-if="schedule.cellphone_whatsapp"
+                                class="badge bg-success-subtle text-success border border-success ms-1 rounded-pill"
+                                style="font-size: 0.65rem"
+                            >
                                 WhatsApp
                             </span>
                         </span>
@@ -322,10 +343,10 @@ function copyNumericCode(field, code) {
                 </div>
                 <ul v-else class="list-unstyled mb-0">
                     <li v-for="r in schedule.resources" :key="r.id" class="d-flex align-items-start gap-2 mb-2">
-                        <i class="ti ti-circle-dot text-primary mt-1" style="font-size:.5rem;"></i>
+                        <i class="ti ti-circle-dot text-primary mt-1" style="font-size: 0.5rem"></i>
                         <div class="flex-grow-1">
                             <div class="fw-medium small">{{ r.name }}</div>
-                            <div v-if="r.type || r.code" class="text-muted" style="font-size:.75rem;">
+                            <div v-if="r.type || r.code" class="text-muted" style="font-size: 0.75rem">
                                 <span v-if="r.type">{{ r.type }}</span>
                                 <span v-if="r.type && r.code"> · </span>
                                 <code v-if="r.code">{{ r.code }}</code>
@@ -357,13 +378,18 @@ function copyNumericCode(field, code) {
                         <tbody>
                             <tr v-for="log in schedule.situation_logs" :key="log.id">
                                 <td>
-                                    <span v-if="log.from_label" class="badge" :class="log.from_badge" style="font-size:.65rem;">
+                                    <span
+                                        v-if="log.from_label"
+                                        class="badge"
+                                        :class="log.from_badge"
+                                        style="font-size: 0.65rem"
+                                    >
                                         {{ log.from_label }}
                                     </span>
                                     <span v-else class="text-muted">—</span>
                                 </td>
                                 <td>
-                                    <span class="badge" :class="log.to_badge" style="font-size:.65rem;">
+                                    <span class="badge" :class="log.to_badge" style="font-size: 0.65rem">
                                         {{ log.to_label }}
                                     </span>
                                 </td>
@@ -387,22 +413,47 @@ function copyNumericCode(field, code) {
                     </div>
                 </div>
             </div>
-
         </template>
     </OffcanvasPanel>
 </template>
 
 <style scoped>
-.min-width-0 { min-width: 0; }
-.text-prewrap { white-space: pre-wrap; }
-.detail-section { margin-bottom: 1.5rem; }
+.min-width-0 {
+    min-width: 0;
+}
+.text-prewrap {
+    white-space: pre-wrap;
+}
+.detail-section {
+    margin-bottom: 1.5rem;
+}
 .detail-section__title {
-    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--bs-secondary-color); margin-bottom: .5rem; padding-bottom: .25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
     border-bottom: 1px solid var(--bs-border-color);
 }
-.detail-table { display: grid; gap: .375rem; }
-.detail-row { display: grid; grid-template-columns: 150px 1fr; gap: .5rem; font-size: .875rem; align-items: baseline; }
-.detail-label { font-weight: 600; color: var(--bs-body-color); }
-.detail-value { color: var(--bs-secondary-color); word-break: break-word; }
+.detail-table {
+    display: grid;
+    gap: 0.375rem;
+}
+.detail-row {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    align-items: baseline;
+}
+.detail-label {
+    font-weight: 600;
+    color: var(--bs-body-color);
+}
+.detail-value {
+    color: var(--bs-secondary-color);
+    word-break: break-word;
+}
 </style>

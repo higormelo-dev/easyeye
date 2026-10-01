@@ -1,9 +1,9 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 
 /**
  * Cards de fornecedores no padrão de Patients/PatientCards, renderizando o
@@ -11,8 +11,8 @@ import TablePagination  from '@/Components/Panel/TablePagination.vue';
  * status, ordenação e página continuam valendo nos dois modos.
  */
 const props = defineProps({
-    items:             { type: Object, required: true },   // paginator Laravel
-    t:                 { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    t: { type: Object, default: () => ({}) },
     purchaseOrdersUrl: { type: String, default: '' },
 });
 
@@ -34,19 +34,18 @@ function purchaseOrdersHref(supplier) {
     </div>
 
     <div v-else class="row g-3">
-        <div
-            v-for="s in rows"
-            :key="s.id"
-            class="col-12 col-sm-6 col-md-4 col-xl-3"
-        >
+        <div v-for="s in rows" :key="s.id" class="col-12 col-sm-6 col-md-4 col-xl-3">
             <div class="card card-body h-100">
                 <div class="d-flex align-items-start gap-2 mb-2">
                     <h6 class="mb-0 fw-semibold lh-sm me-auto text-break">{{ s.name }}</h6>
                     <span
-                        :class="s.active
-                            ? 'badge badge-soft-success rounded text-success border border-success fs-12'
-                            : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'"
-                    >{{ s.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span>
+                        :class="
+                            s.active
+                                ? 'badge badge-soft-success rounded text-success border border-success fs-12'
+                                : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'
+                        "
+                        >{{ s.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span
+                    >
                 </div>
 
                 <dl class="small text-muted mb-1">
@@ -72,7 +71,7 @@ function purchaseOrdersHref(supplier) {
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end" gap="tight">
                     <ActionIconButton
@@ -91,9 +90,13 @@ function purchaseOrdersHref(supplier) {
                                 <i class="ti ti-edit me-1" aria-hidden="true"></i> {{ t.action_edit ?? 'Editar' }}
                             </button>
                         </li>
-                        <li><hr class="dropdown-divider"></li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li>
-                            <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', s)">
+                            <button
+                                type="button"
+                                class="dropdown-item rounded-1 text-danger"
+                                @click="emit('delete', s)"
+                            >
                                 <i class="ti ti-trash me-1" aria-hidden="true"></i> {{ t.action_delete ?? 'Excluir' }}
                             </button>
                         </li>

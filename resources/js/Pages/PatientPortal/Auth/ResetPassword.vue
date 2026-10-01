@@ -29,12 +29,12 @@ function submit() {
     <Head title="Redefinir senha — Portal do Paciente" />
 
     <div class="d-flex align-items-center justify-content-center min-vh-100 bg-light px-3">
-        <div class="card shadow-sm border-0" style="max-width: 420px; width: 100%;">
+        <div class="card shadow-sm border-0" style="max-width: 420px; width: 100%">
             <div class="card-body p-4 p-md-5">
                 <div class="text-center mb-4">
                     <div
                         class="rounded-circle d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary mb-3"
-                        style="width:56px;height:56px;"
+                        style="width: 56px; height: 56px"
                     >
                         <i class="ti ti-key fs-4"></i>
                     </div>
@@ -46,7 +46,7 @@ function submit() {
                 </div>
 
                 <form @submit.prevent="submit" novalidate>
-                    <input type="hidden" :value="form.token" name="token">
+                    <input type="hidden" :value="form.token" name="token" />
 
                     <div class="mb-3">
                         <label class="form-label">E-mail</label>
@@ -60,7 +60,7 @@ function submit() {
                                 autofocus
                                 autocomplete="username"
                                 required
-                            >
+                            />
                         </div>
                     </div>
 
@@ -74,12 +74,19 @@ function submit() {
                                 :class="{ 'is-invalid': form.errors.password }"
                                 autocomplete="new-password"
                                 required
+                            />
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                tabindex="-1"
+                                @click="showPassword = !showPassword"
                             >
-                            <button type="button" class="btn btn-outline-secondary" tabindex="-1" @click="showPassword = !showPassword">
                                 <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                             </button>
                         </div>
-                        <div v-if="form.errors.password" class="invalid-feedback d-block mt-1">{{ form.errors.password }}</div>
+                        <div v-if="form.errors.password" class="invalid-feedback d-block mt-1">
+                            {{ form.errors.password }}
+                        </div>
                     </div>
 
                     <div class="mb-4">
@@ -91,8 +98,13 @@ function submit() {
                                 class="form-control"
                                 autocomplete="new-password"
                                 required
+                            />
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                tabindex="-1"
+                                @click="showConfirm = !showConfirm"
                             >
-                            <button type="button" class="btn btn-outline-secondary" tabindex="-1" @click="showConfirm = !showConfirm">
                                 <i :class="showConfirm ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                             </button>
                         </div>
@@ -106,7 +118,9 @@ function submit() {
                     </div>
 
                     <p class="text-center mb-0">
-                        <a :href="route('patient-portal.login')" class="text-muted small text-decoration-none">Voltar para o login</a>
+                        <a :href="route('patient-portal.login')" class="text-muted small text-decoration-none"
+                            >Voltar para o login</a
+                        >
                     </p>
                 </form>
             </div>

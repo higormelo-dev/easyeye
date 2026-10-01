@@ -14,9 +14,9 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * vivo; o Index recarrega a lista (`saved`).
  */
 const props = defineProps({
-    open:  { type: Boolean, default: false },
-    claim: { type: Object,  default: null },
-    t:     { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    claim: { type: Object, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -24,16 +24,16 @@ const emit = defineEmits(['close', 'saved']);
 const { tx } = useTrans(() => props.t);
 const { date } = useLocaleFormat();
 
-const targets    = ref([]);
-const chosen     = ref('');
-const loading    = ref(false);
+const targets = ref([]);
+const chosen = ref('');
+const loading = ref(false);
 const processing = ref(false);
-const errors     = ref([]);
-const result     = ref(null);
-const rootRef    = ref(null);
-const resultRef  = ref(null);
+const errors = ref([]);
+const result = ref(null);
+const rootRef = ref(null);
+const resultRef = ref(null);
 
-const target     = computed(() => targets.value.find((item) => item.id === chosen.value) ?? null);
+const target = computed(() => targets.value.find((item) => item.id === chosen.value) ?? null);
 const canConfirm = computed(() => Boolean(target.value) && !loading.value && !processing.value && !result.value);
 
 async function loadTargets() {
@@ -42,7 +42,7 @@ async function loadTargets() {
     try {
         const { data } = await window.axios.get(props.claim.attach_targets_url);
         targets.value = data?.data ?? [];
-        chosen.value  = (targets.value.find((item) => item.is_current) ?? targets.value[0])?.id ?? '';
+        chosen.value = (targets.value.find((item) => item.is_current) ?? targets.value[0])?.id ?? '';
     } catch (error) {
         const messages = Object.values(validationErrors(error) ?? {});
         errors.value = messages.length ? messages : [props.t.add_claims_load_failed];
@@ -51,21 +51,25 @@ async function loadTargets() {
     }
 }
 
-watch(() => props.open, (open) => {
-    if (!open || !props.claim) return;
+watch(
+    () => props.open,
+    (open) => {
+        if (!open || !props.claim) return;
 
-    targets.value = [];
-    chosen.value  = '';
-    errors.value  = [];
-    result.value  = null;
+        targets.value = [];
+        chosen.value = '';
+        errors.value = [];
+        result.value = null;
 
-    if (props.claim.attach_targets_url) loadTargets();
-}, { immediate: true });
+        if (props.claim.attach_targets_url) loadTargets();
+    },
+    { immediate: true },
+);
 
 function targetLabel(item) {
     return tx('attach_target_label', {
-        code:   item.code,
-        count:  item.claims_count,
+        code: item.code,
+        count: item.claims_count,
         period: tx('summary_period_value', { from: date(item.period_start), to: date(item.period_end) }),
     });
 }
@@ -78,7 +82,7 @@ async function submit() {
     if (!canConfirm.value) return;
 
     processing.value = true;
-    errors.value     = [];
+    errors.value = [];
 
     try {
         const { data } = await window.axios.post(target.value.attach_url, { claim_ids: [props.claim.id] });
@@ -101,12 +105,20 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
     <CenteredModal :open="open" size="md" :close-label="t.btn_close" @close="requestClose">
         <template #header>
             <h2 class="h5 mb-0 fw-semibold">
-                <i class="ti ti-package-import me-2 text-primary" aria-hidden="true"></i>{{ tx('attach_title', { code: claim?.code ?? '' }) }}
+                <i class="ti ti-package-import me-2 text-primary" aria-hidden="true"></i
+                >{{ tx('attach_title', { code: claim?.code ?? '' }) }}
             </h2>
         </template>
 
         <!-- Foco inicial no conteúdo (os lotes ainda carregam): Tab segue para os controles. -->
-        <div v-if="claim" ref="rootRef" tabindex="-1" data-autofocus class="billing-dialog-body" data-test="attach-modal">
+        <div
+            v-if="claim"
+            ref="rootRef"
+            tabindex="-1"
+            data-autofocus
+            class="billing-dialog-body"
+            data-test="attach-modal"
+        >
             <p class="small text-muted">{{ t.attach_intro }}</p>
 
             <div v-if="errors.length" class="alert alert-danger small py-2" role="alert" data-test="attach-error">
@@ -119,7 +131,11 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 <p v-if="loading" class="d-flex align-items-center gap-2 small text-muted" role="status">
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>{{ t.attach_loading }}
                 </p>
-                <p v-else-if="targets.length === 0 && !errors.length" class="small text-muted text-center py-3 mb-0" data-test="attach-no-targets">
+                <p
+                    v-else-if="targets.length === 0 && !errors.length"
+                    class="small text-muted text-center py-3 mb-0"
+                    data-test="attach-no-targets"
+                >
                     {{ t.attach_no_targets }}
                 </p>
                 <fieldset v-else-if="targets.length" data-test="attach-targets">
@@ -133,10 +149,12 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                             class="form-check-input"
                             :value="item.id"
                             data-test="attach-target"
-                        >
+                        />
                         <label :for="`billing-attach-target-${item.id}`" class="form-check-label small">
                             {{ targetLabel(item) }}
-                            <span v-if="item.is_current" class="badge badge-soft-info ms-1">{{ t.attach_target_current }}</span>
+                            <span v-if="item.is_current" class="badge badge-soft-info ms-1">{{
+                                t.attach_target_current
+                            }}</span>
                         </label>
                     </div>
                 </fieldset>
@@ -157,10 +175,23 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
         </div>
 
         <template #footer>
-            <button type="button" class="btn btn-light" :disabled="processing" data-test="attach-close" @click="requestClose">
+            <button
+                type="button"
+                class="btn btn-light"
+                :disabled="processing"
+                data-test="attach-close"
+                @click="requestClose"
+            >
                 {{ result ? t.btn_close : t.btn_cancel }}
             </button>
-            <button v-if="!result" type="button" class="btn btn-primary" data-test="attach-confirm" :disabled="!canConfirm" @click="submit">
+            <button
+                v-if="!result"
+                type="button"
+                class="btn btn-primary"
+                data-test="attach-confirm"
+                :disabled="!canConfirm"
+                @click="submit"
+            >
                 <span v-if="processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
                 {{ processing ? t.processing : t.attach_confirm }}
             </button>

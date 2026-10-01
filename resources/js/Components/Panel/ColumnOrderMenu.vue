@@ -16,16 +16,16 @@ import { ref } from 'vue';
  * um `hidden: bool` opcional por item nesse modo.
  */
 const props = defineProps({
-    columns:    { type: Array,   required: true }, // [{ key, label, hidden? }] na ordem atual
-    title:      { type: String,  default: 'Ordem das colunas' },
+    columns: { type: Array, required: true }, // [{ key, label, hidden? }] na ordem atual
+    title: { type: String, default: 'Ordem das colunas' },
     toggleable: { type: Boolean, default: false },
     // Rótulos traduzidos (opcional) — sem eles, mantém os textos PT de sempre.
-    labels:     { type: Object,  default: () => ({}) },
+    labels: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['move', 'reset', 'toggle']);
 
-const dragIndex   = ref(null);
+const dragIndex = ref(null);
 const dragOverIdx = ref(null);
 
 function onDragStart(index) {
@@ -40,19 +40,19 @@ function onDrop(index) {
     if (dragIndex.value !== null && dragIndex.value !== index) {
         emit('move', dragIndex.value, index);
     }
-    dragIndex.value   = null;
+    dragIndex.value = null;
     dragOverIdx.value = null;
 }
 
 function onDragEnd() {
-    dragIndex.value   = null;
+    dragIndex.value = null;
     dragOverIdx.value = null;
 }
 </script>
 
 <template>
     <li>
-        <div class="column-order-menu px-1 py-1" style="min-width:230px;">
+        <div class="column-order-menu px-1 py-1" style="min-width: 230px">
             <p class="text-muted small fw-medium mb-2 px-1">{{ title }}</p>
 
             <ul class="list-unstyled mb-2">
@@ -103,11 +103,7 @@ function onDragEnd() {
                 </li>
             </ul>
 
-            <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary w-100"
-                @click="$emit('reset')"
-            >
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100" @click="$emit('reset')">
                 <i class="ti ti-restore me-1" aria-hidden="true"></i>{{ labels.reset ?? 'Restaurar padrão' }}
             </button>
         </div>
@@ -117,16 +113,16 @@ function onDragEnd() {
 <style scoped>
 .column-order-item {
     cursor: grab;
-    transition: background-color .1s ease;
+    transition: background-color 0.1s ease;
 }
 .column-order-item:active {
     cursor: grabbing;
 }
 .column-order-item--over {
-    background-color: var(--primary-transparent, rgba(13, 110, 253, .08));
+    background-color: var(--primary-transparent, rgba(13, 110, 253, 0.08));
 }
 .column-order-item--hidden {
-    opacity: .5;
+    opacity: 0.5;
 }
 .column-order-grip {
     cursor: grab;

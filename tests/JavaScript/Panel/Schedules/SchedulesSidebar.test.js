@@ -14,17 +14,38 @@ vi.mock('@/Components/Panel/MiniCalendar.vue', () => ({
     default: {
         props: ['modelValue', 'locale'],
         emits: ['update:modelValue'],
-        template: '<div class="mini-cal" :data-date="modelValue"><button class="pick" @click="$emit(\'update:modelValue\', \'2026-12-15\')" /></div>',
+        template:
+            '<div class="mini-cal" :data-date="modelValue"><button class="pick" @click="$emit(\'update:modelValue\', \'2026-12-15\')" /></div>',
     },
 }));
-for (const name of ['ScheduleCard', 'EventCard', 'ScheduleFormModal', 'RescheduleModal', 'CancelModal', 'BulkCancelModal',
-    'BulkRescheduleModal', 'NoticesPanel', 'WaitingListPanel', 'WaitingListFormModal', 'ScheduleDetailDrawer', 'CashEntryModal', 'CalendarView']) {
+for (const name of [
+    'ScheduleCard',
+    'EventCard',
+    'ScheduleFormModal',
+    'RescheduleModal',
+    'CancelModal',
+    'BulkCancelModal',
+    'BulkRescheduleModal',
+    'NoticesPanel',
+    'WaitingListPanel',
+    'WaitingListFormModal',
+    'ScheduleDetailDrawer',
+    'CashEntryModal',
+    'CalendarView',
+]) {
     vi.doMock(`@/Pages/Panel/Schedules/${name}.vue`, () => ({ default: { template: `<div class="stub-${name}" />` } }));
 }
 
 const SchedulesIndex = (await import('@/Pages/Panel/Schedules/Index.vue')).default;
 
-const t = { sidebar_doctors: 'Médicos', sidebar_time: 'Horário', sidebar_all: 'Tudo', sidebar_morning: 'Manhã', sidebar_afternoon: 'Tarde', sidebar_evening: 'Noite' };
+const t = {
+    sidebar_doctors: 'Médicos',
+    sidebar_time: 'Horário',
+    sidebar_all: 'Tudo',
+    sidebar_morning: 'Manhã',
+    sidebar_afternoon: 'Tarde',
+    sidebar_evening: 'Noite',
+};
 const doctors = [{ id: 'd1', name: 'DRA. ANA LIMA', record: '123456', color: '#e91e63' }];
 
 function mountPage(props = {}) {

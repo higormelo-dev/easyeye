@@ -17,11 +17,11 @@ import { usePlural } from './useReportPage.js';
  *   sem convênio não há filtro equivalente, então some) e "Ver glosas".
  */
 const props = defineProps({
-    id:       { type: String, required: true },
-    row:      { type: Object, required: true },   // linha de byCovenant ({ covenant_id, covenant, ... })
-    filters:  { type: Object, required: true },   // { from, to } aplicados
-    endpoint: { type: String, required: true },   // routes.claims
-    t:        { type: Object, default: () => ({}) },
+    id: { type: String, required: true },
+    row: { type: Object, required: true }, // linha de byCovenant ({ covenant_id, covenant, ... })
+    filters: { type: Object, required: true }, // { from, to } aplicados
+    endpoint: { type: String, required: true }, // routes.claims
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
@@ -32,20 +32,20 @@ const { plural } = usePlural();
 
 const STATUS_BADGE = {
     submitted: 'badge-soft-info border border-info',
-    paid:      'badge-soft-success border border-success',
-    denied:    'badge-soft-danger border border-danger',
+    paid: 'badge-soft-success border border-success',
+    denied: 'badge-soft-danger border border-danger',
 };
 
 const EMPTY_META = { current_page: 1, last_page: 1, total: 0 };
 
-const c       = computed(() => props.t.covenants ?? {});
+const c = computed(() => props.t.covenants ?? {});
 const titleId = `covenant-claims-title-${useId()}`;
-const title   = computed(() => tx('claims_title', { covenant: props.row.covenant ?? '' }));
+const title = computed(() => tx('claims_title', { covenant: props.row.covenant ?? '' }));
 
-const state   = ref('loading'); // loading | ready | error
-const claims  = ref([]);
-const meta    = ref({ ...EMPTY_META });
-const region  = ref(null);
+const state = ref('loading'); // loading | ready | error
+const claims = ref([]);
+const meta = ref({ ...EMPTY_META });
+const region = ref(null);
 
 let controller = null;
 let requestSeq = 0;
@@ -53,9 +53,9 @@ let requestSeq = 0;
 function queryString(page) {
     return new URLSearchParams({
         covenant_id: props.row.covenant_id ?? '',
-        from:        props.filters.from ?? '',
-        to:          props.filters.to ?? '',
-        page:        String(page),
+        from: props.filters.from ?? '',
+        to: props.filters.to ?? '',
+        page: String(page),
     }).toString();
 }
 
@@ -68,9 +68,9 @@ async function load(page = 1) {
 
     try {
         const response = await fetch(`${props.endpoint}?${queryString(page)}`, {
-            headers:     { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
-            signal:      controller?.signal,
+            signal: controller?.signal,
         });
 
         if (seq !== requestSeq) return;
@@ -85,8 +85,8 @@ async function load(page = 1) {
         if (seq !== requestSeq) return;
 
         claims.value = Array.isArray(json?.data) ? json.data : [];
-        meta.value   = { ...EMPTY_META, ...(json?.meta ?? {}) };
-        state.value  = 'ready';
+        meta.value = { ...EMPTY_META, ...(json?.meta ?? {}) };
+        state.value = 'ready';
     } catch (error) {
         if (error?.name === 'AbortError' || seq !== requestSeq) return;
 
@@ -95,7 +95,11 @@ async function load(page = 1) {
 }
 
 // Troca de convênio ou de período aplicado: recomeça da página 1.
-watch(() => [props.row.covenant_id, props.filters.from, props.filters.to], () => load(1), { immediate: true });
+watch(
+    () => [props.row.covenant_id, props.filters.from, props.filters.to],
+    () => load(1),
+    { immediate: true },
+);
 
 onBeforeUnmount(() => {
     requestSeq += 1;
@@ -123,10 +127,12 @@ const statusBadge = (status) => STATUS_BADGE[status] ?? 'badge-soft-secondary bo
 
 // Placeholders sem prefixo comum (:current/:last): o tx() troca na ordem e
 // ":page" corromperia ":pages".
-const pageStatus = computed(() => tx('pagination_status', {
-    current: number(meta.value.current_page),
-    last:    number(meta.value.last_page),
-}));
+const pageStatus = computed(() =>
+    tx('pagination_status', {
+        current: number(meta.value.current_page),
+        last: number(meta.value.last_page),
+    }),
+);
 
 /** Anúncio (aria-live) de carregando / página e total — o erro tem role=alert próprio. */
 const liveMessage = computed(() => {
@@ -137,18 +143,22 @@ const liveMessage = computed(() => {
     return `${pageStatus.value} · ${plural(c.value, 'claims_count', meta.value.total)}`;
 });
 
-const billingHref = computed(() => (props.row.covenant_id
-    ? route('panel.financial.billing.index', {
-        tab:         'claims',
-        covenant_id: props.row.covenant_id,
-        from:        props.filters.from,
-        to:          props.filters.to,
-    })
-    : null));
+const billingHref = computed(() =>
+    props.row.covenant_id
+        ? route('panel.financial.billing.index', {
+              tab: 'claims',
+              covenant_id: props.row.covenant_id,
+              from: props.filters.from,
+              to: props.filters.to,
+          })
+        : null,
+);
 
 // Aba "todas": na padrão ("pendentes") o período é ignorado e o link mostraria
 // as pendentes de qualquer data.
-const glosasHref = computed(() => route('panel.financial.tiss.glosas.index', { tab: 'all', from: props.filters.from, to: props.filters.to }));
+const glosasHref = computed(() =>
+    route('panel.financial.tiss.glosas.index', { tab: 'all', from: props.filters.from, to: props.filters.to }),
+);
 </script>
 
 <template>
@@ -171,13 +181,23 @@ const glosasHref = computed(() => route('panel.financial.tiss.glosas.index', { t
                 </p>
             </div>
             <div class="d-flex flex-wrap align-items-center gap-2">
-                <Link v-if="billingHref" :href="billingHref" class="btn btn-outline-primary btn-sm" data-test="view-billing">
+                <Link
+                    v-if="billingHref"
+                    :href="billingHref"
+                    class="btn btn-outline-primary btn-sm"
+                    data-test="view-billing"
+                >
                     <i class="ti ti-file-invoice me-1" aria-hidden="true"></i>{{ c.view_in_billing }}
                 </Link>
                 <Link :href="glosasHref" class="btn btn-outline-secondary btn-sm" data-test="view-glosas">
                     <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ c.view_glosas }}
                 </Link>
-                <button type="button" class="btn btn-link btn-sm text-decoration-none" data-test="claims-close" @click="emit('close')">
+                <button
+                    type="button"
+                    class="btn btn-link btn-sm text-decoration-none"
+                    data-test="claims-close"
+                    @click="emit('close')"
+                >
                     <i class="ti ti-x me-1" aria-hidden="true"></i>{{ c.claims_close }}
                 </button>
             </div>
@@ -185,22 +205,47 @@ const glosasHref = computed(() => route('panel.financial.tiss.glosas.index', { t
 
         <p class="visually-hidden" role="status" aria-live="polite" data-test="claims-live">{{ liveMessage }}</p>
 
-        <div v-if="state === 'error'" class="alert alert-danger d-flex flex-wrap align-items-center gap-2 mb-0 py-2" role="alert" data-test="claims-error">
+        <div
+            v-if="state === 'error'"
+            class="alert alert-danger d-flex flex-wrap align-items-center gap-2 mb-0 py-2"
+            role="alert"
+            data-test="claims-error"
+        >
             <i class="ti ti-alert-circle" aria-hidden="true"></i>
             <span class="me-auto">{{ c.claims_error }}</span>
-            <button type="button" class="btn btn-sm btn-outline-danger" data-test="claims-retry" @click="retry">{{ c.claims_retry }}</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-test="claims-retry" @click="retry">
+                {{ c.claims_retry }}
+            </button>
         </div>
 
-        <div v-else-if="state === 'loading' && !claims.length" class="text-body-secondary small py-2" aria-hidden="true" data-test="claims-loading">
+        <div
+            v-else-if="state === 'loading' && !claims.length"
+            class="text-body-secondary small py-2"
+            aria-hidden="true"
+            data-test="claims-loading"
+        >
             <span class="spinner-border spinner-border-sm me-1"></span>{{ c.claims_loading }}
         </div>
 
-        <p v-else-if="state === 'ready' && !claims.length" class="text-body-secondary small mb-0" data-test="claims-empty">{{ c.claims_empty }}</p>
+        <p
+            v-else-if="state === 'ready' && !claims.length"
+            class="text-body-secondary small mb-0"
+            data-test="claims-empty"
+        >
+            {{ c.claims_empty }}
+        </p>
 
         <template v-else>
-            <div class="table-responsive covenant-claims__results" :class="{ 'covenant-claims__results--loading': state === 'loading' }">
+            <div
+                class="table-responsive covenant-claims__results"
+                :class="{ 'covenant-claims__results--loading': state === 'loading' }"
+            >
                 <table class="table table-sm align-middle mb-0 covenant-claims__table">
-                    <caption class="visually-hidden">{{ title }}</caption>
+                    <caption class="visually-hidden">
+                        {{
+                            title
+                        }}
+                    </caption>
                     <thead>
                         <tr>
                             <th scope="col">{{ c.col_guide }}</th>
@@ -214,17 +259,35 @@ const glosasHref = computed(() => route('panel.financial.tiss.glosas.index', { t
                     </thead>
                     <tbody>
                         <tr v-for="claim in claims" :key="claim.id" data-test="claim-row">
-                            <th scope="row" class="fw-medium text-body text-nowrap" data-test="claim-code">{{ claim.code || '—' }}</th>
+                            <th scope="row" class="fw-medium text-body text-nowrap" data-test="claim-code">
+                                {{ claim.code || '—' }}
+                            </th>
                             <td class="text-nowrap text-body" data-test="claim-date">
                                 <time :datetime="claim.attendance_date">{{ date(claim.attendance_date) }}</time>
                             </td>
-                            <td class="d-none d-md-table-cell text-nowrap text-body" data-test="claim-patient">{{ claim.patient }}</td>
-                            <td>
-                                <span class="badge fw-medium" :class="statusBadge(claim.status)" data-test="claim-status">{{ statusLabel(claim.status) }}</span>
+                            <td class="d-none d-md-table-cell text-nowrap text-body" data-test="claim-patient">
+                                {{ claim.patient }}
                             </td>
-                            <td class="text-end text-body text-nowrap" data-test="claim-amount">{{ money(claim.amount) }}</td>
-                            <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="claim-received">{{ money(claim.received) }}</td>
-                            <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="claim-glosa">{{ money(claim.glosa) }}</td>
+                            <td>
+                                <span
+                                    class="badge fw-medium"
+                                    :class="statusBadge(claim.status)"
+                                    data-test="claim-status"
+                                    >{{ statusLabel(claim.status) }}</span
+                                >
+                            </td>
+                            <td class="text-end text-body text-nowrap" data-test="claim-amount">
+                                {{ money(claim.amount) }}
+                            </td>
+                            <td
+                                class="text-end text-body text-nowrap d-none d-lg-table-cell"
+                                data-test="claim-received"
+                            >
+                                {{ money(claim.received) }}
+                            </td>
+                            <td class="text-end text-body text-nowrap d-none d-lg-table-cell" data-test="claim-glosa">
+                                {{ money(claim.glosa) }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -248,7 +311,9 @@ const glosasHref = computed(() => route('panel.financial.tiss.glosas.index', { t
                         :title="c.pagination_previous"
                         data-test="claims-prev"
                         @click="goTo(meta.current_page - 1, $event)"
-                    ><i class="ti ti-arrow-left" aria-hidden="true"></i></button>
+                    >
+                        <i class="ti ti-arrow-left" aria-hidden="true"></i>
+                    </button>
                     <button
                         type="button"
                         class="btn btn-outline-secondary"
@@ -257,7 +322,9 @@ const glosasHref = computed(() => route('panel.financial.tiss.glosas.index', { t
                         :title="c.pagination_next"
                         data-test="claims-next"
                         @click="goTo(meta.current_page + 1, $event)"
-                    ><i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+                    >
+                        <i class="ti ti-arrow-right" aria-hidden="true"></i>
+                    </button>
                 </div>
             </nav>
         </template>

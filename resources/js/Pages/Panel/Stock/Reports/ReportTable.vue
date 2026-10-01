@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh      from '@/Components/Panel/SortableTh.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useTrans } from '@/composables/useTrans.js';
 
@@ -18,16 +18,16 @@ import { useTrans } from '@/composables/useTrans.js';
  * `summary`, na mesma linha do botão "Colunas".
  */
 const props = defineProps({
-    rows:       { type: Array,  default: () => [] },
+    rows: { type: Array, default: () => [] },
     // [{ key, label, sortable?, align?: 'end'|'center', fixed?, cellClass? }]
-    columns:    { type: Array,  required: true },
-    sort:       { type: String, default: '' },
-    direction:  { type: String, default: 'desc' },
+    columns: { type: Array, required: true },
+    sort: { type: String, default: '' },
+    direction: { type: String, default: 'desc' },
     storageKey: { type: String, required: true },
-    rowKey:     { type: String, default: 'id' },
-    emptyIcon:  { type: String, default: 'ti ti-report-off' },
-    emptyText:  { type: String, default: '' },
-    t:          { type: Object, default: () => ({}) },
+    rowKey: { type: String, default: 'id' },
+    emptyIcon: { type: String, default: 'ti ti-report-off' },
+    emptyText: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['sort']);
@@ -36,25 +36,27 @@ const { tx } = useTrans(() => props.t);
 
 // ── Ordem de colunas personalizável ──────────────────────────────────────────
 const movableColumns = computed(() => props.columns.filter((c) => !c.fixed));
-const fixedColumns   = computed(() => props.columns.filter((c) => c.fixed));
+const fixedColumns = computed(() => props.columns.filter((c) => c.fixed));
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder(
     props.storageKey,
     props.columns.filter((c) => !c.fixed).map((c) => c.key),
 );
 
-const orderedMovable = computed(() => (
-    columnOrder.value
-        .map((key) => movableColumns.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
+const orderedMovable = computed(() =>
+    columnOrder.value.map((key) => movableColumns.value.find((c) => c.key === key)).filter(Boolean),
+);
 
 const orderedColumns = computed(() => [...orderedMovable.value, ...fixedColumns.value]);
 
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 
 const ALIGN_CLASS = { end: 'text-end', center: 'text-center' };
@@ -108,7 +110,8 @@ function keyOf(row, index) {
                             :title="tx('sort_by', { column: col.label })"
                             :class="alignClass(col)"
                             @sort="emit('sort', $event)"
-                        >{{ col.label }}</SortableTh>
+                            >{{ col.label }}</SortableTh
+                        >
                         <th v-else :class="alignClass(col)">{{ col.label }}</th>
                     </template>
                 </tr>

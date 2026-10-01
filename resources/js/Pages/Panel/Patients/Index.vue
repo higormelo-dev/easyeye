@@ -2,21 +2,21 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import PatientTable    from './PatientTable.vue';
-import PatientCards    from './PatientCards.vue';
+import PatientTable from './PatientTable.vue';
+import PatientCards from './PatientCards.vue';
 import PatientFormModal from './PatientFormModal.vue';
 import PatientDetailDrawer from './PatientDetailDrawer.vue';
 
 const props = defineProps({
-    patients:        { type: Object, required: true },
-    totalPatients:   { type: Number, default: 0 },
-    covenants:       { type: Array,  default: () => [] },
-    skinTypes:       { type: Array,  default: () => [] },
-    irisTypes:       { type: Array,  default: () => [] },
-    genders:         { type: Object, default: () => ({}) },
+    patients: { type: Object, required: true },
+    totalPatients: { type: Number, default: 0 },
+    covenants: { type: Array, default: () => [] },
+    skinTypes: { type: Array, default: () => [] },
+    irisTypes: { type: Array, default: () => [] },
+    genders: { type: Object, default: () => ({}) },
     maritalStatuses: { type: Object, default: () => ({}) },
-    statesOfBrazil:  { type: Object, default: () => ({}) },
-    filters:         { type: Object, default: () => ({}) },
+    statesOfBrazil: { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) },
 });
 
 // ── View toggle ──────────────────────────────────────────────────────────────
@@ -58,21 +58,21 @@ function onSort({ sort, direction }) {
 }
 
 // ── CRUD modal ───────────────────────────────────────────────────────────────
-const modalOpen    = ref(false);
+const modalOpen = ref(false);
 const editPatientId = ref(null);
 
 function openCreate() {
     editPatientId.value = null;
-    modalOpen.value     = true;
+    modalOpen.value = true;
 }
 
 function openEdit(id) {
     editPatientId.value = id;
-    modalOpen.value     = true;
+    modalOpen.value = true;
 }
 
 function closeModal() {
-    modalOpen.value     = false;
+    modalOpen.value = false;
     editPatientId.value = null;
 }
 
@@ -82,7 +82,7 @@ function closeModal() {
 onMounted(() => {
     const params = new URLSearchParams(window.location.search);
     const openId = params.get('open');
-    const isNew  = params.get('new') === '1';
+    const isNew = params.get('new') === '1';
     if (!openId && !isNew) return;
 
     if (openId) openEdit(openId);
@@ -98,16 +98,16 @@ onMounted(() => {
 });
 
 // ── Detail drawer ────────────────────────────────────────────────────────────
-const detailOpen      = ref(false);
-const viewPatientId   = ref(null);
+const detailOpen = ref(false);
+const viewPatientId = ref(null);
 
 function onView(id) {
     viewPatientId.value = id;
-    detailOpen.value    = true;
+    detailOpen.value = true;
 }
 
 function closeDetail() {
-    detailOpen.value    = false;
+    detailOpen.value = false;
     viewPatientId.value = null;
 }
 
@@ -139,12 +139,24 @@ const breadcrumbs = [
 <template>
     <AppLayout title="Pacientes" :breadcrumbs="breadcrumbs">
         <div class="page-patients">
-
             <!-- ── Page Header ───────────────────────────────────────────── -->
             <div class="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom">
                 <div class="d-flex align-items-center gap-2 me-auto">
                     <h4 class="mb-0 fw-bold">Pacientes</h4>
-                    <span style="font-size:.78rem;font-weight:600;color:#0d6efd;background:#eff4ff;border:1.5px solid #0d6efd;border-radius:20px;padding:2px 12px;white-space:nowrap;line-height:1.6;">Total: {{ patients.total }}</span>
+                    <span
+                        style="
+                            font-size: 0.78rem;
+                            font-weight: 600;
+                            color: #0d6efd;
+                            background: #eff4ff;
+                            border: 1.5px solid #0d6efd;
+                            border-radius: 20px;
+                            padding: 2px 12px;
+                            white-space: nowrap;
+                            line-height: 1.6;
+                        "
+                        >Total: {{ patients.total }}</span
+                    >
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <!-- View toggle -->
@@ -183,7 +195,7 @@ const breadcrumbs = [
             <!-- ── Search bar ────────────────────────────────────────────── -->
             <div class="d-flex align-items-center justify-content-between flex-wrap mb-3 gap-2">
                 <div class="table-search">
-                    <div class="input-group input-group-sm" style="min-width:280px;">
+                    <div class="input-group input-group-sm" style="min-width: 280px">
                         <span class="input-group-text bg-white">
                             <i class="ti ti-search fs-12"></i>
                         </span>
@@ -192,7 +204,7 @@ const breadcrumbs = [
                             type="text"
                             class="form-control border-start-0"
                             placeholder="Buscar por nome, código ou telefone..."
-                        >
+                        />
                         <button
                             v-if="search"
                             class="btn btn-outline-secondary border-start-0"
@@ -232,7 +244,6 @@ const breadcrumbs = [
                 @restore="onRestore"
             />
             <!-- ── /Cards view ───────────────────────────────────────────── -->
-
         </div>
 
         <!-- ── Patient Form Offcanvas ────────────────────────────────────── -->
@@ -249,10 +260,6 @@ const breadcrumbs = [
         />
 
         <!-- ── Patient Detail Drawer ─────────────────────────────────────── -->
-        <PatientDetailDrawer
-            :open="detailOpen"
-            :patient-id="viewPatientId"
-            @close="closeDetail"
-        />
+        <PatientDetailDrawer :open="detailOpen" :patient-id="viewPatientId" @close="closeDetail" />
     </AppLayout>
 </template>

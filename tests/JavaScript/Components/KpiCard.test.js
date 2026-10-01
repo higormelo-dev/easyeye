@@ -34,7 +34,9 @@ describe('KpiCard', () => {
     });
 
     it('tom desconhecido cai no neutro; carregando mostra placeholder sem valor', () => {
-        const wrapper = mount(KpiCard, { props: { label: 'X', value: '9', tone: 'rainbow', loading: true, testId: 'x' } });
+        const wrapper = mount(KpiCard, {
+            props: { label: 'X', value: '9', tone: 'rainbow', loading: true, testId: 'x' },
+        });
 
         expect(wrapper.classes()).toContain('border-secondary');
         expect(wrapper.find('[data-test="kpi-x"]').exists()).toBe(false);

@@ -1,12 +1,12 @@
 <script setup>
 import { computed } from 'vue';
-import AppLayout    from '@/Layouts/AppLayout.vue';
-import PageHeader   from '@/Components/Panel/PageHeader.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import PeriodFilter from '@/Components/Panel/PeriodFilter.vue';
-import KpiCard      from '@/Components/Panel/KpiCard.vue';
+import KpiCard from '@/Components/Panel/KpiCard.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
 import { useTrans } from '@/composables/useTrans';
-import CovenantsTable   from './CovenantsTable.vue';
+import CovenantsTable from './CovenantsTable.vue';
 import ReportExportMenu from './ReportExportMenu.vue';
 import { usePercent, useReportPage } from './useReportPage.js';
 
@@ -20,24 +20,27 @@ import { usePercent, useReportPage } from './useReportPage.js';
  * código + iniciais). Exportação (CSV/Excel) sempre do período aplicado.
  */
 const props = defineProps({
-    breadcrumbs:           { type: Array,  default: () => [] },
-    filters:               { type: Object, required: true },    // { from, to } normalizados no servidor
-    today:                 { type: String, default: '' },       // Y-m-d no fuso da clínica
-    summary:               { type: Object, default: () => ({}) }, // { total_claims, total_amount, total_paid, total_denied, total_open, glosa_rate, received_rate, glosa_alert }
-    byCovenant:            { type: Array,  default: () => [] },   // [{ covenant_id, covenant, inactive, claims, amount, paid, denied, open, glosa_rate, received_rate, glosa_alert }]
+    breadcrumbs: { type: Array, default: () => [] },
+    filters: { type: Object, required: true }, // { from, to } normalizados no servidor
+    today: { type: String, default: '' }, // Y-m-d no fuso da clínica
+    summary: { type: Object, default: () => ({}) }, // { total_claims, total_amount, total_paid, total_denied, total_open, glosa_rate, received_rate, glosa_alert }
+    byCovenant: { type: Array, default: () => [] }, // [{ covenant_id, covenant, inactive, claims, amount, paid, denied, open, glosa_rate, received_rate, glosa_alert }]
     glosa_alert_threshold: { type: Number, default: 10 },
-    routes:                { type: Object, default: () => ({}) },
-    export_formats:        { type: Array,  default: () => ['csv', 'xlsx'] },
-    t:                     { type: Object, default: () => ({}) },
+    routes: { type: Object, default: () => ({}) },
+    export_formats: { type: Array, default: () => ['csv', 'xlsx'] },
+    t: { type: Object, default: () => ({}) },
 });
 
 const { money, number } = useLocaleFormat();
 const { percent } = usePercent();
-const { from, to, loading, loadError, applyPeriod, exportOptions, exportTitle } = useReportPage(props, 'panel.financial.reports.covenants');
+const { from, to, loading, loadError, applyPeriod, exportOptions, exportTitle } = useReportPage(
+    props,
+    'panel.financial.reports.covenants',
+);
 
-const c         = computed(() => props.t.covenants ?? {});
+const c = computed(() => props.t.covenants ?? {});
 const pageTitle = computed(() => c.value.title ?? '');
-const { tx }    = useTrans(() => props.t.covenants ?? {});
+const { tx } = useTrans(() => props.t.covenants ?? {});
 
 // Glosa em alerta só quando existe valor glosado (antes: alarme com R$ 0,00).
 const hasGlosa = computed(() => Number(props.summary.total_denied ?? 0) > 0);
@@ -52,16 +55,26 @@ const kpis = computed(() => {
     return [
         { key: 'claims', icon: 'ti ti-files', tone: 'primary', value: number(s.total_claims ?? 0) },
         { key: 'billed', icon: 'ti ti-file-invoice', tone: 'primary', value: money(s.total_amount ?? 0) },
-        { key: 'received', icon: 'ti ti-cash', tone: 'success', value: money(s.total_paid ?? 0), subtitle: rateOfBilled(s.received_rate) },
         {
-            key:      'glosa',
-            icon:     'ti ti-alert-triangle',
-            tone:     hasGlosa.value ? 'danger' : 'secondary',
-            value:    money(s.total_denied ?? 0),
+            key: 'received',
+            icon: 'ti ti-cash',
+            tone: 'success',
+            value: money(s.total_paid ?? 0),
+            subtitle: rateOfBilled(s.received_rate),
+        },
+        {
+            key: 'glosa',
+            icon: 'ti ti-alert-triangle',
+            tone: hasGlosa.value ? 'danger' : 'secondary',
+            value: money(s.total_denied ?? 0),
             subtitle: rateOfBilled(s.glosa_rate),
         },
         { key: 'open', icon: 'ti ti-hourglass', tone: 'warning', value: money(s.total_open ?? 0) },
-    ].map((kpi) => ({ ...kpi, label: c.value[`kpi_${kpi.key}`] ?? kpi.key, hint: c.value[`kpi_${kpi.key}_hint`] ?? '' }));
+    ].map((kpi) => ({
+        ...kpi,
+        label: c.value[`kpi_${kpi.key}`] ?? kpi.key,
+        hint: c.value[`kpi_${kpi.key}_hint`] ?? '',
+    }));
 });
 </script>
 
@@ -85,7 +98,12 @@ const kpis = computed(() => {
                     :disabled="loading"
                     @change="applyPeriod"
                 />
-                <span class="small text-body-secondary align-self-center" role="status" aria-live="polite" data-test="loading-status">
+                <span
+                    class="small text-body-secondary align-self-center"
+                    role="status"
+                    aria-live="polite"
+                    data-test="loading-status"
+                >
                     <template v-if="loading">
                         <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{{ t.loading }}
                     </template>
@@ -95,7 +113,12 @@ const kpis = computed(() => {
                 <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ c.period_basis }}
             </p>
 
-            <div v-if="loadError" class="alert alert-danger d-flex align-items-center gap-2" role="alert" data-test="load-error">
+            <div
+                v-if="loadError"
+                class="alert alert-danger d-flex align-items-center gap-2"
+                role="alert"
+                data-test="load-error"
+            >
                 <i class="ti ti-alert-circle" aria-hidden="true"></i>{{ loadError }}
             </div>
 

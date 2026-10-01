@@ -64,7 +64,7 @@ export function sortByDocumentOrder(names) {
     const elements = new Map(names.map((name) => [name, document.querySelector(tourSelector(name))]));
 
     return [...names].sort((a, b) => {
-        const first  = elements.get(a);
+        const first = elements.get(a);
         const second = elements.get(b);
         if (!first || !second || first === second) return 0;
 
@@ -96,18 +96,31 @@ function targetStep(name, title, description, extra) {
  *
  * @param {{ nav: Array, t: object, page?: Record<string, {title: string, description: string}>|null, sidebarVisible: boolean, hasTarget: (name: string) => boolean, pageOrder?: (names: string[]) => string[], touch?: boolean }} options
  */
-export function buildTourSteps({ nav = [], t = {}, page = null, sidebarVisible = true, hasTarget = () => false, pageOrder = (names) => names, touch = false }) {
+export function buildTourSteps({
+    nav = [],
+    t = {},
+    page = null,
+    sidebarVisible = true,
+    hasTarget = () => false,
+    pageOrder = (names) => names,
+    touch = false,
+}) {
     const intro = touch && t.intro?.description_touch ? t.intro.description_touch : t.intro?.description;
     const steps = [{ popover: popover(t.intro?.title, intro) }];
 
     const pageEntries = page ?? {};
-    const pageNames   = Object.keys(pageEntries).filter((name) => pageEntries[name]?.title && hasTarget(name));
+    const pageNames = Object.keys(pageEntries).filter((name) => pageEntries[name]?.title && hasTarget(name));
     for (const name of pageOrder(pageNames)) {
         steps.push(targetStep(name, pageEntries[name].title, pageEntries[name].description));
     }
 
     if (!sidebarVisible && t.mobile_menu && hasTarget('mobile-menu')) {
-        steps.push(targetStep('mobile-menu', t.mobile_menu.title, t.mobile_menu.description, { side: 'bottom', align: 'start' }));
+        steps.push(
+            targetStep('mobile-menu', t.mobile_menu.title, t.mobile_menu.description, {
+                side: 'bottom',
+                align: 'start',
+            }),
+        );
     }
 
     // Recolher/expandir só existe com o menu lateral fixo (telas largas); com
@@ -130,15 +143,24 @@ export function buildTourSteps({ nav = [], t = {}, page = null, sidebarVisible =
 
         const name = `nav-${item.key}`;
 
-        steps.push(sidebarVisible && hasTarget(name)
-            ? targetStep(name, item.label, description, { side: 'right', align: 'start' })
-            : { popover: popover(item.label, description) });
+        steps.push(
+            sidebarVisible && hasTarget(name)
+                ? targetStep(name, item.label, description, { side: 'right', align: 'start' })
+                : { popover: popover(item.label, description) },
+        );
     }
 
     for (const name of LAYOUT_TARGETS) {
         const entry = t.layout?.[name];
         if (entry && hasTarget(name)) {
-            steps.push(targetStep(name, entry.title, entry.description, LAYOUT_PLACEMENT[name] ?? { side: 'bottom', align: 'end' }));
+            steps.push(
+                targetStep(
+                    name,
+                    entry.title,
+                    entry.description,
+                    LAYOUT_PLACEMENT[name] ?? { side: 'bottom', align: 'end' },
+                ),
+            );
         }
     }
 
@@ -152,7 +174,9 @@ const sessionKey = (id, version) => `ee-tour:${id}@${version}`;
 function markSeenInSession(id, version) {
     try {
         sessionStorage.setItem(sessionKey(id, version), '1');
-    } catch { /* storage indisponível: vale só a preferência gravada */ }
+    } catch {
+        /* storage indisponível: vale só a preferência gravada */
+    }
 }
 
 function seenInSession(id, version) {
@@ -172,36 +196,42 @@ async function loadDriver() {
 // Um tour por vez na página. `generation` cancela uma abertura em andamento
 // (import ainda carregando) quando o layout sai da tela. Abertura automática
 // no máximo uma vez por tour na sessão da SPA.
-let active       = null;
+let active = null;
 let activeFinish = null;
-let generation   = 0;
+let generation = 0;
 const autoStarted = new Set();
 
 export function usePanelTour() {
     const page = usePage();
     const { preferences, savePreference } = useUserPreferences();
 
-    const config    = computed(() => page.props.tour ?? null);
+    const config = computed(() => page.props.tour ?? null);
     const available = computed(() => !!config.value?.t);
-    const seen      = computed(() => {
+    const seen = computed(() => {
         const current = config.value;
         if (!current) return true;
 
         const local = preferences.value?.tours?.[current.id];
 
-        return !!current.seen
-            || Number(local?.version ?? 0) >= current.version
-            || seenInSession(current.id, current.version);
+        return (
+            !!current.seen ||
+            Number(local?.version ?? 0) >= current.version ||
+            seenInSession(current.id, current.version)
+        );
     });
 
     /** Grava só o tour que mudou (o servidor mescla); na tela, o mapa completo. */
     function persist({ id, version }, status) {
         const state = { version, status };
 
-        savePreference('tours', { [id]: state }, {
-            debounceMs: 0,
-            optimistic: { ...(preferences.value?.tours ?? {}), [id]: state },
-        });
+        savePreference(
+            'tours',
+            { [id]: state },
+            {
+                debounceMs: 0,
+                optimistic: { ...(preferences.value?.tours ?? {}), [id]: state },
+            },
+        );
     }
 
     async function start() {
@@ -225,14 +255,14 @@ export function usePanelTour() {
         // Tour capturado na abertura: a gravação vale para ESTE tour, mesmo
         // que a página mude antes do fechamento.
         const { id, version, auto, t } = current;
-        const reduced  = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
-        const touch    = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+        const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+        const touch = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
         const returnTo = document.activeElement;
         const onScroll = () => active?.refresh();
         // A atualização automática do Dashboard (30 s) muda a altura das
         // seções com o tour aberto: reposiciona o destaque junto.
         const onResize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => active?.refresh()) : null;
-        let finished   = false;
+        let finished = false;
 
         const finish = (status) => {
             if (finished) return;
@@ -240,7 +270,7 @@ export function usePanelTour() {
 
             document.removeEventListener('scroll', onScroll, true);
             onResize?.disconnect();
-            active       = null;
+            active = null;
             activeFinish = null;
             markSeenInSession(id, version);
 
@@ -253,34 +283,34 @@ export function usePanelTour() {
 
         active = driver({
             steps: buildTourSteps({
-                nav:            page.props.nav ?? [],
+                nav: page.props.nav ?? [],
                 t,
-                page:           current.page ?? null,
+                page: current.page ?? null,
                 sidebarVisible: isTargetVisible(document.getElementById('sidebar')),
-                hasTarget:      (name) => isTargetVisible(document.querySelector(tourSelector(name))),
-                pageOrder:      sortByDocumentOrder,
+                hasTarget: (name) => isTargetVisible(document.querySelector(tourSelector(name))),
+                pageOrder: sortByDocumentOrder,
                 touch,
             }),
-            showProgress:             true,
-            progressText:             escapeHtml(t.ui?.progress),
-            nextBtnText:              escapeHtml(t.ui?.next),
-            prevBtnText:              escapeHtml(t.ui?.previous),
-            doneBtnText:              escapeHtml(t.ui?.done),
-            popoverClass:             'ee-tour',
-            animate:                  !reduced,
+            showProgress: true,
+            progressText: escapeHtml(t.ui?.progress),
+            nextBtnText: escapeHtml(t.ui?.next),
+            prevBtnText: escapeHtml(t.ui?.previous),
+            doneBtnText: escapeHtml(t.ui?.done),
+            popoverClass: 'ee-tour',
+            animate: !reduced,
             // Rolagem sem animação: com a suave o destaque e o balão ficavam
             // desalinhados no menu lateral (rolagem interna do simplebar).
-            smoothScroll:             false,
-            allowClose:               true,
-            allowKeyboardControl:     true,
+            smoothScroll: false,
+            allowClose: true,
+            allowKeyboardControl: true,
             // Toque/clique fora avança em vez de encerrar (toque acidental no
             // celular); fechar é no X ou Esc.
-            overlayClickBehavior:     'nextStep',
+            overlayClickBehavior: 'nextStep',
             // O item destacado é um link do menu: clicar nele no meio do tour
             // trocaria de página com o tour aberto.
             disableActiveInteraction: true,
-            stagePadding:             6,
-            stageRadius:              8,
+            stagePadding: 6,
+            stageRadius: 8,
             onPopoverRender: (dom) => {
                 dom.wrapper.setAttribute('aria-modal', 'true');
                 dom.closeButton.setAttribute('aria-label', t.ui?.close ?? '');

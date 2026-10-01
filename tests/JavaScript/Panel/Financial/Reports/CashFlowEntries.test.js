@@ -27,49 +27,126 @@ vi.mock('@/Components/Panel/ActionDropdown.vue', () => ({
 }));
 
 const t = {
-    loading: 'Loading…', load_error: 'Could not load.', sort_by: 'Sort by :column',
-    export: 'Export', export_title: 'Export (:from to :to)', export_csv: 'CSV', export_xlsx: 'Excel', export_pdf: 'PDF',
+    loading: 'Loading…',
+    load_error: 'Could not load.',
+    sort_by: 'Sort by :column',
+    export: 'Export',
+    export_title: 'Export (:from to :to)',
+    export_csv: 'CSV',
+    export_xlsx: 'Excel',
+    export_pdf: 'PDF',
     entry_type: { income: 'Revenue', expense: 'Expense' },
     entry_status: { pending: 'Pending', paid: 'Paid', cancelled: 'Cancelled' },
     cashflow: {
-        title: 'Cash flow report', total_label: 'Entries:', kpis_label: 'Indicators',
-        by_category_income: 'Revenue by category', by_category_expense: 'Expenses by category',
-        col_category: 'Category', col_total: 'Total', col_share: '% of total',
-        by_day: 'By day', col_day: 'Day', col_income: 'Revenue', col_expense: 'Expenses',
-        entries: 'Entries', col_date: 'Date', col_code: 'Code', col_description: 'Description', col_covenant: 'Insurer',
-        col_payment_method: 'Payment method', col_type: 'Type', col_status: 'Status', col_value: 'Amount', no_entries: 'No entries.',
+        title: 'Cash flow report',
+        total_label: 'Entries:',
+        kpis_label: 'Indicators',
+        by_category_income: 'Revenue by category',
+        by_category_expense: 'Expenses by category',
+        col_category: 'Category',
+        col_total: 'Total',
+        col_share: '% of total',
+        by_day: 'By day',
+        col_day: 'Day',
+        col_income: 'Revenue',
+        col_expense: 'Expenses',
+        entries: 'Entries',
+        col_date: 'Date',
+        col_code: 'Code',
+        col_description: 'Description',
+        col_covenant: 'Insurer',
+        col_payment_method: 'Payment method',
+        col_type: 'Type',
+        col_status: 'Status',
+        col_value: 'Amount',
+        no_entries: 'No entries.',
         period_capped: 'Requested :requested_from to :requested_to exceeds :days days. Showing :from to :to.',
-        filters_label: 'Entry list filters', filters_scope_hint: 'Filters apply only to the list.',
-        search_placeholder: 'Search by description or code', search_clear: 'Clear search',
-        filter_type: 'Filter by type', filter_type_all: 'All types',
-        filter_status: 'Filter by status', filter_status_all: 'All statuses',
-        filter_category: 'Filter by category', filter_category_all: 'All categories',
+        filters_label: 'Entry list filters',
+        filters_scope_hint: 'Filters apply only to the list.',
+        search_placeholder: 'Search by description or code',
+        search_clear: 'Clear search',
+        filter_type: 'Filter by type',
+        filter_type_all: 'All types',
+        filter_status: 'Filter by status',
+        filter_status_all: 'All statuses',
+        filter_category: 'Filter by category',
+        filter_category_all: 'All categories',
         filters_clear: 'Clear filters',
-        filtered_count_one: ':count entry found', filtered_count_other: ':count entries found',
-        no_entries_filtered: 'No entries match.', list_loading: 'Updating…', col_actions: 'Actions',
-        open_in_cash_flow: 'Open in cash flow', open_in_cash_flow_code: 'Open :code in cash flow',
-        pagination_label: 'Entries pagination', pagination_showing: 'Showing', pagination_of: 'of', pagination_suffix: 'entries',
-        pagination_previous: 'Previous page', pagination_next: 'Next page',
+        filtered_count_one: ':count entry found',
+        filtered_count_other: ':count entries found',
+        no_entries_filtered: 'No entries match.',
+        list_loading: 'Updating…',
+        col_actions: 'Actions',
+        open_in_cash_flow: 'Open in cash flow',
+        open_in_cash_flow_code: 'Open :code in cash flow',
+        pagination_label: 'Entries pagination',
+        pagination_showing: 'Showing',
+        pagination_of: 'of',
+        pagination_suffix: 'entries',
+        pagination_previous: 'Previous page',
+        pagination_next: 'Next page',
     },
     shared: {
         period: {
-            label: 'Period', from: 'From', to: 'To',
-            invalid_range: 'Start must be before end.', invalid_date: 'Invalid date.', after_max: 'Not after :date.',
-            presets: { today: 'Today', yesterday: 'Yesterday', last7: 'Last 7 days', month: 'This month', last_month: 'Last month', year: 'This year', custom: 'Custom' },
+            label: 'Period',
+            from: 'From',
+            to: 'To',
+            invalid_range: 'Start must be before end.',
+            invalid_date: 'Invalid date.',
+            after_max: 'Not after :date.',
+            presets: {
+                today: 'Today',
+                yesterday: 'Yesterday',
+                last7: 'Last 7 days',
+                month: 'This month',
+                last_month: 'Last month',
+                year: 'This year',
+                custom: 'Custom',
+            },
         },
     },
 };
 
 const ROWS = [
-    { id: 'a', code: 'FLC0000000001', entry_date: '2026-09-05', description: 'Consulta', category_name: 'CONSULTAS', covenant_name: null, payment_method_label: null, type: 'income', status: 'paid', amount: 50, cash_flow_url: '/cash-flow?from=2026-09-01&to=2026-09-26&search=FLC0000000001' },
-    { id: 'b', code: null, entry_date: '2026-09-06', description: 'Legado', category_name: null, covenant_name: null, payment_method_label: null, type: 'expense', status: 'pending', amount: 80, cash_flow_url: '/cash-flow?from=2026-09-06&to=2026-09-06' },
+    {
+        id: 'a',
+        code: 'FLC0000000001',
+        entry_date: '2026-09-05',
+        description: 'Consulta',
+        category_name: 'CONSULTAS',
+        covenant_name: null,
+        payment_method_label: null,
+        type: 'income',
+        status: 'paid',
+        amount: 50,
+        cash_flow_url: '/cash-flow?from=2026-09-01&to=2026-09-26&search=FLC0000000001',
+    },
+    {
+        id: 'b',
+        code: null,
+        entry_date: '2026-09-06',
+        description: 'Legado',
+        category_name: null,
+        covenant_name: null,
+        payment_method_label: null,
+        type: 'expense',
+        status: 'pending',
+        amount: 80,
+        cash_flow_url: '/cash-flow?from=2026-09-06&to=2026-09-06',
+    },
 ];
 
 function paginator(overrides = {}) {
     return {
         data: ROWS,
-        current_page: 1, last_page: 3, per_page: 2, total: 6, from: 1, to: 2,
-        prev_page_url: null, next_page_url: '/reports/cash-flow?entries_page=2',
+        current_page: 1,
+        last_page: 3,
+        per_page: 2,
+        total: 6,
+        from: 1,
+        to: 2,
+        prev_page_url: null,
+        next_page_url: '/reports/cash-flow?entries_page=2',
         links: [
             { url: null, label: '&laquo; Previous', active: false },
             { url: '/reports/cash-flow?entries_page=1', label: '1', active: true },
@@ -84,11 +161,28 @@ function paginator(overrides = {}) {
 function baseProps(overrides = {}) {
     return {
         breadcrumbs: [],
-        filters: { from: '2026-09-01', to: '2026-09-26', search: '', type: null, status: null, category_id: null, sort: 'entry_date', direction: 'asc' },
+        filters: {
+            from: '2026-09-01',
+            to: '2026-09-26',
+            search: '',
+            type: null,
+            status: null,
+            category_id: null,
+            sort: 'entry_date',
+            direction: 'asc',
+        },
         period_capped: null,
         today: '2026-09-26',
         summary: { income: 50, expense: 80, balance: -30, pending: 80 },
-        overview: { received: 50, receivable: 0, paid: 0, payable: 80, realized_balance: 50, projected_balance: -30, entries_count: 6 },
+        overview: {
+            received: 50,
+            receivable: 0,
+            paid: 0,
+            payable: 80,
+            realized_balance: 50,
+            projected_balance: -30,
+            entries_count: 6,
+        },
         byCategory: [],
         byDay: [],
         categories: [
@@ -140,7 +234,9 @@ describe('Financial/Reports/CashFlow — lista paginada', () => {
         const pagination = w.find('[data-test="entries-pagination"]');
         expect(pagination.find('nav').attributes('aria-label')).toBe('Entries pagination');
         expect(pagination.text()).toContain('Showing 1–2 of 6 entries');
-        expect(pagination.find('[aria-label="Next page"]').attributes('href')).toBe('/reports/cash-flow?entries_page=2');
+        expect(pagination.find('[aria-label="Next page"]').attributes('href')).toBe(
+            '/reports/cash-flow?entries_page=2',
+        );
 
         // Total do cabeçalho = período inteiro (overview), não a página.
         expect(w.find('.page-header-total').text()).toBe('Entries: 6');
@@ -166,7 +262,14 @@ describe('Financial/Reports/CashFlow — lista paginada', () => {
         const [url, data, options] = lastVisit();
         expect(url).toBe('/reports/cash-flow');
         expect(data).toEqual({ from: '2026-09-01', to: '2026-09-26', sort: 'amount', direction: 'asc' });
-        expect(options).toEqual(expect.objectContaining({ only: ['entries', 'filters'], preserveState: true, preserveScroll: true, replace: true }));
+        expect(options).toEqual(
+            expect.objectContaining({
+                only: ['entries', 'filters'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }),
+        );
         expect(data).not.toHaveProperty('entries_page');
     });
 });
@@ -179,7 +282,13 @@ describe('Financial/Reports/CashFlow — busca e filtros da lista', () => {
         await nextTick();
 
         expect(router.get).toHaveBeenCalledTimes(1);
-        expect(lastVisit()[1]).toEqual({ from: '2026-09-01', to: '2026-09-26', type: 'expense', sort: 'amount', direction: 'desc' });
+        expect(lastVisit()[1]).toEqual({
+            from: '2026-09-01',
+            to: '2026-09-26',
+            type: 'expense',
+            sort: 'amount',
+            direction: 'desc',
+        });
 
         await w.find('[data-test="filter-status"]').setValue('pending');
         await nextTick();
@@ -258,7 +367,9 @@ describe('Financial/Reports/CashFlow — busca e filtros da lista', () => {
 
     it('erro de rede na lista: aviso dentro da lista (não no topo) e o Inertia não abre o modal de erro', async () => {
         let options;
-        vi.mocked(router.get).mockImplementation((url, data, opts) => { options = opts; });
+        vi.mocked(router.get).mockImplementation((url, data, opts) => {
+            options = opts;
+        });
 
         const w = mountPage();
         await w.find('[data-test="filter-type"]').setValue('income');
@@ -274,13 +385,22 @@ describe('Financial/Reports/CashFlow — busca e filtros da lista', () => {
 
 describe('Financial/Reports/CashFlow — período', () => {
     it('trocar o período mantém busca/filtros/ordem da lista e recarrega a tela inteira', async () => {
-        const w = mountPage({ filters: { ...baseProps().filters, search: 'consulta', status: 'paid', sort: 'amount', direction: 'desc' } });
+        const w = mountPage({
+            filters: { ...baseProps().filters, search: 'consulta', status: 'paid', sort: 'amount', direction: 'desc' },
+        });
 
         await w.find('[data-test="period-preset"]').setValue('last_month');
 
         const [url, data, options] = lastVisit();
         expect(url).toBe('/reports/cash-flow');
-        expect(data).toEqual({ from: '2026-08-01', to: '2026-08-31', search: 'consulta', status: 'paid', sort: 'amount', direction: 'desc' });
+        expect(data).toEqual({
+            from: '2026-08-01',
+            to: '2026-08-31',
+            search: 'consulta',
+            status: 'paid',
+            sort: 'amount',
+            direction: 'desc',
+        });
         expect(options.only).toBeUndefined();
     });
 
@@ -292,7 +412,9 @@ describe('Financial/Reports/CashFlow — período', () => {
 
         const alert = w.find('[data-test="period-capped"]');
         expect(alert.attributes('role')).toBe('status');
-        expect(alert.text()).toBe('Requested 01/01/2024 to 27/09/2026 exceeds 366 days. Showing 27/09/2025 to 27/09/2026.');
+        expect(alert.text()).toBe(
+            'Requested 01/01/2024 to 27/09/2026 exceeds 366 days. Showing 27/09/2025 to 27/09/2026.',
+        );
     });
 
     it('sem recorte, sem aviso', () => {

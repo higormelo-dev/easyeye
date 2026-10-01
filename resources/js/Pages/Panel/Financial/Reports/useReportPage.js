@@ -11,9 +11,9 @@ import { useTrans } from '@/composables/useTrans';
  * sempre do período APLICADO (o mesmo dos números na tela).
  */
 const FORMAT_META = {
-    csv:  { icon: 'ti ti-file-type-csv', labelKey: 'export_csv' },
+    csv: { icon: 'ti ti-file-type-csv', labelKey: 'export_csv' },
     xlsx: { icon: 'ti ti-file-spreadsheet', labelKey: 'export_xlsx' },
-    pdf:  { icon: 'ti ti-file-type-pdf', labelKey: 'export_pdf' },
+    pdf: { icon: 'ti ti-file-type-pdf', labelKey: 'export_pdf' },
 };
 
 /**
@@ -29,14 +29,14 @@ export function useReportPage(props, indexRoute, options = {}) {
     const { tx } = useTrans(() => props.t ?? {});
     const { date } = useLocaleFormat();
 
-    const from      = ref(props.filters.from);
-    const to        = ref(props.filters.to);
-    const loading   = ref(false);
+    const from = ref(props.filters.from);
+    const to = ref(props.filters.to);
+    const loading = ref(false);
     const loadError = ref('');
 
     function restorePeriod() {
         from.value = props.filters.from;
-        to.value   = props.filters.to;
+        to.value = props.filters.to;
     }
 
     watch(() => [props.filters.from, props.filters.to], restorePeriod);
@@ -57,28 +57,51 @@ export function useReportPage(props, indexRoute, options = {}) {
         loadError.value = '';
         options.beforeVisit?.();
 
-        router.get(props.routes?.index ?? route(indexRoute), { ...(options.params?.() ?? {}), from: newFrom, to: newTo }, {
-            preserveState:   true,
-            preserveScroll:  true,
-            replace:         true,
-            onStart:         () => { loading.value = true; },
-            onFinish:        () => { loading.value = false; },
-            onError:         (errors) => { loadError.value = firstError(errors); restorePeriod(); },
-            onHttpException: () => { loadError.value = tx('load_error'); restorePeriod(); return false; },
-            onNetworkError:  () => { loadError.value = tx('load_error'); restorePeriod(); return false; },
-        });
+        router.get(
+            props.routes?.index ?? route(indexRoute),
+            { ...(options.params?.() ?? {}), from: newFrom, to: newTo },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                onStart: () => {
+                    loading.value = true;
+                },
+                onFinish: () => {
+                    loading.value = false;
+                },
+                onError: (errors) => {
+                    loadError.value = firstError(errors);
+                    restorePeriod();
+                },
+                onHttpException: () => {
+                    loadError.value = tx('load_error');
+                    restorePeriod();
+                    return false;
+                },
+                onNetworkError: () => {
+                    loadError.value = tx('load_error');
+                    restorePeriod();
+                    return false;
+                },
+            },
+        );
     }
 
-    const exportOptions = computed(() => (props.export_formats ?? [])
-        .filter((format) => FORMAT_META[format])
-        .map((format) => ({
-            key:   format,
-            icon:  FORMAT_META[format].icon,
-            label: props.t?.[FORMAT_META[format].labelKey] ?? format.toUpperCase(),
-            href:  `${props.routes?.export ?? ''}?${new URLSearchParams({ from: props.filters.from, to: props.filters.to, format }).toString()}`,
-        })));
+    const exportOptions = computed(() =>
+        (props.export_formats ?? [])
+            .filter((format) => FORMAT_META[format])
+            .map((format) => ({
+                key: format,
+                icon: FORMAT_META[format].icon,
+                label: props.t?.[FORMAT_META[format].labelKey] ?? format.toUpperCase(),
+                href: `${props.routes?.export ?? ''}?${new URLSearchParams({ from: props.filters.from, to: props.filters.to, format }).toString()}`,
+            })),
+    );
 
-    const exportTitle = computed(() => tx('export_title', { from: date(props.filters.from), to: date(props.filters.to) }));
+    const exportTitle = computed(() =>
+        tx('export_title', { from: date(props.filters.from), to: date(props.filters.to) }),
+    );
 
     return { from, to, loading, loadError, applyPeriod, exportOptions, exportTitle };
 }
@@ -91,7 +114,7 @@ export function usePercent() {
         if (value === null || value === undefined || value === '' || Number.isNaN(Number(value))) return '—';
 
         return new Intl.NumberFormat(locale.value, {
-            style:                 'percent',
+            style: 'percent',
             minimumFractionDigits: digits,
             maximumFractionDigits: digits,
         }).format(Number(value) / 100);
@@ -108,7 +131,7 @@ export function usePlural() {
     const { locale, number } = useLocaleFormat();
 
     function plural(texts, prefix, count) {
-        const form     = new Intl.PluralRules(locale.value).select(Number(count) || 0) === 'one' ? 'one' : 'other';
+        const form = new Intl.PluralRules(locale.value).select(Number(count) || 0) === 'one' ? 'one' : 'other';
         const template = texts?.[`${prefix}_${form}`] ?? `${prefix}_${form}`;
 
         return String(template).replaceAll(':count', number(count));

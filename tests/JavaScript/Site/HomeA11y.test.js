@@ -7,7 +7,9 @@ import { initSiteAnimations } from '@/site-animations';
 vi.mock('@/Layouts/SiteLayout.vue', () => ({
     default: { props: ['t', 'routes', 'appName', 'hasHero'], template: '<div class="layout-stub"><slot /></div>' },
 }));
-vi.mock('@/Components/Site/ContactForm.vue', () => ({ default: { props: ['t', 'action'], template: '<form class="contact-form-stub" />' } }));
+vi.mock('@/Components/Site/ContactForm.vue', () => ({
+    default: { props: ['t', 'action'], template: '<form class="contact-form-stub" />' },
+}));
 vi.mock('@/site-animations', () => ({ initSiteAnimations: vi.fn(() => () => {}) }));
 // <Head> não renderiza: com a página no document, o happy-dom baixaria as
 // fontes e a imagem do hero dos <link> (rede real dentro do teste).
@@ -28,13 +30,28 @@ function buildT() {
     return {
         meta: { title: 'EasyEye', description: 'd', og_title: 'o', og_description: 'o' },
         hero: {
-            badge: 'b', title: 't', title_em: 'e', subtitle: 's', cta_primary: 'Começar grátis', cta_account: 'Criar conta', cta_secondary: 'Ver o sistema',
-            cta_note: ':days dias grátis · sem cartão de crédito', trust: '', trust_initials: [],
-            visual_alt: 'Prontuário oftalmológico do EasyEye', card_top_lbl: 'Imagens por olho', card_top_val: 'OCT',
-            card_bot_lbl: 'CFM e LGPD', card_bot_val: 'Assinado',
+            badge: 'b',
+            title: 't',
+            title_em: 'e',
+            subtitle: 's',
+            cta_primary: 'Começar grátis',
+            cta_account: 'Criar conta',
+            cta_secondary: 'Ver o sistema',
+            cta_note: ':days dias grátis · sem cartão de crédito',
+            trust: '',
+            trust_initials: [],
+            visual_alt: 'Prontuário oftalmológico do EasyEye',
+            card_top_lbl: 'Imagens por olho',
+            card_top_val: 'OCT',
+            card_bot_lbl: 'CFM e LGPD',
+            card_bot_val: 'Assinado',
         },
         metrics: [],
-        problems: section({ items: [{ title: 'Histórico disperso', text: 'Consulte a evolução clínica em um lugar.', icon: 'ti-history' }] }),
+        problems: section({
+            items: [
+                { title: 'Histórico disperso', text: 'Consulte a evolução clínica em um lugar.', icon: 'ti-history' },
+            ],
+        }),
         demo: section({
             title: 'Veja o EasyEye por dentro',
             fictitious: 'Dados fictícios.',
@@ -51,7 +68,10 @@ function buildT() {
             more: 'Ver todos os recursos de :audience',
             groups: [
                 {
-                    key: 'consultorio', icon: 'ti-stethoscope', title: 'Consultório', audience: 'Para o oftalmologista',
+                    key: 'consultorio',
+                    icon: 'ti-stethoscope',
+                    title: 'Consultório',
+                    audience: 'Para o oftalmologista',
                     items: [
                         { text: 'Prontuário oftalmológico' },
                         { text: 'Integração com aparelhos', feature: 'has_api_integrator' },
@@ -60,27 +80,65 @@ function buildT() {
                     ],
                 },
                 {
-                    key: 'faturamento', icon: 'ti-receipt', title: 'Faturamento', audience: 'Para o faturamento',
+                    key: 'faturamento',
+                    icon: 'ti-receipt',
+                    title: 'Faturamento',
+                    audience: 'Para o faturamento',
                     items: [{ text: 'Guias TISS' }],
-                    flow_label: 'Fluxo TISS', flow: ['Guia', 'Lote XML', 'Retorno e glosa'],
+                    flow_label: 'Fluxo TISS',
+                    flow: ['Guia', 'Lote XML', 'Retorno e glosa'],
                 },
             ],
         }),
-        how: section({ steps: [{ title: 'Passo 1', text: 'a' }, { title: 'Passo 2', text: 'b' }], screenshot_alt: 'alt' }),
+        how: section({
+            steps: [
+                { title: 'Passo 1', text: 'a' },
+                { title: 'Passo 2', text: 'b' },
+            ],
+            screenshot_alt: 'alt',
+        }),
         differentiators: section({
-            items: [{ title: 'Evolução documentada', text: 'Acompanhe cada alteração com rastreabilidade.', icon: 'ti-history' }],
-            proof_title: 'Na prática', proof: [{ icon: 'ti-history', label: 'Trilha de auditoria' }],
+            items: [
+                {
+                    title: 'Evolução documentada',
+                    text: 'Acompanhe cada alteração com rastreabilidade.',
+                    icon: 'ti-history',
+                },
+            ],
+            proof_title: 'Na prática',
+            proof: [{ icon: 'ti-history', label: 'Trilha de auditoria' }],
         }),
         testimonials: section({
             rating: ':stars de 5 estrelas',
         }),
         pricing: {
-            label: 'Planos', title: 'Planos', subtitle: 's', trial_suffix: ':days dias', empty_title: 'e', empty_subtitle: 'e',
-            contact_cta: 'Falar com especialista', featured_badge: 'Mais popular', on_request: 'Sob consulta', trial_text: ':days dias grátis para testar',
-            get_started: 'Começar grátis', included_all_label: 'Em todos os planos', included_all: 'Agenda e prontuário.',
-            choose_plan: 'Escolher :plan', details_label: 'Ver todos os recursos', summary_label: 'Comparação de planos',
+            label: 'Planos',
+            title: 'Planos',
+            subtitle: 's',
+            trial_suffix: ':days dias',
+            empty_title: 'e',
+            empty_subtitle: 'e',
+            contact_cta: 'Falar com especialista',
+            featured_badge: 'Mais popular',
+            on_request: 'Sob consulta',
+            trial_text: ':days dias grátis para testar',
+            get_started: 'Começar grátis',
+            included_all_label: 'Em todos os planos',
+            included_all: 'Agenda e prontuário.',
+            choose_plan: 'Escolher :plan',
+            details_label: 'Ver todos os recursos',
+            summary_label: 'Comparação de planos',
             comparison_labels: { max_doctors: 'Médicos', ai_monthly_credits: 'Créditos de IA' },
-            included: 'Incluído', not_included: 'Não incluído', not_specified: 'Não informado', integrator_label: 'Integrador de exames', integrator_description: 'Envie os exames dos aparelhos para o EasyEye e mantenha-os organizados para consulta.', integrator_title: 'Integrador de exames', integrator_badge: 'Integrador incluído', integrator_plan: 'Incluído no :plan', integrator_flow: ['Aparelhos', 'Integrador', 'Exames'],
+            included: 'Incluído',
+            not_included: 'Não incluído',
+            not_specified: 'Não informado',
+            integrator_label: 'Integrador de exames',
+            integrator_description:
+                'Envie os exames dos aparelhos para o EasyEye e mantenha-os organizados para consulta.',
+            integrator_title: 'Integrador de exames',
+            integrator_badge: 'Integrador incluído',
+            integrator_plan: 'Incluído no :plan',
+            integrator_flow: ['Aparelhos', 'Integrador', 'Exames'],
             groups: { capacity: 'Capacidade', ai: 'Inteligência artificial', resources: 'Recursos' },
             upcoming_label: 'Em breve no Premium',
             upcoming: [{ icon: 'ti-eye', title: 'Programa completo de optotipos', badge: 'Em breve' }],
@@ -88,57 +146,136 @@ function buildT() {
         pricing_credit_note: {
             title: 'IA no seu plano: o que consome créditos',
             intro: 'Os recursos de IA usam o mesmo saldo da clínica.',
-            actions_title: 'Análises e rascunhos', actions_body: 'Consomem créditos quando incluídos no plano.',
-            chat_title: 'Dúvidas e textos no assistente', chat_body: 'Cada pergunta ou pedido de texto também usa esse saldo.',
-            usage_title: 'Consumo variável', usage_body: 'Uma solicitação pode consumir mais de um crédito.',
-            renewal_title: 'Franquia do plano', renewal_body: 'Renova por ciclo e não acumula.',
+            actions_title: 'Análises e rascunhos',
+            actions_body: 'Consomem créditos quando incluídos no plano.',
+            chat_title: 'Dúvidas e textos no assistente',
+            chat_body: 'Cada pergunta ou pedido de texto também usa esse saldo.',
+            usage_title: 'Consumo variável',
+            usage_body: 'Uma solicitação pode consumir mais de um crédito.',
+            renewal_title: 'Franquia do plano',
+            renewal_body: 'Renova por ciclo e não acumula.',
             topup: 'Recargas acumulam e não expiram.',
             trial_note: 'A franquia do plano não é liberada durante o período de teste.',
             medical_note: 'O médico deve revisar o conteúdo gerado.',
         },
-        faq: { label: 'FAQ', title: 'Perguntas', items: [{ q: 'Funciona offline?', a: 'Não.' }, { q: 'Tem TISS?', a: 'Sim.' }] },
+        faq: {
+            label: 'FAQ',
+            title: 'Perguntas',
+            items: [
+                { q: 'Funciona offline?', a: 'Não.' },
+                { q: 'Tem TISS?', a: 'Sim.' },
+            ],
+        },
         contact: {
-            label: 'Contato', headline_pre: 'Quer falar com o', headline_post: 'Estamos aqui', subtitle: 's', form: {},
+            label: 'Contato',
+            headline_pre: 'Quer falar com o',
+            headline_post: 'Estamos aqui',
+            subtitle: 's',
+            form: {},
             sales: { title: 'Vendas', desc: 'd', channel: '+55 61 98467-6485' },
             support: { title: 'Suporte', desc: 'd' },
-            trial: { title: 'Teste', title_no_trial: 'Criar conta', desc: ':days dias sem cartão', desc_no_trial: 'Sem cartão de crédito.', cta: 'Criar conta' },
+            trial: {
+                title: 'Teste',
+                title_no_trial: 'Criar conta',
+                desc: ':days dias sem cartão',
+                desc_no_trial: 'Sem cartão de crédito.',
+                cta: 'Criar conta',
+            },
             aside: { quote_text: '', quote_author: '' },
-            trust_ssl: 'SSL', trust_lgpd: 'LGPD', trust_cfm: 'CFM', trust_nps: '',
+            trust_ssl: 'SSL',
+            trust_lgpd: 'LGPD',
+            trust_cfm: 'CFM',
+            trust_nps: '',
         },
         cta: {
-            title: 'Pronto?', subtitle_trial: ':days dias gratuitos, sem cartão.', subtitle: 'Sem cartão de crédito.',
-            primary: 'Começar grátis', primary_no_trial: 'Criar conta', secondary: 'Conversar pelo WhatsApp', note: 'n',
+            title: 'Pronto?',
+            subtitle_trial: ':days dias gratuitos, sem cartão.',
+            subtitle: 'Sem cartão de crédito.',
+            primary: 'Começar grátis',
+            primary_no_trial: 'Criar conta',
+            secondary: 'Conversar pelo WhatsApp',
+            note: 'n',
         },
         nav: {},
         footer: {},
     };
 }
 
-const feature = (id, key, display_label, extra = {}) => ({ id, key, display_label, enabled: true, is_none: false, ...extra });
+const feature = (id, key, display_label, extra = {}) => ({
+    id,
+    key,
+    display_label,
+    enabled: true,
+    is_none: false,
+    ...extra,
+});
 
 // Catálogo heterogêneo: planos pagos e um plano sob consulta.
 function buildPlans() {
     return [
-        { id: 'p1', slug: 'basico', name: 'Básico', description: '', price: 1299.5, price_period_label: '/mês', is_free: false, is_featured: false, trial_days: 14, register_url: '/register?plan=p1',
+        {
+            id: 'p1',
+            slug: 'basico',
+            name: 'Básico',
+            description: '',
+            price: 1299.5,
+            price_period_label: '/mês',
+            is_free: false,
+            is_featured: false,
+            trial_days: 14,
+            register_url: '/register?plan=p1',
             features: [
                 feature('b1', 'max_doctors', 'Até 1 médico'),
                 feature('b2', 'ai_monthly_credits', 'Sem créditos de IA', { is_none: true }),
                 feature('b3', 'has_api_integrator', 'Integração com equipamentos', { enabled: false }),
-            ] },
-        { id: 'p2', slug: 'pro', name: 'Pro', description: '', price: 899.9, price_period_label: '/mês', is_free: false, is_featured: true, trial_days: 7, register_url: '/register?plan=p2',
+            ],
+        },
+        {
+            id: 'p2',
+            slug: 'pro',
+            name: 'Pro',
+            description: '',
+            price: 899.9,
+            price_period_label: '/mês',
+            is_free: false,
+            is_featured: true,
+            trial_days: 7,
+            register_url: '/register?plan=p2',
             features: [
                 feature('r1', 'max_doctors', 'Até 3 médicos'),
                 feature('r2', 'ai_monthly_credits', '100 créditos de IA por mês'),
                 feature('r3', 'has_api_integrator', 'Integração com equipamentos'),
-            ] },
-        { id: 'p3', slug: 'premium', name: 'Premium', description: '', price: 1799.9, price_period_label: '/mês', is_free: false, is_featured: false, trial_days: null, register_url: '/register?plan=p3',
+            ],
+        },
+        {
+            id: 'p3',
+            slug: 'premium',
+            name: 'Premium',
+            description: '',
+            price: 1799.9,
+            price_period_label: '/mês',
+            is_free: false,
+            is_featured: false,
+            trial_days: null,
+            register_url: '/register?plan=p3',
             features: [
                 feature('m1', 'max_doctors', 'Até 3 médicos'),
                 feature('m2', 'ai_monthly_credits', '500 créditos de IA por mês'),
                 feature('m3', 'has_api_integrator', 'Integração com equipamentos'),
-            ] },
-        { id: 'p4', slug: 'enterprise', name: 'Enterprise', description: '', price: 0, price_period_label: '', is_free: true, is_featured: false, trial_days: null,
-            features: [feature('e1', 'max_doctors', 'Médicos ilimitados')] },
+            ],
+        },
+        {
+            id: 'p4',
+            slug: 'enterprise',
+            name: 'Enterprise',
+            description: '',
+            price: 0,
+            price_period_label: '',
+            is_free: true,
+            is_featured: false,
+            trial_days: null,
+            features: [feature('e1', 'max_doctors', 'Médicos ilimitados')],
+        },
     ];
 }
 
@@ -153,10 +290,12 @@ function stubIntersectionObserver() {
             observers.push(this);
         }
 
-        observe(target) { this.targets.push(target); }
+        observe(target) {
+            this.targets.push(target);
+        }
         disconnect() {}
         report(isVisible) {
-            this.callback(this.targets.map(target => ({ target, isIntersecting: isVisible(target) })));
+            this.callback(this.targets.map((target) => ({ target, isIntersecting: isVisible(target) })));
         }
     }
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
@@ -164,13 +303,24 @@ function stubIntersectionObserver() {
 }
 
 function stubMatchMedia(reduceMotion) {
-    window.matchMedia = vi.fn((query) => Object.assign(new EventTarget(), {
-        matches: reduceMotion && query.includes('prefers-reduced-motion'),
-        media: query,
-    }));
+    window.matchMedia = vi.fn((query) =>
+        Object.assign(new EventTarget(), {
+            matches: reduceMotion && query.includes('prefers-reduced-motion'),
+            media: query,
+        }),
+    );
 }
 
-async function mountHome({ reduceMotion = false, locale = 'pt-BR', plans = buildPlans(), trialDays = 7, demoImages, heroImage = 1, observers, t = buildT() } = {}) {
+async function mountHome({
+    reduceMotion = false,
+    locale = 'pt-BR',
+    plans = buildPlans(),
+    trialDays = 7,
+    demoImages,
+    heroImage = 1,
+    observers,
+    t = buildT(),
+} = {}) {
     if (!observers) stubIntersectionObserver();
     stubMatchMedia(reduceMotion);
     wrapper = mount(Home, {
@@ -243,14 +393,23 @@ describe('Home — demonstração', () => {
         await mountHome();
 
         expect(tabs().map((tab) => tab.text())).toEqual(['Prontuário', 'Imagens', 'Agenda']);
-        expect(wrapper.get('#demonstracao').findAll('button').map(button => button.text())).toEqual(['Prontuário', 'Imagens', 'Agenda']);
+        expect(
+            wrapper
+                .get('#demonstracao')
+                .findAll('button')
+                .map((button) => button.text()),
+        ).toEqual(['Prontuário', 'Imagens', 'Agenda']);
         expect(wrapper.get('#demo-panel-agenda .demo-fictitious').text()).toBe('Dados fictícios.');
         expect(wrapper.find('#demo-panel-prontuario .demo-fictitious').exists()).toBe(false);
 
         const shot = wrapper.get('#demo-panel-prontuario img');
         expect(shot.attributes('src')).toBe('/site/images/demo-prontuario.webp?v=1');
         expect(shot.attributes('alt')).toBe('c1');
-        expect([shot.attributes('width'), shot.attributes('height'), shot.attributes('loading')]).toEqual(['1600', '731', 'lazy']);
+        expect([shot.attributes('width'), shot.attributes('height'), shot.attributes('loading')]).toEqual([
+            '1600',
+            '731',
+            'lazy',
+        ]);
     });
 
     it('abas ligadas aos painéis; só a ativa entra no Tab (tabindex 0)', async () => {
@@ -338,8 +497,11 @@ describe('Home — planos', () => {
         const note = wrapper.get('#creditos-ia');
         expect(note.attributes('aria-labelledby')).toBe('pricing-credit-title');
         expect(note.get('#pricing-credit-title').text()).toBe(buildT().pricing_credit_note.title);
-        expect(note.findAll('dt').map(item => item.text())).toEqual([
-            'Análises e rascunhos', 'Dúvidas e textos no assistente', 'Consumo variável', 'Franquia do plano',
+        expect(note.findAll('dt').map((item) => item.text())).toEqual([
+            'Análises e rascunhos',
+            'Dúvidas e textos no assistente',
+            'Consumo variável',
+            'Franquia do plano',
         ]);
         expect(note.text()).toContain(buildT().pricing_credit_note.chat_body);
         expect(note.text()).toContain(buildT().pricing_credit_note.usage_body);
@@ -351,7 +513,9 @@ describe('Home — planos', () => {
     it('integra o catálogo e apresenta os recursos comerciais nos detalhes de cada plano', async () => {
         await mountHome();
 
-        expect(wrapper.findAll('.pricing-name').map(name => name.text())).toEqual(buildPlans().map(plan => plan.name));
+        expect(wrapper.findAll('.pricing-name').map((name) => name.text())).toEqual(
+            buildPlans().map((plan) => plan.name),
+        );
         const expectedRows = [
             ['Até 1 médico', 'Sem créditos de IA'],
             ['Até 3 médicos', '100 créditos de IA por mês', 'Integrador de exames'],
@@ -362,22 +526,25 @@ describe('Home — planos', () => {
             const details = card(index).get('.pricing-details');
             expect(details.element.tagName).toBe('DETAILS');
             expect(details.get('summary').text()).toBe('Ver todos os recursos');
-            expect(details.findAll('.pricing-features li').map(row => row.text())).toEqual(labels);
+            expect(details.findAll('.pricing-features li').map((row) => row.text())).toEqual(labels);
         });
     });
 
     it('links dos planos pagos preservam sua escolha e sob consulta abre o comercial', async () => {
         await mountHome();
 
-        expect(wrapper.findAll('.pricing-cta a').map(link => link.attributes('href'))).toEqual([
-            '/register?plan=p1', '/register?plan=p2', '/register?plan=p3', 'https://wa.me/5561984676485',
+        expect(wrapper.findAll('.pricing-cta a').map((link) => link.attributes('href'))).toEqual([
+            '/register?plan=p1',
+            '/register?plan=p2',
+            '/register?plan=p3',
+            'https://wa.me/5561984676485',
         ]);
     });
 
     it('apresenta planos depois dos recursos e antes da implantação', async () => {
         await mountHome();
 
-        const sections = wrapper.findAll('section[id]').map(section => section.attributes('id'));
+        const sections = wrapper.findAll('section[id]').map((section) => section.attributes('id'));
         expect(sections.indexOf('precos')).toBeGreaterThan(sections.indexOf('funcionalidades'));
         expect(sections.indexOf('precos')).toBeLessThan(sections.indexOf('como-funciona'));
     });
@@ -457,7 +624,11 @@ describe('Home — funcionalidades por público', () => {
 
         const flow = wrapper.get('[data-test="tiss-flow"]');
         expect(flow.classes()).toContain('is-static');
-        expect(flow.findAll('li').map((li) => li.attributes('style'))).toEqual(['--step: 0;', '--step: 1;', '--step: 2;']);
+        expect(flow.findAll('li').map((li) => li.attributes('style'))).toEqual([
+            '--step: 0;',
+            '--step: 1;',
+            '--step: 2;',
+        ]);
     });
 
     it('fluxo TISS respeita ativar reduzir movimento durante a sessão sem mudar a aba escolhida', async () => {
@@ -466,9 +637,11 @@ describe('Home — funcionalidades por público', () => {
         await tabs()[1].trigger('click');
         const flow = wrapper.get('[data-test="tiss-flow"]');
         expect(flow.classes()).toContain('is-armed');
-        const observer = observers.find(item => item.targets.includes(flow.element));
+        const observer = observers.find((item) => item.targets.includes(flow.element));
         const disconnect = vi.spyOn(observer, 'disconnect');
-        const query = window.matchMedia.mock.results.find(result => result.value.media.includes('prefers-reduced-motion')).value;
+        const query = window.matchMedia.mock.results.find((result) =>
+            result.value.media.includes('prefers-reduced-motion'),
+        ).value;
 
         query.dispatchEvent(Object.assign(new Event('change'), { matches: true }));
         await nextTick();
@@ -506,7 +679,7 @@ describe('Home — funcionalidades por público', () => {
         const audience = consultorio().get('.audience-details');
         expect(audience.element.tagName).toBe('DETAILS');
         expect(audience.get('summary').text()).toBe('Ver todos os recursos de consultório');
-        expect(audience.findAll('li').map(item => item.text())).toEqual(['Histórico de exames']);
+        expect(audience.findAll('li').map((item) => item.text())).toEqual(['Histórico de exames']);
 
         const differentiator = wrapper.get('.diff-card');
         expect(differentiator.element.tagName).toBe('DETAILS');
@@ -519,7 +692,13 @@ describe('Home — leitor de tela, contatos e hero', () => {
     it('sem prova social publicada, não deixa números, citações ou seções vazias', async () => {
         await mountHome();
 
-        for (const selector of ['.hero-trust', '.metrics', '#dados-indicadores', '#depoimentos', '.contact-aside-quote']) {
+        for (const selector of [
+            '.hero-trust',
+            '.metrics',
+            '#dados-indicadores',
+            '#depoimentos',
+            '.contact-aside-quote',
+        ]) {
             expect(wrapper.find(selector).exists()).toBe(false);
         }
         expect(wrapper.get('.contact-trust').text()).toBe('SSL LGPD CFM');
@@ -538,7 +717,9 @@ describe('Home — leitor de tela, contatos e hero', () => {
         t.metrics = [{ value: '7', amount: 7, decimals: 0, prefix: '', suffix: '', label: 'Clínicas ativas' }];
         t.metrics_context = 'Fonte e período da medição de teste.';
         t.metrics_context_label = 'Contexto dos indicadores';
-        t.testimonials.items = [{ name: 'Pessoa de teste', text: 'Depoimento de teste.', stars: 4, initials: 'AC', role: 'Diretora' }];
+        t.testimonials.items = [
+            { name: 'Pessoa de teste', text: 'Depoimento de teste.', stars: 4, initials: 'AC', role: 'Diretora' },
+        ];
         t.contact.aside = { quote_text: 'Citação de teste.', quote_author: 'Pessoa de teste' };
         t.contact.trust_nps = 'Indicador de satisfação de teste';
         await mountHome({ t });
@@ -582,12 +763,21 @@ describe('Home — leitor de tela, contatos e hero', () => {
         const shot = wrapper.get('.hero-shot');
         expect(shot.attributes('src')).toBe('/site/images/hero-prontuario.webp?v=1');
         expect(shot.attributes('alt')).toBe('Prontuário oftalmológico do EasyEye');
-        expect([shot.attributes('width'), shot.attributes('height'), shot.attributes('fetchpriority')]).toEqual(['1061', '857', 'high']);
+        expect([shot.attributes('width'), shot.attributes('height'), shot.attributes('fetchpriority')]).toEqual([
+            '1061',
+            '857',
+            'high',
+        ]);
 
         const calibration = wrapper.get('.hero-calibration');
         expect(calibration.attributes('aria-hidden')).toBe('true');
-        expect(calibration.findAll('svg').map(mark => [mark.attributes('data-corner'), mark.attributes('focusable')])).toEqual([
-            ['tl', 'false'], ['tr', 'false'], ['br', 'false'], ['bl', 'false'],
+        expect(
+            calibration.findAll('svg').map((mark) => [mark.attributes('data-corner'), mark.attributes('focusable')]),
+        ).toEqual([
+            ['tl', 'false'],
+            ['tr', 'false'],
+            ['br', 'false'],
+            ['bl', 'false'],
         ]);
         expect(calibration.find('img').exists()).toBe(false);
         expect(wrapper.get('.hero-enlarge').attributes('href')).toBe(shot.attributes('src'));
@@ -613,8 +803,10 @@ describe('Home — CTA fixo no celular', () => {
         expect(bar().get('a').attributes('tabindex')).toBe('-1');
 
         const [observer] = observers;
-        expect(observer.targets.filter(el => el.matches('.hero, #contato, .cta-final')).map(el => el.className)).toEqual(['hero', 'contact', 'cta-final']);
-        expect(observer.targets.filter(el => el.matches('.pricing-cta a'))).toHaveLength(4);
+        expect(
+            observer.targets.filter((el) => el.matches('.hero, #contato, .cta-final')).map((el) => el.className),
+        ).toEqual(['hero', 'contact', 'cta-final']);
+        expect(observer.targets.filter((el) => el.matches('.pricing-cta a'))).toHaveLength(4);
 
         observer.report(() => false); // rolou além do hero, antes do contato
         await nextTick();
@@ -631,13 +823,13 @@ describe('Home — CTA fixo no celular', () => {
     it('esconde enquanto qualquer CTA de plano está visível e volta ao sair da tela', async () => {
         const observers = stubIntersectionObserver();
         await mountHome({ observers });
-        const observer = observers.find(item => item.targets.some(target => target.matches('.pricing-cta a')));
+        const observer = observers.find((item) => item.targets.some((target) => target.matches('.pricing-cta a')));
         const bar = () => wrapper.get('[data-test="mobile-cta"]');
         observer.report(() => false);
         await nextTick();
         expect(bar().attributes('aria-hidden')).toBe('false');
 
-        observer.report(target => target.matches('.pricing-cta a'));
+        observer.report((target) => target.matches('.pricing-cta a'));
         await nextTick();
         expect(bar().attributes('aria-hidden')).toBe('true');
         expect(bar().get('a').attributes('tabindex')).toBe('-1');

@@ -16,18 +16,18 @@ import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
  * "Analisar com IA").
  */
 const props = defineProps({
-    open:     { type: Boolean, required: true },
-    patient:  { type: Object,  default: null }, // { id, code, name }
-    examIds:  { type: Array,   default: () => [] },
-    urls:     { type: Object,  required: true }, // { templates, preview, store }
-    t:        { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    patient: { type: Object, default: null }, // { id, code, name }
+    examIds: { type: Array, default: () => [] },
+    urls: { type: Object, required: true }, // { templates, preview, store }
+    t: { type: Object, default: () => ({}) },
     // Laudo em lote (Index.vue::openReportModal quando a seleção cobre 2+
     // grupos de exame): progresso/rótulo do passo atual, resumo dos laudos
     // já salvos nesta sessão, e rótulo do botão "próximo grupo". Todos
     // opcionais — fora do fluxo em lote o modal se comporta como sempre.
     queueProgress: { type: Object, default: null }, // { current, total, label }
-    queueSummary:  { type: Array,  default: () => [] }, // [{ label, title, pdf_url }]
-    nextLabel:     { type: String, default: null },
+    queueSummary: { type: Array, default: () => [] }, // [{ label, title, pdf_url }]
+    nextLabel: { type: String, default: null },
     // Imagens do(s) exame(s) deste passo — botão "Inserir imagem do exame"
     // (adaptação do "Auto Load Image" do concorrente: aqui o editor é um
     // bloco de rich-text só, sem campos OD/OE endereçáveis, então em vez de
@@ -42,23 +42,23 @@ function tt(key, fallback = '') {
     return props.t?.[key] ?? fallback;
 }
 
-const templates        = ref([]);
+const templates = ref([]);
 const loadingTemplates = ref(false);
-const previewing       = ref(false);
-const saving           = ref(false);
-const error            = ref('');
-const savedResult      = ref(null); // { pdf_url, title } após salvar
+const previewing = ref(false);
+const saving = ref(false);
+const error = ref('');
+const savedResult = ref(null); // { pdf_url, title } após salvar
 const templateSelectRef = ref(null);
-const editorRef         = ref(null);
-const showImagePicker   = ref(false);
-const imagePickerRef    = ref(null);
+const editorRef = ref(null);
+const showImagePicker = ref(false);
+const imagePickerRef = ref(null);
 
 // Frases rápidas do médico (benchmark 18/09/2026) — dropdown irmão do de
 // imagem, mesmo padrão de fechar ao clicar fora.
-const phrases          = ref([]);
-const loadingPhrases   = ref(false);
+const phrases = ref([]);
+const loadingPhrases = ref(false);
 const showPhrasesPicker = ref(false);
-const phrasesPickerRef  = ref(null);
+const phrasesPickerRef = ref(null);
 
 function onDocumentClick(event) {
     if (showImagePicker.value && imagePickerRef.value && !imagePickerRef.value.contains(event.target)) {
@@ -92,7 +92,10 @@ function insertPhrase(phrase) {
 async function savePhraseFromSelection() {
     const selection = (editorRef.value?.getSelectionHtml() ?? '').trim();
     if (!selection) {
-        if (window.showErrorToast) window.showErrorToast(tt('report_phrases_save_hint', 'Selecione um trecho do texto acima antes de salvar como frase.'));
+        if (window.showErrorToast)
+            window.showErrorToast(
+                tt('report_phrases_save_hint', 'Selecione um trecho do texto acima antes de salvar como frase.'),
+            );
         return;
     }
 
@@ -119,7 +122,8 @@ async function savePhraseFromSelection() {
         phrases.value.push(data);
         if (window.showSuccessToast) window.showSuccessToast(tt('report_phrases_saved', 'Frase salva.'));
     } catch (e) {
-        if (window.showErrorToast) window.showErrorToast(e?.response?.data?.message ?? tt('report_save_failed', 'Não foi possível salvar.'));
+        if (window.showErrorToast)
+            window.showErrorToast(e?.response?.data?.message ?? tt('report_save_failed', 'Não foi possível salvar.'));
     }
 }
 
@@ -136,10 +140,16 @@ async function extractPdfText() {
     try {
         const { data } = await window.axios.post(props.urls.extractPdfText, { exam_ids: props.examIds });
         editorRef.value?.insertContent(
-            data.text.split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join(''),
+            data.text
+                .split(/\n{2,}/)
+                .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+                .join(''),
         );
     } catch (e) {
-        if (window.showErrorToast) window.showErrorToast(e?.response?.data?.message ?? tt('pdf_extract_failed', 'Não foi possível extrair o texto do PDF.'));
+        if (window.showErrorToast)
+            window.showErrorToast(
+                e?.response?.data?.message ?? tt('pdf_extract_failed', 'Não foi possível extrair o texto do PDF.'),
+            );
     } finally {
         extractingPdf.value = false;
     }
@@ -151,14 +161,18 @@ async function deletePhrase(phrase) {
         phrases.value = phrases.value.filter((p) => p.id !== phrase.id);
         if (window.showSuccessToast) window.showSuccessToast(tt('report_phrases_deleted', 'Frase removida.'));
     } catch (e) {
-        if (window.showErrorToast) window.showErrorToast(e?.response?.data?.message ?? tt('report_save_failed', 'Não foi possível remover.'));
+        if (window.showErrorToast)
+            window.showErrorToast(e?.response?.data?.message ?? tt('report_save_failed', 'Não foi possível remover.'));
     }
 }
 
 // alt vem de exam_type.name (cadastro configurável pela clínica, não é
 // literal fixo) — escapar antes de injetar como atributo HTML.
 function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    return String(s).replace(
+        /[&<>"']/g,
+        (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+    );
 }
 
 function insertImage(img) {
@@ -173,16 +187,16 @@ function insertImage(img) {
 // padrão). Menos um campo pro médico preencher à toa.
 const form = reactive({
     report_setting_content_id: '',
-    title:   '',
+    title: '',
     content: '',
 });
 
 function reset() {
     form.report_setting_content_id = '';
-    form.title   = '';
+    form.title = '';
     form.content = '';
-    error.value        = '';
-    savedResult.value  = null;
+    error.value = '';
+    savedResult.value = null;
 }
 
 async function fetchTemplates() {
@@ -194,20 +208,26 @@ async function fetchTemplates() {
         templates.value = [];
         // Distinto de "clínica sem modelos cadastrados" — sem isso o médico
         // via só "Nenhum modelo disponível." e achava que era o esperado.
-        error.value = tt('report_templates_load_failed', 'Não foi possível carregar os modelos. Você pode escrever o laudo do zero ou fechar e tentar novamente.');
+        error.value = tt(
+            'report_templates_load_failed',
+            'Não foi possível carregar os modelos. Você pode escrever o laudo do zero ou fechar e tentar novamente.',
+        );
     } finally {
         loadingTemplates.value = false;
     }
 }
 
-watch(() => props.open, (isOpen) => {
-    if (isOpen) {
-        reset();
-        fetchTemplates();
-        fetchPhrases();
-        nextTick(() => templateSelectRef.value?.focus());
-    }
-});
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (isOpen) {
+            reset();
+            fetchTemplates();
+            fetchPhrases();
+            nextTick(() => templateSelectRef.value?.focus());
+        }
+    },
+);
 
 async function onTemplateChange() {
     if (!form.report_setting_content_id || !props.patient?.id) return;
@@ -234,8 +254,10 @@ async function onTemplateChange() {
 }
 
 async function confirmOpenRecord(consultationDate) {
-    const message = tt('report_confirm_open_record',
-        'Não há prontuário do dia da consulta para este paciente. Deseja abrir um novo prontuário para registrar o laudo?');
+    const message = tt(
+        'report_confirm_open_record',
+        'Não há prontuário do dia da consulta para este paciente. Deseja abrir um novo prontuário para registrar o laudo?',
+    );
 
     if (window.Swal) {
         const result = await window.Swal.fire({
@@ -262,7 +284,7 @@ async function save(confirmOpen = false) {
     }
 
     saving.value = true;
-    error.value  = '';
+    error.value = '';
 
     try {
         const { data } = await window.axios.post(props.urls.store, {
@@ -326,22 +348,33 @@ async function close() {
 
 <template>
     <Teleport to="body">
-        <div v-if="open" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.55);"
-             role="dialog" aria-modal="true" aria-labelledby="eyeReportModalTitle"
-             @click.self="close" @keydown.escape.window="close">
+        <div
+            v-if="open"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.55)"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="eyeReportModalTitle"
+            @click.self="close"
+            @keydown.escape.window="close"
+        >
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
                         <h6 id="eyeReportModalTitle" class="modal-title">
                             <i class="ti ti-file-text me-2 text-primary"></i>{{ tt('report_new', 'Novo laudo') }}
-                            <span v-if="patient" class="text-muted fw-normal ms-1" style="font-size:.82rem;">
+                            <span v-if="patient" class="text-muted fw-normal ms-1" style="font-size: 0.82rem">
                                 — {{ patient.name }}
                             </span>
                         </h6>
                         <button type="button" class="btn-close" @click="close"></button>
                     </div>
 
-                    <div v-if="queueProgress" class="px-3 py-1 bg-body-secondary border-bottom small text-muted d-flex align-items-center gap-1">
+                    <div
+                        v-if="queueProgress"
+                        class="px-3 py-1 bg-body-secondary border-bottom small text-muted d-flex align-items-center gap-1"
+                    >
                         <i class="ti ti-list-numbers"></i>
                         {{ tt('report_queue_label', 'Laudo') }} {{ queueProgress.current }}
                         {{ tt('report_queue_of', 'de') }} {{ queueProgress.total }}
@@ -353,20 +386,32 @@ async function close() {
 
                         <template v-if="!savedResult">
                             <div class="mb-3">
-                                <label class="form-label small fw-semibold">{{ tt('report_templates', 'Modelos') }}</label>
-                                <select ref="templateSelectRef" v-model="form.report_setting_content_id"
-                                        class="form-select form-select-sm"
-                                        :disabled="loadingTemplates || previewing"
-                                        @change="onTemplateChange">
+                                <label class="form-label small fw-semibold">{{
+                                    tt('report_templates', 'Modelos')
+                                }}</label>
+                                <select
+                                    ref="templateSelectRef"
+                                    v-model="form.report_setting_content_id"
+                                    class="form-select form-select-sm"
+                                    :disabled="loadingTemplates || previewing"
+                                    @change="onTemplateChange"
+                                >
                                     <option value="">{{ tt('report_template_blank', 'Em branco') }}</option>
-                                    <optgroup v-for="group in templates" :key="group.report_setting_id" :label="group.report_setting_title">
-                                        <option v-for="tpl in (group.contents || [])" :key="tpl.id" :value="tpl.id">
+                                    <optgroup
+                                        v-for="group in templates"
+                                        :key="group.report_setting_id"
+                                        :label="group.report_setting_title"
+                                    >
+                                        <option v-for="tpl in group.contents || []" :key="tpl.id" :value="tpl.id">
                                             {{ tpl.label }}
                                         </option>
                                     </optgroup>
                                 </select>
                                 <small v-if="loadingTemplates" class="text-muted d-block mt-1">
-                                    <span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                                    <span
+                                        class="spinner-border spinner-border-sm me-1"
+                                        style="width: 0.7rem; height: 0.7rem"
+                                    ></span>
                                     {{ tt('report_loading_templates', 'Carregando modelos…') }}
                                 </small>
                                 <small v-else-if="!templates.length" class="text-muted d-block mt-1">
@@ -377,73 +422,131 @@ async function close() {
                             <div class="mb-0">
                                 <label class="form-label small fw-semibold d-flex align-items-center gap-2">
                                     {{ tt('report_content_label', 'Conteúdo do laudo') }}
-                                    <span v-if="previewing" class="text-muted fw-normal" style="font-size:.75rem;">
-                                        <span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                                    <span v-if="previewing" class="text-muted fw-normal" style="font-size: 0.75rem">
+                                        <span
+                                            class="spinner-border spinner-border-sm me-1"
+                                            style="width: 0.7rem; height: 0.7rem"
+                                        ></span>
                                         {{ tt('report_loading_templates', 'Carregando modelo…') }}
                                     </span>
 
                                     <span class="ms-auto d-flex align-items-center gap-1">
                                         <span v-if="examImages.length" ref="imagePickerRef" class="position-relative">
-                                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
-                                                    style="font-size:.72rem;"
-                                                    @click="showImagePicker = !showImagePicker">
-                                                <i class="ti ti-photo-plus me-1"></i>{{ tt('report_insert_image', 'Inserir imagem') }}
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                                style="font-size: 0.72rem"
+                                                @click="showImagePicker = !showImagePicker"
+                                            >
+                                                <i class="ti ti-photo-plus me-1"></i
+                                                >{{ tt('report_insert_image', 'Inserir imagem') }}
                                             </button>
-                                            <div v-if="showImagePicker" class="position-absolute end-0 mt-1 bg-body border rounded shadow-sm py-1"
-                                                 style="z-index:20;min-width:220px;">
-                                                <button v-for="img in examImages" :key="img.id" type="button"
-                                                        class="dropdown-item d-flex align-items-center gap-2 py-1 px-2 small w-100 text-start border-0 bg-transparent"
-                                                        @click="insertImage(img)">
-                                                    <img :src="img.url" :alt="img.label" width="36" height="28"
-                                                         style="object-fit:cover;border-radius:3px;flex-shrink:0;">
+                                            <div
+                                                v-if="showImagePicker"
+                                                class="position-absolute end-0 mt-1 bg-body border rounded shadow-sm py-1"
+                                                style="z-index: 20; min-width: 220px"
+                                            >
+                                                <button
+                                                    v-for="img in examImages"
+                                                    :key="img.id"
+                                                    type="button"
+                                                    class="dropdown-item d-flex align-items-center gap-2 py-1 px-2 small w-100 text-start border-0 bg-transparent"
+                                                    @click="insertImage(img)"
+                                                >
+                                                    <img
+                                                        :src="img.url"
+                                                        :alt="img.label"
+                                                        width="36"
+                                                        height="28"
+                                                        style="object-fit: cover; border-radius: 3px; flex-shrink: 0"
+                                                    />
                                                     <span class="text-truncate">{{ img.label }}</span>
                                                 </button>
                                             </div>
                                         </span>
 
                                         <span ref="phrasesPickerRef" class="position-relative">
-                                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
-                                                    style="font-size:.72rem;"
-                                                    @click="showPhrasesPicker = !showPhrasesPicker">
-                                                <i class="ti ti-message-2 me-1"></i>{{ tt('report_phrases', 'Frases rápidas') }}
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                                style="font-size: 0.72rem"
+                                                @click="showPhrasesPicker = !showPhrasesPicker"
+                                            >
+                                                <i class="ti ti-message-2 me-1"></i
+                                                >{{ tt('report_phrases', 'Frases rápidas') }}
                                             </button>
-                                            <div v-if="showPhrasesPicker" class="position-absolute end-0 mt-1 bg-body border rounded shadow-sm py-1"
-                                                 style="z-index:20;min-width:240px;max-height:260px;overflow-y:auto;">
-                                                <button type="button"
-                                                        class="dropdown-item d-flex align-items-center gap-2 py-1 px-2 small w-100 text-start border-0 bg-transparent text-primary"
-                                                        @click="savePhraseFromSelection">
-                                                    <i class="ti ti-plus"></i>{{ tt('report_phrases_save', 'Salvar seleção como frase') }}
+                                            <div
+                                                v-if="showPhrasesPicker"
+                                                class="position-absolute end-0 mt-1 bg-body border rounded shadow-sm py-1"
+                                                style="
+                                                    z-index: 20;
+                                                    min-width: 240px;
+                                                    max-height: 260px;
+                                                    overflow-y: auto;
+                                                "
+                                            >
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item d-flex align-items-center gap-2 py-1 px-2 small w-100 text-start border-0 bg-transparent text-primary"
+                                                    @click="savePhraseFromSelection"
+                                                >
+                                                    <i class="ti ti-plus"></i
+                                                    >{{ tt('report_phrases_save', 'Salvar seleção como frase') }}
                                                 </button>
                                                 <div class="dropdown-divider my-1"></div>
                                                 <div v-if="loadingPhrases" class="px-2 py-1 small text-muted">
-                                                    <span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                                                    <span
+                                                        class="spinner-border spinner-border-sm me-1"
+                                                        style="width: 0.7rem; height: 0.7rem"
+                                                    ></span>
                                                 </div>
                                                 <div v-else-if="!phrases.length" class="px-2 py-1 small text-muted">
                                                     {{ tt('report_phrases_empty', 'Nenhuma frase salva ainda.') }}
                                                 </div>
-                                                <div v-for="phrase in phrases" :key="phrase.id"
-                                                     class="d-flex align-items-center gap-1 px-1">
-                                                    <button type="button"
-                                                            class="dropdown-item py-1 px-1 small flex-grow-1 text-start border-0 bg-transparent text-truncate"
-                                                            :title="phrase.label"
-                                                            @click="insertPhrase(phrase)">
+                                                <div
+                                                    v-for="phrase in phrases"
+                                                    :key="phrase.id"
+                                                    class="d-flex align-items-center gap-1 px-1"
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        class="dropdown-item py-1 px-1 small flex-grow-1 text-start border-0 bg-transparent text-truncate"
+                                                        :title="phrase.label"
+                                                        @click="insertPhrase(phrase)"
+                                                    >
                                                         {{ phrase.label }}
                                                     </button>
-                                                    <button type="button" class="btn btn-sm p-0 border-0 bg-transparent text-muted"
-                                                            :title="tt('delete', 'Excluir')"
-                                                            @click="deletePhrase(phrase)">
-                                                        <i class="ti ti-trash" style="font-size:.75rem;"></i>
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm p-0 border-0 bg-transparent text-muted"
+                                                        :title="tt('delete', 'Excluir')"
+                                                        @click="deletePhrase(phrase)"
+                                                    >
+                                                        <i class="ti ti-trash" style="font-size: 0.75rem"></i>
                                                     </button>
                                                 </div>
                                             </div>
                                         </span>
 
-                                        <button v-if="examIds.length" type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
-                                                style="font-size:.72rem;" :disabled="extractingPdf"
-                                                @click="extractPdfText">
-                                            <span v-if="extractingPdf" class="spinner-border spinner-border-sm me-1" style="width:.65rem;height:.65rem;"></span>
+                                        <button
+                                            v-if="examIds.length"
+                                            type="button"
+                                            class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                            style="font-size: 0.72rem"
+                                            :disabled="extractingPdf"
+                                            @click="extractPdfText"
+                                        >
+                                            <span
+                                                v-if="extractingPdf"
+                                                class="spinner-border spinner-border-sm me-1"
+                                                style="width: 0.65rem; height: 0.65rem"
+                                            ></span>
                                             <i v-else class="ti ti-file-text-ai me-1"></i>
-                                            {{ extractingPdf ? tt('pdf_extracting', 'Extraindo texto do PDF…') : tt('pdf_extract_text', 'Extrair texto do PDF') }}
+                                            {{
+                                                extractingPdf
+                                                    ? tt('pdf_extracting', 'Extraindo texto do PDF…')
+                                                    : tt('pdf_extract_text', 'Extrair texto do PDF')
+                                            }}
                                         </button>
                                     </span>
                                 </label>
@@ -473,18 +576,27 @@ async function close() {
 
                         <!-- Pós-salvar: confirmação + link do PDF já gerado -->
                         <div v-else class="text-center py-4">
-                            <i class="ti ti-circle-check text-success" style="font-size:2.6rem;"></i>
+                            <i class="ti ti-circle-check text-success" style="font-size: 2.6rem"></i>
                             <p class="fw-semibold mt-2 mb-1">{{ tt('report_saved', 'Laudo salvo com sucesso.') }}</p>
                             <p class="text-muted small mb-3">{{ savedResult.title }}</p>
                             <a :href="savedResult.pdf_url" target="_blank" class="btn btn-primary btn-sm">
                                 <i class="ti ti-file-download me-1"></i>{{ tt('download_pdf', 'Baixar PDF') }}
                             </a>
 
-                            <div v-if="queueSummary.length" class="text-start mt-4 pt-3 border-top mx-auto" style="max-width:360px;">
-                                <p class="small fw-semibold mb-2">{{ tt('report_queue_previous', 'Laudos já gerados nesta sessão:') }}</p>
+                            <div
+                                v-if="queueSummary.length"
+                                class="text-start mt-4 pt-3 border-top mx-auto"
+                                style="max-width: 360px"
+                            >
+                                <p class="small fw-semibold mb-2">
+                                    {{ tt('report_queue_previous', 'Laudos já gerados nesta sessão:') }}
+                                </p>
                                 <ul class="list-unstyled small mb-0">
-                                    <li v-for="(item, idx) in queueSummary" :key="idx"
-                                        class="d-flex justify-content-between align-items-center mb-1">
+                                    <li
+                                        v-for="(item, idx) in queueSummary"
+                                        :key="idx"
+                                        class="d-flex justify-content-between align-items-center mb-1"
+                                    >
                                         <span class="text-muted">{{ item.label }}</span>
                                         <a :href="item.pdf_url" target="_blank" class="ms-2">
                                             <i class="ti ti-file-download"></i>
@@ -499,14 +611,22 @@ async function close() {
                         <button type="button" class="btn btn-secondary btn-sm" @click="close">
                             {{ tt('close', 'Fechar') }}
                         </button>
-                        <button v-if="!savedResult" type="button" class="btn btn-primary btn-sm"
-                                :disabled="saving || previewing"
-                                @click="save(false)">
+                        <button
+                            v-if="!savedResult"
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            :disabled="saving || previewing"
+                            @click="save(false)"
+                        >
                             <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
                             <i v-else class="ti ti-device-floppy me-1"></i>{{ tt('report_save', 'Salvar laudo') }}
                         </button>
-                        <button v-if="savedResult && nextLabel" type="button" class="btn btn-primary btn-sm"
-                                @click="emit('next')">
+                        <button
+                            v-if="savedResult && nextLabel"
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            @click="emit('next')"
+                        >
                             {{ nextLabel }} <i class="ti ti-arrow-right ms-1"></i>
                         </button>
                     </div>

@@ -16,8 +16,10 @@ const props = defineProps({
     t: { type: Object, default: () => ({}) },
 });
 
-const tx = (key, params = {}) => String(props.t?.[key] ?? key)
-    .replace(/:([A-Za-z_]+)/g, (match, name) => (name in params ? String(params[name]) : match));
+const tx = (key, params = {}) =>
+    String(props.t?.[key] ?? key).replace(/:([A-Za-z_]+)/g, (match, name) =>
+        name in params ? String(params[name]) : match,
+    );
 
 const form = useForm({});
 
@@ -35,12 +37,12 @@ function logout() {
     <Head :title="tx('page_title')" />
 
     <main class="d-flex align-items-center justify-content-center min-vh-100 bg-light px-3">
-        <div class="card shadow-sm border-0 w-100" style="max-width: 460px;">
+        <div class="card shadow-sm border-0 w-100" style="max-width: 460px">
             <div class="card-body p-4 p-md-5">
                 <div class="text-center mb-4">
                     <div
                         class="rounded-circle d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary mb-3"
-                        style="width:56px;height:56px;"
+                        style="width: 56px; height: 56px"
                         aria-hidden="true"
                     >
                         <i class="ti ti-building-hospital fs-4"></i>
@@ -48,7 +50,9 @@ function logout() {
                     <h1 class="h4 fw-bold mb-2">{{ tx('title') }}</h1>
                     <p class="text-muted small mb-2">{{ tx('intro') }}</p>
                     <ul class="list-unstyled fw-semibold mb-0">
-                        <li v-for="clinic in (clinics.length ? clinics : [tx('clinic_fallback')])" :key="clinic">{{ clinic }}</li>
+                        <li v-for="clinic in clinics.length ? clinics : [tx('clinic_fallback')]" :key="clinic">
+                            {{ clinic }}
+                        </li>
                     </ul>
                 </div>
 
@@ -59,10 +63,13 @@ function logout() {
 
                 <template v-if="!emailMatches">
                     <div class="alert alert-warning py-2 small" role="alert">
-                        <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ tx('email_mismatch', { email: inviteEmail }) }}
+                        <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                        >{{ tx('email_mismatch', { email: inviteEmail }) }}
                     </div>
                     <div class="d-grid">
-                        <button type="button" class="btn btn-outline-secondary" @click="logout">{{ tx('not_you') }}</button>
+                        <button type="button" class="btn btn-outline-secondary" @click="logout">
+                            {{ tx('not_you') }}
+                        </button>
                     </div>
                 </template>
 
@@ -72,7 +79,9 @@ function logout() {
                             <i v-if="form.processing" class="ti ti-loader-2 ee-spin me-1" aria-hidden="true"></i>
                             {{ tx('submit') }}
                         </button>
-                        <button type="button" class="btn btn-link btn-sm text-muted" @click="logout">{{ tx('not_you') }}</button>
+                        <button type="button" class="btn btn-link btn-sm text-muted" @click="logout">
+                            {{ tx('not_you') }}
+                        </button>
                     </div>
                 </form>
             </div>

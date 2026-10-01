@@ -29,19 +29,32 @@ vi.mock('driver.js', () => ({
 }));
 vi.mock('driver.js/dist/driver.css', () => ({}));
 
-import { buildTourSteps, escapeHtml, isTargetVisible, sortByDocumentOrder, usePanelTour } from '@/composables/usePanelTour.js';
+import {
+    buildTourSteps,
+    escapeHtml,
+    isTargetVisible,
+    sortByDocumentOrder,
+    usePanelTour,
+} from '@/composables/usePanelTour.js';
 
 const T = {
-    ui:          { start: 'Take the tour', next: 'Next', previous: 'Previous', done: 'Finish', close: 'Close the tour', progress: '{{current}} of {{total}}' },
-    intro:       { title: 'Welcome', description: 'Use the arrow keys', description_touch: 'Use the buttons' },
+    ui: {
+        start: 'Take the tour',
+        next: 'Next',
+        previous: 'Previous',
+        done: 'Finish',
+        close: 'Close the tour',
+        progress: '{{current}} of {{total}}',
+    },
+    intro: { title: 'Welcome', description: 'Use the arrow keys', description_touch: 'Use the buttons' },
     mobile_menu: { title: 'Menu', description: 'Open the menu here' },
-    nav:         { dashboard: 'Day summary', schedules: 'Book & follow <appointments>' },
-    layout:      {
+    nav: { dashboard: 'Day summary', schedules: 'Book & follow <appointments>' },
+    layout: {
         'entity-switcher': { title: 'Current clinic', description: 'Switch clinic' },
-        locale:            { title: 'Language', description: 'Choose' },
-        theme:             { title: 'Theme', description: 'Light or dark' },
-        'user-menu':       { title: 'Your account', description: 'Profile' },
-        help:              { title: 'See again', description: 'Click here' },
+        locale: { title: 'Language', description: 'Choose' },
+        theme: { title: 'Theme', description: 'Light or dark' },
+        'user-menu': { title: 'Your account', description: 'Profile' },
+        help: { title: 'See again', description: 'Click here' },
     },
     outro: { title: 'All set', description: 'Bye' },
 };
@@ -49,14 +62,14 @@ const T = {
 const NAV = [
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'schedules', label: 'Schedules <b>' },
-    { key: 'stock', label: 'Stock' },          // sem texto no tour: fica de fora
-    { section: 'Other' },                      // separador: ignorado
+    { key: 'stock', label: 'Stock' }, // sem texto no tour: fica de fora
+    { section: 'Other' }, // separador: ignorado
 ];
 
-const flush   = () => new Promise((resolve) => setTimeout(resolve, 0));
-const titles  = (steps) => steps.map((step) => step.popover.title);
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const titles = (steps) => steps.map((step) => step.popover.title);
 const targets = (steps) => steps.map((step) => step.data?.target ?? null);
-const hooks   = (instance) => ({ driver: instance });
+const hooks = (instance) => ({ driver: instance });
 
 let tourSeq = 0;
 
@@ -69,9 +82,9 @@ function setTour(overrides = {}) {
     return inertia.props.tour.id;
 }
 
-const lastConfig   = () => driverMock.configs.at(-1);
+const lastConfig = () => driverMock.configs.at(-1);
 const lastInstance = () => driverMock.instances.at(-1);
-const sentBody     = (call = 0) => JSON.parse(vi.mocked(fetch).mock.calls[call][1].body);
+const sentBody = (call = 0) => JSON.parse(vi.mocked(fetch).mock.calls[call][1].body);
 
 beforeEach(() => {
     driverMock.configs.length = 0;
@@ -86,13 +99,33 @@ describe('buildTourSteps', () => {
         const steps = buildTourSteps({ nav: NAV, t: T, sidebarVisible: true, hasTarget: () => true });
 
         expect(titles(steps)).toEqual([
-            'Welcome', 'Current clinic', 'Dashboard', 'Schedules &lt;b&gt;',
-            'Language', 'Theme', 'Your account', 'See again', 'All set',
+            'Welcome',
+            'Current clinic',
+            'Dashboard',
+            'Schedules &lt;b&gt;',
+            'Language',
+            'Theme',
+            'Your account',
+            'See again',
+            'All set',
         ]);
         expect(targets(steps)).toEqual([
-            null, 'entity-switcher', 'nav-dashboard', 'nav-schedules', 'locale', 'theme', 'user-menu', 'help', null,
+            null,
+            'entity-switcher',
+            'nav-dashboard',
+            'nav-schedules',
+            'locale',
+            'theme',
+            'user-menu',
+            'help',
+            null,
         ]);
-        expect(steps[2].popover).toEqual({ title: 'Dashboard', description: 'Day summary', side: 'right', align: 'start' });
+        expect(steps[2].popover).toEqual({
+            title: 'Dashboard',
+            description: 'Day summary',
+            side: 'right',
+            align: 'start',
+        });
         expect(steps[3].popover.description).toBe('Book &amp; follow &lt;appointments&gt;');
         expect(steps[0].popover.description).toBe('Use the arrow keys');
     });
@@ -113,9 +146,24 @@ describe('buildTourSteps', () => {
 
     it('celular (menu lateral fora da tela): aponta o botão do menu e explica clínica e itens em balões centralizados', () => {
         const visible = new Set(['mobile-menu', 'user-menu', 'help']);
-        const steps   = buildTourSteps({ nav: NAV, t: T, sidebarVisible: false, hasTarget: (name) => visible.has(name), touch: true });
+        const steps = buildTourSteps({
+            nav: NAV,
+            t: T,
+            sidebarVisible: false,
+            hasTarget: (name) => visible.has(name),
+            touch: true,
+        });
 
-        expect(titles(steps)).toEqual(['Welcome', 'Menu', 'Current clinic', 'Dashboard', 'Schedules &lt;b&gt;', 'Your account', 'See again', 'All set']);
+        expect(titles(steps)).toEqual([
+            'Welcome',
+            'Menu',
+            'Current clinic',
+            'Dashboard',
+            'Schedules &lt;b&gt;',
+            'Your account',
+            'See again',
+            'All set',
+        ]);
         expect(targets(steps)).toEqual([null, 'mobile-menu', 'entity-switcher', null, null, 'user-menu', 'help', null]);
         expect(steps[2].element()).toBeUndefined(); // seletor de clínica escondido no menu fechado: balão centralizado
         expect(steps[3].element).toBeUndefined();
@@ -124,25 +172,47 @@ describe('buildTourSteps', () => {
 
     it('passos da tela atual entram depois das boas-vindas, na ordem, e só os visíveis para o usuário', () => {
         const page = {
-            'dashboard-customize':  { title: 'Customize', description: 'Order <sections>' },
+            'dashboard-customize': { title: 'Customize', description: 'Order <sections>' },
             'dashboard-activation': { title: 'Setup', description: 'Hidden when done' },
-            'dashboard-kpis':       { title: 'Indicators', description: 'Numbers' },
+            'dashboard-kpis': { title: 'Indicators', description: 'Numbers' },
         };
         const visible = new Set(['dashboard-customize', 'dashboard-kpis', 'nav-dashboard']);
-        const steps   = buildTourSteps({ nav: NAV, t: T, page, sidebarVisible: true, hasTarget: (name) => visible.has(name) });
+        const steps = buildTourSteps({
+            nav: NAV,
+            t: T,
+            page,
+            sidebarVisible: true,
+            hasTarget: (name) => visible.has(name),
+        });
 
-        expect(titles(steps).slice(0, 5)).toEqual(['Welcome', 'Customize', 'Indicators', 'Current clinic', 'Dashboard']);
-        expect(targets(steps).slice(0, 5)).toEqual([null, 'dashboard-customize', 'dashboard-kpis', 'entity-switcher', 'nav-dashboard']);
+        expect(titles(steps).slice(0, 5)).toEqual([
+            'Welcome',
+            'Customize',
+            'Indicators',
+            'Current clinic',
+            'Dashboard',
+        ]);
+        expect(targets(steps).slice(0, 5)).toEqual([
+            null,
+            'dashboard-customize',
+            'dashboard-kpis',
+            'entity-switcher',
+            'nav-dashboard',
+        ]);
         expect(steps[1].popover.description).toBe('Order &lt;sections&gt;');
     });
 
     it('passos da tela seguem a ordem da página (seções reordenadas pelo usuário), não a do arquivo de textos', () => {
         const page = {
-            'dashboard-kpis':            { title: 'Indicators', description: 'Numbers' },
+            'dashboard-kpis': { title: 'Indicators', description: 'Numbers' },
             'dashboard-recent-patients': { title: 'Patients', description: 'Latest' },
         };
         const steps = buildTourSteps({
-            nav: [], t: T, page, sidebarVisible: true, hasTarget: () => true,
+            nav: [],
+            t: T,
+            page,
+            sidebarVisible: true,
+            hasTarget: () => true,
             pageOrder: (names) => [...names].reverse(),
         });
 
@@ -161,21 +231,39 @@ describe('buildTourSteps', () => {
             layout: {
                 ...T.layout,
                 'sidebar-toggle': { title: 'Collapse menu', description: 'Icons only' },
-                'ai-assistant':   { title: 'Virtual assistant', description: 'Ask the AI' },
+                'ai-assistant': { title: 'Virtual assistant', description: 'Ask the AI' },
             },
         };
 
         const desktop = buildTourSteps({ nav: [], t, sidebarVisible: true, hasTarget: () => true });
-        expect(targets(desktop)).toEqual([null, 'sidebar-toggle', 'entity-switcher', 'locale', 'theme', 'user-menu', 'ai-assistant', 'help', null]);
+        expect(targets(desktop)).toEqual([
+            null,
+            'sidebar-toggle',
+            'entity-switcher',
+            'locale',
+            'theme',
+            'user-menu',
+            'ai-assistant',
+            'help',
+            null,
+        ]);
         expect(desktop[6].popover).toMatchObject({ side: 'top', align: 'end' });
 
         // Celular: sem botão de recolher (o menu abre pelo botão do topo); sem IA na clínica, sem passo.
-        const phone = buildTourSteps({ nav: [], t, sidebarVisible: false, hasTarget: (name) => name === 'mobile-menu' });
+        const phone = buildTourSteps({
+            nav: [],
+            t,
+            sidebarVisible: false,
+            hasTarget: (name) => name === 'mobile-menu',
+        });
         expect(targets(phone)).toEqual([null, 'mobile-menu', 'entity-switcher', null]);
     });
 
     it('menu já recolhido: botão de recolher e seletor de clínica escondidos viram balões centralizados', () => {
-        const t = { ...T, layout: { ...T.layout, 'sidebar-toggle': { title: 'Collapse menu', description: 'Icons only' } } };
+        const t = {
+            ...T,
+            layout: { ...T.layout, 'sidebar-toggle': { title: 'Collapse menu', description: 'Icons only' } },
+        };
         const [, toggleStep, entityStep] = buildTourSteps({ nav: [], t, sidebarVisible: true, hasTarget: () => false });
 
         const toggle = document.createElement('button');
@@ -205,15 +293,20 @@ describe('sortByDocumentOrder', () => {
                 <div data-tour="dashboard-kpis"></div>
             </section>`;
 
-        expect(sortByDocumentOrder(['dashboard-kpis', 'dashboard-recent-patients', 'dashboard-live']))
-            .toEqual(['dashboard-live', 'dashboard-recent-patients', 'dashboard-kpis']);
+        expect(sortByDocumentOrder(['dashboard-kpis', 'dashboard-recent-patients', 'dashboard-live'])).toEqual([
+            'dashboard-live',
+            'dashboard-recent-patients',
+            'dashboard-kpis',
+        ]);
         expect(sortByDocumentOrder([])).toEqual([]);
     });
 });
 
 describe('escapeHtml e isTargetVisible', () => {
     it('escapa os caracteres de HTML', () => {
-        expect(escapeHtml(`<img src=x onerror="alert('x')">&`)).toBe('&lt;img src=x onerror=&quot;alert(&#39;x&#39;)&quot;&gt;&amp;');
+        expect(escapeHtml(`<img src=x onerror="alert('x')">&`)).toBe(
+            '&lt;img src=x onerror=&quot;alert(&#39;x&#39;)&quot;&gt;&amp;',
+        );
         expect(escapeHtml(null)).toBe('');
     });
 
@@ -253,7 +346,10 @@ describe('usePanelTour', () => {
     });
 
     it('abre com textos escapados, tema do painel, sem rolagem animada e sem clicar no item destacado', async () => {
-        setTour({ t: { ...T, ui: { ...T.ui, next: 'Próximo <' } }, page: { 'dashboard-customize': { title: 'Customize', description: 'Order' } } });
+        setTour({
+            t: { ...T, ui: { ...T.ui, next: 'Próximo <' } },
+            page: { 'dashboard-customize': { title: 'Customize', description: 'Order' } },
+        });
         const anchor = document.createElement('div');
         anchor.setAttribute('data-tour', 'dashboard-customize');
         anchor.getBoundingClientRect = () => ({ width: 100, height: 30, right: 900 });
@@ -280,11 +376,11 @@ describe('usePanelTour', () => {
 
     it('reposiciona o destaque quando a página muda de altura (atualização automática) e para de observar ao fechar', async () => {
         const observers = [];
-        const original  = globalThis.ResizeObserver;
+        const original = globalThis.ResizeObserver;
         globalThis.ResizeObserver = class {
             constructor(callback) {
-                this.callback   = callback;
-                this.observe    = vi.fn();
+                this.callback = callback;
+                this.observe = vi.fn();
                 this.disconnect = vi.fn();
                 observers.push(this);
             }
@@ -325,9 +421,9 @@ describe('usePanelTour', () => {
         const tour = usePanelTour();
         await tour.start();
 
-        const wrapper     = document.createElement('div');
+        const wrapper = document.createElement('div');
         const closeButton = document.createElement('button');
-        const nextButton  = document.createElement('button');
+        const nextButton = document.createElement('button');
         wrapper.append(closeButton, nextButton);
         document.body.append(wrapper);
 
@@ -354,7 +450,7 @@ describe('usePanelTour', () => {
         expect(instance.destroy).toHaveBeenCalledOnce();
         expect(inertia.props.auth.user.preferences.tours).toEqual({
             'panel:other': { version: 1, status: 'dismissed' },
-            [id]:          { version: 1, status: 'completed' },
+            [id]: { version: 1, status: 'completed' },
         });
         expect(fetch).toHaveBeenCalledOnce();
 
@@ -365,7 +461,7 @@ describe('usePanelTour', () => {
     });
 
     it('fechar (X, Esc, clique fora no último passo) — inclusive logo no início — grava "dismissed" e libera o botão', async () => {
-        const id   = setTour();
+        const id = setTour();
         const tour = usePanelTour();
         await tour.start();
 
@@ -382,7 +478,7 @@ describe('usePanelTour', () => {
     });
 
     it('grava para o tour que foi aberto, mesmo que a página mude antes de fechar', async () => {
-        const id   = setTour();
+        const id = setTour();
         const tour = usePanelTour();
         await tour.start();
 
@@ -395,7 +491,7 @@ describe('usePanelTour', () => {
 
     it('stop() no meio da abertura (import carregando) cancela: o tour não abre na página seguinte', async () => {
         setTour();
-        const tour    = usePanelTour();
+        const tour = usePanelTour();
         const opening = tour.start();
 
         tour.stop();
@@ -435,7 +531,7 @@ describe('usePanelTour', () => {
     });
 
     it('voltar pelo histórico com as props antigas (seen: false) não reabre: marca na sessão do navegador', async () => {
-        const id   = setTour();
+        const id = setTour();
         const tour = usePanelTour();
         await tour.start();
         tour.stop();

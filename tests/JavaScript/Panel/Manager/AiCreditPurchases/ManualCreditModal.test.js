@@ -23,8 +23,8 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 describe('ManualCreditModal', () => {
     const entities = [
         { id: 'ent-internal', name: 'Easyeye Internal', is_client: false },
-        { id: 'ent-client-a', name: 'Clínica A',        is_client: true },
-        { id: 'ent-client-b', name: 'Clínica B',        is_client: true },
+        { id: 'ent-client-a', name: 'Clínica A', is_client: true },
+        { id: 'ent-client-b', name: 'Clínica B', is_client: true },
     ];
 
     const defaultPermissions = {
@@ -36,10 +36,10 @@ describe('ManualCreditModal', () => {
 
     const tStubs = {
         manual: {
-            modal_title:    'Conceder crédito a uma clínica',
-            submit:         'Conceder crédito',
-            cancel:         'Cancelar',
-            kind_purchase:  'Compra (paga)',
+            modal_title: 'Conceder crédito a uma clínica',
+            submit: 'Conceder crédito',
+            cancel: 'Cancelar',
+            kind_purchase: 'Compra (paga)',
             badge_internal: 'Sua empresa',
         },
     };
@@ -64,7 +64,10 @@ describe('ManualCreditModal', () => {
     }
 
     function entityOptionIds(wrapper) {
-        return wrapper.findComponent(SearchSelect).props('options').map((o) => o.id);
+        return wrapper
+            .findComponent(SearchSelect)
+            .props('options')
+            .map((o) => o.id);
     }
 
     function fillReason(text) {
@@ -209,8 +212,9 @@ describe('ManualCreditModal', () => {
     it('emite close ao clicar no botão de cancelar', async () => {
         const wrapper = mountModal();
 
-        const cancelBtn = Array.from(document.body.querySelectorAll('button'))
-            .find((b) => b.textContent.trim() === 'Cancelar');
+        const cancelBtn = Array.from(document.body.querySelectorAll('button')).find(
+            (b) => b.textContent.trim() === 'Cancelar',
+        );
 
         cancelBtn.click();
         await wrapper.vm.$nextTick();
@@ -233,11 +237,11 @@ describe('ManualCreditModal', () => {
         expect(wrapper.emitted('submit')).toBeTruthy();
         const payload = wrapper.emitted('submit')[0][0];
         expect(payload.entity_id).toBe('ent-client-a');
-        expect(payload.credits).toBe(100);                              // default
+        expect(payload.credits).toBe(100); // default
         expect(payload.reason).toBe('motivo válido com mais de 10 caracteres');
-        expect(payload.kind).toBe('courtesy');                          // default
-        expect(payload.amount_reais).toBe(0);                           // cortesia não tem valor
-        expect(payload.package_code).toBeUndefined();                   // não enviamos mais package_code
+        expect(payload.kind).toBe('courtesy'); // default
+        expect(payload.amount_reais).toBe(0); // cortesia não tem valor
+        expect(payload.package_code).toBeUndefined(); // não enviamos mais package_code
         wrapper.unmount();
     });
 
@@ -281,7 +285,7 @@ describe('ManualCreditModal', () => {
 
         const alert = document.body.querySelector('.alert-warning');
         expect(alert).not.toBeNull();
-        expect(alert.textContent).toContain('500');                     // limite
+        expect(alert.textContent).toContain('500'); // limite
         wrapper.unmount();
     });
 

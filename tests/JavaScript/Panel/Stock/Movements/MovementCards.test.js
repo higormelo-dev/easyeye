@@ -17,10 +17,17 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_occurred_at: 'Data', col_quantity: 'Quantidade', col_unit_cost: 'Custo unit.', col_balance_after: 'Saldo após',
-    col_lot: 'Lote', col_created_by: 'Por', col_note: 'Observação',
-    action_filter_product: 'Ver extrato deste produto', empty_list: 'Nenhuma movimentação encontrada.',
-    pagination_label: 'Paginação', pagination_suffix: 'movimentações',
+    col_occurred_at: 'Data',
+    col_quantity: 'Quantidade',
+    col_unit_cost: 'Custo unit.',
+    col_balance_after: 'Saldo após',
+    col_lot: 'Lote',
+    col_created_by: 'Por',
+    col_note: 'Observação',
+    action_filter_product: 'Ver extrato deste produto',
+    empty_list: 'Nenhuma movimentação encontrada.',
+    pagination_label: 'Paginação',
+    pagination_suffix: 'movimentações',
 };
 
 let wrapper;
@@ -29,9 +36,21 @@ afterEach(() => wrapper?.unmount());
 
 function movement(overrides = {}) {
     return {
-        id: 'm1', entity_product_id: 'p1', product_name: 'Lente IOL', product_code: 'PRD-9',
-        type: 'purchase_in', type_label: 'Entrada por compra', direction: 1, quantity: 3, unit_cost: 450, balance_after: 7,
-        lot_number: null, note: null, created_by_name: 'Bia', occurred_at: '01/09/2026 08:30', occurred_at_iso: '2026-09-01T08:30:00',
+        id: 'm1',
+        entity_product_id: 'p1',
+        product_name: 'Lente IOL',
+        product_code: 'PRD-9',
+        type: 'purchase_in',
+        type_label: 'Entrada por compra',
+        direction: 1,
+        quantity: 3,
+        unit_cost: 450,
+        balance_after: 7,
+        lot_number: null,
+        note: null,
+        created_by_name: 'Bia',
+        occurred_at: '01/09/2026 08:30',
+        occurred_at_iso: '2026-09-01T08:30:00',
         ...overrides,
     };
 }
@@ -81,8 +100,17 @@ describe('MovementCards', () => {
 
     it('mostra a paginação traduzida quando há mais de uma página', () => {
         const w = mountCards([movement()], {
-            last_page: 2, from: 1, to: 1, total: 2, next_page_url: '/p?page=2',
-            links: [{ label: '&laquo;', url: null }, { label: '1', url: '/p?page=1', active: true }, { label: '2', url: '/p?page=2' }, { label: '&raquo;', url: null }],
+            last_page: 2,
+            from: 1,
+            to: 1,
+            total: 2,
+            next_page_url: '/p?page=2',
+            links: [
+                { label: '&laquo;', url: null },
+                { label: '1', url: '/p?page=1', active: true },
+                { label: '2', url: '/p?page=2' },
+                { label: '&raquo;', url: null },
+            ],
         });
 
         expect(w.find('nav').attributes('aria-label')).toBe('Paginação');

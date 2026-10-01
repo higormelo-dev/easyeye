@@ -4,19 +4,19 @@
  * data (não futura), forma (as mesmas do recebimento individual) e
  * observação. Erros do servidor por campo, ligados ao campo (aria).
  */
-const paidAt        = defineModel('paidAt', { type: String, default: '' });
+const paidAt = defineModel('paidAt', { type: String, default: '' });
 const paymentMethod = defineModel('paymentMethod', { type: String, default: '' });
-const notes         = defineModel('notes', { type: String, default: '' });
+const notes = defineModel('notes', { type: String, default: '' });
 
 defineProps({
-    paymentMethods: { type: Array,   default: () => [] },
-    today:          { type: String,  default: '' },
+    paymentMethods: { type: Array, default: () => [] },
+    today: { type: String, default: '' },
     /** { paid_at?, payment_method?, notes? } — mensagens já traduzidas. */
-    errors:         { type: Object,  default: () => ({}) },
+    errors: { type: Object, default: () => ({}) },
     /** Prefixo dos ids (dois modais podem estar na página). */
-    idPrefix:       { type: String,  required: true },
-    disabled:       { type: Boolean, default: false },
-    t:              { type: Object,  default: () => ({}) },
+    idPrefix: { type: String, required: true },
+    disabled: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 </script>
 
@@ -39,8 +39,10 @@ defineProps({
                 :aria-describedby="errors.paid_at ? `${idPrefix}-date-error` : undefined"
                 :disabled="disabled"
                 data-test="receipt-date"
-            >
-            <div v-if="errors.paid_at" :id="`${idPrefix}-date-error`" class="invalid-feedback">{{ errors.paid_at }}</div>
+            />
+            <div v-if="errors.paid_at" :id="`${idPrefix}-date-error`" class="invalid-feedback">
+                {{ errors.paid_at }}
+            </div>
         </div>
         <div class="col-12 col-sm-6">
             <label :for="`${idPrefix}-method`" class="form-label">{{ t.receipt_payment_method }}</label>
@@ -56,7 +58,9 @@ defineProps({
             >
                 <option v-for="m in paymentMethods" :key="m.value" :value="m.value">{{ m.label }}</option>
             </select>
-            <div v-if="errors.payment_method" :id="`${idPrefix}-method-error`" class="invalid-feedback">{{ errors.payment_method }}</div>
+            <div v-if="errors.payment_method" :id="`${idPrefix}-method-error`" class="invalid-feedback">
+                {{ errors.payment_method }}
+            </div>
         </div>
         <div class="col-12">
             <label :for="`${idPrefix}-notes`" class="form-label">{{ t.receipt_notes }}</label>

@@ -1,20 +1,20 @@
 <script setup>
 import { ref } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import PortalLayout    from '@/Layouts/PortalLayout.vue';
+import PortalLayout from '@/Layouts/PortalLayout.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
 
 const props = defineProps({
     leads: { type: Object, required: true },
-    urls:  { type: Object, required: true },
+    urls: { type: Object, required: true },
 });
 
 const formOpen = ref(false);
 const form = useForm({
-    name:  '',
+    name: '',
     email: '',
     phone: '',
-    city:  '',
+    city: '',
     state: '',
     notes: '',
 });
@@ -93,56 +93,91 @@ function submit() {
             v-if="formOpen"
             class="modal d-block"
             tabindex="-1"
-            style="background:rgba(0,0,0,.45);"
+            style="background: rgba(0, 0, 0, 0.45)"
             @click.self="formOpen = false"
         >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="ti ti-user-plus me-1 text-primary"></i>Indicar novo lead
-                        </h5>
-                        <button type="button" class="btn-close" :disabled="form.processing" @click="formOpen = false"></button>
+                        <h5 class="modal-title"><i class="ti ti-user-plus me-1 text-primary"></i>Indicar novo lead</h5>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            :disabled="form.processing"
+                            @click="formOpen = false"
+                        ></button>
                     </div>
                     <form @submit.prevent="submit">
                         <div class="modal-body">
                             <div class="row g-3">
                                 <div class="col-12">
                                     <label class="form-label">Nome <span class="text-danger">*</span></label>
-                                    <input v-model="form.name" type="text" maxlength="255" class="form-control"
-                                           :class="{ 'is-invalid': form.errors.name }" required>
+                                    <input
+                                        v-model="form.name"
+                                        type="text"
+                                        maxlength="255"
+                                        class="form-control"
+                                        :class="{ 'is-invalid': form.errors.name }"
+                                        required
+                                    />
                                     <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">E-mail <span class="text-danger">*</span></label>
-                                    <input v-model="form.email" type="email" maxlength="255" class="form-control"
-                                           :class="{ 'is-invalid': form.errors.email }" required>
+                                    <input
+                                        v-model="form.email"
+                                        type="email"
+                                        maxlength="255"
+                                        class="form-control"
+                                        :class="{ 'is-invalid': form.errors.email }"
+                                        required
+                                    />
                                     <div v-if="form.errors.email" class="invalid-feedback">{{ form.errors.email }}</div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Telefone</label>
-                                    <input v-model="form.phone" v-mask="'phone'" type="text" inputmode="numeric"
-                                           class="form-control" placeholder="(00) 00000-0000"
-                                           :class="{ 'is-invalid': form.errors.phone }">
+                                    <input
+                                        v-model="form.phone"
+                                        v-mask="'phone'"
+                                        type="text"
+                                        inputmode="numeric"
+                                        class="form-control"
+                                        placeholder="(00) 00000-0000"
+                                        :class="{ 'is-invalid': form.errors.phone }"
+                                    />
                                     <div v-if="form.errors.phone" class="invalid-feedback">{{ form.errors.phone }}</div>
                                 </div>
                                 <div class="col-md-9">
                                     <label class="form-label">Cidade</label>
-                                    <input v-model="form.city" type="text" maxlength="100" class="form-control">
+                                    <input v-model="form.city" type="text" maxlength="100" class="form-control" />
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label">UF</label>
-                                    <input v-model="form.state" type="text" maxlength="2" class="form-control text-uppercase">
+                                    <input
+                                        v-model="form.state"
+                                        type="text"
+                                        maxlength="2"
+                                        class="form-control text-uppercase"
+                                    />
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Observações</label>
-                                    <textarea v-model="form.notes" rows="3" maxlength="500" class="form-control"></textarea>
+                                    <textarea
+                                        v-model="form.notes"
+                                        rows="3"
+                                        maxlength="500"
+                                        class="form-control"
+                                    ></textarea>
                                 </div>
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                    :disabled="form.processing" @click="formOpen = false">
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                :disabled="form.processing"
+                                @click="formOpen = false"
+                            >
                                 Cancelar
                             </button>
                             <button type="submit" class="btn btn-primary btn-sm" :disabled="form.processing">

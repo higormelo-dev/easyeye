@@ -8,15 +8,22 @@ describe('billingHelpers', () => {
 
     it('withQuery acrescenta parâmetros a URL absoluta ou relativa, codificados', () => {
         expect(withQuery('/glosas', { search: 'GUI-1 %' })).toBe('/glosas?search=GUI-1+%25');
-        expect(withQuery('https://x.test/glosas?tab=all', { search: 'A' })).toBe('https://x.test/glosas?tab=all&search=A');
+        expect(withQuery('https://x.test/glosas?tab=all', { search: 'A' })).toBe(
+            'https://x.test/glosas?tab=all&search=A',
+        );
         expect(withQuery('/glosas', { search: '' })).toBe('/glosas');
     });
 
     it('tablePriceInfo: único preço, faixa de preços diferentes ou nenhum', () => {
-        expect(tablePriceInfo([{ suggested_price: 150 }, { suggested_price: 150 }, { suggested_price: null }]))
-            .toEqual({ min: 150, max: 150, single: 150, priced: 2 });
-        expect(tablePriceInfo([{ suggested_price: 150 }, { suggested_price: 180 }]))
-            .toEqual({ min: 150, max: 180, single: null, priced: 2 });
+        expect(tablePriceInfo([{ suggested_price: 150 }, { suggested_price: 150 }, { suggested_price: null }])).toEqual(
+            { min: 150, max: 150, single: 150, priced: 2 },
+        );
+        expect(tablePriceInfo([{ suggested_price: 150 }, { suggested_price: 180 }])).toEqual({
+            min: 150,
+            max: 180,
+            single: null,
+            priced: 2,
+        });
         expect(tablePriceInfo([{ suggested_price: null }])).toBeNull();
         expect(tablePriceInfo([])).toBeNull();
     });

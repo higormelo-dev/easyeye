@@ -1,21 +1,21 @@
 <script setup>
 import { computed } from 'vue';
-import SortableTh      from '@/Components/Panel/SortableTh.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
-import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     reportSettings: { type: Object, required: true },
-    filters:        { type: Object, default: () => ({}) },
-    t:              { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['sort', 'edit', 'preview', 'publish', 'archive', 'delete']);
 
 const currentSort = computed(() => props.filters.sort ?? 'title');
-const currentDir  = computed(() => props.filters.direction ?? 'asc');
+const currentDir = computed(() => props.filters.direction ?? 'asc');
 </script>
 
 <template>
@@ -28,26 +28,29 @@ const currentDir  = computed(() => props.filters.direction ?? 'asc');
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_title }}</SortableTh>
+                        >{{ t.col_title }}</SortableTh
+                    >
 
                     <SortableTh
                         col-key="category"
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_category }}</SortableTh>
+                        >{{ t.col_category }}</SortableTh
+                    >
 
-                    <th class="text-center" style="min-width:70px;">{{ t.col_paper_size }}</th>
-                    <th class="text-center" style="min-width:90px;">{{ t.col_header }}</th>
-                    <th class="text-center" style="min-width:90px;">{{ t.col_signature }}</th>
-                    <th class="text-center" style="min-width:80px;">{{ t.col_footer }}</th>
+                    <th class="text-center" style="min-width: 70px">{{ t.col_paper_size }}</th>
+                    <th class="text-center" style="min-width: 90px">{{ t.col_header }}</th>
+                    <th class="text-center" style="min-width: 90px">{{ t.col_signature }}</th>
+                    <th class="text-center" style="min-width: 80px">{{ t.col_footer }}</th>
 
                     <SortableTh
                         col-key="status"
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_status }}</SortableTh>
+                        >{{ t.col_status }}</SortableTh
+                    >
 
                     <SortableTh
                         col-key="version"
@@ -55,10 +58,11 @@ const currentDir  = computed(() => props.filters.direction ?? 'asc');
                         :current-dir="currentDir"
                         class="text-center"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_version }}</SortableTh>
+                        >{{ t.col_version }}</SortableTh
+                    >
 
-                    <th class="text-center" style="min-width:70px;">{{ t.col_adoptions }}</th>
-                    <th class="text-end" style="min-width:130px;">{{ t.col_actions }}</th>
+                    <th class="text-center" style="min-width: 70px">{{ t.col_adoptions }}</th>
+                    <th class="text-end" style="min-width: 130px">{{ t.col_actions }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -72,7 +76,9 @@ const currentDir  = computed(() => props.filters.direction ?? 'asc');
                 <tr v-for="r in reportSettings.data" :key="r.id">
                     <td>
                         <div class="fw-semibold">{{ r.title }}</div>
-                        <div v-if="r.description" class="text-muted small text-truncate" style="max-width:220px;">{{ r.description }}</div>
+                        <div v-if="r.description" class="text-muted small text-truncate" style="max-width: 220px">
+                            {{ r.description }}
+                        </div>
                     </td>
 
                     <td class="text-muted small">{{ r.category ?? '—' }}</td>
@@ -83,26 +89,35 @@ const currentDir  = computed(() => props.filters.direction ?? 'asc');
 
                     <td class="text-center">
                         <span
-                            :class="r.show_header
-                                ? 'badge badge-soft-primary rounded text-primary border border-primary fs-12'
-                                : 'badge badge-soft-secondary rounded fs-12'"
-                        >{{ r.show_header ? t.badge_yes : t.badge_no }}</span>
+                            :class="
+                                r.show_header
+                                    ? 'badge badge-soft-primary rounded text-primary border border-primary fs-12'
+                                    : 'badge badge-soft-secondary rounded fs-12'
+                            "
+                            >{{ r.show_header ? t.badge_yes : t.badge_no }}</span
+                        >
                     </td>
 
                     <td class="text-center">
                         <span
-                            :class="r.show_signature
-                                ? 'badge badge-soft-primary rounded text-primary border border-primary fs-12'
-                                : 'badge badge-soft-secondary rounded fs-12'"
-                        >{{ r.show_signature ? t.badge_yes : t.badge_no }}</span>
+                            :class="
+                                r.show_signature
+                                    ? 'badge badge-soft-primary rounded text-primary border border-primary fs-12'
+                                    : 'badge badge-soft-secondary rounded fs-12'
+                            "
+                            >{{ r.show_signature ? t.badge_yes : t.badge_no }}</span
+                        >
                     </td>
 
                     <td class="text-center">
                         <span
-                            :class="r.show_footer
-                                ? 'badge badge-soft-primary rounded text-primary border border-primary fs-12'
-                                : 'badge badge-soft-secondary rounded fs-12'"
-                        >{{ r.show_footer ? t.badge_yes : t.badge_no }}</span>
+                            :class="
+                                r.show_footer
+                                    ? 'badge badge-soft-primary rounded text-primary border border-primary fs-12'
+                                    : 'badge badge-soft-secondary rounded fs-12'
+                            "
+                            >{{ r.show_footer ? t.badge_yes : t.badge_no }}</span
+                        >
                     </td>
 
                     <td>
@@ -120,38 +135,25 @@ const currentDir  = computed(() => props.filters.direction ?? 'asc');
                                 :title="t.action_preview"
                                 @click="$emit('preview', r)"
                             />
-                            <ActionIconButton
-                                icon="ti ti-edit"
-                                :title="t.action_edit"
-                                @click="$emit('edit', r.id)"
-                            />
+                            <ActionIconButton icon="ti ti-edit" :title="t.action_edit" @click="$emit('edit', r.id)" />
                             <ActionDropdown
                                 :min-width="160"
                                 btn-class="ee-action-icon ee-action-icon--default"
                                 icon="ti ti-dots-vertical"
                             >
                                 <li v-if="r.status === 'draft' || r.status === 'archived'">
-                                    <button
-                                        class="dropdown-item rounded-1 text-success"
-                                        @click="$emit('publish', r)"
-                                    >
+                                    <button class="dropdown-item rounded-1 text-success" @click="$emit('publish', r)">
                                         <i class="ti ti-send me-1"></i> {{ t.action_publish }}
                                     </button>
                                 </li>
                                 <li v-if="r.status === 'published'">
-                                    <button
-                                        class="dropdown-item rounded-1 text-warning"
-                                        @click="$emit('archive', r)"
-                                    >
+                                    <button class="dropdown-item rounded-1 text-warning" @click="$emit('archive', r)">
                                         <i class="ti ti-archive me-1"></i> {{ t.action_archive }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider my-1"></li>
+                                <li><hr class="dropdown-divider my-1" /></li>
                                 <li>
-                                    <button
-                                        class="dropdown-item rounded-1 text-danger"
-                                        @click="$emit('delete', r)"
-                                    >
+                                    <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', r)">
                                         <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
                                     </button>
                                 </li>

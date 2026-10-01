@@ -31,20 +31,16 @@ function submit() {
 <template>
     <Head :title="t.reset_password?.title" />
 
-    <GuestLayout
-        :app-name="appName"
-        :title="t.reset_password?.title"
-        :illustration-src="resetIllustrationImg"
-    >
+    <GuestLayout :app-name="appName" :title="t.reset_password?.title" :illustration-src="resetIllustrationImg">
         <div v-if="form.errors.email" class="alert alert-danger mb-3 py-2">
             <i class="ti ti-alert-circle me-1"></i> {{ form.errors.email }}
         </div>
 
         <form @submit.prevent="submit" novalidate>
-            <input type="hidden" :value="form.token" name="token">
+            <input type="hidden" :value="form.token" name="token" />
 
             <div class="mb-3">
-                <label class="form-label">{{ t.reset_password?.email }} <span style="color:#ef4444;">*</span></label>
+                <label class="form-label">{{ t.reset_password?.email }} <span style="color: #ef4444">*</span></label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="ti ti-mail"></i></span>
                     <input
@@ -55,12 +51,12 @@ function submit() {
                         autofocus
                         autocomplete="username"
                         required
-                    >
+                    />
                 </div>
             </div>
 
             <div class="mb-3">
-                <label class="form-label">{{ t.reset_password?.password }} <span style="color:#ef4444;">*</span></label>
+                <label class="form-label">{{ t.reset_password?.password }} <span style="color: #ef4444">*</span></label>
                 <div class="input-group">
                     <input
                         v-model="form.password"
@@ -69,8 +65,13 @@ function submit() {
                         :class="{ 'is-invalid': form.errors.password }"
                         autocomplete="new-password"
                         required
+                    />
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        tabindex="-1"
+                        @click="showPassword = !showPassword"
                     >
-                    <button type="button" class="btn btn-outline-secondary" tabindex="-1" @click="showPassword = !showPassword">
                         <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                     </button>
                 </div>
@@ -78,7 +79,9 @@ function submit() {
             </div>
 
             <div class="mb-4">
-                <label class="form-label">{{ t.reset_password?.confirm_password }} <span style="color:#ef4444;">*</span></label>
+                <label class="form-label"
+                    >{{ t.reset_password?.confirm_password }} <span style="color: #ef4444">*</span></label
+                >
                 <div class="input-group">
                     <input
                         v-model="form.password_confirmation"
@@ -87,8 +90,13 @@ function submit() {
                         :class="{ 'is-invalid': form.errors.password_confirmation }"
                         autocomplete="new-password"
                         required
+                    />
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        tabindex="-1"
+                        @click="showConfirm = !showConfirm"
                     >
-                    <button type="button" class="btn btn-outline-secondary" tabindex="-1" @click="showConfirm = !showConfirm">
                         <i :class="showConfirm ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                     </button>
                 </div>
@@ -102,7 +110,9 @@ function submit() {
             </div>
 
             <p class="text-center mb-0">
-                <a href="/login" class="text-muted" style="font-size:.875rem; text-decoration:none;">{{ t.back_to_login }}</a>
+                <a href="/login" class="text-muted" style="font-size: 0.875rem; text-decoration: none">{{
+                    t.back_to_login
+                }}</a>
             </p>
         </form>
     </GuestLayout>

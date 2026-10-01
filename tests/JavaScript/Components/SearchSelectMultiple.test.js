@@ -32,8 +32,9 @@ describe('SearchSelect — seleção múltipla em uma linha', () => {
 
         const summary = wrapper.find('.multiselect-multiple-label');
         expect(summary.exists()).toBe(true);
-        expect(wrapper.find('.search-select__summary-text').text())
-            .toBe('ANTIRREFLEXO, FILTRO DE LUZ AZUL, FOTOSSENSÍVEL (PHOTOCHROMIC)');
+        expect(wrapper.find('.search-select__summary-text').text()).toBe(
+            'ANTIRREFLEXO, FILTRO DE LUZ AZUL, FOTOSSENSÍVEL (PHOTOCHROMIC)',
+        );
         expect(wrapper.find('.search-select__count').text()).toBe('3');
         // O número é só visual: o leitor de tela já recebe a lista inteira.
         expect(wrapper.find('.search-select__count').attributes('aria-hidden')).toBe('true');
@@ -43,7 +44,7 @@ describe('SearchSelect — seleção múltipla em uma linha', () => {
 
     it('lista completa no hover e no texto assistivo', () => {
         const wrapper = mountSelect({ modelValue: [4, 1] });
-        const full    = 'MONOFOCAL, ANTIRREFLEXO';
+        const full = 'MONOFOCAL, ANTIRREFLEXO';
 
         expect(wrapper.find('.search-select').attributes('title')).toBe(full);
         expect(wrapper.find('.multiselect-assistive-text').text()).toBe(full);
@@ -66,7 +67,7 @@ describe('SearchSelect — seleção múltipla em uma linha', () => {
 
     it('opções escolhidas continuam no dropdown (para desmarcar) e ele não fecha a cada escolha', async () => {
         const wrapper = mountSelect({ modelValue: [1] });
-        const select  = wrapper.findComponent({ name: 'Multiselect' });
+        const select = wrapper.findComponent({ name: 'Multiselect' });
 
         expect(select.props('mode')).toBe('multiple');
         expect(select.props('hideSelected')).toBe(false);
@@ -79,7 +80,7 @@ describe('SearchSelect — seleção múltipla em uma linha', () => {
 
     it('v-model continua array: marcar e desmarcar emitem a lista de ids', async () => {
         const wrapper = mountSelect({ modelValue: [1] });
-        const select  = wrapper.findComponent({ name: 'Multiselect' });
+        const select = wrapper.findComponent({ name: 'Multiselect' });
 
         select.vm.select(LENSES[1]);
         expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([[1, 2]]);
@@ -93,7 +94,7 @@ describe('SearchSelect — seleção múltipla em uma linha', () => {
 
     it('seleção simples não muda: sem resumo nem title', () => {
         const wrapper = mount(SearchSelect, { props: { options: LENSES, modelValue: 2 } });
-        const select  = wrapper.findComponent({ name: 'Multiselect' });
+        const select = wrapper.findComponent({ name: 'Multiselect' });
 
         expect(select.props('mode')).toBe('single');
         expect(select.props('closeOnSelect')).toBe(true);

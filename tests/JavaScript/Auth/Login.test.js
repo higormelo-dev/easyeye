@@ -22,14 +22,17 @@ describe('Login — conteúdo público', () => {
         wrapper = mount(Login, {
             props: {
                 t: {
-                    sign_in: 'Entrar', panel: { feature_schedule: 'Agenda', feature_record: 'Prontuário' },
-                    remember_me: 'Lembrar-me', forget_password: 'Recuperar senha', sign_up: 'Criar conta',
+                    sign_in: 'Entrar',
+                    panel: { feature_schedule: 'Agenda', feature_record: 'Prontuário' },
+                    remember_me: 'Lembrar-me',
+                    forget_password: 'Recuperar senha',
+                    sign_up: 'Criar conta',
                 },
             },
         });
 
         expect(wrapper.find('.ee-login-quote').exists()).toBe(false);
-        expect(wrapper.findAll('.ee-login-trust-item').map(item => item.text())).toEqual(['SSL', 'LGPD', 'CFM']);
+        expect(wrapper.findAll('.ee-login-trust-item').map((item) => item.text())).toEqual(['SSL', 'LGPD', 'CFM']);
         expect(wrapper.text()).not.toMatch(/97%|NPS|Ricardo Mendes/);
         expect(wrapper.get('a[href="/forgot-password"]').text()).toBe('Recuperar senha');
         expect(wrapper.get('a[href="/register"]').text()).toBe('Criar conta');

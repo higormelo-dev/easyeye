@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from 'vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import StatusBadge      from '@/Components/Panel/StatusBadge.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import StatusBadge from '@/Components/Panel/StatusBadge.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
 /**
@@ -11,17 +11,19 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * item = qualquer item do tipo.
  */
 const props = defineProps({
-    rules:     { type: Array,  default: () => [] },
-    doctors:   { type: Array,  default: () => [] },   // nomes dos médicos fixos na divisão (E4)
-    t:         { type: Object, default: () => ({}) },
+    rules: { type: Array, default: () => [] },
+    doctors: { type: Array, default: () => [] }, // nomes dos médicos fixos na divisão (E4)
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
 const emit = defineEmits(['edit', 'duplicate', 'delete']);
 
-const { ruleLabel, validityLabel, serviceTypeLabel, serviceTypeIcon, splitSummary } = useDoctorPayoutFormat(() => props.t);
+const { ruleLabel, validityLabel, serviceTypeLabel, serviceTypeIcon, splitSummary } = useDoctorPayoutFormat(
+    () => props.t,
+);
 
-const rows   = computed(() => props.rules ?? []);
+const rows = computed(() => props.rules ?? []);
 const splits = computed(() => new Map(rows.value.map((rule) => [rule.id, splitSummary(rule, props.doctors)])));
 
 const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.payer_scope;
@@ -30,7 +32,11 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
 <template>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <caption class="visually-hidden">{{ t.rules_title }}</caption>
+            <caption class="visually-hidden">
+                {{
+                    t.rules_title
+                }}
+            </caption>
             <thead class="table-light">
                 <tr>
                     <th scope="col">{{ t.col_scope_doctor }}</th>
@@ -49,13 +55,28 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
                         <i class="ti ti-adjustments-off fs-1 d-block mb-2" aria-hidden="true"></i>{{ emptyText }}
                     </td>
                 </tr>
-                <tr v-for="rule in rows" :key="rule.id" :class="{ 'text-muted': !rule.active }" data-test="rule-row" :data-id="rule.id">
+                <tr
+                    v-for="rule in rows"
+                    :key="rule.id"
+                    :class="{ 'text-muted': !rule.active }"
+                    data-test="rule-row"
+                    :data-id="rule.id"
+                >
                     <td>
-                        <span :class="rule.doctor_id ? 'fw-medium' : 'fst-italic'">{{ rule.doctor_name || t.all_doctors }}</span>
-                        <div v-if="rule.notes" class="small text-muted text-truncate rules-table__notes" :title="rule.notes">{{ rule.notes }}</div>
+                        <span :class="rule.doctor_id ? 'fw-medium' : 'fst-italic'">{{
+                            rule.doctor_name || t.all_doctors
+                        }}</span>
+                        <div
+                            v-if="rule.notes"
+                            class="small text-muted text-truncate rules-table__notes"
+                            :title="rule.notes"
+                        >
+                            {{ rule.notes }}
+                        </div>
                     </td>
                     <td class="text-nowrap">
-                        <i :class="serviceTypeIcon(rule.service_type)" class="me-1 text-muted" aria-hidden="true"></i>{{ serviceTypeLabel(rule.service_type) }}
+                        <i :class="serviceTypeIcon(rule.service_type)" class="me-1 text-muted" aria-hidden="true"></i
+                        >{{ serviceTypeLabel(rule.service_type) }}
                     </td>
                     <td :class="{ 'fst-italic': !rule.item_name }">{{ rule.item_name || t.item_any }}</td>
                     <td>
@@ -74,9 +95,25 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
                     </td>
                     <td class="text-end">
                         <ActionIconGroup align="end" gap="tight">
-                            <ActionIconButton icon="ti ti-edit" :title="t.rules_edit" data-test="rule-edit" @click="emit('edit', rule)" />
-                            <ActionIconButton icon="ti ti-copy" :title="t.rules_duplicate" data-test="rule-duplicate" @click="emit('duplicate', rule)" />
-                            <ActionIconButton icon="ti ti-trash" variant="danger" :title="t.rules_delete" data-test="rule-delete" @click="emit('delete', rule)" />
+                            <ActionIconButton
+                                icon="ti ti-edit"
+                                :title="t.rules_edit"
+                                data-test="rule-edit"
+                                @click="emit('edit', rule)"
+                            />
+                            <ActionIconButton
+                                icon="ti ti-copy"
+                                :title="t.rules_duplicate"
+                                data-test="rule-duplicate"
+                                @click="emit('duplicate', rule)"
+                            />
+                            <ActionIconButton
+                                icon="ti ti-trash"
+                                variant="danger"
+                                :title="t.rules_delete"
+                                data-test="rule-delete"
+                                @click="emit('delete', rule)"
+                            />
                         </ActionIconGroup>
                     </td>
                 </tr>

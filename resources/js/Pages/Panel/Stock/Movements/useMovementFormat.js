@@ -11,14 +11,14 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
  * acompanha a cor para não depender só dela (acessibilidade).
  */
 const TYPE_VARIANTS = {
-    purchase_in:     'success',
-    manual_in:       'success',
-    adjustment_in:   'info',
+    purchase_in: 'success',
+    manual_in: 'success',
+    adjustment_in: 'info',
     consumption_out: 'primary',
-    manual_out:      'secondary',
-    adjustment_out:  'warning',
-    loss:            'danger',
-    return_out:      'secondary',
+    manual_out: 'secondary',
+    adjustment_out: 'warning',
+    loss: 'danger',
+    return_out: 'secondary',
 };
 
 export function useMovementFormat() {

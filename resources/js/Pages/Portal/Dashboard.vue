@@ -3,21 +3,21 @@ import { Head } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 
 const props = defineProps({
-    metrics:           { type: Object, required: true },
-    recentLeads:       { type: Array,  default: () => [] },
-    recentCommissions: { type: Array,  default: () => [] },
+    metrics: { type: Object, required: true },
+    recentLeads: { type: Array, default: () => [] },
+    recentCommissions: { type: Array, default: () => [] },
 });
 
-function brl(v) { return 'R$ ' + Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+function brl(v) {
+    return 'R$ ' + Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
 </script>
 
 <template>
     <Head title="Dashboard — Portal de Parceiros" />
 
     <PortalLayout>
-        <h4 class="fw-bold mb-3">
-            <i class="ti ti-dashboard me-1 text-primary"></i>Dashboard
-        </h4>
+        <h4 class="fw-bold mb-3"><i class="ti ti-dashboard me-1 text-primary"></i>Dashboard</h4>
 
         <!-- KPIs -->
         <div class="row g-3 mb-4">
@@ -63,9 +63,7 @@ function brl(v) { return 'R$ ' + Number(v ?? 0).toLocaleString('pt-BR', { minimu
             <div class="col-md-6">
                 <div class="card shadow-sm h-100">
                     <div class="card-header bg-transparent">
-                        <h6 class="mb-0 fw-semibold">
-                            <i class="ti ti-users me-1 text-primary"></i>Leads recentes
-                        </h6>
+                        <h6 class="mb-0 fw-semibold"><i class="ti ti-users me-1 text-primary"></i>Leads recentes</h6>
                     </div>
                     <div class="card-body p-0">
                         <div v-if="recentLeads.length === 0" class="text-center py-4 text-muted small">
@@ -90,9 +88,7 @@ function brl(v) { return 'R$ ' + Number(v ?? 0).toLocaleString('pt-BR', { minimu
             <div class="col-md-6">
                 <div class="card shadow-sm h-100">
                     <div class="card-header bg-transparent">
-                        <h6 class="mb-0 fw-semibold">
-                            <i class="ti ti-coin me-1 text-warning"></i>Comissões recentes
-                        </h6>
+                        <h6 class="mb-0 fw-semibold"><i class="ti ti-coin me-1 text-warning"></i>Comissões recentes</h6>
                     </div>
                     <div class="card-body p-0">
                         <div v-if="recentCommissions.length === 0" class="text-center py-4 text-muted small">

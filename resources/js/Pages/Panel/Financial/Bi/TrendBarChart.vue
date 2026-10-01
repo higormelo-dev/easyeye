@@ -16,7 +16,17 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat';
 import { useTrans } from '@/composables/useTrans.js';
 import { chartChrome, observeTheme, prefersReducedMotion, toneColor, tooltipTheme } from './chartTheme.js';
 
-Chart.register(BarController, BarElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Legend, Tooltip);
+Chart.register(
+    BarController,
+    BarElement,
+    LineController,
+    LineElement,
+    PointElement,
+    CategoryScale,
+    LinearScale,
+    Legend,
+    Tooltip,
+);
 
 /**
  * Receita × despesa por mês (barras) e saldo (linha) do BI financeiro.
@@ -28,16 +38,16 @@ Chart.register(BarController, BarElement, LineController, LineElement, PointElem
  */
 const props = defineProps({
     /** [{ key, label, income, expense, balance }] — `label` já no idioma do usuário. */
-    rows:   { type: Array,  default: () => [] },
-    t:      { type: Object, default: () => ({}) },
+    rows: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
     height: { type: Number, default: 260 },
 });
 
 const { tx } = useTrans(() => props.t);
 const { locale, money, signedMoney } = useLocaleFormat();
 
-const tableId  = `bi-trend-data-${useId()}`;
-const canvas   = ref(null);
+const tableId = `bi-trend-data-${useId()}`;
+const canvas = ref(null);
 const showData = ref(false);
 
 let chart = null;
@@ -46,19 +56,21 @@ let stopObservingTheme = () => {};
 const round2 = (value) => Math.round(value * 100) / 100;
 
 const totals = computed(() => {
-    const income  = props.rows.reduce((sum, row) => sum + (Number(row.income) || 0), 0);
+    const income = props.rows.reduce((sum, row) => sum + (Number(row.income) || 0), 0);
     const expense = props.rows.reduce((sum, row) => sum + (Number(row.expense) || 0), 0);
 
     return { income: round2(income), expense: round2(expense), balance: round2(income - expense) };
 });
 
-const ariaLabel = computed(() => tx('trend_chart_aria', {
-    from:    props.rows[0]?.label ?? '',
-    to:      props.rows.at(-1)?.label ?? '',
-    income:  money(totals.value.income),
-    expense: money(totals.value.expense),
-    balance: signedMoney(totals.value.balance),
-}));
+const ariaLabel = computed(() =>
+    tx('trend_chart_aria', {
+        from: props.rows[0]?.label ?? '',
+        to: props.rows.at(-1)?.label ?? '',
+        income: money(totals.value.income),
+        expense: money(totals.value.expense),
+        balance: signedMoney(totals.value.balance),
+    }),
+);
 
 function formatValue(key, value) {
     return key === 'balance' ? signedMoney(value) : money(value);
@@ -73,10 +85,15 @@ function buildChart() {
     if (!canvas.value) return;
     destroyChart();
 
-    const el      = canvas.value;
-    const chrome  = chartChrome(el);
+    const el = canvas.value;
+    const chrome = chartChrome(el);
     const primary = toneColor(el, 'primary');
-    const compact = new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
+    const compact = new Intl.NumberFormat(locale.value, {
+        style: 'currency',
+        currency: 'BRL',
+        notation: 'compact',
+        maximumFractionDigits: 1,
+    });
     const byIndex = (a, b) => a.datasetIndex - b.datasetIndex;
 
     const options = {
@@ -85,7 +102,10 @@ function buildChart() {
         interaction: { mode: 'index', intersect: false },
         plugins: {
             // `order` desenha a linha por cima das barras; legenda e tooltip seguem a ordem natural.
-            legend: { position: 'bottom', labels: { color: chrome.body, usePointStyle: true, boxWidth: 8, sort: byIndex } },
+            legend: {
+                position: 'bottom',
+                labels: { color: chrome.body, usePointStyle: true, boxWidth: 8, sort: byIndex },
+            },
             tooltip: {
                 ...tooltipTheme(chrome),
                 itemSort: byIndex,
@@ -111,20 +131,39 @@ function buildChart() {
             labels: props.rows.map((row) => row.label),
             datasets: [
                 {
-                    type: 'bar', key: 'income', label: tx('col_income'), order: 2,
+                    type: 'bar',
+                    key: 'income',
+                    label: tx('col_income'),
+                    order: 2,
                     data: props.rows.map((row) => Number(row.income) || 0),
-                    backgroundColor: toneColor(el, 'success'), borderRadius: 4, maxBarThickness: 28,
+                    backgroundColor: toneColor(el, 'success'),
+                    borderRadius: 4,
+                    maxBarThickness: 28,
                 },
                 {
-                    type: 'bar', key: 'expense', label: tx('col_expense'), order: 2,
+                    type: 'bar',
+                    key: 'expense',
+                    label: tx('col_expense'),
+                    order: 2,
                     data: props.rows.map((row) => Number(row.expense) || 0),
-                    backgroundColor: toneColor(el, 'danger'), borderRadius: 4, maxBarThickness: 28,
+                    backgroundColor: toneColor(el, 'danger'),
+                    borderRadius: 4,
+                    maxBarThickness: 28,
                 },
                 {
-                    type: 'line', key: 'balance', label: tx('col_balance'), order: 1,
+                    type: 'line',
+                    key: 'balance',
+                    label: tx('col_balance'),
+                    order: 1,
                     data: props.rows.map((row) => Number(row.balance) || 0),
-                    borderColor: primary, backgroundColor: primary, borderWidth: 2, tension: 0.3,
-                    pointBackgroundColor: chrome.surface, pointBorderColor: primary, pointBorderWidth: 2, pointRadius: 3,
+                    borderColor: primary,
+                    backgroundColor: primary,
+                    borderWidth: 2,
+                    tension: 0.3,
+                    pointBackgroundColor: chrome.surface,
+                    pointBorderColor: primary,
+                    pointBorderWidth: 2,
+                    pointRadius: 3,
                 },
             ],
         },
@@ -159,12 +198,17 @@ watch([() => props.rows, () => props.t, locale], buildChart, { deep: true });
             data-test="trend-toggle-data"
             @click="showData = !showData"
         >
-            <i class="ti me-1" :class="showData ? 'ti-chevron-up' : 'ti-table'" aria-hidden="true"></i>{{ showData ? tx('hide_data') : tx('see_data') }}
+            <i class="ti me-1" :class="showData ? 'ti-chevron-up' : 'ti-table'" aria-hidden="true"></i
+            >{{ showData ? tx('hide_data') : tx('see_data') }}
         </button>
 
         <div v-show="showData" :id="tableId" class="table-responsive mt-2" data-test="trend-data">
             <table class="table table-sm table-hover align-middle mb-0">
-                <caption class="visually-hidden">{{ tx('monthly_trend') }}</caption>
+                <caption class="visually-hidden">
+                    {{
+                        tx('monthly_trend')
+                    }}
+                </caption>
                 <thead>
                     <tr>
                         <th scope="col">{{ tx('col_month') }}</th>

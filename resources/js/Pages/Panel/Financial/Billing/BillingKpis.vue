@@ -12,11 +12,11 @@ import { useTrans } from '@/composables/useTrans.js';
  * Conciliação de glosas). Cada card explica a definição no `hint`.
  */
 const props = defineProps({
-    kpis:        { type: Object,  default: () => ({}) },
-    claimStatus: { type: String,  default: '' },
-    glosasUrl:   { type: String,  default: '' },
-    loading:     { type: Boolean, default: false },
-    t:           { type: Object,  default: () => ({}) },
+    kpis: { type: Object, default: () => ({}) },
+    claimStatus: { type: String, default: '' },
+    glosasUrl: { type: String, default: '' },
+    loading: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['toggle-status']);
@@ -24,10 +24,10 @@ const emit = defineEmits(['toggle-status']);
 const { tx } = useTrans(() => props.t);
 const { money, number } = useLocaleFormat();
 
-const toBill      = computed(() => props.kpis?.to_bill ?? {});
-const open        = computed(() => props.kpis?.open ?? {});
-const received    = computed(() => props.kpis?.received ?? {});
-const denied      = computed(() => props.kpis?.denied ?? {});
+const toBill = computed(() => props.kpis?.to_bill ?? {});
+const open = computed(() => props.kpis?.open ?? {});
+const received = computed(() => props.kpis?.received ?? {});
+const denied = computed(() => props.kpis?.denied ?? {});
 const tissPending = computed(() => props.kpis?.tiss_pending ?? {});
 
 const toBillSubtitle = computed(() => {
@@ -36,10 +36,10 @@ const toBillSubtitle = computed(() => {
 
     return Number(toBill.value.priced_count) < Number(toBill.value.count)
         ? tx('kpi_to_bill_estimate_partial', {
-            amount: money(amount),
-            priced: number(toBill.value.priced_count),
-            count:  number(toBill.value.count),
-        })
+              amount: money(amount),
+              priced: number(toBill.value.priced_count),
+              count: number(toBill.value.count),
+          })
         : tx('kpi_to_bill_estimate', { amount: money(amount) });
 });
 

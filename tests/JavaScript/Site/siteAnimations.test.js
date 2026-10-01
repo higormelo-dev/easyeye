@@ -16,13 +16,21 @@ function mediaQuery(media, matches) {
         media,
         matches,
         listeners,
-        addEventListener(_, listener) { listeners.add(listener); },
-        removeEventListener(_, listener) { listeners.delete(listener); },
-        addListener(listener) { listeners.add(listener); },
-        removeListener(listener) { listeners.delete(listener); },
+        addEventListener(_, listener) {
+            listeners.add(listener);
+        },
+        removeEventListener(_, listener) {
+            listeners.delete(listener);
+        },
+        addListener(listener) {
+            listeners.add(listener);
+        },
+        removeListener(listener) {
+            listeners.delete(listener);
+        },
         change(value) {
             this.matches = value;
-            listeners.forEach(listener => listener({ matches: value, media }));
+            listeners.forEach((listener) => listener({ matches: value, media }));
         },
     };
 }
@@ -31,8 +39,8 @@ const title = () => document.querySelector('.hero-title');
 const metric = () => document.querySelector('.metric-value');
 const corners = () => [...document.querySelectorAll('.hero-calibration-corner')];
 const heroAnimation = () => gsap.getTweensOf(corners()[0])[0]?.parent;
-const heroObserver = () => intersections.find(observer => observer.target?.matches('.hero-instrument'));
-const counterAnimation = () => ScrollTrigger.getAll().find(trigger => trigger.trigger === metric())?.animation;
+const heroObserver = () => intersections.find((observer) => observer.target?.matches('.hero-instrument'));
+const counterAnimation = () => ScrollTrigger.getAll().find((trigger) => trigger.trigger === metric())?.animation;
 
 function start(locale = 'pt-BR', inView = true) {
     cleanup = initSiteAnimations(locale);
@@ -51,21 +59,30 @@ beforeEach(() => {
     reduced = mediaQuery('(prefers-reduced-motion: reduce)', false);
     desktop = mediaQuery('(min-width: 641px)', true);
     intersections = [];
-    vi.stubGlobal('IntersectionObserver', class {
-        constructor(callback) {
-            this.callback = callback;
-            this.disconnected = false;
-            intersections.push(this);
-        }
+    vi.stubGlobal(
+        'IntersectionObserver',
+        class {
+            constructor(callback) {
+                this.callback = callback;
+                this.disconnected = false;
+                intersections.push(this);
+            }
 
-        observe(target) { this.target = target; }
-        disconnect() { this.disconnected = true; }
-        report(isIntersecting, intersectionRatio = isIntersecting ? 1 : 0) {
-            if (!this.disconnected) this.callback([{ target: this.target, isIntersecting, intersectionRatio }]);
-        }
-    });
+            observe(target) {
+                this.target = target;
+            }
+            disconnect() {
+                this.disconnected = true;
+            }
+            report(isIntersecting, intersectionRatio = isIntersecting ? 1 : 0) {
+                if (!this.disconnected) this.callback([{ target: this.target, isIntersecting, intersectionRatio }]);
+            }
+        },
+    );
     vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
-    vi.spyOn(window, 'matchMedia').mockImplementation(query => query.includes('reduced-motion') ? reduced : desktop);
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) =>
+        query.includes('reduced-motion') ? reduced : desktop,
+    );
     document.body.innerHTML = `
         <section class="hero">
             <h1 class="hero-title">Prontuário oftalmológico</h1>
@@ -74,7 +91,7 @@ beforeEach(() => {
             <p class="hero-trust">Confiança</p>
             <div class="hero-instrument">
                 <figure class="hero-mockup"><img class="hero-shot" src="/hero.webp" alt="Prontuário"></figure>
-                ${['tl', 'tr', 'br', 'bl'].map(corner => `<svg class="hero-calibration-corner" data-corner="${corner}" aria-hidden="true"><path d="M0 12V0H12" /></svg>`).join('')}
+                ${['tl', 'tr', 'br', 'bl'].map((corner) => `<svg class="hero-calibration-corner" data-corner="${corner}" aria-hidden="true"><path d="M0 12V0H12" /></svg>`).join('')}
             </div>
             <div class="hero-float-card card-top">Exames</div>
             <div class="hero-float-card card-bottom">Histórico</div>
@@ -84,7 +101,12 @@ beforeEach(() => {
     // Happy DOM não calcula geometria. A métrica fica abaixo da dobra até o
     // teste iniciar sua animação, como ocorre antes de rolar a landing.
     vi.spyOn(metric(), 'getBoundingClientRect').mockReturnValue({
-        top: 1200, bottom: 1232, left: 0, right: 120, width: 120, height: 32,
+        top: 1200,
+        bottom: 1232,
+        left: 0,
+        right: 120,
+        width: 120,
+        height: 32,
     });
 });
 
@@ -110,7 +132,7 @@ describe('site animations — ciclo de vida', () => {
         expect(metric().textContent).toBe('+ 99,9%');
         expect(title().style.transform).toBe('');
         expect(title().style.opacity).toBe('');
-        expect(corners().every(corner => !corner.style.transform && !corner.style.opacity)).toBe(true);
+        expect(corners().every((corner) => !corner.style.transform && !corner.style.opacity)).toBe(true);
         expect(heroObserver().disconnected).toBe(true);
         expect(ScrollTrigger.getById('other-component')).toBe(foreignTrigger);
         expect(counterAnimation()).toBeUndefined();
@@ -122,7 +144,7 @@ describe('site animations — ciclo de vida', () => {
         counterAnimation().progress(0.4);
         reduced.change(true);
 
-        expect(corners().every(corner => !corner.style.transform && !corner.style.opacity)).toBe(true);
+        expect(corners().every((corner) => !corner.style.transform && !corner.style.opacity)).toBe(true);
         expect(heroObserver().disconnected).toBe(true);
         expect(metric().textContent).toBe('+ 99,9%');
         expect(counterAnimation()).toBeUndefined();
@@ -183,7 +205,7 @@ describe('site animations — ciclo de vida', () => {
         hidden = true;
         start();
         expect(heroAnimation()).toBeUndefined();
-        expect(corners().every(corner => !corner.getAttribute('style'))).toBe(true);
+        expect(corners().every((corner) => !corner.getAttribute('style'))).toBe(true);
         expect(metric().textContent).toBe('+ 99,9%');
 
         setHidden(false);
@@ -215,15 +237,21 @@ describe('site animations — ciclo de vida', () => {
 
     it('anima apenas os cantos e libera seus estilos ao concluir sem mover o conteúdo', () => {
         start();
-        const stable = [...document.querySelectorAll('.hero-title, .hero-sub, .hero-trust, .hero-mockup, .hero-shot, .hero-ctas, .hero-ctas a, .hero-float-card')];
-        expect(stable.every(element => gsap.getTweensOf(element).length === 0 && !element.getAttribute('style'))).toBe(true);
+        const stable = [
+            ...document.querySelectorAll(
+                '.hero-title, .hero-sub, .hero-trust, .hero-mockup, .hero-shot, .hero-ctas, .hero-ctas a, .hero-float-card',
+            ),
+        ];
+        expect(
+            stable.every((element) => gsap.getTweensOf(element).length === 0 && !element.getAttribute('style')),
+        ).toBe(true);
         expect(heroAnimation().duration()).toBeCloseTo(0.8);
-        expect(corners().every(corner => Number(corner.style.opacity || 1) >= 0.4)).toBe(true);
+        expect(corners().every((corner) => Number(corner.style.opacity || 1) >= 0.4)).toBe(true);
         heroAnimation().progress(0.1);
-        expect(corners().every(corner => Number(corner.style.opacity) >= 0.4)).toBe(true);
+        expect(corners().every((corner) => Number(corner.style.opacity) >= 0.4)).toBe(true);
         heroAnimation().progress(1);
-        expect(corners().every(corner => !corner.style.transform && !corner.style.opacity)).toBe(true);
-        expect(stable.every(element => !element.getAttribute('style'))).toBe(true);
+        expect(corners().every((corner) => !corner.style.transform && !corner.style.opacity)).toBe(true);
+        expect(stable.every((element) => !element.getAttribute('style'))).toBe(true);
         expect(heroObserver().disconnected).toBe(true);
         heroObserver().report(false);
         heroObserver().report(true);
@@ -245,7 +273,7 @@ describe('site animations — ciclo de vida', () => {
     it('espera a moldura entrar na tela e pausa fora dela sem reiniciar o gesto', () => {
         start('pt-BR', false);
         expect(heroAnimation()).toBeUndefined();
-        expect(corners().every(corner => !corner.getAttribute('style'))).toBe(true);
+        expect(corners().every((corner) => !corner.getAttribute('style'))).toBe(true);
 
         heroObserver().report(true, 0.2);
         expect(heroAnimation()).toBeUndefined();
@@ -267,18 +295,21 @@ describe('site animations — ciclo de vida', () => {
         expect(entrance.progress()).toBeCloseTo(0.3);
     });
 
-    it.each(['instrument', 'image', 'corner', 'observer'])('mantém o hero estático sem %s e ainda permite contadores', missing => {
-        if (missing === 'instrument') document.querySelector('.hero-instrument').remove();
-        if (missing === 'image') document.querySelector('.hero-shot').removeAttribute('src');
-        if (missing === 'corner') corners()[0].remove();
-        if (missing === 'observer') vi.stubGlobal('IntersectionObserver', undefined);
-        start();
-        expect(heroObserver()).toBeUndefined();
-        expect(corners().every(corner => !corner.getAttribute('style'))).toBe(true);
-        expect(counterAnimation()).toBeDefined();
-    });
+    it.each(['instrument', 'image', 'corner', 'observer'])(
+        'mantém o hero estático sem %s e ainda permite contadores',
+        (missing) => {
+            if (missing === 'instrument') document.querySelector('.hero-instrument').remove();
+            if (missing === 'image') document.querySelector('.hero-shot').removeAttribute('src');
+            if (missing === 'corner') corners()[0].remove();
+            if (missing === 'observer') vi.stubGlobal('IntersectionObserver', undefined);
+            start();
+            expect(heroObserver()).toBeUndefined();
+            expect(corners().every((corner) => !corner.getAttribute('style'))).toBe(true);
+            expect(counterAnimation()).toBeDefined();
+        },
+    );
 
-    it.each(['pt-BR', 'en'])('contador mantém prefixo, sufixo e precisão em %s e restaura texto final', locale => {
+    it.each(['pt-BR', 'en'])('contador mantém prefixo, sufixo e precisão em %s e restaura texto final', (locale) => {
         start(locale);
         const counter = counterAnimation();
         counter.progress(0.5);

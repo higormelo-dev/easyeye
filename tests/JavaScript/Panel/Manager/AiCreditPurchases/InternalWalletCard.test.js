@@ -40,28 +40,28 @@ describe('InternalWalletCard', () => {
     };
 
     const tStubs = {
-        manual:          { badge_internal: 'Sua empresa' },
+        manual: { badge_internal: 'Sua empresa' },
         internal_wallet: {
-            title:                'Sua empresa — consumo interno',
-            subtitle:             'Saldo da entidade administrativa',
-            available:            'Disponível agora',
-            includes_quota:       'cota + comprado',
-            quota:                'Cota mensal',
-            quota_expired:        'expirada',
-            resets_at:            'Reseta em',
-            balance:              'Comprados (não expiram)',
-            reserved:             'reservados',
+            title: 'Sua empresa — consumo interno',
+            subtitle: 'Saldo da entidade administrativa',
+            available: 'Disponível agora',
+            includes_quota: 'cota + comprado',
+            quota: 'Cota mensal',
+            quota_expired: 'expirada',
+            resets_at: 'Reseta em',
+            balance: 'Comprados (não expiram)',
+            reserved: 'reservados',
             consumed_by_provider: 'Consumo histórico por provedor',
-            add_credit:           'Adicionar créditos',
+            add_credit: 'Adicionar créditos',
         },
     };
 
     function mountCard(propsOverride = {}) {
         return mount(InternalWalletCard, {
             props: {
-                wallet:      baseWallet,
+                wallet: baseWallet,
                 permissions: { create_manual_for_internal: true },
-                t:           tStubs,
+                t: tStubs,
                 ...propsOverride,
             },
         });
@@ -88,9 +88,9 @@ describe('InternalWalletCard', () => {
         const wrapper = mountCard();
         const text = wrapper.text();
 
-        expect(text).toContain('500');                                  // available
-        expect(text).toContain('150');                                  // quota_remaining
-        expect(text).toContain('350');                                  // balance
+        expect(text).toContain('500'); // available
+        expect(text).toContain('150'); // quota_remaining
+        expect(text).toContain('350'); // balance
     });
 
     it('quotaPct = (used / total) * 100 = 25% no caso 50/200', () => {

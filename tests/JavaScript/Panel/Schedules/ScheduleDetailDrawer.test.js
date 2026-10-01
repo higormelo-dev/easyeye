@@ -27,23 +27,24 @@ describe('ScheduleDetailDrawer — copiar código', () => {
         globalThis.fetch = vi.fn(() =>
             Promise.resolve({
                 ok: true,
-                json: () => Promise.resolve({
-                    data: {
-                        id: 'sched-1',
-                        code: 'SDL-0000000741',
-                        patient_code: 'PAC-0000000123',
-                        patient_name: 'Maria Silva',
-                        doctor_code: 'DOC-0000000005',
-                        doctor_name: 'Dr. João',
-                        date_time: '2026-09-15 10:00',
-                        situation_label: 'Confirmado',
-                        situation_badge: 'badge-success',
-                        situation_icon: 'fa-check',
-                        resources: [],
-                        situation_logs: [],
-                        ...overrides,
-                    },
-                }),
+                json: () =>
+                    Promise.resolve({
+                        data: {
+                            id: 'sched-1',
+                            code: 'SDL-0000000741',
+                            patient_code: 'PAC-0000000123',
+                            patient_name: 'Maria Silva',
+                            doctor_code: 'DOC-0000000005',
+                            doctor_name: 'Dr. João',
+                            date_time: '2026-09-15 10:00',
+                            situation_label: 'Confirmado',
+                            situation_badge: 'badge-success',
+                            situation_icon: 'fa-check',
+                            resources: [],
+                            situation_logs: [],
+                            ...overrides,
+                        },
+                    }),
             }),
         );
     }
@@ -69,9 +70,7 @@ describe('ScheduleDetailDrawer — copiar código', () => {
         mockSchedule();
         const wrapper = await mountOpenDrawer();
 
-        const scheduleRow = wrapper
-            .findAll('.detail-row')
-            .find((row) => row.text().includes('SDL-0000000741'));
+        const scheduleRow = wrapper.findAll('.detail-row').find((row) => row.text().includes('SDL-0000000741'));
         await scheduleRow.find('button').trigger('click');
 
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith('SDL-741');
@@ -88,9 +87,7 @@ describe('ScheduleDetailDrawer — copiar código', () => {
         mockSchedule();
         const wrapper = await mountOpenDrawer();
 
-        const scheduleRow = wrapper
-            .findAll('.detail-row')
-            .find((row) => row.text().includes('SDL-0000000741'));
+        const scheduleRow = wrapper.findAll('.detail-row').find((row) => row.text().includes('SDL-0000000741'));
 
         expect(scheduleRow.findAll('button')).toHaveLength(1);
     });
@@ -99,9 +96,7 @@ describe('ScheduleDetailDrawer — copiar código', () => {
         mockSchedule();
         const wrapper = await mountOpenDrawer();
 
-        const patientRow = wrapper
-            .findAll('.detail-row')
-            .find((row) => row.text().includes('PAC-0000000123'));
+        const patientRow = wrapper.findAll('.detail-row').find((row) => row.text().includes('PAC-0000000123'));
         const numericButton = patientRow.findAll('button')[1];
         await numericButton.trigger('click');
 
@@ -112,9 +107,7 @@ describe('ScheduleDetailDrawer — copiar código', () => {
         mockSchedule({ patient_code: 'AB12-CD34' });
         const wrapper = await mountOpenDrawer();
 
-        const patientRow = wrapper
-            .findAll('.detail-row')
-            .find((row) => row.text().includes('AB12-CD34'));
+        const patientRow = wrapper.findAll('.detail-row').find((row) => row.text().includes('AB12-CD34'));
         const numericButton = patientRow.findAll('button')[1];
         await numericButton.trigger('click');
 
@@ -126,9 +119,7 @@ describe('ScheduleDetailDrawer — copiar código', () => {
         const wrapper = await mountOpenDrawer();
 
         // Sem patient_code, a linha inteira (v-if="schedule.patient_code") não renderiza.
-        const hasPatientCodeRow = wrapper
-            .findAll('.detail-row')
-            .some((row) => row.text().includes('PAC-'));
+        const hasPatientCodeRow = wrapper.findAll('.detail-row').some((row) => row.text().includes('PAC-'));
         expect(hasPatientCodeRow).toBe(false);
     });
 });

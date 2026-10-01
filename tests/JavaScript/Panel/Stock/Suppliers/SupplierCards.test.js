@@ -19,14 +19,25 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 vi.mock('@/Components/Panel/TablePagination.vue', () => ({
-    default: { props: ['data', 'showingSuffix'], template: '<nav class="pager">{{ data.total }} {{ showingSuffix }}</nav>' },
+    default: {
+        props: ['data', 'showingSuffix'],
+        template: '<nav class="pager">{{ data.total }} {{ showingSuffix }}</nav>',
+    },
 }));
 
 const t = {
-    col_code: 'Código', col_document: 'Documento', col_contact: 'Contato', col_phone: 'Telefone',
-    col_email: 'E-mail', status_active: 'Ativo', status_inactive: 'Inativo',
-    action_purchase_orders: 'Pedidos de compra deste fornecedor', action_edit: 'Editar',
-    action_delete: 'Excluir', empty_list: 'Nenhum fornecedor encontrado.', pagination_suffix: 'fornecedores',
+    col_code: 'Código',
+    col_document: 'Documento',
+    col_contact: 'Contato',
+    col_phone: 'Telefone',
+    col_email: 'E-mail',
+    status_active: 'Ativo',
+    status_inactive: 'Inativo',
+    action_purchase_orders: 'Pedidos de compra deste fornecedor',
+    action_edit: 'Editar',
+    action_delete: 'Excluir',
+    empty_list: 'Nenhum fornecedor encontrado.',
+    pagination_suffix: 'fornecedores',
 };
 
 let wrapper;
@@ -35,9 +46,15 @@ afterEach(() => wrapper?.unmount());
 
 function supplier(overrides = {}) {
     return {
-        id: 's1', code: 'FOR-0000000001', name: 'Alfa Óptica', active: true,
-        document_display: '12.345.678/0001-99', phone_display: '(61) 3333-4444',
-        contact_name: 'Ana', email: 'contato@alfa.test', ...overrides,
+        id: 's1',
+        code: 'FOR-0000000001',
+        name: 'Alfa Óptica',
+        active: true,
+        document_display: '12.345.678/0001-99',
+        phone_display: '(61) 3333-4444',
+        contact_name: 'Ana',
+        email: 'contato@alfa.test',
+        ...overrides,
     };
 }
 
@@ -70,7 +87,9 @@ describe('SupplierCards', () => {
         const row = supplier();
         const w = mountCards([row]);
 
-        expect(w.find('button[title="Pedidos de compra deste fornecedor"]').attributes('data-href')).toBe('/po?supplier_id=s1');
+        expect(w.find('button[title="Pedidos de compra deste fornecedor"]').attributes('data-href')).toBe(
+            '/po?supplier_id=s1',
+        );
 
         const [edit, remove] = w.findAll('.dd .dropdown-item');
         await edit.trigger('click');

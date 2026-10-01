@@ -6,22 +6,40 @@ import { router, resetInertiaMock, forms } from './support/inertiaMock.js';
 import { t, claim, batch, schedule, kpis, lists, paginate, brl, norm } from './support/fixtures.js';
 
 vi.mock('@inertiajs/vue3', async () => (await import('./support/inertiaMock.js')).buildInertiaMock());
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
-vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { props: ['title'], template: '<div><slot name="actions" /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
+vi.mock('@/Components/Panel/PageHeader.vue', () => ({
+    default: { props: ['title'], template: '<div><slot name="actions" /></div>' },
+}));
 vi.mock('@/Components/Panel/SearchSelect.vue', () => ({ default: { props: ['modelValue'], template: '<div />' } }));
-vi.mock('@/Components/Panel/Cid10Picker.vue', () => ({ default: { props: ['modelValue'], template: '<div class="cid-stub" />' } }));
+vi.mock('@/Components/Panel/Cid10Picker.vue', () => ({
+    default: { props: ['modelValue'], template: '<div class="cid-stub" />' },
+}));
 
 // Fase 4: as três abas chegam paginadas (paginator do Laravel) e com `lists`.
 const baseProps = {
     breadcrumbs: [],
-    eligibleSchedules: paginate([schedule(), schedule({ id: 's2', covenant_id: 'cov-2', patient_name: 'Ana' })], {}, 'eligible_page'),
+    eligibleSchedules: paginate(
+        [schedule(), schedule({ id: 's2', covenant_id: 'cov-2', patient_name: 'Ana' })],
+        {},
+        'eligible_page',
+    ),
     claims: paginate([claim()], {}, 'claims_page'),
     batches: paginate([batch()], {}, 'batches_page'),
     kpis,
     totals: { eligible: 2, claims: 1, batches: 1 },
     lists: lists(),
     covenants: [{ id: 'cov-1', name: 'Unimed', has_ans_registry: true, has_tiss_operator: true }],
-    filters: { from: '2026-09-01', to: '2026-09-26', covenant_id: null, claim_status: null, batch_id: null, batch_code: null, tab: 'eligible' },
+    filters: {
+        from: '2026-09-01',
+        to: '2026-09-26',
+        covenant_id: null,
+        claim_status: null,
+        batch_id: null,
+        batch_code: null,
+        tab: 'eligible',
+    },
     claimStatuses: [
         { value: 'draft', label: 'Rascunho' },
         { value: 'submitted', label: 'Enviado' },
@@ -91,7 +109,9 @@ describe('Billing/Index — cabeçalho, KPIs e fluxo', () => {
 
         expect(w.find('[data-test="billing-kpis"]').attributes('aria-label')).toBe(t.kpis_label);
         expect(w.find('[data-test="kpi-to-bill"]').text()).toBe('12 atendimento(s)');
-        expect(norm(w.find('[data-test="billing-kpis"]').text())).toContain(norm('≈ R$ 1.500,00 (10 de 12 com preço na tabela)'));
+        expect(norm(w.find('[data-test="billing-kpis"]').text())).toContain(
+            norm('≈ R$ 1.500,00 (10 de 12 com preço na tabela)'),
+        );
         expect(norm(w.find('[data-test="kpi-open"]').text())).toBe(norm(brl(450)));
         expect(norm(w.find('[data-test="kpi-received"]').text())).toBe(norm(brl(980.5)));
         expect(norm(w.find('[data-test="kpi-denied"]').text())).toBe(norm(brl(120)));
@@ -199,7 +219,12 @@ describe('Billing/Index — filtros (aplicação automática)', () => {
         await w.find('#billing-filter-status').setValue('submitted');
 
         expect(router.get).toHaveBeenCalledTimes(2);
-        expect(lastVisit()[1]).toEqual({ from: '2026-09-01', to: '2026-09-26', claim_status: 'submitted', tab: 'claims' });
+        expect(lastVisit()[1]).toEqual({
+            from: '2026-09-01',
+            to: '2026-09-26',
+            claim_status: 'submitted',
+            tab: 'claims',
+        });
         expect(lastVisit()[2]).toMatchObject({ preserveState: true, preserveScroll: true, replace: true });
     });
 
@@ -240,7 +265,17 @@ describe('Billing/Index — filtros (aplicação automática)', () => {
     it('reflete os filtros normalizados que o servidor devolve', async () => {
         const w = mountPage(withFilters({ tab: 'claims' }));
 
-        await w.setProps({ filters: { from: '2026-08-01', to: '2026-08-31', covenant_id: 'cov-1', claim_status: 'draft', batch_id: null, batch_code: null, tab: 'claims' } });
+        await w.setProps({
+            filters: {
+                from: '2026-08-01',
+                to: '2026-08-31',
+                covenant_id: 'cov-1',
+                claim_status: 'draft',
+                batch_id: null,
+                batch_code: null,
+                tab: 'claims',
+            },
+        });
 
         expect(w.find('[data-test="period-from"]').element.value).toBe('2026-08-01');
         expect(w.find('[data-test="period-to"]').element.value).toBe('2026-08-31');
@@ -258,7 +293,13 @@ describe('Billing/Index — filtros (aplicação automática)', () => {
         expect(w.find('[data-test="new-batch"]').text()).toContain('2 selecionado(s)');
 
         // Página 2 (mesmos filtros): s1 e s2 continuam marcados.
-        await w.setProps({ eligibleSchedules: paginate([schedule({ id: 's3', patient_name: 'Bia' })], { current_page: 2, last_page: 2 }, 'eligible_page') });
+        await w.setProps({
+            eligibleSchedules: paginate(
+                [schedule({ id: 's3', patient_name: 'Bia' })],
+                { current_page: 2, last_page: 2 },
+                'eligible_page',
+            ),
+        });
         expect(w.find('[data-test="new-batch"]').text()).toContain('2 selecionado(s)');
 
         // O modal de lote recebe os marcados de outras páginas junto com a página atual.
@@ -294,7 +335,13 @@ describe('Billing/Index — busca, ordenação e paginação por aba', () => {
         vi.advanceTimersByTime(400);
 
         expect(router.get).toHaveBeenCalledTimes(1);
-        expect(lastVisit()[1]).toEqual({ from: '2026-09-01', to: '2026-09-26', tab: 'claims', claims_search: 'GUI-00', batches_page: 3 });
+        expect(lastVisit()[1]).toEqual({
+            from: '2026-09-01',
+            to: '2026-09-26',
+            tab: 'claims',
+            claims_search: 'GUI-00',
+            batches_page: 3,
+        });
     });
 
     it('ordenar manda a ordem da aba (só quando difere do padrão) e zera a página dela', async () => {
@@ -303,7 +350,13 @@ describe('Billing/Index — busca, ordenação e paginação por aba', () => {
         const patient = w.findAll('#billing-panel-claims thead th[aria-sort] button')[2];
         await patient.trigger('click');
 
-        expect(lastVisit()[1]).toEqual({ from: '2026-09-01', to: '2026-09-26', tab: 'claims', claims_sort: 'patient', claims_direction: 'asc' });
+        expect(lastVisit()[1]).toEqual({
+            from: '2026-09-01',
+            to: '2026-09-26',
+            tab: 'claims',
+            claims_sort: 'patient',
+            claims_direction: 'asc',
+        });
 
         // Voltar ao padrão (Guia = criação, desc) tira a ordem da URL.
         await w.setProps({ lists: lists({ claims: { sort: 'created', direction: 'asc' } }) });
@@ -322,8 +375,13 @@ describe('Billing/Index — busca, ordenação e paginação por aba', () => {
         await w.find('#billing-filter-covenant').setValue('cov-1');
 
         expect(lastVisit()[1]).toEqual({
-            from: '2026-09-01', to: '2026-09-26', covenant_id: 'cov-1', tab: 'batches',
-            batches_search: 'LOT-7', batches_sort: 'total', batches_direction: 'asc',
+            from: '2026-09-01',
+            to: '2026-09-26',
+            covenant_id: 'cov-1',
+            tab: 'batches',
+            batches_search: 'LOT-7',
+            batches_sort: 'total',
+            batches_direction: 'asc',
         });
     });
 
@@ -419,7 +477,12 @@ describe('Billing/Index — enviar lote com confirmação', () => {
 });
 
 describe('Billing/Index — cancelar guia/lote (motivo obrigatório)', () => {
-    const cancellable = claim({ id: 'c9', code: 'GUI-0009', allowed_actions: ['cancel'], cancel_url: '/claims/c9/cancel' });
+    const cancellable = claim({
+        id: 'c9',
+        code: 'GUI-0009',
+        allowed_actions: ['cancel'],
+        cancel_url: '/claims/c9/cancel',
+    });
 
     async function openClaimCancel(w) {
         await w.find('[data-test="claim-menu"] button').trigger('click');
@@ -496,17 +559,29 @@ describe('Billing/Index — corrigir pendência', () => {
         guide_number: 'GUI-202609-000005',
         has_pending_guide: true,
         allowed_actions: ['fix_pending', 'cancel'],
-        fix_pending: { url: '/claims/c5/fix-pending', clinical_indication: '', beneficiary_card_number: '123', authorization_number: null },
+        fix_pending: {
+            url: '/claims/c5/fix-pending',
+            clinical_indication: '',
+            beneficiary_card_number: '123',
+            authorization_number: null,
+        },
     });
 
     it('abre com os dados atuais da guia, posta a correção e mostra o resultado; a lista recarrega', async () => {
-        const post = vi.fn(() => Promise.resolve({
-            data: {
-                message: 'Guia GUI-0005 corrigida e incluída no lote LOT-0001.',
-                attached: true,
-                validation: { passes: true, errors: [], warnings: [{ message: 'Lateralidade não informada.' }], summary: 'Guia possui avisos.' },
-            },
-        }));
+        const post = vi.fn(() =>
+            Promise.resolve({
+                data: {
+                    message: 'Guia GUI-0005 corrigida e incluída no lote LOT-0001.',
+                    attached: true,
+                    validation: {
+                        passes: true,
+                        errors: [],
+                        warnings: [{ message: 'Lateralidade não informada.' }],
+                        summary: 'Guia possui avisos.',
+                    },
+                },
+            }),
+        );
         window.axios = { post };
 
         const w = mountPage({ ...withFilters({ tab: 'claims' }), claims: paginate([pending], {}, 'claims_page') });
@@ -522,11 +597,16 @@ describe('Billing/Index — corrigir pendência', () => {
         await flushPromises();
 
         expect(post).toHaveBeenCalledWith('/claims/c5/fix-pending', {
-            clinical_indication: '', beneficiary_card_number: '123', authorization_number: 'AUT-77',
+            clinical_indication: '',
+            beneficiary_card_number: '123',
+            authorization_number: 'AUT-77',
         });
         expect(w.find('[data-test="fix-message"]').text()).toBe('Guia GUI-0005 corrigida e incluída no lote LOT-0001.');
         expect(w.find('[data-test="prevalidation-warnings"]').text()).toContain('Lateralidade não informada.');
-        expect(router.reload).toHaveBeenCalledWith({ only: ['claims', 'batches', 'kpis', 'totals'], preserveScroll: true });
+        expect(router.reload).toHaveBeenCalledWith({
+            only: ['claims', 'batches', 'kpis', 'totals'],
+            preserveScroll: true,
+        });
     });
 });
 
@@ -554,7 +634,9 @@ describe('Billing/Index — avisos', () => {
         await nextTick();
 
         expect(w.find('[data-test="deny-done"]').text()).toContain('Glosa registrada na guia GUI-0001');
-        expect(w.find('[data-test="open-conciliation"]').attributes('href')).toBe('/financial/tiss/glosas?search=GUI-0001');
+        expect(w.find('[data-test="open-conciliation"]').attributes('href')).toBe(
+            '/financial/tiss/glosas?search=GUI-0001',
+        );
 
         await w.find('[data-test="deny-close"]').trigger('click');
         expect(w.find('[data-test="deny-done"]').exists()).toBe(false);

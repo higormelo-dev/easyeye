@@ -1,33 +1,33 @@
 <script setup>
 import { ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import AppLayout              from '@/Layouts/AppLayout.vue';
-import PatientInfoSidebar     from './Components/PatientInfoSidebar.vue';
-import PreviousRecordsCard    from './Components/PreviousRecordsCard.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PatientInfoSidebar from './Components/PatientInfoSidebar.vue';
+import PreviousRecordsCard from './Components/PreviousRecordsCard.vue';
 import MedicalRecordViewModal from './Components/MedicalRecordViewModal.vue';
-import MedicalRecordForm      from './Components/MedicalRecordForm.vue';
-import ScheduleFlowGuard      from './Components/ScheduleFlowGuard.vue';
+import MedicalRecordForm from './Components/MedicalRecordForm.vue';
+import ScheduleFlowGuard from './Components/ScheduleFlowGuard.vue';
 
 const props = defineProps({
-    breadcrumbs:     { type: Array,   default: () => [] },
-    patient:         { type: Object,  required: true },
-    medicalrecord:   { type: Object,  required: true },
-    previousRecords: { type: Array,   default: () => [] },
-    doctors:         { type: Array,   default: () => [] },
-    currentDoctorId: { type: String,  default: null },
+    breadcrumbs: { type: Array, default: () => [] },
+    patient: { type: Object, required: true },
+    medicalrecord: { type: Object, required: true },
+    previousRecords: { type: Array, default: () => [] },
+    doctors: { type: Array, default: () => [] },
+    currentDoctorId: { type: String, default: null },
     canChooseDoctor: { type: Boolean, default: false },
-    isDoctor:        { type: Boolean, default: false },
-    isEdit:          { type: Boolean, default: true },
+    isDoctor: { type: Boolean, default: false },
+    isEdit: { type: Boolean, default: true },
     // Fluxo Agenda ↔ Prontuário (ver ScheduleFlowGuard.vue)
-    scheduleFlow:    { type: Object,  default: null },
-    catalogs:        { type: Object,  required: true },
-    urls:            { type: Object,  required: true },
-    storage:         { type: Object,  default: () => ({}) },
-    ai:              { type: Object,  default: () => ({ enabled: false }) },
-    t:               { type: Object,  default: () => ({}) },
+    scheduleFlow: { type: Object, default: null },
+    catalogs: { type: Object, required: true },
+    urls: { type: Object, required: true },
+    storage: { type: Object, default: () => ({}) },
+    ai: { type: Object, default: () => ({ enabled: false }) },
+    t: { type: Object, default: () => ({}) },
 });
 
-const flowGuard  = ref(null);
+const flowGuard = ref(null);
 const recordForm = ref(null);
 
 const viewOpen = ref(false);
@@ -53,10 +53,12 @@ function closeView() {
                     <div class="btn-group" role="group">
                         <!-- Com fluxo de agendamento ativo, sair passa pelo
                              ScheduleFlowGuard (Finalizar/Dilatar/Exame/Continuar). -->
-                        <button v-if="flowGuard?.active"
-                                type="button"
-                                class="btn btn-outline-white btn-sm"
-                                @click="flowGuard.requestExit()">
+                        <button
+                            v-if="flowGuard?.active"
+                            type="button"
+                            class="btn btn-outline-white btn-sm"
+                            @click="flowGuard.requestExit()"
+                        >
                             <i class="fas fa-arrow-left me-1"></i>{{ t.title ?? 'Prontuários' }}
                         </button>
                         <Link v-else :href="urls.list" class="btn btn-outline-white btn-sm">
@@ -83,12 +85,12 @@ function closeView() {
                 <div class="col-12 col-lg-9 col-xl-10">
                     <div class="card pmr-content-card overflow-hidden bg-white">
                         <div class="d-flex align-items-center justify-content-between px-3 py-1 pmr-record-strip">
-                            <span>
-                                <i class="fas fa-file-medical-alt me-1"></i>{{ medicalrecord.code }}
-                            </span>
-                            <span v-if="medicalrecord.is_locked"
-                                  class="badge bg-warning text-dark"
-                                  style="font-size:.65rem;">
+                            <span> <i class="fas fa-file-medical-alt me-1"></i>{{ medicalrecord.code }} </span>
+                            <span
+                                v-if="medicalrecord.is_locked"
+                                class="badge bg-warning text-dark"
+                                style="font-size: 0.65rem"
+                            >
                                 <i class="fas fa-lock me-1"></i>{{ t.locked ?? 'Bloqueado' }}
                             </span>
                         </div>

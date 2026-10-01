@@ -7,47 +7,69 @@ import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReas
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
-    open:     { type: Boolean, required: true },
-    entityId: { type: String,  default: null },
-    t:        { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    entityId: { type: String, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit    = defineEmits(['close']);
-const isEdit  = computed(() => !!props.entityId);
-const title   = computed(() => isEdit.value ? props.t.form_title_edit : props.t.form_title_create);
+const emit = defineEmits(['close']);
+const isEdit = computed(() => !!props.entityId);
+const title = computed(() => (isEdit.value ? props.t.form_title_edit : props.t.form_title_create));
 const loading = ref(false);
 const activeTab = ref('dados');
 
 const form = useForm({
-    name: '', subdomain: '', email: '', telephone: '', cellphone: '',
-    national_registration: '', cnes: '', state_registration: '', municipal_registration: '', website: '',
-    zipcode: '', address: '', number: '', complement: '', district: '',
-    city: '', state: '', country: 'Brasil',
-    schedule_interval: 15, active: true,
+    name: '',
+    subdomain: '',
+    email: '',
+    telephone: '',
+    cellphone: '',
+    national_registration: '',
+    cnes: '',
+    state_registration: '',
+    municipal_registration: '',
+    website: '',
+    zipcode: '',
+    address: '',
+    number: '',
+    complement: '',
+    district: '',
+    city: '',
+    state: '',
+    country: 'Brasil',
+    schedule_interval: 15,
+    active: true,
 });
 
 // ── 2FA: estado lido via show() do Manager (separado do useForm para não
 // confundir o submit principal, que não muda 2FA — ele tem endpoint próprio).
 const twoFactor = ref({
-    requires:   false,
+    requires: false,
     enabled_at: null,
     enabled_by: null,
 });
 
-const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
 
 async function loadTwoFactorState(id) {
     try {
-        const res  = await fetch(route('manager.entities.show', id), {
+        const res = await fetch(route('manager.entities.show', id), {
             headers: { Accept: 'application/json' },
         });
         const json = await res.json();
         twoFactor.value = {
-            requires:   !!json.data.requires_two_factor,
+            requires: !!json.data.requires_two_factor,
             enabled_at: json.data.two_factor_enabled_at,
             enabled_by: json.data.two_factor_enabled_by,
         };
-    } catch { /* silent */ }
+    } catch {
+        /* silent */
+    }
 }
 
 function toggleTwoFactor() {
@@ -55,18 +77,16 @@ function toggleTwoFactor() {
 
     openReasonModal({
         title: enabling
-            ? (props.t.form_2fa_toggle_enable  ?? 'Ativar 2FA obrigatório')
+            ? (props.t.form_2fa_toggle_enable ?? 'Ativar 2FA obrigatório')
             : (props.t.form_2fa_toggle_disable ?? 'Desativar 2FA obrigatório'),
-        message: enabling
-            ? (props.t.form_2fa_modal_enable  ?? '')
-            : (props.t.form_2fa_modal_disable ?? ''),
+        message: enabling ? (props.t.form_2fa_modal_enable ?? '') : (props.t.form_2fa_modal_disable ?? ''),
         confirmVariant: enabling ? 'primary' : 'danger',
         async onConfirm(reason) {
             const res = await fetch(route('manager.entities.two-factor.toggle', props.entityId), {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept':       'application/json',
+                    Accept: 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
                 body: JSON.stringify({ enabled: enabling, reason }),
@@ -74,7 +94,7 @@ function toggleTwoFactor() {
             const json = await res.json();
             if (res.ok) {
                 twoFactor.value = {
-                    requires:   !!json.data.requires_two_factor,
+                    requires: !!json.data.requires_two_factor,
                     enabled_at: json.data.two_factor_enabled_at,
                     enabled_by: json.data.two_factor_enabled_by ?? null,
                 };
@@ -88,31 +108,38 @@ function toggleTwoFactor() {
 }
 
 function resetForm() {
-    form.reset(); form.clearErrors();
-    form.country = 'Brasil'; form.schedule_interval = 15;
+    form.reset();
+    form.clearErrors();
+    form.country = 'Brasil';
+    form.schedule_interval = 15;
     activeTab.value = 'dados';
 }
 
 async function loadEditData(id) {
     loading.value = true;
     try {
-        const res  = await fetch(route('manager.entities.edit-data', id));
+        const res = await fetch(route('manager.entities.edit-data', id));
         const json = await res.json();
-        Object.keys(form).forEach(k => { if (k in json.data && json.data[k] !== null) form[k] = json.data[k]; });
+        Object.keys(form).forEach((k) => {
+            if (k in json.data && json.data[k] !== null) form[k] = json.data[k];
+        });
     } finally {
         loading.value = false;
     }
 }
 
-watch(() => props.open, async (val) => {
-    if (val) {
-        resetForm();
-        if (props.entityId) {
-            await loadEditData(props.entityId);
-            await loadTwoFactorState(props.entityId);
+watch(
+    () => props.open,
+    async (val) => {
+        if (val) {
+            resetForm();
+            if (props.entityId) {
+                await loadEditData(props.entityId);
+                await loadTwoFactorState(props.entityId);
+            }
         }
-    }
-});
+    },
+);
 
 function submit() {
     const opts = { preserveScroll: true, onSuccess: () => emit('close') };
@@ -125,20 +152,35 @@ async function lookupCep() {
     const cep = form.zipcode.replace(/\D/g, '');
     if (cep.length !== 8) return;
     try {
-        const d = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then(r => r.json());
+        const d = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then((r) => r.json());
         if (!d.erro) {
             form.address = d.logradouro ?? form.address;
-            form.district = d.bairro    ?? form.district;
-            form.city     = d.localidade ?? form.city;
-            form.state    = d.uf        ?? form.state;
+            form.district = d.bairro ?? form.district;
+            form.city = d.localidade ?? form.city;
+            form.state = d.uf ?? form.state;
         }
-    } catch { /* silent */ }
+    } catch {
+        /* silent */
+    }
 }
 
 const tabErrors = computed(() => ({
-    dados:    ['name','subdomain','email','telephone','cellphone','national_registration','cnes','state_registration','municipal_registration','website'].some(k => k in form.errors),
-    endereco: ['zipcode','address','number','complement','district','city','state','country'].some(k => k in form.errors),
-    config:   ['schedule_interval','active'].some(k => k in form.errors),
+    dados: [
+        'name',
+        'subdomain',
+        'email',
+        'telephone',
+        'cellphone',
+        'national_registration',
+        'cnes',
+        'state_registration',
+        'municipal_registration',
+        'website',
+    ].some((k) => k in form.errors),
+    endereco: ['zipcode', 'address', 'number', 'complement', 'district', 'city', 'state', 'country'].some(
+        (k) => k in form.errors,
+    ),
+    config: ['schedule_interval', 'active'].some((k) => k in form.errors),
 }));
 
 const scheduleIntervalOptions = computed(() => [
@@ -148,51 +190,62 @@ const scheduleIntervalOptions = computed(() => [
 ]);
 
 const statusOptions = computed(() => [
-    { value: true,  label: props.t.status_option_active },
+    { value: true, label: props.t.status_option_active },
     { value: false, label: props.t.status_option_inactive },
 ]);
 </script>
 
 <template>
-    <OffcanvasPanel
-        :open="open"
-        :width="580"
-        :loading="loading"
-        :loading-label="t.loading"
-        @close="$emit('close')"
-    >
+    <OffcanvasPanel :open="open" :width="580" :loading="loading" :loading-label="t.loading" @close="$emit('close')">
         <!-- Header -->
         <template #header>
-            <h5 class="mb-0 fw-semibold">
-                <i class="ti ti-building me-2 text-primary"></i>{{ title }}
-            </h5>
+            <h5 class="mb-0 fw-semibold"><i class="ti ti-building me-2 text-primary"></i>{{ title }}</h5>
         </template>
 
         <!-- Tabs -->
         <template #tabs>
             <ul class="nav nav-tabs border-0">
                 <li class="nav-item">
-                    <button class="nav-link" :class="{ active: activeTab==='dados', 'text-danger': tabErrors.dados }" @click="activeTab='dados'">
+                    <button
+                        class="nav-link"
+                        :class="{ active: activeTab === 'dados', 'text-danger': tabErrors.dados }"
+                        @click="activeTab = 'dados'"
+                    >
                         <i class="ti ti-building me-1"></i> {{ t.tab_data }}
                         <i v-if="tabErrors.dados" class="ti ti-alert-circle text-danger ms-1 fs-12"></i>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" :class="{ active: activeTab==='endereco', 'text-danger': tabErrors.endereco }" @click="activeTab='endereco'">
+                    <button
+                        class="nav-link"
+                        :class="{ active: activeTab === 'endereco', 'text-danger': tabErrors.endereco }"
+                        @click="activeTab = 'endereco'"
+                    >
                         <i class="ti ti-map-pin me-1"></i> {{ t.tab_address }}
                         <i v-if="tabErrors.endereco" class="ti ti-alert-circle text-danger ms-1 fs-12"></i>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" :class="{ active: activeTab==='config', 'text-danger': tabErrors.config }" @click="activeTab='config'">
+                    <button
+                        class="nav-link"
+                        :class="{ active: activeTab === 'config', 'text-danger': tabErrors.config }"
+                        @click="activeTab = 'config'"
+                    >
                         <i class="ti ti-settings me-1"></i> {{ t.tab_config }}
                         <i v-if="tabErrors.config" class="ti ti-alert-circle text-danger ms-1 fs-12"></i>
                     </button>
                 </li>
                 <li v-if="isEdit" class="nav-item">
-                    <button class="nav-link" :class="{ active: activeTab==='security' }" @click="activeTab='security'">
+                    <button
+                        class="nav-link"
+                        :class="{ active: activeTab === 'security' }"
+                        @click="activeTab = 'security'"
+                    >
                         <i class="ti ti-shield-lock me-1"></i> {{ t.form_section_security ?? 'Segurança' }}
-                        <span v-if="twoFactor.requires" class="badge badge-soft-success rounded text-success border border-success fs-11 ms-1">
+                        <span
+                            v-if="twoFactor.requires"
+                            class="badge badge-soft-success rounded text-success border border-success fs-11 ms-1"
+                        >
                             2FA
                         </span>
                     </button>
@@ -202,59 +255,110 @@ const statusOptions = computed(() => [
 
         <!-- Body -->
         <form @submit.prevent="submit">
-
             <!-- TAB: Dados -->
             <div v-show="activeTab === 'dados'">
                 <div class="row g-3">
                     <div class="col-8">
                         <label class="form-label">{{ t.field_name_required }}</label>
-                        <input v-model="form.name" type="text" maxlength="150" class="form-control" autocomplete="off" :class="{ 'is-invalid': form.errors.name }">
+                        <input
+                            v-model="form.name"
+                            type="text"
+                            maxlength="150"
+                            class="form-control"
+                            autocomplete="off"
+                            :class="{ 'is-invalid': form.errors.name }"
+                        />
                         <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
                     </div>
                     <div class="col-4">
                         <label class="form-label">{{ t.field_subdomain }}</label>
-                        <input v-model="form.subdomain" type="text" maxlength="100" class="form-control" :placeholder="t.field_subdomain_placeholder" :class="{ 'is-invalid': form.errors.subdomain }">
+                        <input
+                            v-model="form.subdomain"
+                            type="text"
+                            maxlength="100"
+                            class="form-control"
+                            :placeholder="t.field_subdomain_placeholder"
+                            :class="{ 'is-invalid': form.errors.subdomain }"
+                        />
                         <div v-if="form.errors.subdomain" class="invalid-feedback">{{ form.errors.subdomain }}</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label">{{ t.field_email }}</label>
-                        <input v-model="form.email" type="email" maxlength="150" class="form-control" :class="{ 'is-invalid': form.errors.email }">
+                        <input
+                            v-model="form.email"
+                            type="email"
+                            maxlength="150"
+                            class="form-control"
+                            :class="{ 'is-invalid': form.errors.email }"
+                        />
                         <div v-if="form.errors.email" class="invalid-feedback">{{ form.errors.email }}</div>
                     </div>
                     <div class="col-6">
                         <label class="form-label">{{ t.field_telephone }}</label>
-                        <input v-model="form.telephone" v-mask="'phone'" type="text" inputmode="numeric" class="form-control" placeholder="(00) 0000-0000"
-                               :class="{ 'is-invalid': form.errors.telephone }">
+                        <input
+                            v-model="form.telephone"
+                            v-mask="'phone'"
+                            type="text"
+                            inputmode="numeric"
+                            class="form-control"
+                            placeholder="(00) 0000-0000"
+                            :class="{ 'is-invalid': form.errors.telephone }"
+                        />
                         <div v-if="form.errors.telephone" class="invalid-feedback">{{ form.errors.telephone }}</div>
                     </div>
                     <div class="col-6">
                         <label class="form-label">{{ t.field_cellphone }}</label>
-                        <input v-model="form.cellphone" v-mask="'phone'" type="text" inputmode="numeric" class="form-control" placeholder="(00) 00000-0000"
-                               :class="{ 'is-invalid': form.errors.cellphone }">
+                        <input
+                            v-model="form.cellphone"
+                            v-mask="'phone'"
+                            type="text"
+                            inputmode="numeric"
+                            class="form-control"
+                            placeholder="(00) 00000-0000"
+                            :class="{ 'is-invalid': form.errors.cellphone }"
+                        />
                         <div v-if="form.errors.cellphone" class="invalid-feedback">{{ form.errors.cellphone }}</div>
                     </div>
                     <div class="col-4">
                         <label class="form-label">{{ t.field_national_registration }}</label>
-                        <input v-model="form.national_registration" v-mask="'cpfCnpj'" type="text" autocapitalize="characters" class="form-control">
+                        <input
+                            v-model="form.national_registration"
+                            v-mask="'cpfCnpj'"
+                            type="text"
+                            autocapitalize="characters"
+                            class="form-control"
+                        />
                     </div>
                     <div class="col-4">
                         <label class="form-label">{{ t.field_state_registration }}</label>
-                        <input v-model="form.state_registration" type="text" maxlength="30" class="form-control">
+                        <input v-model="form.state_registration" type="text" maxlength="30" class="form-control" />
                     </div>
                     <div class="col-4">
                         <label class="form-label">{{ t.field_municipal_registration }}</label>
-                        <input v-model="form.municipal_registration" type="text" maxlength="30" class="form-control">
+                        <input v-model="form.municipal_registration" type="text" maxlength="30" class="form-control" />
                     </div>
                     <div class="col-4">
                         <label class="form-label">{{ t.field_cnes }}</label>
-                        <input v-model="form.cnes" type="text" maxlength="7" class="form-control"
-                               :class="{ 'is-invalid': form.errors.cnes }">
+                        <input
+                            v-model="form.cnes"
+                            type="text"
+                            maxlength="7"
+                            class="form-control"
+                            :class="{ 'is-invalid': form.errors.cnes }"
+                        />
                         <div v-if="form.errors.cnes" class="invalid-feedback">{{ form.errors.cnes }}</div>
                         <small class="text-muted">{{ t.field_cnes_hint }}</small>
                     </div>
                     <div class="col-12">
                         <label class="form-label">{{ t.field_website }}</label>
-                        <input v-model="form.website" type="text" maxlength="150" class="form-control" :placeholder="t.field_website_placeholder" :class="{ 'is-invalid': form.errors.website }">
+                        <input
+                            v-model="form.website"
+                            type="text"
+                            maxlength="150"
+                            class="form-control"
+                            :placeholder="t.field_website_placeholder"
+                            :class="{ 'is-invalid': form.errors.website }"
+                        />
                         <div v-if="form.errors.website" class="invalid-feedback">{{ form.errors.website }}</div>
                     </div>
                 </div>
@@ -266,41 +370,72 @@ const statusOptions = computed(() => [
                     <div class="col-4">
                         <label class="form-label">{{ t.field_zipcode }}</label>
                         <div class="input-group">
-                            <input v-model="form.zipcode" v-mask="'cep'" type="text" inputmode="numeric" class="form-control" :placeholder="t.field_zipcode_placeholder" @blur="lookupCep">
-                            <button type="button" class="btn btn-outline-secondary" :title="t.btn_lookup_cep" @click="lookupCep">
+                            <input
+                                v-model="form.zipcode"
+                                v-mask="'cep'"
+                                type="text"
+                                inputmode="numeric"
+                                class="form-control"
+                                :placeholder="t.field_zipcode_placeholder"
+                                @blur="lookupCep"
+                            />
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                :title="t.btn_lookup_cep"
+                                @click="lookupCep"
+                            >
                                 <i class="ti ti-search"></i>
                             </button>
                         </div>
                     </div>
                     <div class="col-6">
                         <label class="form-label">{{ t.field_address }}</label>
-                        <input v-model="form.address" type="text" maxlength="200" class="form-control">
+                        <input v-model="form.address" type="text" maxlength="200" class="form-control" />
                     </div>
                     <div class="col-2">
                         <label class="form-label">{{ t.field_number }}</label>
-                        <input v-model="form.number" type="text" maxlength="10" class="form-control">
+                        <input v-model="form.number" type="text" maxlength="10" class="form-control" />
                     </div>
                     <div class="col-6">
                         <label class="form-label">{{ t.field_complement }}</label>
-                        <input v-model="form.complement" type="text" maxlength="100" class="form-control">
+                        <input v-model="form.complement" type="text" maxlength="100" class="form-control" />
                     </div>
                     <div class="col-6">
                         <label class="form-label">{{ t.field_district }}</label>
-                        <input v-model="form.district" type="text" maxlength="100" class="form-control">
+                        <input v-model="form.district" type="text" maxlength="100" class="form-control" />
                     </div>
                     <div class="col-6">
                         <label class="form-label">{{ t.field_city_required }}</label>
-                        <input v-model="form.city" type="text" maxlength="100" class="form-control" :class="{ 'is-invalid': form.errors.city }">
+                        <input
+                            v-model="form.city"
+                            type="text"
+                            maxlength="100"
+                            class="form-control"
+                            :class="{ 'is-invalid': form.errors.city }"
+                        />
                         <div v-if="form.errors.city" class="invalid-feedback">{{ form.errors.city }}</div>
                     </div>
                     <div class="col-2">
                         <label class="form-label">{{ t.field_state_required }}</label>
-                        <input v-model="form.state" type="text" maxlength="2" class="form-control text-uppercase" :class="{ 'is-invalid': form.errors.state }">
+                        <input
+                            v-model="form.state"
+                            type="text"
+                            maxlength="2"
+                            class="form-control text-uppercase"
+                            :class="{ 'is-invalid': form.errors.state }"
+                        />
                         <div v-if="form.errors.state" class="invalid-feedback">{{ form.errors.state }}</div>
                     </div>
                     <div class="col-4">
                         <label class="form-label">{{ t.field_country_required }}</label>
-                        <input v-model="form.country" type="text" maxlength="50" class="form-control" :class="{ 'is-invalid': form.errors.country }">
+                        <input
+                            v-model="form.country"
+                            type="text"
+                            maxlength="50"
+                            class="form-control"
+                            :class="{ 'is-invalid': form.errors.country }"
+                        />
                         <div v-if="form.errors.country" class="invalid-feedback">{{ form.errors.country }}</div>
                     </div>
                 </div>
@@ -341,27 +476,31 @@ const statusOptions = computed(() => [
                     <div class="card-body">
                         <div class="d-flex align-items-start gap-3 mb-3">
                             <div class="flex-shrink-0">
-                                <i class="ti ti-shield-lock fs-1"
-                                   :class="twoFactor.requires ? 'text-success' : 'text-muted'"></i>
+                                <i
+                                    class="ti ti-shield-lock fs-1"
+                                    :class="twoFactor.requires ? 'text-success' : 'text-muted'"
+                                ></i>
                             </div>
                             <div class="flex-grow-1">
                                 <h6 class="fw-semibold mb-1">
                                     {{ t.form_2fa_label ?? 'Exigir 2FA para todos os usuários' }}
-                                    <span v-if="twoFactor.requires"
-                                          class="badge badge-soft-success rounded text-success border border-success ms-1">
+                                    <span
+                                        v-if="twoFactor.requires"
+                                        class="badge badge-soft-success rounded text-success border border-success ms-1"
+                                    >
                                         Ativo
                                     </span>
-                                    <span v-else class="badge badge-soft-secondary rounded ms-1">
-                                        Inativo
-                                    </span>
+                                    <span v-else class="badge badge-soft-secondary rounded ms-1"> Inativo </span>
                                 </h6>
                                 <p class="text-muted small mb-2">{{ t.form_2fa_hint }}</p>
 
                                 <p v-if="twoFactor.requires && twoFactor.enabled_at" class="small text-muted mb-0">
                                     <i class="ti ti-history me-1"></i>
-                                    {{ (t.form_2fa_enabled_at ?? 'Ativado em :date por :user')
-                                        ?.replace(':date', twoFactor.enabled_at)
-                                        ?.replace(':user', twoFactor.enabled_by ?? '—') }}
+                                    {{
+                                        (t.form_2fa_enabled_at ?? 'Ativado em :date por :user')
+                                            ?.replace(':date', twoFactor.enabled_at)
+                                            ?.replace(':user', twoFactor.enabled_by ?? '—')
+                                    }}
                                 </p>
                             </div>
                         </div>

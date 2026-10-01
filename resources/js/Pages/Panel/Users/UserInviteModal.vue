@@ -11,9 +11,9 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
  * tem o convite próprio no cadastro de médicos.
  */
 const props = defineProps({
-    open:  { type: Boolean, required: true },
-    roles: { type: Object,  default: () => ({}) },   // perfil convidável: rule → rótulo
-    t:     { type: Object,  default: () => ({}) },   // lang access_control (usa `invitation`)
+    open: { type: Boolean, required: true },
+    roles: { type: Object, default: () => ({}) }, // perfil convidável: rule → rótulo
+    t: { type: Object, default: () => ({}) }, // lang access_control (usa `invitation`)
 });
 
 const emit = defineEmits(['close']);
@@ -23,12 +23,15 @@ const roleOptions = computed(() => Object.entries(props.roles).map(([value, labe
 
 const form = useForm({ email: '', rule: '' });
 
-watch(() => props.open, (open) => {
-    if (open) {
-        form.reset();
-        form.clearErrors();
-    }
-});
+watch(
+    () => props.open,
+    (open) => {
+        if (open) {
+            form.reset();
+            form.clearErrors();
+        }
+    },
+);
 
 function submit() {
     form.post(route('panel.accesscontrol.users.invitations.store'), {
@@ -50,7 +53,9 @@ function submit() {
 
         <form id="user-invite-form" novalidate @submit.prevent="submit">
             <div class="mb-3">
-                <label for="invite-email" class="form-label fw-semibold">{{ it.email }} <span class="text-danger" aria-hidden="true">*</span></label>
+                <label for="invite-email" class="form-label fw-semibold"
+                    >{{ it.email }} <span class="text-danger" aria-hidden="true">*</span></label
+                >
                 <input
                     id="invite-email"
                     v-model="form.email"
@@ -61,12 +66,16 @@ function submit() {
                     :aria-invalid="form.errors.email ? 'true' : 'false'"
                     :aria-describedby="form.errors.email ? 'invite-email-error' : undefined"
                     required
-                >
-                <div v-if="form.errors.email" id="invite-email-error" class="invalid-feedback d-block">{{ form.errors.email }}</div>
+                />
+                <div v-if="form.errors.email" id="invite-email-error" class="invalid-feedback d-block">
+                    {{ form.errors.email }}
+                </div>
             </div>
 
             <div class="mb-1">
-                <label class="form-label fw-semibold">{{ it.rule }} <span class="text-danger" aria-hidden="true">*</span></label>
+                <label class="form-label fw-semibold"
+                    >{{ it.rule }} <span class="text-danger" aria-hidden="true">*</span></label
+                >
                 <SearchSelect
                     v-model="form.rule"
                     :options="roleOptions"

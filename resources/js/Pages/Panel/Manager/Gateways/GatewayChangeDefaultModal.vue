@@ -3,24 +3,24 @@ import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
-    open:           { type: Boolean, required: true },
-    gateways:       { type: Array,   default: () => [] },
-    defaultGateway: { type: Object,  default: null },
-    t:              { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    gateways: { type: Array, default: () => [] },
+    defaultGateway: { type: Object, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit    = defineEmits(['close']);
-const saving  = ref(null); // gateway id being saved
+const emit = defineEmits(['close']);
+const saving = ref(null); // gateway id being saved
 
 async function setDefault(gateway) {
     if (!confirm((props.t.js_confirm_set_default_modal ?? '').replace(':name', gateway.name))) return;
     saving.value = gateway.id;
     try {
-        const res  = await fetch(gateway.set_default_url, {
+        const res = await fetch(gateway.set_default_url, {
             method: 'PATCH',
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
         });
         const json = await res.json();
@@ -47,7 +47,7 @@ function isDefault(g) {
             v-if="open"
             class="modal fade show d-block"
             tabindex="-1"
-            style="background:rgba(0,0,0,.4)"
+            style="background: rgba(0, 0, 0, 0.4)"
             @click.self="$emit('close')"
         >
             <div class="modal-dialog modal-dialog-centered">
@@ -72,32 +72,48 @@ function isDefault(g) {
                                 :key="g.id"
                                 class="list-group-item list-group-item-action d-flex align-items-center gap-3 px-0 py-3"
                                 :class="{ 'opacity-50': !g.can_be_default }"
-                                style="border-left:0;border-right:0;"
+                                style="border-left: 0; border-right: 0"
                             >
                                 <div class="flex-grow-1">
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
                                         <i v-if="isDefault(g)" class="ti ti-star gw-gold-icon"></i>
                                         <span class="fw-semibold small">{{ g.name }}</span>
-                                        <span class="badge badge-soft-secondary text-uppercase" style="font-size:.68rem;">{{ g.code }}</span>
-                                        <span v-if="isDefault(g)" class="badge gw-gold-badge" style="font-size:.68rem;">
+                                        <span
+                                            class="badge badge-soft-secondary text-uppercase"
+                                            style="font-size: 0.68rem"
+                                            >{{ g.code }}</span
+                                        >
+                                        <span
+                                            v-if="isDefault(g)"
+                                            class="badge gw-gold-badge"
+                                            style="font-size: 0.68rem"
+                                        >
                                             {{ t.modal_default_current }}
                                         </span>
                                     </div>
                                     <div class="d-flex gap-1 mt-1">
-                                        <span v-if="!g.active" class="badge badge-soft-secondary" style="font-size:.68rem;">{{ t.status_inactive }}</span>
+                                        <span
+                                            v-if="!g.active"
+                                            class="badge badge-soft-secondary"
+                                            style="font-size: 0.68rem"
+                                            >{{ t.status_inactive }}</span
+                                        >
                                         <span
                                             v-if="g.credentials_label"
                                             class="badge badge-soft-success"
-                                            style="font-size:.68rem;"
-                                        >{{ g.credentials_label }}</span>
-                                        <span v-else class="badge badge-soft-warning" style="font-size:.68rem;">{{ t.credentials_none }}</span>
+                                            style="font-size: 0.68rem"
+                                            >{{ g.credentials_label }}</span
+                                        >
+                                        <span v-else class="badge badge-soft-warning" style="font-size: 0.68rem">{{
+                                            t.credentials_none
+                                        }}</span>
                                     </div>
                                 </div>
                                 <div class="flex-shrink-0">
                                     <button
                                         v-if="isDefault(g)"
                                         class="btn btn-sm gw-gold-badge"
-                                        style="border:none;"
+                                        style="border: none"
                                         disabled
                                     >
                                         <i class="ti ti-check me-1"></i>{{ t.default_badge }}
@@ -109,7 +125,10 @@ function isDefault(g) {
                                         :disabled="saving === g.id"
                                         @click="setDefault(g)"
                                     >
-                                        <span v-if="saving === g.id" class="spinner-border spinner-border-sm me-1"></span>
+                                        <span
+                                            v-if="saving === g.id"
+                                            class="spinner-border spinner-border-sm me-1"
+                                        ></span>
                                         <i v-else class="ti ti-star me-1"></i>{{ t.modal_default_btn }}
                                     </button>
                                     <button v-else class="btn btn-sm btn-outline-secondary" disabled>
@@ -139,10 +158,10 @@ function isDefault(g) {
     color: #5d4037;
 }
 
-:root[data-bs-theme=dark] .gw-gold-icon {
+:root[data-bs-theme='dark'] .gw-gold-icon {
     color: #d1a936;
 }
-:root[data-bs-theme=dark] .gw-gold-badge {
+:root[data-bs-theme='dark'] .gw-gold-badge {
     background: #a3821f;
     color: #fff6df;
 }

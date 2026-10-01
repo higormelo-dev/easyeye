@@ -20,19 +20,47 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_category: 'Category', col_paper: 'Paper', col_blocks: 'Blocks', col_updated_at: 'Updated',
-    no_description: 'No description', block_header: 'Header', block_signature: 'Signature', block_footer: 'Footer',
-    block_on: ':block: included', block_off: ':block: not included', origin_adopted: 'Adopted',
-    update_available: 'Update available', status_active: 'Active', status_inactive: 'Inactive',
-    action_preview: 'Preview', action_edit: 'Edit', action_reimport: 'Re-import global template', action_delete: 'Delete',
-    pagination_showing: 'Showing', pagination_of: 'of', pagination_suffix: 'templates',
+    col_category: 'Category',
+    col_paper: 'Paper',
+    col_blocks: 'Blocks',
+    col_updated_at: 'Updated',
+    no_description: 'No description',
+    block_header: 'Header',
+    block_signature: 'Signature',
+    block_footer: 'Footer',
+    block_on: ':block: included',
+    block_off: ':block: not included',
+    origin_adopted: 'Adopted',
+    update_available: 'Update available',
+    status_active: 'Active',
+    status_inactive: 'Inactive',
+    action_preview: 'Preview',
+    action_edit: 'Edit',
+    action_reimport: 'Re-import global template',
+    action_delete: 'Delete',
+    pagination_showing: 'Showing',
+    pagination_of: 'of',
+    pagination_suffix: 'templates',
 };
 
 const row = {
-    id: 'r1', title: 'Prescription', description: null, category: null, paper_size: 'A5',
-    show_header: true, show_signature: true, show_footer: false, active: false,
-    is_adopted: true, has_update: true, updated_at: '2026-09-27T12:00:00-03:00', mode: 'full',
-    preview_url: '/p', edit_url: '/e', destroy_url: '/d', reimport_url: '/r',
+    id: 'r1',
+    title: 'Prescription',
+    description: null,
+    category: null,
+    paper_size: 'A5',
+    show_header: true,
+    show_signature: true,
+    show_footer: false,
+    active: false,
+    is_adopted: true,
+    has_update: true,
+    updated_at: '2026-09-27T12:00:00-03:00',
+    mode: 'full',
+    preview_url: '/p',
+    edit_url: '/e',
+    destroy_url: '/d',
+    reimport_url: '/r',
 };
 
 let wrapper;
@@ -61,12 +89,7 @@ describe('Settings/ReportSettings/ReportSettingCards', () => {
         expect(w.text()).toContain('Adopted');
         expect(w.text()).toContain('Update available');
         expect(w.text()).toContain('No description');
-        expect(rows).toEqual([
-            'Category: —',
-            'Paper: A5',
-            'Blocks: Header, Signature',
-            'Updated: 27/09/2026',
-        ]);
+        expect(rows).toEqual(['Category: —', 'Paper: A5', 'Blocks: Header, Signature', 'Updated: 27/09/2026']);
     });
 
     it('nenhum bloco incluído mostra —', () => {

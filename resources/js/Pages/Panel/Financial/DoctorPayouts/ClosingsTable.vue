@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
-import ActionIconButton  from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup   from '@/Components/Panel/ActionIconGroup.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 import PayoutStatusBadge from './PayoutStatusBadge.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
@@ -11,9 +11,9 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * PDF). O PDF é link comum — o navegador baixa o anexo.
  */
 const props = defineProps({
-    payouts:   { type: Array,  default: () => [] },
-    routes:    { type: Object, required: true },   // { show, pdf } com __ID__
-    t:         { type: Object, default: () => ({}) },
+    payouts: { type: Array, default: () => [] },
+    routes: { type: Object, required: true }, // { show, pdf } com __ID__
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
@@ -27,7 +27,11 @@ const rows = computed(() => props.payouts ?? []);
 <template>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <caption class="visually-hidden">{{ t.closings_title }}</caption>
+            <caption class="visually-hidden">
+                {{
+                    t.closings_title
+                }}
+            </caption>
             <thead class="table-light">
                 <tr>
                     <th scope="col">{{ t.col_code }}</th>
@@ -54,11 +58,15 @@ const rows = computed(() => props.payouts ?? []);
                             class="badge badge-soft-purple border rounded fs-11 fw-medium ms-1"
                             :title="t.complementary_hint"
                             data-test="complementary"
-                        >{{ t.complementary }}<span class="visually-hidden">: {{ t.complementary_hint }}</span></span>
+                            >{{ t.complementary
+                            }}<span class="visually-hidden">: {{ t.complementary_hint }}</span></span
+                        >
                     </td>
                     <td>
                         <div class="fw-medium">{{ payout.doctor_name }}</div>
-                        <div v-if="payout.doctor_record" class="small text-muted">{{ t.statement_record }} {{ payout.doctor_record }}</div>
+                        <div v-if="payout.doctor_record" class="small text-muted">
+                            {{ t.statement_record }} {{ payout.doctor_record }}
+                        </div>
                     </td>
                     <td class="small text-nowrap">{{ periodText(payout.period_start, payout.period_end) }}</td>
                     <td class="text-end closings__value">{{ number(payout.items_count) }}</td>
@@ -68,10 +76,16 @@ const rows = computed(() => props.payouts ?? []);
                         <template v-if="payout.status === 'cancelled'">{{ t.none }}</template>
                         <template v-else>
                             <div class="closings__value">{{ money(payout.paid_amount ?? 0) }}</div>
-                            <div v-if="Number(payout.remaining_amount ?? 0) > 0" class="small text-warning-emphasis" data-test="closing-balance">
+                            <div
+                                v-if="Number(payout.remaining_amount ?? 0) > 0"
+                                class="small text-warning-emphasis"
+                                data-test="closing-balance"
+                            >
                                 {{ tx('balance_line', { value: money(payout.remaining_amount) }) }}
                             </div>
-                            <div v-if="payout.paid_at" class="small text-muted">{{ tx('last_payment_on', { date: date(payout.paid_at) }) }}</div>
+                            <div v-if="payout.paid_at" class="small text-muted">
+                                {{ tx('last_payment_on', { date: date(payout.paid_at) }) }}
+                            </div>
                         </template>
                     </td>
                     <td class="text-end">

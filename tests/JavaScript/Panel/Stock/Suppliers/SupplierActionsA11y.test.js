@@ -14,7 +14,18 @@ vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { template: 
 
 const t = { more_actions: 'More actions', columns_label: 'Columns', columns_customize: 'Customize columns' };
 const items = {
-    data: [{ id: 's1', name: 'Alfa', code: 'FOR-1', active: true, document_display: null, phone_display: null, contact_name: null, email: null }],
+    data: [
+        {
+            id: 's1',
+            name: 'Alfa',
+            code: 'FOR-1',
+            active: true,
+            document_display: null,
+            phone_display: null,
+            contact_name: null,
+            email: null,
+        },
+    ],
     total: 1,
 };
 

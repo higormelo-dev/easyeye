@@ -24,47 +24,93 @@ vi.mock('@inertiajs/vue3', async () => {
 });
 
 vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><slot /></div>' } }));
-vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { props: ['title', 'subtitle'], template: '<div><slot name="actions" /></div>' } }));
+vi.mock('@/Components/Panel/PageHeader.vue', () => ({
+    default: { props: ['title', 'subtitle'], template: '<div><slot name="actions" /></div>' },
+}));
 vi.mock('@/Components/Panel/SearchSelect.vue', () => ({
     default: {
         props: ['modelValue', 'options'],
         emits: ['update:modelValue'],
-        template: '<select class="covenant-select" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.id" :value="o.id">{{ o.name }}</option></select>',
+        template:
+            '<select class="covenant-select" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.id" :value="o.id">{{ o.name }}</option></select>',
     },
 }));
 vi.mock('@/Components/Panel/CenteredModal.vue', () => ({
     default: {
         props: ['open', 'size'],
         emits: ['close'],
-        template: '<div v-if="open" class="modal-stub"><div class="m-header"><slot name="header" /></div><slot /><div class="m-footer"><slot name="footer" /></div></div>',
+        template:
+            '<div v-if="open" class="modal-stub"><div class="m-header"><slot name="header" /></div><slot /><div class="m-footer"><slot name="footer" /></div></div>',
     },
 }));
 
 const t = {
-    title: 'Tabela de Preços', priced_counter: ':priced de :total com preço', covenant: 'Convênio',
-    code: 'Código', procedure: 'Procedimento', price: 'Preço', price_aria: 'Preço de :procedure', inherited_price: 'Padrão do sistema: :price',
-    row_changed: 'alterado', search_placeholder: 'Buscar por código ou nome', filter_label: 'Filtrar procedimentos',
-    filter_all: 'Todos', filter_priced: 'Com preço', filter_unpriced: 'Sem preço', charging: 'Cobrar do convênio (guia TISS)',
-    charging_aria: 'Cobrar :procedure', savebar_label: 'Salvar tabela de preços', save: 'Salvar preços', saving: 'Salvando...',
-    unsaved: ':count alteração(ões) não salva(s)', no_changes: 'Nenhuma alteração pendente', save_error: 'Não foi possível salvar os preços.',
-    rows_with_errors: ':count linha(s) com erro.', leave_confirm: 'Sair?', charging_legacy: ':count marcado(s) para guia.',
-    too_many_changes: 'São :count alterações e o limite por salvamento é :max. Aplique o reajuste ou a cópia por partes (use a busca ou o filtro) e salve entre uma e outra.',
-    bulk_menu: 'Ajustar preços', bulk_menu_label: 'Ajustar preços em lote (reajuste ou cópia)', bulk_adjust: 'Reajustar %',
-    bulk_copy: 'Copiar de outro convênio', bulk_local_hint: 'As mudanças vão só para a grade: nada é salvo até você clicar em "Salvar preços".',
+    title: 'Tabela de Preços',
+    priced_counter: ':priced de :total com preço',
+    covenant: 'Convênio',
+    code: 'Código',
+    procedure: 'Procedimento',
+    price: 'Preço',
+    price_aria: 'Preço de :procedure',
+    inherited_price: 'Padrão do sistema: :price',
+    row_changed: 'alterado',
+    search_placeholder: 'Buscar por código ou nome',
+    filter_label: 'Filtrar procedimentos',
+    filter_all: 'Todos',
+    filter_priced: 'Com preço',
+    filter_unpriced: 'Sem preço',
+    charging: 'Cobrar do convênio (guia TISS)',
+    charging_aria: 'Cobrar :procedure',
+    savebar_label: 'Salvar tabela de preços',
+    save: 'Salvar preços',
+    saving: 'Salvando...',
+    unsaved: ':count alteração(ões) não salva(s)',
+    no_changes: 'Nenhuma alteração pendente',
+    save_error: 'Não foi possível salvar os preços.',
+    rows_with_errors: ':count linha(s) com erro.',
+    leave_confirm: 'Sair?',
+    charging_legacy: ':count marcado(s) para guia.',
+    too_many_changes:
+        'São :count alterações e o limite por salvamento é :max. Aplique o reajuste ou a cópia por partes (use a busca ou o filtro) e salve entre uma e outra.',
+    bulk_menu: 'Ajustar preços',
+    bulk_menu_label: 'Ajustar preços em lote (reajuste ou cópia)',
+    bulk_adjust: 'Reajustar %',
+    bulk_copy: 'Copiar de outro convênio',
+    bulk_local_hint: 'As mudanças vão só para a grade: nada é salvo até você clicar em "Salvar preços".',
     bulk_applied: ':count preço(s) alterado(s) na grade. Nada foi salvo ainda: revise e clique em "Salvar preços".',
-    bulk_cancel: 'Cancelar', preview_label: 'Prévia', preview_changes: ':count preço(s) vão mudar.', preview_none: 'Nenhum preço muda com essas opções.',
-    preview_examples: 'Exemplos:', preview_example: ':procedure: de :from para :to', preview_example_new: ':procedure: sem preço próprio, passa a :to',
-    adjust_title: 'Reajustar preços', adjust_direction: 'Tipo de reajuste', adjust_increase: 'Aumento', adjust_decrease: 'Redução',
-    adjust_percent: 'Percentual', adjust_percent_help: 'Até 2 casas decimais.', adjust_percent_range: 'Informe um percentual entre :min e :max.',
-    adjust_preview_empty: 'Informe o percentual para ver a prévia.', adjust_scope: 'Aplicar em',
-    adjust_scope_visible: 'Só nas :count linha(s) visíveis (busca e filtro atuais)', adjust_scope_all: 'Em todas as :count linha(s) deste convênio',
-    adjust_skipped: ':count linha(s) sem preço próprio ficam como estão (o padrão do sistema não é reajustado).', adjust_apply: 'Aplicar na grade',
-    copy_title: 'Copiar preços de outro convênio', copy_source: 'Convênio de origem', copy_source_placeholder: 'Selecione o convênio de origem',
-    copy_no_sources: 'Não há outro convênio para copiar.', copy_scope_hint: 'Vale para os :count procedimentos da tabela.',
-    copy_overwrite: 'Substituir também os preços já preenchidos neste convênio', copy_overwrite_help: 'Desmarcado: só os sem preço.',
-    copy_loading: 'Carregando os preços do convênio de origem...', copy_load_error: 'Não foi possível carregar os preços desse convênio. Tente novamente.',
-    copy_preview_empty: 'Escolha o convênio de origem para ver a prévia.', copy_kept: ':count procedimento(s) já têm preço e ficam como estão.',
-    copy_missing: ':count procedimento(s) sem preço no convênio de origem ficam como estão.', copy_apply: 'Copiar para a grade',
+    bulk_cancel: 'Cancelar',
+    preview_label: 'Prévia',
+    preview_changes: ':count preço(s) vão mudar.',
+    preview_none: 'Nenhum preço muda com essas opções.',
+    preview_examples: 'Exemplos:',
+    preview_example: ':procedure: de :from para :to',
+    preview_example_new: ':procedure: sem preço próprio, passa a :to',
+    adjust_title: 'Reajustar preços',
+    adjust_direction: 'Tipo de reajuste',
+    adjust_increase: 'Aumento',
+    adjust_decrease: 'Redução',
+    adjust_percent: 'Percentual',
+    adjust_percent_help: 'Até 2 casas decimais.',
+    adjust_percent_range: 'Informe um percentual entre :min e :max.',
+    adjust_preview_empty: 'Informe o percentual para ver a prévia.',
+    adjust_scope: 'Aplicar em',
+    adjust_scope_visible: 'Só nas :count linha(s) visíveis (busca e filtro atuais)',
+    adjust_scope_all: 'Em todas as :count linha(s) deste convênio',
+    adjust_skipped: ':count linha(s) sem preço próprio ficam como estão (o padrão do sistema não é reajustado).',
+    adjust_apply: 'Aplicar na grade',
+    copy_title: 'Copiar preços de outro convênio',
+    copy_source: 'Convênio de origem',
+    copy_source_placeholder: 'Selecione o convênio de origem',
+    copy_no_sources: 'Não há outro convênio para copiar.',
+    copy_scope_hint: 'Vale para os :count procedimentos da tabela.',
+    copy_overwrite: 'Substituir também os preços já preenchidos neste convênio',
+    copy_overwrite_help: 'Desmarcado: só os sem preço.',
+    copy_loading: 'Carregando os preços do convênio de origem...',
+    copy_load_error: 'Não foi possível carregar os preços desse convênio. Tente novamente.',
+    copy_preview_empty: 'Escolha o convênio de origem para ver a prévia.',
+    copy_kept: ':count procedimento(s) já têm preço e ficam como estão.',
+    copy_missing: ':count procedimento(s) sem preço no convênio de origem ficam como estão.',
+    copy_apply: 'Copiar para a grade',
 };
 
 const covenants = [
@@ -164,7 +210,10 @@ describe('pricesBulk — cálculo', () => {
             { index: 2, row: { price: 0 } },
         ];
 
-        expect(planAdjustment(entries, 10)).toEqual({ changes: [{ index: 0, row: entries[0].row, from: 100, to: 110 }], skipped: 1 });
+        expect(planAdjustment(entries, 10)).toEqual({
+            changes: [{ index: 0, row: entries[0].row, from: 100, to: 110 }],
+            skipped: 1,
+        });
     });
 
     it('planCopy: sem substituir preenche só o vazio; com substituir troca o que difere', () => {
@@ -182,7 +231,10 @@ describe('pricesBulk — cálculo', () => {
         expect(keep.missing).toBe(1);
 
         const replace = planCopy(entries, source, { overwrite: true });
-        expect(replace.changes.map((c) => [c.index, c.from, c.to])).toEqual([[0, 150, 200], [1, null, 80]]);
+        expect(replace.changes.map((c) => [c.index, c.from, c.to])).toEqual([
+            [0, 150, 200],
+            [1, null, 80],
+        ]);
         expect(replace.kept).toBe(0);
     });
 });
@@ -247,7 +299,9 @@ describe('Reajustar %', () => {
 
         await w.find('[data-test="adjust-increase"]').setValue(true);
         await w.find('[data-test="adjust-percent"]').setValue('50');
-        expect(norm(w.findAll('[data-test="preview-example"]')[1].text())).toBe('41301250 Mapeamento de retina: de R$ 0,15 para R$ 0,23');
+        expect(norm(w.findAll('[data-test="preview-example"]')[1].text())).toBe(
+            '41301250 Mapeamento de retina: de R$ 0,15 para R$ 0,23',
+        );
     });
 
     it('percentual fora do limite: erro ligado ao campo e "Aplicar" desabilitado', async () => {
@@ -275,7 +329,9 @@ describe('Reajustar %', () => {
         await openMenuItem(w, 'bulk-adjust');
 
         expect(w.find('[data-test="adjust-scope-visible"]').element.checked).toBe(true);
-        expect(w.find('label[for="pp-adjust-scope-visible"]').text()).toBe('Só nas 1 linha(s) visíveis (busca e filtro atuais)');
+        expect(w.find('label[for="pp-adjust-scope-visible"]').text()).toBe(
+            'Só nas 1 linha(s) visíveis (busca e filtro atuais)',
+        );
         expect(w.find('label[for="pp-adjust-scope-all"]').text()).toBe('Em todas as 4 linha(s) deste convênio');
 
         await w.find('[data-test="adjust-percent"]').setValue('10');
@@ -319,11 +375,13 @@ describe('Copiar de outro convênio', () => {
 
         await chooseSource(w, 'c1');
 
-        expect(router.reload).toHaveBeenCalledWith(expect.objectContaining({
-            only: ['sourcePrices'],
-            data: { source_covenant_id: 'c1' },
-            preserveUrl: true,
-        }));
+        expect(router.reload).toHaveBeenCalledWith(
+            expect.objectContaining({
+                only: ['sourcePrices'],
+                data: { source_covenant_id: 'c1' },
+                preserveUrl: true,
+            }),
+        );
         expect(w.find('[data-test="copy-loading"]').text()).toBe('Carregando os preços do convênio de origem...');
 
         await respondSource(w, { covenant_id: 'c1', prices: { p1: 200, p2: 80, p3: 50 } });
@@ -336,7 +394,9 @@ describe('Copiar de outro convênio', () => {
             '41301323 Tonometria: sem preço próprio, passa a R$ 50,00',
         ]);
         expect(w.find('[data-test="preview-kept"]').text()).toBe('2 procedimento(s) já têm preço e ficam como estão.');
-        expect(w.find('[data-test="preview-missing"]').text()).toBe('1 procedimento(s) sem preço no convênio de origem ficam como estão.');
+        expect(w.find('[data-test="preview-missing"]').text()).toBe(
+            '1 procedimento(s) sem preço no convênio de origem ficam como estão.',
+        );
 
         await w.find('[data-test="copy-apply"]').trigger('click');
 
@@ -387,7 +447,9 @@ describe('Copiar de outro convênio', () => {
         vi.mocked(router.reload).mock.calls.at(-1)[0].onFinish(); // sem onSuccess: erro/cancelado
         await nextTick();
 
-        expect(w.find('[data-test="copy-failed"]').text()).toBe('Não foi possível carregar os preços desse convênio. Tente novamente.');
+        expect(w.find('[data-test="copy-failed"]').text()).toBe(
+            'Não foi possível carregar os preços desse convênio. Tente novamente.',
+        );
         expect(w.find('[data-test="copy-apply"]').element.disabled).toBe(true);
     });
 
@@ -414,7 +476,10 @@ describe('Salvar só as linhas alteradas', () => {
         await typePrice(rowsOf(w)[0], '');
         await w.find('[data-test="save"]').trigger('click');
 
-        expect(lastPost()[1]).toEqual({ covenant_id: 'c2', items: [{ procedure_id: 'p1', price: null, charging: true }] });
+        expect(lastPost()[1]).toEqual({
+            covenant_id: 'c2',
+            items: [{ procedure_id: 'p1', price: null, charging: true }],
+        });
     });
 
     it('sem alterações: Salvar desabilitado e nada é enviado', async () => {
@@ -435,7 +500,10 @@ describe('Salvar só as linhas alteradas', () => {
         expect(w.find('[data-test="save"]').element.disabled).toBe(false);
 
         await w.find('[data-test="save"]').trigger('click');
-        expect(lastPost()[1]).toEqual({ covenant_id: 'c1', items: [{ procedure_id: 'p1', price: 150, charging: false }] });
+        expect(lastPost()[1]).toEqual({
+            covenant_id: 'c1',
+            items: [{ procedure_id: 'p1', price: 150, charging: false }],
+        });
     });
 
     it('acima do teto de linhas por salvamento: avisa e não envia', async () => {

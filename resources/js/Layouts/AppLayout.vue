@@ -8,26 +8,27 @@ import AiFloatingAssistant from '@/Components/Panel/AiFloatingAssistant.vue';
 import { usePanelTour } from '@/composables/usePanelTour.js';
 
 const props = defineProps({
-    title:       { type: String, default: '' },
-    breadcrumbs: { type: Array,  default: () => [] },
+    title: { type: String, default: '' },
+    breadcrumbs: { type: Array, default: () => [] },
 });
 
-const page      = usePage();
-const auth      = computed(() => page.props.auth ?? {});
-const user      = computed(() => auth.value.user ?? {});
-const entity    = computed(() => auth.value.entity ?? {});
-const nav       = computed(() => page.props.nav ?? []);
-const locales   = computed(() => page.props.locales ?? []);
-const flash     = computed(() => page.props.flash ?? {});
-const entities  = computed(() => auth.value.entities ?? []);
+const page = usePage();
+const auth = computed(() => page.props.auth ?? {});
+const user = computed(() => auth.value.user ?? {});
+const entity = computed(() => auth.value.entity ?? {});
+const nav = computed(() => page.props.nav ?? []);
+const locales = computed(() => page.props.locales ?? []);
+const flash = computed(() => page.props.flash ?? {});
+const entities = computed(() => auth.value.entities ?? []);
 const aiAssistant = computed(() => page.props.aiAssistant ?? { enabled: false });
 
 // ── Dark mode ──────────────────────────────────────────────────────────────
 const isDark = ref(false);
 
 onMounted(() => {
-    isDark.value = document.documentElement.getAttribute('data-bs-theme') === 'dark'
-        || document.documentElement.getAttribute('data-sidebar') === 'dark';
+    isDark.value =
+        document.documentElement.getAttribute('data-bs-theme') === 'dark' ||
+        document.documentElement.getAttribute('data-sidebar') === 'dark';
 });
 
 function toggleDark() {
@@ -46,22 +47,24 @@ function toggleDark() {
             sessionStorage.setItem('__THEME_CONFIG__', JSON.stringify(cfg));
         }
         if (window.config) window.config.theme = theme;
-    } catch { /* storage indisponível: tema vale só até o reload */ }
+    } catch {
+        /* storage indisponível: tema vale só até o reload */
+    }
 }
 
 // ── Session timeout ────────────────────────────────────────────────────────
-let warningTimer  = null;
-let expireTimer   = null;
-let warningShown  = false;
-const lifetime    = window.sessionLifetimeMs ?? 120 * 60 * 1000;
-const warnBefore  = 2 * 60 * 1000;
+let warningTimer = null;
+let expireTimer = null;
+let warningShown = false;
+const lifetime = window.sessionLifetimeMs ?? 120 * 60 * 1000;
+const warnBefore = 2 * 60 * 1000;
 
 function resetTimers() {
     clearTimeout(warningTimer);
     clearTimeout(expireTimer);
     warningShown = false;
     warningTimer = setTimeout(showSessionWarning, lifetime - warnBefore);
-    expireTimer  = setTimeout(() => window.location.reload(), lifetime);
+    expireTimer = setTimeout(() => window.location.reload(), lifetime);
 }
 
 function showSessionWarning() {
@@ -84,13 +87,14 @@ function showSessionWarning() {
         willClose() {
             clearInterval(Swal.getPopup().__countdownInterval);
         },
-    }).then(result => {
+    }).then((result) => {
         if (result.isConfirmed) {
             fetch(safeRoute('session.ping'), {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-            }).then(r => r.ok ? resetTimers() : window.location.reload())
-              .catch(() => window.location.reload());
+            })
+                .then((r) => (r.ok ? resetTimers() : window.location.reload()))
+                .catch(() => window.location.reload());
         } else {
             window.location.reload();
         }
@@ -101,13 +105,13 @@ const sessionEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
 
 onMounted(() => {
     resetTimers();
-    sessionEvents.forEach(e => document.addEventListener(e, resetTimers, { passive: true }));
+    sessionEvents.forEach((e) => document.addEventListener(e, resetTimers, { passive: true }));
 });
 
 onUnmounted(() => {
     clearTimeout(warningTimer);
     clearTimeout(expireTimer);
-    sessionEvents.forEach(e => document.removeEventListener(e, resetTimers));
+    sessionEvents.forEach((e) => document.removeEventListener(e, resetTimers));
 });
 
 // BUG — item de menu com nome de rota inexistente/desatualizado no Ziggy
@@ -135,8 +139,10 @@ function isActive(matchPatterns) {
     let current = null;
     try {
         current = route().current();
-    } catch { /* menu sem estado ativo é melhor que tela em branco */ }
-    return matchPatterns.some(p => {
+    } catch {
+        /* menu sem estado ativo é melhor que tela em branco */
+    }
+    return matchPatterns.some((p) => {
         if (p.endsWith('*')) return current?.startsWith(p.slice(0, -2).replace('.*', ''));
         return current === p;
     });
@@ -144,7 +150,7 @@ function isActive(matchPatterns) {
 
 function isGroupActive(item) {
     if (item.match && isActive(item.match)) return true;
-    if (item.children) return item.children.some(c => c.match && isActive(c.match));
+    if (item.children) return item.children.some((c) => c.match && isActive(c.match));
     return false;
 }
 
@@ -153,7 +159,7 @@ const openMenus = ref({});
 
 onMounted(() => {
     // Pré-abre grupos com rota filha ativa
-    nav.value.forEach(item => {
+    nav.value.forEach((item) => {
         if (item.children && isGroupActive(item)) {
             openMenus.value[item.key] = true;
         }
@@ -170,14 +176,23 @@ function isMenuOpen(item) {
 
 // ── Entity switch ──────────────────────────────────────────────────────────
 function switchEntity(entityUserId) {
-    router.post(safeRoute('selectentity.store'), { entity_user_id: entityUserId }, {
-        preserveScroll: false,
-        onSuccess: () => router.visit(safeRoute('panel.dashboard')),
-    });
+    router.post(
+        safeRoute('selectentity.store'),
+        { entity_user_id: entityUserId },
+        {
+            preserveScroll: false,
+            onSuccess: () => router.visit(safeRoute('panel.dashboard')),
+        },
+    );
 }
 
 function entityInitials(name) {
-    return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    return name
+        .split(' ')
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase();
 }
 
 // ── Logout ─────────────────────────────────────────────────────────────────
@@ -192,9 +207,9 @@ function exitImpersonation() {
 
 // ── Flash messages (Vue-controlled + auto-dismiss 6s) ─────────────────────
 const flashSuccessOpen = ref(false);
-const flashErrorOpen   = ref(false);
-let flashSuccessTimer  = null;
-let flashErrorTimer    = null;
+const flashErrorOpen = ref(false);
+let flashSuccessTimer = null;
+let flashErrorTimer = null;
 
 function dismissSuccess() {
     flashSuccessOpen.value = false;
@@ -213,7 +228,9 @@ watch(
         clearTimeout(flashSuccessTimer);
         if (val) {
             flashSuccessOpen.value = true;
-            flashSuccessTimer = setTimeout(() => { flashSuccessOpen.value = false; }, 6000);
+            flashSuccessTimer = setTimeout(() => {
+                flashSuccessOpen.value = false;
+            }, 6000);
         }
     },
     { immediate: true },
@@ -225,7 +242,9 @@ watch(
         clearTimeout(flashErrorTimer);
         if (val) {
             flashErrorOpen.value = true;
-            flashErrorTimer = setTimeout(() => { flashErrorOpen.value = false; }, 6000);
+            flashErrorTimer = setTimeout(() => {
+                flashErrorOpen.value = false;
+            }, 6000);
         }
     },
     { immediate: true },
@@ -238,28 +257,32 @@ watch(
 // browser. Define-os aqui reutilizando OS MESMOS alerts do flash do layout
 // (visual idêntico ao restante do sistema, auto-dismiss 6s).
 const localSuccess = ref('');
-const localError   = ref('');
+const localError = ref('');
 
 function pushLocalToast(type, message) {
     if (type === 'success') {
         localSuccess.value = String(message ?? '');
         clearTimeout(flashSuccessTimer);
         flashSuccessOpen.value = true;
-        flashSuccessTimer = setTimeout(() => { flashSuccessOpen.value = false; }, 6000);
+        flashSuccessTimer = setTimeout(() => {
+            flashSuccessOpen.value = false;
+        }, 6000);
     } else {
         localError.value = String(message ?? '');
         clearTimeout(flashErrorTimer);
         flashErrorOpen.value = true;
-        flashErrorTimer = setTimeout(() => { flashErrorOpen.value = false; }, 6000);
+        flashErrorTimer = setTimeout(() => {
+            flashErrorOpen.value = false;
+        }, 6000);
     }
 }
 
 const successText = computed(() => flash.value.success || localSuccess.value);
-const errorText   = computed(() => flash.value.error || localError.value);
+const errorText = computed(() => flash.value.error || localError.value);
 
 onMounted(() => {
     window.showSuccessToast = (msg) => pushLocalToast('success', msg);
-    window.showErrorToast   = (msg) => pushLocalToast('error', msg);
+    window.showErrorToast = (msg) => pushLocalToast('error', msg);
 });
 
 onUnmounted(() => {
@@ -272,15 +295,17 @@ onUnmounted(() => {
 // ── Tour guiado (driver.js — ver composables/usePanelTour.js) ──────────────
 // Botão de ajuda no cabeçalho sempre que o painel de clínica tem tour; abre
 // sozinho uma vez no painel inicial para quem ainda não viu a versão atual.
-const panelTour     = usePanelTour();
+const panelTour = usePanelTour();
 const tourAvailable = panelTour.available;
-const tourLabels    = computed(() => page.props.tour?.t?.ui ?? {});
+const tourLabels = computed(() => page.props.tour?.t?.ui ?? {});
 
 onMounted(() => {
     let onDashboard = false;
     try {
         onDashboard = route().current('panel.dashboard');
-    } catch { /* sem Ziggy: não abre sozinho */ }
+    } catch {
+        /* sem Ziggy: não abre sozinho */
+    }
 
     if (onDashboard) {
         requestAnimationFrame(() => panelTour.autoStart());
@@ -296,18 +321,17 @@ onUnmounted(() => panelTour.stop());
 
 <template>
     <div class="main-wrapper">
-
         <!-- ═══════════════════ HEADER ═══════════════════ -->
         <header class="navbar-header">
             <div class="page-container topbar-menu">
                 <div class="d-flex align-items-center gap-2">
                     <a :href="safeRoute('panel.dashboard')" class="logo">
                         <span class="logo-light">
-                            <span class="logo-lg"><img :src="logoSvg" alt="EasyEye"></span>
-                            <span class="logo-sm"><img :src="logoSmallSvg" alt="EasyEye"></span>
+                            <span class="logo-lg"><img :src="logoSvg" alt="EasyEye" /></span>
+                            <span class="logo-sm"><img :src="logoSmallSvg" alt="EasyEye" /></span>
                         </span>
                         <span class="logo-dark">
-                            <span class="logo-lg"><img :src="logoWhiteSvg" alt="EasyEye"></span>
+                            <span class="logo-lg"><img :src="logoWhiteSvg" alt="EasyEye" /></span>
                         </span>
                     </a>
                     <a id="mobile_btn" class="mobile-btn" href="#sidebar" data-tour="mobile-menu">
@@ -324,12 +348,14 @@ onUnmounted(() => panelTour.stop());
 
                     <!-- Tour guiado: rever quando quiser -->
                     <div v-if="tourAvailable" class="header-item me-2" data-tour="help">
-                        <button type="button"
-                                class="topbar-link btn btn-icon"
-                                :title="tourLabels.start"
-                                :aria-label="tourLabels.start"
-                                data-test="tour-start"
-                                @click="panelTour.start()">
+                        <button
+                            type="button"
+                            class="topbar-link btn btn-icon"
+                            :title="tourLabels.start"
+                            :aria-label="tourLabels.start"
+                            data-test="tour-start"
+                            @click="panelTour.start()"
+                        >
                             <i class="ti ti-help-circle fs-16" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -337,15 +363,21 @@ onUnmounted(() => panelTour.stop());
                     <!-- Locale selector -->
                     <div class="header-item" v-if="locales.length > 1" data-tour="locale">
                         <div class="dropdown me-2">
-                            <button class="topbar-link btn btn-icon dropdown-toggle drop-arrow-none"
-                                    data-bs-toggle="dropdown" data-bs-offset="0,24">
+                            <button
+                                class="topbar-link btn btn-icon dropdown-toggle drop-arrow-none"
+                                data-bs-toggle="dropdown"
+                                data-bs-offset="0,24"
+                            >
                                 <i class="ti ti-world fs-16"></i>
                             </button>
                             <div class="dropdown-menu dropdown-menu-end p-2">
-                                <a v-for="locale in locales" :key="locale.code"
-                                   :href="locale.url"
-                                   class="dropdown-item"
-                                   :class="{ active: locale.active }">
+                                <a
+                                    v-for="locale in locales"
+                                    :key="locale.code"
+                                    :href="locale.url"
+                                    class="dropdown-item"
+                                    :class="{ active: locale.active }"
+                                >
                                     {{ locale.flag }} {{ locale.native }}
                                     <i v-if="locale.active" class="ti ti-check ms-2"></i>
                                 </a>
@@ -361,17 +393,32 @@ onUnmounted(() => panelTour.stop());
                     </div>
 
                     <!-- User dropdown -->
-                    <div class="dropdown profile-dropdown d-flex align-items-center justify-content-center" data-tour="user-menu">
-                        <a href="#" class="topbar-link dropdown-toggle drop-arrow-none position-relative"
-                           data-bs-toggle="dropdown" data-bs-offset="0,22">
-                            <img :src="user.photo_url" width="32" class="rounded-circle d-flex" :alt="user.name">
+                    <div
+                        class="dropdown profile-dropdown d-flex align-items-center justify-content-center"
+                        data-tour="user-menu"
+                    >
+                        <a
+                            href="#"
+                            class="topbar-link dropdown-toggle drop-arrow-none position-relative"
+                            data-bs-toggle="dropdown"
+                            data-bs-offset="0,22"
+                        >
+                            <img :src="user.photo_url" width="32" class="rounded-circle d-flex" :alt="user.name" />
                             <span class="online text-success">
-                                <i class="ti ti-circle-dot d-flex bg-white rounded-circle border border-1 border-white"></i>
+                                <i
+                                    class="ti ti-circle-dot d-flex bg-white rounded-circle border border-1 border-white"
+                                ></i>
                             </span>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end dropdown-menu-md p-2">
                             <div class="d-flex align-items-center bg-light rounded-3 p-2 mb-2">
-                                <img :src="user.photo_url" class="rounded-circle" width="42" height="42" :alt="user.name">
+                                <img
+                                    :src="user.photo_url"
+                                    class="rounded-circle"
+                                    width="42"
+                                    height="42"
+                                    :alt="user.name"
+                                />
                                 <div class="ms-2">
                                     <p class="fw-medium text-dark mb-0">{{ user.name }}</p>
                                     <span class="d-block fs-13">{{ user.email }}</span>
@@ -419,13 +466,13 @@ onUnmounted(() => panelTour.stop());
             <div class="sidebar-logo">
                 <div>
                     <a :href="safeRoute('panel.dashboard')" class="logo logo-normal">
-                        <img :src="logoSvg" alt="EasyEye">
+                        <img :src="logoSvg" alt="EasyEye" />
                     </a>
                     <a :href="safeRoute('panel.dashboard')" class="logo-small">
-                        <img :src="logoSmallSvg" alt="EasyEye">
+                        <img :src="logoSmallSvg" alt="EasyEye" />
                     </a>
                     <a :href="safeRoute('panel.dashboard')" class="dark-logo">
-                        <img :src="logoWhiteSvg" alt="EasyEye">
+                        <img :src="logoWhiteSvg" alt="EasyEye" />
                     </a>
                 </div>
                 <button class="sidenav-toggle-btn btn border-0 p-0 active" id="toggle_btn" data-tour="sidebar-toggle">
@@ -436,42 +483,51 @@ onUnmounted(() => panelTour.stop());
                 </button>
             </div>
 
-            <div class="sidebar-inner" data-simplebar style="padding-top:45px">
-
+            <div class="sidebar-inner" data-simplebar style="padding-top: 45px">
                 <!-- ── Avatar compacto (mini-sidebar) ────────────────────── -->
                 <div class="sidebar-mini-avatar">
-                    <span class="avatar rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                          style="width:36px;height:36px;font-size:.75rem;"
-                          :style="entity.logo_url ? { background: 'transparent' } : {}"
-                          :title="entity.name">
-                        <img v-if="entity.logo_url"
-                             :src="entity.logo_url"
-                             :alt="entity.name"
-                             class="rounded-circle"
-                             style="width:36px;height:36px;object-fit:cover;">
+                    <span
+                        class="avatar rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                        style="width: 36px; height: 36px; font-size: 0.75rem"
+                        :style="entity.logo_url ? { background: 'transparent' } : {}"
+                        :title="entity.name"
+                    >
+                        <img
+                            v-if="entity.logo_url"
+                            :src="entity.logo_url"
+                            :alt="entity.name"
+                            class="rounded-circle"
+                            style="width: 36px; height: 36px; object-fit: cover"
+                        />
                         <span v-else>{{ entityInitials(entity.name) }}</span>
                     </span>
                 </div>
 
                 <!-- ── Seletor de empresa (sidebar expandido) ─────────────── -->
                 <div class="sidebar-top p-2 mx-3 mb-3 dropend" data-tour="entity-switcher">
-                    <a href="javascript:void(0);"
-                       class="drop-arrow-none"
-                       data-bs-toggle="dropdown"
-                       data-bs-auto-close="outside"
-                       data-bs-offset="0,22"
-                       aria-haspopup="false"
-                       aria-expanded="false">
+                    <a
+                        href="javascript:void(0);"
+                        class="drop-arrow-none"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        data-bs-offset="0,22"
+                        aria-haspopup="false"
+                        aria-expanded="false"
+                    >
                         <div class="d-flex align-items-center gap-2">
                             <!-- Logo ou iniciais -->
-                            <span class="avatar rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center text-white fw-bold"
-                                  style="width:36px;height:36px;font-size:.75rem;"
-                                  :style="entity.logo_url ? { background: 'transparent' } : {}">
-                                <img v-if="entity.logo_url"
-                                     :src="entity.logo_url"
-                                     :alt="entity.name"
-                                     class="rounded-circle"
-                                     style="width:36px;height:36px;object-fit:cover;">
+                            <span
+                                class="avatar rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center text-white fw-bold"
+                                style="width: 36px; height: 36px; font-size: 0.75rem"
+                                :style="entity.logo_url ? { background: 'transparent' } : {}"
+                            >
+                                <img
+                                    v-if="entity.logo_url"
+                                    :src="entity.logo_url"
+                                    :alt="entity.name"
+                                    class="rounded-circle"
+                                    style="width: 36px; height: 36px; object-fit: cover"
+                                />
                                 <span v-else>{{ entityInitials(entity.name) }}</span>
                             </span>
                             <div class="overflow-hidden flex-grow-1">
@@ -487,20 +543,30 @@ onUnmounted(() => panelTour.stop());
                     <!-- Dropdown com todas as entidades do usuário -->
                     <div v-if="entities.length > 1" class="dropdown-menu dropdown-menu-lg p-2">
                         <p class="text-muted small px-2 mb-1 fw-medium">Trocar empresa</p>
-                        <button v-for="e in entities"
-                                :key="e.entity_user_id"
-                                type="button"
-                                class="dropdown-item d-flex align-items-center justify-content-between rounded-1 p-2"
-                                :class="{ 'bg-primary bg-opacity-10': e.is_selected }"
-                                @click="switchEntity(e.entity_user_id)">
+                        <button
+                            v-for="e in entities"
+                            :key="e.entity_user_id"
+                            type="button"
+                            class="dropdown-item d-flex align-items-center justify-content-between rounded-1 p-2"
+                            :class="{ 'bg-primary bg-opacity-10': e.is_selected }"
+                            @click="switchEntity(e.entity_user_id)"
+                        >
                             <span class="d-flex align-items-center overflow-hidden">
-                                <span class="avatar avatar-xs rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center text-white fw-bold me-2"
-                                      style="width:28px;height:28px;font-size:.65rem;background:var(--bs-primary);">
+                                <span
+                                    class="avatar avatar-xs rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center text-white fw-bold me-2"
+                                    style="width: 28px; height: 28px; font-size: 0.65rem; background: var(--bs-primary)"
+                                >
                                     {{ entityInitials(e.name) }}
                                 </span>
                                 <span class="overflow-hidden">
-                                    <span class="fw-semibold text-dark d-block text-truncate" style="font-size:.8125rem;">{{ e.name }}</span>
-                                    <small class="text-muted d-block" style="font-size:.72rem;">{{ e.city || '—' }}</small>
+                                    <span
+                                        class="fw-semibold text-dark d-block text-truncate"
+                                        style="font-size: 0.8125rem"
+                                        >{{ e.name }}</span
+                                    >
+                                    <small class="text-muted d-block" style="font-size: 0.72rem">{{
+                                        e.city || '—'
+                                    }}</small>
                                 </span>
                             </span>
                             <i v-if="e.is_selected" class="ti ti-check text-primary flex-shrink-0 ms-2"></i>
@@ -522,18 +588,22 @@ onUnmounted(() => panelTour.stop());
 
                                     <!-- Item with submenu -->
                                     <li v-else-if="item.children" class="submenu">
-                                        <a href="#"
-                                           :class="{ 'subdrop active': isMenuOpen(item) }"
-                                           :data-tour="`nav-${item.key}`"
-                                           @click.prevent="toggleMenu(item.key)">
+                                        <a
+                                            href="#"
+                                            :class="{ 'subdrop active': isMenuOpen(item) }"
+                                            :data-tour="`nav-${item.key}`"
+                                            @click.prevent="toggleMenu(item.key)"
+                                        >
                                             <i :class="item.icon"></i>
                                             <span>{{ item.label }}</span>
                                             <span class="menu-arrow"></span>
                                         </a>
                                         <ul :style="isMenuOpen(item) ? 'display:block;' : ''">
                                             <li v-for="child in item.children" :key="child.route">
-                                                <a :href="safeRoute(child.route)"
-                                                   :class="{ active: isActive(child.match) }">
+                                                <a
+                                                    :href="safeRoute(child.route)"
+                                                    :class="{ active: isActive(child.match) }"
+                                                >
                                                     <i v-if="child.icon" :class="child.icon + ' me-1'"></i>
                                                     {{ child.label }}
                                                 </a>
@@ -543,9 +613,11 @@ onUnmounted(() => panelTour.stop());
 
                                     <!-- Simple item -->
                                     <li v-else>
-                                        <a :href="safeRoute(item.route)"
-                                           :class="{ active: isActive(item.match) }"
-                                           :data-tour="`nav-${item.key}`">
+                                        <a
+                                            :href="safeRoute(item.route)"
+                                            :class="{ active: isActive(item.match) }"
+                                            :data-tour="`nav-${item.key}`"
+                                        >
                                             <i :class="item.icon"></i>
                                             <span>{{ item.label }}</span>
                                         </a>
@@ -561,11 +633,15 @@ onUnmounted(() => panelTour.stop());
 
         <!-- ═══════════════════ PAGE WRAPPER ═══════════════════ -->
         <div class="page-wrapper">
-
             <!-- Impersonation banner -->
-            <div v-if="auth.impersonating" class="alert alert-warning alert-dismissible m-0 rounded-0 border-0 border-bottom d-flex align-items-center gap-2 py-2 px-3">
+            <div
+                v-if="auth.impersonating"
+                class="alert alert-warning alert-dismissible m-0 rounded-0 border-0 border-bottom d-flex align-items-center gap-2 py-2 px-3"
+            >
                 <i class="ti ti-user-check fs-16"></i>
-                <span>Você está visualizando como <strong>{{ user.name }}</strong> ({{ user.email }})</span>
+                <span
+                    >Você está visualizando como <strong>{{ user.name }}</strong> ({{ user.email }})</span
+                >
                 <button type="button" class="btn btn-sm btn-warning ms-auto" @click="exitImpersonation">
                     <i class="ti ti-user-x me-1"></i> Sair
                 </button>
@@ -573,14 +649,22 @@ onUnmounted(() => panelTour.stop());
 
             <!-- Flash messages (Vue-controlled — auto-dismiss 6s + botão X funcional) -->
             <transition name="flash">
-                <div v-if="flashSuccessOpen && successText" class="alert alert-success m-3 mb-0 d-flex align-items-center gap-2" role="alert">
+                <div
+                    v-if="flashSuccessOpen && successText"
+                    class="alert alert-success m-3 mb-0 d-flex align-items-center gap-2"
+                    role="alert"
+                >
                     <i class="ti ti-circle-check fs-16"></i>
                     <span class="flex-grow-1">{{ successText }}</span>
                     <button type="button" class="btn-close" :aria-label="'Fechar'" @click="dismissSuccess"></button>
                 </div>
             </transition>
             <transition name="flash">
-                <div v-if="flashErrorOpen && errorText" class="alert alert-danger m-3 mb-0 d-flex align-items-center gap-2" role="alert">
+                <div
+                    v-if="flashErrorOpen && errorText"
+                    class="alert alert-danger m-3 mb-0 d-flex align-items-center gap-2"
+                    role="alert"
+                >
                     <i class="ti ti-alert-circle fs-16"></i>
                     <span class="flex-grow-1">{{ errorText }}</span>
                     <button type="button" class="btn-close" :aria-label="'Fechar'" @click="dismissError"></button>
@@ -591,9 +675,12 @@ onUnmounted(() => panelTour.stop());
                 <!-- Breadcrumbs -->
                 <nav v-if="breadcrumbs.length" aria-label="breadcrumb" class="d-flex justify-content-end mb-2">
                     <ol class="breadcrumb mb-0 app-breadcrumb">
-                        <li v-for="(crumb, i) in breadcrumbs" :key="i"
+                        <li
+                            v-for="(crumb, i) in breadcrumbs"
+                            :key="i"
                             class="breadcrumb-item"
-                            :class="{ active: crumb.active }">
+                            :class="{ active: crumb.active }"
+                        >
                             <a v-if="!crumb.active" :href="crumb.url">{{ crumb.label }}</a>
                             <span v-else class="breadcrumb-active">{{ crumb.label }}</span>
                         </li>
@@ -611,14 +698,20 @@ onUnmounted(() => panelTour.stop());
              painel sem perder a conversa. Gate (isDoctor + feature) já vem
              resolvido do backend em page.props.aiAssistant.enabled. -->
         <AiFloatingAssistant v-if="aiAssistant.enabled" :ai="aiAssistant" />
-
     </div>
 </template>
 
 <style scoped>
 /* Flash messages: fade + slide suave */
 .flash-enter-active,
-.flash-leave-active { transition: opacity .25s ease, transform .25s ease; }
+.flash-leave-active {
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+}
 .flash-enter-from,
-.flash-leave-to     { opacity: 0; transform: translateY(-6px); }
+.flash-leave-to {
+    opacity: 0;
+    transform: translateY(-6px);
+}
 </style>

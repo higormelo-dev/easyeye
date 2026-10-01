@@ -6,9 +6,9 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
 
 /** Resultado da pré-validação TISS (motor anti-glosa) de uma guia. */
 const props = defineProps({
-    open:   { type: Boolean, default: false },
-    result: { type: Object,  default: null },
-    t:      { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    result: { type: Object, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
@@ -21,7 +21,9 @@ useDialogKeyboard(() => props.open, { onEscape: () => emit('close'), focusRef: c
 <template>
     <OffcanvasPanel :open="open" :width="480" @close="emit('close')">
         <template #header>
-            <h5 class="mb-0 fw-semibold"><i class="ti ti-checklist me-2 text-primary" aria-hidden="true"></i>{{ t.pending_result_title }}</h5>
+            <h5 class="mb-0 fw-semibold">
+                <i class="ti ti-checklist me-2 text-primary" aria-hidden="true"></i>{{ t.pending_result_title }}
+            </h5>
         </template>
 
         <PreValidationResult :result="result" :t="t" />

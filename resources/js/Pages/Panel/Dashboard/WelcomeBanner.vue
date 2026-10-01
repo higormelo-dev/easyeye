@@ -5,17 +5,17 @@ import { usePage } from '@inertiajs/vue3';
 const props = defineProps({
     // Atalhos só para quem pode abrir Pacientes (mesma regra da rota).
     access: { type: Object, default: () => ({}) },
-    t:      { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
-const page      = usePage();
-const auth      = computed(() => page.props.auth ?? {});
-const user      = computed(() => auth.value.user ?? {});
-const entity    = computed(() => auth.value.entity ?? {});
+const page = usePage();
+const auth = computed(() => page.props.auth ?? {});
+const user = computed(() => auth.value.user ?? {});
+const entity = computed(() => auth.value.entity ?? {});
 const firstName = computed(() => user.value.name?.split(' ')[0] ?? '');
 
-const hour    = new Date().getHours();
-const gKey    = hour < 12 ? 'greeting_morning' : hour < 18 ? 'greeting_afternoon' : 'greeting_evening';
+const hour = new Date().getHours();
+const gKey = hour < 12 ? 'greeting_morning' : hour < 18 ? 'greeting_afternoon' : 'greeting_evening';
 const greeting = computed(() => props.t[gKey] ?? 'Olá');
 </script>
 
@@ -26,7 +26,7 @@ const greeting = computed(() => props.t[gKey] ?? 'Olá');
                 <h4 class="mb-1">{{ greeting }}, {{ firstName }}! 👋</h4>
                 <p>{{ t.operational_panel?.replace(':app', entity.name) }}</p>
             </div>
-            <div v-if="access.patients" class="d-flex gap-2 flex-wrap" style="position:relative;z-index:1">
+            <div v-if="access.patients" class="d-flex gap-2 flex-wrap" style="position: relative; z-index: 1">
                 <a :href="route('panel.patients.index')" class="btn btn-sm btn-banner">
                     <i class="ti ti-users me-1"></i> {{ t.btn_patients }}
                 </a>

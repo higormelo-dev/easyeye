@@ -19,37 +19,40 @@ import { currencySymbol, formatMoneyInput, parseMoneyInput } from '@/utils/money
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps({
-    modelValue:    { type: [Number, String], default: null },
-    currency:      { type: String,  default: 'BRL' },
+    modelValue: { type: [Number, String], default: null },
+    currency: { type: String, default: 'BRL' },
     /** Idioma BCP 47; padrão: o do usuário (prop Inertia `locale`). */
-    locale:        { type: String,  default: '' },
-    placeholder:   { type: String,  default: '' },
-    invalid:       { type: Boolean, default: false },
-    disabled:      { type: Boolean, default: false },
-    readonly:      { type: Boolean, default: false },
+    locale: { type: String, default: '' },
+    placeholder: { type: String, default: '' },
+    invalid: { type: Boolean, default: false },
+    disabled: { type: Boolean, default: false },
+    readonly: { type: Boolean, default: false },
     allowNegative: { type: Boolean, default: false },
     /** 'sm' | '' */
-    size:          { type: String,  default: 'sm' },
+    size: { type: String, default: 'sm' },
 });
 
 const emit = defineEmits(['update:modelValue', 'blur']);
 
 const page = usePage();
 
-const resolvedLocale  = computed(() => props.locale || String(page?.props?.locale ?? 'pt_BR').replace('_', '-'));
-const symbol          = computed(() => currencySymbol(resolvedLocale.value, props.currency));
+const resolvedLocale = computed(() => props.locale || String(page?.props?.locale ?? 'pt_BR').replace('_', '-'));
+const symbol = computed(() => currencySymbol(resolvedLocale.value, props.currency));
 const placeholderText = computed(() => props.placeholder || formatMoneyInput(0, resolvedLocale.value));
 
 const focused = ref(false);
-const text    = ref(formatMoneyInput(props.modelValue, resolvedLocale.value));
+const text = ref(formatMoneyInput(props.modelValue, resolvedLocale.value));
 
 // Valor mudou por fora (reset do formulário, edição carregada): reformata,
 // exceto enquanto o usuário digita (não reescreve o que ele está escrevendo).
-watch(() => props.modelValue, (value) => {
-    if (focused.value) return;
+watch(
+    () => props.modelValue,
+    (value) => {
+        if (focused.value) return;
 
-    text.value = formatMoneyInput(value, resolvedLocale.value);
-});
+        text.value = formatMoneyInput(value, resolvedLocale.value);
+    },
+);
 
 watch(resolvedLocale, (locale) => {
     text.value = formatMoneyInput(props.modelValue, locale);
@@ -58,7 +61,10 @@ watch(resolvedLocale, (locale) => {
 function onInput(event) {
     text.value = event.target.value;
 
-    emit('update:modelValue', parseMoneyInput(text.value, resolvedLocale.value, { allowNegative: props.allowNegative }));
+    emit(
+        'update:modelValue',
+        parseMoneyInput(text.value, resolvedLocale.value, { allowNegative: props.allowNegative }),
+    );
 }
 
 function onFocus() {
@@ -96,7 +102,7 @@ const groupClass = computed(() => (props.size === 'sm' ? 'input-group input-grou
             @input="onInput"
             @focus="onFocus"
             @blur="onBlur"
-        >
+        />
     </div>
 </template>
 

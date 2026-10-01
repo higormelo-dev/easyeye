@@ -20,46 +20,52 @@ import { useDialogKeyboard } from './useDialogKeyboard.js';
  * vêm do contrato da operadora (o servidor mantém os padrões para legados).
  */
 const props = defineProps({
-    open:               { type: Boolean, default: false },
-    covenants:          { type: Array,   default: () => [] },
-    eligibleSchedules:  { type: Array,   default: () => [] },
-    selectedIds:        { type: Array,   default: () => [] },
-    filters:            { type: Object,  default: () => ({}) },
-    tussCodes:          { type: Array,   default: () => [] },
-    url:                { type: String,  required: true },
-    cid10SearchUrl:     { type: String,  default: '' },
-    procedurePricesUrl: { type: String,  default: '' },
-    t:                  { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    covenants: { type: Array, default: () => [] },
+    eligibleSchedules: { type: Array, default: () => [] },
+    selectedIds: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    tussCodes: { type: Array, default: () => [] },
+    url: { type: String, required: true },
+    cid10SearchUrl: { type: String, default: '' },
+    procedurePricesUrl: { type: String, default: '' },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const FIELDS = [
-    'covenant_id', 'date_from', 'date_until', 'quantity', 'unit_price', 'tuss_code',
-    'procedure_description', 'clinical_indication',
+    'covenant_id',
+    'date_from',
+    'date_until',
+    'quantity',
+    'unit_price',
+    'tuss_code',
+    'procedure_description',
+    'clinical_indication',
 ];
 
 const { tx } = useTrans(() => props.t);
 const { money, number } = useLocaleFormat();
 
 const form = useForm({
-    covenant_id:           '',
-    date_from:             '',
-    date_until:            '',
-    quantity:              1,
-    unit_price:            null,
-    tuss_code:             '',
+    covenant_id: '',
+    date_from: '',
+    date_until: '',
+    quantity: 1,
+    unit_price: null,
+    tuss_code: '',
     procedure_description: '',
-    clinical_indication:   '',
+    clinical_indication: '',
 });
 
-const rootRef           = ref(null);
+const rootRef = ref(null);
 const confirmingDiscard = ref(false);
 /** Último valor preenchido pela sugestão: trocar de convênio só o substitui se o usuário não mexeu. */
-const autoFilledPrice   = ref(null);
+const autoFilledPrice = ref(null);
 
 const otherErrors = computed(() => generalErrors(form.errors, FIELDS));
-const covenant    = computed(() => props.covenants.find((c) => c.id === form.covenant_id) ?? null);
+const covenant = computed(() => props.covenants.find((c) => c.id === form.covenant_id) ?? null);
 
 function onlyDate(value) {
     return String(value ?? '').slice(0, 10);
@@ -83,62 +89,75 @@ function candidatesFor(covenantId, dateFrom, dateUntil) {
     });
 }
 
-const candidates         = computed(() => candidatesFor(form.covenant_id, form.date_from, form.date_until));
+const candidates = computed(() => candidatesFor(form.covenant_id, form.date_from, form.date_until));
 const selectedInCovenant = computed(() => (props.selectedIds.length > 0 ? candidates.value.length : 0));
-const selectedExcluded   = computed(() => props.selectedIds.length - selectedInCovenant.value);
-const listedInPeriod     = computed(() => (props.selectedIds.length > 0 ? 0 : candidates.value.length));
-const estimatedCount     = computed(() => candidates.value.length);
-const priceInfo          = computed(() => tablePriceInfo(candidates.value));
+const selectedExcluded = computed(() => props.selectedIds.length - selectedInCovenant.value);
+const listedInPeriod = computed(() => (props.selectedIds.length > 0 ? 0 : candidates.value.length));
+const estimatedCount = computed(() => candidates.value.length);
+const priceInfo = computed(() => tablePriceInfo(candidates.value));
 
 const estimatedTotal = computed(() => {
     const price = Number(form.unit_price ?? 0);
-    const qty   = Number(form.quantity || 0);
+    const qty = Number(form.quantity || 0);
 
     return price > 0 && qty > 0 && estimatedCount.value > 0
         ? Math.round(price * qty * estimatedCount.value * 100) / 100
         : null;
 });
 
-const priceDescribedBy = computed(() => [
-    form.covenant_id ? 'billing-batch-price-hint' : null,
-    form.errors.unit_price ? 'billing-batch-price-error' : null,
-].filter(Boolean).join(' ') || undefined);
+const priceDescribedBy = computed(
+    () =>
+        [
+            form.covenant_id ? 'billing-batch-price-hint' : null,
+            form.errors.unit_price ? 'billing-batch-price-error' : null,
+        ]
+            .filter(Boolean)
+            .join(' ') || undefined,
+);
 
-watch(() => props.open, (open) => {
-    confirmingDiscard.value = false;
-    if (!open) return;
+watch(
+    () => props.open,
+    (open) => {
+        confirmingDiscard.value = false;
+        if (!open) return;
 
-    const firstSelected = props.eligibleSchedules.find((s) => props.selectedIds.includes(s.id));
-    const covenantId    = firstSelected?.covenant_id ?? props.filters.covenant_id ?? '';
-    const suggestion    = tablePriceInfo(candidatesFor(covenantId, props.filters.from ?? '', props.filters.to ?? ''))?.single ?? null;
+        const firstSelected = props.eligibleSchedules.find((s) => props.selectedIds.includes(s.id));
+        const covenantId = firstSelected?.covenant_id ?? props.filters.covenant_id ?? '';
+        const suggestion =
+            tablePriceInfo(candidatesFor(covenantId, props.filters.from ?? '', props.filters.to ?? ''))?.single ?? null;
 
-    autoFilledPrice.value = suggestion;
+        autoFilledPrice.value = suggestion;
 
-    form.defaults({
-        covenant_id:           covenantId,
-        date_from:             props.filters.from ?? '',
-        date_until:            props.filters.to ?? '',
-        quantity:              1,
-        unit_price:            suggestion,
-        tuss_code:             '',
-        procedure_description: '',
-        clinical_indication:   '',
-    });
-    form.reset();
-    form.clearErrors();
-}, { immediate: true });
+        form.defaults({
+            covenant_id: covenantId,
+            date_from: props.filters.from ?? '',
+            date_until: props.filters.to ?? '',
+            quantity: 1,
+            unit_price: suggestion,
+            tuss_code: '',
+            procedure_description: '',
+            clinical_indication: '',
+        });
+        form.reset();
+        form.clearErrors();
+    },
+    { immediate: true },
+);
 
 // Convênio/período trocado: acompanha a sugestão enquanto o valor não foi
 // digitado pelo usuário (vazio ou igual ao último preenchido automaticamente).
-watch(() => priceInfo.value?.single ?? null, (single) => {
-    if (!props.open) return;
+watch(
+    () => priceInfo.value?.single ?? null,
+    (single) => {
+        if (!props.open) return;
 
-    const untouched = form.unit_price === null || form.unit_price === autoFilledPrice.value;
-    if (!untouched) return;
+        const untouched = form.unit_price === null || form.unit_price === autoFilledPrice.value;
+        if (!untouched) return;
 
-    form.unit_price       = single;
-    autoFilledPrice.value = single;
-});
+        form.unit_price = single;
+        autoFilledPrice.value = single;
+    },
+);
 
 function requestClose() {
     if (form.processing) return;
@@ -161,13 +180,11 @@ function submit() {
 
     // Envia todos os marcados, como antes: o servidor filtra pelo convênio. Não
     // filtrar aqui — lista vazia significaria "todos os elegíveis do período".
-    form
-        .transform((data) => ({ ...data, schedule_ids: [...props.selectedIds] }))
-        .post(props.url, {
-            preserveScroll: true,
-            preserveState:  true,
-            onSuccess:      () => emit('saved'),
-        });
+    form.transform((data) => ({ ...data, schedule_ids: [...props.selectedIds] })).post(props.url, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => emit('saved'),
+    });
 }
 
 useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef });
@@ -176,7 +193,9 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
 <template>
     <OffcanvasPanel :open="open" :width="580" @close="requestClose">
         <template #header>
-            <h2 class="h5 mb-0 fw-semibold"><i class="ti ti-package me-2 text-primary" aria-hidden="true"></i>{{ t.batch_title }}</h2>
+            <h2 class="h5 mb-0 fw-semibold">
+                <i class="ti ti-package me-2 text-primary" aria-hidden="true"></i>{{ t.batch_title }}
+            </h2>
         </template>
 
         <form ref="rootRef" novalidate @submit.prevent="submit">
@@ -185,14 +204,24 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     <label for="billing-batch-covenant" class="form-label">
                         {{ t.batch_covenant }} <span class="text-danger" aria-hidden="true">*</span>
                     </label>
-                    <select id="billing-batch-covenant" v-model="form.covenant_id" class="form-select" required aria-required="true"
-                            :class="{ 'is-invalid': form.errors.covenant_id }"
-                            :aria-invalid="form.errors.covenant_id ? 'true' : 'false'">
+                    <select
+                        id="billing-batch-covenant"
+                        v-model="form.covenant_id"
+                        class="form-select"
+                        required
+                        aria-required="true"
+                        :class="{ 'is-invalid': form.errors.covenant_id }"
+                        :aria-invalid="form.errors.covenant_id ? 'true' : 'false'"
+                    >
                         <option value="">{{ t.select }}</option>
                         <option v-for="c in covenants" :key="c.id" :value="c.id">{{ c.name }}</option>
                     </select>
                     <div v-if="form.errors.covenant_id" class="invalid-feedback">{{ form.errors.covenant_id }}</div>
-                    <small v-if="covenant && !covenant.has_ans_registry" class="d-block text-warning-emphasis mt-1" data-test="particular-hint">
+                    <small
+                        v-if="covenant && !covenant.has_ans_registry"
+                        class="d-block text-warning-emphasis mt-1"
+                        data-test="particular-hint"
+                    >
                         <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ t.particular_hint }}
                     </small>
                 </div>
@@ -200,16 +229,30 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     <label for="billing-batch-from" class="form-label">
                         {{ t.batch_period_from }} <span class="text-danger" aria-hidden="true">*</span>
                     </label>
-                    <input id="billing-batch-from" v-model="form.date_from" type="date" class="form-control" required aria-required="true"
-                           :class="{ 'is-invalid': form.errors.date_from }">
+                    <input
+                        id="billing-batch-from"
+                        v-model="form.date_from"
+                        type="date"
+                        class="form-control"
+                        required
+                        aria-required="true"
+                        :class="{ 'is-invalid': form.errors.date_from }"
+                    />
                     <div v-if="form.errors.date_from" class="invalid-feedback">{{ form.errors.date_from }}</div>
                 </div>
                 <div class="col-12 col-sm-6">
                     <label for="billing-batch-until" class="form-label">
                         {{ t.batch_period_to }} <span class="text-danger" aria-hidden="true">*</span>
                     </label>
-                    <input id="billing-batch-until" v-model="form.date_until" type="date" class="form-control" required aria-required="true"
-                           :class="{ 'is-invalid': form.errors.date_until }">
+                    <input
+                        id="billing-batch-until"
+                        v-model="form.date_until"
+                        type="date"
+                        class="form-control"
+                        required
+                        aria-required="true"
+                        :class="{ 'is-invalid': form.errors.date_until }"
+                    />
                     <div v-if="form.errors.date_until" class="invalid-feedback">{{ form.errors.date_until }}</div>
                 </div>
 
@@ -218,15 +261,26 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         <template v-if="!form.covenant_id">{{ t.batch_hint_pick }}</template>
                         <template v-else-if="selectedIds.length > 0">
                             <div>{{ tx('batch_hint_selected', { count: selectedInCovenant }) }}</div>
-                            <div v-if="selectedExcluded > 0" class="text-warning-emphasis fw-medium" data-test="batch-excluded">
-                                <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ tx('batch_hint_excluded', { count: selectedExcluded }) }}
+                            <div
+                                v-if="selectedExcluded > 0"
+                                class="text-warning-emphasis fw-medium"
+                                data-test="batch-excluded"
+                            >
+                                <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                                >{{ tx('batch_hint_excluded', { count: selectedExcluded }) }}
                             </div>
                         </template>
                         <template v-else>{{ tx('batch_hint_all', { count: listedInPeriod }) }}</template>
                         <div v-if="estimatedTotal !== null" class="fw-semibold mt-1" data-test="batch-estimated">
                             {{ tx('batch_estimated_total', { total: money(estimatedTotal) }) }}
                             <span class="fw-normal">
-                                ({{ tx('batch_estimated_formula', { count: estimatedCount, quantity: number(form.quantity), unit: money(form.unit_price) }) }})
+                                ({{
+                                    tx('batch_estimated_formula', {
+                                        count: estimatedCount,
+                                        quantity: number(form.quantity),
+                                        unit: money(form.unit_price),
+                                    })
+                                }})
                             </span>
                         </div>
                     </div>
@@ -244,7 +298,7 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.quantity }"
                         :aria-invalid="form.errors.quantity ? 'true' : 'false'"
-                    >
+                    />
                     <div v-if="form.errors.quantity" class="invalid-feedback">{{ form.errors.quantity }}</div>
                 </div>
                 <div class="col-12 col-sm-8">
@@ -261,17 +315,31 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                         :aria-describedby="priceDescribedBy"
                         data-test="batch-price"
                     />
-                    <div v-if="form.errors.unit_price" id="billing-batch-price-error" class="invalid-feedback d-block">{{ form.errors.unit_price }}</div>
-                    <small v-if="form.covenant_id" id="billing-batch-price-hint" class="form-text d-block" data-test="batch-suggested">
+                    <div v-if="form.errors.unit_price" id="billing-batch-price-error" class="invalid-feedback d-block">
+                        {{ form.errors.unit_price }}
+                    </div>
+                    <small
+                        v-if="form.covenant_id"
+                        id="billing-batch-price-hint"
+                        class="form-text d-block"
+                        data-test="batch-suggested"
+                    >
                         <template v-if="priceInfo && priceInfo.single !== null">
-                            <i class="ti ti-table me-1" aria-hidden="true"></i>{{ tx('suggested_price_batch', { amount: money(priceInfo.single) }) }}
+                            <i class="ti ti-table me-1" aria-hidden="true"></i
+                            >{{ tx('suggested_price_batch', { amount: money(priceInfo.single) }) }}
                         </template>
                         <template v-else-if="priceInfo">
-                            <i class="ti ti-alert-triangle me-1 text-warning" aria-hidden="true"></i>{{ tx('suggested_price_mixed', { min: money(priceInfo.min), max: money(priceInfo.max) }) }}
+                            <i class="ti ti-alert-triangle me-1 text-warning" aria-hidden="true"></i
+                            >{{ tx('suggested_price_mixed', { min: money(priceInfo.min), max: money(priceInfo.max) }) }}
                         </template>
                         <template v-else>
                             {{ t.suggested_price_none }}
-                            <a v-if="procedurePricesUrl" :href="procedurePricesUrl" target="_blank" rel="noopener noreferrer">
+                            <a
+                                v-if="procedurePricesUrl"
+                                :href="procedurePricesUrl"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
                                 {{ t.price_table_link }}<span class="visually-hidden"> {{ t.new_tab }}</span>
                                 <i class="ti ti-external-link ms-1" aria-hidden="true"></i>
                             </a>
@@ -305,26 +373,54 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                 </div>
                 <div class="col-12">
                     <label for="billing-batch-desc" class="form-label">{{ t.procedure_desc }}</label>
-                    <input id="billing-batch-desc" v-model="form.procedure_description" type="text" maxlength="255" class="form-control"
-                           :class="{ 'is-invalid': form.errors.procedure_description }">
-                    <div v-if="form.errors.procedure_description" class="invalid-feedback">{{ form.errors.procedure_description }}</div>
+                    <input
+                        id="billing-batch-desc"
+                        v-model="form.procedure_description"
+                        type="text"
+                        maxlength="255"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.procedure_description }"
+                    />
+                    <div v-if="form.errors.procedure_description" class="invalid-feedback">
+                        {{ form.errors.procedure_description }}
+                    </div>
                 </div>
                 <div v-for="message in otherErrors" :key="message" class="col-12">
-                    <div class="alert alert-danger small py-2 mb-0" role="alert" data-test="batch-error">{{ message }}</div>
+                    <div class="alert alert-danger small py-2 mb-0" role="alert" data-test="batch-error">
+                        {{ message }}
+                    </div>
                 </div>
             </div>
         </form>
 
         <template #footer>
             <template v-if="confirmingDiscard">
-                <span class="me-auto small fw-medium" role="alert" data-test="discard-prompt">{{ t.discard_title }}</span>
-                <button type="button" class="btn btn-light" @click="confirmingDiscard = false">{{ t.btn_keep_editing }}</button>
-                <button type="button" class="btn btn-outline-danger" data-test="discard" @click="requestClose">{{ t.btn_discard }}</button>
+                <span class="me-auto small fw-medium" role="alert" data-test="discard-prompt">{{
+                    t.discard_title
+                }}</span>
+                <button type="button" class="btn btn-light" @click="confirmingDiscard = false">
+                    {{ t.btn_keep_editing }}
+                </button>
+                <button type="button" class="btn btn-outline-danger" data-test="discard" @click="requestClose">
+                    {{ t.btn_discard }}
+                </button>
             </template>
             <template v-else>
-                <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">{{ t.btn_cancel }}</button>
-                <button type="button" class="btn btn-primary" data-test="create-batch" :disabled="form.processing" @click="submit">
-                    <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                <button type="button" class="btn btn-light" :disabled="form.processing" @click="requestClose">
+                    {{ t.btn_cancel }}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    data-test="create-batch"
+                    :disabled="form.processing"
+                    @click="submit"
+                >
+                    <span
+                        v-if="form.processing"
+                        class="spinner-border spinner-border-sm me-1"
+                        aria-hidden="true"
+                    ></span>
                     {{ form.processing ? t.processing : t.btn_create_batch }}
                 </button>
             </template>

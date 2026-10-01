@@ -13,13 +13,17 @@
  * @returns {string[]}
  */
 export function recordColumnOrder(defaults, saved) {
-    const order = (Array.isArray(saved) ? saved : [])
-        .filter((key, index, list) => defaults.includes(key) && list.indexOf(key) === index);
+    const order = (Array.isArray(saved) ? saved : []).filter(
+        (key, index, list) => defaults.includes(key) && list.indexOf(key) === index,
+    );
 
     defaults.forEach((key, index) => {
         if (order.includes(key)) return;
 
-        const previous = defaults.slice(0, index).reverse().find((candidate) => order.includes(candidate));
+        const previous = defaults
+            .slice(0, index)
+            .reverse()
+            .find((candidate) => order.includes(candidate));
         order.splice(previous === undefined ? 0 : order.indexOf(previous) + 1, 0, key);
     });
 

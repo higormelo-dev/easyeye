@@ -12,23 +12,56 @@ vi.mock('@inertiajs/vue3', () => ({ usePage: () => page }));
  */
 const t = {
     nav: {
-        features: 'Recursos', demo: 'Demonstração', how: 'Como funciona', pricing: 'Planos', testimonials: 'Depoimentos',
-        faq: 'FAQ', contact: 'Contato', login: 'Entrar', get_started: 'Começar grátis', language: 'Idioma',
-        menu: 'Menu principal', skip: 'Pular para o conteúdo', create_account: 'Criar conta',
+        features: 'Recursos',
+        demo: 'Demonstração',
+        how: 'Como funciona',
+        pricing: 'Planos',
+        testimonials: 'Depoimentos',
+        faq: 'FAQ',
+        contact: 'Contato',
+        login: 'Entrar',
+        get_started: 'Começar grátis',
+        language: 'Idioma',
+        menu: 'Menu principal',
+        skip: 'Pular para o conteúdo',
+        create_account: 'Criar conta',
     },
     footer: {
-        tagline: 'Gestão clínica.', product: 'Produto', system: 'Acesso e contato', company: 'Empresa',
-        login: 'Acessar sistema', register: 'Criar conta', help: 'Central de ajuda', status: 'Status da plataforma',
-        api: 'API & Integrações', about: 'Sobre nós', blog: 'Blog', partners: 'Parceiros', contact: 'Contato',
-        careers: 'Trabalhe conosco', privacy: 'Privacidade', terms: 'Termos de uso', lgpd: 'LGPD',
+        tagline: 'Gestão clínica.',
+        product: 'Produto',
+        system: 'Acesso e contato',
+        company: 'Empresa',
+        login: 'Acessar sistema',
+        register: 'Criar conta',
+        help: 'Central de ajuda',
+        status: 'Status da plataforma',
+        api: 'API & Integrações',
+        about: 'Sobre nós',
+        blog: 'Blog',
+        partners: 'Parceiros',
+        contact: 'Contato',
+        careers: 'Trabalhe conosco',
+        privacy: 'Privacidade',
+        terms: 'Termos de uso',
+        lgpd: 'LGPD',
         copyright: '© :year :name.',
     },
 };
 
 const routesWithoutPages = {
-    siteHome: '/', go: '/go', register: '/register',
-    help: null, status: null, apiDocs: null, about: null, blog: null, partners: null, careers: null,
-    privacy: null, terms: null, lgpd: null,
+    siteHome: '/',
+    go: '/go',
+    register: '/register',
+    help: null,
+    status: null,
+    apiDocs: null,
+    about: null,
+    blog: null,
+    partners: null,
+    careers: null,
+    privacy: null,
+    terms: null,
+    lgpd: null,
 };
 
 let wrapper;
@@ -44,7 +77,9 @@ function mountLayout(routes = {}, { hasHero = true, content = '<p>conteúdo</p>'
 
 const footerHrefs = () => wrapper.findAll('footer a').map((link) => link.attributes('href'));
 
-beforeEach(() => { page.props = { locales: [] }; });
+beforeEach(() => {
+    page.props = { locales: [] };
+});
 afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
@@ -57,7 +92,9 @@ describe('SiteLayout — rodapé', () => {
         await wrapper.setProps({ t: { ...t, nav: { ...t.nav, testimonials: null } } });
 
         expect(footerHrefs()).not.toContain('/#depoimentos');
-        expect(footerHrefs()).toEqual(expect.arrayContaining(['/#funcionalidades', '/#demonstracao', '/#precos', '/#faq']));
+        expect(footerHrefs()).toEqual(
+            expect.arrayContaining(['/#funcionalidades', '/#demonstracao', '/#precos', '/#faq']),
+        );
 
         await wrapper.setProps({ t });
         expect(footerHrefs()).toContain('/#depoimentos');
@@ -66,7 +103,18 @@ describe('SiteLayout — rodapé', () => {
     it('não aponta para páginas que não existem (antes: 10 URLs fixas respondendo 404)', () => {
         mountLayout();
 
-        for (const dead of ['/ajuda', '/status', '/api-docs', '/sobre', '/blog', '/parceiros', '/carreiras', '/privacidade', '/termos', '/lgpd']) {
+        for (const dead of [
+            '/ajuda',
+            '/status',
+            '/api-docs',
+            '/sobre',
+            '/blog',
+            '/parceiros',
+            '/carreiras',
+            '/privacidade',
+            '/termos',
+            '/lgpd',
+        ]) {
             expect(footerHrefs()).not.toContain(dead);
         }
         expect(wrapper.find('.footer-legal').exists()).toBe(false);
@@ -79,8 +127,14 @@ describe('SiteLayout — rodapé', () => {
     it('página que passa a existir aparece sozinha, na ordem de antes', () => {
         mountLayout({ privacy: '/privacidade', terms: '/termos', apiDocs: '/docs/api', about: '/sobre' });
 
-        const legal = wrapper.get('.footer-legal').findAll('a').map((link) => [link.text(), link.attributes('href')]);
-        expect(legal).toEqual([['Privacidade', '/privacidade'], ['Termos de uso', '/termos']]);
+        const legal = wrapper
+            .get('.footer-legal')
+            .findAll('a')
+            .map((link) => [link.text(), link.attributes('href')]);
+        expect(legal).toEqual([
+            ['Privacidade', '/privacidade'],
+            ['Termos de uso', '/termos'],
+        ]);
         expect(wrapper.get('footer a[href="/docs/api"]').text()).toBe('API & Integrações');
         expect(wrapper.get('footer a[href="/sobre"]').text()).toBe('Sobre nós');
         expect(wrapper.get('.footer-inner').classes()).not.toContain('footer-inner--compact');
@@ -100,11 +154,18 @@ describe('SiteLayout — navegação', () => {
     it('prioriza os mesmos quatro destinos no desktop e mobile e mantém detalhes no rodapé', () => {
         mountLayout();
         const expected = [
-            ['Recursos', '/#funcionalidades'], ['Demonstração', '/#demonstracao'],
-            ['Planos', '/#precos'], ['Contato', '/#contato'],
+            ['Recursos', '/#funcionalidades'],
+            ['Demonstração', '/#demonstracao'],
+            ['Planos', '/#precos'],
+            ['Contato', '/#contato'],
         ];
         for (const selector of ['.nav-links', '#site-mobile-menu ul']) {
-            expect(wrapper.get(selector).findAll('a').map(link => [link.text(), link.attributes('href')])).toEqual(expected);
+            expect(
+                wrapper
+                    .get(selector)
+                    .findAll('a')
+                    .map((link) => [link.text(), link.attributes('href')]),
+            ).toEqual(expected);
         }
         expect(footerHrefs()).toEqual(expect.arrayContaining(['/#como-funciona', '/#depoimentos', '/#faq']));
     });
@@ -187,30 +248,37 @@ describe('SiteLayout — seção atual', () => {
     });
 
     function mountSections(options = {}) {
-        mountLayout({}, {
-            content: ['hero', 'demonstracao', 'funcionalidades', 'precos', 'faq', 'contato']
-                .map(id => `<section id="${id}">${id}</section>`).join(''),
-            ...options,
-        });
-        vi.spyOn(wrapper.get('#navbar').element, 'getBoundingClientRect')
-            .mockImplementation(() => ({ top: 0, bottom: headerBottom }));
+        mountLayout(
+            {},
+            {
+                content: ['hero', 'demonstracao', 'funcionalidades', 'precos', 'faq', 'contato']
+                    .map((id) => `<section id="${id}">${id}</section>`)
+                    .join(''),
+                ...options,
+            },
+        );
+        vi.spyOn(wrapper.get('#navbar').element, 'getBoundingClientRect').mockImplementation(() => ({
+            top: 0,
+            bottom: headerBottom,
+        }));
         wrapper.findAll('main section').forEach((section) => {
-            vi.spyOn(section.element, 'getBoundingClientRect')
-                .mockImplementation(() => bounds[section.attributes('id')] ?? { top: 1000, bottom: 1400 });
+            vi.spyOn(section.element, 'getBoundingClientRect').mockImplementation(
+                () => bounds[section.attributes('id')] ?? { top: 1000, bottom: 1400 },
+            );
         });
     }
 
     async function flushFrame() {
         const queued = [...frames.values()];
         frames.clear();
-        queued.forEach(callback => callback(0));
+        queued.forEach((callback) => callback(0));
         await nextTick();
     }
 
     function expectCurrent(anchor) {
         for (const selector of ['.nav-links', '#site-mobile-menu ul']) {
             const current = wrapper.get(selector).findAll('[aria-current="location"]');
-            expect(current.map(link => link.attributes('href'))).toEqual(anchor ? [`/${anchor}`] : []);
+            expect(current.map((link) => link.attributes('href'))).toEqual(anchor ? [`/${anchor}`] : []);
         }
     }
 

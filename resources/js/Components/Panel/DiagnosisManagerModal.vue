@@ -34,12 +34,12 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated']);
 
-const form           = useForm({ diagnoses: [] });
+const form = useForm({ diagnoses: [] });
 const creatingCustom = ref(false);
-const createError    = ref('');
+const createError = ref('');
 
 function latLabel(v) {
-    return ({ 1: 'OD', 2: 'OE' })[v] ?? 'AO';
+    return { 1: 'OD', 2: 'OE' }[v] ?? 'AO';
 }
 
 // Erros de validação (422): a chave pode ser tanto `diagnoses` (ex.: CID
@@ -47,21 +47,24 @@ function latLabel(v) {
 // `diagnoses.N.campo` (ex.: descrição vazia) — mostramos todos.
 const errorMessages = computed(() => Object.values(form.errors ?? {}));
 
-watch(() => props.open, (isOpen) => {
-    if (!isOpen) return;
-    form.clearErrors();
-    createError.value = '';
-    form.diagnoses = Array.isArray(props.exam?.diagnosis_cids)
-        ? props.exam.diagnosis_cids.map((d) => ({ ...d }))
-        : [];
-});
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (!isOpen) return;
+        form.clearErrors();
+        createError.value = '';
+        form.diagnoses = Array.isArray(props.exam?.diagnosis_cids)
+            ? props.exam.diagnosis_cids.map((d) => ({ ...d }))
+            : [];
+    },
+);
 
 // Ao emit('create', termo) do Cid10Picker: cadastra o diagnóstico customizado
 // da clínica (ExamDiagnosisController::store) e injeta o resultado na seleção.
 async function onCreateDiagnosis(term) {
     if (!props.urls?.store) return;
     creatingCustom.value = true;
-    createError.value    = '';
+    createError.value = '';
     try {
         const { data } = await window.axios.post(props.urls.store, { name: term });
         const created = data?.data;
@@ -102,19 +105,15 @@ function submit() {
 <template>
     <OffcanvasPanel :open="open" :width="620" @close="$emit('close')">
         <template #header>
-            <h5 class="mb-0 fw-semibold">
-                <i class="ti ti-stethoscope me-2 text-info"></i>Diagnóstico do exame
-            </h5>
-            <div v-if="exam" class="text-muted mt-1" style="font-size:.78rem;">
+            <h5 class="mb-0 fw-semibold"><i class="ti ti-stethoscope me-2 text-info"></i>Diagnóstico do exame</h5>
+            <div v-if="exam" class="text-muted mt-1" style="font-size: 0.78rem">
                 {{ exam.exam_type_name || exam.exam_type?.name || 'Exame' }}
                 <span class="mx-1">·</span>{{ latLabel(exam.laterality) }}
                 <template v-if="exam.created_at_fmt"><span class="mx-1">·</span>{{ exam.created_at_fmt }}</template>
             </div>
         </template>
 
-        <div v-if="!exam" class="text-muted text-center py-4">
-            Nenhum exame selecionado.
-        </div>
+        <div v-if="!exam" class="text-muted text-center py-4">Nenhum exame selecionado.</div>
 
         <template v-else>
             <div v-if="errorMessages.length" class="alert alert-danger py-2 px-3 small mb-3">
@@ -143,12 +142,13 @@ function submit() {
         </template>
 
         <template #footer>
-            <button type="button" class="btn btn-outline-secondary btn-sm" @click="$emit('close')">
-                Cancelar
-            </button>
-            <button type="button" class="btn btn-primary btn-sm"
-                    :disabled="form.processing || !exam || form.diagnoses.length === 0"
-                    @click="submit">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @click="$emit('close')">Cancelar</button>
+            <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                :disabled="form.processing || !exam || form.diagnoses.length === 0"
+                @click="submit"
+            >
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                 Salvar
             </button>

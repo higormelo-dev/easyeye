@@ -3,7 +3,7 @@ import { computed } from 'vue';
 
 const props = defineProps({
     trialsExpiring: { type: Array, default: () => [] },
-    t:              { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
 function daysLeft(trialEndsAt) {
@@ -21,9 +21,7 @@ function scoreClass(score) {
 <template>
     <div class="card mgr-chart-card h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
-            <span>
-                <i class="ti ti-alert-triangle me-2 text-warning"></i>{{ t.trials_expiring }}
-            </span>
+            <span> <i class="ti ti-alert-triangle me-2 text-warning"></i>{{ t.trials_expiring }} </span>
             <span class="badge bg-warning text-dark">{{ trialsExpiring.length }}</span>
         </div>
         <div class="card-body p-0">
@@ -49,7 +47,10 @@ function scoreClass(score) {
                         <td>{{ trial.plan?.name ?? '—' }}</td>
                         <td>
                             <span
-                                :class="['badge', daysLeft(trial.trial_ends_at) <= 2 ? 'bg-danger' : 'bg-warning text-dark']"
+                                :class="[
+                                    'badge',
+                                    daysLeft(trial.trial_ends_at) <= 2 ? 'bg-danger' : 'bg-warning text-dark',
+                                ]"
                             >
                                 {{ daysLeft(trial.trial_ends_at) }}d
                             </span>
@@ -64,7 +65,7 @@ function scoreClass(score) {
                                 </div>
                                 <span
                                     :class="['fw-semibold', `text-score-${scoreClass(trial.activation_score)}`]"
-                                    style="font-size:.8rem;"
+                                    style="font-size: 0.8rem"
                                 >
                                     {{ trial.activation_score }}%
                                 </span>

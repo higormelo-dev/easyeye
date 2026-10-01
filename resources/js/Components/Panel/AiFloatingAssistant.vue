@@ -31,7 +31,7 @@ const tt = (key, fallback = '') => t.value?.[key] ?? fallback;
 
 // ── Estado da janela ─────────────────────────────────────────────────────────
 const windowState = ref('closed'); // closed | open | minimized
-const expanded    = ref(false);
+const expanded = ref(false);
 const unreadCount = ref(0);
 
 function openWidget() {
@@ -39,23 +39,27 @@ function openWidget() {
     unreadCount.value = 0;
     nextTick(() => textareaEl.value?.focus());
 }
-function minimizeWidget() { windowState.value = 'minimized'; }
+function minimizeWidget() {
+    windowState.value = 'minimized';
+}
 function closeWidget() {
     windowState.value = 'closed';
     cancelPolling();
 }
-function toggleExpand() { expanded.value = !expanded.value; }
+function toggleExpand() {
+    expanded.value = !expanded.value;
+}
 
 // ── Conversa ──────────────────────────────────────────────────────────────────
 function newConversationId() {
-    return (window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    return window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 const conversationId = ref(newConversationId());
-const messages       = ref([]); // [{ id, role: 'user'|'assistant'|'error', content, pending, runId, usedContext, medicalRecordId, patientId }]
-const userPrompt     = ref('');
-const textareaEl     = ref(null);
-const sending        = ref(false);
+const messages = ref([]); // [{ id, role: 'user'|'assistant'|'error', content, pending, runId, usedContext, medicalRecordId, patientId }]
+const userPrompt = ref('');
+const textareaEl = ref(null);
+const sending = ref(false);
 
 function startNewConversation() {
     cancelPolling();
@@ -65,15 +69,25 @@ function startNewConversation() {
 }
 
 // ── Contexto opt-in ───────────────────────────────────────────────────────────
-const hasContextAvailable = computed(() => Boolean(
-    aiAssistantContext.patient_id || aiAssistantContext.medical_record_id,
-));
+const hasContextAvailable = computed(() =>
+    Boolean(aiAssistantContext.patient_id || aiAssistantContext.medical_record_id),
+);
 const useContext = ref(false);
 // Se a tela mudar (ex.: saiu do prontuário do paciente A, entrou no B), o
 // contexto disponível muda — desliga o toggle pra não vazar contexto de uma
 // tela pro pedido feito em outra sem o médico perceber.
-watch(() => aiAssistantContext.patient_id, () => { useContext.value = false; });
-watch(() => aiAssistantContext.medical_record_id, () => { useContext.value = false; });
+watch(
+    () => aiAssistantContext.patient_id,
+    () => {
+        useContext.value = false;
+    },
+);
+watch(
+    () => aiAssistantContext.medical_record_id,
+    () => {
+        useContext.value = false;
+    },
+);
 
 // ── Atalhos do welcome ("Como posso ajudar?") ────────────────────────────────
 // 4 ações principais, sensíveis ao contexto da tela (ticket "reformular IA"):
@@ -136,7 +150,7 @@ function runShortcut(shortcut) {
 
 // ── Envio + polling (mesmo padrão de backoff do AiAssistantPanel) ─────────────
 let pollController = null;
-let pollTimer       = null;
+let pollTimer = null;
 
 function cancelPolling() {
     pollController?.abort();
@@ -207,8 +221,9 @@ function finishWithError(msg, error) {
     msg.role = 'error';
     const status = error?.response?.status;
     if (status === 422 && error.response.data?.details) {
-        msg.content = tt('error_generic', 'Não foi possível obter resposta. Tente novamente.')
-            + ` (${error.response.data.message ?? ''})`;
+        msg.content =
+            tt('error_generic', 'Não foi possível obter resposta. Tente novamente.') +
+            ` (${error.response.data.message ?? ''})`;
     } else if (status === 403) {
         msg.content = error.response.data?.message ?? tt('error_generic', 'Não foi possível obter resposta.');
     } else {
@@ -294,9 +309,13 @@ async function insertAsEvolution(msg) {
     try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
         const storeUrl = route('panel.patients.medicalrecords.evolutions.store', [msg.patientId, msg.medicalRecordId]);
-        await window.axios.post(storeUrl, { content: msg.content }, {
-            headers: { 'X-CSRF-TOKEN': csrfToken },
-        });
+        await window.axios.post(
+            storeUrl,
+            { content: msg.content },
+            {
+                headers: { 'X-CSRF-TOKEN': csrfToken },
+            },
+        );
         msg.insertedAsEvolution = true;
     } catch (e) {
         // Erro silencioso na UI de chat — o médico ainda tem o texto pra copiar manualmente.
@@ -326,16 +345,24 @@ onBeforeUnmount(cancelPolling);
         <!-- data-tour: âncora do tour guiado do painel (lang/*/tour.php → layout) -->
         <div class="ai-floating-assistant" data-tour="ai-assistant">
             <!-- Ícone flutuante (fechado) -->
-            <button v-if="windowState === 'closed'" type="button"
-                    class="ai-fab" :title="tt('title', 'Assistente virtual')"
-                    @click="openWidget">
+            <button
+                v-if="windowState === 'closed'"
+                type="button"
+                class="ai-fab"
+                :title="tt('title', 'Assistente virtual')"
+                @click="openWidget"
+            >
                 <i class="fas fa-wand-magic-sparkles"></i>
             </button>
 
             <!-- Minimizado: pill pequeno com badge -->
-            <button v-else-if="windowState === 'minimized'" type="button"
-                    class="ai-fab ai-fab--minimized" :title="tt('title', 'Assistente virtual')"
-                    @click="openWidget">
+            <button
+                v-else-if="windowState === 'minimized'"
+                type="button"
+                class="ai-fab ai-fab--minimized"
+                :title="tt('title', 'Assistente virtual')"
+                @click="openWidget"
+            >
                 <i class="fas fa-wand-magic-sparkles"></i>
                 <span v-if="unreadCount > 0" class="ai-fab-badge">{{ unreadCount }}</span>
             </button>
@@ -348,13 +375,28 @@ onBeforeUnmount(cancelPolling);
                         <span>{{ tt('title', 'Assistente virtual') }}</span>
                     </div>
                     <div class="ai-chat-header-actions">
-                        <button type="button" class="ai-icon-btn" :title="tt('new_conversation', 'Nova conversa')" @click="startNewConversation">
+                        <button
+                            type="button"
+                            class="ai-icon-btn"
+                            :title="tt('new_conversation', 'Nova conversa')"
+                            @click="startNewConversation"
+                        >
                             <i class="fas fa-rotate-left"></i>
                         </button>
-                        <button type="button" class="ai-icon-btn" :title="expanded ? tt('collapse', 'Compactar') : tt('expand', 'Ampliar')" @click="toggleExpand">
+                        <button
+                            type="button"
+                            class="ai-icon-btn"
+                            :title="expanded ? tt('collapse', 'Compactar') : tt('expand', 'Ampliar')"
+                            @click="toggleExpand"
+                        >
                             <i :class="expanded ? 'fas fa-compress' : 'fas fa-expand'"></i>
                         </button>
-                        <button type="button" class="ai-icon-btn" :title="tt('minimize', 'Minimizar')" @click="minimizeWidget">
+                        <button
+                            type="button"
+                            class="ai-icon-btn"
+                            :title="tt('minimize', 'Minimizar')"
+                            @click="minimizeWidget"
+                        >
                             <i class="fas fa-minus"></i>
                         </button>
                         <button type="button" class="ai-icon-btn" :title="tt('close', 'Fechar')" @click="closeWidget">
@@ -364,13 +406,14 @@ onBeforeUnmount(cancelPolling);
                 </div>
 
                 <div class="ai-chat-disclaimer">
-                    <i class="fas fa-shield-halved me-1"></i>{{ tt('disclaimer', 'Apoio à decisão — não substitui julgamento clínico.') }}
+                    <i class="fas fa-shield-halved me-1"></i
+                    >{{ tt('disclaimer', 'Apoio à decisão — não substitui julgamento clínico.') }}
                 </div>
 
                 <!-- Toggle de contexto (só aparece quando a tela atual oferece contexto) -->
                 <div v-if="hasContextAvailable" class="ai-chat-context">
                     <label class="ai-context-toggle">
-                        <input type="checkbox" v-model="useContext">
+                        <input type="checkbox" v-model="useContext" />
                         <span>{{ tt('context_available', 'Usar contexto desta tela') }}</span>
                     </label>
                     <span v-if="aiAssistantContext.label" class="ai-context-label">{{ aiAssistantContext.label }}</span>
@@ -383,10 +426,17 @@ onBeforeUnmount(cancelPolling);
                          contextuais — a conversa é o elemento principal. -->
                     <div v-if="messages.length === 0" class="ai-chat-welcome">
                         <div class="ai-chat-welcome-title">{{ tt('welcome_title', 'Como posso ajudar?') }}</div>
-                        <div class="ai-chat-welcome-sub">{{ tt('welcome_sub', 'Pergunte livremente ou escolha um atalho.') }}</div>
+                        <div class="ai-chat-welcome-sub">
+                            {{ tt('welcome_sub', 'Pergunte livremente ou escolha um atalho.') }}
+                        </div>
                         <div class="ai-chat-shortcuts">
-                            <button v-for="shortcut in shortcuts" :key="shortcut.label" type="button"
-                                    class="ai-shortcut" @click="runShortcut(shortcut)">
+                            <button
+                                v-for="shortcut in shortcuts"
+                                :key="shortcut.label"
+                                type="button"
+                                class="ai-shortcut"
+                                @click="runShortcut(shortcut)"
+                            >
                                 <i :class="shortcut.icon"></i>
                                 <span>{{ shortcut.label }}</span>
                             </button>
@@ -397,16 +447,27 @@ onBeforeUnmount(cancelPolling);
                         <div class="ai-msg" :class="`ai-msg--${msg.role}`">
                             <div class="ai-msg-bubble">
                                 <span v-if="msg.pending" class="ai-msg-thinking">
-                                    <span class="spinner-border spinner-border-sm me-1"></span>{{ tt('thinking', 'Pensando...') }}
+                                    <span class="spinner-border spinner-border-sm me-1"></span
+                                    >{{ tt('thinking', 'Pensando...') }}
                                 </span>
                                 <span v-else class="ai-msg-content">{{ msg.content }}</span>
 
-                                <div v-if="msg.role === 'assistant' && !msg.pending && msg.medicalRecordId" class="ai-msg-actions">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm"
-                                            :disabled="insertingEvolution === msg.id || msg.insertedAsEvolution"
-                                            @click="insertAsEvolution(msg)">
+                                <div
+                                    v-if="msg.role === 'assistant' && !msg.pending && msg.medicalRecordId"
+                                    class="ai-msg-actions"
+                                >
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        :disabled="insertingEvolution === msg.id || msg.insertedAsEvolution"
+                                        @click="insertAsEvolution(msg)"
+                                    >
                                         <i class="fas fa-notes-medical me-1"></i>
-                                        {{ msg.insertedAsEvolution ? tt('inserted_as_evolution', 'Adicionado às evoluções.') : tt('insert_as_evolution', 'Inserir como evolução') }}
+                                        {{
+                                            msg.insertedAsEvolution
+                                                ? tt('inserted_as_evolution', 'Adicionado às evoluções.')
+                                                : tt('insert_as_evolution', 'Inserir como evolução')
+                                        }}
                                     </button>
                                 </div>
                             </div>
@@ -416,14 +477,21 @@ onBeforeUnmount(cancelPolling);
 
                 <!-- Composer -->
                 <div class="ai-chat-composer">
-                    <textarea ref="textareaEl" v-model="userPrompt" rows="2"
-                              class="form-control form-control-sm"
-                              :placeholder="tt('placeholder', 'Pergunte algo...')"
-                              :disabled="sending"
-                              @keydown="onKeydown"></textarea>
-                    <button type="button" class="btn btn-primary btn-sm ai-send-btn"
-                            :disabled="sending || userPrompt.trim().length === 0"
-                            @click="sendMessage">
+                    <textarea
+                        ref="textareaEl"
+                        v-model="userPrompt"
+                        rows="2"
+                        class="form-control form-control-sm"
+                        :placeholder="tt('placeholder', 'Pergunte algo...')"
+                        :disabled="sending"
+                        @keydown="onKeydown"
+                    ></textarea>
+                    <button
+                        type="button"
+                        class="btn btn-primary btn-sm ai-send-btn"
+                        :disabled="sending || userPrompt.trim().length === 0"
+                        @click="sendMessage"
+                    >
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
@@ -451,22 +519,26 @@ onBeforeUnmount(cancelPolling);
     background: linear-gradient(135deg, #6c5ce7, #00b894);
     color: #fff;
     font-size: 1.25rem;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform .15s ease;
+    transition: transform 0.15s ease;
 }
-.ai-fab:hover { transform: scale(1.06); }
-.ai-fab--minimized { position: relative; }
+.ai-fab:hover {
+    transform: scale(1.06);
+}
+.ai-fab--minimized {
+    position: relative;
+}
 .ai-fab-badge {
     position: absolute;
     top: -4px;
     right: -4px;
     background: #f62d51;
     color: #fff;
-    font-size: .65rem;
+    font-size: 0.65rem;
     font-weight: 700;
     min-width: 18px;
     height: 18px;
@@ -483,7 +555,7 @@ onBeforeUnmount(cancelPolling);
     max-height: 75vh;
     background: #fff;
     border-radius: 14px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, .25);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -497,64 +569,91 @@ onBeforeUnmount(cancelPolling);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: .6rem .8rem;
+    padding: 0.6rem 0.8rem;
     background: linear-gradient(135deg, #6c5ce7, #00b894);
     color: #fff;
 }
-.ai-chat-header-title { font-weight: 600; font-size: .9rem; display: flex; align-items: center; }
-.ai-chat-header-actions { display: flex; gap: .25rem; }
+.ai-chat-header-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+}
+.ai-chat-header-actions {
+    display: flex;
+    gap: 0.25rem;
+}
 .ai-icon-btn {
     border: none;
-    background: rgba(255, 255, 255, .18);
+    background: rgba(255, 255, 255, 0.18);
     color: #fff;
     width: 26px;
     height: 26px;
     border-radius: 6px;
-    font-size: .7rem;
+    font-size: 0.7rem;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
 }
-.ai-icon-btn:hover { background: rgba(255, 255, 255, .3); }
+.ai-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
 
 .ai-chat-disclaimer {
-    font-size: .68rem;
+    font-size: 0.68rem;
     color: #856404;
     background: #fff8e1;
-    padding: .35rem .7rem;
+    padding: 0.35rem 0.7rem;
     border-bottom: 1px solid #f0e6c8;
 }
 
 .ai-chat-context {
     display: flex;
     align-items: center;
-    gap: .4rem;
-    padding: .35rem .7rem;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
     background: #f4f2ff;
     border-bottom: 1px solid #e8e4fb;
-    font-size: .72rem;
+    font-size: 0.72rem;
     flex-wrap: wrap;
 }
-.ai-context-toggle { display: flex; align-items: center; gap: .3rem; cursor: pointer; margin: 0; }
-.ai-context-label { color: #6c5ce7; font-weight: 600; }
-.ai-context-hint { color: #9b95d6; cursor: help; }
+.ai-context-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    margin: 0;
+}
+.ai-context-label {
+    color: #6c5ce7;
+    font-weight: 600;
+}
+.ai-context-hint {
+    color: #9b95d6;
+    cursor: help;
+}
 
 .ai-chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: .7rem;
+    padding: 0.7rem;
     display: flex;
     flex-direction: column;
-    gap: .5rem;
+    gap: 0.5rem;
     background: #fafafc;
 }
-.ai-chat-empty { color: #94a3b8; font-size: .8rem; text-align: center; margin-top: 1.5rem; }
+.ai-chat-empty {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    text-align: center;
+    margin-top: 1.5rem;
+}
 
 /* Welcome "Como posso ajudar?" + atalhos contextuais */
 .ai-chat-welcome {
     text-align: center;
-    padding: 1.4rem .6rem .6rem;
+    padding: 1.4rem 0.6rem 0.6rem;
 }
 .ai-chat-welcome-title {
     font-size: 1.05rem;
@@ -562,9 +661,9 @@ onBeforeUnmount(cancelPolling);
     color: #1f2937;
 }
 .ai-chat-welcome-sub {
-    font-size: .76rem;
+    font-size: 0.76rem;
     color: #94a3b8;
-    margin: .2rem 0 .9rem;
+    margin: 0.2rem 0 0.9rem;
 }
 .ai-chat-shortcuts {
     display: grid;
@@ -576,65 +675,105 @@ onBeforeUnmount(cancelPolling);
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: .65rem .4rem;
+    padding: 0.65rem 0.4rem;
     border: 1px solid #e5e7eb;
-    border-radius: .55rem;
+    border-radius: 0.55rem;
     background: #fff;
-    font-size: .74rem;
+    font-size: 0.74rem;
     font-weight: 600;
     color: #374151;
     cursor: pointer;
-    transition: border-color .12s ease, background .12s ease, transform .12s ease;
+    transition:
+        border-color 0.12s ease,
+        background 0.12s ease,
+        transform 0.12s ease;
 }
-.ai-shortcut i { font-size: 1rem; color: #6c5ce7; }
+.ai-shortcut i {
+    font-size: 1rem;
+    color: #6c5ce7;
+}
 .ai-shortcut:hover {
     border-color: #6c5ce7;
     background: #f6f4ff;
     transform: translateY(-1px);
 }
 
-.ai-msg { display: flex; }
-.ai-msg--user { justify-content: flex-end; }
-.ai-msg--assistant, .ai-msg--error { justify-content: flex-start; }
+.ai-msg {
+    display: flex;
+}
+.ai-msg--user {
+    justify-content: flex-end;
+}
+.ai-msg--assistant,
+.ai-msg--error {
+    justify-content: flex-start;
+}
 .ai-msg-bubble {
     max-width: 84%;
-    padding: .5rem .7rem;
+    padding: 0.5rem 0.7rem;
     border-radius: 10px;
-    font-size: .82rem;
+    font-size: 0.82rem;
     line-height: 1.4;
     white-space: pre-wrap;
     word-break: break-word;
 }
-.ai-msg--user .ai-msg-bubble { background: #6c5ce7; color: #fff; border-bottom-right-radius: 2px; }
-.ai-msg--assistant .ai-msg-bubble { background: #fff; border: 1px solid #e5e7eb; border-bottom-left-radius: 2px; }
-.ai-msg--error .ai-msg-bubble { background: #fdecea; color: #b71c1c; border: 1px solid #f5c6c2; }
-.ai-msg-thinking { color: #94a3b8; font-size: .78rem; display: inline-flex; align-items: center; }
-.ai-msg-actions { margin-top: .4rem; }
+.ai-msg--user .ai-msg-bubble {
+    background: #6c5ce7;
+    color: #fff;
+    border-bottom-right-radius: 2px;
+}
+.ai-msg--assistant .ai-msg-bubble {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-bottom-left-radius: 2px;
+}
+.ai-msg--error .ai-msg-bubble {
+    background: #fdecea;
+    color: #b71c1c;
+    border: 1px solid #f5c6c2;
+}
+.ai-msg-thinking {
+    color: #94a3b8;
+    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+}
+.ai-msg-actions {
+    margin-top: 0.4rem;
+}
 
 .ai-chat-quick-prompts {
     display: flex;
     flex-wrap: wrap;
-    gap: .3rem;
-    padding: 0 .7rem .5rem;
+    gap: 0.3rem;
+    padding: 0 0.7rem 0.5rem;
 }
 .ai-quick-chip {
     border: 1px solid #d8d4f7;
     background: #f4f2ff;
     color: #5a4fcf;
-    font-size: .7rem;
-    padding: .25rem .55rem;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.55rem;
     border-radius: 20px;
     cursor: pointer;
 }
-.ai-quick-chip:hover { background: #e8e4fb; }
+.ai-quick-chip:hover {
+    background: #e8e4fb;
+}
 
 .ai-chat-composer {
     display: flex;
-    gap: .4rem;
-    padding: .6rem .7rem;
+    gap: 0.4rem;
+    padding: 0.6rem 0.7rem;
     border-top: 1px solid #eee;
     background: #fff;
 }
-.ai-chat-composer textarea { resize: none; flex: 1; font-size: .82rem; }
-.ai-send-btn { align-self: flex-end; }
+.ai-chat-composer textarea {
+    resize: none;
+    flex: 1;
+    font-size: 0.82rem;
+}
+.ai-send-btn {
+    align-self: flex-end;
+}
 </style>

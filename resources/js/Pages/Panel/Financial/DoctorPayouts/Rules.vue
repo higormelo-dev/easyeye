@@ -1,17 +1,17 @@
 <script setup>
 import { computed, ref, useId } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout         from '@/Layouts/AppLayout.vue';
-import PageHeader        from '@/Components/Panel/PageHeader.vue';
-import TablePagination   from '@/Components/Panel/TablePagination.vue';
-import { useViewMode }   from '@/composables/useViewMode.js';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import { useViewMode } from '@/composables/useViewMode.js';
 import DeductionRatesCard from './DeductionRatesCard.vue';
-import FlashMessage      from './FlashMessage.vue';
-import PayoutTabs        from './PayoutTabs.vue';
-import RuleFormModal     from './RuleFormModal.vue';
-import RulesCards        from './RulesCards.vue';
+import FlashMessage from './FlashMessage.vue';
+import PayoutTabs from './PayoutTabs.vue';
+import RuleFormModal from './RuleFormModal.vue';
+import RulesCards from './RulesCards.vue';
 import RulesSettingsCard from './RulesSettingsCard.vue';
-import RulesTable        from './RulesTable.vue';
+import RulesTable from './RulesTable.vue';
 import { SERVICE_TYPES } from './ruleForm.js';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
@@ -22,20 +22,20 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * confirmação. Inclui a política "médicos veem os próprios repasses".
  */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    tabs:        { type: Object, default: () => ({}) },
-    rules:       { type: Object, required: true },             // paginator Laravel
-    filters:     { type: Object, default: () => ({}) },        // { doctor: '' | 'general' | uuid, service_type, status }
-    options:     { type: Object, default: () => ({}) },        // { doctors, visit_types, procedures, exam_types, covenants }
-    settings:    { type: Object, default: () => ({}) },        // { doctor_payouts_visible, can_manage }
-    routes:      { type: Object, required: true },             // { index, store, update, destroy, settings, deduction_rate_store, deduction_rate_destroy }
-    deduction_rates: { type: Array, default: () => [] },       // vigências das deduções (E4)
-    t:           { type: Object, default: () => ({}) },
-    shared:      { type: Object, default: () => ({}) },
+    breadcrumbs: { type: Array, default: () => [] },
+    tabs: { type: Object, default: () => ({}) },
+    rules: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) }, // { doctor: '' | 'general' | uuid, service_type, status }
+    options: { type: Object, default: () => ({}) }, // { doctors, visit_types, procedures, exam_types, covenants }
+    settings: { type: Object, default: () => ({}) }, // { doctor_payouts_visible, can_manage }
+    routes: { type: Object, required: true }, // { index, store, update, destroy, settings, deduction_rate_store, deduction_rate_destroy }
+    deduction_rates: { type: Array, default: () => [] }, // vigências das deduções (E4)
+    t: { type: Object, default: () => ({}) },
+    shared: { type: Object, default: () => ({}) },
 });
 
 const DOCTOR_GENERAL = 'general';
-const RULE_STATUSES  = ['active', 'inactive'];
+const RULE_STATUSES = ['active', 'inactive'];
 
 const { doctorLabel, serviceTypeLabel } = useDoctorPayoutFormat(() => props.t);
 const { view, setView } = useViewMode('doctor_payout_rules_view');
@@ -43,33 +43,53 @@ const { view, setView } = useViewMode('doctor_payout_rules_view');
 const uid = useId();
 const ids = {
     doctor: `dp-rules-doctor-${uid}`,
-    type:   `dp-rules-type-${uid}`,
+    type: `dp-rules-type-${uid}`,
     status: `dp-rules-status-${uid}`,
 };
 
-const rows       = computed(() => props.rules?.data ?? []);
+const rows = computed(() => props.rules?.data ?? []);
 const hasFilters = computed(() => !!(props.filters.doctor || props.filters.service_type || props.filters.status));
 
 function applyFilters(patch) {
-    router.get(props.routes.index, {
-        doctor:       props.filters.doctor ?? '',
-        service_type: props.filters.service_type ?? '',
-        status:       props.filters.status ?? '',
-        ...patch,
-    }, { preserveState: true, preserveScroll: true });
+    router.get(
+        props.routes.index,
+        {
+            doctor: props.filters.doctor ?? '',
+            service_type: props.filters.service_type ?? '',
+            status: props.filters.status ?? '',
+            ...patch,
+        },
+        { preserveState: true, preserveScroll: true },
+    );
 }
 
 // ── Painel criar/editar ─────────────────────────────────────────────────────
-const modalOpen   = ref(false);
+const modalOpen = ref(false);
 const editingRule = ref(null);
 // Duplicar: abre como NOVA regra com os campos de outra (várias cirurgias,
 // variações de OCT...).
 const templateRule = ref(null);
 
-function openCreate() { editingRule.value = null; templateRule.value = null; modalOpen.value = true; }
-function openEdit(rule) { editingRule.value = rule; templateRule.value = null; modalOpen.value = true; }
-function openDuplicate(rule) { editingRule.value = null; templateRule.value = rule; modalOpen.value = true; }
-function closeModal() { modalOpen.value = false; editingRule.value = null; templateRule.value = null; }
+function openCreate() {
+    editingRule.value = null;
+    templateRule.value = null;
+    modalOpen.value = true;
+}
+function openEdit(rule) {
+    editingRule.value = rule;
+    templateRule.value = null;
+    modalOpen.value = true;
+}
+function openDuplicate(rule) {
+    editingRule.value = null;
+    templateRule.value = rule;
+    modalOpen.value = true;
+}
+function closeModal() {
+    modalOpen.value = false;
+    editingRule.value = null;
+    templateRule.value = null;
+}
 
 // ── Exclusão (fechamentos antigos guardam a regra aplicada) ─────────────────
 function onDelete(rule) {
@@ -121,7 +141,9 @@ function onDelete(rule) {
                     >
                         <option value="">{{ t.filter_doctor_any }}</option>
                         <option :value="DOCTOR_GENERAL">{{ t.all_doctors }}</option>
-                        <option v-for="doctor in options.doctors ?? []" :key="doctor.id" :value="doctor.id">{{ doctorLabel(doctor) }}</option>
+                        <option v-for="doctor in options.doctors ?? []" :key="doctor.id" :value="doctor.id">
+                            {{ doctorLabel(doctor) }}
+                        </option>
                     </select>
                 </div>
                 <div class="rules__filter">
@@ -134,7 +156,9 @@ function onDelete(rule) {
                         @change="applyFilters({ service_type: $event.target.value })"
                     >
                         <option value="">{{ t.filter_service_type_all }}</option>
-                        <option v-for="type in SERVICE_TYPES" :key="type" :value="type">{{ serviceTypeLabel(type) }}</option>
+                        <option v-for="type in SERVICE_TYPES" :key="type" :value="type">
+                            {{ serviceTypeLabel(type) }}
+                        </option>
                     </select>
                 </div>
                 <div class="rules__filter">

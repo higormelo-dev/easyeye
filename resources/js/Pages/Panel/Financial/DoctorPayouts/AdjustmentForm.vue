@@ -9,18 +9,18 @@ import MoneyInput from '@/Components/Panel/MoneyInput.vue';
  * sinal vem do tipo (DoctorPayoutAdjustmentRequest::signedCents()).
  */
 const props = defineProps({
-    action: { type: String, required: true },   // routes.adjustments_store
-    t:      { type: Object, default: () => ({}) },
+    action: { type: String, required: true }, // routes.adjustments_store
+    t: { type: Object, default: () => ({}) },
 });
 
 const KINDS = ['credit', 'debit'];
 
 const uid = useId();
 const ids = {
-    hint:        `dp-adj-hint-${uid}`,
+    hint: `dp-adj-hint-${uid}`,
     description: `dp-adj-description-${uid}`,
-    kind:        `dp-adj-kind-${uid}`,
-    amount:      `dp-adj-amount-${uid}`,
+    kind: `dp-adj-kind-${uid}`,
+    amount: `dp-adj-amount-${uid}`,
 };
 
 const form = useForm({ description: '', kind: 'credit', amount: null });
@@ -62,8 +62,10 @@ function submit() {
                     :aria-describedby="describedBy('description')"
                     autocomplete="off"
                     data-test="adjustment-description"
-                >
-                <div v-if="form.errors.description" :id="`${ids.description}-error`" class="invalid-feedback d-block">{{ form.errors.description }}</div>
+                />
+                <div v-if="form.errors.description" :id="`${ids.description}-error`" class="invalid-feedback d-block">
+                    {{ form.errors.description }}
+                </div>
             </div>
             <div class="col-6 col-md-3">
                 <label :for="ids.kind" class="form-label small mb-1">{{ t.adjustment_kind }}</label>
@@ -78,7 +80,9 @@ function submit() {
                 >
                     <option v-for="kind in KINDS" :key="kind" :value="kind">{{ kindLabel(kind) }}</option>
                 </select>
-                <div v-if="form.errors.kind" :id="`${ids.kind}-error`" class="invalid-feedback d-block">{{ form.errors.kind }}</div>
+                <div v-if="form.errors.kind" :id="`${ids.kind}-error`" class="invalid-feedback d-block">
+                    {{ form.errors.kind }}
+                </div>
             </div>
             <div class="col-6 col-md-2">
                 <label :for="ids.amount" class="form-label small mb-1">{{ t.adjustment_amount }}</label>
@@ -89,11 +93,22 @@ function submit() {
                     :aria-describedby="form.errors.amount ? `${ids.amount}-error` : undefined"
                     data-test="adjustment-amount-input"
                 />
-                <div v-if="form.errors.amount" :id="`${ids.amount}-error`" class="invalid-feedback d-block">{{ form.errors.amount }}</div>
+                <div v-if="form.errors.amount" :id="`${ids.amount}-error`" class="invalid-feedback d-block">
+                    {{ form.errors.amount }}
+                </div>
             </div>
             <div class="col-12 col-md-2 d-grid adjustment-form__submit">
-                <button type="submit" class="btn btn-outline-primary btn-sm" :disabled="form.processing" data-test="adjustment-submit">
-                    <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                <button
+                    type="submit"
+                    class="btn btn-outline-primary btn-sm"
+                    :disabled="form.processing"
+                    data-test="adjustment-submit"
+                >
+                    <span
+                        v-if="form.processing"
+                        class="spinner-border spinner-border-sm me-1"
+                        aria-hidden="true"
+                    ></span>
                     <i v-else class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.adjustment_add }}
                 </button>
             </div>

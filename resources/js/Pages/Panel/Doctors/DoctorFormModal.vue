@@ -5,20 +5,20 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    open:           { type: Boolean, required: true },
-    doctorId:       { type: String,  default: null },
-    genders:        { type: Object,  default: () => ({}) },
-    maritalStatuses:{ type: Object,  default: () => ({}) },
-    statesOfBrazil: { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    doctorId: { type: String, default: null },
+    genders: { type: Object, default: () => ({}) },
+    maritalStatuses: { type: Object, default: () => ({}) },
+    statesOfBrazil: { type: Object, default: () => ({}) },
     // Traduções de lang/<locale>/doctors.php (usa só a seção `invitation` aqui).
-    t:              { type: Object,  default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const inviteT = computed(() => props.t?.invitation ?? {});
 
-const emit    = defineEmits(['close']);
-const isEdit  = computed(() => !!props.doctorId);
-const title   = computed(() => isEdit.value ? 'Editar Médico' : 'Novo Médico');
+const emit = defineEmits(['close']);
+const isEdit = computed(() => !!props.doctorId);
+const title = computed(() => (isEdit.value ? 'Editar Médico' : 'Novo Médico'));
 const loading = ref(false);
 const activeTab = ref('personal');
 const showPassword = ref(false);
@@ -26,37 +26,37 @@ const showPasswordConfirmation = ref(false);
 
 const form = useForm({
     // Pessoal
-    name:              '',
-    nickname:          '',
+    name: '',
+    nickname: '',
     national_registry: '',
-    birth_date:        '',
-    gender:            '',
-    marital_status:    '',
-    email:             '',
-    mother_name:       '',
-    father_name:       '',
+    birth_date: '',
+    gender: '',
+    marital_status: '',
+    email: '',
+    mother_name: '',
+    father_name: '',
     // Médico
-    record:           '',
+    record: '',
     record_specialty: '',
-    cbo_code:         '',
-    color:            '#3699ff',
-    observation:      '',
-    partner:          false,
-    active:           true,
+    cbo_code: '',
+    color: '#3699ff',
+    observation: '',
+    partner: false,
+    active: true,
     // Contato + Endereço
     telephone: '',
     cellphone: '',
-    whatsapp:  false,
-    zipcode:   '',
-    address:   '',
-    number:    '',
-    complement:'',
-    district:  '',
-    city:      '',
-    state:     '',
+    whatsapp: false,
+    zipcode: '',
+    address: '',
+    number: '',
+    complement: '',
+    district: '',
+    city: '',
+    state: '',
     // Acesso (somente criação)
-    password:             '',
-    password_confirmation:'',
+    password: '',
+    password_confirmation: '',
 });
 
 function resetForm() {
@@ -72,9 +72,9 @@ function resetForm() {
 async function loadEditData(id) {
     loading.value = true;
     try {
-        const res  = await fetch(route('panel.doctors.editData', id));
+        const res = await fetch(route('panel.doctors.editData', id));
         const json = await res.json();
-        const d    = json.data;
+        const d = json.data;
         Object.keys(form).forEach((key) => {
             if (key in d) form[key] = d[key] ?? form[key];
         });
@@ -83,11 +83,14 @@ async function loadEditData(id) {
     }
 }
 
-watch(() => props.open, async (val) => {
-    if (!val) return;
-    resetForm();
-    if (props.doctorId) await loadEditData(props.doctorId);
-});
+watch(
+    () => props.open,
+    async (val) => {
+        if (!val) return;
+        resetForm();
+        if (props.doctorId) await loadEditData(props.doctorId);
+    },
+);
 
 // Médico que já tem login no EasyEye (outra clínica): o servidor não cadastra
 // e devolve `existing_doctor` — a clínica pode enviar um convite, que vai ao
@@ -115,83 +118,103 @@ async function lookupCep() {
     if (cep.length !== 8) return;
     try {
         const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-        const d   = await res.json();
+        const d = await res.json();
         if (!d.erro) {
-            form.address  = d.logradouro ?? form.address;
-            form.district = d.bairro     ?? form.district;
-            form.city     = d.localidade ?? form.city;
-            form.state    = d.uf         ?? form.state;
+            form.address = d.logradouro ?? form.address;
+            form.district = d.bairro ?? form.district;
+            form.city = d.localidade ?? form.city;
+            form.state = d.uf ?? form.state;
         }
-    } catch { /**/ }
+    } catch {
+        /**/
+    }
 }
 
-const genderOptions = computed(() =>
-    Object.entries(props.genders).map(([v, l]) => ({ value: Number(v), label: l })),
-);
+const genderOptions = computed(() => Object.entries(props.genders).map(([v, l]) => ({ value: Number(v), label: l })));
 const maritalOptions = computed(() =>
     Object.entries(props.maritalStatuses).map(([v, l]) => ({ value: Number(v), label: l })),
 );
-const stateOptions = computed(() =>
-    Object.entries(props.statesOfBrazil).map(([v]) => ({ value: v, label: v })),
-);
+const stateOptions = computed(() => Object.entries(props.statesOfBrazil).map(([v]) => ({ value: v, label: v })));
 
 const tabErrors = computed(() => ({
-    personal: ['name','nickname','national_registry','birth_date','gender','marital_status','email','mother_name','father_name'].some(k => k in form.errors),
-    doctor:   ['record','record_specialty','cbo_code','color','observation'].some(k => k in form.errors),
-    contact:  ['telephone','cellphone','whatsapp','zipcode','address','number','complement','district','city','state'].some(k => k in form.errors),
-    auth:     ['password','password_confirmation'].some(k => k in form.errors),
+    personal: [
+        'name',
+        'nickname',
+        'national_registry',
+        'birth_date',
+        'gender',
+        'marital_status',
+        'email',
+        'mother_name',
+        'father_name',
+    ].some((k) => k in form.errors),
+    doctor: ['record', 'record_specialty', 'cbo_code', 'color', 'observation'].some((k) => k in form.errors),
+    contact: [
+        'telephone',
+        'cellphone',
+        'whatsapp',
+        'zipcode',
+        'address',
+        'number',
+        'complement',
+        'district',
+        'city',
+        'state',
+    ].some((k) => k in form.errors),
+    auth: ['password', 'password_confirmation'].some((k) => k in form.errors),
 }));
 </script>
 
 <template>
-    <OffcanvasPanel
-        :open="open"
-        :width="580"
-        :loading="loading"
-        @close="emit('close')"
-    >
+    <OffcanvasPanel :open="open" :width="580" :loading="loading" @close="emit('close')">
         <!-- ── Cabeçalho ─────────────────────────────────────────────────────── -->
         <template #header>
-            <h5 class="mb-0 fw-semibold">
-                <i class="ti ti-stethoscope me-2 text-primary"></i>{{ title }}
-            </h5>
+            <h5 class="mb-0 fw-semibold"><i class="ti ti-stethoscope me-2 text-primary"></i>{{ title }}</h5>
         </template>
 
         <!-- ── Abas ──────────────────────────────────────────────────────────── -->
         <template #tabs>
             <ul class="nav nav-tabs border-0">
                 <li class="nav-item">
-                    <button type="button"
-                            class="nav-link"
-                            :class="{ active: activeTab === 'personal', 'text-danger': tabErrors.personal }"
-                            @click="activeTab = 'personal'">
+                    <button
+                        type="button"
+                        class="nav-link"
+                        :class="{ active: activeTab === 'personal', 'text-danger': tabErrors.personal }"
+                        @click="activeTab = 'personal'"
+                    >
                         <i class="ti ti-user me-1"></i>Pessoal
                         <i v-if="tabErrors.personal" class="ti ti-alert-circle text-danger ms-1"></i>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button type="button"
-                            class="nav-link"
-                            :class="{ active: activeTab === 'doctor', 'text-danger': tabErrors.doctor }"
-                            @click="activeTab = 'doctor'">
+                    <button
+                        type="button"
+                        class="nav-link"
+                        :class="{ active: activeTab === 'doctor', 'text-danger': tabErrors.doctor }"
+                        @click="activeTab = 'doctor'"
+                    >
                         <i class="ti ti-stethoscope me-1"></i>Médico
                         <i v-if="tabErrors.doctor" class="ti ti-alert-circle text-danger ms-1"></i>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button type="button"
-                            class="nav-link"
-                            :class="{ active: activeTab === 'contact', 'text-danger': tabErrors.contact }"
-                            @click="activeTab = 'contact'">
+                    <button
+                        type="button"
+                        class="nav-link"
+                        :class="{ active: activeTab === 'contact', 'text-danger': tabErrors.contact }"
+                        @click="activeTab = 'contact'"
+                    >
                         <i class="ti ti-phone me-1"></i>Contato
                         <i v-if="tabErrors.contact" class="ti ti-alert-circle text-danger ms-1"></i>
                     </button>
                 </li>
                 <li v-if="!isEdit" class="nav-item">
-                    <button type="button"
-                            class="nav-link"
-                            :class="{ active: activeTab === 'auth', 'text-danger': tabErrors.auth }"
-                            @click="activeTab = 'auth'">
+                    <button
+                        type="button"
+                        class="nav-link"
+                        :class="{ active: activeTab === 'auth', 'text-danger': tabErrors.auth }"
+                        @click="activeTab = 'auth'"
+                    >
                         <i class="ti ti-lock me-1"></i>Acesso
                         <i v-if="tabErrors.auth" class="ti ti-alert-circle text-danger ms-1"></i>
                     </button>
@@ -200,90 +223,114 @@ const tabErrors = computed(() => ({
         </template>
 
         <!-- ── Corpo ─────────────────────────────────────────────────────────── -->
-        <div v-if="existingDoctor && !isEdit" class="alert alert-info d-flex flex-column gap-2" role="status" aria-live="polite">
+        <div
+            v-if="existingDoctor && !isEdit"
+            class="alert alert-info d-flex flex-column gap-2"
+            role="status"
+            aria-live="polite"
+        >
             <div><i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ existingDoctor }}</div>
             <div>
-                <button type="button"
-                        class="btn btn-primary btn-sm"
-                        :disabled="form.processing"
-                        @click="sendInvitation">
-                    <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    :disabled="form.processing"
+                    @click="sendInvitation"
+                >
+                    <span
+                        v-if="form.processing"
+                        class="spinner-border spinner-border-sm me-1"
+                        aria-hidden="true"
+                    ></span>
                     <i v-else class="ti ti-send me-1" aria-hidden="true"></i>{{ inviteT.send_button }}
                 </button>
             </div>
         </div>
 
         <form @submit.prevent="submit">
-
             <!-- TAB: Pessoal -->
             <div v-show="activeTab === 'personal'">
                 <div class="mb-3">
                     <label class="form-label">Nome completo <span class="text-danger">*</span></label>
-                    <input v-model="form.name"
-                           type="text"
-                           class="form-control"
-                           :class="{ 'is-invalid': form.errors.name }">
+                    <input
+                        v-model="form.name"
+                        type="text"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.name }"
+                    />
                     <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Apelido <span class="text-danger">*</span></label>
-                    <input v-model="form.nickname"
-                           type="text"
-                           class="form-control"
-                           :class="{ 'is-invalid': form.errors.nickname }">
+                    <input
+                        v-model="form.nickname"
+                        type="text"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.nickname }"
+                    />
                     <div v-if="form.errors.nickname" class="invalid-feedback">{{ form.errors.nickname }}</div>
                 </div>
 
                 <div class="row g-3 mb-3">
                     <div class="col-6">
                         <label class="form-label">Data de nascimento</label>
-                        <input v-model="form.birth_date" type="date" class="form-control">
+                        <input v-model="form.birth_date" type="date" class="form-control" />
                     </div>
                     <div class="col-6">
                         <label class="form-label">Gênero</label>
-                        <SearchSelect v-model="form.gender"
-                                      :options="genderOptions"
-                                      :value-key="'value'"
-                                      :label-key="'label'"
-                                      :placeholder="'Selecione'" />
+                        <SearchSelect
+                            v-model="form.gender"
+                            :options="genderOptions"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :placeholder="'Selecione'"
+                        />
                     </div>
                 </div>
 
                 <div class="row g-3 mb-3">
                     <div class="col-6">
                         <label class="form-label">CPF <span class="text-danger">*</span></label>
-                        <input v-model="form.national_registry"
-                               v-mask="'cpf'"
-                               type="text"
-                               inputmode="numeric"
-                               class="form-control"
-                               placeholder="000.000.000-00"
-                               :class="{ 'is-invalid': form.errors.national_registry }">
-                        <div v-if="form.errors.national_registry" class="invalid-feedback">{{ form.errors.national_registry }}</div>
+                        <input
+                            v-model="form.national_registry"
+                            v-mask="'cpf'"
+                            type="text"
+                            inputmode="numeric"
+                            class="form-control"
+                            placeholder="000.000.000-00"
+                            :class="{ 'is-invalid': form.errors.national_registry }"
+                        />
+                        <div v-if="form.errors.national_registry" class="invalid-feedback">
+                            {{ form.errors.national_registry }}
+                        </div>
                     </div>
                     <div class="col-6">
                         <label class="form-label">Estado civil</label>
-                        <SearchSelect v-model="form.marital_status"
-                                      :options="maritalOptions"
-                                      :value-key="'value'"
-                                      :label-key="'label'"
-                                      :placeholder="'Selecione'" />
+                        <SearchSelect
+                            v-model="form.marital_status"
+                            :options="maritalOptions"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :placeholder="'Selecione'"
+                        />
                     </div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">E-mail <span class="text-danger">*</span></label>
-                    <input v-model="form.email"
-                           type="email"
-                           class="form-control"
-                           :class="{ 'is-invalid': form.errors.email }">
+                    <input
+                        v-model="form.email"
+                        type="email"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.email }"
+                    />
                     <div v-if="form.errors.email" class="invalid-feedback">{{ form.errors.email }}</div>
                 </div>
 
                 <div v-if="isEdit" class="mb-3">
                     <div class="form-check form-switch">
-                        <input id="drActive" v-model="form.active" class="form-check-input" type="checkbox">
+                        <input id="drActive" v-model="form.active" class="form-check-input" type="checkbox" />
                         <label class="form-check-label" for="drActive">Médico ativo</label>
                     </div>
                 </div>
@@ -294,59 +341,76 @@ const tabErrors = computed(() => ({
                 <div class="row g-3 mb-3">
                     <div class="col-6">
                         <label class="form-label">CRM <span class="text-danger">*</span></label>
-                        <input v-model="form.record"
-                               type="text"
-                               class="form-control"
-                               :class="{ 'is-invalid': form.errors.record }">
+                        <input
+                            v-model="form.record"
+                            type="text"
+                            class="form-control"
+                            :class="{ 'is-invalid': form.errors.record }"
+                        />
                         <div v-if="form.errors.record" class="invalid-feedback">{{ form.errors.record }}</div>
                     </div>
                     <div class="col-6">
                         <label class="form-label">Especialidade <span class="text-danger">*</span></label>
-                        <input v-model="form.record_specialty"
-                               type="text"
-                               class="form-control"
-                               :class="{ 'is-invalid': form.errors.record_specialty }">
-                        <div v-if="form.errors.record_specialty" class="invalid-feedback">{{ form.errors.record_specialty }}</div>
+                        <input
+                            v-model="form.record_specialty"
+                            type="text"
+                            class="form-control"
+                            :class="{ 'is-invalid': form.errors.record_specialty }"
+                        />
+                        <div v-if="form.errors.record_specialty" class="invalid-feedback">
+                            {{ form.errors.record_specialty }}
+                        </div>
                     </div>
                     <div class="col-6">
                         <label class="form-label">CBO</label>
-                        <input v-model="form.cbo_code"
-                               type="text"
-                               maxlength="10"
-                               placeholder="225265"
-                               class="form-control"
-                               :class="{ 'is-invalid': form.errors.cbo_code }">
+                        <input
+                            v-model="form.cbo_code"
+                            type="text"
+                            maxlength="10"
+                            placeholder="225265"
+                            class="form-control"
+                            :class="{ 'is-invalid': form.errors.cbo_code }"
+                        />
                         <div v-if="form.errors.cbo_code" class="invalid-feedback">{{ form.errors.cbo_code }}</div>
-                        <small class="text-muted">Classificação Brasileira de Ocupações — 225265 = Médico oftalmologista. Exigido pelo XML TISS.</small>
+                        <small class="text-muted"
+                            >Classificação Brasileira de Ocupações — 225265 = Médico oftalmologista. Exigido pelo XML
+                            TISS.</small
+                        >
                     </div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">
                         Cor na agenda <span class="text-danger">*</span>
-                        <span class="ms-2 rounded-circle d-inline-block border"
-                              :style="{ background: form.color, width: '16px', height: '16px', verticalAlign: 'middle' }">
+                        <span
+                            class="ms-2 rounded-circle d-inline-block border"
+                            :style="{ background: form.color, width: '16px', height: '16px', verticalAlign: 'middle' }"
+                        >
                         </span>
                     </label>
-                    <input v-model="form.color"
-                           type="color"
-                           class="form-control form-control-color"
-                           style="height:38px;"
-                           :class="{ 'is-invalid': form.errors.color }">
+                    <input
+                        v-model="form.color"
+                        type="color"
+                        class="form-control form-control-color"
+                        style="height: 38px"
+                        :class="{ 'is-invalid': form.errors.color }"
+                    />
                     <div v-if="form.errors.color" class="invalid-feedback">{{ form.errors.color }}</div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Observações</label>
-                    <textarea v-model="form.observation"
-                              class="form-control"
-                              rows="3"
-                              placeholder="Informações adicionais sobre o médico...">
+                    <textarea
+                        v-model="form.observation"
+                        class="form-control"
+                        rows="3"
+                        placeholder="Informações adicionais sobre o médico..."
+                    >
                     </textarea>
                 </div>
 
                 <div class="form-check mb-3">
-                    <input id="drPartner" v-model="form.partner" class="form-check-input" type="checkbox">
+                    <input id="drPartner" v-model="form.partner" class="form-check-input" type="checkbox" />
                     <label class="form-check-label" for="drPartner">Médico parceiro</label>
                 </div>
             </div>
@@ -356,33 +420,49 @@ const tabErrors = computed(() => ({
                 <div class="row g-3 mb-3">
                     <div class="col-6">
                         <label class="form-label">Celular</label>
-                        <input v-model="form.cellphone" v-mask="'phone'" type="text" inputmode="numeric" class="form-control" placeholder="(00) 00000-0000">
+                        <input
+                            v-model="form.cellphone"
+                            v-mask="'phone'"
+                            type="text"
+                            inputmode="numeric"
+                            class="form-control"
+                            placeholder="(00) 00000-0000"
+                        />
                     </div>
                     <div class="col-6">
                         <label class="form-label">Telefone</label>
-                        <input v-model="form.telephone" v-mask="'phone'" type="text" inputmode="numeric" class="form-control" placeholder="(00) 0000-0000">
+                        <input
+                            v-model="form.telephone"
+                            v-mask="'phone'"
+                            type="text"
+                            inputmode="numeric"
+                            class="form-control"
+                            placeholder="(00) 0000-0000"
+                        />
                     </div>
                 </div>
 
                 <div class="form-check mb-3">
-                    <input id="drWhatsapp" v-model="form.whatsapp" class="form-check-input" type="checkbox">
+                    <input id="drWhatsapp" v-model="form.whatsapp" class="form-check-input" type="checkbox" />
                     <label class="form-check-label" for="drWhatsapp">
                         <i class="fab fa-whatsapp text-success me-1"></i>Celular tem WhatsApp
                     </label>
                 </div>
 
-                <hr class="my-3">
+                <hr class="my-3" />
 
                 <div class="mb-3">
                     <label class="form-label">CEP</label>
                     <div class="input-group">
-                        <input v-model="form.zipcode"
-                               v-mask="'cep'"
-                               type="text"
-                               inputmode="numeric"
-                               class="form-control"
-                               placeholder="00000-000"
-                               @blur="lookupCep">
+                        <input
+                            v-model="form.zipcode"
+                            v-mask="'cep'"
+                            type="text"
+                            inputmode="numeric"
+                            class="form-control"
+                            placeholder="00000-000"
+                            @blur="lookupCep"
+                        />
                         <button type="button" class="btn btn-outline-secondary" @click="lookupCep">
                             <i class="ti ti-search"></i>
                         </button>
@@ -391,37 +471,39 @@ const tabErrors = computed(() => ({
 
                 <div class="mb-3">
                     <label class="form-label">Logradouro</label>
-                    <input v-model="form.address" type="text" class="form-control">
+                    <input v-model="form.address" type="text" class="form-control" />
                 </div>
 
                 <div class="row g-3 mb-3">
                     <div class="col-4">
                         <label class="form-label">Número</label>
-                        <input v-model="form.number" type="text" class="form-control">
+                        <input v-model="form.number" type="text" class="form-control" />
                     </div>
                     <div class="col-8">
                         <label class="form-label">Complemento</label>
-                        <input v-model="form.complement" type="text" class="form-control">
+                        <input v-model="form.complement" type="text" class="form-control" />
                     </div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Bairro</label>
-                    <input v-model="form.district" type="text" class="form-control">
+                    <input v-model="form.district" type="text" class="form-control" />
                 </div>
 
                 <div class="row g-3 mb-3">
                     <div class="col-8">
                         <label class="form-label">Cidade</label>
-                        <input v-model="form.city" type="text" class="form-control">
+                        <input v-model="form.city" type="text" class="form-control" />
                     </div>
                     <div class="col-4">
                         <label class="form-label">UF</label>
-                        <SearchSelect v-model="form.state"
-                                      :options="stateOptions"
-                                      :value-key="'value'"
-                                      :label-key="'label'"
-                                      :placeholder="'—'" />
+                        <SearchSelect
+                            v-model="form.state"
+                            :options="stateOptions"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :placeholder="'—'"
+                        />
                     </div>
                 </div>
             </div>
@@ -436,54 +518,65 @@ const tabErrors = computed(() => ({
                 <div class="mb-3">
                     <label class="form-label">Senha <span class="text-danger">*</span></label>
                     <div class="input-group">
-                        <input v-model="form.password"
-                               :type="showPassword ? 'text' : 'password'"
-                               class="form-control"
-                               autocomplete="new-password"
-                               :class="{ 'is-invalid': form.errors.password }">
-                        <button type="button" class="btn btn-outline-secondary" tabindex="-1"
-                                :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
-                                :aria-pressed="showPassword"
-                                @click="showPassword = !showPassword">
+                        <input
+                            v-model="form.password"
+                            :type="showPassword ? 'text' : 'password'"
+                            class="form-control"
+                            autocomplete="new-password"
+                            :class="{ 'is-invalid': form.errors.password }"
+                        />
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary"
+                            tabindex="-1"
+                            :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
+                            :aria-pressed="showPassword"
+                            @click="showPassword = !showPassword"
+                        >
                             <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                         </button>
                     </div>
                     <div v-if="form.errors.password" class="invalid-feedback d-block">{{ form.errors.password }}</div>
-                    <div class="form-text">Mínimo 8 caracteres com letras maiúsculas, minúsculas, números e símbolos.</div>
+                    <div class="form-text">
+                        Mínimo 8 caracteres com letras maiúsculas, minúsculas, números e símbolos.
+                    </div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Confirmar senha <span class="text-danger">*</span></label>
                     <div class="input-group">
-                        <input v-model="form.password_confirmation"
-                               :type="showPasswordConfirmation ? 'text' : 'password'"
-                               class="form-control"
-                               autocomplete="new-password"
-                               :class="{ 'is-invalid': form.errors.password_confirmation }">
-                        <button type="button" class="btn btn-outline-secondary" tabindex="-1"
-                                :aria-label="showPasswordConfirmation ? 'Ocultar senha' : 'Mostrar senha'"
-                                :aria-pressed="showPasswordConfirmation"
-                                @click="showPasswordConfirmation = !showPasswordConfirmation">
+                        <input
+                            v-model="form.password_confirmation"
+                            :type="showPasswordConfirmation ? 'text' : 'password'"
+                            class="form-control"
+                            autocomplete="new-password"
+                            :class="{ 'is-invalid': form.errors.password_confirmation }"
+                        />
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary"
+                            tabindex="-1"
+                            :aria-label="showPasswordConfirmation ? 'Ocultar senha' : 'Mostrar senha'"
+                            :aria-pressed="showPasswordConfirmation"
+                            @click="showPasswordConfirmation = !showPasswordConfirmation"
+                        >
                             <i :class="showPasswordConfirmation ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                         </button>
                     </div>
-                    <div v-if="form.errors.password_confirmation" class="invalid-feedback d-block">{{ form.errors.password_confirmation }}</div>
+                    <div v-if="form.errors.password_confirmation" class="invalid-feedback d-block">
+                        {{ form.errors.password_confirmation }}
+                    </div>
                 </div>
             </div>
-
         </form>
 
         <!-- ── Rodapé ─────────────────────────────────────────────────────────── -->
         <template #footer>
             <button type="button" class="btn btn-light" @click="emit('close')">Cancelar</button>
-            <button type="button"
-                    class="btn btn-primary px-4"
-                    :disabled="form.processing"
-                    @click="submit">
+            <button type="button" class="btn btn-primary px-4" :disabled="form.processing" @click="submit">
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                 {{ isEdit ? 'Salvar alterações' : 'Cadastrar médico' }}
             </button>
         </template>
-
     </OffcanvasPanel>
 </template>

@@ -91,9 +91,11 @@ export function tablePriceInfo(schedules) {
 /** Símbolo da moeda no idioma do usuário (ex.: 'R$'), para o prefixo dos campos de valor. */
 export function currencySymbol(locale, currency = 'BRL') {
     try {
-        return new Intl.NumberFormat(locale, { style: 'currency', currency })
-            .formatToParts(0)
-            .find((part) => part.type === 'currency')?.value ?? currency;
+        return (
+            new Intl.NumberFormat(locale, { style: 'currency', currency })
+                .formatToParts(0)
+                .find((part) => part.type === 'currency')?.value ?? currency
+        );
     } catch {
         return currency;
     }

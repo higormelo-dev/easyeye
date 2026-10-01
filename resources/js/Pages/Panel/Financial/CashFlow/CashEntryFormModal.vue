@@ -23,40 +23,50 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
  * 429/500, falha de rede).
  */
 const props = defineProps({
-    open:            { type: Boolean, required: true },
-    entry:           { type: Object,  default: null }, // linha da listagem (edição) ou null (novo)
-    categories:      { type: Array,   default: () => [] },
-    covenants:       { type: Array,   default: () => [] },
-    paymentMethods:  { type: Array,   default: () => [] }, // [{ value, label }]
-    today:           { type: String,  default: '' },   // Y-m-d no fuso da clínica (servidor)
+    open: { type: Boolean, required: true },
+    entry: { type: Object, default: null }, // linha da listagem (edição) ou null (novo)
+    categories: { type: Array, default: () => [] },
+    covenants: { type: Array, default: () => [] },
+    paymentMethods: { type: Array, default: () => [] }, // [{ value, label }]
+    today: { type: String, default: '' }, // Y-m-d no fuso da clínica (servidor)
     canEditSchedule: { type: Boolean, default: false },
-    t:               { type: Object,  default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 /** Campos exibidos no formulário: erro de outra chave vira alerta geral. */
-const FORM_FIELDS = ['type', 'amount', 'description', 'entry_date', 'payment_method', 'category_id', 'status', 'covenant_id', 'notes'];
+const FORM_FIELDS = [
+    'type',
+    'amount',
+    'description',
+    'entry_date',
+    'payment_method',
+    'category_id',
+    'status',
+    'covenant_id',
+    'notes',
+];
 
 const uid = useId();
 const ids = {
-    form:          `cash-entry-form-${uid}`,
-    title:         `cash-entry-title-${uid}`,
-    type:          `cash-entry-type-${uid}`,
-    amount:        `cash-entry-amount-${uid}`,
-    amountError:   `cash-entry-amount-error-${uid}`,
-    scheduleLock:  `cash-entry-schedule-lock-${uid}`,
-    description:   `cash-entry-description-${uid}`,
-    date:          `cash-entry-date-${uid}`,
+    form: `cash-entry-form-${uid}`,
+    title: `cash-entry-title-${uid}`,
+    type: `cash-entry-type-${uid}`,
+    amount: `cash-entry-amount-${uid}`,
+    amountError: `cash-entry-amount-error-${uid}`,
+    scheduleLock: `cash-entry-schedule-lock-${uid}`,
+    description: `cash-entry-description-${uid}`,
+    date: `cash-entry-date-${uid}`,
     paymentMethod: `cash-entry-payment-method-${uid}`,
-    paymentError:  `cash-entry-payment-method-error-${uid}`,
-    category:      `cash-entry-category-${uid}`,
-    status:        `cash-entry-status-${uid}`,
-    covenant:      `cash-entry-covenant-${uid}`,
-    notes:         `cash-entry-notes-${uid}`,
+    paymentError: `cash-entry-payment-method-error-${uid}`,
+    category: `cash-entry-category-${uid}`,
+    status: `cash-entry-status-${uid}`,
+    covenant: `cash-entry-covenant-${uid}`,
+    notes: `cash-entry-notes-${uid}`,
 };
 
-const isEdit   = computed(() => !!props.entry?.id);
+const isEdit = computed(() => !!props.entry?.id);
 const isLocked = computed(() => !!props.entry?.lock_reason);
 const lockHint = computed(() => {
     if (props.entry?.lock_reason === 'billing_claim') return props.t.lock_billing_claim_hint;
@@ -68,16 +78,18 @@ const lockHint = computed(() => {
 
 /** Recebimento da agenda com dinheiro + cartão: valor e forma só pela agenda. */
 const isScheduleSplit = computed(() => isEdit.value && props.entry?.origin === 'schedule' && !!props.entry?.has_split);
-const scheduleHref    = computed(() => route('panel.schedules.index', {
-    date: props.entry?.schedule_date || props.entry?.entry_date,
-}));
+const scheduleHref = computed(() =>
+    route('panel.schedules.index', {
+        date: props.entry?.schedule_date || props.entry?.entry_date,
+    }),
+);
 
-const saving            = ref(false);
-const errors            = ref({});
-const generalError      = ref('');
+const saving = ref(false);
+const errors = ref({});
+const generalError = ref('');
 const confirmingDiscard = ref(false);
-const initialSnapshot   = ref('');
-const formEl            = ref(null);
+const initialSnapshot = ref('');
+const formEl = ref(null);
 
 /** "Hoje" local: toISOString() é UTC e depois das 21h (UTC-3) já é amanhã. */
 function localToday() {
@@ -96,7 +108,12 @@ function localToday() {
  * lançamento em ONTEM sem aviso (a prop só muda numa visita completa).
  */
 let serverTodaySeenOn = localToday();
-watch(() => props.today, () => { serverTodaySeenOn = localToday(); });
+watch(
+    () => props.today,
+    () => {
+        serverTodaySeenOn = localToday();
+    },
+);
 
 function defaultEntryDate() {
     const local = localToday();
@@ -107,29 +124,29 @@ function defaultEntryDate() {
 /** Formulário em branco; `keep` carrega tipo/data/forma do lançamento anterior. */
 function blankForm(keep = {}) {
     return {
-        type:           keep.type ?? 'income',
-        amount:         null,
-        description:    '',
-        entry_date:     keep.entry_date ?? defaultEntryDate(),
+        type: keep.type ?? 'income',
+        amount: null,
+        description: '',
+        entry_date: keep.entry_date ?? defaultEntryDate(),
         payment_method: keep.payment_method ?? '',
-        category_id:    '',
-        status:         'paid',
-        covenant_id:    '',
-        notes:          '',
+        category_id: '',
+        status: 'paid',
+        covenant_id: '',
+        notes: '',
     };
 }
 
 function formFromEntry(entry) {
     return {
-        type:           entry.type ?? 'income',
-        amount:         entry.amount ?? null,
-        description:    entry.description ?? '',
-        entry_date:     entry.entry_date || defaultEntryDate(),
+        type: entry.type ?? 'income',
+        amount: entry.amount ?? null,
+        description: entry.description ?? '',
+        entry_date: entry.entry_date || defaultEntryDate(),
         payment_method: entry.payment_method ?? '',
-        category_id:    entry.category_id ?? '',
-        status:         entry.status ?? 'paid',
-        covenant_id:    entry.covenant_id ?? '',
-        notes:          entry.notes ?? '',
+        category_id: entry.category_id ?? '',
+        status: entry.status ?? 'paid',
+        covenant_id: entry.covenant_id ?? '',
+        notes: entry.notes ?? '',
     };
 }
 
@@ -138,11 +155,11 @@ const form = ref(blankForm());
 const isDirty = computed(() => JSON.stringify(form.value) !== initialSnapshot.value);
 
 function resetState(values) {
-    form.value              = values;
-    errors.value            = {};
-    generalError.value      = '';
+    form.value = values;
+    errors.value = {};
+    generalError.value = '';
     confirmingDiscard.value = false;
-    initialSnapshot.value   = JSON.stringify(values);
+    initialSnapshot.value = JSON.stringify(values);
 }
 
 // ── Foco: primeiro campo (tipo) ao abrir; valor no "lançar outro" ───────────
@@ -167,34 +184,40 @@ function onKeydown(event) {
     requestClose();
 }
 
-watch(() => props.open, async (isOpen) => {
-    // immediate: roda também no render SSR, onde não há `document`.
-    if (typeof document === 'undefined') return;
+watch(
+    () => props.open,
+    async (isOpen) => {
+        // immediate: roda também no render SSR, onde não há `document`.
+        if (typeof document === 'undefined') return;
 
-    if (!isOpen) {
-        document.removeEventListener('keydown', onKeydown);
+        if (!isOpen) {
+            document.removeEventListener('keydown', onKeydown);
 
-        return;
-    }
+            return;
+        }
 
-    resetState(props.entry ? formFromEntry(props.entry) : blankForm());
-    document.addEventListener('keydown', onKeydown);
-    await nextTick();
-    focusFirstField();
-}, { immediate: true });
+        resetState(props.entry ? formFromEntry(props.entry) : blankForm());
+        document.addEventListener('keydown', onKeydown);
+        await nextTick();
+        focusFirstField();
+    },
+    { immediate: true },
+);
 
 onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 
 // ── Opções ──────────────────────────────────────────────────────────────────
 const typeOptions = computed(() => [
-    { value: 'income',  label: props.t.types?.income ?? 'income',   icon: 'ti ti-arrow-down-left' },
+    { value: 'income', label: props.t.types?.income ?? 'income', icon: 'ti ti-arrow-down-left' },
     { value: 'expense', label: props.t.types?.expense ?? 'expense', icon: 'ti ti-arrow-up-right' },
 ]);
 
-const statusOptions = computed(() => ['pending', 'paid', 'cancelled'].map((value) => ({
-    value,
-    label: props.t.statuses?.[value] ?? value,
-})));
+const statusOptions = computed(() =>
+    ['pending', 'paid', 'cancelled'].map((value) => ({
+        value,
+        label: props.t.statuses?.[value] ?? value,
+    })),
+);
 
 /**
  * Mantém visível a opção já gravada que saiu da lista (categoria/convênio
@@ -206,17 +229,21 @@ function withCurrentOption(options, id, name) {
     return [...options, { id, name: name || '—' }];
 }
 
-const filteredCategories = computed(() => withCurrentOption(
-    props.categories.filter((c) => !form.value.type || c.type === form.value.type),
-    form.value.category_id,
-    props.entry?.category_id === form.value.category_id ? props.entry?.category_name : '',
-));
+const filteredCategories = computed(() =>
+    withCurrentOption(
+        props.categories.filter((c) => !form.value.type || c.type === form.value.type),
+        form.value.category_id,
+        props.entry?.category_id === form.value.category_id ? props.entry?.category_name : '',
+    ),
+);
 
-const covenantOptions = computed(() => withCurrentOption(
-    props.covenants,
-    form.value.covenant_id,
-    props.entry?.covenant_id === form.value.covenant_id ? props.entry?.covenant_name : '',
-));
+const covenantOptions = computed(() =>
+    withCurrentOption(
+        props.covenants,
+        form.value.covenant_id,
+        props.entry?.covenant_id === form.value.covenant_id ? props.entry?.covenant_name : '',
+    ),
+);
 
 // ── Tipo × categoria: trocar o tipo limpa a categoria do outro tipo ─────────
 /** Tipo da categoria (da lista, ou do próprio lançamento se ela saiu da lista). */
@@ -277,11 +304,13 @@ function buildPayload() {
 
 /** "Salvar e lançar outro": mantém tipo/data/forma, limpa o resto, foco no valor. */
 async function startAnother(previous) {
-    resetState(blankForm({
-        type:           previous.type,
-        entry_date:     previous.entry_date,
-        payment_method: previous.payment_method ?? '',
-    }));
+    resetState(
+        blankForm({
+            type: previous.type,
+            entry_date: previous.entry_date,
+            payment_method: previous.payment_method ?? '',
+        }),
+    );
     await nextTick();
     focusAmount();
 }
@@ -291,8 +320,8 @@ async function submit({ another = false } = {}) {
 
     const keepOpen = another && !isEdit.value;
 
-    saving.value       = true;
-    errors.value       = {};
+    saving.value = true;
+    errors.value = {};
     generalError.value = '';
 
     const url = isEdit.value
@@ -302,9 +331,9 @@ async function submit({ another = false } = {}) {
 
     try {
         const res = await fetch(url, {
-            method:  'POST',
+            method: 'POST',
             headers: {
-                Accept:         'application/json',
+                Accept: 'application/json',
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrf(),
             },
@@ -319,7 +348,12 @@ async function submit({ another = false } = {}) {
         }
 
         // entryDate = a data enviada (Y-m-d): a listagem avisa se ela caiu fora do filtro.
-        emit('saved', { message: json.message ?? '', entry: json.data ?? null, entryDate: payload.entry_date, keepOpen });
+        emit('saved', {
+            message: json.message ?? '',
+            entry: json.data ?? null,
+            entryDate: payload.entry_date,
+            keepOpen,
+        });
 
         if (keepOpen) await startAnother(payload);
     } catch {
@@ -357,18 +391,22 @@ function requestClose() {
     emit('close');
 }
 
-function hasError(field)   { return !!(errors.value[field] && errors.value[field].length); }
-function firstError(field) { return firstMessage(errors.value[field]); }
+function hasError(field) {
+    return !!(errors.value[field] && errors.value[field].length);
+}
+function firstError(field) {
+    return firstMessage(errors.value[field]);
+}
 
 /** aria-describedby: erro do campo + aviso da trava da agenda, quando houver. */
 function describedBy(field, errorId) {
-    return [
-        hasError(field) ? errorId : null,
-        isScheduleSplit.value ? ids.scheduleLock : null,
-    ].filter(Boolean).join(' ') || undefined;
+    return (
+        [hasError(field) ? errorId : null, isScheduleSplit.value ? ids.scheduleLock : null].filter(Boolean).join(' ') ||
+        undefined
+    );
 }
 
-const amountDescribedBy  = computed(() => describedBy('amount', ids.amountError));
+const amountDescribedBy = computed(() => describedBy('amount', ids.amountError));
 const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paymentError));
 </script>
 
@@ -417,7 +455,7 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                             :checked="form.type === option.value"
                             :disabled="isLocked"
                             @change="setType(option.value)"
-                        >
+                        />
                         <label
                             class="btn btn-sm"
                             :class="option.value === 'income' ? 'btn-outline-success' : 'btn-outline-danger'"
@@ -446,7 +484,12 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                     required
                     data-test="amount-input"
                 />
-                <div v-if="hasError('amount')" :id="ids.amountError" class="invalid-feedback d-block" data-test="amount-error">
+                <div
+                    v-if="hasError('amount')"
+                    :id="ids.amountError"
+                    class="invalid-feedback d-block"
+                    data-test="amount-error"
+                >
                     {{ firstError('amount') }}
                 </div>
             </div>
@@ -466,13 +509,17 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                     :disabled="isLocked"
                     required
                     data-test="description-input"
-                >
+                />
                 <div class="invalid-feedback">{{ firstError('description') }}</div>
             </div>
 
             <!-- Agenda com pagamento dividido: valor e forma só pela agenda -->
             <div v-if="isScheduleSplit" class="col-12">
-                <div :id="ids.scheduleLock" class="alert alert-info small d-flex flex-wrap align-items-center gap-2 mb-0 py-2" data-test="schedule-lock">
+                <div
+                    :id="ids.scheduleLock"
+                    class="alert alert-info small d-flex flex-wrap align-items-center gap-2 mb-0 py-2"
+                    data-test="schedule-lock"
+                >
                     <i class="ti ti-calendar-event" aria-hidden="true"></i>
                     <span class="me-auto">{{ t.form_schedule_locked }}</span>
                     <Link v-if="canEditSchedule" :href="scheduleHref" class="alert-link" data-test="schedule-link">
@@ -494,7 +541,7 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                     :class="{ 'is-invalid': hasError('entry_date') }"
                     :disabled="isLocked"
                     required
-                >
+                />
                 <div class="invalid-feedback" data-test="entry-date-error">{{ firstError('entry_date') }}</div>
             </div>
 
@@ -511,7 +558,9 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                     data-test="payment-method-input"
                 >
                     <option value="">{{ t.form_payment_method_none }}</option>
-                    <option v-for="method in paymentMethods" :key="method.value" :value="method.value">{{ method.label }}</option>
+                    <option v-for="method in paymentMethods" :key="method.value" :value="method.value">
+                        {{ method.label }}
+                    </option>
                 </select>
                 <div :id="ids.paymentError" class="invalid-feedback">{{ firstError('payment_method') }}</div>
             </div>
@@ -527,7 +576,9 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                     :disabled="isLocked"
                     :aria-labelledby="ids.category"
                 />
-                <div v-if="hasError('category_id')" class="invalid-feedback d-block">{{ firstError('category_id') }}</div>
+                <div v-if="hasError('category_id')" class="invalid-feedback d-block">
+                    {{ firstError('category_id') }}
+                </div>
             </div>
 
             <!-- 7. Status -->
@@ -559,7 +610,9 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                     :disabled="isLocked"
                     :aria-labelledby="ids.covenant"
                 />
-                <div v-if="hasError('covenant_id')" class="invalid-feedback d-block">{{ firstError('covenant_id') }}</div>
+                <div v-if="hasError('covenant_id')" class="invalid-feedback d-block">
+                    {{ firstError('covenant_id') }}
+                </div>
             </div>
 
             <div class="col-12">
@@ -582,7 +635,12 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                 <span class="me-auto small fw-medium align-self-center" role="alert" data-test="discard-prompt">
                     {{ t.form_discard_title }}
                 </span>
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-test="keep-editing" @click="confirmingDiscard = false">
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    data-test="keep-editing"
+                    @click="confirmingDiscard = false"
+                >
                     {{ t.form_discard_keep }}
                 </button>
                 <button type="button" class="btn btn-danger btn-sm" data-test="discard" @click="requestClose">

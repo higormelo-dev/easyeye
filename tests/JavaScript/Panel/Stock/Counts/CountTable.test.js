@@ -21,10 +21,19 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 
 const t = {
-    col_product: 'Produto', col_code: 'Código', col_category: 'Categoria', col_qty_on_hand: 'Saldo do sistema',
-    col_counted: 'Contado', col_difference: 'Diferença', col_actions: 'Ações', sort_by: 'Ordenar por :column',
-    requires_lot: 'Exige lote', counted_label: 'Quantidade contada de :product', difference_match: 'Confere',
-    action_movements: 'Ver movimentações do produto', opens_new_tab: 'abre em nova aba',
+    col_product: 'Produto',
+    col_code: 'Código',
+    col_category: 'Categoria',
+    col_qty_on_hand: 'Saldo do sistema',
+    col_counted: 'Contado',
+    col_difference: 'Diferença',
+    col_actions: 'Ações',
+    sort_by: 'Ordenar por :column',
+    requires_lot: 'Exige lote',
+    counted_label: 'Quantidade contada de :product',
+    difference_match: 'Confere',
+    action_movements: 'Ver movimentações do produto',
+    opens_new_tab: 'abre em nova aba',
     empty_list: 'Nenhum produto ativo encontrado para contar.',
 };
 
@@ -35,14 +44,34 @@ afterEach(() => wrapper?.unmount());
 
 function product(overrides = {}) {
     return {
-        id: 'p1', name: 'Colírio', code: 'PRD-1', unit: 'fr', unit_label: 'Frasco', category_name: 'Colírios',
-        qty_on_hand: 10, requires_lot: true, movements_url: '/stock/movements?entity_product_id=p1', ...overrides,
+        id: 'p1',
+        name: 'Colírio',
+        code: 'PRD-1',
+        unit: 'fr',
+        unit_label: 'Frasco',
+        category_name: 'Colírios',
+        qty_on_hand: 10,
+        requires_lot: true,
+        movements_url: '/stock/movements?entity_product_id=p1',
+        ...overrides,
     };
 }
 
-function mountTable({ rows = [product()], counted = {}, deltas = {}, filters = { sort: 'name', direction: 'asc' }, attachTo } = {}) {
+function mountTable({
+    rows = [product()],
+    counted = {},
+    deltas = {},
+    filters = { sort: 'name', direction: 'asc' },
+    attachTo,
+} = {}) {
     wrapper = mount(CountTable, {
-        props: { products: { data: rows, total: rows.length, last_page: 1, current_page: 1, links: [] }, counted, deltas, filters, t },
+        props: {
+            products: { data: rows, total: rows.length, last_page: 1, current_page: 1, links: [] },
+            counted,
+            deltas,
+            filters,
+            t,
+        },
         attachTo,
     });
 
@@ -55,11 +84,22 @@ describe('CountTable', () => {
     it('mostra as colunas na ordem padrão com Contado, Diferença e Ações fixos no fim', () => {
         const w = mountTable();
 
-        expect(headerLabels(w)).toEqual(['Produto', 'Código', 'Categoria', 'Saldo do sistema', 'Contado', 'Diferença', 'Ações']);
+        expect(headerLabels(w)).toEqual([
+            'Produto',
+            'Código',
+            'Categoria',
+            'Saldo do sistema',
+            'Contado',
+            'Diferença',
+            'Ações',
+        ]);
     });
 
     it('respeita e grava a ordem de colunas no navegador', async () => {
-        window.localStorage.setItem('stock_counts_columns_order', JSON.stringify(['qty_on_hand', 'product', 'code', 'category']));
+        window.localStorage.setItem(
+            'stock_counts_columns_order',
+            JSON.stringify(['qty_on_hand', 'product', 'code', 'category']),
+        );
         const w = mountTable();
 
         expect(headerLabels(w).slice(0, 2)).toEqual(['Saldo do sistema', 'Produto']);
@@ -68,7 +108,12 @@ describe('CountTable', () => {
         await w.vm.$nextTick();
 
         expect(headerLabels(w).slice(0, 2)).toEqual(['Produto', 'Código']);
-        expect(JSON.parse(window.localStorage.getItem('stock_counts_columns_order'))).toEqual(['product', 'code', 'category', 'qty_on_hand']);
+        expect(JSON.parse(window.localStorage.getItem('stock_counts_columns_order'))).toEqual([
+            'product',
+            'code',
+            'category',
+            'qty_on_hand',
+        ]);
     });
 
     it('ordena pelos cabeçalhos com as chaves da whitelist do backend', async () => {
@@ -123,7 +168,9 @@ describe('CountTable', () => {
         expect(w.emitted('count')).toBeUndefined();
 
         // O atalho da linha continua acessível por teclado (sem tabindex negativo).
-        expect(w.find('a[title="Ver movimentações do produto (abre em nova aba)"]').attributes('tabindex')).toBeUndefined();
+        expect(
+            w.find('a[title="Ver movimentações do produto (abre em nova aba)"]').attributes('tabindex'),
+        ).toBeUndefined();
     });
 
     it('diferença como status: confere, sobra, falta e não contado', () => {

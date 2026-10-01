@@ -1,22 +1,22 @@
 <script setup>
 import { computed } from 'vue';
-import SortableTh          from '@/Components/Panel/SortableTh.vue';
-import BillingStateBadge   from '@/Components/Panel/BillingStateBadge.vue';
-import TablePagination     from '@/Components/Panel/TablePagination.vue';
-import ActionDropdown      from '@/Components/Panel/ActionDropdown.vue';
-import ActionIconButton    from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup     from '@/Components/Panel/ActionIconGroup.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import BillingStateBadge from '@/Components/Panel/BillingStateBadge.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     subscriptions: { type: Object, required: true },
-    filters:       { type: Object, default: () => ({}) },
-    t:             { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['sort', 'view', 'edit', 'activate', 'trial', 'cancel', 'block']);
 
 const currentSort = computed(() => props.filters.sort ?? 'created_at');
-const currentDir  = computed(() => props.filters.direction ?? 'desc');
+const currentDir = computed(() => props.filters.direction ?? 'desc');
 </script>
 
 <template>
@@ -29,39 +29,44 @@ const currentDir  = computed(() => props.filters.direction ?? 'desc');
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_entity }}</SortableTh>
+                        >{{ t.col_entity }}</SortableTh
+                    >
 
                     <SortableTh
                         col-key="plan_name"
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_plan }}</SortableTh>
+                        >{{ t.col_plan }}</SortableTh
+                    >
 
-                    <th class="text-center" style="min-width:90px;">{{ t.col_status }}</th>
-                    <th class="text-center" style="min-width:100px;">{{ t.col_billing_state }}</th>
-                    <th class="text-center" style="min-width:90px;">{{ t.col_gateway }}</th>
+                    <th class="text-center" style="min-width: 90px">{{ t.col_status }}</th>
+                    <th class="text-center" style="min-width: 100px">{{ t.col_billing_state }}</th>
+                    <th class="text-center" style="min-width: 90px">{{ t.col_gateway }}</th>
 
                     <SortableTh
                         col-key="next_billing_at"
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_next_billing }}</SortableTh>
+                        >{{ t.col_next_billing }}</SortableTh
+                    >
 
                     <SortableTh
                         col-key="starts_at"
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_starts_at }}</SortableTh>
+                        >{{ t.col_starts_at }}</SortableTh
+                    >
 
                     <SortableTh
                         col-key="ends_at"
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         @sort="$emit('sort', $event)"
-                    >{{ t.col_ends_at }}</SortableTh>
+                        >{{ t.col_ends_at }}</SortableTh
+                    >
 
                     <th class="text-end">{{ t.col_actions }}</th>
                 </tr>
@@ -75,18 +80,14 @@ const currentDir  = computed(() => props.filters.direction ?? 'desc');
                     </td>
                 </tr>
 
-                <tr
-                    v-for="s in subscriptions.data"
-                    :key="s.id"
-                    :class="{ 'table-warning': s.needs_attention }"
-                >
+                <tr v-for="s in subscriptions.data" :key="s.id" :class="{ 'table-warning': s.needs_attention }">
                     <!-- Empresa -->
                     <td>
                         <div class="d-flex align-items-center gap-2">
                             <span
                                 class="avatar-xs rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0"
                                 :class="s.entity_active ? 'bg-success-subtle' : 'bg-danger-subtle'"
-                                style="width:28px;height:28px;"
+                                style="width: 28px; height: 28px"
                             >
                                 <i
                                     class="fas fa-file-contract fs-11"
@@ -94,8 +95,8 @@ const currentDir  = computed(() => props.filters.direction ?? 'desc');
                                 ></i>
                             </span>
                             <div>
-                                <div class="fw-medium" style="font-size:.875rem;">{{ s.entity_name }}</div>
-                                <div v-if="s.needs_attention" class="text-danger" style="font-size:.7rem;">
+                                <div class="fw-medium" style="font-size: 0.875rem">{{ s.entity_name }}</div>
+                                <div v-if="s.needs_attention" class="text-danger" style="font-size: 0.7rem">
                                     <i class="ti ti-alert-triangle me-1"></i>{{ t.attention_badge }}
                                 </div>
                             </div>
@@ -112,7 +113,11 @@ const currentDir  = computed(() => props.filters.direction ?? 'desc');
 
                     <!-- Estado cobrança -->
                     <td class="text-center">
-                        <BillingStateBadge :badge="s.billing_state_badge" :label="s.billing_state_label" :state="s.billing_state" />
+                        <BillingStateBadge
+                            :badge="s.billing_state_badge"
+                            :label="s.billing_state_label"
+                            :state="s.billing_state"
+                        />
                     </td>
 
                     <!-- Gateway -->
@@ -133,11 +138,7 @@ const currentDir  = computed(() => props.filters.direction ?? 'desc');
                     <!-- Ações -->
                     <td class="text-end">
                         <ActionIconGroup align="end" gap="tight">
-                            <ActionIconButton
-                                icon="ti ti-eye"
-                                :title="t.action_view"
-                                @click="$emit('view', s.id)"
-                            />
+                            <ActionIconButton icon="ti ti-eye" :title="t.action_view" @click="$emit('view', s.id)" />
 
                             <ActionDropdown
                                 :min-width="180"
@@ -164,7 +165,7 @@ const currentDir  = computed(() => props.filters.direction ?? 'desc');
                                         <i class="ti ti-ban me-1"></i> {{ t.action_cancel }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider my-1"></li>
+                                <li><hr class="dropdown-divider my-1" /></li>
                                 <li>
                                     <button class="dropdown-item rounded-1" @click="$emit('block', s)">
                                         <i :class="`ti me-1 ${s.entity_active ? 'ti-lock' : 'ti-lock-open'}`"></i>

@@ -11,7 +11,9 @@ import CountsIndex from '@/Pages/Panel/Stock/Counts/Index.vue';
  * outra página/busca) vai no envio, item em branco nunca vai.
  */
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view', 'showViewToggle'],
@@ -27,7 +29,8 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Pages/Panel/Stock/Counts/CountTable.vue', () => ({
@@ -39,20 +42,37 @@ vi.mock('@/Pages/Panel/Stock/Counts/CountTable.vue', () => ({
     },
 }));
 vi.mock('@/Pages/Panel/Stock/Counts/CountCards.vue', () => ({
-    default: { name: 'CountCardsStub', props: ['products', 'counted', 'deltas'], emits: ['count'], template: '<div class="cards-stub">{{ products.data.length }}</div>' },
+    default: {
+        name: 'CountCardsStub',
+        props: ['products', 'counted', 'deltas'],
+        emits: ['count'],
+        template: '<div class="cards-stub">{{ products.data.length }}</div>',
+    },
 }));
 
 const t = {
-    page_title: 'Stock count', total_label: 'Total:', btn_movements: 'Movements', opens_new_tab: 'opens in a new tab', close: 'Close',
+    page_title: 'Stock count',
+    total_label: 'Total:',
+    btn_movements: 'Movements',
+    opens_new_tab: 'opens in a new tab',
+    close: 'Close',
     btn_apply: 'Apply count (:count)',
-    search_placeholder: 'Search by name...', filter_category_all: 'All categories',
+    search_placeholder: 'Search by name...',
+    filter_category_all: 'All categories',
     touched_summary: ':touched of :total product(s) with a typed count',
-    result_applied: ':count product(s) adjusted', apply_error: 'Could not apply the count.',
+    result_applied: ':count product(s) adjusted',
+    apply_error: 'Could not apply the count.',
 };
 
 const routes = { index: '/stock/counts', store: '/stock/counts', movements_index: '/stock/movements' };
 
-const page1 = { data: [{ id: 'p1', name: 'A', qty_on_hand: 10 }, { id: 'p2', name: 'B', qty_on_hand: 5 }], total: 60 };
+const page1 = {
+    data: [
+        { id: 'p1', name: 'A', qty_on_hand: 10 },
+        { id: 'p2', name: 'B', qty_on_hand: 5 },
+    ],
+    total: 60,
+};
 const page2 = { data: [{ id: 'p3', name: 'C', qty_on_hand: 1 }], total: 60 };
 
 let wrapper;
@@ -142,8 +162,18 @@ describe('Stock/Counts/Index', () => {
         table(w).vm.$emit('sort', { sort: 'category', direction: 'asc' });
         await w.find('select').setValue('c1');
 
-        expect(router.get).toHaveBeenNthCalledWith(1, '/stock/counts', { search: 'ab', category_id: '', sort: 'category', direction: 'asc' }, expect.any(Object));
-        expect(router.get).toHaveBeenNthCalledWith(2, '/stock/counts', { search: 'ab', category_id: 'c1', sort: 'name', direction: 'asc' }, expect.any(Object));
+        expect(router.get).toHaveBeenNthCalledWith(
+            1,
+            '/stock/counts',
+            { search: 'ab', category_id: '', sort: 'category', direction: 'asc' },
+            expect.any(Object),
+        );
+        expect(router.get).toHaveBeenNthCalledWith(
+            2,
+            '/stock/counts',
+            { search: 'ab', category_id: 'c1', sort: 'name', direction: 'asc' },
+            expect.any(Object),
+        );
     });
 
     it('calcula a diferença do que foi digitado e conta só itens preenchidos', async () => {
@@ -159,13 +189,18 @@ describe('Stock/Counts/Index', () => {
     });
 
     it('envia tudo o que foi digitado, inclusive em outra página, e recarrega os saldos', async () => {
-        window.axios.post.mockResolvedValue({ data: { message: 'x', variances: [{ entity_product_id: 'p1', product_name: 'A', before: 10, counted: 8, delta: -2 }] } });
+        window.axios.post.mockResolvedValue({
+            data: {
+                message: 'x',
+                variances: [{ entity_product_id: 'p1', product_name: 'A', before: 10, counted: 8, delta: -2 }],
+            },
+        });
         const w = mountPage();
 
         table(w).vm.$emit('count', 'p1', '8');
-        table(w).vm.$emit('count', 'p2', '');           // em branco: não vai
-        await w.setProps({ products: page2 });           // trocou de página (estado preservado)
-        table(w).vm.$emit('count', 'p3', '0');           // "contei zero" vai
+        table(w).vm.$emit('count', 'p2', ''); // em branco: não vai
+        await w.setProps({ products: page2 }); // trocou de página (estado preservado)
+        table(w).vm.$emit('count', 'p3', '0'); // "contei zero" vai
         await nextTick();
 
         await applyButtons(w)[0].trigger('click');

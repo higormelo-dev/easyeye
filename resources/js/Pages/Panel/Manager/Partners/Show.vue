@@ -1,28 +1,25 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { router, Link }             from '@inertiajs/vue3';
-import AppLayout                    from '@/Layouts/AppLayout.vue';
-import PartnerFormModal             from './PartnerFormModal.vue';
-import LiveStatusBar                from '@/Components/Panel/LiveStatusBar.vue';
-import ConfirmationWithReasonModal  from '@/Components/Panel/ConfirmationWithReasonModal.vue';
-import SearchSelect                  from '@/Components/Panel/SearchSelect.vue';
+import { router, Link } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PartnerFormModal from './PartnerFormModal.vue';
+import LiveStatusBar from '@/Components/Panel/LiveStatusBar.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
-import { useDashboardPolling }      from '@/composables/useDashboardPolling.js';
+import { useDashboardPolling } from '@/composables/useDashboardPolling.js';
 
 const props = defineProps({
-    partner:      { type: Object, required: true },
-    leads:        { type: Object, required: true },
-    commissions:  { type: Object, required: true },
-    leadStatuses: { type: Array,  default: () => [] },
-    partnerTypes: { type: Array,  default: () => [] },
-    t:            { type: Object, default: () => ({}) },
+    partner: { type: Object, required: true },
+    leads: { type: Object, required: true },
+    commissions: { type: Object, required: true },
+    leadStatuses: { type: Array, default: () => [] },
+    partnerTypes: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
 });
 
 // ── Polling real-time (15s) ────────────────────────────────────────────────────
-const { isRefreshing, lastUpdated, refresh } = useDashboardPolling(
-    ['leads', 'commissions', 'partner'],
-    15_000,
-);
+const { isRefreshing, lastUpdated, refresh } = useDashboardPolling(['leads', 'commissions', 'partner'], 15_000);
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const activeTab = ref('leads');
@@ -41,9 +38,9 @@ async function advanceLead(lead, newStatus) {
         const res = await fetch(lead.advance_url, {
             method: 'PATCH',
             headers: {
-                'Content-Type':  'application/json',
-                'Accept':        'application/json',
-                'X-CSRF-TOKEN':  document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
             },
             body: JSON.stringify({ status: newStatus }),
         });
@@ -57,7 +54,12 @@ async function advanceLead(lead, newStatus) {
 
 // ── Pay commission (com justificativa LGPD/CFM) ────────────────────────────────
 const payingId = ref(null);
-const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
 
 function payCommission(commission) {
     openReasonModal({
@@ -70,7 +72,7 @@ function payCommission(commission) {
                 const res = await fetch(commission.pay_url, {
                     method: 'PATCH',
                     headers: {
-                        'Accept':       'application/json',
+                        Accept: 'application/json',
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                     },
@@ -110,35 +112,31 @@ const tokenCopied = ref(false);
 function copyToken() {
     navigator.clipboard.writeText(props.partner.token).then(() => {
         tokenCopied.value = true;
-        setTimeout(() => { tokenCopied.value = false; }, 2000);
+        setTimeout(() => {
+            tokenCopied.value = false;
+        }, 2000);
     });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function showToast(msg, type = 'success') {
     if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
-    if (type === 'error'   && window.showErrorToast)   return window.showErrorToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
     alert(msg);
 }
 
 const breadcrumbs = computed(() => [
-    { label: props.t.breadcrumb_home    ?? 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
     { label: props.t.breadcrumb_current ?? 'Parceiros', url: route('manager.partners.index'), active: false },
-    { label: props.partner.name,                        url: '#', active: true },
+    { label: props.partner.name, url: '#', active: true },
 ]);
 </script>
 
 <template>
     <AppLayout :title="partner.name" :breadcrumbs="breadcrumbs">
         <div>
-
             <!-- ── Live status bar ────────────────────────────────────────── -->
-            <LiveStatusBar
-                :is-refreshing="isRefreshing"
-                :last-updated="lastUpdated"
-                :t="t"
-                @refresh="refresh"
-            />
+            <LiveStatusBar :is-refreshing="isRefreshing" :last-updated="lastUpdated" :t="t" @refresh="refresh" />
 
             <!-- ── Cabeçalho ───────────────────────────────────────────────── -->
             <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-4 border-bottom">
@@ -160,7 +158,6 @@ const breadcrumbs = computed(() => [
             </div>
 
             <div class="row g-4">
-
                 <!-- ── Coluna lateral: informações ─────────────────────────── -->
                 <div class="col-12 col-md-4">
                     <div class="card h-100">
@@ -168,7 +165,6 @@ const breadcrumbs = computed(() => [
                             <i class="ti ti-info-circle me-2 text-muted"></i>{{ t.sidebar_info }}
                         </div>
                         <div class="card-body">
-
                             <!-- Mini KPIs -->
                             <div class="row g-2 mb-4">
                                 <div class="col-6">
@@ -189,7 +185,9 @@ const breadcrumbs = computed(() => [
                             <ul class="list-unstyled mb-0 small">
                                 <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                     <span class="text-muted">{{ t.label_type }}</span>
-                                    <span class="badge badge-soft-secondary rounded fs-12">{{ partner.type_label }}</span>
+                                    <span class="badge badge-soft-secondary rounded fs-12">{{
+                                        partner.type_label
+                                    }}</span>
                                 </li>
                                 <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                     <span class="text-muted">{{ t.label_status }}</span>
@@ -199,7 +197,10 @@ const breadcrumbs = computed(() => [
                                     <span class="text-muted">{{ t.label_commission }}</span>
                                     <span class="fw-semibold">{{ partner.commission_rate }}%</span>
                                 </li>
-                                <li v-if="partner.document" class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                <li
+                                    v-if="partner.document"
+                                    class="d-flex justify-content-between align-items-center py-2 border-bottom"
+                                >
                                     <span class="text-muted">{{ t.label_document }}</span>
                                     <span>{{ partner.document }}</span>
                                 </li>
@@ -227,7 +228,6 @@ const breadcrumbs = computed(() => [
                             <div v-if="partner.notes" class="mt-3 p-3 rounded bg-light small text-muted">
                                 <i class="ti ti-notes me-1"></i>{{ partner.notes }}
                             </div>
-
                         </div>
                     </div>
                 </div>
@@ -245,7 +245,9 @@ const breadcrumbs = computed(() => [
                                         @click="activeTab = 'leads'"
                                     >
                                         <i class="ti ti-target-arrow me-1"></i>{{ t.tab_leads }}
-                                        <span class="badge badge-soft-secondary rounded ms-1 fs-12">{{ leads.meta?.total ?? 0 }}</span>
+                                        <span class="badge badge-soft-secondary rounded ms-1 fs-12">{{
+                                            leads.meta?.total ?? 0
+                                        }}</span>
                                     </button>
                                 </li>
                                 <li class="nav-item">
@@ -255,7 +257,9 @@ const breadcrumbs = computed(() => [
                                         @click="activeTab = 'commissions'"
                                     >
                                         <i class="ti ti-cash me-1"></i>{{ t.tab_commissions }}
-                                        <span class="badge badge-soft-secondary rounded ms-1 fs-12">{{ commissions.meta?.total ?? 0 }}</span>
+                                        <span class="badge badge-soft-secondary rounded ms-1 fs-12">{{
+                                            commissions.meta?.total ?? 0
+                                        }}</span>
                                     </button>
                                 </li>
                             </ul>
@@ -270,7 +274,7 @@ const breadcrumbs = computed(() => [
                                             <th>{{ t.col_name }}</th>
                                             <th>{{ t.col_city }}</th>
                                             <th class="text-center">{{ t.col_status }}</th>
-                                            <th class="text-center" style="min-width:140px;">{{ t.col_advance }}</th>
+                                            <th class="text-center" style="min-width: 140px">{{ t.col_advance }}</th>
                                             <th class="text-center">{{ t.col_date }}</th>
                                         </tr>
                                     </thead>
@@ -288,14 +292,16 @@ const breadcrumbs = computed(() => [
                                             </td>
                                             <td class="text-muted small">{{ lead.city_state ?? '—' }}</td>
                                             <td class="text-center">
-                                                <span class="badge" :class="lead.status_badge">{{ lead.status_label }}</span>
+                                                <span class="badge" :class="lead.status_badge">{{
+                                                    lead.status_label
+                                                }}</span>
                                             </td>
                                             <td class="text-center">
                                                 <SearchSelect
                                                     v-if="lead.is_active"
                                                     :model-value="''"
-                                                    style="min-width:130px;"
-                                                    :options="leadStatuses.filter(s => s.value !== lead.status)"
+                                                    style="min-width: 130px"
+                                                    :options="leadStatuses.filter((s) => s.value !== lead.status)"
                                                     :value-key="'value'"
                                                     :label-key="'label'"
                                                     :placeholder="t.field_advance"
@@ -316,19 +322,25 @@ const breadcrumbs = computed(() => [
                                     class="btn btn-sm btn-outline-secondary"
                                     :disabled="leads.meta.current_page === 1"
                                     @click="goLeadsPage(leads.meta.current_page - 1)"
-                                ><i class="ti ti-arrow-left"></i></button>
+                                >
+                                    <i class="ti ti-arrow-left"></i>
+                                </button>
                                 <button
                                     v-for="p in leads.meta.last_page"
                                     :key="p"
                                     class="btn btn-sm"
                                     :class="p === leads.meta.current_page ? 'btn-primary' : 'btn-outline-secondary'"
                                     @click="goLeadsPage(p)"
-                                >{{ p }}</button>
+                                >
+                                    {{ p }}
+                                </button>
                                 <button
                                     class="btn btn-sm btn-outline-secondary"
                                     :disabled="leads.meta.current_page === leads.meta.last_page"
                                     @click="goLeadsPage(leads.meta.current_page + 1)"
-                                ><i class="ti ti-arrow-right"></i></button>
+                                >
+                                    <i class="ti ti-arrow-right"></i>
+                                </button>
                             </div>
                         </div>
 
@@ -370,7 +382,10 @@ const breadcrumbs = computed(() => [
                                                         :disabled="payingId === c.id"
                                                         @click="payCommission(c)"
                                                     >
-                                                        <span v-if="payingId === c.id" class="spinner-border spinner-border-sm"></span>
+                                                        <span
+                                                            v-if="payingId === c.id"
+                                                            class="spinner-border spinner-border-sm"
+                                                        ></span>
                                                         <span v-else>{{ t.pay }}</span>
                                                     </button>
                                                 </div>
@@ -381,30 +396,39 @@ const breadcrumbs = computed(() => [
                             </div>
 
                             <!-- Commissions pagination -->
-                            <div v-if="commissions.meta?.last_page > 1" class="d-flex justify-content-center py-3 gap-1">
+                            <div
+                                v-if="commissions.meta?.last_page > 1"
+                                class="d-flex justify-content-center py-3 gap-1"
+                            >
                                 <button
                                     class="btn btn-sm btn-outline-secondary"
                                     :disabled="commissions.meta.current_page === 1"
                                     @click="goCommissionsPage(commissions.meta.current_page - 1)"
-                                ><i class="ti ti-arrow-left"></i></button>
+                                >
+                                    <i class="ti ti-arrow-left"></i>
+                                </button>
                                 <button
                                     v-for="p in commissions.meta.last_page"
                                     :key="p"
                                     class="btn btn-sm"
-                                    :class="p === commissions.meta.current_page ? 'btn-primary' : 'btn-outline-secondary'"
+                                    :class="
+                                        p === commissions.meta.current_page ? 'btn-primary' : 'btn-outline-secondary'
+                                    "
                                     @click="goCommissionsPage(p)"
-                                >{{ p }}</button>
+                                >
+                                    {{ p }}
+                                </button>
                                 <button
                                     class="btn btn-sm btn-outline-secondary"
                                     :disabled="commissions.meta.current_page === commissions.meta.last_page"
                                     @click="goCommissionsPage(commissions.meta.current_page + 1)"
-                                ><i class="ti ti-arrow-right"></i></button>
+                                >
+                                    <i class="ti ti-arrow-right"></i>
+                                </button>
                             </div>
                         </div>
-
                     </div>
                 </div>
-
             </div>
         </div>
 
@@ -417,7 +441,10 @@ const breadcrumbs = computed(() => [
             :partner-types="partnerTypes"
             :t="t"
             @close="formOpen = false"
-            @saved="formOpen = false; router.reload({ only: ['partner'] })"
+            @saved="
+                formOpen = false;
+                router.reload({ only: ['partner'] });
+            "
         />
 
         <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
@@ -430,6 +457,5 @@ const breadcrumbs = computed(() => [
             @close="closeReasonModal"
             @confirm="handleReasonConfirm"
         />
-
     </AppLayout>
 </template>

@@ -26,10 +26,10 @@ export const t = {
     flow_label: 'Como funciona o faturamento',
     flow_steps: {
         attendance: { title: 'Atendimento', hint: 'Marcado como Atendido na agenda' },
-        claim:      { title: 'Guia', hint: 'Individual ou em lote' },
-        batch:      { title: 'Lote', hint: 'Guias do mesmo convênio' },
-        submit:     { title: 'Envio', hint: 'XML TISS para a operadora' },
-        settle:     { title: 'Recebimento/Glosa', hint: 'Registre o pagamento ou a glosa' },
+        claim: { title: 'Guia', hint: 'Individual ou em lote' },
+        batch: { title: 'Lote', hint: 'Guias do mesmo convênio' },
+        submit: { title: 'Envio', hint: 'XML TISS para a operadora' },
+        settle: { title: 'Recebimento/Glosa', hint: 'Registre o pagamento ou a glosa' },
     },
     filters_label: 'Filtros do faturamento',
     filter_covenant: 'Convênio',
@@ -167,7 +167,8 @@ export const t = {
     suggested_price_hint: 'Preço da tabela (:procedure × :covenant): :amount.',
     suggested_price_short: 'Preço da tabela: :amount.',
     suggested_price_none: 'Sem preço na tabela para este procedimento e convênio.',
-    suggested_price_mixed: 'Os atendimentos deste lote têm preços diferentes na tabela (:min a :max); o lote usa um único valor unitário.',
+    suggested_price_mixed:
+        'Os atendimentos deste lote têm preços diferentes na tabela (:min a :max); o lote usa um único valor unitário.',
     suggested_price_batch: 'Preço da tabela para os atendimentos do lote: :amount.',
     suggested_price_use: 'Usar :amount',
     price_table_link: 'Abrir a tabela de preços',
@@ -178,14 +179,16 @@ export const t = {
     batch_quantity: 'Quantidade por guia',
     batch_hint_selected: ':count atendimento(s) marcado(s) deste convênio entrarão no lote.',
     batch_hint_excluded: ':count marcado(s) de outro convênio ficarão de fora.',
-    batch_hint_all: 'Nenhum atendimento marcado: o lote incluirá todos os atendimentos elegíveis do convênio no período (:count na lista atual).',
+    batch_hint_all:
+        'Nenhum atendimento marcado: o lote incluirá todos os atendimentos elegíveis do convênio no período (:count na lista atual).',
     batch_hint_pick: 'Escolha o convênio do lote.',
     batch_estimated_total: 'Total estimado: :total',
     batch_estimated_formula: ':count guia(s) × :quantity × :unit',
     particular_hint: 'Convênio sem registro ANS.',
     receipt_title: 'Registrar recebimento',
     receipt_partial_hint: 'Recebimento parcial: :difference a menos que o esperado.',
-    receipt_glosa_reversed_hint: 'Valor acima do esperado: :amount da glosa será considerado revertido (ex.: recurso aceito).',
+    receipt_glosa_reversed_hint:
+        'Valor acima do esperado: :amount da glosa será considerado revertido (ex.: recurso aceito).',
     btn_confirm_receipt: 'Registrar recebimento',
     deny_title: 'Marcar guia como glosada',
     deny_summary_guide: 'Guia',
@@ -201,11 +204,13 @@ export const t = {
     deny_amount_min: 'O valor glosado deve ser maior que zero.',
     deny_amount_max: 'O valor glosado não pode ser maior que o valor da guia (:max).',
     deny_effect_hint: 'A guia passa para Glosada e o atendimento volta a aparecer em "A faturar".',
-    deny_effect_hint_partial: 'Glosa parcial: a guia passa para Glosada com :remaining ainda a receber. Registre esse recebimento antes de refaturar o atendimento.',
+    deny_effect_hint_partial:
+        'Glosa parcial: a guia passa para Glosada com :remaining ainda a receber. Registre esse recebimento antes de refaturar o atendimento.',
     btn_confirm_deny: 'Confirmar glosa',
     deny_done_title: 'Glosa registrada',
     denied_next_step: 'Glosa registrada na guia :code. Próximo passo: abrir o recurso na Conciliação de glosas.',
-    denied_particular: 'Glosa registrada na guia :code. Guia particular (sem TISS) não gera recurso na Conciliação de glosas.',
+    denied_particular:
+        'Glosa registrada na guia :code. Guia particular (sem TISS) não gera recurso na Conciliação de glosas.',
     btn_open_conciliation: 'Abrir conciliação',
     pending_check_failed: 'Não foi possível verificar as pendências desta guia. Tente novamente.',
     unexpected_error: 'Não foi possível concluir a ação. Tente novamente.',
@@ -290,8 +295,13 @@ export const t = {
             invalid_date: 'Informe uma data válida.',
             after_max: 'A data não pode ser posterior a :date.',
             presets: {
-                today: 'Hoje', yesterday: 'Ontem', last7: 'Últimos 7 dias', month: 'Mês atual',
-                last_month: 'Mês anterior', year: 'Ano atual', custom: 'Personalizado',
+                today: 'Hoje',
+                yesterday: 'Ontem',
+                last7: 'Últimos 7 dias',
+                month: 'Mês atual',
+                last_month: 'Mês anterior',
+                year: 'Ano atual',
+                custom: 'Personalizado',
             },
         },
     },
@@ -382,20 +392,22 @@ export function schedule(overrides = {}) {
  */
 export function paginate(data, overrides = {}, pageName = 'page') {
     const currentPage = overrides.current_page ?? 1;
-    const lastPage    = overrides.last_page ?? 1;
-    const url         = (page) => `/panel/financial/billing?${pageName}=${page}`;
-    const numbers     = Array.from({ length: lastPage }, (_, i) => ({
-        url: url(i + 1), label: String(i + 1), active: i + 1 === currentPage,
+    const lastPage = overrides.last_page ?? 1;
+    const url = (page) => `/panel/financial/billing?${pageName}=${page}`;
+    const numbers = Array.from({ length: lastPage }, (_, i) => ({
+        url: url(i + 1),
+        label: String(i + 1),
+        active: i + 1 === currentPage,
     }));
 
     return {
         data,
-        current_page:  currentPage,
-        last_page:     lastPage,
-        per_page:      50,
-        from:          data.length ? 1 : null,
-        to:            data.length || null,
-        total:         overrides.total ?? data.length,
+        current_page: currentPage,
+        last_page: lastPage,
+        per_page: 50,
+        from: data.length ? 1 : null,
+        to: data.length || null,
+        total: overrides.total ?? data.length,
         prev_page_url: currentPage > 1 ? url(currentPage - 1) : null,
         next_page_url: currentPage < lastPage ? url(currentPage + 1) : null,
         links: [
@@ -410,17 +422,38 @@ export function paginate(data, overrides = {}, pageName = 'page') {
 /** `lists` do servidor (busca/ordem aplicadas por aba) com os padrões. */
 export function lists(overrides = {}) {
     return {
-        eligible: { search: '', sort: 'date', direction: 'asc', default_sort: 'date', default_direction: 'asc', ...(overrides.eligible ?? {}) },
-        claims:   { search: '', sort: 'created', direction: 'desc', default_sort: 'created', default_direction: 'desc', ...(overrides.claims ?? {}) },
-        batches:  { search: '', sort: 'created', direction: 'desc', default_sort: 'created', default_direction: 'desc', ...(overrides.batches ?? {}) },
+        eligible: {
+            search: '',
+            sort: 'date',
+            direction: 'asc',
+            default_sort: 'date',
+            default_direction: 'asc',
+            ...(overrides.eligible ?? {}),
+        },
+        claims: {
+            search: '',
+            sort: 'created',
+            direction: 'desc',
+            default_sort: 'created',
+            default_direction: 'desc',
+            ...(overrides.claims ?? {}),
+        },
+        batches: {
+            search: '',
+            sort: 'created',
+            direction: 'desc',
+            default_sort: 'created',
+            default_direction: 'desc',
+            ...(overrides.batches ?? {}),
+        },
     };
 }
 
 export const kpis = {
-    to_bill:      { count: 12, priced_count: 10, estimated_amount: 1500 },
-    open:         { count: 3, amount: 450 },
-    received:     { count: 5, amount: 980.5 },
-    denied:       { count: 2, amount: 120 },
+    to_bill: { count: 12, priced_count: 10, estimated_amount: 1500 },
+    open: { count: 3, amount: 450 },
+    received: { count: 5, amount: 980.5 },
+    denied: { count: 2, amount: 120 },
     tiss_pending: { count: 4 },
 };
 
@@ -431,5 +464,7 @@ export function brl(value) {
 
 /** Normaliza espaços (o Intl usa espaço não separável entre "R$" e o valor). */
 export function norm(text) {
-    return String(text ?? '').replace(/\s+/g, ' ').trim();
+    return String(text ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
 }

@@ -18,7 +18,7 @@ describe('MoneyInput', () => {
 
     it('digitação emite número canônico; ao sair do campo reformata', async () => {
         const wrapper = mountMoney();
-        const input   = wrapper.get('input');
+        const input = wrapper.get('input');
 
         await input.trigger('focus');
         await input.setValue('1.234,5');
@@ -32,7 +32,7 @@ describe('MoneyInput', () => {
 
     it('valor vindo de fora (edição) aparece formatado; limpar emite null', async () => {
         const wrapper = mountMoney({ modelValue: '250.00' });
-        const input   = wrapper.get('input');
+        const input = wrapper.get('input');
 
         expect(input.element.value).toBe('250,00');
 
@@ -47,8 +47,11 @@ describe('MoneyInput', () => {
     });
 
     it('atributos vão para o <input> (id, aria) e inválido marca aria-invalid', () => {
-        const wrapper = mountMoney({ invalid: true }, { id: 'amount', 'aria-describedby': 'amount-error', 'data-test': 'amount' });
-        const input   = wrapper.get('input');
+        const wrapper = mountMoney(
+            { invalid: true },
+            { id: 'amount', 'aria-describedby': 'amount-error', 'data-test': 'amount' },
+        );
+        const input = wrapper.get('input');
 
         expect(input.attributes('id')).toBe('amount');
         expect(input.attributes('aria-describedby')).toBe('amount-error');
@@ -59,7 +62,7 @@ describe('MoneyInput', () => {
 
     it('não reescreve o texto enquanto o usuário digita', async () => {
         const wrapper = mountMoney();
-        const input   = wrapper.get('input');
+        const input = wrapper.get('input');
 
         await input.trigger('focus');
         await input.setValue('10,');

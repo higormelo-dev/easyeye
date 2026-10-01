@@ -18,21 +18,21 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
  */
 const props = defineProps({
     modelValue: { type: [String, null], default: null },
-    options:    { type: Array,   default: () => [] },
-    placeholder:{ type: String,  default: '—' },
-    disabled:   { type: Boolean, default: false },
-    invalid:    { type: Boolean, default: false },
+    options: { type: Array, default: () => [] },
+    placeholder: { type: String, default: '—' },
+    disabled: { type: Boolean, default: false },
+    invalid: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
 
 const CD_SENTINEL = '__conta_dedos__';
-const cdRegex     = /^CD\s*([1-5])\s*M$/i;
+const cdRegex = /^CD\s*([1-5])\s*M$/i;
 
 const cdOptions = computed(() =>
     props.options
-        .filter(o => cdRegex.test((o.name ?? '').trim()))
-        .map(o => ({ ...o, meters: Number(o.name.trim().match(cdRegex)[1]) }))
+        .filter((o) => cdRegex.test((o.name ?? '').trim()))
+        .map((o) => ({ ...o, meters: Number(o.name.trim().match(cdRegex)[1]) }))
         .sort((a, b) => a.meters - b.meters),
 );
 
@@ -40,7 +40,7 @@ const cdOptions = computed(() =>
 const displayOptions = computed(() => {
     if (cdOptions.value.length === 0) return props.options;
 
-    const out      = [];
+    const out = [];
     let cdInserted = false;
 
     for (const o of props.options) {
@@ -58,8 +58,8 @@ const displayOptions = computed(() => {
     return out;
 });
 
-const display  = ref(null); // valor do dropdown principal (id normal ou sentinel)
-const distance = ref('');   // id da linha CD Xm quando CONTA DEDOS ativo
+const display = ref(null); // valor do dropdown principal (id normal ou sentinel)
+const distance = ref(''); // id da linha CD Xm quando CONTA DEDOS ativo
 
 function syncFromModel(value) {
     // Estado "CONTA DEDOS aguardando distância": emitimos null pro pai até a
@@ -67,13 +67,13 @@ function syncFromModel(value) {
     // NÃO pode apagar o modo CD (senão o seletor de metros nunca aparece).
     if (!value && display.value === CD_SENTINEL && !distance.value) return;
 
-    const cd = cdOptions.value.find(o => o.id === value);
+    const cd = cdOptions.value.find((o) => o.id === value);
 
     if (cd) {
-        display.value  = CD_SENTINEL;
+        display.value = CD_SENTINEL;
         distance.value = cd.id;
     } else {
-        display.value  = value ?? null;
+        display.value = value ?? null;
         distance.value = '';
     }
 }
@@ -106,7 +106,7 @@ function onDistanceChange() {
 <template>
     <!-- flex-grow + width:1%: dentro de um .input-group, div genérica não
          estica como .form-control — sem isso o select colapsa a ~15px. -->
-    <div class="d-flex gap-1 align-items-start flex-grow-1" style="width:1%;min-width:0;">
+    <div class="d-flex gap-1 align-items-start flex-grow-1" style="width: 1%; min-width: 0">
         <div class="flex-grow-1 min-w-0">
             <SearchSelect
                 :model-value="display"
@@ -120,14 +120,16 @@ function onDistanceChange() {
         </div>
 
         <!-- Distância do Conta Dedos — só aparece com CONTA DEDOS selecionado -->
-        <select v-if="cdActive"
-                v-model="distance"
-                class="form-select form-select-sm flex-shrink-0"
-                style="width:84px;min-height:30px;"
-                :class="{ 'is-invalid': !distance }"
-                :disabled="disabled"
-                title="Distância do Conta Dedos"
-                @change="onDistanceChange">
+        <select
+            v-if="cdActive"
+            v-model="distance"
+            class="form-select form-select-sm flex-shrink-0"
+            style="width: 84px; min-height: 30px"
+            :class="{ 'is-invalid': !distance }"
+            :disabled="disabled"
+            title="Distância do Conta Dedos"
+            @change="onDistanceChange"
+        >
             <option value="" disabled>m?</option>
             <option v-for="cd in cdOptions" :key="cd.id" :value="cd.id">{{ cd.meters }} m</option>
         </select>

@@ -14,18 +14,29 @@ vi.mock('@/Components/Panel/ActionIconButton.vue', () => ({
     default: {
         props: ['title', 'href'],
         emits: ['click'],
-        template: '<button type="button" class="icon-btn" :title="title" :data-href="href" @click="$emit(\'click\')" />',
+        template:
+            '<button type="button" class="icon-btn" :title="title" :data-href="href" @click="$emit(\'click\')" />',
     },
 }));
 vi.mock('@/Components/Panel/ActionIconGroup.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 vi.mock('@/Components/Panel/TablePagination.vue', () => ({
-    default: { props: ['data', 'showingSuffix'], template: '<nav class="pager">{{ data.total }} {{ showingSuffix }}</nav>' },
+    default: {
+        props: ['data', 'showingSuffix'],
+        template: '<nav class="pager">{{ data.total }} {{ showingSuffix }}</nav>',
+    },
 }));
 
 const t = {
-    col_order_date: 'Data', col_expected_delivery: 'Previsão de entrega', col_total: 'Total',
-    action_pdf: 'Baixar PDF', action_send: 'Enviar ao fornecedor', action_receive: 'Receber', action_edit: 'Editar',
-    action_cancel: 'Cancelar pedido', action_delete: 'Excluir', empty_list: 'Nenhum pedido de compra encontrado.',
+    col_order_date: 'Data',
+    col_expected_delivery: 'Previsão de entrega',
+    col_total: 'Total',
+    action_pdf: 'Baixar PDF',
+    action_send: 'Enviar ao fornecedor',
+    action_receive: 'Receber',
+    action_edit: 'Editar',
+    action_cancel: 'Cancelar pedido',
+    action_delete: 'Excluir',
+    empty_list: 'Nenhum pedido de compra encontrado.',
     pagination_suffix: 'pedidos',
 };
 
@@ -35,14 +46,26 @@ afterEach(() => wrapper?.unmount());
 
 function po(overrides = {}) {
     return {
-        id: 'p1', code: 'PC-0000000001', supplier_name: 'Alfa Óptica', status: 'draft', status_label: 'Rascunho', is_editable: true,
-        order_date: '2026-09-01', expected_delivery_date: '2026-09-15', total_amount: 250, ...overrides,
+        id: 'p1',
+        code: 'PC-0000000001',
+        supplier_name: 'Alfa Óptica',
+        status: 'draft',
+        status_label: 'Rascunho',
+        is_editable: true,
+        order_date: '2026-09-01',
+        expected_delivery_date: '2026-09-15',
+        total_amount: 250,
+        ...overrides,
     };
 }
 
 function mountCards(rows, total = rows.length) {
     wrapper = mount(PurchaseOrderCards, {
-        props: { items: { data: rows, total, last_page: 3, current_page: 1, links: [] }, t, pdfUrlTemplate: '/po/__ID__/pdf' },
+        props: {
+            items: { data: rows, total, last_page: 3, current_page: 1, links: [] },
+            t,
+            pdfUrlTemplate: '/po/__ID__/pdf',
+        },
     });
 
     return wrapper;
@@ -52,7 +75,13 @@ const normalizeSpaces = (s) => s.replace(/\s/g, ' ');
 
 describe('PurchaseOrderCards', () => {
     it('renderiza um card por linha do paginator com fornecedor, código, status, datas e total', () => {
-        const w = mountCards([po(), po({ id: 'p2', status: 'received', status_label: 'Recebido', is_editable: false, supplier_name: null })], 31);
+        const w = mountCards(
+            [
+                po(),
+                po({ id: 'p2', status: 'received', status_label: 'Recebido', is_editable: false, supplier_name: null }),
+            ],
+            31,
+        );
         const cards = w.findAll('.card');
 
         expect(cards).toHaveLength(2);
@@ -68,10 +97,14 @@ describe('PurchaseOrderCards', () => {
     });
 
     it('usa o mesmo gating por status da tabela', () => {
-        const w = mountCards([po(), po({ id: 'p2', status: 'sent', is_editable: false }), po({ id: 'p3', status: 'received', is_editable: false })]);
+        const w = mountCards([
+            po(),
+            po({ id: 'p2', status: 'sent', is_editable: false }),
+            po({ id: 'p3', status: 'received', is_editable: false }),
+        ]);
         const cards = w.findAll('.card');
         const titles = (card) => card.findAll('.icon-btn').map((b) => b.attributes('title'));
-        const menu   = (card) => card.findAll('.dd .dropdown-item').map((b) => b.text());
+        const menu = (card) => card.findAll('.dd .dropdown-item').map((b) => b.text());
 
         expect(titles(cards[0])).toEqual(['Baixar PDF', 'Enviar ao fornecedor']);
         expect(menu(cards[0])).toEqual(['Editar', 'Cancelar pedido', 'Excluir']);

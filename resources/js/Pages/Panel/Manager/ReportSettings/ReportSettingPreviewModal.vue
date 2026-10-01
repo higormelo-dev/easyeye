@@ -2,23 +2,26 @@
 import { ref, watch } from 'vue';
 
 const props = defineProps({
-    open:       { type: Boolean, required: true },
-    previewUrl: { type: String,  default: null },
-    t:          { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    previewUrl: { type: String, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit    = defineEmits(['close']);
+const emit = defineEmits(['close']);
 const loading = ref(false);
-const srcUrl  = ref('');
+const srcUrl = ref('');
 
-watch(() => props.open, (val) => {
-    if (val && props.previewUrl) {
-        loading.value = true;
-        srcUrl.value  = props.previewUrl;
-    } else {
-        srcUrl.value = '';
-    }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val && props.previewUrl) {
+            loading.value = true;
+            srcUrl.value = props.previewUrl;
+        } else {
+            srcUrl.value = '';
+        }
+    },
+);
 
 function onIframeLoad() {
     loading.value = false;
@@ -28,11 +31,7 @@ function onIframeLoad() {
 <template>
     <Teleport to="body">
         <transition name="rs-fade">
-            <div
-                v-if="open"
-                class="rs-preview-backdrop"
-                @click="$emit('close')"
-            />
+            <div v-if="open" class="rs-preview-backdrop" @click="$emit('close')" />
         </transition>
 
         <transition name="rs-scale">
@@ -72,7 +71,7 @@ function onIframeLoad() {
 .rs-preview-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .5);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 1054;
 }
 
@@ -84,8 +83,8 @@ function onIframeLoad() {
     width: min(860px, 96vw);
     height: min(90vh, 960px);
     background: #fff;
-    border-radius: .5rem;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, .28);
+    border-radius: 0.5rem;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
     z-index: 1055;
     display: flex;
     flex-direction: column;
@@ -95,7 +94,7 @@ function onIframeLoad() {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: .875rem 1.25rem;
+    padding: 0.875rem 1.25rem;
     border-bottom: 1px solid var(--bs-border-color, #dee2e6);
     flex-shrink: 0;
 }
@@ -116,14 +115,29 @@ function onIframeLoad() {
 .rs-preview-footer {
     display: flex;
     justify-content: flex-end;
-    padding: .75rem 1.25rem;
+    padding: 0.75rem 1.25rem;
     border-top: 1px solid var(--bs-border-color, #dee2e6);
     flex-shrink: 0;
 }
 
-.rs-fade-enter-active, .rs-fade-leave-active { transition: opacity .2s ease; }
-.rs-fade-enter-from, .rs-fade-leave-to       { opacity: 0; }
+.rs-fade-enter-active,
+.rs-fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+.rs-fade-enter-from,
+.rs-fade-leave-to {
+    opacity: 0;
+}
 
-.rs-scale-enter-active, .rs-scale-leave-active { transition: opacity .22s ease, transform .22s cubic-bezier(.34,1.56,.64,1); }
-.rs-scale-enter-from, .rs-scale-leave-to       { opacity: 0; transform: translate(-50%, -50%) scale(.9); }
+.rs-scale-enter-active,
+.rs-scale-leave-active {
+    transition:
+        opacity 0.22s ease,
+        transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.rs-scale-enter-from,
+.rs-scale-leave-to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+}
 </style>

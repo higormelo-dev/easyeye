@@ -39,8 +39,8 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                 <div class="ee-login-panel-blob ee-login-panel-blob-1"></div>
                 <div class="ee-login-panel-blob ee-login-panel-blob-2"></div>
 
-                <img :src="logoWhiteSvg" :alt="appName" class="ee-login-panel-logo">
-                <img :src="illustrationImg" :alt="appName" class="ee-login-panel-img">
+                <img :src="logoWhiteSvg" :alt="appName" class="ee-login-panel-logo" />
+                <img :src="illustrationImg" :alt="appName" class="ee-login-panel-img" />
 
                 <div class="ee-login-features">
                     <div class="ee-login-feature">
@@ -60,14 +60,13 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                         <span>{{ t.panel?.feature_compliance }}</span>
                     </div>
                 </div>
-
             </div>
         </template>
 
         <!-- ── Right: login form ── -->
         <div class="text-center mb-4">
             <a href="/login" class="d-inline-block">
-                <img :src="logoSvg" class="img-fluid ee-login-brand" :alt="appName">
+                <img :src="logoSvg" class="img-fluid ee-login-brand" :alt="appName" />
             </a>
         </div>
 
@@ -87,7 +86,6 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                 </div>
 
                 <form @submit.prevent="submit" novalidate>
-
                     <div class="mb-3">
                         <label class="form-label">{{ t.email ?? 'E-mail' }}</label>
                         <div class="input-group">
@@ -100,7 +98,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                                 autocomplete="username"
                                 autofocus
                                 required
-                            >
+                            />
                         </div>
                     </div>
 
@@ -116,7 +114,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                                 autocomplete="current-password"
                                 placeholder="••••••••••"
                                 required
-                            >
+                            />
                             <button
                                 type="button"
                                 class="btn btn-light"
@@ -133,12 +131,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
 
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="form-check mb-0">
-                            <input
-                                v-model="form.remember"
-                                type="checkbox"
-                                id="remember"
-                                class="form-check-input"
-                            >
+                            <input v-model="form.remember" type="checkbox" id="remember" class="form-check-input" />
                             <label for="remember" class="form-check-label text-dark">
                                 {{ t.remember_me }}
                             </label>
@@ -147,11 +140,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                     </div>
 
                     <div class="d-grid mb-3">
-                        <button
-                            type="submit"
-                            class="btn btn-primary ee-login-submit"
-                            :disabled="form.processing"
-                        >
+                        <button type="submit" class="btn btn-primary ee-login-submit" :disabled="form.processing">
                             <span v-if="form.processing">
                                 <i class="ti ti-loader-2 ee-spin me-1"></i>
                             </span>
@@ -181,7 +170,11 @@ const statusMessage = computed(() => props.flash?.status ?? null);
     animation: eeSpin 1s linear infinite;
 }
 @keyframes eeSpin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 </style>

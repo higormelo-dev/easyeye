@@ -3,19 +3,20 @@ import { ref, watch } from 'vue';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 
 const props = defineProps({
-    open:   { type: Boolean, required: true },
-    planId: { type: String,  default: null },
-    t:      { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    planId: { type: String, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit    = defineEmits(['close', 'edit']);
+const emit = defineEmits(['close', 'edit']);
 const loading = ref(false);
-const plan    = ref(null);
+const plan = ref(null);
 
 async function loadDetail(id) {
-    loading.value = true; plan.value = null;
+    loading.value = true;
+    plan.value = null;
     try {
-        const res  = await fetch(route('manager.plans.show', id));
+        const res = await fetch(route('manager.plans.show', id));
         const json = await res.json();
         plan.value = json.data;
     } finally {
@@ -23,10 +24,13 @@ async function loadDetail(id) {
     }
 }
 
-watch(() => props.open, (val) => {
-    if (val && props.planId) loadDetail(props.planId);
-    if (!val) plan.value = null;
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val && props.planId) loadDetail(props.planId);
+        if (!val) plan.value = null;
+    },
+);
 
 function featureValueLabel(feature) {
     if (feature.is_boolean) {
@@ -46,13 +50,7 @@ function featureBadgeClass(feature) {
 </script>
 
 <template>
-    <OffcanvasPanel
-        :open="open"
-        :width="440"
-        :loading="loading"
-        :loading-label="t.loading"
-        @close="$emit('close')"
-    >
+    <OffcanvasPanel :open="open" :width="440" :loading="loading" :loading-label="t.loading" @close="$emit('close')">
         <!-- Header -->
         <template #header>
             <div>
@@ -73,16 +71,30 @@ function featureBadgeClass(feature) {
 
         <!-- Body -->
         <template v-if="plan">
-
             <!-- Section: Precificação -->
             <div class="pdd-section">
                 <div class="pdd-section__title"><i class="ti ti-currency-dollar me-1"></i> {{ t.section_pricing }}</div>
                 <div class="pdd-table">
-                    <div class="pdd-row"><span class="pdd-label">{{ t.detail_price }}</span><span class="pdd-value fw-semibold fs-5 text-body">{{ plan.price_formatted }}</span></div>
-                    <div class="pdd-row"><span class="pdd-label">{{ t.detail_cycle }}</span><span class="pdd-value">{{ plan.billing_label }}</span></div>
-                    <div class="pdd-row"><span class="pdd-label">{{ t.detail_sort_order }}</span><span class="pdd-value">{{ plan.sort_order }}</span></div>
-                    <div v-if="plan.description" class="pdd-row"><span class="pdd-label">{{ t.detail_description }}</span><span class="pdd-value">{{ plan.description }}</span></div>
-                    <div class="pdd-row"><span class="pdd-label">{{ t.detail_created_at }}</span><span class="pdd-value">{{ plan.created_at }}</span></div>
+                    <div class="pdd-row">
+                        <span class="pdd-label">{{ t.detail_price }}</span
+                        ><span class="pdd-value fw-semibold fs-5 text-body">{{ plan.price_formatted }}</span>
+                    </div>
+                    <div class="pdd-row">
+                        <span class="pdd-label">{{ t.detail_cycle }}</span
+                        ><span class="pdd-value">{{ plan.billing_label }}</span>
+                    </div>
+                    <div class="pdd-row">
+                        <span class="pdd-label">{{ t.detail_sort_order }}</span
+                        ><span class="pdd-value">{{ plan.sort_order }}</span>
+                    </div>
+                    <div v-if="plan.description" class="pdd-row">
+                        <span class="pdd-label">{{ t.detail_description }}</span
+                        ><span class="pdd-value">{{ plan.description }}</span>
+                    </div>
+                    <div class="pdd-row">
+                        <span class="pdd-label">{{ t.detail_created_at }}</span
+                        ><span class="pdd-value">{{ plan.created_at }}</span>
+                    </div>
                 </div>
             </div>
 
@@ -104,20 +116,41 @@ function featureBadgeClass(feature) {
                 <i class="ti ti-adjustments-off d-block mb-1 fs-4"></i>
                 {{ t.empty_features }}
             </div>
-
         </template>
     </OffcanvasPanel>
 </template>
 
 <style scoped>
-.pdd-section { margin-bottom: 1.5rem; }
+.pdd-section {
+    margin-bottom: 1.5rem;
+}
 .pdd-section__title {
-    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--bs-secondary-color); margin-bottom: .5rem; padding-bottom: .25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
     border-bottom: 1px solid var(--bs-border-color);
 }
-.pdd-table { display: grid; gap: .375rem; }
-.pdd-row { display: grid; grid-template-columns: 160px 1fr; gap: .5rem; font-size: .875rem; align-items: baseline; }
-.pdd-label { font-weight: 600; color: var(--bs-body-color); }
-.pdd-value { color: var(--bs-secondary-color); word-break: break-word; }
+.pdd-table {
+    display: grid;
+    gap: 0.375rem;
+}
+.pdd-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    align-items: baseline;
+}
+.pdd-label {
+    font-weight: 600;
+    color: var(--bs-body-color);
+}
+.pdd-value {
+    color: var(--bs-secondary-color);
+    word-break: break-word;
+}
 </style>

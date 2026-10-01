@@ -1,12 +1,12 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh      from '@/Components/Panel/SortableTh.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
-import UserActions        from './UserActions.vue';
-import { useUserFormat }  from './useUserFormat.js';
+import UserActions from './UserActions.vue';
+import { useUserFormat } from './useUserFormat.js';
 
 /**
  * Tabela de usuários no padrão de Patients/PatientTable: cabeçalhos
@@ -15,9 +15,9 @@ import { useUserFormat }  from './useUserFormat.js';
  * acessível (TablePagination, sem v-html).
  */
 const props = defineProps({
-    users:     { type: Object, required: true },   // paginator Laravel
-    filters:   { type: Object, default: () => ({}) },
-    t:         { type: Object, default: () => ({}) },
+    users: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
@@ -29,33 +29,32 @@ const rows = computed(() => props.users?.data ?? []);
 
 // ── Ordenação (padrão = cadastro mais recente primeiro, igual ao backend) ───
 const currentSort = computed(() => props.filters.sort ?? 'created_at');
-const currentDir  = computed(() => props.filters.direction ?? 'desc');
+const currentDir = computed(() => props.filters.direction ?? 'desc');
 
 // ── Ordem de colunas personalizável ─────────────────────────────────────────
 // sortKey = chave aceita por UsersController::SORTABLE.
 const COLUMN_DEFS = computed(() => [
-    { key: 'nome',     label: props.t.col_name ?? 'Nome',           sortKey: 'name' },
-    { key: 'email',    label: props.t.col_email ?? 'E-mail',        sortKey: 'email' },
-    { key: 'perfil',   label: props.t.col_role ?? 'Perfil',         sortKey: 'rule' },
+    { key: 'nome', label: props.t.col_name ?? 'Nome', sortKey: 'name' },
+    { key: 'email', label: props.t.col_email ?? 'E-mail', sortKey: 'email' },
+    { key: 'perfil', label: props.t.col_role ?? 'Perfil', sortKey: 'rule' },
     { key: 'cadastro', label: props.t.col_created_at ?? 'Cadastro', sortKey: 'created_at' },
 ]);
 const DEFAULT_COLUMN_ORDER = ['nome', 'email', 'perfil', 'cadastro'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'access_users_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('access_users_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 </script>
 
@@ -95,7 +94,8 @@ const columnMenuLabels = computed(() => ({
                         :current-dir="currentDir"
                         :title="tx('sort_by', { column: col.label })"
                         @sort="emit('sort', $event)"
-                    >{{ col.label }}</SortableTh>
+                        >{{ col.label }}</SortableTh
+                    >
                     <th class="text-center">{{ t.col_status ?? 'Status' }}</th>
                     <th class="text-end">{{ t.col_actions ?? 'Ações' }}</th>
                 </tr>
@@ -118,13 +118,16 @@ const columnMenuLabels = computed(() => ({
                                     width="30"
                                     height="30"
                                     loading="lazy"
-                                    style="object-fit:cover;"
-                                >
+                                    style="object-fit: cover"
+                                />
                                 <span class="fw-medium">{{ u.name }}</span>
                                 <span v-if="u.is_owner" class="badge badge-soft-warning rounded fs-11">
-                                    <i class="ti ti-crown me-1" aria-hidden="true"></i>{{ t.badge_owner ?? 'Proprietário' }}
+                                    <i class="ti ti-crown me-1" aria-hidden="true"></i
+                                    >{{ t.badge_owner ?? 'Proprietário' }}
                                 </span>
-                                <span v-if="u.is_self" class="badge badge-soft-primary rounded fs-11">{{ t.badge_self ?? 'Você' }}</span>
+                                <span v-if="u.is_self" class="badge badge-soft-primary rounded fs-11">{{
+                                    t.badge_self ?? 'Você'
+                                }}</span>
                             </div>
                         </td>
 
@@ -142,15 +145,19 @@ const columnMenuLabels = computed(() => ({
                         <span
                             v-if="u.deleted"
                             class="badge badge-soft-secondary rounded text-body-secondary border fs-13 fw-medium"
-                        ><i class="ti ti-trash me-1" aria-hidden="true"></i>{{ t.status_deleted ?? 'Excluído' }}</span>
+                            ><i class="ti ti-trash me-1" aria-hidden="true"></i
+                            >{{ t.status_deleted ?? 'Excluído' }}</span
+                        >
                         <span
                             v-else-if="u.active"
                             class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                        >{{ t.status_active ?? 'Ativo' }}</span>
+                            >{{ t.status_active ?? 'Ativo' }}</span
+                        >
                         <span
                             v-else
                             class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
-                        >{{ t.status_inactive ?? 'Inativo' }}</span>
+                            >{{ t.status_inactive ?? 'Inativo' }}</span
+                        >
                     </td>
 
                     <td class="text-end">

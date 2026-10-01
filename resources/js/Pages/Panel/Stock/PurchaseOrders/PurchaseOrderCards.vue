@@ -1,9 +1,9 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 
 /**
@@ -12,9 +12,9 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
  * Ações com o mesmo gating por status de PurchaseOrderTable.
  */
 const props = defineProps({
-    items:          { type: Object, required: true },   // paginator Laravel
-    t:              { type: Object, default: () => ({}) },
-    pdfUrlTemplate: { type: String, default: '' },     // rota com __ID__
+    items: { type: Object, required: true }, // paginator Laravel
+    t: { type: Object, default: () => ({}) },
+    pdfUrlTemplate: { type: String, default: '' }, // rota com __ID__
 });
 
 const emit = defineEmits(['edit', 'send', 'receive', 'cancel', 'delete']);
@@ -24,11 +24,11 @@ const { money, date } = useLocaleFormat();
 const rows = computed(() => props.items?.data ?? []);
 
 const STATUS_BADGE = {
-    draft:              'badge-soft-secondary text-secondary border border-secondary',
-    sent:               'badge-soft-info text-info border border-info',
+    draft: 'badge-soft-secondary text-secondary border border-secondary',
+    sent: 'badge-soft-info text-info border border-info',
     partially_received: 'badge-soft-warning text-warning border border-warning',
-    received:           'badge-soft-success text-success border border-success',
-    cancelled:          'badge-soft-danger text-danger border border-danger',
+    received: 'badge-soft-success text-success border border-success',
+    cancelled: 'badge-soft-danger text-danger border border-danger',
 };
 
 /** Rótulo traduzido pelo backend (PurchaseOrderStatus::label()). */
@@ -36,12 +36,12 @@ function statusLabel(po) {
     return po.status_label ?? po.status;
 }
 
-const canEdit    = (po) => Boolean(po.is_editable);
-const canSend    = (po) => po.status === 'draft';
+const canEdit = (po) => Boolean(po.is_editable);
+const canSend = (po) => po.status === 'draft';
 const canReceive = (po) => ['sent', 'partially_received'].includes(po.status);
-const canCancel  = (po) => !['received', 'cancelled'].includes(po.status);
-const canDelete  = (po) => po.status === 'draft';
-const hasMenu    = (po) => canEdit(po) || canCancel(po) || canDelete(po);
+const canCancel = (po) => !['received', 'cancelled'].includes(po.status);
+const canDelete = (po) => po.status === 'draft';
+const hasMenu = (po) => canEdit(po) || canCancel(po) || canDelete(po);
 
 function pdfUrl(po) {
     return props.pdfUrlTemplate ? props.pdfUrlTemplate.replace('__ID__', po.id) : null;
@@ -55,21 +55,16 @@ function pdfUrl(po) {
     </div>
 
     <div v-else class="row g-3">
-        <div
-            v-for="po in rows"
-            :key="po.id"
-            class="col-12 col-sm-6 col-md-4 col-xl-3"
-        >
+        <div v-for="po in rows" :key="po.id" class="col-12 col-sm-6 col-md-4 col-xl-3">
             <div class="card card-body h-100">
                 <div class="d-flex align-items-start gap-2 mb-2">
                     <div class="me-auto">
                         <h6 class="mb-1 fw-semibold lh-sm text-break">{{ po.supplier_name ?? '—' }}</h6>
                         <code class="text-muted small">{{ po.code }}</code>
                     </div>
-                    <span
-                        class="badge rounded fs-12"
-                        :class="STATUS_BADGE[po.status] ?? 'badge-soft-secondary'"
-                    >{{ statusLabel(po) }}</span>
+                    <span class="badge rounded fs-12" :class="STATUS_BADGE[po.status] ?? 'badge-soft-secondary'">{{
+                        statusLabel(po)
+                    }}</span>
                 </div>
 
                 <dl class="small text-muted mb-1">
@@ -87,7 +82,7 @@ function pdfUrl(po) {
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end" gap="tight">
                     <ActionIconButton
@@ -120,14 +115,23 @@ function pdfUrl(po) {
                                 <i class="ti ti-edit me-1" aria-hidden="true"></i> {{ t.action_edit ?? 'Editar' }}
                             </button>
                         </li>
-                        <li v-if="canEdit(po) && (canCancel(po) || canDelete(po))"><hr class="dropdown-divider"></li>
+                        <li v-if="canEdit(po) && (canCancel(po) || canDelete(po))"><hr class="dropdown-divider" /></li>
                         <li v-if="canCancel(po)">
-                            <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('cancel', po)">
-                                <i class="ti ti-x me-1" aria-hidden="true"></i> {{ t.action_cancel ?? 'Cancelar pedido' }}
+                            <button
+                                type="button"
+                                class="dropdown-item rounded-1 text-danger"
+                                @click="emit('cancel', po)"
+                            >
+                                <i class="ti ti-x me-1" aria-hidden="true"></i>
+                                {{ t.action_cancel ?? 'Cancelar pedido' }}
                             </button>
                         </li>
                         <li v-if="canDelete(po)">
-                            <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', po)">
+                            <button
+                                type="button"
+                                class="dropdown-item rounded-1 text-danger"
+                                @click="emit('delete', po)"
+                            >
                                 <i class="ti ti-trash me-1" aria-hidden="true"></i> {{ t.action_delete ?? 'Excluir' }}
                             </button>
                         </li>

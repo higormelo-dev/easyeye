@@ -20,13 +20,23 @@ vi.mock('@inertiajs/vue3', async () => {
 
     return {
         usePage: () => ({ props: inertia.pageProps }),
-        router: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn(), reload: vi.fn(), visit: vi.fn() },
+        router: {
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            patch: vi.fn(),
+            delete: vi.fn(),
+            reload: vi.fn(),
+            visit: vi.fn(),
+        },
         Link: { template: '<a><slot /></a>', props: ['href'] },
         Head: { template: '<div><slot /></div>' },
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view'],
@@ -42,7 +52,8 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder', 'clearLabel', 'maxWidth'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Pages/Panel/AccessControl/Roles/RoleTable.vue', () => ({
@@ -58,24 +69,36 @@ vi.mock('@/Pages/Panel/AccessControl/Roles/RoleTable.vue', () => ({
     },
 }));
 vi.mock('@/Pages/Panel/AccessControl/Roles/RoleCards.vue', () => ({
-    default: { props: ['roles', 't', 'emptyText'], template: '<div class="cards-stub">{{ roles.data.map((r) => r.name).join(",") }}</div>' },
+    default: {
+        props: ['roles', 't', 'emptyText'],
+        template: '<div class="cards-stub">{{ roles.data.map((r) => r.name).join(",") }}</div>',
+    },
 }));
 vi.mock('@/Pages/Panel/AccessControl/Roles/RoleFormModal.vue', () => ({
     default: {
         props: ['open', 'role', 't'],
-        template: '<div class="modal-stub" :data-open="open" :data-role="role?.name ?? \'\'" :data-title="open ? (role ? t.form_title_edit : t.form_title_create) : \'\'" />',
+        template:
+            '<div class="modal-stub" :data-open="open" :data-role="role?.name ?? \'\'" :data-title="open ? (role ? t.form_title_edit : t.form_title_create) : \'\'" />',
     },
 }));
 
 const t = {
-    page_title: 'Access profiles', total_label: 'Total:', btn_new: 'New profile',
-    search_placeholder: 'Search profiles by name or description...', search_clear: 'Clear search', close: 'Close',
-    system_profiles_title: 'System profiles', system_profiles_count: ':count predefined by the platform',
-    system_profile_badge: 'Default', notice: 'System profiles are defined by the platform.',
+    page_title: 'Access profiles',
+    total_label: 'Total:',
+    btn_new: 'New profile',
+    search_placeholder: 'Search profiles by name or description...',
+    search_clear: 'Clear search',
+    close: 'Close',
+    system_profiles_title: 'System profiles',
+    system_profiles_count: ':count predefined by the platform',
+    system_profile_badge: 'Default',
+    notice: 'System profiles are defined by the platform.',
     confirm_delete: 'Delete the profile ":name"?',
     confirm_delete_with_users: 'Delete the profile ":name"? :count user(s) will lose these additional permissions.',
-    empty_list: 'No custom profiles yet.', empty_search: 'No profiles match this search.',
-    form_title_create: 'New profile', form_title_edit: 'Edit profile',
+    empty_list: 'No custom profiles yet.',
+    empty_search: 'No profiles match this search.',
+    form_title_create: 'New profile',
+    form_title_edit: 'Edit profile',
 };
 
 const routes = {
@@ -220,12 +243,18 @@ describe('AccessControl/Roles/Index', () => {
     });
 
     it('estado vazio distingue "nenhum cadastrado" de "nada encontrado na busca"', () => {
-        expect(mountPage({ roles: { data: [], total: 0 } }).get('.table-stub').attributes('data-empty'))
-            .toBe('No custom profiles yet.');
+        expect(
+            mountPage({ roles: { data: [], total: 0 } })
+                .get('.table-stub')
+                .attributes('data-empty'),
+        ).toBe('No custom profiles yet.');
         wrapper.unmount();
 
-        expect(mountPage({ roles: { data: [], total: 0 }, filters: { ...baseFilters, search: 'x' } })
-            .get('.table-stub').attributes('data-empty')).toBe('No profiles match this search.');
+        expect(
+            mountPage({ roles: { data: [], total: 0 }, filters: { ...baseFilters, search: 'x' } })
+                .get('.table-stub')
+                .attributes('data-empty'),
+        ).toBe('No profiles match this search.');
     });
 
     it('excluir perfil com usuários avisa quantos perdem as permissões; confirmado, apaga pela rota', async () => {
@@ -235,7 +264,9 @@ describe('AccessControl/Roles/Index', () => {
 
         await w.find('.delete-row-2').trigger('click');
 
-        expect(confirm).toHaveBeenCalledWith('Delete the profile "Recepção"? 3 user(s) will lose these additional permissions.');
+        expect(confirm).toHaveBeenCalledWith(
+            'Delete the profile "Recepção"? 3 user(s) will lose these additional permissions.',
+        );
         expect(router.delete).toHaveBeenCalledWith('/panel/accesscontrol/roles/r2', { preserveScroll: true });
     });
 

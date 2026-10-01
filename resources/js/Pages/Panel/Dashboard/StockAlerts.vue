@@ -9,7 +9,7 @@
  */
 const props = defineProps({
     alerts: { type: Object, required: true }, // { below_minimum_count, expiring_lots_count, list_url, products_url, expiring_url }
-    t:      { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 /** Texto com plural (_one/_other) e :count. */
@@ -37,20 +37,32 @@ function countText(key, count) {
         <div class="card-body">
             <div class="row g-3">
                 <div v-if="alerts.below_minimum_count > 0" class="col-md-6">
-                    <a :href="alerts.products_url" class="d-flex align-items-center gap-3 p-2 rounded text-decoration-none text-reset border">
-                        <span class="avatar avatar-lg bg-warning-subtle rounded-circle d-flex align-items-center justify-content-center">
+                    <a
+                        :href="alerts.products_url"
+                        class="d-flex align-items-center gap-3 p-2 rounded text-decoration-none text-reset border"
+                    >
+                        <span
+                            class="avatar avatar-lg bg-warning-subtle rounded-circle d-flex align-items-center justify-content-center"
+                        >
                             <i class="ti ti-alert-triangle text-warning fs-4"></i>
                         </span>
                         <div>
-                            <div class="fw-semibold">{{ countText('stock_below_minimum', alerts.below_minimum_count) }}</div>
+                            <div class="fw-semibold">
+                                {{ countText('stock_below_minimum', alerts.below_minimum_count) }}
+                            </div>
                             <div class="text-muted small">{{ t.stock_below_minimum_hint }}</div>
                         </div>
                     </a>
                 </div>
 
                 <div v-if="alerts.expiring_lots_count > 0" class="col-md-6">
-                    <a :href="alerts.expiring_url" class="d-flex align-items-center gap-3 p-2 rounded text-decoration-none text-reset border">
-                        <span class="avatar avatar-lg bg-danger-subtle rounded-circle d-flex align-items-center justify-content-center">
+                    <a
+                        :href="alerts.expiring_url"
+                        class="d-flex align-items-center gap-3 p-2 rounded text-decoration-none text-reset border"
+                    >
+                        <span
+                            class="avatar avatar-lg bg-danger-subtle rounded-circle d-flex align-items-center justify-content-center"
+                        >
                             <i class="ti ti-calendar-x text-danger fs-4"></i>
                         </span>
                         <div>

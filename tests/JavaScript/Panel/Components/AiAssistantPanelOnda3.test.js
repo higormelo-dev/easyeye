@@ -10,45 +10,45 @@ import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
  */
 describe('AiAssistantPanel — Onda 3', () => {
     const baseUrls = {
-        estimate:           '/_routes/panel.ai-runs.estimate',
-        store:              '/_routes/panel.ai-runs.store',
-        show:               '/_routes/panel.ai-runs.show/__ID__',
-        approve:            '/_routes/panel.ai-runs.approve/__ID__',
-        reject:             '/_routes/panel.ai-runs.reject/__ID__',
-        cancel:             '/_routes/panel.ai-runs.cancel/__ID__',
-        my_prompts_index:   '/_routes/panel.ai-runs.my-prompts.index',
-        my_prompts_store:   '/_routes/panel.ai-runs.my-prompts.store',
+        estimate: '/_routes/panel.ai-runs.estimate',
+        store: '/_routes/panel.ai-runs.store',
+        show: '/_routes/panel.ai-runs.show/__ID__',
+        approve: '/_routes/panel.ai-runs.approve/__ID__',
+        reject: '/_routes/panel.ai-runs.reject/__ID__',
+        cancel: '/_routes/panel.ai-runs.cancel/__ID__',
+        my_prompts_index: '/_routes/panel.ai-runs.my-prompts.index',
+        my_prompts_store: '/_routes/panel.ai-runs.my-prompts.store',
         my_prompts_destroy: '/_routes/panel.ai-runs.my-prompts.destroy/__ID__',
-        escalate:           '/_routes/panel.ai-runs.escalate/__ID__',
-        feedback:           '/_routes/panel.ai-runs.feedback/__ID__',
+        escalate: '/_routes/panel.ai-runs.escalate/__ID__',
+        feedback: '/_routes/panel.ai-runs.feedback/__ID__',
     };
 
     const baseAi = {
-        urls:    baseUrls,
+        urls: baseUrls,
         balance: { available: 50 },
-        modes:   [{ value: 'validated' }],
+        modes: [{ value: 'validated' }],
         workflows: ['record_assist'],
         default_workflow: 'record_assist',
         assistant: {
-            title:            'Assistente de IA',
-            analyze:          'Analisar',
-            approve:          'Aprovar',
-            my_prompts:       'Meus prompts',
+            title: 'Assistente de IA',
+            analyze: 'Analisar',
+            approve: 'Aprovar',
+            my_prompts: 'Meus prompts',
             save_as_my_prompt: 'Salvar como meu prompt',
             escalate_validated: 'Reanalisar com Validated',
             escalate_consensus: 'Reanalisar com Consensus',
-            feedback_title:   'Você fez muitas alterações no rascunho.',
-            feedback_skip:    'Pular feedback',
+            feedback_title: 'Você fez muitas alterações no rascunho.',
+            feedback_skip: 'Pular feedback',
             feedback_submit_and_approve: 'Enviar e aprovar',
         },
         workflow_labels: { record_assist: 'Análise do prontuário' },
     };
 
     const baseContext = {
-        workflow_default:  'record_assist',
-        patient_id:        'p1',
+        workflow_default: 'record_assist',
+        patient_id: 'p1',
         medical_record_id: 'r1',
-        can_insert:        true,
+        can_insert: true,
     };
 
     function mountPanel(overrides = {}) {
@@ -56,7 +56,8 @@ describe('AiAssistantPanel — Onda 3', () => {
             global: {
                 stubs: {
                     OffcanvasPanel: {
-                        template: '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
+                        template:
+                            '<div data-test="offcanvas"><slot name="header" /><slot /><slot name="footer" /></div>',
                         props: ['open', 'width'],
                     },
                 },
@@ -68,13 +69,25 @@ describe('AiAssistantPanel — Onda 3', () => {
     beforeEach(() => {
         globalThis.window = globalThis.window ?? {};
         globalThis.window.axios = {
-            post:   vi.fn(() => Promise.resolve({ data: { run_id: 'r-abc' } })),
-            get:    vi.fn((u) => {
+            post: vi.fn(() => Promise.resolve({ data: { run_id: 'r-abc' } })),
+            get: vi.fn((u) => {
                 if (u.includes('my-prompts')) {
-                    return Promise.resolve({ data: { data: [
-                        { id: 'mp-1', label: 'Padrão consulta retorno', prompt: 'Resumir caso com base nas últimas 3 consultas.' },
-                        { id: 'mp-2', label: 'Glaucoma',              prompt: 'Avaliar disco óptico e relação E/D do paciente.' },
-                    ] } });
+                    return Promise.resolve({
+                        data: {
+                            data: [
+                                {
+                                    id: 'mp-1',
+                                    label: 'Padrão consulta retorno',
+                                    prompt: 'Resumir caso com base nas últimas 3 consultas.',
+                                },
+                                {
+                                    id: 'mp-2',
+                                    label: 'Glaucoma',
+                                    prompt: 'Avaliar disco óptico e relação E/D do paciente.',
+                                },
+                            ],
+                        },
+                    });
                 }
                 return Promise.resolve({ data: { data: [] } });
             }),
@@ -96,7 +109,7 @@ describe('AiAssistantPanel — Onda 3', () => {
             const wrapper = mountPanel();
             await flushPromises();
 
-            const promptBtn = wrapper.findAll('button').find(b => b.text() === 'Padrão consulta retorno');
+            const promptBtn = wrapper.findAll('button').find((b) => b.text() === 'Padrão consulta retorno');
             await promptBtn.trigger('click');
 
             expect(wrapper.vm.form.user_prompt).toContain('Resumir caso');
@@ -109,12 +122,14 @@ describe('AiAssistantPanel — Onda 3', () => {
             vm.form.user_prompt = 'um prompt válido com mais de 12 caracteres';
 
             globalThis.window.prompt = vi.fn(() => 'Novo prompt');
-            window.axios.post.mockResolvedValueOnce({ data: { id: 'mp-3', label: 'Novo prompt', prompt: vm.form.user_prompt } });
+            window.axios.post.mockResolvedValueOnce({
+                data: { id: 'mp-3', label: 'Novo prompt', prompt: vm.form.user_prompt },
+            });
 
             await vm.saveCurrentPrompt();
             await flushPromises();
 
-            const calls = window.axios.post.mock.calls.filter(c => c[0].includes('my-prompts'));
+            const calls = window.axios.post.mock.calls.filter((c) => c[0].includes('my-prompts'));
             expect(calls.length).toBe(1);
         });
     });
@@ -161,7 +176,9 @@ describe('AiAssistantPanel — Onda 3', () => {
             vm.runStatus = 'failed';
             vm.runMode = 'economy';
 
-            window.axios.post.mockResolvedValueOnce({ data: { run_id: 'r-new', status: 'reserved', mode: 'validated' } });
+            window.axios.post.mockResolvedValueOnce({
+                data: { run_id: 'r-new', status: 'reserved', mode: 'validated' },
+            });
 
             await vm.escalate();
             await flushPromises();
@@ -197,7 +214,7 @@ describe('AiAssistantPanel — Onda 3', () => {
             const wrapper = mountPanel();
             const vm = wrapper.vm;
             vm.runId = 'r-abc';
-            vm.step  = 'review';
+            vm.step = 'review';
             vm.originalDraft = 'um dois três quatro cinco';
             vm.reviewText = 'A B C D cinco';
             await wrapper.vm.$nextTick();
@@ -207,7 +224,7 @@ describe('AiAssistantPanel — Onda 3', () => {
 
             expect(vm.feedbackPanel).toBe(true);
             // approve NÃO foi chamado (axios.post ainda não para /approve)
-            const approveCalls = window.axios.post.mock.calls.filter(c => c[0].includes('approve'));
+            const approveCalls = window.axios.post.mock.calls.filter((c) => c[0].includes('approve'));
             expect(approveCalls.length).toBe(0);
         });
 
@@ -226,7 +243,7 @@ describe('AiAssistantPanel — Onda 3', () => {
             const wrapper = mountPanel();
             const vm = wrapper.vm;
             vm.runId = 'r-abc';
-            vm.step  = 'review';
+            vm.step = 'review';
             vm.reviewText = 'algum texto';
             vm.feedbackPanel = true;
 
@@ -234,7 +251,7 @@ describe('AiAssistantPanel — Onda 3', () => {
             await flushPromises();
 
             expect(vm.feedbackPanel).toBe(false);
-            const approveCalls = window.axios.post.mock.calls.filter(c => c[0].includes('approve'));
+            const approveCalls = window.axios.post.mock.calls.filter((c) => c[0].includes('approve'));
             expect(approveCalls.length).toBeGreaterThanOrEqual(1);
         });
     });

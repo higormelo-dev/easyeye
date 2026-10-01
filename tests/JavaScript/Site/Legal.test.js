@@ -32,9 +32,16 @@ const t = {
 };
 
 const doc = (extra = {}) => ({
-    version: '1.0', effectiveFrom: 'September 27, 2026', content: '1. Who we are\n\nText.',
-    contentLang: 'en', isTranslation: false, isOriginal: false, hasTranslation: false,
-    originalUrl: '/privacidade?original=1', translationUrl: '/privacidade', ...extra,
+    version: '1.0',
+    effectiveFrom: 'September 27, 2026',
+    content: '1. Who we are\n\nText.',
+    contentLang: 'en',
+    isTranslation: false,
+    isOriginal: false,
+    hasTranslation: false,
+    originalUrl: '/privacidade?original=1',
+    translationUrl: '/privacidade',
+    ...extra,
 });
 
 let wrapper;
@@ -59,17 +66,33 @@ afterEach(() => wrapper?.unmount());
 describe('Site/Legal', () => {
     it('mostra título, versão vigente e parágrafos do documento', () => {
         mountLegal({
-            document: { version: '2.0', effectiveFrom: '27 de setembro de 2026', content: 'Primeiro parágrafo\ncom quebra.\n\n  Segundo parágrafo.  ' },
+            document: {
+                version: '2.0',
+                effectiveFrom: '27 de setembro de 2026',
+                content: 'Primeiro parágrafo\ncom quebra.\n\n  Segundo parágrafo.  ',
+            },
         });
 
         expect(wrapper.get('h1').text()).toBe('Política de Privacidade');
-        expect(wrapper.get('[data-test="legal-version"]').text()).toBe('Versão 2.0 · vigente desde 27 de setembro de 2026');
-        const paragraphs = wrapper.get('[data-test="legal-body"]').findAll('p').map((p) => p.text());
+        expect(wrapper.get('[data-test="legal-version"]').text()).toBe(
+            'Versão 2.0 · vigente desde 27 de setembro de 2026',
+        );
+        const paragraphs = wrapper
+            .get('[data-test="legal-body"]')
+            .findAll('p')
+            .map((p) => p.text());
         expect(paragraphs).toEqual(['Primeiro parágrafo\ncom quebra.', 'Segundo parágrafo.']);
     });
 
     it('conteúdo é texto: marcação vira texto, nunca HTML executado', () => {
-        mountLegal({ kind: 'terms', document: { version: '1.0', effectiveFrom: 'hoje', content: 'Aceite <img src=x onerror="alert(1)"> os termos.' } });
+        mountLegal({
+            kind: 'terms',
+            document: {
+                version: '1.0',
+                effectiveFrom: 'hoje',
+                content: 'Aceite <img src=x onerror="alert(1)"> os termos.',
+            },
+        });
 
         expect(wrapper.get('h1').text()).toBe('Termos de Uso');
         expect(wrapper.find('[data-test="legal-body"] img').exists()).toBe(false);
@@ -89,8 +112,10 @@ describe('Site/Legal', () => {
     it('oferece navegação para as seções e listas sem interpretar HTML', () => {
         mountLegal({
             document: {
-                version: '1.0', effectiveFrom: 'hoje',
-                content: 'Introdução.\r\n\r\n1. Dados tratados\r\n\r\n- Nome\r\n- <img src=x onerror="alert(1)">\r\n\r\n2. Seus direitos\r\n\r\nSolicite acesso.\r\nCom segurança.',
+                version: '1.0',
+                effectiveFrom: 'hoje',
+                content:
+                    'Introdução.\r\n\r\n1. Dados tratados\r\n\r\n- Nome\r\n- <img src=x onerror="alert(1)">\r\n\r\n2. Seus direitos\r\n\r\nSolicite acesso.\r\nCom segurança.',
             },
         });
 
@@ -98,7 +123,9 @@ describe('Site/Legal', () => {
         const headings = body.findAll('h2');
         const links = wrapper.findAll('.legal-index a');
         expect(headings.map((heading) => heading.text())).toEqual(['1. Dados tratados', '2. Seus direitos']);
-        expect(links.map((link) => link.attributes('href'))).toEqual(headings.map((heading) => '#' + heading.attributes('id')));
+        expect(links.map((link) => link.attributes('href'))).toEqual(
+            headings.map((heading) => '#' + heading.attributes('id')),
+        );
         expect(wrapper.get('.legal-index').attributes('aria-labelledby')).toBe('legal-index-title');
         expect(body.findAll('li').map((item) => item.text())).toEqual(['Nome', '<img src=x onerror="alert(1)">']);
         expect(body.find('img').exists()).toBe(false);

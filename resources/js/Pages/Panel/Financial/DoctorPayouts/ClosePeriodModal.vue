@@ -12,19 +12,18 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  * servidor para o demonstrativo; erros aparecem aqui dentro.
  */
 const props = defineProps({
-    open:     { type: Boolean, default: false },
-    preview:  { type: Object,  required: true },   // close_preview
-    doctorId: { type: String,  default: '' },
-    doctor:   { type: Object,  default: null },    // selected_doctor
-    action:   { type: String,  required: true },   // routes.close
-    t:        { type: Object,  default: () => ({}) },
+    open: { type: Boolean, default: false },
+    preview: { type: Object, required: true }, // close_preview
+    doctorId: { type: String, default: '' },
+    doctor: { type: Object, default: null }, // selected_doctor
+    action: { type: String, required: true }, // routes.close
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
 
-const {
-    money, number, periodText, doctorLabel, warningLabel, warningHint, warningIcon, warningTone,
-} = useDoctorPayoutFormat(() => props.t);
+const { money, number, periodText, doctorLabel, warningLabel, warningHint, warningIcon, warningTone } =
+    useDoctorPayoutFormat(() => props.t);
 
 const uid = useId();
 const ids = {
@@ -34,20 +33,22 @@ const ids = {
 };
 
 const form = useForm({
-    doctor_id:             '',
-    period_start:          '',
-    period_end:            '',
-    expected_count:         0,
+    doctor_id: '',
+    period_start: '',
+    period_end: '',
+    expected_count: 0,
     expected_charged_cents: 0,
-    expected_payout_cents:  0,
-    notes:                  '',
+    expected_payout_cents: 0,
+    notes: '',
 });
 
 const cancelButton = ref(null);
 
-const warnings = computed(() => Object.entries(props.preview?.warnings ?? {})
-    .filter(([, count]) => Number(count) > 0)
-    .map(([code, count]) => ({ code, count: Number(count) })));
+const warnings = computed(() =>
+    Object.entries(props.preview?.warnings ?? {})
+        .filter(([, count]) => Number(count) > 0)
+        .map(([code, count]) => ({ code, count: Number(count) })),
+);
 
 /** Erros que não são do campo de observações (período, médico, prévia mudou…). */
 const generalErrors = computed(() => {
@@ -60,12 +61,12 @@ const generalErrors = computed(() => {
 });
 
 function fillFromPreview() {
-    form.doctor_id             = props.doctorId;
-    form.period_start          = props.preview?.period_start ?? '';
-    form.period_end            = props.preview?.period_end ?? '';
-    form.expected_count         = Number(props.preview?.count ?? 0);
+    form.doctor_id = props.doctorId;
+    form.period_start = props.preview?.period_start ?? '';
+    form.period_end = props.preview?.period_end ?? '';
+    form.expected_count = Number(props.preview?.count ?? 0);
     form.expected_charged_cents = Number(props.preview?.charged_cents ?? 0);
-    form.expected_payout_cents  = Number(props.preview?.payout_cents ?? 0);
+    form.expected_payout_cents = Number(props.preview?.payout_cents ?? 0);
 }
 
 function close() {
@@ -88,20 +89,23 @@ function onKeydown(event) {
     if (event.key === 'Escape') close();
 }
 
-watch(() => props.open, async (isOpen) => {
-    if (!isOpen) {
-        document.removeEventListener('keydown', onKeydown);
+watch(
+    () => props.open,
+    async (isOpen) => {
+        if (!isOpen) {
+            document.removeEventListener('keydown', onKeydown);
 
-        return;
-    }
+            return;
+        }
 
-    form.clearErrors();
-    fillFromPreview();
-    document.addEventListener('keydown', onKeydown);
+        form.clearErrors();
+        fillFromPreview();
+        document.addEventListener('keydown', onKeydown);
 
-    await nextTick();
-    cancelButton.value?.focus();
-});
+        await nextTick();
+        cancelButton.value?.focus();
+    },
+);
 
 onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 </script>
@@ -121,25 +125,41 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
                 <dt class="col-5 fw-medium">{{ t.filter_doctor }}</dt>
                 <dd class="col-7 mb-1 text-break" data-test="close-doctor">{{ doctorLabel(doctor) || t.none }}</dd>
                 <dt class="col-5 fw-medium">{{ t.filter_period }}</dt>
-                <dd class="col-7 mb-1" data-test="close-period">{{ periodText(preview.period_start, preview.period_end) }}</dd>
+                <dd class="col-7 mb-1" data-test="close-period">
+                    {{ periodText(preview.period_start, preview.period_end) }}
+                </dd>
                 <dt class="col-5 fw-medium">{{ t.close_items }}</dt>
                 <dd class="col-7 mb-1" data-test="close-count">{{ number(preview.count ?? 0) }}</dd>
                 <dt class="col-5 fw-medium">{{ t.close_charged }}</dt>
-                <dd class="col-7 mb-1" data-test="close-charged">{{ money(Number(preview.charged_cents ?? 0) / 100) }}</dd>
+                <dd class="col-7 mb-1" data-test="close-charged">
+                    {{ money(Number(preview.charged_cents ?? 0) / 100) }}
+                </dd>
                 <dt class="col-5 fw-medium">{{ t.close_payout }}</dt>
-                <dd class="col-7 mb-1 fw-bold" data-test="close-payout">{{ money(Number(preview.payout_cents ?? 0) / 100) }}</dd>
+                <dd class="col-7 mb-1 fw-bold" data-test="close-payout">
+                    {{ money(Number(preview.payout_cents ?? 0) / 100) }}
+                </dd>
             </dl>
 
-            <div v-if="warnings.length" class="alert alert-warning small mt-3 mb-0" role="status" data-test="close-warnings">
+            <div
+                v-if="warnings.length"
+                class="alert alert-warning small mt-3 mb-0"
+                role="status"
+                data-test="close-warnings"
+            >
                 <p class="fw-semibold mb-2">
                     <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ t.close_warnings }}
                 </p>
                 <ul class="list-unstyled mb-0 d-grid gap-2">
                     <li v-for="warning in warnings" :key="warning.code" :data-warning="warning.code">
                         <span class="d-flex align-items-center gap-2">
-                            <i :class="[warningIcon(warning.code), `text-${warningTone(warning.code)}`]" aria-hidden="true"></i>
+                            <i
+                                :class="[warningIcon(warning.code), `text-${warningTone(warning.code)}`]"
+                                aria-hidden="true"
+                            ></i>
                             <span class="fw-medium">{{ warningLabel(warning.code) }}</span>
-                            <span class="badge badge-soft-secondary border rounded ms-auto">{{ number(warning.count) }}</span>
+                            <span class="badge badge-soft-secondary border rounded ms-auto">{{
+                                number(warning.count)
+                            }}</span>
                         </span>
                         <span class="d-block text-body-secondary mt-1">{{ warningHint(warning.code) }}</span>
                     </li>
@@ -160,8 +180,12 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
                     :disabled="form.processing"
                     data-test="close-notes"
                 ></textarea>
-                <div v-if="form.errors.notes" :id="`${ids.notes}-error`" class="invalid-feedback d-block">{{ form.errors.notes }}</div>
-                <div :id="`${ids.notes}-hint`" class="form-text small" data-test="close-notes-hint">{{ t.close_notes_hint }}</div>
+                <div v-if="form.errors.notes" :id="`${ids.notes}-error`" class="invalid-feedback d-block">
+                    {{ form.errors.notes }}
+                </div>
+                <div :id="`${ids.notes}-hint`" class="form-text small" data-test="close-notes-hint">
+                    {{ t.close_notes_hint }}
+                </div>
             </div>
 
             <div
@@ -179,7 +203,13 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
         </div>
 
         <template #footer>
-            <button ref="cancelButton" type="button" class="btn btn-outline-secondary btn-sm" :disabled="form.processing" @click="close">
+            <button
+                ref="cancelButton"
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                :disabled="form.processing"
+                @click="close"
+            >
                 {{ t.close_cancel }}
             </button>
             <button

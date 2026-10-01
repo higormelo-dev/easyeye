@@ -1,28 +1,31 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout        from '@/Layouts/AppLayout.vue';
-import PageHeader       from '@/Components/Panel/PageHeader.vue';
-import SearchInput      from '@/Components/Panel/SearchInput.vue';
-import PlanTable        from './PlanTable.vue';
-import PlanCards        from './PlanCards.vue';
-import PlanFormModal    from './PlanFormModal.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import PlanTable from './PlanTable.vue';
+import PlanCards from './PlanCards.vue';
+import PlanFormModal from './PlanFormModal.vue';
 import PlanDetailDrawer from './PlanDetailDrawer.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
-    plans:         { type: Object, required: true },
-    total:         { type: Number, default: 0 },
-    filters:       { type: Object, default: () => ({}) },
-    features:      { type: Array,  default: () => [] },
-    billingCycles: { type: Array,  default: () => [] },
-    t:             { type: Object, default: () => ({}) },
+    plans: { type: Object, required: true },
+    total: { type: Number, default: 0 },
+    filters: { type: Object, default: () => ({}) },
+    features: { type: Array, default: () => [] },
+    billingCycles: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
 });
 
 // ── View toggle ──────────────────────────────────────────────────────────────
 const view = ref(localStorage.getItem('mgr_plans_view') ?? 'table');
-function setView(v) { view.value = v; localStorage.setItem('mgr_plans_view', v); }
+function setView(v) {
+    view.value = v;
+    localStorage.setItem('mgr_plans_view', v);
+}
 
 // ── Search / sort ─────────────────────────────────────────────────────────────
 const search = ref(props.filters.search ?? '');
@@ -48,22 +51,42 @@ function onSort({ sort, direction }) {
 }
 
 // ── Form modal ────────────────────────────────────────────────────────────────
-const formOpen   = ref(false);
+const formOpen = ref(false);
 const editPlanId = ref(null);
 
-function openCreate() { editPlanId.value = null; formOpen.value = true; }
-function openEdit(id) { editPlanId.value = id;   formOpen.value = true; }
-function closeForm()  { formOpen.value = false; editPlanId.value = null; }
+function openCreate() {
+    editPlanId.value = null;
+    formOpen.value = true;
+}
+function openEdit(id) {
+    editPlanId.value = id;
+    formOpen.value = true;
+}
+function closeForm() {
+    formOpen.value = false;
+    editPlanId.value = null;
+}
 
 // ── Detail drawer ─────────────────────────────────────────────────────────────
 const detailOpen = ref(false);
-const detailId   = ref(null);
+const detailId = ref(null);
 
-function openDetail(id) { detailId.value = id; detailOpen.value = true; }
-function closeDetail()  { detailOpen.value = false; detailId.value = null; }
+function openDetail(id) {
+    detailId.value = id;
+    detailOpen.value = true;
+}
+function closeDetail() {
+    detailOpen.value = false;
+    detailId.value = null;
+}
 
 // ── Actions ───────────────────────────────────────────────────────────────────
-const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
 
 function onDelete(id) {
     openReasonModal({
@@ -84,23 +107,18 @@ function onDelete(id) {
 }
 
 function onToggleActive(id, currentActive) {
-    router.put(
-        route('manager.plans.update', id),
-        { active: !currentActive },
-        { preserveScroll: true },
-    );
+    router.put(route('manager.plans.update', id), { active: !currentActive }, { preserveScroll: true });
 }
 
 const breadcrumbs = [
-    { label: props.t.breadcrumb_home    ?? 'Dashboard', url: route('panel.dashboard'), active: false },
-    { label: props.t.breadcrumb_current ?? 'Planos',    url: '#', active: true },
+    { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: props.t.breadcrumb_current ?? 'Planos', url: '#', active: true },
 ];
 </script>
 
 <template>
     <AppLayout :title="t.page_title" :breadcrumbs="breadcrumbs">
         <div>
-
             <!-- ── Page Header ──────────────────────────────────────────── -->
             <PageHeader
                 :title="t.page_title"
@@ -119,11 +137,7 @@ const breadcrumbs = [
             </PageHeader>
 
             <!-- ── Search ───────────────────────────────────────────────── -->
-            <SearchInput
-                v-model="search"
-                :placeholder="t.search_placeholder"
-                max-width="320px"
-            />
+            <SearchInput v-model="search" :placeholder="t.search_placeholder" max-width="320px" />
 
             <!-- ── Table / Cards ─────────────────────────────────────────── -->
             <PlanTable
@@ -165,7 +179,12 @@ const breadcrumbs = [
             :plan-id="detailId"
             :t="t"
             @close="closeDetail"
-            @edit="(id) => { closeDetail(); openEdit(id); }"
+            @edit="
+                (id) => {
+                    closeDetail();
+                    openEdit(id);
+                }
+            "
         />
 
         <!-- Confirmação destrutiva com justificativa -->

@@ -6,7 +6,8 @@ function mountTh(props = {}) {
     return mount({
         components: { SortableTh },
         data: () => ({ props }),
-        template: '<table><thead><tr><SortableTh v-bind="props" class="text-end">Nome</SortableTh></tr></thead></table>',
+        template:
+            '<table><thead><tr><SortableTh v-bind="props" class="text-end">Nome</SortableTh></tr></thead></table>',
     });
 }
 
@@ -20,8 +21,12 @@ describe('SortableTh', () => {
 
     it('expõe aria-sort conforme a coluna/direção atual', () => {
         expect(mountTh({ colKey: 'name', currentSort: 'code' }).find('th').attributes('aria-sort')).toBe('none');
-        expect(mountTh({ colKey: 'name', currentSort: 'name', currentDir: 'asc' }).find('th').attributes('aria-sort')).toBe('ascending');
-        expect(mountTh({ colKey: 'name', currentSort: 'name', currentDir: 'desc' }).find('th').attributes('aria-sort')).toBe('descending');
+        expect(
+            mountTh({ colKey: 'name', currentSort: 'name', currentDir: 'asc' }).find('th').attributes('aria-sort'),
+        ).toBe('ascending');
+        expect(
+            mountTh({ colKey: 'name', currentSort: 'name', currentDir: 'desc' }).find('th').attributes('aria-sort'),
+        ).toBe('descending');
     });
 
     it('inverte a direção da coluna atual e começa ascendente nas outras', async () => {

@@ -21,13 +21,23 @@ vi.mock('@inertiajs/vue3', async () => {
 
     return {
         usePage: () => ({ props: inertia.pageProps }),
-        router: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn(), reload: vi.fn(), visit: vi.fn() },
+        router: {
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            patch: vi.fn(),
+            delete: vi.fn(),
+            reload: vi.fn(),
+            visit: vi.fn(),
+        },
         Link: { template: '<a><slot /></a>', props: ['href'] },
         Head: { template: '<div><slot /></div>' },
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view'],
@@ -43,7 +53,8 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder', 'clearLabel', 'wrapperClass', 'maxWidth'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :data-wrapper-class="wrapperClass" :data-max-width="maxWidth" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :data-wrapper-class="wrapperClass" :data-max-width="maxWidth" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Pages/Panel/Stock/IolLenses/IolLensTable.vue', () => ({
@@ -58,16 +69,25 @@ vi.mock('@/Pages/Panel/Stock/IolLenses/IolLensTable.vue', () => ({
     },
 }));
 vi.mock('@/Pages/Panel/Stock/IolLenses/IolLensCards.vue', () => ({
-    default: { props: ['items', 't'], template: '<div class="cards-stub">{{ items.data.map((l) => l.model_name).join(",") }}</div>' },
+    default: {
+        props: ['items', 't'],
+        template: '<div class="cards-stub">{{ items.data.map((l) => l.model_name).join(",") }}</div>',
+    },
 }));
 vi.mock('@/Pages/Panel/Stock/IolLenses/IolLensFormModal.vue', () => ({ default: { template: '<div />' } }));
 
 const t = {
-    page_title: 'Cataract lenses', total_label: 'Total:', btn_new: 'New lens',
-    search_placeholder: 'Search by model or manufacturer...', filter_status_all: 'All',
-    filter_status_active: 'Active', filter_status_inactive: 'Inactive',
-    confirm_delete: 'Delete the lens ":name"?', search_clear: 'Clear search',
-    toggle_error: 'Could not load the current lens data.', close: 'Close',
+    page_title: 'Cataract lenses',
+    total_label: 'Total:',
+    btn_new: 'New lens',
+    search_placeholder: 'Search by model or manufacturer...',
+    filter_status_all: 'All',
+    filter_status_active: 'Active',
+    filter_status_inactive: 'Inactive',
+    confirm_delete: 'Delete the lens ":name"?',
+    search_clear: 'Clear search',
+    toggle_error: 'Could not load the current lens data.',
+    close: 'Close',
 };
 
 const routes = {
@@ -81,8 +101,16 @@ const routes = {
 const baseFilters = { search: '', status: 'all', sort: 'manufacturer', direction: 'asc' };
 
 const lensRow = {
-    id: 'l1', manufacturer: 'Alcon', model_name: 'AcrySof IQ', category: 'Monofocal', diopter_min: 10,
-    diopter_max: 30, price: 2500.5, active: true, image_url: '/x.jpg', iol_lens_model_id: 'm1',
+    id: 'l1',
+    manufacturer: 'Alcon',
+    model_name: 'AcrySof IQ',
+    category: 'Monofocal',
+    diopter_min: 10,
+    diopter_max: 30,
+    price: 2500.5,
+    active: true,
+    image_url: '/x.jpg',
+    iol_lens_model_id: 'm1',
 };
 
 let wrapper;
@@ -153,7 +181,12 @@ describe('Stock/IolLenses/Index', () => {
 
         expect(w.find('.search').attributes('data-wrapper-class')).toBe('');
         expect(w.find('.search').attributes('data-max-width')).toBe('280px');
-        expect(w.findAll('select')[0].findAll('option').map((o) => o.text())).toEqual(['All', 'Active', 'Inactive']);
+        expect(
+            w
+                .findAll('select')[0]
+                .findAll('option')
+                .map((o) => o.text()),
+        ).toEqual(['All', 'Active', 'Inactive']);
     });
 
     it('abre em tabela por padrão e alterna para cards (mesmo paginator), guardando a preferência', async () => {
@@ -198,9 +231,18 @@ describe('Stock/IolLenses/Index', () => {
     it('ativar/desativar reenvia os dados ATUAIS da lente (não os da linha, sem imagem nem modelo global) com o status invertido', async () => {
         // Outra pessoa trocou tipo/dioptrias/valor depois que a página abriu:
         // o clique em "Desativar" não pode desfazer essa edição.
-        const get = vi.fn().mockResolvedValue({ data: { data: {
-            ...lensRow, category: 'Tórica', diopter_min: 12, diopter_max: 28, price: 3100, image_url: '/novo.jpg',
-        } } });
+        const get = vi.fn().mockResolvedValue({
+            data: {
+                data: {
+                    ...lensRow,
+                    category: 'Tórica',
+                    diopter_min: 12,
+                    diopter_max: 28,
+                    price: 3100,
+                    image_url: '/novo.jpg',
+                },
+            },
+        });
         vi.stubGlobal('axios', { get });
         const w = mountPage();
 
@@ -211,8 +253,13 @@ describe('Stock/IolLenses/Index', () => {
         expect(router.put).toHaveBeenCalledWith(
             '/stock/iollenses/l1',
             {
-                manufacturer: 'Alcon', model_name: 'AcrySof IQ', category: 'Tórica',
-                diopter_min: 12, diopter_max: 28, price: 3100, active: false,
+                manufacturer: 'Alcon',
+                model_name: 'AcrySof IQ',
+                category: 'Tórica',
+                diopter_min: 12,
+                diopter_max: 28,
+                price: 3100,
+                active: false,
             },
             expect.objectContaining({ preserveScroll: true }),
         );
@@ -242,6 +289,9 @@ describe('Stock/IolLenses/Index', () => {
         await w.find('.delete-row').trigger('click');
 
         expect(confirmSpy).toHaveBeenCalledWith('Delete the lens "Alcon AcrySof IQ"?');
-        expect(router.delete).toHaveBeenCalledWith('/stock/iollenses/l1', expect.objectContaining({ preserveScroll: true }));
+        expect(router.delete).toHaveBeenCalledWith(
+            '/stock/iollenses/l1',
+            expect.objectContaining({ preserveScroll: true }),
+        );
     });
 });

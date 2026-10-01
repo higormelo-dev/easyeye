@@ -34,18 +34,18 @@ function caretAfterKept(formatted, keptCount, keep) {
 }
 
 function onInput(event) {
-    const el     = event.target;
+    const el = event.target;
     const format = el._maskFormat;
     // Composição (IME) em andamento: o v-model também espera o compositionend.
     if (!format || event.isComposing) return;
 
-    const raw       = el.value;
+    const raw = el.value;
     const formatted = format(raw);
     if (formatted === raw) return;
 
-    const keep            = el._maskKeep ?? DIGIT;
-    const caret           = el.selectionStart ?? raw.length;
-    const keptBeforeCaret = [...raw.slice(0, caret)].filter(ch => keep.test(ch)).length;
+    const keep = el._maskKeep ?? DIGIT;
+    const caret = el.selectionStart ?? raw.length;
+    const keptBeforeCaret = [...raw.slice(0, caret)].filter((ch) => keep.test(ch)).length;
 
     el.value = formatted;
 
@@ -68,9 +68,9 @@ function syncView(el) {
 }
 
 function bind(el, binding) {
-    el._maskName   = binding.value;
+    el._maskName = binding.value;
     el._maskFormat = MASKS[binding.value] ?? null;
-    el._maskKeep   = MASK_KEEP[binding.value] ?? DIGIT;
+    el._maskKeep = MASK_KEEP[binding.value] ?? DIGIT;
 }
 
 export default {

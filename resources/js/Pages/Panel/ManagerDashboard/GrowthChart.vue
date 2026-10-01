@@ -6,10 +6,10 @@ Chart.register(BarElement, BarController, CategoryScale, LinearScale, Tooltip);
 
 const props = defineProps({
     growthTrend: { type: Object, required: true },
-    t:           { type: Object, required: true },
+    t: { type: Object, required: true },
 });
 
-const canvas  = ref(null);
+const canvas = ref(null);
 let chartInst = null;
 
 function isDark() {
@@ -18,10 +18,13 @@ function isDark() {
 
 function buildChart() {
     if (!canvas.value) return;
-    if (chartInst) { chartInst.destroy(); chartInst = null; }
+    if (chartInst) {
+        chartInst.destroy();
+        chartInst = null;
+    }
 
     const dark = isDark();
-    const barColor  = dark ? 'rgba(93,166,255,0.75)' : 'rgba(25,118,210,0.75)';
+    const barColor = dark ? 'rgba(93,166,255,0.75)' : 'rgba(25,118,210,0.75)';
     const lineColor = dark ? '#5da6ff' : '#1976d2';
     const gridColor = dark ? '#22334c' : '#e2e8f0';
     const textColor = dark ? '#9fb0cc' : '#64748b';
@@ -30,15 +33,17 @@ function buildChart() {
         type: 'bar',
         data: {
             labels: props.growthTrend.labels,
-            datasets: [{
-                label: props.t.chart_new_entities,
-                data: props.growthTrend.values,
-                backgroundColor: barColor,
-                borderColor: lineColor,
-                borderWidth: 1,
-                borderRadius: 5,
-                borderSkipped: false,
-            }],
+            datasets: [
+                {
+                    label: props.t.chart_new_entities,
+                    data: props.growthTrend.values,
+                    backgroundColor: barColor,
+                    borderColor: lineColor,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    borderSkipped: false,
+                },
+            ],
         },
         options: {
             responsive: true,
@@ -86,11 +91,9 @@ watch(() => props.growthTrend, buildChart, { deep: true });
 
 <template>
     <div class="card mgr-chart-card h-100">
-        <div class="card-header">
-            <i class="ti ti-building-plus me-2"></i>{{ t.chart_growth }}
-        </div>
+        <div class="card-header"><i class="ti ti-building-plus me-2"></i>{{ t.chart_growth }}</div>
         <div class="card-body">
-            <canvas ref="canvas" style="height:240px;max-height:240px;"></canvas>
+            <canvas ref="canvas" style="height: 240px; max-height: 240px"></canvas>
         </div>
     </div>
 </template>

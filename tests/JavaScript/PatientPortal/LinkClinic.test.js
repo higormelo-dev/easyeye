@@ -21,7 +21,14 @@ const T = {
 
 function mountPage(props = {}) {
     return mount(LinkClinic, {
-        props: { clinics: ['CLÍNICA B'], accountEmail: 'maria@example.com', inviteEmail: 'maria@example.com', emailMatches: true, t: T, ...props },
+        props: {
+            clinics: ['CLÍNICA B'],
+            accountEmail: 'maria@example.com',
+            inviteEmail: 'maria@example.com',
+            emailMatches: true,
+            t: T,
+            ...props,
+        },
     });
 }
 
@@ -53,7 +60,10 @@ describe('PatientPortal/Auth/LinkClinic', () => {
     it('"não é sua conta" encerra a sessão do portal', async () => {
         const wrapper = mountPage();
 
-        await wrapper.findAll('button').find((b) => b.text() === T.not_you).trigger('click');
+        await wrapper
+            .findAll('button')
+            .find((b) => b.text() === T.not_you)
+            .trigger('click');
 
         expect(router.post).toHaveBeenCalledWith('/_routes/patient-portal.logout');
     });

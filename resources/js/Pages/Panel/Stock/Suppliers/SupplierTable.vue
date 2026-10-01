@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh       from '@/Components/Panel/SortableTh.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useTrans } from '@/composables/useTrans.js';
 
@@ -19,9 +19,9 @@ import { useTrans } from '@/composables/useTrans.js';
  * mutilar valor legado em texto livre.
  */
 const props = defineProps({
-    items:             { type: Object, required: true },   // paginator Laravel
-    filters:           { type: Object, default: () => ({}) },
-    t:                 { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
     purchaseOrdersUrl: { type: String, default: '' },
 });
 
@@ -33,35 +33,34 @@ const rows = computed(() => props.items?.data ?? []);
 
 // ── Ordenação ────────────────────────────────────────────────────────────────
 const currentSort = computed(() => props.filters.sort ?? 'name');
-const currentDir  = computed(() => props.filters.direction ?? 'asc');
+const currentDir = computed(() => props.filters.direction ?? 'asc');
 
 // ── Ordem de colunas personalizável ──────────────────────────────────────────
 // sortKey = chave aceita pela whitelist do backend; null = não ordenável.
 const COLUMN_DEFS = computed(() => [
-    { key: 'nome',      label: props.t.col_name ?? 'Nome',          sortKey: 'name' },
-    { key: 'telefone',  label: props.t.col_phone ?? 'Telefone',     sortKey: 'phone' },
+    { key: 'nome', label: props.t.col_name ?? 'Nome', sortKey: 'name' },
+    { key: 'telefone', label: props.t.col_phone ?? 'Telefone', sortKey: 'phone' },
     { key: 'documento', label: props.t.col_document ?? 'Documento', sortKey: 'document' },
-    { key: 'contato',   label: props.t.col_contact ?? 'Contato',    sortKey: 'contact_name' },
-    { key: 'email',     label: props.t.col_email ?? 'E-mail',       sortKey: 'email' },
-    { key: 'codigo',    label: props.t.col_code ?? 'Código',        sortKey: 'code' },
+    { key: 'contato', label: props.t.col_contact ?? 'Contato', sortKey: 'contact_name' },
+    { key: 'email', label: props.t.col_email ?? 'E-mail', sortKey: 'email' },
+    { key: 'codigo', label: props.t.col_code ?? 'Código', sortKey: 'code' },
 ]);
 const DEFAULT_COLUMN_ORDER = ['nome', 'telefone', 'documento', 'contato', 'email', 'codigo'];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'stock_suppliers_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('stock_suppliers_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 
 /** Atalho para os pedidos de compra já filtrados por este fornecedor. */
@@ -108,7 +107,8 @@ function purchaseOrdersHref(supplier) {
                             :current-dir="currentDir"
                             :title="tx('sort_by', { column: col.label })"
                             @sort="emit('sort', $event)"
-                        >{{ col.label }}</SortableTh>
+                            >{{ col.label }}</SortableTh
+                        >
                         <th v-else>{{ col.label }}</th>
                     </template>
                     <th class="text-center">{{ t.col_status ?? 'Status' }}</th>
@@ -128,13 +128,21 @@ function purchaseOrdersHref(supplier) {
                             <span class="fw-medium">{{ s.name }}</span>
                         </td>
 
-                        <td v-else-if="col.key === 'telefone'" data-col="telefone" class="small">{{ s.phone_display ?? '—' }}</td>
+                        <td v-else-if="col.key === 'telefone'" data-col="telefone" class="small">
+                            {{ s.phone_display ?? '—' }}
+                        </td>
 
-                        <td v-else-if="col.key === 'documento'" data-col="documento" class="small">{{ s.document_display ?? '—' }}</td>
+                        <td v-else-if="col.key === 'documento'" data-col="documento" class="small">
+                            {{ s.document_display ?? '—' }}
+                        </td>
 
-                        <td v-else-if="col.key === 'contato'" data-col="contato" class="small">{{ s.contact_name ?? '—' }}</td>
+                        <td v-else-if="col.key === 'contato'" data-col="contato" class="small">
+                            {{ s.contact_name ?? '—' }}
+                        </td>
 
-                        <td v-else-if="col.key === 'email'" data-col="email" class="text-muted small">{{ s.email ?? '—' }}</td>
+                        <td v-else-if="col.key === 'email'" data-col="email" class="text-muted small">
+                            {{ s.email ?? '—' }}
+                        </td>
 
                         <td v-else-if="col.key === 'codigo'" data-col="codigo">
                             <code class="text-muted small">{{ s.code }}</code>
@@ -145,11 +153,13 @@ function purchaseOrdersHref(supplier) {
                         <span
                             v-if="s.active"
                             class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                        >{{ t.status_active ?? 'Ativo' }}</span>
+                            >{{ t.status_active ?? 'Ativo' }}</span
+                        >
                         <span
                             v-else
                             class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
-                        >{{ t.status_inactive ?? 'Inativo' }}</span>
+                            >{{ t.status_inactive ?? 'Inativo' }}</span
+                        >
                     </td>
 
                     <td class="text-end">
@@ -167,13 +177,19 @@ function purchaseOrdersHref(supplier) {
                             >
                                 <li>
                                     <button type="button" class="dropdown-item rounded-1" @click="emit('edit', s)">
-                                        <i class="ti ti-edit me-1" aria-hidden="true"></i> {{ t.action_edit ?? 'Editar' }}
+                                        <i class="ti ti-edit me-1" aria-hidden="true"></i>
+                                        {{ t.action_edit ?? 'Editar' }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+                                <li><hr class="dropdown-divider" /></li>
                                 <li>
-                                    <button type="button" class="dropdown-item rounded-1 text-danger" @click="emit('delete', s)">
-                                        <i class="ti ti-trash me-1" aria-hidden="true"></i> {{ t.action_delete ?? 'Excluir' }}
+                                    <button
+                                        type="button"
+                                        class="dropdown-item rounded-1 text-danger"
+                                        @click="emit('delete', s)"
+                                    >
+                                        <i class="ti ti-trash me-1" aria-hidden="true"></i>
+                                        {{ t.action_delete ?? 'Excluir' }}
                                     </button>
                                 </li>
                             </ActionDropdown>

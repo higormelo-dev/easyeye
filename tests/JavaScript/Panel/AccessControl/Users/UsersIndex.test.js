@@ -18,13 +18,23 @@ vi.mock('@inertiajs/vue3', async () => {
 
     return {
         usePage: () => ({ props: inertia.pageProps }),
-        router: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn(), reload: vi.fn(), visit: vi.fn() },
+        router: {
+            get: vi.fn(),
+            post: vi.fn(),
+            put: vi.fn(),
+            patch: vi.fn(),
+            delete: vi.fn(),
+            reload: vi.fn(),
+            visit: vi.fn(),
+        },
         Link: { template: '<a class="link" :href="href"><slot /></a>', props: ['href'] },
         Head: { template: '<div><slot /></div>' },
     };
 });
 
-vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' } }));
+vi.mock('@/Layouts/AppLayout.vue', () => ({
+    default: { props: ['title'], template: '<div><h1 class="layout-title">{{ title }}</h1><slot /></div>' },
+}));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
         props: ['title', 'total', 'totalLabel', 'view'],
@@ -40,7 +50,8 @@ vi.mock('@/Components/Panel/SearchInput.vue', () => ({
     default: {
         props: ['modelValue', 'placeholder', 'clearLabel', 'maxWidth'],
         emits: ['update:modelValue'],
-        template: '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+        template:
+            '<input class="search" :placeholder="placeholder" :data-clear-label="clearLabel" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     },
 }));
 vi.mock('@/Pages/Panel/Users/UserTable.vue', () => ({
@@ -58,7 +69,10 @@ vi.mock('@/Pages/Panel/Users/UserTable.vue', () => ({
     },
 }));
 vi.mock('@/Pages/Panel/Users/UserCards.vue', () => ({
-    default: { props: ['users', 't', 'emptyText'], template: '<div class="cards-stub">{{ users.data.map((u) => u.name).join(",") }}</div>' },
+    default: {
+        props: ['users', 't', 'emptyText'],
+        template: '<div class="cards-stub">{{ users.data.map((u) => u.name).join(",") }}</div>',
+    },
 }));
 vi.mock('@/Pages/Panel/Users/UserFormModal.vue', () => ({
     default: {
@@ -73,13 +87,22 @@ vi.mock('@/Pages/Panel/Users/UserInviteModal.vue', () => ({
     default: { props: ['open', 'roles', 't'], template: '<div class="invite-stub" :data-open="open" />' },
 }));
 vi.mock('@/Pages/Panel/Users/UserInvitationsPending.vue', () => ({
-    default: { props: ['invitations', 't'], template: '<div class="pending-stub">{{ invitations.map((i) => i.email).join(",") }}</div>' },
+    default: {
+        props: ['invitations', 't'],
+        template: '<div class="pending-stub">{{ invitations.map((i) => i.email).join(",") }}</div>',
+    },
 }));
 
 const t = {
-    page_title: 'Users', total_label: 'Total:', new_user: 'New user', roles_link: 'Roles & Permissions',
-    search_placeholder: 'Search by name or e-mail…', search_clear: 'Clear search', close: 'Close',
-    empty: 'No users yet.', empty_search: 'No users match this search.',
+    page_title: 'Users',
+    total_label: 'Total:',
+    new_user: 'New user',
+    roles_link: 'Roles & Permissions',
+    search_placeholder: 'Search by name or e-mail…',
+    search_clear: 'Clear search',
+    close: 'Close',
+    empty: 'No users yet.',
+    empty_search: 'No users match this search.',
     confirm_delete: 'Remove ":name"\'s access to this clinic?',
     confirm_restore: 'Restore ":name"\'s access to this clinic?',
 };
@@ -184,11 +207,18 @@ describe('Users/Index', () => {
     });
 
     it('estado vazio distingue "nenhum cadastrado" de "nada encontrado na busca"', () => {
-        expect(mountPage({ users: { data: [], total: 0 } }).get('.table-stub').attributes('data-empty')).toBe('No users yet.');
+        expect(
+            mountPage({ users: { data: [], total: 0 } })
+                .get('.table-stub')
+                .attributes('data-empty'),
+        ).toBe('No users yet.');
         wrapper.unmount();
 
-        expect(mountPage({ users: { data: [], total: 0 }, filters: { ...baseFilters, search: 'x' } })
-            .get('.table-stub').attributes('data-empty')).toBe('No users match this search.');
+        expect(
+            mountPage({ users: { data: [], total: 0 }, filters: { ...baseFilters, search: 'x' } })
+                .get('.table-stub')
+                .attributes('data-empty'),
+        ).toBe('No users match this search.');
     });
 
     it('excluir confirma com o nome; cancelado, nada acontece; confirmado, DELETE na rota do usuário', async () => {
@@ -202,16 +232,25 @@ describe('Users/Index', () => {
 
         confirm.mockReturnValue(true);
         await w.find('.delete-row').trigger('click');
-        expect(router.delete).toHaveBeenCalledWith('/_routes/panel.accesscontrol.users.destroy/u1', { preserveScroll: true });
+        expect(router.delete).toHaveBeenCalledWith('/_routes/panel.accesscontrol.users.destroy/u1', {
+            preserveScroll: true,
+        });
     });
 
     it('restaurar confirma com o nome e usa PATCH (não GET)', async () => {
-        vi.stubGlobal('confirm', vi.fn(() => true));
+        vi.stubGlobal(
+            'confirm',
+            vi.fn(() => true),
+        );
         const w = mountPage();
 
         await w.find('.restore-row').trigger('click');
 
-        expect(router.patch).toHaveBeenCalledWith('/_routes/panel.accesscontrol.users.restore/u3', {}, { preserveScroll: true });
+        expect(router.patch).toHaveBeenCalledWith(
+            '/_routes/panel.accesscontrol.users.restore/u3',
+            {},
+            { preserveScroll: true },
+        );
         expect(router.get).not.toHaveBeenCalled();
     });
 

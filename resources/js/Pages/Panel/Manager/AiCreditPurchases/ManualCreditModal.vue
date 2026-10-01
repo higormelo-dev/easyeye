@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
-import SearchSelect from "@/Components/Panel/SearchSelect.vue";
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
  * Modal para conceder crédito IA a uma clínica — cortesia (grátis) ou compra (paga).
@@ -15,21 +15,21 @@ import SearchSelect from "@/Components/Panel/SearchSelect.vue";
  *   - create_manual_for_internal: Admin apenas — pode escolher a entidade interna
  */
 const props = defineProps({
-    open:           { type: Boolean, required: true },
-    entities:       { type: Array,   default: () => [] },
-    permissions:    { type: Object,  default: () => ({}) },
-    presetEntityId: { type: String,  default: null },
-    t:              { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    entities: { type: Array, default: () => [] },
+    permissions: { type: Object, default: () => ({}) },
+    presetEntityId: { type: String, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'submit']);
 
 const EMPTY_FORM = () => ({
-    entity_id:    '',
-    kind:         'courtesy',  // 'courtesy' (grátis) | 'purchase' (paga fora do app)
-    credits:      100,
-    amount_reais: null,        // só usado em compra paga
-    reason:       '',
+    entity_id: '',
+    kind: 'courtesy', // 'courtesy' (grátis) | 'purchase' (paga fora do app)
+    credits: 100,
+    amount_reais: null, // só usado em compra paga
+    reason: '',
 });
 
 const form = ref(EMPTY_FORM());
@@ -37,44 +37,51 @@ const form = ref(EMPTY_FORM());
 const saving = ref(false);
 const errorMessage = ref('');
 
-watch(() => props.open, (val) => {
-    if (val) {
-        form.value = { ...EMPTY_FORM(), entity_id: props.presetEntityId ?? '' };
-        errorMessage.value = '';
-    }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val) {
+            form.value = { ...EMPTY_FORM(), entity_id: props.presetEntityId ?? '' };
+            errorMessage.value = '';
+        }
+    },
+);
 
 const isCourtesy = computed(() => form.value.kind === 'courtesy');
 
 // Ao voltar para cortesia, limpa o valor para não enviar resíduo.
-watch(() => form.value.kind, (kind) => {
-    if (kind === 'courtesy') form.value.amount_reais = null;
-});
+watch(
+    () => form.value.kind,
+    (kind) => {
+        if (kind === 'courtesy') form.value.amount_reais = null;
+    },
+);
 
 const filteredEntities = computed(() => {
     if (props.permissions?.create_manual_for_internal) return props.entities;
-    return props.entities.filter(e => e.is_client);
+    return props.entities.filter((e) => e.is_client);
 });
 
 const entityOptions = computed(() =>
-    filteredEntities.value.map(e => ({
+    filteredEntities.value.map((e) => ({
         id: e.id,
         name: `${e.name}${!e.is_client ? ' ★' : ''}`,
     })),
 );
 
 const selectedEntityIsInternal = computed(() => {
-    const e = props.entities.find(x => x.id === form.value.entity_id);
+    const e = props.entities.find((x) => x.id === form.value.entity_id);
     return e ? !e.is_client : false;
 });
 
 const amountReais = computed(() => Number(form.value.amount_reais) || 0);
 
-const isValid = computed(() =>
-    form.value.entity_id
-    && form.value.credits > 0
-    && form.value.reason.trim().length >= 10
-    && (isCourtesy.value || amountReais.value > 0),
+const isValid = computed(
+    () =>
+        form.value.entity_id &&
+        form.value.credits > 0 &&
+        form.value.reason.trim().length >= 10 &&
+        (isCourtesy.value || amountReais.value > 0),
 );
 
 function close() {
@@ -90,10 +97,10 @@ async function submit() {
 
     try {
         await emit('submit', {
-            entity_id:    form.value.entity_id,
-            kind:         form.value.kind,
-            credits:      form.value.credits,
-            reason:       form.value.reason,
+            entity_id: form.value.entity_id,
+            kind: form.value.kind,
+            credits: form.value.credits,
+            reason: form.value.reason,
             amount_reais: isCourtesy.value ? 0 : amountReais.value,
         });
     } catch (e) {
@@ -103,8 +110,12 @@ async function submit() {
     }
 }
 
-function setSaving(value) { saving.value = value; }
-function setError(msg) { errorMessage.value = msg; }
+function setSaving(value) {
+    saving.value = value;
+}
+function setError(msg) {
+    errorMessage.value = msg;
+}
 
 defineExpose({ setSaving, setError });
 </script>
@@ -114,7 +125,7 @@ defineExpose({ setSaving, setError });
         <div
             v-if="open"
             class="modal fade show d-block"
-            style="background: rgba(0,0,0,0.45);"
+            style="background: rgba(0, 0, 0, 0.45)"
             tabindex="-1"
             @click.self="close"
         >
@@ -135,7 +146,6 @@ defineExpose({ setSaving, setError });
 
                     <form @submit.prevent="submit">
                         <div class="modal-body">
-
                             <!-- Aviso de limite Support -->
                             <div
                                 v-if="!permissions?.create_manual_unlimited"
@@ -143,9 +153,11 @@ defineExpose({ setSaving, setError });
                             >
                                 <i class="ti ti-shield-half mt-1"></i>
                                 <div>
-                                    {{ (t?.manual?.limit_warning ?? 'Limite diário: :limit créditos.')
-                                        .replace(':limit', permissions?.support_daily_limit ?? '?')
-                                        .replace(':used', '—') }}
+                                    {{
+                                        (t?.manual?.limit_warning ?? 'Limite diário: :limit créditos.')
+                                            .replace(':limit', permissions?.support_daily_limit ?? '?')
+                                            .replace(':used', '—')
+                                    }}
                                 </div>
                             </div>
 
@@ -155,7 +167,6 @@ defineExpose({ setSaving, setError });
                             </div>
 
                             <div class="row g-3">
-
                                 <!-- Clínica destinatária -->
                                 <div class="col-12">
                                     <label class="form-label small fw-semibold mb-1">
@@ -171,7 +182,9 @@ defineExpose({ setSaving, setError });
                                     />
                                     <small class="text-muted">{{ t?.manual?.select_entity_help ?? '' }}</small>
                                     <div v-if="selectedEntityIsInternal" class="mt-2">
-                                        <span class="badge bg-primary-subtle text-primary border border-primary border-opacity-25">
+                                        <span
+                                            class="badge bg-primary-subtle text-primary border border-primary border-opacity-25"
+                                        >
                                             <i class="ti ti-building me-1"></i>
                                             {{ t?.manual?.badge_internal ?? 'Sua empresa' }}
                                         </span>
@@ -184,19 +197,39 @@ defineExpose({ setSaving, setError });
                                         {{ t?.manual?.kind ?? 'Como conceder' }} <span class="text-danger">*</span>
                                     </label>
                                     <div class="d-flex gap-2" role="group">
-                                        <input id="kind-courtesy" v-model="form.kind" type="radio" class="btn-check" value="courtesy" :disabled="saving">
+                                        <input
+                                            id="kind-courtesy"
+                                            v-model="form.kind"
+                                            type="radio"
+                                            class="btn-check"
+                                            value="courtesy"
+                                            :disabled="saving"
+                                        />
                                         <label class="btn btn-outline-info flex-fill" for="kind-courtesy">
-                                            <i class="ti ti-gift me-1"></i>{{ t?.manual?.kind_courtesy ?? 'Cortesia (grátis)' }}
+                                            <i class="ti ti-gift me-1"></i
+                                            >{{ t?.manual?.kind_courtesy ?? 'Cortesia (grátis)' }}
                                         </label>
-                                        <input id="kind-purchase" v-model="form.kind" type="radio" class="btn-check" value="purchase" :disabled="saving">
+                                        <input
+                                            id="kind-purchase"
+                                            v-model="form.kind"
+                                            type="radio"
+                                            class="btn-check"
+                                            value="purchase"
+                                            :disabled="saving"
+                                        />
                                         <label class="btn btn-outline-success flex-fill" for="kind-purchase">
-                                            <i class="ti ti-cash me-1"></i>{{ t?.manual?.kind_purchase ?? 'Compra (paga)' }}
+                                            <i class="ti ti-cash me-1"></i
+                                            >{{ t?.manual?.kind_purchase ?? 'Compra (paga)' }}
                                         </label>
                                     </div>
                                     <small class="text-muted d-block mt-1">
-                                        {{ isCourtesy
-                                            ? (t?.manual?.kind_courtesy_help ?? 'Crédito gratuito — sem valor financeiro.')
-                                            : (t?.manual?.kind_purchase_help ?? 'A clínica pagou fora do app — informe o valor recebido.') }}
+                                        {{
+                                            isCourtesy
+                                                ? (t?.manual?.kind_courtesy_help ??
+                                                  'Crédito gratuito — sem valor financeiro.')
+                                                : (t?.manual?.kind_purchase_help ??
+                                                  'A clínica pagou fora do app — informe o valor recebido.')
+                                        }}
                                     </small>
                                 </div>
 
@@ -213,7 +246,8 @@ defineExpose({ setSaving, setError });
                                         max="1000000"
                                         class="form-control"
                                         required
-                                        :disabled="saving">
+                                        :disabled="saving"
+                                    />
                                     <small class="text-muted">{{ t?.manual?.credits_help ?? '' }}</small>
                                 </div>
 
@@ -233,9 +267,12 @@ defineExpose({ setSaving, setError });
                                             max="99999.99"
                                             class="form-control"
                                             placeholder="0,00"
-                                            :disabled="saving">
+                                            :disabled="saving"
+                                        />
                                     </div>
-                                    <small class="text-muted">{{ t?.manual?.amount_reais_help ?? 'Quanto a clínica pagou por estes créditos.' }}</small>
+                                    <small class="text-muted">{{
+                                        t?.manual?.amount_reais_help ?? 'Quanto a clínica pagou por estes créditos.'
+                                    }}</small>
                                 </div>
 
                                 <!-- Motivo -->
@@ -251,13 +288,13 @@ defineExpose({ setSaving, setError });
                                         maxlength="500"
                                         class="form-control"
                                         required
-                                        :disabled="saving"></textarea>
+                                        :disabled="saving"
+                                    ></textarea>
                                     <small class="text-muted d-flex justify-content-between">
                                         <span>{{ t?.manual?.reason_help ?? '' }}</span>
                                         <span>{{ form.reason.length }}/500</span>
                                     </small>
                                 </div>
-
                             </div>
                         </div>
 

@@ -16,22 +16,22 @@ import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 
 const props = defineProps({
     shareableType: { type: String, required: true }, // 'laudo' | 'exame' | 'anexo'
-    shareableId:   { type: String, required: true },
-    patientId:     { type: String, required: true },
-    isShared:      { type: Boolean, default: false },
-    shareId:       { type: String, default: null },   // obrigatório pra revogar
-    disabled:      { type: Boolean, default: false },
+    shareableId: { type: String, required: true },
+    patientId: { type: String, required: true },
+    isShared: { type: Boolean, default: false },
+    shareId: { type: String, default: null }, // obrigatório pra revogar
+    disabled: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['changed']);
 
-const loading  = ref(false);
+const loading = ref(false);
 const errorMsg = ref('');
 
 function toggle() {
     if (props.disabled || loading.value) return;
 
-    loading.value  = true;
+    loading.value = true;
     errorMsg.value = '';
 
     const options = {
@@ -48,25 +48,34 @@ function toggle() {
         onError: () => {
             errorMsg.value = 'Não foi possível atualizar o compartilhamento.';
         },
-        onFinish: () => { loading.value = false; },
+        onFinish: () => {
+            loading.value = false;
+        },
     };
 
     if (props.isShared && props.shareId) {
         router.delete(route('panel.document-shares.destroy', props.shareId), options);
     } else {
-        router.post(route('panel.document-shares.store'), {
-            shareable_type: props.shareableType,
-            shareable_id: props.shareableId,
-            patient_id: props.patientId,
-        }, options);
+        router.post(
+            route('panel.document-shares.store'),
+            {
+                shareable_type: props.shareableType,
+                shareable_id: props.shareableId,
+                patient_id: props.patientId,
+            },
+            options,
+        );
     }
 }
 </script>
 
 <template>
     <ActionIconButton
-        :icon="loading ? 'ti ti-loader-2 ee-spin' : (isShared ? 'ti ti-share-off' : 'ti ti-share')"
-        :title="errorMsg || (isShared ? 'Revogar acesso do paciente a este documento' : 'Compartilhar este documento com o paciente')"
+        :icon="loading ? 'ti ti-loader-2 ee-spin' : isShared ? 'ti ti-share-off' : 'ti ti-share'"
+        :title="
+            errorMsg ||
+            (isShared ? 'Revogar acesso do paciente a este documento' : 'Compartilhar este documento com o paciente')
+        "
         :variant="isShared ? 'success' : 'default'"
         :disabled="disabled || loading"
         @click="toggle"

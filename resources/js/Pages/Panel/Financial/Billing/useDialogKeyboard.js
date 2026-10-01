@@ -29,21 +29,24 @@ export function useDialogKeyboard(isOpen, { onEscape, focusRef = null }) {
         const root = focusRef?.value;
         if (!root) return;
 
-        const target = typeof root.matches === 'function' && root.matches(FOCUSABLE)
-            ? root
-            : root.querySelector?.(FOCUSABLE);
+        const target =
+            typeof root.matches === 'function' && root.matches(FOCUSABLE) ? root : root.querySelector?.(FOCUSABLE);
 
         target?.focus?.();
     }
 
-    watch(isOpen, (open) => {
-        document.removeEventListener('keydown', onKeydown);
+    watch(
+        isOpen,
+        (open) => {
+            document.removeEventListener('keydown', onKeydown);
 
-        if (open) {
-            document.addEventListener('keydown', onKeydown);
-            focusFirst();
-        }
-    }, { immediate: true });
+            if (open) {
+                document.addEventListener('keydown', onKeydown);
+                focusFirst();
+            }
+        },
+        { immediate: true },
+    );
 
     onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 }

@@ -1,14 +1,14 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import AppLayout       from '@/Layouts/AppLayout.vue';
-import PageHeader      from '@/Components/Panel/PageHeader.vue';
-import SearchInput     from '@/Components/Panel/SearchInput.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
 import { useViewMode } from '@/composables/useViewMode.js';
-import { useTrans }    from '@/composables/useTrans.js';
-import RoleTable       from './RoleTable.vue';
-import RoleCards       from './RoleCards.vue';
-import RoleFormModal   from './RoleFormModal.vue';
+import { useTrans } from '@/composables/useTrans.js';
+import RoleTable from './RoleTable.vue';
+import RoleCards from './RoleCards.vue';
+import RoleFormModal from './RoleFormModal.vue';
 
 /**
  * Perfis de acesso customizados (RBAC granular ADITIVO por clínica) — mesmo
@@ -22,14 +22,14 @@ import RoleFormModal   from './RoleFormModal.vue';
  * (prop `t`).
  */
 const props = defineProps({
-    breadcrumbs:          { type: Array,  default: () => [] },
-    roles:                { type: Object, required: true },        // paginator Laravel (through())
-    filters:              { type: Object, default: () => ({}) },   // { search, sort, direction } — normalizados
+    breadcrumbs: { type: Array, default: () => [] },
+    roles: { type: Object, required: true }, // paginator Laravel (through())
+    filters: { type: Object, default: () => ({}) }, // { search, sort, direction } — normalizados
     // Perfis FIXOS da plataforma — somente leitura: [{ value, label, description }].
-    systemProfiles:       { type: Array,  default: () => [] },
-    availablePermissions: { type: Array,  default: () => [] },
-    routes:               { type: Object, required: true },        // { index, store, update, destroy } — update/destroy com __ID__
-    t:                    { type: Object, default: () => ({}) },
+    systemProfiles: { type: Array, default: () => [] },
+    availablePermissions: { type: Array, default: () => [] },
+    routes: { type: Object, required: true }, // { index, store, update, destroy } — update/destroy com __ID__
+    t: { type: Object, default: () => ({}) },
 });
 
 const { tx } = useTrans(() => props.t);
@@ -49,9 +49,11 @@ watch([() => page.props?.flash, flashMessage], () => {
 
 const pageTitle = computed(() => props.t.page_title ?? 'Perfis de acesso');
 
-const emptyText = computed(() => (props.filters?.search
-    ? (props.t.empty_search ?? 'Nenhum perfil encontrado para esta busca.')
-    : (props.t.empty_list ?? 'Nenhum perfil customizado cadastrado.')));
+const emptyText = computed(() =>
+    props.filters?.search
+        ? (props.t.empty_search ?? 'Nenhum perfil encontrado para esta busca.')
+        : (props.t.empty_list ?? 'Nenhum perfil customizado cadastrado.'),
+);
 
 // ── Busca (debounce) + ordenação — uma preserva a outra ─────────────────────
 const search = ref(props.filters?.search ?? '');
@@ -76,12 +78,21 @@ function onSort({ sort, direction }) {
 }
 
 // ── Painel criar/editar ─────────────────────────────────────────────────────
-const modalOpen   = ref(false);
+const modalOpen = ref(false);
 const editingRole = ref(null);
 
-function openCreate() { editingRole.value = null; modalOpen.value = true; }
-function openEdit(role) { editingRole.value = role; modalOpen.value = true; }
-function closeModal() { modalOpen.value = false; editingRole.value = null; }
+function openCreate() {
+    editingRole.value = null;
+    modalOpen.value = true;
+}
+function openEdit(role) {
+    editingRole.value = role;
+    modalOpen.value = true;
+}
+function closeModal() {
+    modalOpen.value = false;
+    editingRole.value = null;
+}
 
 // ── Exclusão ────────────────────────────────────────────────────────────────
 function onDelete(role) {
@@ -95,7 +106,6 @@ function onDelete(role) {
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-access-roles">
-
             <PageHeader
                 :title="pageTitle"
                 :total="roles.total ?? 0"
@@ -113,7 +123,11 @@ function onDelete(role) {
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+            <div
+                v-if="flashMessage && !flashDismissed"
+                class="alert alert-success alert-dismissible mb-3"
+                role="status"
+            >
                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
                 <button
                     type="button"
@@ -129,7 +143,9 @@ function onDelete(role) {
                     <i class="ti ti-chevron-right system-profiles-chevron text-muted" aria-hidden="true"></i>
                     <i class="ti ti-building-store text-primary" aria-hidden="true"></i>
                     <span class="fw-semibold">{{ t.system_profiles_title ?? 'Perfis do sistema' }}</span>
-                    <span class="text-muted small">· {{ tx('system_profiles_count', { count: systemProfiles.length }) }}</span>
+                    <span class="text-muted small"
+                        >· {{ tx('system_profiles_count', { count: systemProfiles.length }) }}</span
+                    >
                 </summary>
 
                 <div class="px-3 pb-3">
@@ -141,10 +157,12 @@ function onDelete(role) {
                             <div class="system-profile h-100 rounded border px-3 py-2">
                                 <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
                                     <span class="fw-semibold small text-truncate">
-                                        <i class="ti ti-shield-check me-1 text-primary" aria-hidden="true"></i>{{ profile.label }}
+                                        <i class="ti ti-shield-check me-1 text-primary" aria-hidden="true"></i
+                                        >{{ profile.label }}
                                     </span>
                                     <span class="badge badge-soft-primary rounded fs-11 flex-shrink-0">
-                                        <i class="ti ti-lock me-1" aria-hidden="true"></i>{{ t.system_profile_badge ?? 'Padrão' }}
+                                        <i class="ti ti-lock me-1" aria-hidden="true"></i
+                                        >{{ t.system_profile_badge ?? 'Padrão' }}
                                     </span>
                                 </div>
                                 <p class="small text-muted mb-0">{{ profile.description }}</p>
@@ -171,14 +189,7 @@ function onDelete(role) {
                 @edit="openEdit"
                 @delete="onDelete"
             />
-            <RoleCards
-                v-else
-                :roles="roles"
-                :t="t"
-                :empty-text="emptyText"
-                @edit="openEdit"
-                @delete="onDelete"
-            />
+            <RoleCards v-else :roles="roles" :t="t" :empty-text="emptyText" @edit="openEdit" @delete="onDelete" />
         </div>
 
         <RoleFormModal

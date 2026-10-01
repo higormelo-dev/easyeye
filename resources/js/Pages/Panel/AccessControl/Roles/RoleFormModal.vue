@@ -17,44 +17,51 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
  * das permissões já chegam traduzidos em `availablePermissions`.
  */
 const props = defineProps({
-    open:                { type: Boolean, required: true },
-    role:                { type: Object,  default: null },
-    availablePermissions: { type: Array,  default: () => [] },
-    routes:              { type: Object,  required: true }, // { store, update } — update com placeholder __ID__
-    t:                   { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    role: { type: Object, default: null },
+    availablePermissions: { type: Array, default: () => [] },
+    routes: { type: Object, required: true }, // { store, update } — update com placeholder __ID__
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit    = defineEmits(['close']);
-const isEdit  = computed(() => !!props.role);
-const title   = computed(() => (isEdit.value
-    ? (props.t.form_title_edit ?? 'Editar perfil')
-    : (props.t.form_title_create ?? 'Novo perfil')));
+const emit = defineEmits(['close']);
+const isEdit = computed(() => !!props.role);
+const title = computed(() =>
+    isEdit.value ? (props.t.form_title_edit ?? 'Editar perfil') : (props.t.form_title_create ?? 'Novo perfil'),
+);
 
 const form = useForm({
-    name:           '',
-    description:    '',
+    name: '',
+    description: '',
     permission_ids: [],
 });
 
 // Só exibe grupos que tenham ao menos uma permission com PermissionRecord
 // sincronizado (id não nulo) — sem id não há o que marcar (Rule::exists em
 // RoleRequest rejeitaria mesmo assim).
-const groups = computed(() => props.availablePermissions
-    .map((g) => ({ ...g, items: g.items.filter((item) => item.id) }))
-    .filter((g) => g.items.length > 0));
+const groups = computed(() =>
+    props.availablePermissions
+        .map((g) => ({ ...g, items: g.items.filter((item) => item.id) }))
+        .filter((g) => g.items.length > 0),
+);
 
 function resetForm() {
     form.reset();
     form.clearErrors();
 
     if (props.role) {
-        form.name           = props.role.name ?? '';
-        form.description    = props.role.description ?? '';
+        form.name = props.role.name ?? '';
+        form.description = props.role.description ?? '';
         form.permission_ids = [...(props.role.permission_ids ?? [])];
     }
 }
 
-watch(() => props.open, (val) => { if (val) resetForm(); });
+watch(
+    () => props.open,
+    (val) => {
+        if (val) resetForm();
+    },
+);
 
 function togglePermission(id) {
     const idx = form.permission_ids.indexOf(id);
@@ -88,9 +95,7 @@ function submit() {
     <OffcanvasPanel :open="open" :width="560" @close="$emit('close')">
         <!-- Header -->
         <template #header>
-            <h5 class="mb-0 fw-semibold">
-                <i class="ti ti-shield-lock me-2 text-primary"></i>{{ title }}
-            </h5>
+            <h5 class="mb-0 fw-semibold"><i class="ti ti-shield-lock me-2 text-primary"></i>{{ title }}</h5>
         </template>
 
         <!-- Body -->
@@ -111,7 +116,7 @@ function submit() {
                         aria-required="true"
                         :aria-invalid="form.errors.name ? 'true' : undefined"
                         autocomplete="off"
-                    >
+                    />
                     <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
                 </div>
 
@@ -122,7 +127,9 @@ function submit() {
                         v-model="form.description"
                         class="form-control"
                         rows="2"
-                        :placeholder="t.field_description_hint ?? 'Opcional — explique quando este perfil deve ser usado'"
+                        :placeholder="
+                            t.field_description_hint ?? 'Opcional — explique quando este perfil deve ser usado'
+                        "
                     ></textarea>
                     <div v-if="form.errors.description" class="invalid-feedback d-block">
                         {{ form.errors.description }}
@@ -130,9 +137,12 @@ function submit() {
                 </div>
             </div>
 
-            <hr class="my-3">
+            <hr class="my-3" />
 
-            <h6 class="text-muted fw-semibold mb-1" style="font-size:.75rem;letter-spacing:.05em;text-transform:uppercase;">
+            <h6
+                class="text-muted fw-semibold mb-1"
+                style="font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase"
+            >
                 {{ t.field_permissions ?? 'Permissões' }}
             </h6>
             <div v-if="form.errors.permission_ids" class="alert alert-danger small py-2 mb-2">
@@ -151,7 +161,11 @@ function submit() {
                         class="btn btn-link btn-sm p-0 fs-12"
                         @click="toggleGroup(group, !isGroupFullySelected(group))"
                     >
-                        {{ isGroupFullySelected(group) ? (t.unselect_all ?? 'Desmarcar todos') : (t.select_all ?? 'Marcar todos') }}
+                        {{
+                            isGroupFullySelected(group)
+                                ? (t.unselect_all ?? 'Desmarcar todos')
+                                : (t.select_all ?? 'Marcar todos')
+                        }}
                     </button>
                 </div>
                 <div class="border rounded p-2">
@@ -162,7 +176,7 @@ function submit() {
                             class="form-check-input"
                             :checked="form.permission_ids.includes(item.id)"
                             @change="togglePermission(item.id)"
-                        >
+                        />
                         <label class="form-check-label small" :for="`perm_${item.id}`">
                             {{ item.label }}
                         </label>
@@ -173,7 +187,9 @@ function submit() {
 
         <!-- Footer -->
         <template #footer>
-            <button type="button" class="btn btn-light" @click="$emit('close')">{{ t.btn_cancel ?? 'Cancelar' }}</button>
+            <button type="button" class="btn btn-light" @click="$emit('close')">
+                {{ t.btn_cancel ?? 'Cancelar' }}
+            </button>
             <button type="button" class="btn btn-primary" :disabled="form.processing" @click="submit">
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                 {{ isEdit ? (t.btn_save ?? 'Salvar alterações') : (t.btn_create ?? 'Criar perfil') }}

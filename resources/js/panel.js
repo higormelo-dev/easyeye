@@ -6,11 +6,7 @@ import { ZiggyVue } from 'ziggy-js';
 import mask from './directives/mask.js';
 
 createInertiaApp({
-    resolve: name =>
-        resolvePageComponent(
-            `./Pages/${name}.vue`,
-            import.meta.glob('./Pages/**/*.vue'),
-        ),
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
 
     setup({ el, App, props, plugin }) {
         createApp({ render: () => h(App, props) })

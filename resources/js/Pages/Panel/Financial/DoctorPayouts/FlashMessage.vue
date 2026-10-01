@@ -12,9 +12,9 @@ import { usePage } from '@inertiajs/vue3';
  */
 const page = usePage();
 
-const message    = computed(() => page.props?.flash?.message ?? null);
+const message = computed(() => page.props?.flash?.message ?? null);
 const closeLabel = computed(() => page.props?.t_ui?.close ?? '');
-const dismissed  = ref(false);
+const dismissed = ref(false);
 
 watch([() => page.props?.flash, message], () => {
     dismissed.value = false;
@@ -22,8 +22,19 @@ watch([() => page.props?.flash, message], () => {
 </script>
 
 <template>
-    <div v-if="message && !dismissed" class="alert alert-success alert-dismissible mb-3" role="status" data-test="flash-message">
+    <div
+        v-if="message && !dismissed"
+        class="alert alert-success alert-dismissible mb-3"
+        role="status"
+        data-test="flash-message"
+    >
         <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ message }}
-        <button type="button" class="btn-close" :aria-label="closeLabel" :title="closeLabel" @click="dismissed = true"></button>
+        <button
+            type="button"
+            class="btn-close"
+            :aria-label="closeLabel"
+            :title="closeLabel"
+            @click="dismissed = true"
+        ></button>
     </div>
 </template>

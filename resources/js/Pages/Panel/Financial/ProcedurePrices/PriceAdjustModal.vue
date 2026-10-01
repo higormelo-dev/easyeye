@@ -22,12 +22,12 @@ import {
  * Emite `apply` com [{ index, to }] (índices da grade) e `close`.
  */
 const props = defineProps({
-    open:           { type: Boolean, default: false },
+    open: { type: Boolean, default: false },
     /** Linhas na tela agora: [{ row, index }]. */
-    visibleEntries: { type: Array,   default: () => [] },
+    visibleEntries: { type: Array, default: () => [] },
     /** Todas as linhas da grade: [{ row, index }]. */
-    allEntries:     { type: Array,   default: () => [] },
-    t:              { type: Object,  default: () => ({}) },
+    allEntries: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'apply']);
@@ -35,26 +35,30 @@ const emit = defineEmits(['close', 'apply']);
 const { tx } = useTrans(() => props.t);
 const { locale, money, number } = useLocaleFormat();
 
-const direction    = ref('increase');
-const percentText  = ref('');
-const scope        = ref('all');
+const direction = ref('increase');
+const percentText = ref('');
+const scope = ref('all');
 const percentInput = ref(null);
 
 const filtered = computed(() => props.visibleEntries.length !== props.allEntries.length);
 
-watch(() => props.open, (isOpen) => {
-    if (!isOpen) return;
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (!isOpen) return;
 
-    direction.value   = 'increase';
-    percentText.value = '';
-    // Com busca/filtro ativo, o padrão é o que está na tela.
-    scope.value = filtered.value ? 'visible' : 'all';
-    nextTick(() => percentInput.value?.focus?.());
-}, { immediate: true });
+        direction.value = 'increase';
+        percentText.value = '';
+        // Com busca/filtro ativo, o padrão é o que está na tela.
+        scope.value = filtered.value ? 'visible' : 'all';
+        nextTick(() => percentInput.value?.focus?.());
+    },
+    { immediate: true },
+);
 
-const percent      = computed(() => parseMoneyInput(percentText.value, locale.value));
+const percent = computed(() => parseMoneyInput(percentText.value, locale.value));
 const percentValid = computed(() => isValidAdjustPercent(percent.value, direction.value));
-const showError    = computed(() => percentText.value.trim() !== '' && !percentValid.value);
+const showError = computed(() => percentText.value.trim() !== '' && !percentValid.value);
 
 const entries = computed(() => (scope.value === 'visible' ? props.visibleEntries : props.allEntries));
 
@@ -73,17 +77,22 @@ function formatPercent(value) {
     return new Intl.NumberFormat(locale.value, { style: 'percent', maximumFractionDigits: 2 }).format(value / 100);
 }
 
-const rangeMessage = computed(() => tx('adjust_percent_range', {
-    min: formatPercent(ADJUST_PERCENT_MIN),
-    max: formatPercent(adjustPercentLimit(direction.value)),
-}));
+const rangeMessage = computed(() =>
+    tx('adjust_percent_range', {
+        min: formatPercent(ADJUST_PERCENT_MIN),
+        max: formatPercent(adjustPercentLimit(direction.value)),
+    }),
+);
 
 const procedureLabel = (row) => `${row.code} ${row.name}`;
 
 function apply() {
     if (!canApply.value) return;
 
-    emit('apply', plan.value.changes.map(({ index, to }) => ({ index, to })));
+    emit(
+        'apply',
+        plan.value.changes.map(({ index, to }) => ({ index, to })),
+    );
 }
 
 /* Esc fecha (o CenteredModal não trata teclado). */
@@ -91,11 +100,15 @@ function onKeydown(event) {
     if (event.key === 'Escape') emit('close');
 }
 
-watch(() => props.open, (isOpen) => {
-    if (typeof document === 'undefined') return;
-    if (isOpen) document.addEventListener('keydown', onKeydown);
-    else document.removeEventListener('keydown', onKeydown);
-}, { immediate: true });
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (typeof document === 'undefined') return;
+        if (isOpen) document.addEventListener('keydown', onKeydown);
+        else document.removeEventListener('keydown', onKeydown);
+    },
+    { immediate: true },
+);
 
 onBeforeUnmount(() => {
     if (typeof document !== 'undefined') document.removeEventListener('keydown', onKeydown);
@@ -105,7 +118,9 @@ onBeforeUnmount(() => {
 <template>
     <CenteredModal :open="open" size="md" @close="emit('close')">
         <template #header>
-            <h2 class="h5 mb-0"><i class="ti ti-percentage me-1 text-primary" aria-hidden="true"></i>{{ tx('adjust_title') }}</h2>
+            <h2 class="h5 mb-0">
+                <i class="ti ti-percentage me-1 text-primary" aria-hidden="true"></i>{{ tx('adjust_title') }}
+            </h2>
         </template>
 
         <form novalidate data-test="adjust-form" @submit.prevent="apply">
@@ -116,11 +131,27 @@ onBeforeUnmount(() => {
             <fieldset class="mb-3">
                 <legend class="form-label fs-6 mb-2">{{ tx('adjust_direction') }}</legend>
                 <div class="btn-group btn-group-sm" role="group">
-                    <input id="pp-adjust-increase" v-model="direction" class="btn-check" type="radio" name="pp-adjust-direction" value="increase" data-test="adjust-increase">
+                    <input
+                        id="pp-adjust-increase"
+                        v-model="direction"
+                        class="btn-check"
+                        type="radio"
+                        name="pp-adjust-direction"
+                        value="increase"
+                        data-test="adjust-increase"
+                    />
                     <label class="btn btn-outline-primary" for="pp-adjust-increase">
                         <i class="ti ti-trending-up me-1" aria-hidden="true"></i>{{ tx('adjust_increase') }}
                     </label>
-                    <input id="pp-adjust-decrease" v-model="direction" class="btn-check" type="radio" name="pp-adjust-direction" value="decrease" data-test="adjust-decrease">
+                    <input
+                        id="pp-adjust-decrease"
+                        v-model="direction"
+                        class="btn-check"
+                        type="radio"
+                        name="pp-adjust-direction"
+                        value="decrease"
+                        data-test="adjust-decrease"
+                    />
                     <label class="btn btn-outline-primary" for="pp-adjust-decrease">
                         <i class="ti ti-trending-down me-1" aria-hidden="true"></i>{{ tx('adjust_decrease') }}
                     </label>
@@ -142,47 +173,105 @@ onBeforeUnmount(() => {
                         :aria-invalid="showError ? 'true' : 'false'"
                         :aria-describedby="showError ? 'pp-adjust-percent-error' : 'pp-adjust-percent-help'"
                         data-test="adjust-percent"
-                    >
+                    />
                     <span class="input-group-text" aria-hidden="true">%</span>
                 </div>
-                <div v-if="showError" id="pp-adjust-percent-error" class="invalid-feedback d-block" data-test="adjust-percent-error">{{ rangeMessage }}</div>
+                <div
+                    v-if="showError"
+                    id="pp-adjust-percent-error"
+                    class="invalid-feedback d-block"
+                    data-test="adjust-percent-error"
+                >
+                    {{ rangeMessage }}
+                </div>
                 <div v-else id="pp-adjust-percent-help" class="form-text">{{ tx('adjust_percent_help') }}</div>
             </div>
 
             <fieldset class="mb-3">
                 <legend class="form-label fs-6 mb-2">{{ tx('adjust_scope') }}</legend>
                 <div class="form-check">
-                    <input id="pp-adjust-scope-visible" v-model="scope" class="form-check-input" type="radio" name="pp-adjust-scope" value="visible" data-test="adjust-scope-visible">
-                    <label class="form-check-label" for="pp-adjust-scope-visible">{{ tx('adjust_scope_visible', { count: number(visibleEntries.length) }) }}</label>
+                    <input
+                        id="pp-adjust-scope-visible"
+                        v-model="scope"
+                        class="form-check-input"
+                        type="radio"
+                        name="pp-adjust-scope"
+                        value="visible"
+                        data-test="adjust-scope-visible"
+                    />
+                    <label class="form-check-label" for="pp-adjust-scope-visible">{{
+                        tx('adjust_scope_visible', { count: number(visibleEntries.length) })
+                    }}</label>
                 </div>
                 <div class="form-check">
-                    <input id="pp-adjust-scope-all" v-model="scope" class="form-check-input" type="radio" name="pp-adjust-scope" value="all" data-test="adjust-scope-all">
-                    <label class="form-check-label" for="pp-adjust-scope-all">{{ tx('adjust_scope_all', { count: number(allEntries.length) }) }}</label>
+                    <input
+                        id="pp-adjust-scope-all"
+                        v-model="scope"
+                        class="form-check-input"
+                        type="radio"
+                        name="pp-adjust-scope"
+                        value="all"
+                        data-test="adjust-scope-all"
+                    />
+                    <label class="form-check-label" for="pp-adjust-scope-all">{{
+                        tx('adjust_scope_all', { count: number(allEntries.length) })
+                    }}</label>
                 </div>
             </fieldset>
 
-            <div class="pp-preview rounded border p-2 small" role="status" aria-live="polite" aria-atomic="true" data-test="adjust-preview">
+            <div
+                class="pp-preview rounded border p-2 small"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                data-test="adjust-preview"
+            >
                 <p class="fw-semibold mb-1">{{ tx('preview_label') }}</p>
                 <p v-if="!plan" class="mb-0 text-body-secondary">{{ tx('adjust_preview_empty') }}</p>
                 <template v-else>
-                    <p v-if="plan.changes.length === 0" class="mb-0" data-test="preview-none">{{ tx('preview_none') }}</p>
+                    <p v-if="plan.changes.length === 0" class="mb-0" data-test="preview-none">
+                        {{ tx('preview_none') }}
+                    </p>
                     <template v-else>
-                        <p class="mb-1" data-test="preview-count">{{ tx('preview_changes', { count: number(plan.changes.length) }) }}</p>
+                        <p class="mb-1" data-test="preview-count">
+                            {{ tx('preview_changes', { count: number(plan.changes.length) }) }}
+                        </p>
                         <p class="mb-1 text-body-secondary">{{ tx('preview_examples') }}</p>
                         <ul class="mb-1 ps-3">
                             <li v-for="change in examples" :key="change.index" data-test="preview-example">
-                                {{ tx('preview_example', { procedure: procedureLabel(change.row), from: money(change.from), to: money(change.to) }) }}
+                                {{
+                                    tx('preview_example', {
+                                        procedure: procedureLabel(change.row),
+                                        from: money(change.from),
+                                        to: money(change.to),
+                                    })
+                                }}
                             </li>
                         </ul>
                     </template>
-                    <p v-if="plan.skipped > 0" class="mb-0 text-body-secondary" data-test="preview-skipped">{{ tx('adjust_skipped', { count: number(plan.skipped) }) }}</p>
+                    <p v-if="plan.skipped > 0" class="mb-0 text-body-secondary" data-test="preview-skipped">
+                        {{ tx('adjust_skipped', { count: number(plan.skipped) }) }}
+                    </p>
                 </template>
             </div>
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-outline-secondary btn-sm" data-test="adjust-cancel" @click="emit('close')">{{ tx('bulk_cancel') }}</button>
-            <button type="button" class="btn btn-primary btn-sm" data-test="adjust-apply" :disabled="!canApply" @click="apply">
+            <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                data-test="adjust-cancel"
+                @click="emit('close')"
+            >
+                {{ tx('bulk_cancel') }}
+            </button>
+            <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                data-test="adjust-apply"
+                :disabled="!canApply"
+                @click="apply"
+            >
                 <i class="ti ti-check me-1" aria-hidden="true"></i>{{ tx('adjust_apply') }}
             </button>
         </template>

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useForm, router, Link, usePage } from '@inertiajs/vue3';
-import AppLayout  from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 
 /**
@@ -14,20 +14,20 @@ import PageHeader from '@/Components/Panel/PageHeader.vue';
  * Padrão job-tries=1 + dedup CPF/(nome+tel) preservado no backend.
  */
 const props = defineProps({
-    breadcrumbs:    { type: Array,  default: () => [] },
-    imports:        { type: Array,  default: () => [] },
+    breadcrumbs: { type: Array, default: () => [] },
+    imports: { type: Array, default: () => [] },
     pending_import: { type: Object, default: null },
-    preview_id:     { type: String, default: null },
-    plan_status:    { type: Object, default: () => ({}) },
-    urls:           { type: Object, required: true },
-    t:              { type: Object, default: () => ({}) },
+    preview_id: { type: String, default: null },
+    plan_status: { type: Object, default: () => ({}) },
+    urls: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
 });
 
 const page = usePage();
 
 // ── Upload ──────────────────────────────────────────────────────────────────
 const uploadForm = useForm({ file: null });
-const fileInput  = ref(null);
+const fileInput = ref(null);
 
 function onFileChange(e) {
     uploadForm.file = e.target.files[0];
@@ -48,7 +48,7 @@ function submitUpload() {
 // ── Preview / confirm ───────────────────────────────────────────────────────
 const previewImport = computed(() => {
     if (!props.preview_id) return null;
-    return props.imports.find(i => i.id === props.preview_id);
+    return props.imports.find((i) => i.id === props.preview_id);
 });
 
 function csrf() {
@@ -58,10 +58,19 @@ function csrf() {
 // Confirmação padrão via SweetAlert2 (já usado no resto do painel — ver
 // Layouts/AppLayout.vue e EyeImages/Index.vue), com fallback pro confirm()
 // nativo do browser se o script não tiver carregado por algum motivo.
-async function confirmDialog({ icon = 'warning', title, text, confirmButtonText, cancelButtonText = 'Voltar', confirmButtonColor }) {
+async function confirmDialog({
+    icon = 'warning',
+    title,
+    text,
+    confirmButtonText,
+    cancelButtonText = 'Voltar',
+    confirmButtonColor,
+}) {
     if (window.Swal) {
         const result = await window.Swal.fire({
-            icon, title, text,
+            icon,
+            title,
+            text,
             showCancelButton: true,
             confirmButtonText,
             cancelButtonText,
@@ -85,8 +94,8 @@ async function confirmImport(item) {
     if (!ok) return;
 
     await fetch(item.urls.confirm, {
-        method:  'POST',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        method: 'POST',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
     router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
 }
@@ -101,8 +110,8 @@ async function cancelImport(item) {
     if (!ok) return;
 
     await fetch(item.urls.cancel, {
-        method:  'DELETE',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
     router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
 }
@@ -121,8 +130,8 @@ async function cancelProcessingImport(item) {
 
     stopPolling();
     await fetch(item.urls.cancel, {
-        method:  'DELETE',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
     router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
 }
@@ -134,7 +143,7 @@ let pollTimer = null;
 async function pollStatus() {
     if (!pollingImport.value || pollingImport.value.is_done) return;
     try {
-        const res  = await fetch(pollingImport.value.urls.status, { headers: { Accept: 'application/json' } });
+        const res = await fetch(pollingImport.value.urls.status, { headers: { Accept: 'application/json' } });
         const json = await res.json();
 
         // Mescla os campos atualizados ao item em memória
@@ -144,7 +153,9 @@ async function pollStatus() {
             // Recarrega lista completa para atualizar tudo
             router.reload({ only: ['imports', 'pending_import'] });
         }
-    } catch { /* silent */ }
+    } catch {
+        /* silent */
+    }
 }
 
 function startPolling() {
@@ -163,10 +174,13 @@ function stopPolling() {
 // enviar/confirmar/cancelar um import, o Inertia atualiza a prop (router.reload
 // parcial), mas o componente não remonta, então esse ref nunca refletia a
 // mudança sem F5 manual. Este watch mantém os dois sincronizados sempre.
-watch(() => props.pending_import, (value) => {
-    pollingImport.value = value;
-    value && !value.is_done ? startPolling() : stopPolling();
-});
+watch(
+    () => props.pending_import,
+    (value) => {
+        pollingImport.value = value;
+        value && !value.is_done ? startPolling() : stopPolling();
+    },
+);
 
 onMounted(startPolling);
 onBeforeUnmount(stopPolling);
@@ -180,7 +194,10 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
 <template>
     <AppLayout title="Importar pacientes" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader title="Importação em massa de pacientes" subtitle="Upload CSV — geração de preview antes da importação efetiva.">
+            <PageHeader
+                title="Importação em massa de pacientes"
+                subtitle="Upload CSV — geração de preview antes da importação efetiva."
+            >
                 <template #actions>
                     <a :href="urls.template" class="btn btn-outline-secondary btn-sm">
                         <i class="ti ti-download me-1"></i>Modelo CSV
@@ -195,9 +212,10 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
             <div v-if="plan_status?.max" class="alert alert-info small d-flex align-items-start mb-3">
                 <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                 <div>
-                    Seu plano permite até <strong>{{ plan_status.max }}</strong> pacientes.
-                    Utilizados: <strong>{{ plan_status.used }}</strong>.
-                    Disponíveis: <strong>{{ plan_status.available ?? '—' }}</strong>.
+                    Seu plano permite até <strong>{{ plan_status.max }}</strong> pacientes. Utilizados:
+                    <strong>{{ plan_status.used }}</strong
+                    >. Disponíveis: <strong>{{ plan_status.available ?? '—' }}</strong
+                    >.
                 </div>
             </div>
 
@@ -222,7 +240,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                     </button>
                 </div>
 
-                <div class="progress mb-2" style="height: 8px;">
+                <div class="progress mb-2" style="height: 8px">
                     <div
                         class="progress-bar bg-info progress-bar-striped progress-bar-animated"
                         :style="`width: ${pollingImport.progress}%`"
@@ -247,7 +265,8 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                 </div>
                 <div class="card-body">
                     <p class="text-muted small mb-3">
-                        Revise as primeiras linhas do arquivo. Confirme para iniciar a importação ou cancele para descartar.
+                        Revise as primeiras linhas do arquivo. Confirme para iniciar a importação ou cancele para
+                        descartar.
                     </p>
 
                     <div v-if="previewImport.preview?.mapped_columns?.length" class="table-responsive mb-3">
@@ -262,28 +281,43 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                             </thead>
                             <tbody>
                                 <tr v-for="(row, ri) in previewImport.preview.sample_rows ?? []" :key="ri">
-                                    <td v-for="col in previewImport.preview.mapped_columns" :key="col.field">{{ row[col.label] ?? '' }}</td>
+                                    <td v-for="col in previewImport.preview.mapped_columns" :key="col.field">
+                                        {{ row[col.label] ?? '' }}
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <div v-if="previewImport.preview?.unmapped_columns?.length" class="alert alert-secondary small py-2 mb-3">
+                    <div
+                        v-if="previewImport.preview?.unmapped_columns?.length"
+                        class="alert alert-secondary small py-2 mb-3"
+                    >
                         <i class="ti ti-info-circle me-1"></i>
-                        Colunas do arquivo não reconhecidas (serão ignoradas): <strong>{{ previewImport.preview.unmapped_columns.join(', ') }}</strong>
+                        Colunas do arquivo não reconhecidas (serão ignoradas):
+                        <strong>{{ previewImport.preview.unmapped_columns.join(', ') }}</strong>
                     </div>
 
-                    <div v-if="previewImport.preview?.missing_required?.length" class="alert alert-danger small py-2 mb-3">
+                    <div
+                        v-if="previewImport.preview?.missing_required?.length"
+                        class="alert alert-danger small py-2 mb-3"
+                    >
                         <i class="ti ti-alert-triangle me-1"></i>
-                        Colunas obrigatórias ausentes: <strong>{{ previewImport.preview.missing_required.join(', ') }}</strong>
+                        Colunas obrigatórias ausentes:
+                        <strong>{{ previewImport.preview.missing_required.join(', ') }}</strong>
                         <div class="mt-1 text-muted">
-                            Confira se a <strong>primeira linha</strong> do arquivo tem os nomes das colunas (ex.: "nome", "celular") e não já os dados de um paciente. Baixe o
+                            Confira se a <strong>primeira linha</strong> do arquivo tem os nomes das colunas (ex.:
+                            "nome", "celular") e não já os dados de um paciente. Baixe o
                             <a :href="urls.template">Modelo CSV</a> pra comparar o formato esperado.
                         </div>
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end">
-                        <button type="button" class="btn btn-outline-danger btn-sm" @click="cancelImport(previewImport)">
+                        <button
+                            type="button"
+                            class="btn btn-outline-danger btn-sm"
+                            @click="cancelImport(previewImport)"
+                        >
                             <i class="ti ti-x me-1"></i>Cancelar
                         </button>
                         <button
@@ -301,11 +335,11 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
             <!-- Upload novo -->
             <div v-if="!pollingImport || pollingImport.is_done" class="card mb-3">
                 <div class="card-body">
-                    <h6 class="fw-semibold mb-3">
-                        <i class="ti ti-upload me-1"></i>Novo arquivo CSV
-                    </h6>
+                    <h6 class="fw-semibold mb-3"><i class="ti ti-upload me-1"></i>Novo arquivo CSV</h6>
                     <form @submit.prevent="submitUpload">
-                        <label class="form-label small">Arquivo (.csv, máx 20MB) <span class="text-danger">*</span></label>
+                        <label class="form-label small"
+                            >Arquivo (.csv, máx 20MB) <span class="text-danger">*</span></label
+                        >
                         <div class="d-flex flex-column flex-sm-row gap-2">
                             <input
                                 ref="fileInput"
@@ -315,7 +349,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                                 :class="{ 'is-invalid': uploadForm.errors.file }"
                                 @change="onFileChange"
                                 required
-                            >
+                            />
                             <button
                                 type="submit"
                                 class="btn btn-primary btn-sm text-nowrap"
@@ -326,7 +360,9 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                                 Enviar
                             </button>
                         </div>
-                        <div v-if="uploadForm.errors.file" class="invalid-feedback d-block">{{ uploadForm.errors.file }}</div>
+                        <div v-if="uploadForm.errors.file" class="invalid-feedback d-block">
+                            {{ uploadForm.errors.file }}
+                        </div>
                         <small class="text-muted d-block mt-1">
                             Separador: ponto-e-vírgula (;). Encoding UTF-8. Convênio vazio entra como Particular;
                             convênio com nome não cadastrado na clínica vira erro na linha. Veja o
@@ -339,9 +375,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
             <!-- Histórico -->
             <div class="card">
                 <div class="card-header bg-transparent">
-                    <h6 class="mb-0 fw-semibold">
-                        <i class="ti ti-history me-1"></i>Histórico de importações
-                    </h6>
+                    <h6 class="mb-0 fw-semibold"><i class="ti ti-history me-1"></i>Histórico de importações</h6>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">

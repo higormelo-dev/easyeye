@@ -20,7 +20,9 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 reset: () => Object.assign(form, initial),
-                clearErrors: () => { form.errors = {}; },
+                clearErrors: () => {
+                    form.errors = {};
+                },
                 post: vi.fn(),
                 put: vi.fn(),
             });
@@ -40,16 +42,17 @@ function mockEntity(overrides = {}) {
     globalThis.fetch = vi.fn(() =>
         Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({
-                data: {
-                    name: 'CLINICA TESTE',
-                    telephone: '6133334444',
-                    cellphone: '61999998888',
-                    national_registration: '12ABC345000195',
-                    zipcode: '01310100',
-                    ...overrides,
-                },
-            }),
+            json: () =>
+                Promise.resolve({
+                    data: {
+                        name: 'CLINICA TESTE',
+                        telephone: '6133334444',
+                        cellphone: '61999998888',
+                        national_registration: '12ABC345000195',
+                        zipcode: '01310100',
+                        ...overrides,
+                    },
+                }),
         }),
     );
 }
@@ -103,7 +106,7 @@ describe('EntityFormModal — máscaras de telefone e CEP', () => {
         expect(byPlaceholder(wrapper, '(00) 0000-0000').element.value).toBe('(61) 3333-4444');
         expect(byPlaceholder(wrapper, '(00) 00000-0000').element.value).toBe('(61) 99999-8888');
         // CEP: único input numérico sem placeholder de telefone (t = {} no teste) e sem maxlength
-        const cep = wrapper.findAll('input[inputmode="numeric"]').find(i => !i.attributes('placeholder'));
+        const cep = wrapper.findAll('input[inputmode="numeric"]').find((i) => !i.attributes('placeholder'));
         expect(cep.attributes('maxlength')).toBeUndefined();
         expect(cep.element.value).toBe('01310-100');
         expect(wrapper.find('input[autocapitalize="characters"]').element.value).toBe('12.ABC.345/0001-95');

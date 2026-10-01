@@ -30,14 +30,14 @@ export function useTrans(tOrGetter) {
      * @returns {string}
      */
     function tx(key, params = {}) {
-        const t   = resolve();
+        const t = resolve();
         const str = String(t[key] ?? key);
 
         // Um placeholder = ':' + o nome INTEIRO (como no Laravel): ':page' não
         // corrompe ':pages', e um valor que contenha ':x' não é substituído de novo.
-        return str.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (match, name) => (
-            Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match
-        ));
+        return str.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (match, name) =>
+            Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match,
+        );
     }
 
     return { tx };

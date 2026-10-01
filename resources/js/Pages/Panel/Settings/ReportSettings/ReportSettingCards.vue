@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
-import TablePagination            from '@/Components/Panel/TablePagination.vue';
-import ReportSettingActions       from './ReportSettingActions.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
+import ReportSettingActions from './ReportSettingActions.vue';
 import { useReportSettingFormat } from './useReportSettingFormat.js';
 
 /**
@@ -10,8 +10,8 @@ import { useReportSettingFormat } from './useReportSettingFormat.js';
  * tabela. Usa o MESMO paginator da tabela (prop `items`), sem endpoint extra.
  */
 const props = defineProps({
-    items:     { type: Object, required: true },   // paginator Laravel
-    t:         { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    t: { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
@@ -23,7 +23,12 @@ const rows = computed(() => props.items?.data ?? []);
 
 /** Só os blocos incluídos, por extenso ("Cabeçalho, Assinatura"). */
 function includedBlocks(item) {
-    return blocks(item).filter((block) => block.on).map((block) => block.label).join(', ') || '—';
+    return (
+        blocks(item)
+            .filter((block) => block.on)
+            .map((block) => block.label)
+            .join(', ') || '—'
+    );
 }
 </script>
 
@@ -42,12 +47,21 @@ function includedBlocks(item) {
                         <h6 class="mb-1 fw-semibold lh-sm text-break">{{ item.title }}</h6>
                         <div class="d-flex flex-wrap gap-1">
                             <span
-                                :class="item.active
-                                    ? 'badge badge-soft-success rounded text-success border border-success fs-12'
-                                    : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'"
-                            >{{ item.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo') }}</span>
-                            <span v-if="item.is_adopted" class="badge badge-soft-info rounded fs-11">{{ t.origin_adopted ?? 'Adotado' }}</span>
-                            <span v-if="item.has_update" class="badge badge-soft-warning rounded fs-11">{{ t.update_available ?? 'Atualização disponível' }}</span>
+                                :class="
+                                    item.active
+                                        ? 'badge badge-soft-success rounded text-success border border-success fs-12'
+                                        : 'badge badge-soft-danger rounded text-danger border border-danger fs-12'
+                                "
+                                >{{
+                                    item.active ? (t.status_active ?? 'Ativo') : (t.status_inactive ?? 'Inativo')
+                                }}</span
+                            >
+                            <span v-if="item.is_adopted" class="badge badge-soft-info rounded fs-11">{{
+                                t.origin_adopted ?? 'Adotado'
+                            }}</span>
+                            <span v-if="item.has_update" class="badge badge-soft-warning rounded fs-11">{{
+                                t.update_available ?? 'Atualização disponível'
+                            }}</span>
                         </div>
                     </div>
                 </div>
@@ -55,7 +69,9 @@ function includedBlocks(item) {
                 <p
                     class="small mt-2 mb-0 rs-description"
                     :class="item.description ? 'text-muted' : 'text-body-secondary fst-italic'"
-                >{{ item.description || (t.no_description ?? 'Sem descrição') }}</p>
+                >
+                    {{ item.description || (t.no_description ?? 'Sem descrição') }}
+                </p>
 
                 <!-- Linhas rotuladas no estilo de PatientCards ("Rótulo: valor"). -->
                 <dl class="small text-muted mt-2 mb-1">
@@ -77,7 +93,7 @@ function includedBlocks(item) {
                     </div>
                 </dl>
 
-                <hr class="my-2 mt-auto">
+                <hr class="my-2 mt-auto" />
 
                 <ReportSettingActions
                     :item="item"

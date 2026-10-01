@@ -23,12 +23,12 @@ import { contactLensCompact } from './contactLens.js';
  */
 defineProps({
     records: { type: Array, default: () => [] },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['view']);
 
-const collapsed  = ref(false);
+const collapsed = ref(false);
 const expandedId = ref(null);
 
 function toggleExpand(record) {
@@ -38,25 +38,33 @@ function toggleExpand(record) {
 
 <template>
     <div v-if="records.length" class="card prev-records mt-2">
-        <div class="card-header py-2 d-flex align-items-center gap-2 prev-records__header"
-             role="button"
-             :title="collapsed ? (t.expand_panel ?? 'Mostrar histórico') : (t.collapse_panel ?? 'Minimizar histórico')"
-             @click="collapsed = !collapsed">
+        <div
+            class="card-header py-2 d-flex align-items-center gap-2 prev-records__header"
+            role="button"
+            :title="collapsed ? (t.expand_panel ?? 'Mostrar histórico') : (t.collapse_panel ?? 'Minimizar histórico')"
+            @click="collapsed = !collapsed"
+        >
             <i class="fas fa-clock-rotate-left text-primary"></i>
             <span class="fw-semibold small">{{ t.previous_records ?? 'Consultas anteriores' }}</span>
             <span class="badge bg-light text-muted ms-auto">{{ records.length }}</span>
-            <i class="fas fa-chevron-down prev-records__chevron" :class="{ 'prev-records__chevron--collapsed': collapsed }"></i>
+            <i
+                class="fas fa-chevron-down prev-records__chevron"
+                :class="{ 'prev-records__chevron--collapsed': collapsed }"
+            ></i>
         </div>
 
         <ul v-show="!collapsed" class="list-group list-group-flush">
-            <li v-for="r in records" :key="r.id"
+            <li
+                v-for="r in records"
+                :key="r.id"
                 class="list-group-item prev-records__item"
                 :class="{ 'prev-records__item--expanded': expandedId === r.id }"
                 role="button"
                 tabindex="0"
                 @click="toggleExpand(r)"
                 @keydown.enter="toggleExpand(r)"
-                @keydown.space.prevent="toggleExpand(r)">
+                @keydown.space.prevent="toggleExpand(r)"
+            >
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div class="min-w-0">
                         <div class="fw-semibold small text-truncate">
@@ -68,10 +76,15 @@ function toggleExpand(record) {
                         </div>
                     </div>
                     <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
-                        <i class="fas prev-records__view text-muted"
-                           :class="expandedId === r.id ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                        <span v-if="r.is_signed" class="badge bg-success-subtle text-success border border-success-subtle"
-                              :title="t.signed ?? 'Assinado'">
+                        <i
+                            class="fas prev-records__view text-muted"
+                            :class="expandedId === r.id ? 'fa-chevron-up' : 'fa-chevron-down'"
+                        ></i>
+                        <span
+                            v-if="r.is_signed"
+                            class="badge bg-success-subtle text-success border border-success-subtle"
+                            :title="t.signed ?? 'Assinado'"
+                        >
                             <i class="fas fa-lock"></i>
                         </span>
                     </div>
@@ -91,21 +104,36 @@ function toggleExpand(record) {
                         <div class="prev-records__summary-line prev-records__summary-line--strong">
                             <span class="prev-records__tag">Ref</span>
                         </div>
-                        <div v-if="r.summary.refraction_od" class="prev-records__summary-line prev-records__summary-line--indent">
+                        <div
+                            v-if="r.summary.refraction_od"
+                            class="prev-records__summary-line prev-records__summary-line--indent"
+                        >
                             <span class="prev-records__eye">OD:</span>{{ r.summary.refraction_od }}
                         </div>
-                        <div v-if="r.summary.refraction_oe" class="prev-records__summary-line prev-records__summary-line--indent">
+                        <div
+                            v-if="r.summary.refraction_oe"
+                            class="prev-records__summary-line prev-records__summary-line--indent"
+                        >
                             <span class="prev-records__eye">OE:</span>{{ r.summary.refraction_oe }}
                         </div>
-                        <div v-if="r.summary.addition" class="prev-records__summary-line prev-records__summary-line--indent">
+                        <div
+                            v-if="r.summary.addition"
+                            class="prev-records__summary-line prev-records__summary-line--indent"
+                        >
                             <span class="prev-records__eye">Ad:</span>{{ r.summary.addition }}
                         </div>
                     </template>
                     <!-- Cálculo de lentes de contato da consulta (só quando houve):
                          resultado por olho; rótulo completo no title. -->
-                    <div v-for="row in contactLensCompact(r.summary.contact_lens, t)" :key="row.key"
-                         class="prev-records__summary-line" :title="row.label" :data-contact-lens="row.key">
-                        <span class="prev-records__tag">{{ row.tag }}</span>{{ row.value }}
+                    <div
+                        v-for="row in contactLensCompact(r.summary.contact_lens, t)"
+                        :key="row.key"
+                        class="prev-records__summary-line"
+                        :title="row.label"
+                        :data-contact-lens="row.key"
+                    >
+                        <span class="prev-records__tag">{{ row.tag }}</span
+                        >{{ row.value }}
                     </div>
                     <div v-if="r.summary.pio" class="prev-records__summary-line">
                         <span class="prev-records__tag">PIO</span>{{ r.summary.pio }}
@@ -116,8 +144,11 @@ function toggleExpand(record) {
                 <div v-if="expandedId === r.id" class="prev-records__detail mt-2" @click.stop>
                     <div v-if="r.summary?.diagnoses?.length" class="mb-1">
                         <div class="prev-records__detail-label">{{ t.diagnoses ?? 'Diagnósticos' }}</div>
-                        <span v-for="diag in r.summary.diagnoses" :key="diag"
-                              class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1 mb-1 text-wrap text-start">
+                        <span
+                            v-for="diag in r.summary.diagnoses"
+                            :key="diag"
+                            class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1 mb-1 text-wrap text-start"
+                        >
                             {{ diag }}
                         </span>
                     </div>
@@ -130,8 +161,11 @@ function toggleExpand(record) {
                         <div class="small text-muted">{{ r.main_complaint }}</div>
                     </div>
 
-                    <button type="button" class="btn btn-outline-primary btn-sm w-100 mt-1"
-                            @click.stop="emit('view', r)">
+                    <button
+                        type="button"
+                        class="btn btn-outline-primary btn-sm w-100 mt-1"
+                        @click.stop="emit('view', r)"
+                    >
                         <i class="fas fa-eye me-1"></i>{{ t.view_full ?? 'Ver prontuário completo' }}
                     </button>
                 </div>
@@ -143,7 +177,7 @@ function toggleExpand(record) {
 <style scoped>
 .prev-records {
     border: 1px solid var(--bs-border-color);
-    border-radius: .5rem;
+    border-radius: 0.5rem;
     overflow: hidden;
 }
 .prev-records__header {
@@ -151,16 +185,16 @@ function toggleExpand(record) {
     user-select: none;
 }
 .prev-records__chevron {
-    font-size: .7rem;
+    font-size: 0.7rem;
     color: var(--bs-secondary-color);
-    transition: transform .15s ease;
+    transition: transform 0.15s ease;
 }
 .prev-records__chevron--collapsed {
     transform: rotate(-90deg);
 }
 .prev-records__item {
     cursor: pointer;
-    transition: background-color .12s ease;
+    transition: background-color 0.12s ease;
 }
 .prev-records__item:hover,
 .prev-records__item:focus-visible {
@@ -171,9 +205,9 @@ function toggleExpand(record) {
     background-color: var(--bs-primary-bg-subtle, #e7f1ff);
 }
 .prev-records__view {
-    opacity: .4;
-    font-size: .7rem;
-    transition: opacity .12s ease;
+    opacity: 0.4;
+    font-size: 0.7rem;
+    transition: opacity 0.12s ease;
 }
 .prev-records__item:hover .prev-records__view {
     opacity: 1;
@@ -184,7 +218,7 @@ function toggleExpand(record) {
     gap: 1px;
 }
 .prev-records__summary-line {
-    font-size: .72rem;
+    font-size: 0.72rem;
     color: var(--bs-body-color);
     /* Sem truncate: dado clínico NUNCA cortado — quebra de linha permitida
        (o grau completo vale mais que uma linha a menos). */
@@ -202,28 +236,28 @@ function toggleExpand(record) {
     display: inline-block;
     min-width: 26px;
     font-weight: 700;
-    font-size: .64rem;
+    font-size: 0.64rem;
     color: var(--bs-secondary-color);
 }
 .prev-records__tag {
     display: inline-block;
     min-width: 40px;
     font-weight: 700;
-    font-size: .62rem;
+    font-size: 0.62rem;
     color: var(--bs-secondary-color);
     text-transform: uppercase;
-    letter-spacing: .02em;
+    letter-spacing: 0.02em;
 }
 .prev-records__detail {
     border-top: 1px dashed var(--bs-border-color);
-    padding-top: .5rem;
+    padding-top: 0.5rem;
     cursor: default;
 }
 .prev-records__detail-label {
-    font-size: .64rem;
+    font-size: 0.64rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .03em;
+    letter-spacing: 0.03em;
     color: var(--bs-secondary-color);
     margin-bottom: 2px;
 }

@@ -71,8 +71,12 @@ export function computeContactLens(inputs = {}) {
 }
 
 export function hasContactLensResult(calc) {
-    return !!calc && ['vertex_od_result', 'vertex_oe_result', 'se_od_result', 'se_oe_result']
-        .some((key) => calc[key] !== null && calc[key] !== undefined);
+    return (
+        !!calc &&
+        ['vertex_od_result', 'vertex_oe_result', 'se_od_result', 'se_oe_result'].some(
+            (key) => calc[key] !== null && calc[key] !== undefined,
+        )
+    );
 }
 
 /**
@@ -93,9 +97,7 @@ export const CONTACT_LENS_LIMITS = Object.freeze({
 export function contactLensOutOfRange(inputs = {}) {
     return Object.entries(CONTACT_LENS_LIMITS)
         .filter(([key, [min, max]]) => {
-            const n = key === 'vertex_distance_mm'
-                ? (toNumber(inputs[key]) || DEFAULT_VERTEX_MM)
-                : toNumber(inputs[key]);
+            const n = key === 'vertex_distance_mm' ? toNumber(inputs[key]) || DEFAULT_VERTEX_MM : toNumber(inputs[key]);
             return n !== null && (n < min || n > max);
         })
         .map(([key]) => key);
@@ -116,8 +118,10 @@ export function formatVertexMm(v) {
 
 /** Rótulo da conversão ao vértice com a distância usada ("… (vértice 12 mm)"). */
 function vertexLabel(calc, t) {
-    return (t.contact_lens_vertex_label ?? 'Esférico → lente de contato (vértice :mm mm)')
-        .replace(':mm', formatVertexMm(calc.vertex_distance_mm));
+    return (t.contact_lens_vertex_label ?? 'Esférico → lente de contato (vértice :mm mm)').replace(
+        ':mm',
+        formatVertexMm(calc.vertex_distance_mm),
+    );
 }
 
 /**
@@ -129,12 +133,15 @@ function vertexLabel(calc, t) {
  */
 export function contactLensSummary(calc, t = {}) {
     if (!hasContactLensResult(calc)) return [];
-    const eyes = (pairs) => pairs
-        .filter(([, , result]) => toNumber(result) !== null)
-        .map(([eye, input, result]) => (input === undefined
-            ? `${eye}: ${formatDiopter(result)}`
-            : `${eye}: ${formatDiopter(input)} → ${formatDiopter(result)}`))
-        .join('  ·  ');
+    const eyes = (pairs) =>
+        pairs
+            .filter(([, , result]) => toNumber(result) !== null)
+            .map(([eye, input, result]) =>
+                input === undefined
+                    ? `${eye}: ${formatDiopter(result)}`
+                    : `${eye}: ${formatDiopter(input)} → ${formatDiopter(result)}`,
+            )
+            .join('  ·  ');
     const od = t.od ?? 'OD';
     const oe = t.oe ?? 'OE';
 
@@ -142,12 +149,18 @@ export function contactLensSummary(calc, t = {}) {
         {
             key: 'vertex',
             label: vertexLabel(calc, t),
-            value: eyes([[od, calc.vertex_od, calc.vertex_od_result], [oe, calc.vertex_oe, calc.vertex_oe_result]]),
+            value: eyes([
+                [od, calc.vertex_od, calc.vertex_od_result],
+                [oe, calc.vertex_oe, calc.vertex_oe_result],
+            ]),
         },
         {
             key: 'se',
             label: t.contact_lens_se_title ?? 'Equivalente esférico',
-            value: eyes([[od, undefined, calc.se_od_result], [oe, undefined, calc.se_oe_result]]),
+            value: eyes([
+                [od, undefined, calc.se_od_result],
+                [oe, undefined, calc.se_oe_result],
+            ]),
         },
     ].filter((row) => row.value !== '');
 }
@@ -159,10 +172,14 @@ export function contactLensSummary(calc, t = {}) {
  */
 export function contactLensCompact(calc, t = {}) {
     if (!hasContactLensResult(calc)) return [];
-    const results = (odResult, oeResult) => [[t.od ?? 'OD', odResult], [t.oe ?? 'OE', oeResult]]
-        .filter(([, result]) => toNumber(result) !== null)
-        .map(([eye, result]) => `${eye} ${formatDiopter(result)}`)
-        .join(' | ');
+    const results = (odResult, oeResult) =>
+        [
+            [t.od ?? 'OD', odResult],
+            [t.oe ?? 'OE', oeResult],
+        ]
+            .filter(([, result]) => toNumber(result) !== null)
+            .map(([eye, result]) => `${eye} ${formatDiopter(result)}`)
+            .join(' | ');
 
     return [
         {
@@ -180,7 +197,14 @@ export function contactLensCompact(calc, t = {}) {
     ].filter((row) => row.value !== '');
 }
 
-const REFRACTION_FIELDS = ['spherical_right', 'spherical_left', 'cylindrical_right', 'cylindrical_left', 'axis_right', 'axis_left'];
+const REFRACTION_FIELDS = [
+    'spherical_right',
+    'spherical_left',
+    'cylindrical_right',
+    'cylindrical_left',
+    'axis_right',
+    'axis_left',
+];
 
 /** Valor padrão do bloco ("", "0.00", "0,00", "0°") — mesma regra do servidor (refractionBlockOrNull). */
 function isDefaultRefraction(v) {
@@ -202,7 +226,13 @@ export function refractionFromRecord(form, prefix) {
     }
 
     return {
-        od: { sphere: toNumber(form?.[`${prefix}_spherical_right`]), cylinder: toNumber(form?.[`${prefix}_cylindrical_right`]) },
-        oe: { sphere: toNumber(form?.[`${prefix}_spherical_left`]), cylinder: toNumber(form?.[`${prefix}_cylindrical_left`]) },
+        od: {
+            sphere: toNumber(form?.[`${prefix}_spherical_right`]),
+            cylinder: toNumber(form?.[`${prefix}_cylindrical_right`]),
+        },
+        oe: {
+            sphere: toNumber(form?.[`${prefix}_spherical_left`]),
+            cylinder: toNumber(form?.[`${prefix}_cylindrical_left`]),
+        },
     };
 }

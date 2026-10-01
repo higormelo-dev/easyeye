@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import AppLayout  from '@/Layouts/AppLayout.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 
 /**
@@ -11,31 +11,40 @@ import PageHeader from '@/Components/Panel/PageHeader.vue';
  * "sincronizado há Xmin" abaixo).
  */
 const props = defineProps({
-    entity:         { type: Object, required: true },
+    entity: { type: Object, required: true },
     userIntegrator: { type: Object, required: true },
-    integrator:     { type: Object, required: true },
-    health:         { type: Object, default: null },
+    integrator: { type: Object, required: true },
+    health: { type: Object, default: null },
     // Últimos pontos do log de tendência (integrator_queue_health_history,
     // retido 7 dias no banco — aqui só os mais recentes, ver
     // HISTORY_LIMIT no controller). Mais recente primeiro.
-    history:        { type: Array, default: () => [] },
+    history: { type: Array, default: () => [] },
 });
 
 const breadcrumbs = [
-    { label: 'Dashboard',            url: route('panel.dashboard'),                                                                            active: false },
-    { label: 'Empresas',             url: route('manager.entities.index'),                                                                     active: false },
-    { label: props.entity.name,                                        url: '#',                                                                active: false },
-    { label: 'Usuários Integradores', url: route('manager.entities.user-integrators.index', props.entity.id),                                  active: false },
-    { label: props.userIntegrator.name,                                url: '#',                                                                active: false },
-    { label: 'Integradores',         url: route('manager.entities.user-integrators.integrators.index', [props.entity.id, props.userIntegrator.id]), active: false },
-    { label: props.integrator.name,                                    url: '#',                                                                active: false },
-    { label: 'Fila',                 url: '#',                                                                                                  active: true  },
+    { label: 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: 'Empresas', url: route('manager.entities.index'), active: false },
+    { label: props.entity.name, url: '#', active: false },
+    {
+        label: 'Usuários Integradores',
+        url: route('manager.entities.user-integrators.index', props.entity.id),
+        active: false,
+    },
+    { label: props.userIntegrator.name, url: '#', active: false },
+    {
+        label: 'Integradores',
+        url: route('manager.entities.user-integrators.integrators.index', [props.entity.id, props.userIntegrator.id]),
+        active: false,
+    },
+    { label: props.integrator.name, url: '#', active: false },
+    { label: 'Fila', url: '#', active: true },
 ];
 
-const equipmentsUrl = route(
-    'manager.entities.user-integrators.integrators.equipments.index',
-    [props.entity.id, props.userIntegrator.id, props.integrator.id],
-);
+const equipmentsUrl = route('manager.entities.user-integrators.integrators.equipments.index', [
+    props.entity.id,
+    props.userIntegrator.id,
+    props.integrator.id,
+]);
 
 // Ciclo de sync do integrador é ~5min (ver docs/QUEUE_HEALTH.md do
 // integrator) — acima de 3x isso sem sincronizar é sinal de que a máquina
@@ -92,9 +101,8 @@ function statusLabel(status) {
             <div v-if="!health" class="alert alert-secondary d-flex align-items-center">
                 <i class="ti ti-info-circle me-2 fs-5"></i>
                 <span>
-                    Este integrador ainda não sincronizou o estado da fila. Ou é uma
-                    versão do integrador anterior a este recurso, ou ele nunca chegou
-                    a se conectar de verdade — confirme com a clínica.
+                    Este integrador ainda não sincronizou o estado da fila. Ou é uma versão do integrador anterior a
+                    este recurso, ou ele nunca chegou a se conectar de verdade — confirme com a clínica.
                 </span>
             </div>
 
@@ -107,9 +115,8 @@ function statusLabel(status) {
                     <span>
                         Sincronizado {{ syncedLabel() }}
                         <span v-if="isStale">
-                            — mais de {{ STALE_AFTER_MINUTES }} min sem notícia deste
-                            integrador. Pode estar desligado, sem internet, ou o
-                            processo parado na clínica.
+                            — mais de {{ STALE_AFTER_MINUTES }} min sem notícia deste integrador. Pode estar desligado,
+                            sem internet, ou o processo parado na clínica.
                         </span>
                         <span v-else>— não é uma consulta ao vivo na máquina da clínica.</span>
                     </span>
@@ -158,7 +165,10 @@ function statusLabel(status) {
                     </div>
                 </div>
 
-                <div v-if="health.blocked_count === 0 && health.failed_count === 0" class="alert alert-success d-flex align-items-center">
+                <div
+                    v-if="health.blocked_count === 0 && health.failed_count === 0"
+                    class="alert alert-success d-flex align-items-center"
+                >
                     <i class="ti ti-circle-check me-2 fs-5"></i>
                     <span>Nada bloqueado ou com falha no último retrato — fila saudável.</span>
                 </div>
@@ -186,21 +196,32 @@ function statusLabel(status) {
                             <tbody>
                                 <tr v-for="item in health.problems" :key="item.id">
                                     <td class="text-muted small">#{{ item.id }}</td>
-                                    <td><code class="small">{{ item.file_name }}</code></td>
                                     <td>
-                                        <span class="badge rounded fs-13 fw-medium" :class="statusBadgeClass(item.status)">
+                                        <code class="small">{{ item.file_name }}</code>
+                                    </td>
+                                    <td>
+                                        <span
+                                            class="badge rounded fs-13 fw-medium"
+                                            :class="statusBadgeClass(item.status)"
+                                        >
                                             {{ statusLabel(item.status) }}
                                         </span>
                                     </td>
                                     <td class="text-muted small">{{ item.attempts }}</td>
                                     <td>
-                                        <code v-if="item.schedule_identifier" class="small">{{ item.schedule_identifier }}</code>
-                                        <code v-else-if="item.patient_identifier" class="small">{{ item.patient_identifier }}</code>
+                                        <code v-if="item.schedule_identifier" class="small">{{
+                                            item.schedule_identifier
+                                        }}</code>
+                                        <code v-else-if="item.patient_identifier" class="small">{{
+                                            item.patient_identifier
+                                        }}</code>
                                         <span v-else class="text-muted small">—</span>
                                     </td>
                                     <td class="small">
                                         {{ item.last_error ?? '—' }}
-                                        <span v-if="item.api_status" class="text-muted">(HTTP {{ item.api_status }})</span>
+                                        <span v-if="item.api_status" class="text-muted"
+                                            >(HTTP {{ item.api_status }})</span
+                                        >
                                     </td>
                                     <td class="text-muted small">{{ new Date(item.updated_at).toLocaleString() }}</td>
                                 </tr>

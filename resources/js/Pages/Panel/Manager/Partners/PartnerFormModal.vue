@@ -5,68 +5,69 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    open:         { type: Boolean, required: true },
-    partnerId:    { type: String,  default: null },
-    editDataUrl:  { type: String,  default: '' },
-    updateUrl:    { type: String,  default: '' },
-    partnerTypes: { type: Array,   default: () => [] },
-    t:            { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    partnerId: { type: String, default: null },
+    editDataUrl: { type: String, default: '' },
+    updateUrl: { type: String, default: '' },
+    partnerTypes: { type: Array, default: () => [] },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'saved']);
 
 const loading = ref(false);
-const saving  = ref(false);
-const errors  = ref({});
+const saving = ref(false);
+const errors = ref({});
 
 const defaultForm = () => ({
-    name:            '',
-    email:           '',
-    type:            '',
-    document:        '',
+    name: '',
+    email: '',
+    type: '',
+    document: '',
     commission_rate: '',
-    notes:           '',
-    status:          'active',
+    notes: '',
+    status: 'active',
 });
 
-const form   = ref(defaultForm());
+const form = ref(defaultForm());
 const isEdit = computed(() => !!props.partnerId);
 
-const defaultRates = Object.fromEntries(
-    props.partnerTypes.map(t => [t.value, t.default_rate])
-);
+const defaultRates = Object.fromEntries(props.partnerTypes.map((t) => [t.value, t.default_rate]));
 
 function resetForm() {
-    form.value   = defaultForm();
+    form.value = defaultForm();
     errors.value = {};
 }
 
 async function loadData() {
     loading.value = true;
     try {
-        const res  = await fetch(props.editDataUrl);
+        const res = await fetch(props.editDataUrl);
         const json = await res.json();
-        const d    = json.data;
+        const d = json.data;
         form.value = {
-            name:            d.name            ?? '',
-            email:           d.email           ?? '',
-            type:            d.type            ?? '',
-            document:        d.document        ?? '',
+            name: d.name ?? '',
+            email: d.email ?? '',
+            type: d.type ?? '',
+            document: d.document ?? '',
             commission_rate: d.commission_rate ?? '',
-            notes:           d.notes           ?? '',
-            status:          d.status          ?? 'active',
+            notes: d.notes ?? '',
+            status: d.status ?? 'active',
         };
     } finally {
         loading.value = false;
     }
 }
 
-watch(() => props.open, (val) => {
-    if (val) {
-        resetForm();
-        if (props.partnerId) loadData();
-    }
-});
+watch(
+    () => props.open,
+    (val) => {
+        if (val) {
+            resetForm();
+            if (props.partnerId) loadData();
+        }
+    },
+);
 
 function onTypeChange() {
     if (!isEdit.value && form.value.type && defaultRates[form.value.type]) {
@@ -78,15 +79,15 @@ async function submit() {
     saving.value = true;
     errors.value = {};
     try {
-        const url    = isEdit.value ? props.updateUrl : route('manager.partners.store');
+        const url = isEdit.value ? props.updateUrl : route('manager.partners.store');
         const method = isEdit.value ? 'PUT' : 'POST';
 
         const res = await fetch(url, {
             method,
             headers: {
-                'Content-Type':  'application/json',
-                'Accept':        'application/json',
-                'X-CSRF-TOKEN':  document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
             },
             body: JSON.stringify(form.value),
         });
@@ -114,17 +115,12 @@ function err(field) {
 
 function showToast(msg, type = 'success') {
     if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
-    if (type === 'error'   && window.showErrorToast)   return window.showErrorToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
 }
 </script>
 
 <template>
-    <OffcanvasPanel
-        :open="open"
-        :loading="loading"
-        :loading-label="t.saving"
-        @close="$emit('close')"
-    >
+    <OffcanvasPanel :open="open" :loading="loading" :loading-label="t.saving" @close="$emit('close')">
         <template #header>
             <div>
                 <h5 class="mb-0 fw-semibold">
@@ -135,7 +131,6 @@ function showToast(msg, type = 'success') {
         </template>
 
         <div class="row g-3">
-
             <!-- Nome -->
             <div class="col-12 col-sm-6">
                 <label class="form-label">{{ t.field_name }} <span class="text-danger">*</span></label>
@@ -146,7 +141,7 @@ function showToast(msg, type = 'success') {
                     :class="{ 'is-invalid': err('name') }"
                     :placeholder="t.field_name_ph"
                     maxlength="255"
-                >
+                />
                 <div v-if="err('name')" class="invalid-feedback">{{ err('name') }}</div>
             </div>
 
@@ -161,7 +156,7 @@ function showToast(msg, type = 'success') {
                     :placeholder="t.field_email_ph"
                     :disabled="isEdit"
                     maxlength="255"
-                >
+                />
                 <div v-if="err('email')" class="invalid-feedback">{{ err('email') }}</div>
                 <div v-if="!isEdit" class="form-text small">{{ t.email_hint }}</div>
             </div>
@@ -189,11 +184,13 @@ function showToast(msg, type = 'success') {
                     <input
                         v-model="form.commission_rate"
                         type="number"
-                        step="0.01" min="0" max="100"
+                        step="0.01"
+                        min="0"
+                        max="100"
                         class="form-control"
                         :class="{ 'is-invalid': err('commission_rate') }"
                         placeholder="0.00"
-                    >
+                    />
                     <span class="input-group-text">%</span>
                     <div v-if="err('commission_rate')" class="invalid-feedback">{{ err('commission_rate') }}</div>
                 </div>
@@ -210,7 +207,7 @@ function showToast(msg, type = 'success') {
                     class="form-control"
                     :class="{ 'is-invalid': err('document') }"
                     :placeholder="t.field_document_ph"
-                >
+                />
                 <div v-if="err('document')" class="invalid-feedback">{{ err('document') }}</div>
             </div>
 
@@ -219,7 +216,11 @@ function showToast(msg, type = 'success') {
                 <label class="form-label">{{ t.field_status }}</label>
                 <SearchSelect
                     v-model="form.status"
-                    :options="[{value:'active',label:t.status_active},{value:'inactive',label:t.status_inactive},{value:'suspended',label:t.status_suspended}]"
+                    :options="[
+                        { value: 'active', label: t.status_active },
+                        { value: 'inactive', label: t.status_inactive },
+                        { value: 'suspended', label: t.status_suspended },
+                    ]"
                     :value-key="'value'"
                     :label-key="'label'"
                     :placeholder="t.field_select"
@@ -246,7 +247,7 @@ function showToast(msg, type = 'success') {
             <button type="button" class="btn btn-secondary" @click="$emit('close')">{{ t.cancel }}</button>
             <button type="button" class="btn btn-primary" :disabled="saving" @click="submit">
                 <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
-                {{ saving ? t.saving : (isEdit ? t.save : t.register) }}
+                {{ saving ? t.saving : isEdit ? t.save : t.register }}
             </button>
         </template>
     </OffcanvasPanel>

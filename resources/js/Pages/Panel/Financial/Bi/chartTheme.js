@@ -25,12 +25,12 @@ export function toneColor(element, tone) {
 /** Cores de apoio (texto, grade, superfície do tooltip) do tema atual. */
 export function chartChrome(element) {
     return {
-        text:     cssVar(element, '--bs-secondary-color'),
-        body:     cssVar(element, '--bs-body-color'),
+        text: cssVar(element, '--bs-secondary-color'),
+        body: cssVar(element, '--bs-body-color'),
         emphasis: cssVar(element, '--bs-emphasis-color') ?? cssVar(element, '--bs-body-color'),
-        grid:     cssVar(element, '--bs-border-color-translucent') ?? cssVar(element, '--bs-border-color'),
-        border:   cssVar(element, '--bs-border-color'),
-        surface:  cssVar(element, '--bs-card-bg') ?? cssVar(element, '--bs-body-bg'),
+        grid: cssVar(element, '--bs-border-color-translucent') ?? cssVar(element, '--bs-border-color'),
+        border: cssVar(element, '--bs-border-color'),
+        surface: cssVar(element, '--bs-card-bg') ?? cssVar(element, '--bs-body-bg'),
     };
 }
 
@@ -38,19 +38,21 @@ export function chartChrome(element) {
 export function tooltipTheme(chrome) {
     return {
         backgroundColor: chrome.surface,
-        titleColor:      chrome.emphasis,
-        bodyColor:       chrome.body,
-        borderColor:     chrome.border,
-        borderWidth:     1,
-        padding:         10,
+        titleColor: chrome.emphasis,
+        bodyColor: chrome.body,
+        borderColor: chrome.border,
+        borderWidth: 1,
+        padding: 10,
     };
 }
 
 /** Respeita "reduzir movimento" do sistema operacional (sem animação do Chart.js). */
 export function prefersReducedMotion() {
-    return typeof window !== 'undefined'
-        && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return (
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
 }
 
 /** Chama `callback` quando o tema (data-bs-theme do <html>) muda. Devolve a função que para de observar. */

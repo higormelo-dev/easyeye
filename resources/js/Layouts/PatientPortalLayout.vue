@@ -37,7 +37,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
         <!-- Navbar -->
         <nav
             class="navbar navbar-expand navbar-dark py-2"
-            style="background: linear-gradient(135deg, #0f766e 0%, #0369a1 100%);"
+            style="background: linear-gradient(135deg, #0f766e 0%, #0369a1 100%)"
         >
             <div class="container-fluid px-4">
                 <span class="navbar-brand fw-semibold mb-0">
@@ -48,20 +48,23 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
                     <button
                         type="button"
                         class="btn btn-link text-white d-flex align-items-center gap-2"
-                        style="text-decoration:none;"
+                        style="text-decoration: none"
                         @click.stop="showUserMenu = !showUserMenu"
                     >
-                        <span class="rounded-circle d-flex align-items-center justify-content-center bg-white bg-opacity-25" style="width:32px;height:32px;">
+                        <span
+                            class="rounded-circle d-flex align-items-center justify-content-center bg-white bg-opacity-25"
+                            style="width: 32px; height: 32px"
+                        >
                             <i class="ti ti-user"></i>
                         </span>
                         <span class="d-none d-md-inline">{{ patientName || 'Minha conta' }}</span>
-                        <i class="ti ti-chevron-down" style="font-size:12px;"></i>
+                        <i class="ti ti-chevron-down" style="font-size: 12px"></i>
                     </button>
 
                     <ul
                         v-if="showUserMenu"
                         class="dropdown-menu dropdown-menu-end show position-absolute"
-                        style="right:0; top:100%;"
+                        style="right: 0; top: 100%"
                     >
                         <li>
                             <Link

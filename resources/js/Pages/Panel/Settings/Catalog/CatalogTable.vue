@@ -1,10 +1,10 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useTrans } from '@/composables/useTrans.js';
 import CatalogCell from './CatalogCell.vue';
@@ -16,11 +16,11 @@ import CatalogCell from './CatalogCell.vue';
  * sistema (global) só visualiza; editar/excluir ficam para os da clínica.
  */
 const props = defineProps({
-    items:      { type: Object, required: true },   // paginator Laravel
-    columns:    { type: Array,  required: true },
-    sortable:   { type: Array,  default: () => [] },
-    filters:    { type: Object, default: () => ({}) },
-    t:          { type: Object, default: () => ({}) },
+    items: { type: Object, required: true }, // paginator Laravel
+    columns: { type: Array, required: true },
+    sortable: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
     storageKey: { type: String, default: 'catalog_view' },
 });
 
@@ -32,7 +32,7 @@ const rows = computed(() => props.items?.data ?? []);
 
 // ── Ordenação ────────────────────────────────────────────────────────────────
 const currentSort = computed(() => props.filters.sort ?? 'name');
-const currentDir  = computed(() => props.filters.dir ?? 'asc');
+const currentDir = computed(() => props.filters.dir ?? 'asc');
 
 function isSortable(col) {
     return props.sortable.includes(col.key);
@@ -56,21 +56,23 @@ function ariaSort(col) {
 
 // ── Ordem de colunas personalizável (por catálogo) ───────────────────────────
 // Status/Ações ficam fixas no fim, como na tabela de pacientes.
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder(
     `${props.storageKey.replace(/_view$/, '')}_columns_order`,
     props.columns.map((c) => c.key),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => props.columns.find((c) => c.key === key))
-        .filter(Boolean)
-));
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => props.columns.find((c) => c.key === key)).filter(Boolean),
+);
 
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 </script>
 
@@ -126,11 +128,7 @@ const columnMenuLabels = computed(() => ({
                         {{ t.empty_list ?? 'Nenhum registro.' }}
                     </td>
                 </tr>
-                <tr
-                    v-for="item in rows"
-                    :key="item.id"
-                    :class="{ 'table-secondary opacity-75': item.deleted }"
-                >
+                <tr v-for="item in rows" :key="item.id" :class="{ 'table-secondary opacity-75': item.deleted }">
                     <td v-for="col in orderedColumns" :key="col.key">
                         <CatalogCell :item="item" :col="col" :t="t" />
                     </td>
@@ -143,8 +141,12 @@ const columnMenuLabels = computed(() => ({
                         <span
                             v-else-if="item.active"
                             class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium"
-                        >{{ t.status_active ?? 'Ativo' }}</span>
-                        <span v-else class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium">
+                            >{{ t.status_active ?? 'Ativo' }}</span
+                        >
+                        <span
+                            v-else
+                            class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium"
+                        >
                             {{ t.status_inactive ?? 'Inativo' }}
                         </span>
                         <span
@@ -194,10 +196,14 @@ const columnMenuLabels = computed(() => ({
                                 <li>
                                     <button class="dropdown-item rounded-1" @click="emit('toggleActive', item)">
                                         <i :class="`ti me-1 ${item.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                        {{ item.active ? (t.action_deactivate ?? 'Desativar') : (t.action_activate ?? 'Ativar') }}
+                                        {{
+                                            item.active
+                                                ? (t.action_deactivate ?? 'Desativar')
+                                                : (t.action_activate ?? 'Ativar')
+                                        }}
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
+                                <li><hr class="dropdown-divider" /></li>
                                 <li>
                                     <button class="dropdown-item rounded-1 text-danger" @click="emit('delete', item)">
                                         <i class="ti ti-trash me-1"></i> {{ t.action_delete ?? 'Excluir' }}

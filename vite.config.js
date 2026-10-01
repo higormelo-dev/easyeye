@@ -23,7 +23,7 @@ const getImageInputs = (...dirs) => {
 
 export default defineConfig(({ command, mode, ssrBuild }) => {
     const isSsr = ssrBuild || process.argv.includes('--ssr');
-    
+
     return {
         server: {
             // Escuta em todas as interfaces dentro do container Docker

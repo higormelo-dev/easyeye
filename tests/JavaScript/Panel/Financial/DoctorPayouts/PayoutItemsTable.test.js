@@ -31,9 +31,17 @@ function mountTable(rows) {
 
 describe('Financial/DoctorPayouts/PayoutItemsTable — divisão (E4)', () => {
     it('médico fixo: papel, % do grupo e líquido com as deduções', () => {
-        const w = mountTable([{
-            ...base, row_id: 'r1', beneficiary_role: 'doctor', share_percentage: 60, net: 940, deductions: 60, payout: 338.4,
-        }]);
+        const w = mountTable([
+            {
+                ...base,
+                row_id: 'r1',
+                beneficiary_role: 'doctor',
+                share_percentage: 60,
+                net: 940,
+                deductions: 60,
+                payout: 338.4,
+            },
+        ]);
 
         const rule = w.find('[data-test="item-rule"]');
         expect(rule.find('[data-test="item-share"]').text()).toBe('Participant · 60% of the group');
@@ -43,7 +51,15 @@ describe('Financial/DoctorPayouts/PayoutItemsTable — divisão (E4)', () => {
     it('executor com parte do grupo mostra o papel; com 100% (sem divisão) não', () => {
         const w = mountTable([
             { ...base, row_id: 'r1', beneficiary_role: 'executor', share_percentage: 40, net: 1000, deductions: 0 },
-            { ...base, row_id: 'r2', key: 'schedule:s2', beneficiary_role: 'executor', share_percentage: 100, net: 1000, deductions: 0 },
+            {
+                ...base,
+                row_id: 'r2',
+                key: 'schedule:s2',
+                beneficiary_role: 'executor',
+                share_percentage: 100,
+                net: 1000,
+                deductions: 0,
+            },
         ]);
 
         const [split, whole] = w.findAll('[data-test="item-row"]');
@@ -54,7 +70,9 @@ describe('Financial/DoctorPayouts/PayoutItemsTable — divisão (E4)', () => {
     });
 
     it('item do regime anterior / regra fixa (sem papel nem líquido): só a regra', () => {
-        const w = mountTable([{ ...base, row_id: 'r1', beneficiary_role: null, share_percentage: null, net: null, deductions: 0 }]);
+        const w = mountTable([
+            { ...base, row_id: 'r1', beneficiary_role: null, share_percentage: null, net: null, deductions: 0 },
+        ]);
 
         const rule = w.find('[data-test="item-rule"]');
         expect(rule.text()).toBe('60% of net received');
@@ -85,29 +103,53 @@ describe('Financial/DoctorPayouts/PayoutItemsTable — conferência (lacunas do 
     });
 
     it('regra fixa com recebimento parcial mostra a proporção; esperado (cobrado − glosa) aparece quando difere do recebido', () => {
-        const w = mountTable([{
-            ...base, row_id: 'r1', basis: 'receipt', status: 'pending', received: 120, expected: 200,
-            rule: { calculation: 'fixed', percentage: null, fixed: 100 }, payout: 60,
-        }]);
+        const w = mountTable([
+            {
+                ...base,
+                row_id: 'r1',
+                basis: 'receipt',
+                status: 'pending',
+                received: 120,
+                expected: 200,
+                rule: { calculation: 'fixed', percentage: null, fixed: 100 },
+                payout: 60,
+            },
+        ]);
 
-        expect(w.find('[data-test="item-fixed-proportional"]').text()).toBe(`Proportional to receipt: ${brl(120)} of ${brl(200)}`);
+        expect(w.find('[data-test="item-fixed-proportional"]').text()).toBe(
+            `Proportional to receipt: ${brl(120)} of ${brl(200)}`,
+        );
         expect(w.find('[data-test="item-expected"]').text()).toBe(`Expected ${brl(200)} (charged − denial)`);
     });
 
     it('recebido completo: sem proporção nem esperado repetido', () => {
-        const w = mountTable([{
-            ...base, row_id: 'r1', basis: 'receipt', status: 'pending', received: 200, expected: 200,
-            rule: { calculation: 'fixed', percentage: null, fixed: 100 }, payout: 100,
-        }]);
+        const w = mountTable([
+            {
+                ...base,
+                row_id: 'r1',
+                basis: 'receipt',
+                status: 'pending',
+                received: 200,
+                expected: 200,
+                rule: { calculation: 'fixed', percentage: null, fixed: 100 },
+                payout: 100,
+            },
+        ]);
 
         expect(w.find('[data-test="item-fixed-proportional"]').exists()).toBe(false);
         expect(w.find('[data-test="item-expected"]').exists()).toBe(false);
     });
 
     it('deduções detalhadas por tipo sob o líquido (acumulado do atendimento)', () => {
-        const w = mountTable([{
-            ...base, row_id: 'r1', net: 880, deductions: 120, deductions_breakdown: { card: 30, tax: 70, admin: 20 },
-        }]);
+        const w = mountTable([
+            {
+                ...base,
+                row_id: 'r1',
+                net: 880,
+                deductions: 120,
+                deductions_breakdown: { card: 30, tax: 70, admin: 20 },
+            },
+        ]);
 
         const detail = w.find('[data-test="item-deductions"]');
         expect(detail.text()).toBe(`Card ${brl(30)} · Tax ${brl(70)} · Admin fee ${brl(20)}`);

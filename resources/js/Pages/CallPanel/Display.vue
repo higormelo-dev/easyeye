@@ -10,18 +10,18 @@ import { ref, onMounted, onUnmounted } from 'vue';
  * nenhum dado clínico/cadastral chega aqui.
  */
 const props = defineProps({
-    clinic:   { type: String, required: true },
+    clinic: { type: String, required: true },
     feed_url: { type: String, required: true },
 });
 
-const calls   = ref([]);
+const calls = ref([]);
 const current = ref(null);
-const clock   = ref('');
+const clock = ref('');
 
-let pollTimer  = null;
+let pollTimer = null;
 let clockTimer = null;
-let seenIds    = new Set();
-let firstLoad  = true;
+let seenIds = new Set();
+let firstLoad = true;
 
 function speak(call) {
     try {
@@ -33,7 +33,9 @@ function speak(call) {
         utter.lang = 'pt-BR';
         utter.rate = 0.92;
         window.speechSynthesis.speak(utter);
-    } catch { /**/ }
+    } catch {
+        /**/
+    }
 }
 
 async function poll() {
@@ -45,14 +47,16 @@ async function poll() {
 
         const newest = data[0] ?? null;
         if (newest && !seenIds.has(newest.id)) {
-            data.forEach(c => seenIds.add(c.id));
+            data.forEach((c) => seenIds.add(c.id));
             current.value = newest;
             // Primeira carga não anuncia (senão a TV "repete" chamadas velhas
             // toda vez que a página recarrega).
             if (!firstLoad) speak(newest);
         }
         firstLoad = false;
-    } catch { /**/ }
+    } catch {
+        /**/
+    }
 }
 
 function tickClock() {
@@ -62,7 +66,7 @@ function tickClock() {
 onMounted(() => {
     tickClock();
     poll();
-    pollTimer  = setInterval(poll, 4000);
+    pollTimer = setInterval(poll, 4000);
     clockTimer = setInterval(tickClock, 1000);
 });
 
@@ -108,17 +112,29 @@ onUnmounted(() => {
     color: #fff;
     display: flex;
     flex-direction: column;
-    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        'Segoe UI',
+        sans-serif;
 }
 .cp-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 2vh 3vw;
-    border-bottom: 1px solid rgba(255, 255, 255, .12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
-.cp-clinic { font-size: 2.2vw; font-weight: 700; letter-spacing: .02em; }
-.cp-clock  { font-size: 2.2vw; font-variant-numeric: tabular-nums; opacity: .85; }
+.cp-clinic {
+    font-size: 2.2vw;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.cp-clock {
+    font-size: 2.2vw;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
+}
 .cp-main {
     flex: 1;
     display: flex;
@@ -131,7 +147,7 @@ onUnmounted(() => {
 .cp-label {
     font-size: 2.4vw;
     text-transform: uppercase;
-    letter-spacing: .35em;
+    letter-spacing: 0.35em;
     color: #4fc3f7;
     margin-bottom: 2vh;
 }
@@ -141,22 +157,47 @@ onUnmounted(() => {
     line-height: 1.1;
     text-wrap: balance;
 }
-.cp-doctor { font-size: 3vw; margin-top: 2vh; opacity: .8; }
-.cp-idle   { font-size: 3vw; opacity: .5; }
+.cp-doctor {
+    font-size: 3vw;
+    margin-top: 2vh;
+    opacity: 0.8;
+}
+.cp-idle {
+    font-size: 3vw;
+    opacity: 0.5;
+}
 .cp-history {
     padding: 2vh 3vw 3vh;
-    border-top: 1px solid rgba(255, 255, 255, .12);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 .cp-history-title {
     font-size: 1.4vw;
     text-transform: uppercase;
-    letter-spacing: .2em;
-    opacity: .6;
+    letter-spacing: 0.2em;
+    opacity: 0.6;
     margin-bottom: 1vh;
 }
-.cp-history-list { display: flex; gap: 3vw; flex-wrap: wrap; }
-.cp-history-item { display: flex; gap: .8vw; align-items: baseline; }
-.cp-history-time   { font-size: 1.6vw; color: #4fc3f7; font-variant-numeric: tabular-nums; }
-.cp-history-name   { font-size: 1.8vw; font-weight: 600; }
-.cp-history-doctor { font-size: 1.4vw; opacity: .65; }
+.cp-history-list {
+    display: flex;
+    gap: 3vw;
+    flex-wrap: wrap;
+}
+.cp-history-item {
+    display: flex;
+    gap: 0.8vw;
+    align-items: baseline;
+}
+.cp-history-time {
+    font-size: 1.6vw;
+    color: #4fc3f7;
+    font-variant-numeric: tabular-nums;
+}
+.cp-history-name {
+    font-size: 1.8vw;
+    font-weight: 600;
+}
+.cp-history-doctor {
+    font-size: 1.4vw;
+    opacity: 0.65;
+}
 </style>

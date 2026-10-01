@@ -4,49 +4,52 @@ import SlotPicker from '@/Components/Panel/SlotPicker.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    item:    { type: Object, default: null },
-    doctors: { type: Array,  default: () => [] },
-    t:       { type: Object, required: true },
+    item: { type: Object, default: null },
+    doctors: { type: Array, default: () => [] },
+    t: { type: Object, required: true },
 });
 
 const emit = defineEmits(['close', 'rescheduled']);
 
-const dateTime      = ref('');
-const doctorId      = ref('');
-const saving        = ref(false);
-const errorMsg      = ref('');
-const modalOpen     = ref(false);
+const dateTime = ref('');
+const doctorId = ref('');
+const saving = ref(false);
+const errorMsg = ref('');
+const modalOpen = ref(false);
 const slotPickerRef = ref(null);
-let bsModal         = null;
+let bsModal = null;
 
-watch(() => props.item, async (val) => {
-    if (val) {
-        dateTime.value = '';
-        doctorId.value = val.doctor_id ?? '';
-        errorMsg.value = '';
-        saving.value   = false;
-        modalOpen.value = true;
-        await nextTick();
-        slotPickerRef.value?.reset();
-        if (! bsModal) {
-            bsModal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
+watch(
+    () => props.item,
+    async (val) => {
+        if (val) {
+            dateTime.value = '';
+            doctorId.value = val.doctor_id ?? '';
+            errorMsg.value = '';
+            saving.value = false;
+            modalOpen.value = true;
+            await nextTick();
+            slotPickerRef.value?.reset();
+            if (!bsModal) {
+                bsModal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
+            }
+            bsModal.show();
+        } else {
+            bsModal?.hide();
         }
-        bsModal.show();
-    } else {
-        bsModal?.hide();
-    }
-});
+    },
+);
 
 async function onConfirm() {
-    if (saving.value || ! props.item || ! dateTime.value) return;
-    saving.value   = true;
+    if (saving.value || !props.item || !dateTime.value) return;
+    saving.value = true;
     errorMsg.value = '';
 
     const res = await fetch(props.item.reschedule_url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Accept':       'application/json',
+            Accept: 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
         },
         body: JSON.stringify({ date_time: dateTime.value, doctor_id: doctorId.value || null }),
@@ -70,10 +73,7 @@ function onHidden() {
 
 <template>
     <Teleport to="body">
-        <div id="rescheduleModal"
-             class="modal fade"
-             tabindex="-1"
-             @hidden.bs.modal="onHidden">
+        <div id="rescheduleModal" class="modal fade" tabindex="-1" @hidden.bs.modal="onHidden">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -104,9 +104,12 @@ function onHidden() {
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                             {{ t.reschedule_cancel }}
                         </button>
-                        <button type="button" class="btn btn-primary"
-                                :disabled="saving || !dateTime"
-                                @click="onConfirm">
+                        <button
+                            type="button"
+                            class="btn btn-primary"
+                            :disabled="saving || !dateTime"
+                            @click="onConfirm"
+                        >
                             <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
                             {{ saving ? t.saving : t.reschedule_save }}
                         </button>

@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue';
-import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
-import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
-import SortableTh       from '@/Components/Panel/SortableTh.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import SortableTh from '@/Components/Panel/SortableTh.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { useTrans } from '@/composables/useTrans.js';
 import { useMovementFormat } from './useMovementFormat.js';
@@ -19,9 +19,9 @@ import { useMovementFormat } from './useMovementFormat.js';
  * extrato do produto da linha (filtro da própria tela).
  */
 const props = defineProps({
-    items:   { type: Object, required: true },   // paginator Laravel
+    items: { type: Object, required: true }, // paginator Laravel
     filters: { type: Object, default: () => ({}) },
-    t:       { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['sort', 'filterProduct']);
@@ -33,36 +33,49 @@ const rows = computed(() => props.items?.data ?? []);
 
 // ── Ordenação (padrão = o de sempre: data mais recente primeiro) ─────────────
 const currentSort = computed(() => props.filters.sort ?? 'occurred_at');
-const currentDir  = computed(() => props.filters.direction ?? 'desc');
+const currentDir = computed(() => props.filters.direction ?? 'desc');
 
 // ── Ordem de colunas personalizável ──────────────────────────────────────────
 const COLUMN_DEFS = computed(() => [
-    { key: 'occurred_at',   label: props.t.col_occurred_at ?? 'Data',         sortKey: 'occurred_at' },
-    { key: 'product',       label: props.t.col_product ?? 'Produto',          sortKey: 'product' },
-    { key: 'lot',           label: props.t.col_lot ?? 'Lote' },
-    { key: 'quantity',      label: props.t.col_quantity ?? 'Quantidade',      sortKey: 'quantity',      align: 'text-end' },
-    { key: 'unit_cost',     label: props.t.col_unit_cost ?? 'Custo unit.',    sortKey: 'unit_cost',     align: 'text-end' },
-    { key: 'balance_after', label: props.t.col_balance_after ?? 'Saldo após', sortKey: 'balance_after', align: 'text-end' },
-    { key: 'note',          label: props.t.col_note ?? 'Observação' },
-    { key: 'created_by',    label: props.t.col_created_by ?? 'Por' },
+    { key: 'occurred_at', label: props.t.col_occurred_at ?? 'Data', sortKey: 'occurred_at' },
+    { key: 'product', label: props.t.col_product ?? 'Produto', sortKey: 'product' },
+    { key: 'lot', label: props.t.col_lot ?? 'Lote' },
+    { key: 'quantity', label: props.t.col_quantity ?? 'Quantidade', sortKey: 'quantity', align: 'text-end' },
+    { key: 'unit_cost', label: props.t.col_unit_cost ?? 'Custo unit.', sortKey: 'unit_cost', align: 'text-end' },
+    {
+        key: 'balance_after',
+        label: props.t.col_balance_after ?? 'Saldo após',
+        sortKey: 'balance_after',
+        align: 'text-end',
+    },
+    { key: 'note', label: props.t.col_note ?? 'Observação' },
+    { key: 'created_by', label: props.t.col_created_by ?? 'Por' },
 ]);
-const DEFAULT_COLUMN_ORDER = ['occurred_at', 'product', 'lot', 'quantity', 'unit_cost', 'balance_after', 'note', 'created_by'];
+const DEFAULT_COLUMN_ORDER = [
+    'occurred_at',
+    'product',
+    'lot',
+    'quantity',
+    'unit_cost',
+    'balance_after',
+    'note',
+    'created_by',
+];
 
-const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
-    'stock_movements_columns_order',
-    DEFAULT_COLUMN_ORDER,
+const {
+    order: columnOrder,
+    moveTo: moveColumn,
+    reset: resetColumnOrder,
+} = useColumnOrder('stock_movements_columns_order', DEFAULT_COLUMN_ORDER);
+
+const orderedColumns = computed(() =>
+    columnOrder.value.map((key) => COLUMN_DEFS.value.find((c) => c.key === key)).filter(Boolean),
 );
 
-const orderedColumns = computed(() => (
-    columnOrder.value
-        .map((key) => COLUMN_DEFS.value.find((c) => c.key === key))
-        .filter(Boolean)
-));
-
 const columnMenuLabels = computed(() => ({
-    moveUp:   props.t.columns_move_up,
+    moveUp: props.t.columns_move_up,
     moveDown: props.t.columns_move_down,
-    reset:    props.t.columns_reset,
+    reset: props.t.columns_reset,
 }));
 
 function isCurrentProduct(movement) {
@@ -107,7 +120,8 @@ function isCurrentProduct(movement) {
                             :title="tx('sort_by', { column: col.label })"
                             :class="col.align"
                             @sort="emit('sort', $event)"
-                        >{{ col.label }}</SortableTh>
+                            >{{ col.label }}</SortableTh
+                        >
                         <th v-else :class="col.align">{{ col.label }}</th>
                     </template>
                     <th class="text-center">{{ t.col_type ?? 'Tipo' }}</th>
@@ -123,7 +137,9 @@ function isCurrentProduct(movement) {
                 </tr>
                 <tr v-for="m in rows" :key="m.id">
                     <template v-for="col in orderedColumns" :key="col.key">
-                        <td v-if="col.key === 'occurred_at'" class="text-muted small">{{ dateTime(m.occurred_at_iso) }}</td>
+                        <td v-if="col.key === 'occurred_at'" class="text-muted small">
+                            {{ dateTime(m.occurred_at_iso) }}
+                        </td>
 
                         <td v-else-if="col.key === 'product'">
                             <div class="fw-medium">{{ m.product_name ?? '—' }}</div>
@@ -136,18 +152,29 @@ function isCurrentProduct(movement) {
                             v-else-if="col.key === 'quantity'"
                             class="text-end fw-medium"
                             :class="m.direction === 1 ? 'text-success' : 'text-danger'"
-                        >{{ signedQuantity(m) }}</td>
+                        >
+                            {{ signedQuantity(m) }}
+                        </td>
 
                         <td v-else-if="col.key === 'unit_cost'" class="text-end">{{ money(m.unit_cost) }}</td>
 
-                        <td v-else-if="col.key === 'balance_after'" class="text-end fw-semibold">{{ quantity(m.balance_after) }}</td>
+                        <td v-else-if="col.key === 'balance_after'" class="text-end fw-semibold">
+                            {{ quantity(m.balance_after) }}
+                        </td>
 
                         <td v-else-if="col.key === 'note'" class="small text-muted">
-                            <span v-if="m.note" class="movement-note d-inline-block text-truncate align-middle" :title="m.note">{{ m.note }}</span>
+                            <span
+                                v-if="m.note"
+                                class="movement-note d-inline-block text-truncate align-middle"
+                                :title="m.note"
+                                >{{ m.note }}</span
+                            >
                             <template v-else>—</template>
                         </td>
 
-                        <td v-else-if="col.key === 'created_by'" class="small text-muted">{{ m.created_by_name ?? '—' }}</td>
+                        <td v-else-if="col.key === 'created_by'" class="small text-muted">
+                            {{ m.created_by_name ?? '—' }}
+                        </td>
                     </template>
 
                     <td class="text-center">

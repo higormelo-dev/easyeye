@@ -5,27 +5,32 @@ import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReas
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
-    open:    { type: Boolean, required: true },
-    gateway: { type: Object,  default: null },
-    t:       { type: Object,  default: () => ({}) },
+    open: { type: Boolean, required: true },
+    gateway: { type: Object, default: null },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close']);
 
 // Modal de confirmação destrutiva (LGPD/CFM)
-const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
 
 // Credential list
-const credentials  = ref([]);
-const listLoading  = ref(false);
-const listError    = ref('');
+const credentials = ref([]);
+const listLoading = ref(false);
+const listError = ref('');
 
 // New credential form
-const form         = ref({ label: '', secret: '', webhook_secret: '', valid_from: '', valid_to: '' });
-const saving       = ref(false);
-const formError    = ref('');
-const showSecret   = ref(false);
-const showWebhook  = ref(false);
+const form = ref({ label: '', secret: '', webhook_secret: '', valid_from: '', valid_to: '' });
+const saving = ref(false);
+const formError = ref('');
+const showSecret = ref(false);
+const showWebhook = ref(false);
 
 // Secret field label/hint from t.secret_label per gateway code
 const secretInfo = computed(() => {
@@ -33,20 +38,26 @@ const secretInfo = computed(() => {
     return props.t?.secret_label?.[code] ?? { label: props.t?.modal_cred_api_key ?? 'API Key', hint: '' };
 });
 
-watch(() => props.open, async (val) => {
-    if (val && props.gateway) {
-        resetForm();
-        await loadCredentials();
-    }
-    if (!val) { credentials.value = []; listError.value = ''; }
-});
+watch(
+    () => props.open,
+    async (val) => {
+        if (val && props.gateway) {
+            resetForm();
+            await loadCredentials();
+        }
+        if (!val) {
+            credentials.value = [];
+            listError.value = '';
+        }
+    },
+);
 
 async function loadCredentials() {
     listLoading.value = true;
-    listError.value   = '';
+    listError.value = '';
     credentials.value = [];
     try {
-        const res  = await fetch(props.gateway.credentials_url);
+        const res = await fetch(props.gateway.credentials_url);
         const json = await res.json();
         if (!res.ok) throw new Error(json.message);
         credentials.value = json.data ?? [];
@@ -58,9 +69,9 @@ async function loadCredentials() {
 }
 
 function resetForm() {
-    form.value      = { label: '', secret: '', webhook_secret: '', valid_from: '', valid_to: '' };
+    form.value = { label: '', secret: '', webhook_secret: '', valid_from: '', valid_to: '' };
     formError.value = '';
-    showSecret.value  = false;
+    showSecret.value = false;
     showWebhook.value = false;
 }
 
@@ -76,22 +87,22 @@ function saveCredential() {
         message: props.t.js_confirm_store ?? 'A credencial anterior será revogada automaticamente.',
         confirmVariant: 'primary',
         async onConfirm(reason) {
-            saving.value    = true;
+            saving.value = true;
             formError.value = '';
             try {
                 const body = { reason };
-                if (form.value.label)          body.label          = form.value.label;
-                if (form.value.secret)         body.secret         = form.value.secret;
+                if (form.value.label) body.label = form.value.label;
+                if (form.value.secret) body.secret = form.value.secret;
                 if (form.value.webhook_secret) body.webhook_secret = form.value.webhook_secret;
-                if (form.value.valid_from)     body.valid_from     = form.value.valid_from;
-                if (form.value.valid_to)       body.valid_to       = form.value.valid_to;
+                if (form.value.valid_from) body.valid_from = form.value.valid_from;
+                if (form.value.valid_to) body.valid_to = form.value.valid_to;
 
-                const res  = await fetch(props.gateway.credentials_store_url, {
+                const res = await fetch(props.gateway.credentials_store_url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                        'Accept': 'application/json',
+                        Accept: 'application/json',
                     },
                     body: JSON.stringify(body),
                 });
@@ -118,12 +129,12 @@ function revokeCredential(cred) {
         message: props.t.js_confirm_revoke ?? 'Revogar?',
         confirmVariant: 'danger',
         async onConfirm(reason) {
-            const res  = await fetch(cred.revoke_url, {
+            const res = await fetch(cred.revoke_url, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                 },
                 body: JSON.stringify({ reason }),
             });
@@ -146,7 +157,7 @@ function revokeCredential(cred) {
             v-if="open"
             class="modal fade show d-block"
             tabindex="-1"
-            style="background:rgba(0,0,0,.4)"
+            style="background: rgba(0, 0, 0, 0.4)"
             @click.self="$emit('close')"
         >
             <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
@@ -198,30 +209,36 @@ function revokeCredential(cred) {
                                         <span
                                             class="badge"
                                             :class="c.active ? 'badge-soft-success' : 'badge-soft-secondary'"
-                                            style="font-size:.7rem;"
-                                        >{{ c.active ? t.modal_cred_active : t.modal_cred_inactive }}</span>
+                                            style="font-size: 0.7rem"
+                                            >{{ c.active ? t.modal_cred_active : t.modal_cred_inactive }}</span
+                                        >
                                         <span
                                             v-if="c.valid_from"
                                             class="badge badge-soft-info"
-                                            style="font-size:.7rem;"
-                                        >{{ c.valid_from }} → {{ c.valid_to ?? '∞' }}</span>
-                                        <span class="text-muted" style="font-size:.75rem;">{{ c.created_at }}</span>
+                                            style="font-size: 0.7rem"
+                                            >{{ c.valid_from }} → {{ c.valid_to ?? '∞' }}</span
+                                        >
+                                        <span class="text-muted" style="font-size: 0.75rem">{{ c.created_at }}</span>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                    <span class="text-muted fst-italic" style="font-size:.75rem;">{{ t.modal_cred_hidden }}</span>
+                                    <span class="text-muted fst-italic" style="font-size: 0.75rem">{{
+                                        t.modal_cred_hidden
+                                    }}</span>
                                     <button
                                         v-if="c.active"
                                         type="button"
                                         class="btn btn-sm btn-outline-danger py-0 px-2"
-                                        style="font-size:.75rem;"
+                                        style="font-size: 0.75rem"
                                         @click="revokeCredential(c)"
-                                    >{{ t.modal_cred_revoke }}</button>
+                                    >
+                                        {{ t.modal_cred_revoke }}
+                                    </button>
                                 </div>
                             </div>
                         </div>
 
-                        <hr class="my-3">
+                        <hr class="my-3" />
 
                         <!-- New credential form -->
                         <h6 class="fw-semibold mb-3 small text-uppercase text-muted">
@@ -237,7 +254,7 @@ function revokeCredential(cred) {
                                         type="text"
                                         class="form-control form-control-sm"
                                         :placeholder="t.modal_cred_label_ph"
-                                    >
+                                    />
                                 </div>
 
                                 <!-- Secret key -->
@@ -253,7 +270,7 @@ function revokeCredential(cred) {
                                             autocomplete="new-password"
                                             required
                                             :placeholder="t.modal_cred_api_key_ph"
-                                        >
+                                        />
                                         <button
                                             type="button"
                                             class="btn btn-outline-secondary"
@@ -277,7 +294,7 @@ function revokeCredential(cred) {
                                             :type="showWebhook ? 'text' : 'password'"
                                             class="form-control font-monospace"
                                             autocomplete="new-password"
-                                        >
+                                        />
                                         <button
                                             type="button"
                                             class="btn btn-outline-secondary"
@@ -291,11 +308,11 @@ function revokeCredential(cred) {
                                 <!-- Validity -->
                                 <div class="col-md-6">
                                     <label class="form-label small fw-semibold">{{ t.modal_cred_valid_from }}</label>
-                                    <input v-model="form.valid_from" type="date" class="form-control form-control-sm">
+                                    <input v-model="form.valid_from" type="date" class="form-control form-control-sm" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small fw-semibold">{{ t.modal_cred_valid_to }}</label>
-                                    <input v-model="form.valid_to" type="date" class="form-control form-control-sm">
+                                    <input v-model="form.valid_to" type="date" class="form-control form-control-sm" />
                                 </div>
                             </div>
 

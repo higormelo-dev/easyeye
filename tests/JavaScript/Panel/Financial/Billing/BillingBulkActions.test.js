@@ -14,7 +14,9 @@ import { t, claim, batch, schedule, kpis, lists, paginate, brl, norm } from './s
 
 vi.mock('@inertiajs/vue3', async () => (await import('./support/inertiaMock.js')).buildInertiaMock());
 vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><slot /></div>' } }));
-vi.mock('@/Components/Panel/PageHeader.vue', () => ({ default: { props: ['title'], template: '<div><slot name="actions" /></div>' } }));
+vi.mock('@/Components/Panel/PageHeader.vue', () => ({
+    default: { props: ['title'], template: '<div><slot name="actions" /></div>' },
+}));
 vi.mock('@/Components/Panel/SearchSelect.vue', () => ({ default: { props: ['modelValue'], template: '<div />' } }));
 vi.mock('@/Components/Panel/Cid10Picker.vue', () => ({ default: { props: ['modelValue'], template: '<div />' } }));
 
@@ -46,10 +48,28 @@ afterEach(() => {
 
 /* ───────────────────────── Index: seleção entre páginas + barra ───────────────────────── */
 describe('Billing/Index — seleção da aba Guias para o recebimento em lote', () => {
-    const p1 = claim({ id: 'p1', code: 'GUI-P1', patient_name: 'Ana', allowed_actions: ['pay', 'deny'], receivable_amount: 200 });
-    const p2 = claim({ id: 'p2', code: 'GUI-P2', patient_name: 'Bia', allowed_actions: ['pay'], receivable_amount: 150.5 });
-    const x  = claim({ id: 'x', code: 'GUI-X', allowed_actions: [], status: 'paid' });
-    const p3 = claim({ id: 'p3', code: 'GUI-P3', patient_name: 'Caio', allowed_actions: ['pay'], receivable_amount: 99.5 });
+    const p1 = claim({
+        id: 'p1',
+        code: 'GUI-P1',
+        patient_name: 'Ana',
+        allowed_actions: ['pay', 'deny'],
+        receivable_amount: 200,
+    });
+    const p2 = claim({
+        id: 'p2',
+        code: 'GUI-P2',
+        patient_name: 'Bia',
+        allowed_actions: ['pay'],
+        receivable_amount: 150.5,
+    });
+    const x = claim({ id: 'x', code: 'GUI-X', allowed_actions: [], status: 'paid' });
+    const p3 = claim({
+        id: 'p3',
+        code: 'GUI-P3',
+        patient_name: 'Caio',
+        allowed_actions: ['pay'],
+        receivable_amount: 99.5,
+    });
 
     const baseProps = {
         breadcrumbs: [],
@@ -60,7 +80,15 @@ describe('Billing/Index — seleção da aba Guias para o recebimento em lote', 
         totals: { eligible: 1, claims: 4, batches: 1 },
         lists: lists(),
         covenants: [],
-        filters: { from: '2026-09-01', to: '2026-09-26', covenant_id: null, claim_status: null, batch_id: null, batch_code: null, tab: 'claims' },
+        filters: {
+            from: '2026-09-01',
+            to: '2026-09-26',
+            covenant_id: null,
+            claim_status: null,
+            batch_id: null,
+            batch_code: null,
+            tab: 'claims',
+        },
         claimStatuses: [],
         paymentMethods,
         today: '2026-09-26',
@@ -73,11 +101,15 @@ describe('Billing/Index — seleção da aba Guias para o recebimento em lote', 
     };
 
     function mountPage(overrides = {}) {
-        return track(mount(BillingIndex, {
-            props: { ...baseProps, ...overrides },
-            global: { stubs: { teleport: true, Link: { props: ['href'], template: '<a :href="href"><slot /></a>' } } },
-            attachTo: document.body,
-        }));
+        return track(
+            mount(BillingIndex, {
+                props: { ...baseProps, ...overrides },
+                global: {
+                    stubs: { teleport: true, Link: { props: ['href'], template: '<a :href="href"><slot /></a>' } },
+                },
+                attachTo: document.body,
+            }),
+        );
     }
 
     function bar(w) {
@@ -89,26 +121,36 @@ describe('Billing/Index — seleção da aba Guias para o recebimento em lote', 
 
         const rows = w.findAll('[data-test="claim-row"]');
         expect(rows[2].find('[data-test="claim-select"]').exists()).toBe(false);
-        expect(rows[0].find('[data-test="claim-select"]').attributes('aria-label')).toBe('Selecionar a guia GUI-P1 — Ana');
+        expect(rows[0].find('[data-test="claim-select"]').attributes('aria-label')).toBe(
+            'Selecionar a guia GUI-P1 — Ana',
+        );
         expect(bar(w).exists()).toBe(false);
 
         await rows[0].find('[data-test="claim-select"]').trigger('change');
-        expect(norm(bar(w).find('[data-test="selection-summary"]').text())).toBe(norm(`1 selecionada(s) · ${brl(200)}`));
+        expect(norm(bar(w).find('[data-test="selection-summary"]').text())).toBe(
+            norm(`1 selecionada(s) · ${brl(200)}`),
+        );
         expect(norm(w.find('[data-test="selection-live"]').text())).toBe(norm(`1 selecionada(s) · ${brl(200)}`));
         expect(bar(w).attributes('aria-label')).toBe(t.selection_bar_label);
 
         // "Selecionar a página": marca as pagáveis desta página.
         await w.find('[data-test="claims-select-page"]').trigger('change');
-        expect(norm(bar(w).find('[data-test="selection-summary"]').text())).toBe(norm(`2 selecionada(s) · ${brl(350.5)}`));
+        expect(norm(bar(w).find('[data-test="selection-summary"]').text())).toBe(
+            norm(`2 selecionada(s) · ${brl(350.5)}`),
+        );
 
         // Página 2 (mesmos filtros): as da página 1 continuam marcadas.
         await w.setProps({ claims: paginate([p3], { current_page: 2, last_page: 2, total: 4 }, 'claims_page') });
-        expect(norm(bar(w).find('[data-test="selection-summary"]').text())).toBe(norm(`2 selecionada(s) · ${brl(350.5)}`));
+        expect(norm(bar(w).find('[data-test="selection-summary"]').text())).toBe(
+            norm(`2 selecionada(s) · ${brl(350.5)}`),
+        );
         expect(bar(w).find('[data-test="selection-other-pages"]').text()).toBe(t.selection_other_pages);
         expect(w.find('[data-test="claims-select-page"]').element.checked).toBe(false);
 
         await w.find('[data-test="claim-select"]').trigger('change');
-        expect(norm(bar(w).find('[data-test="selection-summary"]').text())).toBe(norm(`3 selecionada(s) · ${brl(450)}`));
+        expect(norm(bar(w).find('[data-test="selection-summary"]').text())).toBe(
+            norm(`3 selecionada(s) · ${brl(450)}`),
+        );
     });
 
     it('guia que deixou de ser pagável sai da seleção; filtro novo descarta o que saiu da lista; limpar zera', async () => {
@@ -118,7 +160,13 @@ describe('Billing/Index — seleção da aba Guias para o recebimento em lote', 
         expect(bar(w).text()).toContain('2 selecionada(s)');
 
         // A página volta do servidor com p2 já paga por outro usuário.
-        await w.setProps({ claims: paginate([p1, { ...p2, allowed_actions: [], status: 'paid' }, x], { last_page: 2, total: 4 }, 'claims_page') });
+        await w.setProps({
+            claims: paginate(
+                [p1, { ...p2, allowed_actions: [], status: 'paid' }, x],
+                { last_page: 2, total: 4 },
+                'claims_page',
+            ),
+        });
         expect(bar(w).text()).toContain('1 selecionada(s)');
 
         await w.find('[data-test="claims-select-page"]').trigger('change');
@@ -136,7 +184,11 @@ describe('Billing/Index — seleção da aba Guias para o recebimento em lote', 
 
     it('"Registrar recebimento" abre o modal com as marcadas de todas as páginas; gravou → limpa a seleção e recarrega a lista', async () => {
         window.axios = {
-            post: vi.fn(() => Promise.resolve({ data: { message: 'Recebimento registrado em 3 guia(s).', paid: [], skipped: [], total_paid: 450 } })),
+            post: vi.fn(() =>
+                Promise.resolve({
+                    data: { message: 'Recebimento registrado em 3 guia(s).', paid: [], skipped: [], total_paid: 450 },
+                }),
+            ),
         };
         const w = mountPage();
 
@@ -149,28 +201,41 @@ describe('Billing/Index — seleção da aba Guias para o recebimento em lote', 
         const modal = w.find('[data-test="bulk-receipt-form"]');
         expect(modal.exists()).toBe(true);
         expect(modal.findAll('[data-test="bulk-row"]').map((row) => row.text())).toEqual([
-            expect.stringContaining('GUI-P1'), expect.stringContaining('GUI-P2'), expect.stringContaining('GUI-P3'),
+            expect.stringContaining('GUI-P1'),
+            expect.stringContaining('GUI-P2'),
+            expect.stringContaining('GUI-P3'),
         ]);
 
         await w.find('[data-test="bulk-confirm"]').trigger('click');
         await flushPromises();
 
-        expect(window.axios.post).toHaveBeenCalledWith('/billing/claims/bulk-receipt', expect.objectContaining({
-            items: [
-                { claim_id: 'p1', paid_amount: 200 },
-                { claim_id: 'p2', paid_amount: 150.5 },
-                { claim_id: 'p3', paid_amount: 99.5 },
-            ],
-        }));
+        expect(window.axios.post).toHaveBeenCalledWith(
+            '/billing/claims/bulk-receipt',
+            expect.objectContaining({
+                items: [
+                    { claim_id: 'p1', paid_amount: 200 },
+                    { claim_id: 'p2', paid_amount: 150.5 },
+                    { claim_id: 'p3', paid_amount: 99.5 },
+                ],
+            }),
+        );
         expect(bar(w).exists()).toBe(false);
-        expect(router.reload).toHaveBeenCalledWith({ only: ['claims', 'batches', 'kpis', 'totals'], preserveScroll: true });
+        expect(router.reload).toHaveBeenCalledWith({
+            only: ['claims', 'batches', 'kpis', 'totals'],
+            preserveScroll: true,
+        });
         // O modal segue aberto com o resultado.
         expect(w.find('[data-test="bulk-result"]').text()).toContain('Recebimento registrado em 3 guia(s).');
     });
 
     it('"Incluir em lote" (guia) e as ações do lote abrem os modais certos', async () => {
         window.axios = { get: vi.fn(() => new Promise(() => {})) };
-        const attachable = claim({ id: 'c7', code: 'GUI-7', allowed_actions: ['attach'], attach_targets_url: '/claims/c7/attach-targets' });
+        const attachable = claim({
+            id: 'c7',
+            code: 'GUI-7',
+            allowed_actions: ['attach'],
+            attach_targets_url: '/claims/c7/attach-targets',
+        });
         const w = mountPage({ claims: paginate([attachable], {}, 'claims_page') });
 
         await w.find('[data-test="claim-menu"] button').trigger('click');
@@ -186,7 +251,9 @@ describe('ClaimsTable / BatchesTable — ações em lote vindas de allowed_actio
         const a = claim({ id: 'a', allowed_actions: ['pay'] });
         const b = claim({ id: 'b', allowed_actions: ['pay'] });
         const c = claim({ id: 'c', code: 'GUI-C', allowed_actions: ['attach', 'cancel'] });
-        const w = track(mount(ClaimsTable, { props: { t, claims: paginate([a, b, c]), selectedIds: ['a'] }, ...modalMount }));
+        const w = track(
+            mount(ClaimsTable, { props: { t, claims: paginate([a, b, c]), selectedIds: ['a'] }, ...modalMount }),
+        );
         await nextTick();
 
         const header = w.find('[data-test="claims-select-page"]');
@@ -210,8 +277,17 @@ describe('ClaimsTable / BatchesTable — ações em lote vindas de allowed_actio
     });
 
     it('lote enviado com guia a receber: "Registrar recebimento" rotulado; rascunho: "Adicionar guias"/"Reprocessar pendentes" no menu', async () => {
-        const sent  = batch({ id: 's', code: 'LOT-S', status: 'submitted', allowed_actions: ['download_xml', 'receive'] });
-        const draft = batch({ id: 'd', code: 'LOT-D', allowed_actions: ['submit', 'cancel', 'add_claims', 'reprocess_pending'] });
+        const sent = batch({
+            id: 's',
+            code: 'LOT-S',
+            status: 'submitted',
+            allowed_actions: ['download_xml', 'receive'],
+        });
+        const draft = batch({
+            id: 'd',
+            code: 'LOT-D',
+            allowed_actions: ['submit', 'cancel', 'add_claims', 'reprocess_pending'],
+        });
         const w = track(mount(BatchesTable, { props: { t, batches: paginate([sent, draft]) }, ...modalMount }));
 
         const [sentRow, draftRow] = w.findAll('[data-test="batch-row"]');
@@ -261,10 +337,21 @@ describe('BulkReceiptModal — valor por guia', () => {
     ];
 
     function mountModal(props = {}) {
-        return track(mount(BulkReceiptModal, {
-            props: { open: true, claims: rows, paymentMethods, today: '2026-09-26', url: '/bulk', max: 200, t, ...props },
-            ...modalMount,
-        }));
+        return track(
+            mount(BulkReceiptModal, {
+                props: {
+                    open: true,
+                    claims: rows,
+                    paymentMethods,
+                    today: '2026-09-26',
+                    url: '/bulk',
+                    max: 200,
+                    t,
+                    ...props,
+                },
+                ...modalMount,
+            }),
+        );
     }
 
     function amountInput(w, id) {
@@ -299,7 +386,9 @@ describe('BulkReceiptModal — valor por guia', () => {
         expect(window.axios.post).not.toHaveBeenCalled();
         expect(input.attributes('aria-invalid')).toBe('true');
         expect(input.attributes('aria-describedby')).toBe('billing-bulk-amount-c1-error');
-        expect(norm(w.find('#billing-bulk-amount-c1-error').text())).toBe(norm(`Informe um valor maior que zero e até ${brl(200)}.`));
+        expect(norm(w.find('#billing-bulk-amount-c1-error').text())).toBe(
+            norm(`Informe um valor maior que zero e até ${brl(200)}.`),
+        );
         expect(document.activeElement).toBe(input.element);
     });
 
@@ -323,7 +412,10 @@ describe('BulkReceiptModal — valor por guia', () => {
             paid_at: '2026-09-26',
             payment_method: 'cash',
             notes: 'Depósito 123',
-            items: [{ claim_id: 'c1', paid_amount: 180 }, { claim_id: 'c2', paid_amount: 200 }],
+            items: [
+                { claim_id: 'c1', paid_amount: 180 },
+                { claim_id: 'c2', paid_amount: 200 },
+            ],
         });
 
         const result = w.find('[role="status"] [data-test="bulk-result"]');
@@ -338,11 +430,17 @@ describe('BulkReceiptModal — valor por guia', () => {
 
     it('recusa do servidor (tudo ou nada): motivo em cada guia, no campo da data e na lista geral; nada marcado como gravado', async () => {
         window.axios = {
-            post: vi.fn(() => Promise.reject(axios422({
-                'claims.c2': ['A guia GUI-2 está cancelada.'],
-                'items.0.paid_amount': ['O valor recebido da guia GUI-1 não pode ser maior que o valor da guia.'],
-                paid_at: ['O caixa do dia 25/09/2026 está fechado.'],
-            }))),
+            post: vi.fn(() =>
+                Promise.reject(
+                    axios422({
+                        'claims.c2': ['A guia GUI-2 está cancelada.'],
+                        'items.0.paid_amount': [
+                            'O valor recebido da guia GUI-1 não pode ser maior que o valor da guia.',
+                        ],
+                        paid_at: ['O caixa do dia 25/09/2026 está fechado.'],
+                    }),
+                ),
+            ),
         };
         const w = mountModal();
 
@@ -378,34 +476,61 @@ describe('BulkReceiptModal — valor por guia', () => {
 
 /* ───────────────────────── Recebimento do lote ───────────────────────── */
 describe('BatchReceiptModal — prévia antes de confirmar', () => {
-    const sent = batch({ id: 'b9', code: 'LOT-9', status: 'submitted', receipt_preview_url: '/batches/b9/receipt-preview', receipt_url: '/batches/b9/receipt' });
+    const sent = batch({
+        id: 'b9',
+        code: 'LOT-9',
+        status: 'submitted',
+        receipt_preview_url: '/batches/b9/receipt-preview',
+        receipt_url: '/batches/b9/receipt',
+    });
 
     function mountModal() {
-        return track(mount(BatchReceiptModal, { props: { open: true, batch: sent, paymentMethods, today: '2026-09-26', t }, ...modalMount }));
+        return track(
+            mount(BatchReceiptModal, {
+                props: { open: true, batch: sent, paymentMethods, today: '2026-09-26', t },
+                ...modalMount,
+            }),
+        );
     }
 
     it('mostra quantidade e total da prévia e posta data/forma/observação na rota do lote', async () => {
         window.axios = {
-            get: vi.fn(() => Promise.resolve({ data: { count: 2, total: 400, blocked: 1, max: 200, over_limit: false } })),
-            post: vi.fn(() => Promise.resolve({ data: { message: 'Recebimento registrado em 2 guia(s).', paid: [], skipped: [], total_paid: 400 } })),
+            get: vi.fn(() =>
+                Promise.resolve({ data: { count: 2, total: 400, blocked: 1, max: 200, over_limit: false } }),
+            ),
+            post: vi.fn(() =>
+                Promise.resolve({
+                    data: { message: 'Recebimento registrado em 2 guia(s).', paid: [], skipped: [], total_paid: 400 },
+                }),
+            ),
         };
         const w = mountModal();
         await flushPromises();
 
         expect(window.axios.get).toHaveBeenCalledWith('/batches/b9/receipt-preview');
-        expect(norm(w.find('[data-test="batch-receipt-summary"]').text())).toBe(norm(`2 guia(s) a receber · ${brl(400)}`));
+        expect(norm(w.find('[data-test="batch-receipt-summary"]').text())).toBe(
+            norm(`2 guia(s) a receber · ${brl(400)}`),
+        );
         expect(w.find('[data-test="batch-receipt-blocked"]').text()).toContain('1 guia(s)');
 
         await w.find('[data-test="batch-receipt-confirm"]').trigger('click');
         await flushPromises();
 
-        expect(window.axios.post).toHaveBeenCalledWith('/batches/b9/receipt', { paid_at: '2026-09-26', payment_method: 'transfer', notes: '' });
+        expect(window.axios.post).toHaveBeenCalledWith('/batches/b9/receipt', {
+            paid_at: '2026-09-26',
+            payment_method: 'transfer',
+            notes: '',
+        });
         expect(w.find('[data-test="batch-receipt-message"]').text()).toBe('Recebimento registrado em 2 guia(s).');
         expect(w.emitted('saved')).toHaveLength(1);
     });
 
     it('acima do teto ou sem guia a receber: confirmar desabilitado; erro da prévia aparece traduzido', async () => {
-        window.axios = { get: vi.fn(() => Promise.resolve({ data: { count: 250, total: 50000, blocked: 0, max: 200, over_limit: true } })) };
+        window.axios = {
+            get: vi.fn(() =>
+                Promise.resolve({ data: { count: 250, total: 50000, blocked: 0, max: 200, over_limit: true } }),
+            ),
+        };
         const over = mountModal();
         await flushPromises();
 
@@ -413,7 +538,9 @@ describe('BatchReceiptModal — prévia antes de confirmar', () => {
         expect(over.find('[data-test="batch-receipt-confirm"]').attributes('disabled')).toBeDefined();
         over.unmount();
 
-        window.axios = { get: vi.fn(() => Promise.reject(axios422({ batch: ['O lote LOT-9 não tem guia a receber.'] }))) };
+        window.axios = {
+            get: vi.fn(() => Promise.reject(axios422({ batch: ['O lote LOT-9 não tem guia a receber.'] }))),
+        };
         const empty = mountModal();
         await flushPromises();
 
@@ -425,8 +552,12 @@ describe('BatchReceiptModal — prévia antes de confirmar', () => {
 /* ───────────────────────── Adicionar guias / reprocessar / incluir em lote ───────────────────────── */
 describe('AddClaimsModal / AttachToBatchModal — resultado por guia', () => {
     const draft = batch({
-        id: 'b1', code: 'LOT-1', pending_count: 2,
-        attachable_claims_url: '/batches/b1/attachable-claims', attach_claims_url: '/batches/b1/attach-claims', reprocess_url: '/batches/b1/reprocess-pending',
+        id: 'b1',
+        code: 'LOT-1',
+        pending_count: 2,
+        attachable_claims_url: '/batches/b1/attachable-claims',
+        attach_claims_url: '/batches/b1/attach-claims',
+        reprocess_url: '/batches/b1/reprocess-pending',
     });
 
     const result = {
@@ -435,23 +566,60 @@ describe('AddClaimsModal / AttachToBatchModal — resultado por guia', () => {
         pending_count: 1,
         remaining: 0,
         results: [
-            { claim_id: 'a', code: 'GUI-A', patient_name: 'Ana', attached: true, validation: { passes: true, errors: [], warnings: [], summary: 'ok' } },
-            { claim_id: 'b', code: 'GUI-B', patient_name: 'Bia', attached: false, validation: { passes: false, errors: [{ message: 'CID não informado.' }], warnings: [], summary: 'Guia possui pendências.' } },
+            {
+                claim_id: 'a',
+                code: 'GUI-A',
+                patient_name: 'Ana',
+                attached: true,
+                validation: { passes: true, errors: [], warnings: [], summary: 'ok' },
+            },
+            {
+                claim_id: 'b',
+                code: 'GUI-B',
+                patient_name: 'Bia',
+                attached: false,
+                validation: {
+                    passes: false,
+                    errors: [{ message: 'CID não informado.' }],
+                    warnings: [],
+                    summary: 'Guia possui pendências.',
+                },
+            },
         ],
     };
 
     it('"Adicionar guias": lista as elegíveis (origem, pendência, rótulo por linha), seleção múltipla e resultado por guia', async () => {
         window.axios = {
-            get: vi.fn(() => Promise.resolve({
-                data: {
-                    data: [
-                        { id: 'a', code: 'GUI-A', patient_name: 'Ana', attendance_date: '2026-09-20', amount: 150, origin: 'individual', origin_batch_code: null, has_errors: false },
-                        { id: 'b', code: 'GUI-B', patient_name: 'Bia', attendance_date: '2026-09-21', amount: 150, origin: 'other', origin_batch_code: 'LOT-9', has_errors: true },
-                    ],
-                    total: 3,
-                    max: 200,
-                },
-            })),
+            get: vi.fn(() =>
+                Promise.resolve({
+                    data: {
+                        data: [
+                            {
+                                id: 'a',
+                                code: 'GUI-A',
+                                patient_name: 'Ana',
+                                attendance_date: '2026-09-20',
+                                amount: 150,
+                                origin: 'individual',
+                                origin_batch_code: null,
+                                has_errors: false,
+                            },
+                            {
+                                id: 'b',
+                                code: 'GUI-B',
+                                patient_name: 'Bia',
+                                attendance_date: '2026-09-21',
+                                amount: 150,
+                                origin: 'other',
+                                origin_batch_code: 'LOT-9',
+                                has_errors: true,
+                            },
+                        ],
+                        total: 3,
+                        max: 200,
+                    },
+                }),
+            ),
             post: vi.fn(() => Promise.resolve({ data: result })),
         };
         const w = track(mount(AddClaimsModal, { props: { open: true, batch: draft, mode: 'add', t }, ...modalMount }));
@@ -464,7 +632,9 @@ describe('AddClaimsModal / AttachToBatchModal — resultado por guia', () => {
         expect(items[0].text()).toContain('Individual');
         expect(items[1].text()).toContain('Pendente no lote LOT-9');
         expect(items[1].text()).toContain(t.pending_badge);
-        expect(w.find('[data-test="add-claims-truncated"]').text()).toBe('Mostrando as primeiras 2 de 3 guias elegíveis.');
+        expect(w.find('[data-test="add-claims-truncated"]').text()).toBe(
+            'Mostrando as primeiras 2 de 3 guias elegíveis.',
+        );
         expect(w.find('[data-test="add-claims-confirm"]').attributes('disabled')).toBeDefined();
 
         await w.find('[data-test="add-claims-all"]').trigger('change');
@@ -489,7 +659,9 @@ describe('AddClaimsModal / AttachToBatchModal — resultado por guia', () => {
 
     it('"Reprocessar pendentes": sem lista, posta na rota do lote e mostra o resultado; recusa do servidor vira aviso', async () => {
         window.axios = { get: vi.fn(), post: vi.fn(() => Promise.resolve({ data: result })) };
-        const w = track(mount(AddClaimsModal, { props: { open: true, batch: draft, mode: 'reprocess', t }, ...modalMount }));
+        const w = track(
+            mount(AddClaimsModal, { props: { open: true, batch: draft, mode: 'reprocess', t }, ...modalMount }),
+        );
 
         expect(window.axios.get).not.toHaveBeenCalled();
         expect(w.find('[data-test="reprocess-intro"]').text()).toContain('2 guia(s)');
@@ -501,8 +673,15 @@ describe('AddClaimsModal / AttachToBatchModal — resultado por guia', () => {
         expect(w.findAll('[data-test="attach-result-item"]')).toHaveLength(2);
         w.unmount();
 
-        window.axios = { get: vi.fn(), post: vi.fn(() => Promise.reject(axios422({ batch: ['O lote LOT-1 está sendo enviado ou alterado agora.'] }))) };
-        const busy = track(mount(AddClaimsModal, { props: { open: true, batch: draft, mode: 'reprocess', t }, ...modalMount }));
+        window.axios = {
+            get: vi.fn(),
+            post: vi.fn(() =>
+                Promise.reject(axios422({ batch: ['O lote LOT-1 está sendo enviado ou alterado agora.'] })),
+            ),
+        };
+        const busy = track(
+            mount(AddClaimsModal, { props: { open: true, batch: draft, mode: 'reprocess', t }, ...modalMount }),
+        );
 
         await busy.find('[data-test="add-claims-confirm"]').trigger('click');
         await flushPromises();
@@ -514,15 +693,45 @@ describe('AddClaimsModal / AttachToBatchModal — resultado por guia', () => {
 
     it('"Incluir em lote": lotes do convênio em rádio (o atual marcado), envia a guia ao lote escolhido e mostra o resultado', async () => {
         window.axios = {
-            get: vi.fn(() => Promise.resolve({
-                data: {
-                    data: [
-                        { id: 'b1', code: 'LOT-1', period_start: '2026-09-01', period_end: '2026-09-20', claims_count: 3, total_amount: 450, is_current: false, attach_url: '/batches/b1/attach-claims' },
-                        { id: 'b2', code: 'LOT-2', period_start: '2026-09-10', period_end: '2026-09-20', claims_count: 1, total_amount: 150, is_current: true, attach_url: '/batches/b2/attach-claims' },
-                    ],
-                },
-            })),
-            post: vi.fn(() => Promise.resolve({ data: { ...result, attached_count: 1, pending_count: 0, results: [result.results[0]], message: '1 guia(s) incluída(s) no lote LOT-1.' } })),
+            get: vi.fn(() =>
+                Promise.resolve({
+                    data: {
+                        data: [
+                            {
+                                id: 'b1',
+                                code: 'LOT-1',
+                                period_start: '2026-09-01',
+                                period_end: '2026-09-20',
+                                claims_count: 3,
+                                total_amount: 450,
+                                is_current: false,
+                                attach_url: '/batches/b1/attach-claims',
+                            },
+                            {
+                                id: 'b2',
+                                code: 'LOT-2',
+                                period_start: '2026-09-10',
+                                period_end: '2026-09-20',
+                                claims_count: 1,
+                                total_amount: 150,
+                                is_current: true,
+                                attach_url: '/batches/b2/attach-claims',
+                            },
+                        ],
+                    },
+                }),
+            ),
+            post: vi.fn(() =>
+                Promise.resolve({
+                    data: {
+                        ...result,
+                        attached_count: 1,
+                        pending_count: 0,
+                        results: [result.results[0]],
+                        message: '1 guia(s) incluída(s) no lote LOT-1.',
+                    },
+                }),
+            ),
         };
         const single = claim({ id: 'a', code: 'GUI-A', attach_targets_url: '/claims/a/attach-targets' });
         const w = track(mount(AttachToBatchModal, { props: { open: true, claim: single, t }, ...modalMount }));
@@ -531,7 +740,9 @@ describe('AddClaimsModal / AttachToBatchModal — resultado por guia', () => {
         const radios = w.findAll('[data-test="attach-target"]');
         expect(w.find('legend').text()).toBe(t.attach_targets_legend);
         expect(radios[1].element.checked).toBe(true);
-        expect(w.find('label[for="billing-attach-target-b1"]').text()).toBe('LOT-1 — 3 guia(s) · 01/09/2026 a 20/09/2026');
+        expect(w.find('label[for="billing-attach-target-b1"]').text()).toBe(
+            'LOT-1 — 3 guia(s) · 01/09/2026 a 20/09/2026',
+        );
         expect(w.find('label[for="billing-attach-target-b2"]').text()).toContain(t.attach_target_current);
 
         await radios[0].setValue(true);
@@ -545,7 +756,12 @@ describe('AddClaimsModal / AttachToBatchModal — resultado por guia', () => {
 
     it('sem lote de destino: aviso e confirmar desabilitado', async () => {
         window.axios = { get: vi.fn(() => Promise.resolve({ data: { data: [] } })) };
-        const w = track(mount(AttachToBatchModal, { props: { open: true, claim: claim({ attach_targets_url: '/x' }), t }, ...modalMount }));
+        const w = track(
+            mount(AttachToBatchModal, {
+                props: { open: true, claim: claim({ attach_targets_url: '/x' }), t },
+                ...modalMount,
+            }),
+        );
         await flushPromises();
 
         expect(w.find('[data-test="attach-no-targets"]').text()).toBe(t.attach_no_targets);

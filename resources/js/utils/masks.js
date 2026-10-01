@@ -10,7 +10,9 @@
  */
 
 function onlyDigits(value, max) {
-    return String(value ?? '').replace(/\D/g, '').slice(0, max);
+    return String(value ?? '')
+        .replace(/\D/g, '')
+        .slice(0, max);
 }
 
 /**
@@ -19,7 +21,9 @@ function onlyDigits(value, max) {
  * CNPJ só numérico continua válido — é o caso particular sem letras.
  */
 function cnpjChars(value) {
-    const chars = String(value ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const chars = String(value ?? '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
 
     return chars.slice(0, 12) + chars.slice(12).replace(/\D/g, '').slice(0, 2);
 }
@@ -39,9 +43,9 @@ export function maskCpf(value) {
 export function maskCnpj(value) {
     const c = cnpjChars(value);
 
-    if (c.length <= 2)  return c;
-    if (c.length <= 5)  return `${c.slice(0, 2)}.${c.slice(2)}`;
-    if (c.length <= 8)  return `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5)}`;
+    if (c.length <= 2) return c;
+    if (c.length <= 5) return `${c.slice(0, 2)}.${c.slice(2)}`;
+    if (c.length <= 8) return `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5)}`;
     if (c.length <= 12) return `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8)}`;
 
     return `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`;
@@ -52,7 +56,9 @@ export function maskCnpj(value) {
  * disso ou quando há letra (CNPJ alfanumérico — CPF nunca tem letra).
  */
 export function maskCpfCnpj(value) {
-    const chars = String(value ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const chars = String(value ?? '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
 
     return /[A-Z]/.test(chars) || chars.length > 11 ? maskCnpj(value) : maskCpf(value);
 }
@@ -101,10 +107,10 @@ export function maskPhone(value) {
 
     d = d.slice(0, 11);
 
-    if (d.length === 0)  return '';
-    if (d.length <= 2)   return `(${d}`;
-    if (d.length <= 6)   return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-    if (d.length <= 10)  return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    if (d.length === 0) return '';
+    if (d.length <= 2) return `(${d}`;
+    if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
 
     return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
@@ -118,11 +124,11 @@ export function maskCep(value) {
 
 /** Nome da máscara (usado em v-mask="'cpf'") → função formatadora. */
 export const MASKS = Object.freeze({
-    cpf:     maskCpf,
-    cnpj:    maskCnpj,
+    cpf: maskCpf,
+    cnpj: maskCnpj,
     cpfCnpj: maskCpfCnpj,
-    phone:   maskPhone,
-    cep:     maskCep,
+    phone: maskPhone,
+    cep: maskCep,
 });
 
 /**
@@ -130,15 +136,15 @@ export const MASKS = Object.freeze({
  * caracteres antes do cursor para reposicioná-lo após formatar.
  */
 export const MASK_KEEP = Object.freeze({
-    cnpj:    /[0-9A-Za-z]/,
+    cnpj: /[0-9A-Za-z]/,
     cpfCnpj: /[0-9A-Za-z]/,
-    phone:   /[0-9+]/,
+    phone: /[0-9+]/,
 });
 
 const SEPARATORS = /^[\s().\/+-]*$/;
 
 function onlySeparatorsBesides(value, keep) {
-    return SEPARATORS.test([...String(value)].filter(ch => !keep.test(ch)).join(''));
+    return SEPARATORS.test([...String(value)].filter((ch) => !keep.test(ch)).join(''));
 }
 
 function isCompletePhone(value) {
@@ -156,16 +162,22 @@ function isCompleteCpf(value) {
 }
 
 function isCompleteCnpj(value) {
-    return onlySeparatorsBesides(value, /[0-9A-Za-z]/)
-        && /^[A-Z0-9]{12}\d{2}$/.test(String(value).toUpperCase().replace(/[^A-Z0-9]/g, ''));
+    return (
+        onlySeparatorsBesides(value, /[0-9A-Za-z]/) &&
+        /^[A-Z0-9]{12}\d{2}$/.test(
+            String(value)
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, ''),
+        )
+    );
 }
 
 const COMPLETE = Object.freeze({
-    cpf:     isCompleteCpf,
-    cnpj:    isCompleteCnpj,
-    cpfCnpj: v => isCompleteCpf(v) || isCompleteCnpj(v),
-    phone:   isCompletePhone,
-    cep:     v => onlySeparatorsBesides(v, /\d/) && /^\d{8}$/.test(String(v).replace(/\D/g, '')),
+    cpf: isCompleteCpf,
+    cnpj: isCompleteCnpj,
+    cpfCnpj: (v) => isCompleteCpf(v) || isCompleteCnpj(v),
+    phone: isCompletePhone,
+    cep: (v) => onlySeparatorsBesides(v, /\d/) && /^\d{8}$/.test(String(v).replace(/\D/g, '')),
 });
 
 /**

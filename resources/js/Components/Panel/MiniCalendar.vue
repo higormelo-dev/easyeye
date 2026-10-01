@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
     modelValue: { type: String, default: '' }, // YYYY-MM-DD
-    locale:     { type: String, default: 'pt-BR' },
+    locale: { type: String, default: 'pt-BR' },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -15,29 +15,36 @@ function parseDate(str) {
     return new Date(str + 'T12:00:00');
 }
 
-const viewYear  = ref(parseDate(props.modelValue).getFullYear());
+const viewYear = ref(parseDate(props.modelValue).getFullYear());
 const viewMonth = ref(parseDate(props.modelValue).getMonth()); // 0-based
 
-watch(() => props.modelValue, (v) => {
-    if (!v) return;
-    const d = parseDate(v);
-    viewYear.value  = d.getFullYear();
-    viewMonth.value = d.getMonth();
-});
+watch(
+    () => props.modelValue,
+    (v) => {
+        if (!v) return;
+        const d = parseDate(v);
+        viewYear.value = d.getFullYear();
+        viewMonth.value = d.getMonth();
+    },
+);
 
 function prevMonth() {
-    if (viewMonth.value === 0) { viewMonth.value = 11; viewYear.value--; }
-    else viewMonth.value--;
+    if (viewMonth.value === 0) {
+        viewMonth.value = 11;
+        viewYear.value--;
+    } else viewMonth.value--;
 }
 function nextMonth() {
-    if (viewMonth.value === 11) { viewMonth.value = 0; viewYear.value++; }
-    else viewMonth.value++;
+    if (viewMonth.value === 11) {
+        viewMonth.value = 0;
+        viewYear.value++;
+    } else viewMonth.value++;
 }
 
 const monthLabel = computed(() =>
     new Date(viewYear.value, viewMonth.value, 1)
         .toLocaleDateString(props.locale, { month: 'long' })
-        .replace(/^\w/, c => c.toUpperCase())
+        .replace(/^\w/, (c) => c.toUpperCase()),
 );
 
 // Abbreviations Dom Seg Ter Qua Qui Sex Sáb anchored on 2023-01-01 (Sunday)
@@ -47,8 +54,8 @@ const dayAbbrevs = computed(() =>
             .toLocaleDateString(props.locale, { weekday: 'short' })
             .replace(/\.$/, '')
             .substring(0, 3)
-            .replace(/^\w/, c => c.toUpperCase())
-    )
+            .replace(/^\w/, (c) => c.toUpperCase()),
+    ),
 );
 
 // Grid: leading empty cells + day cells
@@ -61,7 +68,7 @@ const cells = computed(() => {
     for (let i = 0; i < startDow; i++) grid.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
         const month = String(viewMonth.value + 1).padStart(2, '0');
-        const day   = String(d).padStart(2, '0');
+        const day = String(d).padStart(2, '0');
         grid.push(`${viewYear.value}-${month}-${day}`);
     }
     // Pad to full weeks
@@ -94,9 +101,9 @@ function select(dateStr) {
                 :key="i"
                 class="mini-cal-cell"
                 :class="{
-                    'is-today':    cell === today,
+                    'is-today': cell === today,
                     'is-selected': cell === modelValue && cell !== today,
-                    'is-empty':    cell === null,
+                    'is-empty': cell === null,
                 }"
                 @click="select(cell)"
             >
@@ -109,32 +116,34 @@ function select(dateStr) {
 <style scoped>
 .mini-cal {
     user-select: none;
-    font-size: .8rem;
+    font-size: 0.8rem;
 }
 
 .mini-cal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: .5rem;
+    margin-bottom: 0.5rem;
 }
 
 .mini-cal-title {
     font-weight: 700;
-    font-size: .82rem;
+    font-size: 0.82rem;
     text-transform: capitalize;
 }
 
 .mini-cal-nav {
     background: none;
     border: none;
-    padding: 0 .3rem;
+    padding: 0 0.3rem;
     font-size: 1.2rem;
     line-height: 1;
     cursor: pointer;
     color: #555;
 }
-.mini-cal-nav:hover { color: #000; }
+.mini-cal-nav:hover {
+    color: #000;
+}
 
 .mini-cal-grid {
     display: grid;
@@ -144,10 +153,10 @@ function select(dateStr) {
 
 .mini-cal-dow {
     text-align: center;
-    font-size: .68rem;
+    font-size: 0.68rem;
     font-weight: 700;
     color: #888;
-    padding: .15rem 0 .3rem;
+    padding: 0.15rem 0 0.3rem;
 }
 
 .mini-cal-cell {
@@ -157,9 +166,9 @@ function select(dateStr) {
     aspect-ratio: 1;
     border-radius: 50%;
     cursor: pointer;
-    font-size: .78rem;
+    font-size: 0.78rem;
     color: #333;
-    transition: background .15s;
+    transition: background 0.15s;
 }
 .mini-cal-cell:not(.is-empty):hover {
     background: #e9ecef;

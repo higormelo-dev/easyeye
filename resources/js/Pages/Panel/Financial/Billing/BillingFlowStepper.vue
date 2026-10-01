@@ -12,24 +12,34 @@ const props = defineProps({
 
 const STEPS = [
     { key: 'attendance', icon: 'ti-stethoscope' },
-    { key: 'claim',      icon: 'ti-file-invoice' },
-    { key: 'batch',      icon: 'ti-package' },
-    { key: 'submit',     icon: 'ti-send' },
-    { key: 'settle',     icon: 'ti-cash' },
+    { key: 'claim', icon: 'ti-file-invoice' },
+    { key: 'batch', icon: 'ti-package' },
+    { key: 'submit', icon: 'ti-send' },
+    { key: 'settle', icon: 'ti-cash' },
 ];
 
-const steps = computed(() => STEPS.map((step, index) => ({
-    ...step,
-    number: index + 1,
-    title:  props.t.flow_steps?.[step.key]?.title ?? step.key,
-    hint:   props.t.flow_steps?.[step.key]?.hint ?? '',
-})));
+const steps = computed(() =>
+    STEPS.map((step, index) => ({
+        ...step,
+        number: index + 1,
+        title: props.t.flow_steps?.[step.key]?.title ?? step.key,
+        hint: props.t.flow_steps?.[step.key]?.hint ?? '',
+    })),
+);
 </script>
 
 <template>
     <div class="billing-flow mb-3" data-test="billing-flow">
-        <ol class="billing-flow__list list-unstyled d-flex flex-wrap align-items-stretch gap-2 mb-0" :aria-label="t.flow_label">
-            <li v-for="step in steps" :key="step.key" class="billing-flow__step d-flex align-items-center gap-2" :data-test="`flow-step-${step.key}`">
+        <ol
+            class="billing-flow__list list-unstyled d-flex flex-wrap align-items-stretch gap-2 mb-0"
+            :aria-label="t.flow_label"
+        >
+            <li
+                v-for="step in steps"
+                :key="step.key"
+                class="billing-flow__step d-flex align-items-center gap-2"
+                :data-test="`flow-step-${step.key}`"
+            >
                 <span class="billing-flow__number" aria-hidden="true">{{ step.number }}</span>
                 <span class="d-flex flex-column lh-sm">
                     <span class="fw-semibold small">
@@ -37,7 +47,11 @@ const steps = computed(() => STEPS.map((step, index) => ({
                     </span>
                     <span v-if="step.hint" class="text-muted billing-flow__hint">{{ step.hint }}</span>
                 </span>
-                <i v-if="step.number < steps.length" class="ti ti-chevron-right text-muted billing-flow__arrow d-none d-md-inline" aria-hidden="true"></i>
+                <i
+                    v-if="step.number < steps.length"
+                    class="ti ti-chevron-right text-muted billing-flow__arrow d-none d-md-inline"
+                    aria-hidden="true"
+                ></i>
             </li>
         </ol>
     </div>

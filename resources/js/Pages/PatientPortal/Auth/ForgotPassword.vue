@@ -20,12 +20,12 @@ function submit() {
     <Head title="Esqueci minha senha — Portal do Paciente" />
 
     <div class="d-flex align-items-center justify-content-center min-vh-100 bg-light px-3">
-        <div class="card shadow-sm border-0" style="max-width: 420px; width: 100%;">
+        <div class="card shadow-sm border-0" style="max-width: 420px; width: 100%">
             <div class="card-body p-4 p-md-5">
                 <div class="text-center mb-4">
                     <div
                         class="rounded-circle d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary mb-3"
-                        style="width:56px;height:56px;"
+                        style="width: 56px; height: 56px"
                     >
                         <i class="ti ti-lock-open fs-4"></i>
                     </div>
@@ -53,7 +53,7 @@ function submit() {
                                 autofocus
                                 autocomplete="username"
                                 required
-                            >
+                            />
                         </div>
                     </div>
 

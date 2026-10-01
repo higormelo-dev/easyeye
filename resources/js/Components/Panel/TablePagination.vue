@@ -17,13 +17,13 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat';
  * Não exibe nada quando last_page === 1.
  */
 defineProps({
-    data:          { type: Object,  required: true },
-    showingFrom:   { type: String,  default: 'Exibindo' },
-    showingOf:     { type: String,  default: 'de' },
-    showingSuffix: { type: String,  default: '' },
-    ariaLabel:     { type: String,  default: 'Paginação' },
-    previousLabel: { type: String,  default: 'Anterior' },
-    nextLabel:     { type: String,  default: 'Próxima' },
+    data: { type: Object, required: true },
+    showingFrom: { type: String, default: 'Exibindo' },
+    showingOf: { type: String, default: 'de' },
+    showingSuffix: { type: String, default: '' },
+    ariaLabel: { type: String, default: 'Paginação' },
+    previousLabel: { type: String, default: 'Anterior' },
+    nextLabel: { type: String, default: 'Próxima' },
 });
 
 // Números no formato do idioma (1234 → "1.234" em pt-BR).
@@ -31,14 +31,11 @@ const { number } = useLocaleFormat();
 </script>
 
 <template>
-    <div
-        v-if="data.last_page > 1"
-        class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2"
-    >
+    <div v-if="data.last_page > 1" class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-2">
         <!-- Range label -->
         <p class="text-muted small mb-0">
-            {{ showingFrom }} {{ number(data.from) }}–{{ number(data.to) }}
-            {{ showingOf }} {{ number(data.total) }} {{ showingSuffix }}
+            {{ showingFrom }} {{ number(data.from) }}–{{ number(data.to) }} {{ showingOf }} {{ number(data.total) }}
+            {{ showingSuffix }}
         </p>
 
         <!-- Page links -->
@@ -52,7 +49,8 @@ const { number } = useLocaleFormat();
                         :aria-label="previousLabel"
                         preserve-scroll
                         preserve-state
-                    ><i class="ti ti-arrow-left" aria-hidden="true"></i></Link>
+                        ><i class="ti ti-arrow-left" aria-hidden="true"></i
+                    ></Link>
                 </li>
 
                 <!-- Page numbers -->
@@ -77,7 +75,8 @@ const { number } = useLocaleFormat();
                         :aria-label="nextLabel"
                         preserve-scroll
                         preserve-state
-                    ><i class="ti ti-arrow-right" aria-hidden="true"></i></Link>
+                        ><i class="ti ti-arrow-right" aria-hidden="true"></i
+                    ></Link>
                 </li>
             </ul>
         </nav>

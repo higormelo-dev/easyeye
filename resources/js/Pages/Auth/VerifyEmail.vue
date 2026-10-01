@@ -33,19 +33,14 @@ function logout() {
         subtitle="Confirmação necessária"
         :illustration-src="emailVerificationImg"
     >
-        <p class="text-muted mb-4" style="font-size:.9rem;">{{ t.verify_email?.description }}</p>
+        <p class="text-muted mb-4" style="font-size: 0.9rem">{{ t.verify_email?.description }}</p>
 
         <div v-if="verificationSent" class="alert alert-success mb-4">
             <i class="ti ti-circle-check me-1"></i> {{ t.verify_email?.link_sent }}
         </div>
 
         <div class="d-grid mb-3">
-            <button
-                type="button"
-                class="btn btn-primary fw-semibold"
-                :disabled="resendForm.processing"
-                @click="resend"
-            >
+            <button type="button" class="btn btn-primary fw-semibold" :disabled="resendForm.processing" @click="resend">
                 <i v-if="resendForm.processing" class="ti ti-loader-2 ee-spin me-1"></i>
                 {{ t.verify_email?.resend }}
             </button>
@@ -55,7 +50,7 @@ function logout() {
             <button
                 type="button"
                 class="btn btn-link text-muted"
-                style="font-size:.875rem;"
+                style="font-size: 0.875rem"
                 :disabled="logoutForm.processing"
                 @click="logout"
             >

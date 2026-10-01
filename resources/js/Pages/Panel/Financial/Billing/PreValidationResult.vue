@@ -8,7 +8,7 @@
  */
 defineProps({
     result: { type: Object, default: null },
-    t:      { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
 });
 </script>
 
@@ -32,7 +32,10 @@ defineProps({
             </div>
         </div>
 
-        <p v-if="result.passes && !result.errors?.length && !result.warnings?.length" class="text-success-emphasis small mb-0">
+        <p
+            v-if="result.passes && !result.errors?.length && !result.warnings?.length"
+            class="text-success-emphasis small mb-0"
+        >
             <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ t.pending_no_issues }}
         </p>
     </div>

@@ -14,16 +14,16 @@ import { PREVIEW_EXAMPLES, planCopy } from './pricesBulk.js';
  * Emite `load` (id do convênio), `apply` com [{ index, to }] e `close`.
  */
 const props = defineProps({
-    open:    { type: Boolean, default: false },
+    open: { type: Boolean, default: false },
     /** Convênios de origem: [{ id, name }] (sem o convênio da grade). */
-    sources: { type: Array,   default: () => [] },
+    sources: { type: Array, default: () => [] },
     /** Todas as linhas da grade: [{ row, index }]. */
-    entries: { type: Array,   default: () => [] },
+    entries: { type: Array, default: () => [] },
     /** Preços do convênio escolhido (procedure_id → preço); null enquanto não carregou. */
-    prices:  { type: [Object, Array], default: null },
+    prices: { type: [Object, Array], default: null },
     loading: { type: Boolean, default: false },
-    failed:  { type: Boolean, default: false },
-    t:       { type: Object,  default: () => ({}) },
+    failed: { type: Boolean, default: false },
+    t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'load', 'apply']);
@@ -31,25 +31,31 @@ const emit = defineEmits(['close', 'load', 'apply']);
 const { tx } = useTrans(() => props.t);
 const { money, number } = useLocaleFormat();
 
-const sourceId     = ref('');
-const overwrite    = ref(false);
+const sourceId = ref('');
+const overwrite = ref(false);
 const sourceSelect = ref(null);
 
-watch(() => props.open, (isOpen) => {
-    if (!isOpen) return;
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (!isOpen) return;
 
-    sourceId.value  = '';
-    overwrite.value = false;
-    nextTick(() => sourceSelect.value?.focus?.());
-}, { immediate: true });
+        sourceId.value = '';
+        overwrite.value = false;
+        nextTick(() => sourceSelect.value?.focus?.());
+    },
+    { immediate: true },
+);
 
 function onSourceChange() {
     emit('load', sourceId.value);
 }
 
-const plan = computed(() => (sourceId.value && props.prices && !props.loading
-    ? planCopy(props.entries, props.prices, { overwrite: overwrite.value })
-    : null));
+const plan = computed(() =>
+    sourceId.value && props.prices && !props.loading
+        ? planCopy(props.entries, props.prices, { overwrite: overwrite.value })
+        : null,
+);
 
 const examples = computed(() => plan.value?.changes.slice(0, PREVIEW_EXAMPLES) ?? []);
 const canApply = computed(() => Boolean(plan.value?.changes.length));
@@ -67,7 +73,10 @@ function exampleText(change) {
 function apply() {
     if (!canApply.value) return;
 
-    emit('apply', plan.value.changes.map(({ index, to }) => ({ index, to })));
+    emit(
+        'apply',
+        plan.value.changes.map(({ index, to }) => ({ index, to })),
+    );
 }
 
 /* Esc fecha (o CenteredModal não trata teclado). */
@@ -75,11 +84,15 @@ function onKeydown(event) {
     if (event.key === 'Escape') emit('close');
 }
 
-watch(() => props.open, (isOpen) => {
-    if (typeof document === 'undefined') return;
-    if (isOpen) document.addEventListener('keydown', onKeydown);
-    else document.removeEventListener('keydown', onKeydown);
-}, { immediate: true });
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (typeof document === 'undefined') return;
+        if (isOpen) document.addEventListener('keydown', onKeydown);
+        else document.removeEventListener('keydown', onKeydown);
+    },
+    { immediate: true },
+);
 
 onBeforeUnmount(() => {
     if (typeof document !== 'undefined') document.removeEventListener('keydown', onKeydown);
@@ -89,7 +102,9 @@ onBeforeUnmount(() => {
 <template>
     <CenteredModal :open="open" size="md" @close="emit('close')">
         <template #header>
-            <h2 class="h5 mb-0"><i class="ti ti-copy me-1 text-primary" aria-hidden="true"></i>{{ tx('copy_title') }}</h2>
+            <h2 class="h5 mb-0">
+                <i class="ti ti-copy me-1 text-primary" aria-hidden="true"></i>{{ tx('copy_title') }}
+            </h2>
         </template>
 
         <form novalidate data-test="copy-form" @submit.prevent="apply">
@@ -116,36 +131,74 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="form-check mb-3">
-                <input id="pp-copy-overwrite" v-model="overwrite" class="form-check-input" type="checkbox" aria-describedby="pp-copy-overwrite-help" data-test="copy-overwrite">
+                <input
+                    id="pp-copy-overwrite"
+                    v-model="overwrite"
+                    class="form-check-input"
+                    type="checkbox"
+                    aria-describedby="pp-copy-overwrite-help"
+                    data-test="copy-overwrite"
+                />
                 <label class="form-check-label" for="pp-copy-overwrite">{{ tx('copy_overwrite') }}</label>
                 <div id="pp-copy-overwrite-help" class="form-text">{{ tx('copy_overwrite_help') }}</div>
             </div>
 
-            <div class="pp-preview rounded border p-2 small" role="status" aria-live="polite" aria-atomic="true" data-test="copy-preview">
+            <div
+                class="pp-preview rounded border p-2 small"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                data-test="copy-preview"
+            >
                 <p class="fw-semibold mb-1">{{ tx('preview_label') }}</p>
                 <p v-if="loading" class="mb-0 d-flex align-items-center gap-2" data-test="copy-loading">
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>{{ tx('copy_loading') }}
                 </p>
-                <p v-else-if="failed" class="mb-0 text-danger-emphasis" data-test="copy-failed">{{ tx('copy_load_error') }}</p>
+                <p v-else-if="failed" class="mb-0 text-danger-emphasis" data-test="copy-failed">
+                    {{ tx('copy_load_error') }}
+                </p>
                 <p v-else-if="!plan" class="mb-0 text-body-secondary">{{ tx('copy_preview_empty') }}</p>
                 <template v-else>
-                    <p v-if="plan.changes.length === 0" class="mb-0" data-test="preview-none">{{ tx('preview_none') }}</p>
+                    <p v-if="plan.changes.length === 0" class="mb-0" data-test="preview-none">
+                        {{ tx('preview_none') }}
+                    </p>
                     <template v-else>
-                        <p class="mb-1" data-test="preview-count">{{ tx('preview_changes', { count: number(plan.changes.length) }) }}</p>
+                        <p class="mb-1" data-test="preview-count">
+                            {{ tx('preview_changes', { count: number(plan.changes.length) }) }}
+                        </p>
                         <p class="mb-1 text-body-secondary">{{ tx('preview_examples') }}</p>
                         <ul class="mb-1 ps-3">
-                            <li v-for="change in examples" :key="change.index" data-test="preview-example">{{ exampleText(change) }}</li>
+                            <li v-for="change in examples" :key="change.index" data-test="preview-example">
+                                {{ exampleText(change) }}
+                            </li>
                         </ul>
                     </template>
-                    <p v-if="plan.kept > 0" class="mb-0 text-body-secondary" data-test="preview-kept">{{ tx('copy_kept', { count: number(plan.kept) }) }}</p>
-                    <p v-if="plan.missing > 0" class="mb-0 text-body-secondary" data-test="preview-missing">{{ tx('copy_missing', { count: number(plan.missing) }) }}</p>
+                    <p v-if="plan.kept > 0" class="mb-0 text-body-secondary" data-test="preview-kept">
+                        {{ tx('copy_kept', { count: number(plan.kept) }) }}
+                    </p>
+                    <p v-if="plan.missing > 0" class="mb-0 text-body-secondary" data-test="preview-missing">
+                        {{ tx('copy_missing', { count: number(plan.missing) }) }}
+                    </p>
                 </template>
             </div>
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-outline-secondary btn-sm" data-test="copy-cancel" @click="emit('close')">{{ tx('bulk_cancel') }}</button>
-            <button type="button" class="btn btn-primary btn-sm" data-test="copy-apply" :disabled="!canApply" @click="apply">
+            <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                data-test="copy-cancel"
+                @click="emit('close')"
+            >
+                {{ tx('bulk_cancel') }}
+            </button>
+            <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                data-test="copy-apply"
+                :disabled="!canApply"
+                @click="apply"
+            >
                 <i class="ti ti-check me-1" aria-hidden="true"></i>{{ tx('copy_apply') }}
             </button>
         </template>
