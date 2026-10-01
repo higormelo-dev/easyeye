@@ -568,8 +568,11 @@ const breadcrumbs = [
                  ════════════════════════════════════════════════════════════ -->
             <div class="row g-3">
 
-                <!-- Sidebar — sempre visível para não-médicos -->
-                <div v-if="!isDoctor" class="col-12 col-md-3">
+                <!-- Sidebar — calendário para todos (o médico também escolhe a
+                     data direto, sem ir dia a dia); a lista de médicos só para
+                     quem vê a agenda de vários (o médico vê só a dele — o
+                     servidor força o filtro). -->
+                <div class="col-12 col-md-3">
                     <div class="card">
                         <div class="card-body">
 
@@ -580,8 +583,8 @@ const breadcrumbs = [
                                 @update:model-value="goToDate"
                             />
 
-                            <!-- Médicos + Turno — só quando há médicos cadastrados -->
-                            <template v-if="doctors.length > 0">
+                            <!-- Médicos — só para quem vê vários médicos -->
+                            <template v-if="!isDoctor && doctors.length > 0">
                                 <hr class="my-3">
 
                                 <!-- Médicos -->
@@ -619,7 +622,10 @@ const breadcrumbs = [
                                         <div class="text-muted" style="font-size:.72rem;">{{ d.record }}</div>
                                     </div>
                                 </div>
+                            </template>
 
+                            <!-- Turno — médico também filtra a própria agenda -->
+                            <template v-if="isDoctor || doctors.length > 0">
                                 <hr class="my-3">
 
                                 <!-- Turno -->
@@ -646,7 +652,7 @@ const breadcrumbs = [
                 </div>
 
                 <!-- Coluna principal de agendamentos -->
-                <div :class="!isDoctor ? 'col-12 col-md-9' : 'col-12'">
+                <div class="col-12 col-md-9">
 
                     <!-- ── Vista calendário ───────────────────────────────── -->
                     <CalendarView
