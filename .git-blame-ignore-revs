@@ -1,0 +1,6 @@
+# Commits só de formatação: o git blame pula estes e mostra quem escreveu a
+# linha de verdade. O GitHub lê este arquivo sozinho; no clone local:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: formata o frontend com Prettier
+b2f7ebbcdf5cdd8d9d7d4c85e798ebe2bcdffb57
