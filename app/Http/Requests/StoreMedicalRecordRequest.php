@@ -282,6 +282,17 @@ class StoreMedicalRecordRequest extends FormRequest
             'fundoscopy_left'           => ['nullable', 'string', 'max:5000'],
             'observation_general'       => ['nullable', 'string', 'max:5000'],
             'observation_of_lenses'     => ['nullable', 'string', 'max:5000'],
+            // Cálculo de lentes de contato — só ENTRADAS; os resultados são
+            // recalculados no servidor (ContactLensCalculator). Faixas
+            // clínicas plausíveis: barram valor digitado errado (ex.: -90).
+            'contact_lens_calculation'                    => ['nullable', 'array'],
+            'contact_lens_calculation.vertex_distance_mm' => ['nullable', 'numeric', 'min:5', 'max:25'],
+            'contact_lens_calculation.vertex_od'          => ['nullable', 'numeric', 'min:-40', 'max:40'],
+            'contact_lens_calculation.vertex_oe'          => ['nullable', 'numeric', 'min:-40', 'max:40'],
+            'contact_lens_calculation.se_od_sphere'       => ['nullable', 'numeric', 'min:-40', 'max:40'],
+            'contact_lens_calculation.se_od_cylinder'     => ['nullable', 'numeric', 'min:-15', 'max:15'],
+            'contact_lens_calculation.se_oe_sphere'       => ['nullable', 'numeric', 'min:-40', 'max:40'],
+            'contact_lens_calculation.se_oe_cylinder'     => ['nullable', 'numeric', 'min:-15', 'max:15'],
             // Diagnóstico — CBO obrigatório (array de {code, description})
             'diagnosis_cids'               => ['nullable', 'array', 'max:20'],
             'diagnosis_cids.*.code'        => ['required_with:diagnosis_cids', 'string', 'max:10'],

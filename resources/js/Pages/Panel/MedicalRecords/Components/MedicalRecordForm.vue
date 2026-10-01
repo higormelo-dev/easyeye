@@ -9,6 +9,8 @@ import AcuitySelect    from '@/Pages/Panel/MedicalRecords/Components/AcuitySelec
 import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
 import MedicalRecordImagingModal from './MedicalRecordImagingModal.vue';
 import MedicalRecordProceduresModal from './MedicalRecordProceduresModal.vue';
+import ContactLensCalculatorModal from './ContactLensCalculatorModal.vue';
+import { contactLensSummary } from './contactLens.js';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
 import { recordColumnOrder } from './recordLayout.js';
@@ -140,6 +142,9 @@ const form = useForm({
     fundoscopy_left:       r?.fundoscopy_left ?? props.t?.fundoscopy_ph ?? '',
     observation_general:   r?.observation_general ?? '',
     observation_of_lenses: r?.observation_of_lenses ?? '',
+    // Cálculo de lentes de contato vinculado à consulta (entradas +
+    // resultados; o servidor recalcula ao salvar). null = sem cálculo.
+    contact_lens_calculation: r?.contact_lens_calculation ?? null,
 
     // Diagnóstico & conduta
     diagnosis_cids:    r?.diagnosis_cids ?? [],
@@ -517,6 +522,7 @@ const showExamHubModal        = ref(false);
 const showImagingModal        = ref(false);
 const showTonometryModal      = ref(false);
 const showPresbyopiaObsModal  = ref(false);
+const showContactLensCalc     = ref(false);
 
 // CID-10 search state
 const cidQuery       = ref('');
@@ -889,6 +895,20 @@ async function confirmPresbyopiaCalc() {
     form.observation_of_lenses = presbyopiaObsForm.content;
     showPresbyopiaObsModal.value = false;
     await calcPresbyopia();
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Lentes de contato (saiu do Gerenciador de Imagens): o modal devolve
+// entradas + resultados; grava junto com a consulta ao salvar.
+// ──────────────────────────────────────────────────────────────────────────
+const contactLensRows = computed(() => contactLensSummary(form.contact_lens_calculation, i18n.value));
+
+function applyContactLens(calculation) {
+    form.contact_lens_calculation = calculation;
+}
+
+function removeContactLens() {
+    form.contact_lens_calculation = null;
 }
 
 async function calcPresbyopia() {
@@ -2020,6 +2040,17 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                             :title="tt('calc', 'Calcular presbiopia')">
                                         <i class="fas fa-pencil-alt"></i>
                                     </button>
+                                    <!-- Cálculo de lentes de contato (saiu do Gerenciador
+                                         de Imagens): só médico, como antes. Assinado:
+                                         abre só para consultar o que foi gravado. -->
+                                    <button v-if="isDoctor" type="button" class="btn btn-outline-secondary btn-sm"
+                                            data-contact-lens-open
+                                            :disabled="isLocked && !contactLensRows.length"
+                                            :title="tt('contact_lens_title', 'Cálculo de lentes de contato')"
+                                            :aria-label="tt('contact_lens_title', 'Cálculo de lentes de contato')"
+                                            @click="showContactLensCalc = true">
+                                        <i class="fas fa-calculator" aria-hidden="true"></i>
+                                    </button>
                                     <!--
                                         Receituário de óculos: exclusivo para médicos (CFM Res. 2.227/2018).
                                         Admin/secretária da clínica não pode emitir receituário — só visualizar.
@@ -2049,6 +2080,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 <textarea v-model="form.observation_of_lenses" name="observation_of_lenses" rows="1"
                                           class="form-control form-control-sm" :disabled="isLocked"
                                           :placeholder="tt('lenses_obs_ph', 'Uso contínuo, orientações, preferência de lente…')"></textarea>
+                            </div>
+                            <!-- Cálculo de lentes de contato vinculado a esta consulta. -->
+                            <div v-if="contactLensRows.length" class="col-12" data-contact-lens-summary>
+                                <span class="pmr-label d-block">{{ tt('contact_lens_title', 'Cálculo de lentes de contato') }}</span>
+                                <ul class="list-unstyled small mb-0">
+                                    <li v-for="row in contactLensRows" :key="row.key">
+                                        <span class="text-muted">{{ row.label }}:</span> {{ row.value }}
+                                    </li>
+                                </ul>
                             </div>
                         </div>
                     </div>
@@ -3157,6 +3197,12 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             </div>
         </div>
     </Teleport>
+
+    <!-- Cálculo de lentes de contato (resultado vai para o form; grava ao salvar) -->
+    <ContactLensCalculatorModal :open="showContactLensCalc" :t="i18n"
+                                :model-value="form.contact_lens_calculation" :record="form" :readonly="isLocked"
+                                @close="showContactLensCalc = false"
+                                @apply="applyContactLens" @remove="removeContactLens" />
 
     <!-- PDF preview universal -->
     <PdfPreviewModal v-if="showPdfPreview" :url="pdfPreviewUrl" :title="pdfPreviewTitle" @close="closePdfPreview" />

@@ -133,10 +133,32 @@ trait Signable
      */
     private function clinicalContent(): array
     {
-        return array_diff_key(
+        $content = array_diff_key(
             $this->getAttributes(),
             array_flip(['signed_by', 'signed_at', 'signature_hash', 'is_locked']),
         );
+
+        // Coluna criada depois de já haver assinaturas: vazia, fica fora do
+        // hash — senão a chave nova (null) invalidaria toda assinatura
+        // anterior à coluna (o hash serializa todos os atributos).
+        foreach ($this->signatureOptionalAttributes() as $column) {
+            if (array_key_exists($column, $content) && $content[$column] === null) {
+                unset($content[$column]);
+            }
+        }
+
+        return $content;
+    }
+
+    /**
+     * Colunas adicionadas depois de existirem prontuários assinados: quando
+     * vazias, não entram no hash (o que foi assinado antes segue conferindo).
+     *
+     * @return list<string>
+     */
+    protected function signatureOptionalAttributes(): array
+    {
+        return [];
     }
 
     public function isLocked(): bool

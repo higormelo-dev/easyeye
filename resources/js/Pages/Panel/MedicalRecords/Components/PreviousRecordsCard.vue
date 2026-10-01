@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue';
+import { contactLensCompact } from './contactLens.js';
 
 /**
  * Painel lateral "Consultas anteriores" (somente leitura) — resumo clínico das
@@ -7,7 +8,8 @@ import { ref } from 'vue';
  * grau/AV/PIO/diagnóstico/conduta SEM sair do atendimento nem abrir modal.
  *
  * Interação em 3 níveis:
- *  1. Resumo compacto sempre visível por consulta (AV, refração, PIO).
+ *  1. Resumo compacto sempre visível por consulta (AV, refração, cálculo de
+ *     lentes de contato quando houve, PIO).
  *  2. Clique no item → expande NO PRÓPRIO PAINEL (diagnósticos, conduta,
  *     queixa) — o form continua utilizável ao lado.
  *  3. "Ver completo" → MedicalRecordViewModal (via emit `view`, como antes)
@@ -99,6 +101,12 @@ function toggleExpand(record) {
                             <span class="prev-records__eye">Ad:</span>{{ r.summary.addition }}
                         </div>
                     </template>
+                    <!-- Cálculo de lentes de contato da consulta (só quando houve):
+                         resultado por olho; rótulo completo no title. -->
+                    <div v-for="row in contactLensCompact(r.summary.contact_lens, t)" :key="row.key"
+                         class="prev-records__summary-line" :title="row.label" :data-contact-lens="row.key">
+                        <span class="prev-records__tag">{{ row.tag }}</span>{{ row.value }}
+                    </div>
                     <div v-if="r.summary.pio" class="prev-records__summary-line">
                         <span class="prev-records__tag">PIO</span>{{ r.summary.pio }}
                     </div>

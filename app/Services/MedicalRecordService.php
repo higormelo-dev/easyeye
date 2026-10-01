@@ -129,6 +129,13 @@ class MedicalRecordService
             'glaucomatous', 'glaucomatous_family',
         ];
 
+        // Cálculo de lentes de contato: grava só o que o SERVIDOR calcula a
+        // partir das entradas (resultado vindo do navegador é ignorado).
+        if (array_key_exists('contact_lens_calculation', $data)) {
+            $data['contact_lens_calculation'] = app(ContactLensCalculator::class)
+                ->calculate(is_array($data['contact_lens_calculation']) ? $data['contact_lens_calculation'] : null);
+        }
+
         foreach ($nullableIds as $field) {
             if (array_key_exists($field, $data)) {
                 $data[$field] = blank($data[$field]) ? null : $data[$field];

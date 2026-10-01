@@ -264,6 +264,8 @@ class MedicalRecordsController extends Controller
             'fundoscopy_left'       => $medicalrecord->fundoscopy_left,
             'observation_general'   => $medicalrecord->observation_general,
             'observation_of_lenses' => $medicalrecord->observation_of_lenses,
+            // Cálculo de lentes de contato da consulta (ContactLensCalculator)
+            'contact_lens_calculation' => $medicalrecord->contact_lens_calculation,
             // Diagnóstico & conduta
             'diagnosis_cids'   => $medicalrecord->diagnosis_cids ?? [],
             'clinical_conduct' => $medicalrecord->clinical_conduct,
@@ -598,6 +600,9 @@ class MedicalRecordsController extends Controller
                     'refraction_oe' => $this->refractionText($mr->dynamic_spherical_left, $mr->dynamic_cylindrical_left, $mr->dynamic_axis_left),
                     'addition'      => $mr->additionType?->name,
                     'pio'           => $this->eyePair($mr->tonometer_right, $mr->tonometer_left, ' mmHg'),
+                    // Cálculo de lentes de contato da consulta — o painel mostra o
+                    // resultado por olho (contactLensCompact); null = sem cálculo.
+                    'contact_lens' => $mr->contact_lens_calculation,
                     // "H40.1 – Glaucoma..." — código + descrição juntos.
                     'diagnoses' => collect(is_array($mr->diagnosis_cids) ? $mr->diagnosis_cids : [])
                         ->map(fn ($d) => trim(implode(' – ', array_filter([(string) ($d['code'] ?? ''), (string) ($d['description'] ?? '')]))))
@@ -1064,12 +1069,13 @@ class MedicalRecordsController extends Controller
             'gonioscopy_left'  => $r->gonioscopy_left,
 
             // Achados
-            'biomicroscopy_right'   => $r->biomicroscopy_right,
-            'biomicroscopy_left'    => $r->biomicroscopy_left,
-            'fundoscopy_right'      => $r->fundoscopy_right,
-            'fundoscopy_left'       => $r->fundoscopy_left,
-            'observation_general'   => $r->observation_general,
-            'observation_of_lenses' => $r->observation_of_lenses,
+            'biomicroscopy_right'      => $r->biomicroscopy_right,
+            'biomicroscopy_left'       => $r->biomicroscopy_left,
+            'fundoscopy_right'         => $r->fundoscopy_right,
+            'fundoscopy_left'          => $r->fundoscopy_left,
+            'observation_general'      => $r->observation_general,
+            'observation_of_lenses'    => $r->observation_of_lenses,
+            'contact_lens_calculation' => $r->contact_lens_calculation,
 
             // Vínculo com a agenda (hidrata o form no edit — sem isso o
             // update mandava '' e desvinculava o agendamento).

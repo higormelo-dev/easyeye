@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ClientRule;
 use App\Models\{Covenant, Doctor, Entity, MedicalRecord, Patient, People, User, VisualAcuityType};
+use App\Services\ContactLensCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -94,8 +95,29 @@ it('omite linhas sem dado (null) — a UI esconde a linha inteira', function () 
         ->and($summary['refraction_oe'])->toBeNull()
         ->and($summary['addition'])->toBeNull()
         ->and($summary['pio'])->toBeNull()
+        ->and($summary['contact_lens'])->toBeNull()
         ->and($summary['diagnoses'])->toBe([])
         ->and($summary['conduct'])->toBeNull();
+});
+
+it('consulta anterior com cálculo de lentes de contato: o painel recebe o resultado gravado', function () {
+    MedicalRecord::create([
+        'patient_id'               => $this->patient->id,
+        'doctor_id'                => $this->doctor->id,
+        'main_complaint'           => 'Adaptação de lente de contato',
+        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate([
+            'vertex_od' => -6, 'vertex_oe' => 6, 'se_od_sphere' => -2, 'se_od_cylinder' => -1,
+        ]),
+    ]);
+
+    $summary = $this->get(route('panel.patients.medicalrecords.create', $this->patient))
+        ->viewData('page')['props']['previousRecords'][0]['summary'];
+
+    expect($summary['contact_lens']['vertex_distance_mm'])->toEqual(12)
+        ->and($summary['contact_lens']['vertex_od_result'])->toEqual(-5.6)
+        ->and($summary['contact_lens']['vertex_oe_result'])->toEqual(6.47)
+        ->and($summary['contact_lens']['se_od_result'])->toEqual(-2.5)
+        ->and($summary['contact_lens']['se_oe_result'])->toBeNull();
 });
 
 it('na edição, o prontuário ATUAL não aparece na lista de anteriores', function () {

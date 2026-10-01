@@ -91,6 +91,9 @@ class MedicalRecord extends Model
         'fundoscopy_left',
         'observation_general',
         'observation_of_lenses',
+        // Cálculo de lentes de contato (entradas + resultados recalculados
+        // no servidor — App\Services\ContactLensCalculator)
+        'contact_lens_calculation',
         // Diagnóstico — CBO obrigatório (múltiplos CIDs como JSON [{code, description}])
         'diagnosis_cids',
         // Conduta — CBO obrigatório
@@ -276,7 +279,22 @@ class MedicalRecord extends Model
             'diagnosis_cids' => 'array',
             'lens_away_ids'  => 'array',
             'lens_near_ids'  => 'array',
+            // Cálculo de lentes de contato vinculado à consulta.
+            'contact_lens_calculation' => 'array',
         ];
+    }
+
+    /**
+     * Signable: colunas criadas depois de já haver prontuários assinados.
+     * Vazias, ficam fora do hash de integridade — assinaturas anteriores à
+     * coluna seguem conferindo. Coluna nova (nullable) em medical_records
+     * deve entrar aqui.
+     *
+     * @return list<string>
+     */
+    protected function signatureOptionalAttributes(): array
+    {
+        return ['contact_lens_calculation'];
     }
 
     /**

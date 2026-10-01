@@ -91,12 +91,15 @@ return [
     'gonioscopy_oe'          => 'Gonioscopy OE',
 
     // ── Refraction ───────────────────────────────────────────────────────
-    'av_sc_short' => 'VA w/o',
-    'av_cc_short' => 'VA w/',
-    'dynamic'     => 'Dynamic',
-    'static'      => 'Static',
-    'lens_away'   => 'Distance lens',
-    'lens_near'   => 'Near lens',
+    'av_sc_short'         => 'VA w/o',
+    'av_cc_short'         => 'VA w/',
+    'dynamic'             => 'Dynamic',
+    'static'              => 'Static',
+    'lens_away'           => 'Distance lens',
+    'lens_near'           => 'Near lens',
+    'contact_lens_title'  => 'Contact lens calculation',
+    'contact_lens_vertex' => 'Sphere → contact lens (vertex :mm mm)',
+    'contact_lens_se'     => 'Spherical equivalent',
 
     // ── Clinical findings ────────────────────────────────────────────────
     'biomicroscopy_od' => 'Biomicroscopy OD',

@@ -371,6 +371,36 @@
     </div>
 </div>
 @endif
+{{-- Cálculo de lentes de contato da consulta (ContactLensCalculator) --}}
+@php
+    $clc = is_array($record->contact_lens_calculation) ? $record->contact_lens_calculation : null;
+    // Dioptria com sinal e 2 casas (mesma notação da calculadora na tela).
+    $diopter = static fn ($v) => $v === null ? '—' : (($v > 0 ? '+' : '') . number_format((float) $v, 2, '.', ''));
+    $vertexMm = rtrim(rtrim(number_format((float) ($clc['vertex_distance_mm'] ?? 12), 1, '.', ''), '0'), '.');
+    // Vértice: esférico digitado → lente de contato (deixa claro que só o esférico foi convertido).
+    $vertexEye = static fn ($in, $out) => $out === null ? '—' : $diopter($in) . ' → ' . $diopter($out);
+@endphp
+@if($clc)
+<div class="row">
+    <div class="col col-12">
+        <span class="field-label">{{ __('pdf.contact_lens_title') }}</span>
+    </div>
+</div>
+<div class="row">
+    @if(($clc['vertex_od_result'] ?? null) !== null || ($clc['vertex_oe_result'] ?? null) !== null)
+    <div class="col col-6">
+        <span class="field-label">{{ __('pdf.contact_lens_vertex', ['mm' => $vertexMm]) }}</span>
+        <span class="field-value">OD {{ $vertexEye($clc['vertex_od'] ?? null, $clc['vertex_od_result'] ?? null) }} · OE {{ $vertexEye($clc['vertex_oe'] ?? null, $clc['vertex_oe_result'] ?? null) }}</span>
+    </div>
+    @endif
+    @if(($clc['se_od_result'] ?? null) !== null || ($clc['se_oe_result'] ?? null) !== null)
+    <div class="col col-6">
+        <span class="field-label">{{ __('pdf.contact_lens_se') }}</span>
+        <span class="field-value">OD {{ $diopter($clc['se_od_result'] ?? null) }} · OE {{ $diopter($clc['se_oe_result'] ?? null) }}</span>
+    </div>
+    @endif
+</div>
+@endif
 </div>
 
 <!-- ─── ACHADOS CLÍNICOS ───────────────────────────────────────────────────── -->

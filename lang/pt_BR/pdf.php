@@ -91,12 +91,15 @@ return [
     'gonioscopy_oe'          => 'Gonioscopia OE',
 
     // ── Refração ─────────────────────────────────────────────────────────
-    'av_sc_short' => 'AV s/c',
-    'av_cc_short' => 'AV c/c',
-    'dynamic'     => 'Dinâmica',
-    'static'      => 'Estática',
-    'lens_away'   => 'Lente Longe',
-    'lens_near'   => 'Lente Perto',
+    'av_sc_short'         => 'AV s/c',
+    'av_cc_short'         => 'AV c/c',
+    'dynamic'             => 'Dinâmica',
+    'static'              => 'Estática',
+    'lens_away'           => 'Lente Longe',
+    'lens_near'           => 'Lente Perto',
+    'contact_lens_title'  => 'Cálculo de lentes de contato',
+    'contact_lens_vertex' => 'Esférico → lente de contato (vértice :mm mm)',
+    'contact_lens_se'     => 'Equivalente esférico',
 
     // ── Achados clínicos ─────────────────────────────────────────────────
     'biomicroscopy_od' => 'Biomicroscopia OD',

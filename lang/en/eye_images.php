@@ -109,18 +109,6 @@ return [
     'merged_badge'               => 'Merged',
     'undo_merge_split'           => 'Manually merged/split — click to undo (back to automatic grouping).',
 
-    // Lens calculator (vertex + spherical equivalent) — competitor benchmark 2026-09-09
-    'lens_calc_title'           => 'Lens calculator',
-    'lens_calc_disclaimer'      => 'Reference optics formulas (vertex distance and spherical equivalent) — always double-check the result before using it. Does not include IOL (intraocular lens) power calculation: use a dedicated, validated biometry calculator for cataract surgery.',
-    'lens_calc_vertex_title'    => 'Vertex distance conversion',
-    'lens_calc_vertex_hint'     => 'Converts spectacle prescription to the equivalent contact lens power (zero vertex).',
-    'lens_calc_vertex_distance' => 'Vertex distance (mm)',
-    'lens_calc_sphere_od'       => 'Sphere OD (D)',
-    'lens_calc_sphere_oe'       => 'Sphere OS (D)',
-    'lens_calc_result'          => 'Contact lens',
-    'lens_calc_se_title'        => 'Spherical equivalent',
-    'lens_calc_se_hint'         => 'SE = Sphere + Cylinder / 2.',
-
     // Group by Equipment (default) / Group by Exam — 09/18/2026 benchmark
     'group_by_equipment' => 'Group by Equipment',
     'group_by_exam'      => 'Group by Exam',

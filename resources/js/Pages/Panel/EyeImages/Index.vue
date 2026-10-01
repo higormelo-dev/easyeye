@@ -9,7 +9,6 @@ import ImportExternalExamModal from '@/Components/Panel/ImportExternalExamModal.
 import EyeImageReportModal from './EyeImageReportModal.vue';
 import EyeImageCompareModal from './EyeImageCompareModal.vue';
 import EyeImageContextMenu from './EyeImageContextMenu.vue';
-import LensCalculatorModal from './LensCalculatorModal.vue';
 
 /**
  * Eye Images — porta fiel da implementação Alpine.js original.
@@ -501,7 +500,6 @@ async function setPatientPriority(patient, value) {
 // visual (chave de agrupamento: data|equipamento|tipo — ver groupedExams).
 const showImportModal   = ref(false);
 const importPresetGroup = ref(null);
-const lensCalculatorOpen = ref(false);
 
 function openImportModal(group = null) {
     importPresetGroup.value = group ? {
@@ -1710,11 +1708,9 @@ const printEntity = computed(() => props.entity ?? {});
                         </button>
                     </div>
 
+                    <!-- Cálculo de lentes de contato mudou para o Prontuário
+                         (bloco de lentes), vinculado à consulta. -->
                     <div class="col col-md d-flex justify-content-end gap-2">
-                        <button v-if="isDoctor" type="button" class="btn btn-outline-secondary btn-sm"
-                                @click="lensCalculatorOpen = true">
-                            <i class="ti ti-calculator"></i> {{ tt('lens_calc_title', 'Calculadora de lentes') }}
-                        </button>
                         <button type="button" class="btn btn-primary btn-sm" @click="openImportModal()">
                             <i class="fa fa-plus"></i> Novo
                         </button>
@@ -2766,9 +2762,6 @@ const printEntity = computed(() => props.entity ?? {});
             @share="onContextMenuShare"
             @download="onContextMenuDownload"
         />
-
-        <!-- Calculadora de lentes (vértice + equivalente esférico) -->
-        <LensCalculatorModal :open="lensCalculatorOpen" :t="t" @close="lensCalculatorOpen = false" />
     </AppLayout>
 </template>
 

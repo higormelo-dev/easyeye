@@ -109,18 +109,6 @@ return [
     'merged_badge'               => 'Mesclado',
     'undo_merge_split'           => 'Mesclado/dividido manualmente — clique pra desfazer (volta ao agrupamento automático).',
 
-    // Calculadora de lentes (vértice + equivalente esférico) — benchmark 09/09/2026
-    'lens_calc_title'           => 'Calculadora de lentes',
-    'lens_calc_disclaimer'      => 'Fórmulas de óptica de referência (vértice e equivalente esférico) — sempre confira o resultado antes de usar. Não inclui cálculo de LIO (lente intraocular): use uma calculadora de biometria dedicada e validada para cirurgia de catarata.',
-    'lens_calc_vertex_title'    => 'Conversão de distância ao vértice',
-    'lens_calc_vertex_hint'     => 'Converte a graduação do óculos para a potência equivalente em lente de contato (vértice zero).',
-    'lens_calc_vertex_distance' => 'Distância ao vértice (mm)',
-    'lens_calc_sphere_od'       => 'Esférico OD (D)',
-    'lens_calc_sphere_oe'       => 'Esférico OE (D)',
-    'lens_calc_result'          => 'Lente de contato',
-    'lens_calc_se_title'        => 'Equivalente esférico',
-    'lens_calc_se_hint'         => 'SE = Esférico + Cilindro / 2.',
-
     // Agrupar por Equipamento (padrão) / Agrupar por Exame — benchmark 18/09/2026
     'group_by_equipment' => 'Agrupar por Equipamento',
     'group_by_exam'      => 'Agrupar por Exame',

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue';
+import { contactLensSummary } from './contactLens.js';
 
 /**
  * Modal somente-leitura de um prontuário anterior. Busca o JSON completo via
@@ -106,6 +107,8 @@ const sections = computed(() => {
         ['Adição', d.addition_type],
         ['Lente longe', d.lens_away],
         ['Lente perto', d.lens_near],
+        // Cálculo de lentes de contato vinculado à consulta.
+        ...contactLensSummary(d.contact_lens_calculation, props.t).map((row) => [row.label, row.value]),
     ]);
     if (refracao.length) out.push({ title: 'Refração', icon: 'fa-glasses', rows: refracao });
 
