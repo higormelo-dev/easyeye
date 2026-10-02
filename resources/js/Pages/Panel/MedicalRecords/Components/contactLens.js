@@ -70,6 +70,19 @@ export function computeContactLens(inputs = {}) {
     return hasContactLensResult(calc) ? calc : null;
 }
 
+/**
+ * Payload da edição sem o cálculo quando ele não mudou desde que o prontuário
+ * abriu: um valor gravado antes de uma regra nova (ex.: limite de 2 casas)
+ * não pode travar com 422 o save do prontuário inteiro. Sem a chave, o
+ * servidor mantém o que está gravado. `saved` = cálculo carregado (ou null).
+ */
+export function omitUnchangedContactLens(data, saved) {
+    if (JSON.stringify(data.contact_lens_calculation ?? null) !== JSON.stringify(saved ?? null)) return data;
+    const payload = { ...data };
+    delete payload.contact_lens_calculation;
+    return payload;
+}
+
 export function hasContactLensResult(calc) {
     return (
         !!calc &&
@@ -93,12 +106,16 @@ export const CONTACT_LENS_LIMITS = Object.freeze({
     se_oe_cylinder: [-15, 15],
 });
 
-/** Campos fora da faixa (distância vazia/0 vira 12 mm — não conta). */
-export function contactLensOutOfRange(inputs = {}) {
+/**
+ * Campos fora da faixa ou com mais de 2 casas decimais (o servidor exige o
+ * mesmo — decimal:0,2 —, para o valor exibido ser o usado no cálculo).
+ * Distância vazia/0 vira 12 mm — não conta.
+ */
+export function contactLensInvalid(inputs = {}) {
     return Object.entries(CONTACT_LENS_LIMITS)
         .filter(([key, [min, max]]) => {
             const n = key === 'vertex_distance_mm' ? toNumber(inputs[key]) || DEFAULT_VERTEX_MM : toNumber(inputs[key]);
-            return n !== null && (n < min || n > max);
+            return n !== null && (n < min || n > max || round2(n) !== n);
         })
         .map(([key]) => key);
 }
@@ -110,17 +127,17 @@ export function formatDiopter(v) {
     return `${n > 0 ? '+' : ''}${n.toFixed(2)}`;
 }
 
-/** Distância ao vértice sem zeros à toa ("12", "12.5"). */
-export function formatVertexMm(v) {
+/** Distância ao vértice no idioma da tela, sem zeros à toa ("12", "12,5"). `locale` como 'pt-BR'. */
+export function formatVertexMm(v, locale = 'pt-BR') {
     const n = toNumber(v) ?? DEFAULT_VERTEX_MM;
-    return String(Math.round(n * 10) / 10);
+    return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n);
 }
 
 /** Rótulo da conversão ao vértice com a distância usada ("… (vértice 12 mm)"). */
-function vertexLabel(calc, t) {
+function vertexLabel(calc, t, locale) {
     return (t.contact_lens_vertex_label ?? 'Esférico → lente de contato (vértice :mm mm)').replace(
         ':mm',
-        formatVertexMm(calc.vertex_distance_mm),
+        formatVertexMm(calc.vertex_distance_mm, locale),
     );
 }
 
@@ -129,9 +146,9 @@ function vertexLabel(calc, t) {
  * value }]. Vértice mostra entrada → resultado ("OD: -6.00 → -5.60"), para
  * ficar claro que só o esférico foi convertido; SE mostra o resultado. Olho
  * sem resultado fica de fora; linha sem resultado some. `t` = traduções de
- * actions.medical_records.
+ * actions.medical_records; `locale` formata a distância em mm.
  */
-export function contactLensSummary(calc, t = {}) {
+export function contactLensSummary(calc, t = {}, locale = undefined) {
     if (!hasContactLensResult(calc)) return [];
     const eyes = (pairs) =>
         pairs
@@ -148,7 +165,7 @@ export function contactLensSummary(calc, t = {}) {
     return [
         {
             key: 'vertex',
-            label: vertexLabel(calc, t),
+            label: vertexLabel(calc, t, locale),
             value: eyes([
                 [od, calc.vertex_od, calc.vertex_od_result],
                 [oe, calc.vertex_oe, calc.vertex_oe_result],
@@ -170,7 +187,7 @@ export function contactLensSummary(calc, t = {}) {
  * resultado por olho, no formato do painel ("OD -5.60 | OE +6.47"), com sigla
  * (LC / SE) e o rótulo completo para o title. Linha sem resultado some.
  */
-export function contactLensCompact(calc, t = {}) {
+export function contactLensCompact(calc, t = {}, locale = undefined) {
     if (!hasContactLensResult(calc)) return [];
     const results = (odResult, oeResult) =>
         [
@@ -185,7 +202,7 @@ export function contactLensCompact(calc, t = {}) {
         {
             key: 'vertex',
             tag: t.contact_lens_short ?? 'LC',
-            label: vertexLabel(calc, t),
+            label: vertexLabel(calc, t, locale),
             value: results(calc.vertex_od_result, calc.vertex_oe_result),
         },
         {
@@ -218,21 +235,25 @@ function isDefaultRefraction(v) {
  * Refração do prontuário (dinâmica/estática) no formato da calculadora —
  * para copiar sem redigitar. null quando o bloco não foi preenchido (tudo no
  * padrão "0.00"/"0°"): não vira "plano" por engano. Num bloco preenchido,
- * 0.00 conta como plano.
+ * 0.00 conta como plano. `unreadable` lista os campos com texto que não é
+ * número (ex.: "PL"): copiados como vazio, o SE ignoraria o cilindro.
  */
 export function refractionFromRecord(form, prefix) {
     if (REFRACTION_FIELDS.every((field) => isDefaultRefraction(form?.[`${prefix}_${field}`]))) {
         return null;
     }
 
+    const unreadable = [];
+    const read = (field) => {
+        const raw = form?.[`${prefix}_${field}`];
+        const n = toNumber(raw);
+        if (n === null && !isBlank(raw)) unreadable.push(field);
+        return n;
+    };
+
     return {
-        od: {
-            sphere: toNumber(form?.[`${prefix}_spherical_right`]),
-            cylinder: toNumber(form?.[`${prefix}_cylindrical_right`]),
-        },
-        oe: {
-            sphere: toNumber(form?.[`${prefix}_spherical_left`]),
-            cylinder: toNumber(form?.[`${prefix}_cylindrical_left`]),
-        },
+        od: { sphere: read('spherical_right'), cylinder: read('cylindrical_right') },
+        oe: { sphere: read('spherical_left'), cylinder: read('cylindrical_left') },
+        unreadable,
     };
 }

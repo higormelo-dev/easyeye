@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { contactLensCompact } from './contactLens.js';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
 
 /**
  * Painel lateral "Consultas anteriores" (somente leitura) — resumo clínico das
@@ -27,6 +28,8 @@ defineProps({
 });
 
 const emit = defineEmits(['view']);
+
+const { locale } = useLocaleFormat();
 
 const collapsed = ref(false);
 const expandedId = ref(null);
@@ -126,7 +129,7 @@ function toggleExpand(record) {
                     <!-- Cálculo de lentes de contato da consulta (só quando houve):
                          resultado por olho; rótulo completo no title. -->
                     <div
-                        v-for="row in contactLensCompact(r.summary.contact_lens, t)"
+                        v-for="row in contactLensCompact(r.summary.contact_lens, t, locale)"
                         :key="row.key"
                         class="prev-records__summary-line"
                         :title="row.label"

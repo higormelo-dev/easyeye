@@ -96,10 +96,17 @@ final class ContactLensCalculator
         return $cyl === null ? null : $this->round($sphere + $cyl / 2);
     }
 
-    /** Math.round(x·100)/100 do JavaScript. */
+    /**
+     * Math.round(x·100)/100 do JavaScript, exato: .5 sobe (rumo a +∞).
+     * floor(x + 0,5) erra quando a soma arredonda em ponto flutuante
+     * (0,49999999999999994 + 0,5 = 1,0); a parte fracionária y − floor(y) é exata.
+     */
     private function round(float $value): float
     {
-        return floor($value * 100 + 0.5) / 100;
+        $scaled = $value * 100;
+        $floor  = floor($scaled);
+
+        return ($scaled - $floor >= 0.5 ? $floor + 1 : $floor) / 100;
     }
 
     /** Vazio é "nada digitado" (≠ 0, que é plano — valor clínico válido). */

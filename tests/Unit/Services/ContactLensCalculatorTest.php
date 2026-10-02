@@ -43,6 +43,13 @@ it('arredondamento igual ao da tela (Math.round): -2.375 vira -2.37', function (
     expect(clc(['se_od_sphere' => -2.25, 'se_od_cylinder' => -0.25])['se_od_result'])->toBe(-2.37);
 });
 
+it('arredondamento exato também no caso-limite do ponto flutuante (tela mostra 0.00, grava 0.00)', function (): void {
+    // -0.01 + 0.03/2 = 0.004999…9 → ×100 = 0.49999999999999994: floor(y + 0.5)
+    // dava 1 (0.01); Math.round dá 0.
+    expect(clc(['se_od_sphere' => -0.01, 'se_od_cylinder' => 0.03])['se_od_result'])->toBe(0.0)
+        ->and(clc(['se_od_sphere' => 0.004999999999999999])['se_od_result'])->toBe(0.0);
+});
+
 it('nada digitado: não grava nada (null)', function (): void {
     expect(clc([]))->toBeNull()
         ->and(clc(['vertex_distance_mm' => 12]))->toBeNull()

@@ -10,7 +10,8 @@ import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
 import MedicalRecordImagingModal from './MedicalRecordImagingModal.vue';
 import MedicalRecordProceduresModal from './MedicalRecordProceduresModal.vue';
 import ContactLensCalculatorModal from './ContactLensCalculatorModal.vue';
-import { contactLensSummary } from './contactLens.js';
+import { contactLensSummary, omitUnchangedContactLens } from './contactLens.js';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
 import { recordColumnOrder } from './recordLayout.js';
@@ -737,6 +738,13 @@ function submit(flowAction = null) {
 
     const url = props.isEdit ? props.urls.update : props.urls.store;
     const method = props.isEdit ? 'put' : 'post';
+    // Edição: cálculo de lentes não alterado não volta ao servidor (valor
+    // legado não pode travar o save do prontuário inteiro). Compara com o
+    // registro ATUAL: depois de um save a tela não remonta (preserveState),
+    // e remover o cálculo salvo precisa chegar ao servidor.
+    form.transform((data) =>
+        props.isEdit ? omitUnchangedContactLens(data, props.medicalrecord?.contact_lens_calculation) : data,
+    );
     form[method](url, {
         preserveScroll: true,
         onSuccess: () => {
@@ -974,7 +982,8 @@ async function confirmPresbyopiaCalc() {
 // Lentes de contato (saiu do Gerenciador de Imagens): o modal devolve
 // entradas + resultados; grava junto com a consulta ao salvar.
 // ──────────────────────────────────────────────────────────────────────────
-const contactLensRows = computed(() => contactLensSummary(form.contact_lens_calculation, i18n.value));
+const { locale } = useLocaleFormat();
+const contactLensRows = computed(() => contactLensSummary(form.contact_lens_calculation, i18n.value, locale.value));
 
 function applyContactLens(calculation) {
     form.contact_lens_calculation = calculation;

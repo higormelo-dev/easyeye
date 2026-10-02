@@ -137,6 +137,11 @@ class MedicalRecordsController extends Controller
         // Achado de segurança (auditoria panel.* IDOR) — mesma checagem de index().
         abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
 
+        // As props levam o resumo clínico das consultas anteriores (refração,
+        // PIO, cálculo de lentes…): leitura de dado sensível. patientId explícito:
+        // com o próprio Patient como recurso, o log não infere o paciente.
+        $this->logAccess($patient, DataAccessPurpose::PatientCare, patientId: (string) $patient->id);
+
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
         $props                  = $this->buildFormProps($patient, null);
         $props['breadcrumbs'][] = [

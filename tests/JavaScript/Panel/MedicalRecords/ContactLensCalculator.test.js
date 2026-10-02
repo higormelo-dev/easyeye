@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
+import { createSSRApp, h } from 'vue';
+import { renderToString } from '@vue/server-renderer';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ContactLensCalculatorModal from '@/Pages/Panel/MedicalRecords/Components/ContactLensCalculatorModal.vue';
@@ -8,8 +10,10 @@ import PreviousRecordsCard from '@/Pages/Panel/MedicalRecords/Components/Previou
 import {
     computeContactLens,
     contactLensCompact,
-    contactLensOutOfRange,
+    contactLensInvalid,
     contactLensSummary,
+    formatVertexMm,
+    omitUnchangedContactLens,
     refractionFromRecord,
     sphericalEquivalent,
     vertexConvert,
@@ -70,12 +74,42 @@ describe('contactLens.js — mesmas fórmulas e arredondamento do servidor', () 
             se_oe_result: null,
         });
 
-        expect(contactLensOutOfRange({ vertex_distance_mm: 0, vertex_od: -6 })).toEqual([]);
-        expect(contactLensOutOfRange({ vertex_distance_mm: 3, vertex_od: -41, se_oe_cylinder: 16 })).toEqual([
+        expect(contactLensInvalid({ vertex_distance_mm: 0, vertex_od: -6 })).toEqual([]);
+        expect(contactLensInvalid({ vertex_distance_mm: 3, vertex_od: -41, se_oe_cylinder: 16 })).toEqual([
             'vertex_distance_mm',
             'vertex_od',
             'se_oe_cylinder',
         ]);
+        // Mais de 2 casas: o servidor recusa (decimal:0,2); o modal avisa antes.
+        expect(contactLensInvalid({ vertex_od: -5.385, se_od_sphere: -2.25, se_od_cylinder: -0.125 })).toEqual([
+            'vertex_od',
+            'se_od_cylinder',
+        ]);
+    });
+
+    it('arredondamento exato igual ao do servidor no caso-limite (-0.01 + 0.03/2 → 0)', () => {
+        expect(sphericalEquivalent(-0.01, 0.03)).toBe(0);
+    });
+
+    it('edição: cálculo não alterado sai do payload; alterado ou removido vai', () => {
+        const legacy = { ...calc, vertex_od: -5.385 };
+        const data = { main_complaint: 'Retorno', contact_lens_calculation: { ...legacy } };
+
+        expect(omitUnchangedContactLens(data, legacy)).toEqual({ main_complaint: 'Retorno' });
+        expect(omitUnchangedContactLens(data, calc)).toBe(data);
+        expect(omitUnchangedContactLens({ contact_lens_calculation: null }, calc)).toEqual({
+            contact_lens_calculation: null,
+        });
+        expect(omitUnchangedContactLens({ contact_lens_calculation: null }, null)).toEqual({});
+    });
+
+    it('distância ao vértice no idioma da tela', () => {
+        expect(formatVertexMm(12.5)).toBe('12,5');
+        expect(formatVertexMm(12.5, 'en')).toBe('12.5');
+        expect(formatVertexMm(12, 'pt-BR')).toBe('12');
+        expect(contactLensSummary({ ...calc, vertex_distance_mm: 12.5 }, {}, 'pt-BR')[0].label).toBe(
+            'Esférico → lente de contato (vértice 12,5 mm)',
+        );
     });
 
     it('refração do prontuário ("+1.50", "-0,75", "0.00") vira número', () => {
@@ -89,7 +123,21 @@ describe('contactLens.js — mesmas fórmulas e arredondamento do servidor', () 
             'dynamic',
         );
 
-        expect(r).toEqual({ od: { sphere: 1.5, cylinder: -0.75 }, oe: { sphere: 0, cylinder: null } });
+        expect(r).toEqual({
+            od: { sphere: 1.5, cylinder: -0.75 },
+            oe: { sphere: 0, cylinder: null },
+            unreadable: [],
+        });
+    });
+
+    it('refração com texto que não é número ("PL") é sinalizada, não vira vazio', () => {
+        const r = refractionFromRecord(
+            { dynamic_spherical_right: 'PL', dynamic_cylindrical_right: '-1.00' },
+            'dynamic',
+        );
+
+        expect(r.unreadable).toEqual(['spherical_right']);
+        expect(r.od).toEqual({ sphere: null, cylinder: -1 });
     });
 
     it('bloco de refração em branco (tudo "0.00"/"0°", como o servidor) não vira plano', () => {
@@ -200,9 +248,18 @@ describe('ContactLensCalculatorModal', () => {
 
         await wrapper.find('[data-copy="dynamic"]').trigger('click');
 
-        expect(wrapper.find('[data-copy-empty]').exists()).toBe(true);
+        expect(wrapper.find('[data-copy-notice]').text()).toBe('Essa refração ainda não foi preenchida no prontuário.');
         expect(wrapper.find('#clc-vertex-od').element.value).toBe('-6');
         expect(wrapper.find('[data-result="vertex-od"]').text()).toBe('-5.60');
+    });
+
+    it('refração com valor que não é número: avisa e não copia', async () => {
+        const wrapper = mountModal({ record: { dynamic_spherical_right: 'PL', dynamic_cylindrical_right: '-1.00' } });
+
+        await wrapper.find('[data-copy="dynamic"]').trigger('click');
+
+        expect(wrapper.find('[data-copy-notice]').text()).toContain('não é número');
+        expect(wrapper.find('#clc-se-od-cyl').element.value).toBe('');
     });
 
     it('fora da faixa aceita pelo servidor: campo destacado e "Usar" bloqueado', async () => {
@@ -212,8 +269,54 @@ describe('ContactLensCalculatorModal', () => {
 
         expect(wrapper.find('#clc-vertex-od').classes()).toContain('is-invalid');
         expect(wrapper.find('#clc-vertex-od').attributes('aria-invalid')).toBe('true');
-        expect(wrapper.find('[data-out-of-range]').exists()).toBe(true);
+        expect(wrapper.find('[data-invalid]').exists()).toBe(true);
         expect(wrapper.find('[data-action="apply"]').attributes('disabled')).toBeDefined();
+    });
+
+    it('mais de 2 casas decimais: campo destacado e "Usar" bloqueado', async () => {
+        const wrapper = mountModal();
+
+        await wrapper.find('#clc-vertex-od').setValue('-5.385');
+
+        expect(wrapper.find('#clc-vertex-od').classes()).toContain('is-invalid');
+        expect(wrapper.find('[data-action="apply"]').attributes('disabled')).toBeDefined();
+    });
+
+    it('texto que o campo numérico não reconhece não vira "vazio": destaca e bloqueia "Usar"', async () => {
+        const wrapper = mountModal();
+        await wrapper.find('#clc-se-od-sph').setValue('-2');
+        // Para "-1,5-" num type=number o navegador entrega '' com validity.badInput.
+        // Busca o campo de novo depois do evento: o stub de Teleport recria o elemento.
+        const typeCylinder = async (value, badInput) => {
+            const field = wrapper.find('#clc-se-od-cyl');
+            Object.defineProperty(field.element, 'validity', { configurable: true, value: { badInput } });
+            await field.setValue(value);
+            return wrapper.find('#clc-se-od-cyl');
+        };
+
+        let cyl = await typeCylinder('', true);
+
+        expect(cyl.classes()).toContain('is-invalid');
+        expect(cyl.attributes('aria-invalid')).toBe('true');
+        expect(wrapper.find('[data-invalid]').exists()).toBe(true);
+        expect(wrapper.find('[data-action="apply"]').attributes('disabled')).toBeDefined();
+
+        // Nova digitação válida limpa a marca e o SE volta a considerar o cilindro.
+        cyl = await typeCylinder('-1', false);
+
+        expect(cyl.classes()).not.toContain('is-invalid');
+        expect(wrapper.find('[data-action="apply"]').attributes('disabled')).toBeUndefined();
+        expect(wrapper.find('[data-result="se-od"]').text()).toBe('-2.50');
+    });
+
+    it('acessibilidade: resultado anunciado com olho e tipo; "copiar" é grupo rotulado', () => {
+        const wrapper = mountModal();
+        const box = wrapper.find('[data-result="vertex-od"]').element.parentElement;
+
+        expect(box.getAttribute('aria-live')).toBe('polite');
+        expect(box.getAttribute('aria-atomic')).toBe('true');
+        expect(wrapper.find('[role="group"]').attributes('aria-labelledby')).toBe('clc-copy-label');
+        expect(wrapper.find('#clc-copy-label').text()).toBe('Copiar da refração:');
     });
 
     it('reabre com o cálculo gravado e permite remover do prontuário', async () => {
@@ -269,6 +372,31 @@ describe('ContactLensCalculatorModal', () => {
 
         wrapper.unmount();
         opener.remove();
+    });
+
+    it('Esc dado dentro de outro diálogo aberto por cima não fecha a calculadora', async () => {
+        const wrapper = mount(ContactLensCalculatorModal, {
+            props: { open: true, t: {} },
+            global: { stubs: { teleport: true } },
+            attachTo: document.body,
+        });
+        await flushPromises();
+        const other = document.createElement('div');
+        other.setAttribute('role', 'dialog');
+        const field = document.createElement('input');
+        other.appendChild(field);
+        document.body.appendChild(other);
+
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(wrapper.emitted('close')).toBeUndefined();
+
+        wrapper
+            .find('#clc-vertex-od')
+            .element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(wrapper.emitted('close')).toHaveLength(1);
+
+        wrapper.unmount();
+        other.remove();
     });
 
     it('textos vêm das traduções (inglês: OS para olho esquerdo)', () => {
@@ -330,6 +458,35 @@ describe('Consulta posterior — visualização do prontuário', () => {
         expect(lines[1].text()).toContain('OD -2.50');
         expect(second.find('[data-contact-lens]').exists()).toBe(false);
     });
+
+    it('painel em inglês: siglas e olhos vêm das traduções', () => {
+        const wrapper = mount(PreviousRecordsCard, {
+            props: {
+                t: { od: 'OD', oe: 'OS', contact_lens_short: 'CL', contact_lens_se_short: 'SE' },
+                records: [{ id: 'a', created_at_formatted: '01/09/2026', summary: { contact_lens: calc } }],
+            },
+        });
+        const lines = wrapper.findAll('[data-contact-lens]');
+
+        expect(lines.map((line) => line.find('.prev-records__tag').text())).toEqual(['CL', 'SE']);
+        expect(lines[0].text()).toContain('OD -5.60 | OS +6.47');
+    });
+});
+
+describe('SSR (o Inertia renderiza o prontuário no servidor)', () => {
+    it.each([false, true])('o modal renderiza sem document e sem erro (open=%s)', async (open) => {
+        const errors = [];
+        const app = createSSRApp({ render: () => h(ContactLensCalculatorModal, { open, t: {} }) });
+        // O watcher é async: no servidor o erro não derruba o render, vai para o errorHandler (log).
+        app.config.errorHandler = (err) => errors.push(err);
+
+        // No servidor não existe document; o watcher `immediate` roda lá.
+        vi.stubGlobal('document', undefined);
+        await expect(renderToString(app, {})).resolves.toBeTypeOf('string');
+        await flushPromises();
+
+        expect(errors).toEqual([]);
+    });
 });
 
 describe('Local de acesso: Prontuário (não mais o Gerenciador de Imagens)', () => {
@@ -345,6 +502,8 @@ describe('Local de acesso: Prontuário (não mais o Gerenciador de Imagens)', ()
             /<ContactLensCalculatorModal[^>]*:readonly="isLocked"[^>]*@apply="applyContactLens"[^>]*@remove="removeContactLens"/,
         );
         expect(form).toMatch(/v-if="contactLensRows\.length"[^>]*data-contact-lens-summary/);
+        // Edição não reenvia cálculo inalterado (valor legado não trava o save).
+        expect(form).toMatch(/props\.isEdit \? omitUnchangedContactLens\(data, props\.medicalrecord\?\.contact_lens_calculation\)/);
     });
 
     it('Gerenciador de Imagens não tem mais a calculadora', () => {

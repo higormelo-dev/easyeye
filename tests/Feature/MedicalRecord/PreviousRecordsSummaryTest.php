@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Enums\ClientRule;
-use App\Models\{Covenant, Doctor, Entity, MedicalRecord, Patient, People, User, VisualAcuityType};
+use App\Enums\{ClientRule, DataAccessPurpose};
+use App\Models\{Covenant, DataAccessLog, Doctor, Entity, MedicalRecord, Patient, People, User, VisualAcuityType};
 use App\Services\ContactLensCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -118,6 +118,21 @@ it('consulta anterior com cálculo de lentes de contato: o painel recebe o resul
         ->and($summary['contact_lens']['vertex_oe_result'])->toEqual(6.47)
         ->and($summary['contact_lens']['se_od_result'])->toEqual(-2.5)
         ->and($summary['contact_lens']['se_oe_result'])->toBeNull();
+});
+
+it('abrir o novo prontuário registra o acesso (o resumo das consultas anteriores é dado clínico)', function () {
+    MedicalRecord::create([
+        'patient_id'     => $this->patient->id,
+        'doctor_id'      => $this->doctor->id,
+        'main_complaint' => 'Consulta anterior',
+    ]);
+
+    $this->get(route('panel.patients.medicalrecords.create', $this->patient))->assertOk();
+
+    expect(DataAccessLog::query()
+        ->where('patient_id', $this->patient->id)
+        ->where('purpose', DataAccessPurpose::PatientCare->value)
+        ->count())->toBe(1);
 });
 
 it('na edição, o prontuário ATUAL não aparece na lista de anteriores', function () {

@@ -110,6 +110,69 @@ it('valores fora da faixa são recusados (422)', function () {
     ]);
 });
 
+it('mais de 2 casas decimais é recusado no cadastro e na edição (422)', function () {
+    ($this->asDoctor)()->postJson(route('panel.patients.medicalrecords.store', $this->patient), [
+        'doctor_id'                => $this->doctor->id,
+        'main_complaint'           => 'Consulta',
+        'contact_lens_calculation' => ['vertex_od' => -5.385],
+    ])->assertStatus(422)->assertJsonValidationErrors(['contact_lens_calculation.vertex_od']);
+
+    $record = MedicalRecord::create([
+        'entity_id'      => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
+        'main_complaint' => 'Consulta',
+    ]);
+
+    ($this->asDoctor)()->putJson(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
+        'contact_lens_calculation' => ['se_od_sphere' => -2, 'se_od_cylinder' => -0.125],
+    ])->assertStatus(422)->assertJsonValidationErrors(['contact_lens_calculation.se_od_cylinder']);
+});
+
+it('"Remover do prontuário": salvar com o cálculo nulo apaga o que estava gravado', function () {
+    $record = MedicalRecord::create([
+        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
+        'main_complaint'           => 'Consulta',
+        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate($this->inputs),
+    ]);
+
+    ($this->asDoctor)()->put(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
+        'contact_lens_calculation' => null,
+    ])->assertSessionHasNoErrors();
+
+    expect($record->fresh()->contact_lens_calculation)->toBeNull();
+});
+
+it('edição sem a chave do cálculo mantém o gravado, inclusive valor anterior ao limite de 2 casas', function () {
+    $legacy = [...app(ContactLensCalculator::class)->calculate($this->inputs), 'vertex_od' => -5.385];
+    $record = MedicalRecord::create([
+        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
+        'main_complaint'           => 'Consulta',
+        'contact_lens_calculation' => $legacy,
+    ]);
+
+    ($this->asDoctor)()->put(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
+        'main_complaint' => 'Retorno',
+    ])->assertSessionHasNoErrors();
+
+    expect($record->fresh()->main_complaint)->toBe('Retorno')
+        ->and($record->fresh()->contact_lens_calculation['vertex_od'])->toEqual(-5.385);
+});
+
+it('PDF: distância ao vértice no idioma do documento', function () {
+    $record = MedicalRecord::create([
+        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
+        'main_complaint'           => 'Consulta',
+        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate([...$this->inputs, 'vertex_distance_mm' => 12.5]),
+    ]);
+
+    app()->setLocale('pt_BR');
+    expect(view('pdf.medical_record', ['record' => $record->fresh(), 'setting' => null])->render())
+        ->toContain('vértice 12,5 mm');
+
+    app()->setLocale('en');
+    expect(view('pdf.medical_record', ['record' => $record->fresh(), 'setting' => null])->render())
+        ->toContain('vertex 12.5 mm');
+});
+
 it('prontuário assinado: o cálculo não muda', function () {
     $record = MedicalRecord::create([
         'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,

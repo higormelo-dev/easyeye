@@ -3,7 +3,7 @@ import { reactive, computed, watch, ref, nextTick, onBeforeUnmount } from 'vue';
 import {
     DEFAULT_VERTEX_MM,
     computeContactLens,
-    contactLensOutOfRange,
+    contactLensInvalid,
     vertexConvert,
     sphericalEquivalent,
     refractionFromRecord,
@@ -42,13 +42,21 @@ function tt(key, fallback = '') {
 }
 
 const dialogRef = ref(null);
-// Refração que o médico tentou copiar mas está em branco no prontuário.
-const copyEmpty = ref(null);
+// Aviso do "copiar da refração": 'empty' (bloco em branco) ou 'unreadable'.
+const copyNotice = ref(null);
 let openerEl = null;
 
-// Esc fecha mesmo com o foco fora do diálogo (listener no document, não no div).
+// Esc fecha mesmo com o foco fora do diálogo (listener no document, não no
+// div) — mas Esc dado dentro de outro diálogo aberto por cima (assistente de
+// IA, aviso de sessão…) é daquele diálogo, não da calculadora.
 function onKeydown(event) {
     if (event.key !== 'Escape') return;
+    const target = event.target;
+    const inOtherDialog =
+        target instanceof Element &&
+        !dialogRef.value?.contains(target) &&
+        target.closest('[role="dialog"], [aria-modal="true"], .modal, .offcanvas');
+    if (inOtherDialog) return;
     event.preventDefault();
     close();
 }
@@ -65,11 +73,24 @@ const inputs = reactive({
     se_oe_cylinder: null,
 });
 
+// Texto que o campo numérico não reconhece (ex.: "-1.5-", vírgula onde o
+// navegador não aceita) chega ao v-model como '' — sem isto, viraria "vazio"
+// e o SE ignoraria o cilindro sem aviso. Só nova digitação limpa a marca:
+// se o navegador apagar o texto ao sair do campo, o aviso continua.
+const unreadable = reactive(new Set());
+
+function trackUnreadable(key, event) {
+    if (event.target?.validity?.badInput) unreadable.add(key);
+    else unreadable.delete(key);
+}
+
 // Abre com o que está vinculado à consulta (ou em branco) e leva o foco
 // para dentro do diálogo; ao fechar, devolve o foco a quem abriu.
 watch(
     () => props.open,
     async (open) => {
+        // SSR: o Vue roda watcher `immediate` no servidor, onde não há document.
+        if (typeof document === 'undefined') return;
         document.removeEventListener('keydown', onKeydown);
         if (!open) {
             openerEl?.focus?.();
@@ -78,7 +99,8 @@ watch(
         }
         openerEl = document.activeElement;
         document.addEventListener('keydown', onKeydown);
-        copyEmpty.value = null;
+        copyNotice.value = null;
+        unreadable.clear();
         const saved = props.modelValue ?? {};
         Object.assign(inputs, {
             vertex_distance_mm: saved.vertex_distance_mm ?? DEFAULT_VERTEX_MM,
@@ -106,23 +128,41 @@ const seResultOd = result('se_od_result', () => sphericalEquivalent(inputs.se_od
 const seResultOe = result('se_oe_result', () => sphericalEquivalent(inputs.se_oe_sphere, inputs.se_oe_cylinder));
 
 const calculation = computed(() => computeContactLens(inputs));
-const outOfRange = computed(() => new Set(contactLensOutOfRange(inputs)));
-const canApply = computed(() => Boolean(calculation.value) && outOfRange.value.size === 0);
+const invalidFields = computed(() => new Set([...contactLensInvalid(inputs), ...unreadable]));
+const canApply = computed(() => Boolean(calculation.value) && invalidFields.value.size === 0);
 
-// Campo fora da faixa: destacado e anunciado (aria-invalid).
-const invalid = (key) => outOfRange.value.has(key);
+// Campo inválido (não reconhecido, fora da faixa ou com mais de 2 casas):
+// destacado e anunciado (aria-invalid).
+const invalid = (key) => invalidFields.value.has(key);
 
 // Mesma exibição da calculadora antiga (2 casas; vazio = "—").
 const show = (v) => (v !== null ? v.toFixed(2) : '—');
 
+const copyNoticeText = computed(() => {
+    if (copyNotice.value === 'empty') {
+        return tt('contact_lens_copy_empty', 'Essa refração ainda não foi preenchida no prontuário.');
+    }
+    if (copyNotice.value === 'unreadable') {
+        return tt(
+            'contact_lens_copy_unreadable',
+            'Essa refração tem valor que não é número (ex.: "PL"): digite os valores.',
+        );
+    }
+    return '';
+});
+
 /**
  * Copia esférico/cilindro da refração do prontuário (sem redigitar). Bloco
- * em branco no prontuário não é copiado (não vira "plano" por engano).
+ * em branco no prontuário não é copiado (não vira "plano" por engano), nem
+ * bloco com valor que não é número (ex.: "PL") — o médico digita.
  */
 function copyFrom(prefix) {
     const r = refractionFromRecord(props.record, prefix);
-    copyEmpty.value = r ? null : prefix;
-    if (!r) return;
+    copyNotice.value = !r ? 'empty' : r.unreadable.length ? 'unreadable' : null;
+    if (copyNotice.value) return;
+    ['vertex_od', 'vertex_oe', 'se_od_sphere', 'se_od_cylinder', 'se_oe_sphere', 'se_oe_cylinder'].forEach((key) =>
+        unreadable.delete(key),
+    );
     Object.assign(inputs, {
         vertex_od: r.od.sphere,
         vertex_oe: r.oe.sphere,
@@ -192,9 +232,15 @@ function remove() {
                             {{ tt('contact_lens_locked', 'Prontuário assinado: cálculo somente para consulta.') }}
                         </div>
 
-                        <!-- Copiar da refração já digitada no prontuário -->
-                        <div v-else class="d-flex align-items-center gap-2 flex-wrap mb-3">
-                            <span class="small text-muted">{{
+                        <!-- Copiar da refração já digitada no prontuário (grupo rotulado:
+                             o leitor de tela anuncia "Copiar da refração" com os botões). -->
+                        <div
+                            v-else
+                            class="d-flex align-items-center gap-2 flex-wrap mb-3"
+                            role="group"
+                            aria-labelledby="clc-copy-label"
+                        >
+                            <span id="clc-copy-label" class="small text-muted">{{
                                 tt('contact_lens_copy_from', 'Copiar da refração:')
                             }}</span>
                             <button
@@ -213,14 +259,10 @@ function remove() {
                             >
                                 {{ tt('contact_lens_copy_static', 'Estática') }}
                             </button>
-                            <span v-if="copyEmpty" class="small text-muted fst-italic" role="status" data-copy-empty>
-                                {{
-                                    tt(
-                                        'contact_lens_copy_empty',
-                                        'Essa refração ainda não foi preenchida no prontuário.',
-                                    )
-                                }}
-                            </span>
+                            <!-- Sempre no DOM: região viva criada já com texto nem sempre é anunciada. -->
+                            <span class="small text-muted fst-italic" role="status" data-copy-notice>{{
+                                copyNoticeText
+                            }}</span>
                         </div>
 
                         <fieldset :disabled="readonly">
@@ -251,6 +293,7 @@ function remove() {
                                         class="form-control form-control-sm"
                                         :class="{ 'is-invalid': invalid('vertex_distance_mm') }"
                                         :aria-invalid="invalid('vertex_distance_mm')"
+                                        @input="trackUnreadable('vertex_distance_mm', $event)"
                                     />
                                 </div>
                                 <div class="col-6 col-sm-4">
@@ -268,6 +311,7 @@ function remove() {
                                         :class="{ 'is-invalid': invalid('vertex_od') }"
                                         :aria-invalid="invalid('vertex_od')"
                                         placeholder="-6.00"
+                                        @input="trackUnreadable('vertex_od', $event)"
                                     />
                                 </div>
                                 <div class="col-6 col-sm-4">
@@ -285,12 +329,13 @@ function remove() {
                                         :class="{ 'is-invalid': invalid('vertex_oe') }"
                                         :aria-invalid="invalid('vertex_oe')"
                                         placeholder="-6.00"
+                                        @input="trackUnreadable('vertex_oe', $event)"
                                     />
                                 </div>
                             </div>
-                            <div class="row g-2 mb-4" aria-live="polite">
+                            <div class="row g-2 mb-4">
                                 <div class="col-6">
-                                    <div class="border rounded p-2 text-center">
+                                    <div class="border rounded p-2 text-center" aria-live="polite" aria-atomic="true">
                                         <div class="text-muted small">
                                             {{ tt('od', 'OD') }} → {{ tt('contact_lens_result', 'Lente de contato') }}
                                         </div>
@@ -300,7 +345,7 @@ function remove() {
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <div class="border rounded p-2 text-center">
+                                    <div class="border rounded p-2 text-center" aria-live="polite" aria-atomic="true">
                                         <div class="text-muted small">
                                             {{ tt('oe', 'OE') }} → {{ tt('contact_lens_result', 'Lente de contato') }}
                                         </div>
@@ -337,6 +382,7 @@ function remove() {
                                                 :class="{ 'is-invalid': invalid('se_od_sphere') }"
                                                 :aria-invalid="invalid('se_od_sphere')"
                                                 :placeholder="tt('contact_lens_sphere', 'Esférico')"
+                                                @input="trackUnreadable('se_od_sphere', $event)"
                                             />
                                         </div>
                                         <div class="col-6">
@@ -355,6 +401,7 @@ function remove() {
                                                 :class="{ 'is-invalid': invalid('se_od_cylinder') }"
                                                 :aria-invalid="invalid('se_od_cylinder')"
                                                 :placeholder="tt('contact_lens_cylinder', 'Cilindro')"
+                                                @input="trackUnreadable('se_od_cylinder', $event)"
                                             />
                                         </div>
                                     </div>
@@ -377,6 +424,7 @@ function remove() {
                                                 :class="{ 'is-invalid': invalid('se_oe_sphere') }"
                                                 :aria-invalid="invalid('se_oe_sphere')"
                                                 :placeholder="tt('contact_lens_sphere', 'Esférico')"
+                                                @input="trackUnreadable('se_oe_sphere', $event)"
                                             />
                                         </div>
                                         <div class="col-6">
@@ -395,14 +443,15 @@ function remove() {
                                                 :class="{ 'is-invalid': invalid('se_oe_cylinder') }"
                                                 :aria-invalid="invalid('se_oe_cylinder')"
                                                 :placeholder="tt('contact_lens_cylinder', 'Cilindro')"
+                                                @input="trackUnreadable('se_oe_cylinder', $event)"
                                             />
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="row g-2" aria-live="polite">
+                            <div class="row g-2">
                                 <div class="col-6">
-                                    <div class="border rounded p-2 text-center">
+                                    <div class="border rounded p-2 text-center" aria-live="polite" aria-atomic="true">
                                         <div class="text-muted small">
                                             {{ tt('od', 'OD') }} → {{ tt('contact_lens_se_short', 'SE') }}
                                         </div>
@@ -410,7 +459,7 @@ function remove() {
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <div class="border rounded p-2 text-center">
+                                    <div class="border rounded p-2 text-center" aria-live="polite" aria-atomic="true">
                                         <div class="text-muted small">
                                             {{ tt('oe', 'OE') }} → {{ tt('contact_lens_se_short', 'SE') }}
                                         </div>
@@ -420,12 +469,12 @@ function remove() {
                             </div>
                         </fieldset>
 
-                        <div v-if="outOfRange.size" class="text-danger small mt-3" role="alert" data-out-of-range>
+                        <div v-if="invalidFields.size" class="text-danger small mt-3" role="alert" data-invalid>
                             <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>
                             {{
                                 tt(
-                                    'contact_lens_out_of_range',
-                                    'Valor fora da faixa aceita (esférico ±40 D, cilindro ±15 D, vértice 5–25 mm) — confira os campos destacados.',
+                                    'contact_lens_invalid',
+                                    'Confira os campos destacados: valor não reconhecido, fora da faixa aceita (esférico ±40 D, cilindro ±15 D, vértice 5–25 mm) ou com mais de 2 casas decimais.',
                                 )
                             }}
                         </div>

@@ -376,7 +376,8 @@
     $clc = is_array($record->contact_lens_calculation) ? $record->contact_lens_calculation : null;
     // Dioptria com sinal e 2 casas (mesma notação da calculadora na tela).
     $diopter = static fn ($v) => $v === null ? '—' : (($v > 0 ? '+' : '') . number_format((float) $v, 2, '.', ''));
-    $vertexMm = rtrim(rtrim(number_format((float) ($clc['vertex_distance_mm'] ?? 12), 1, '.', ''), '0'), '.');
+    // Distância ao vértice no idioma do documento, sem zeros à toa ("12", "12,5").
+    $vertexMm = \Illuminate\Support\Number::format((float) ($clc['vertex_distance_mm'] ?? 12), maxPrecision: 2, locale: app()->getLocale());
     // Vértice: esférico digitado → lente de contato (deixa claro que só o esférico foi convertido).
     $vertexEye = static fn ($in, $out) => $out === null ? '—' : $diopter($in) . ' → ' . $diopter($out);
 @endphp
