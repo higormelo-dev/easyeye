@@ -12,6 +12,7 @@ import MedicalRecordProceduresModal from './MedicalRecordProceduresModal.vue';
 import ContactLensCalculatorModal from './ContactLensCalculatorModal.vue';
 import { contactLensSummary, omitUnchangedContactLens } from './contactLens.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard.js';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
 import { recordColumnOrder } from './recordLayout.js';
@@ -481,9 +482,10 @@ function applyAiSuggestion({ field, value }) {
     form[target] = current ? `${current}\n${value}` : value;
 }
 
-// Após aprovar um laudo de IA, recarrega o prontuário para puxar a nova documentação.
+// Após aprovar um laudo de IA, recarrega o prontuário para puxar a nova
+// documentação (recarga parcial: o que está sendo digitado continua no form).
 function onAiApproved() {
-    router.reload({ only: ['medicalrecord'], preserveScroll: true });
+    bypass(() => router.reload({ only: ['medicalrecord'], preserveScroll: true }));
 }
 const docForm = reactive({
     report_setting_content_id: '',
@@ -580,10 +582,15 @@ const selectedCids = ref(Array.isArray(r?.diagnosis_cids) ? [...r.diagnosis_cids
 onMounted(async () => {
     await fetchValidationRules();
 
-    // schedule_id via querystring
+    // schedule_id via querystring — vínculo com a Agenda, não edição do
+    // médico: entra também no "estado salvo" (não dispara o aviso de saída).
     const params = new URLSearchParams(window.location.search);
     const sid = params.get('schedule_id');
-    if (sid) form.schedule_id = sid;
+    if (sid) {
+        form.defaults('schedule_id', sid);
+        savedSnapshot.schedule_id = sid;
+        form.schedule_id = sid;
+    }
 
     runPostSaveAction();
 
@@ -713,13 +720,58 @@ function validateBeforeSubmit() {
     return true;
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Alterações não salvas: sair por link/menu, Voltar do navegador ou
+// recarregar/fechar a aba pergunta antes de descartar. Conta o form inteiro
+// (inclusive o cálculo de lentes de contato) e os rascunhos fora do form que
+// continuam ao fechar o modal: evolução não registrada, receita e solicitação
+// de procedimentos alteradas desde a última emissão. Salvar/Finalizar/
+// Dilatar/Exame passam direto (bypass).
+// ──────────────────────────────────────────────────────────────────────────
+
+// Último conteúdo emitido (receita/solicitação ficam no modal depois de
+// emitidas, pra reemitir) — só o que mudou depois disso é rascunho.
+const issuedDrafts = reactive({ medication: '', procedure: '' });
+const changedSince = (text, issued) => {
+    const value = (text || '').trim();
+    return value !== '' && value !== issued;
+};
+const hasPendingDrafts = () =>
+    evolutionText.value.trim() !== '' ||
+    changedSince(medicineLists.value, issuedDrafts.medication) ||
+    changedSince(procedureLists.value, issuedDrafts.procedure);
+
+// O que o servidor tem: dados enviados no último save bem-sucedido (ou os do
+// carregamento). Intenção de fluxo (flow_action/post_save_action) nunca é dado.
+const snapshotOf = (data) => JSON.parse(JSON.stringify({ ...data, flow_action: null, post_save_action: null }));
+let savedSnapshot = snapshotOf(form.data());
+
+function markSaved(snapshot) {
+    savedSnapshot = snapshot;
+    // Chamar defaults() no onSuccess impede o useForm de marcar como salvo o
+    // form ATUAL — o que foi digitado durante o envio continua pendente.
+    form.defaults(snapshot);
+    form.isDirty = JSON.stringify(snapshotOf(form.data())) !== JSON.stringify(snapshot);
+}
+
+// Fluxos que levam pra Agenda (saem do prontuário) — ver redirectAfterSave.
+const LEAVING_FLOW_ACTIONS = ['finish', 'dilate', 'exam'];
+
+const { bypass } = useUnsavedChangesGuard({
+    isDirty: () => form.isDirty || hasPendingDrafts(),
+    message: () =>
+        tt('unsaved_leave_confirm', 'Há alterações neste prontuário que ainda não foram salvas. Sair e descartá-las?'),
+});
+
 /**
  * Salva o prontuário. `flowAction` (opcional) diz o que acontece com o
  * paciente em seguida — save (mantém a consulta aberta, volta pro edit) |
  * finish (Atendido) | dilate (Dilatando) | exam (Em exame); os três últimos
  * voltam pra Agenda. Chamado pelo @submit do form (evento) ou pelos botões.
+ * `afterSave` (opcional): o que fazer depois de salvo, no lugar da pergunta
+ * de destino — usado pelo "Continuar atendimento" (saveAndLeave).
  */
-function submit(flowAction = null) {
+function submit(flowAction = null, { afterSave = null } = {}) {
     // Sem request não há onFinish: desarma a intenção da barra pra um
     // "Salvar" posterior não emitir um documento que o médico não pediu.
     if (isLocked.value || !validateBeforeSubmit()) {
@@ -728,13 +780,35 @@ function submit(flowAction = null) {
     }
 
     const normalizedFlowAction = typeof flowAction === 'string' ? flowAction : null;
+
+    // Finalizar/Dilatar/Exame (vão pra Agenda) e "Continuar atendimento"
+    // saem do prontuário: rascunho fora do form (evolução, receita,
+    // solicitação — outros registros, com botão próprio) se perderia. O
+    // "Salvar" simples fica na tela e mantém os rascunhos.
+    const leavesScreen = Boolean(afterSave) || LEAVING_FLOW_ACTIONS.includes(normalizedFlowAction);
+    if (
+        leavesScreen &&
+        hasPendingDrafts() &&
+        !window.confirm(
+            tt(
+                'drafts_leave_confirm',
+                'Há texto ainda não registrado (evolução, receita ou solicitação de procedimentos) — ele será descartado ao sair do prontuário. Continuar?',
+            ),
+        )
+    ) {
+        form.post_save_action = null;
+        return;
+    }
+
     form.flow_action = normalizedFlowAction;
+    const sent = snapshotOf(form.data());
 
     // Só o clique isolado em "Salvar" (edit, sem flow_action nem ação da
     // barra pendente) pergunta o destino — Dilatar/Exame/Finalizar já
     // decidem sozinhos (Agenda), e o save-then-open-modal da barra de
     // documentos (withRecord) não deve interromper o médico com um prompt.
-    const shouldPromptDestination = props.isEdit && normalizedFlowAction === null && !form.post_save_action;
+    const shouldPromptDestination =
+        !afterSave && props.isEdit && normalizedFlowAction === null && !form.post_save_action;
 
     const url = props.isEdit ? props.urls.update : props.urls.store;
     const method = props.isEdit ? 'put' : 'post';
@@ -745,17 +819,36 @@ function submit(flowAction = null) {
     form.transform((data) =>
         props.isEdit ? omitUnchangedContactLens(data, props.medicalrecord?.contact_lens_calculation) : data,
     );
-    form[method](url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            if (shouldPromptDestination) promptSaveDestination();
-        },
-        onError: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
-        onFinish: () => {
-            form.flow_action = null;
-            form.post_save_action = null;
-        },
-    });
+    bypass(() =>
+        form[method](url, {
+            preserveScroll: true,
+            onSuccess: () => {
+                markSaved(sent);
+                if (afterSave) afterSave();
+                else if (shouldPromptDestination) promptSaveDestination();
+            },
+            onError: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+            onFinish: () => {
+                form.flow_action = null;
+                form.post_save_action = null;
+            },
+        }),
+    );
+}
+
+/**
+ * "Continuar atendimento" (ScheduleFlowGuard): sai mantendo a consulta em
+ * andamento, mas grava antes o que foi digitado — como Finalizar/Dilatar/
+ * Exame. Sem alteração no form, só sai (o aviso ainda cobre a evolução não
+ * registrada).
+ */
+function saveAndLeave(url) {
+    if (!form.isDirty) {
+        router.visit(url);
+        return;
+    }
+
+    submit('save', { afterSave: () => bypass(() => router.visit(url)) });
 }
 
 /**
@@ -854,7 +947,7 @@ function runPostSaveAction() {
 
 // Guard de saída ("←") reaproveita o mesmo submit — Finalizar/Dilatar/Exame
 // salvam o que foi digitado antes de transitar (nunca perde texto).
-defineExpose({ submitFlow: (action) => submit(action) });
+defineExpose({ submitFlow: (action) => submit(action), saveAndLeave });
 
 // ──────────────────────────────────────────────────────────────────────────
 // Lens auto-format
@@ -863,6 +956,9 @@ async function formatLens(kind, field) {
     if (!props.urls.lens_format) return;
     const value = form[field];
     if (value === '' || value == null) return;
+    // Só formata o que o médico digitou: passar pelo campo com o valor salvo
+    // (ex.: eixo "90" → "90º") não pode virar "alteração não salva".
+    if (value === savedSnapshot[field]) return;
     try {
         const res = await fetch(props.urls.lens_format, {
             method: 'POST',
@@ -1061,6 +1157,7 @@ async function issueQuickAction(action, payload = {}, { openPdf = true, preview 
         documentations.value.unshift(doc);
         if (preview && doc.pdf_url) openPdfPreview(doc.pdf_url, doc.title || '');
         else if (openPdf && doc.pdf_url) window.open(doc.pdf_url, '_blank', 'noopener');
+        return doc;
     } catch (e) {
         console.error('Quick action error:', e);
     } finally {
@@ -1410,11 +1507,14 @@ function clearMedicines() {
     cancelSelection();
 }
 
-function submitMedicationPrescription() {
+async function submitMedicationPrescription() {
     const content = (medicineLists.value || '').trim();
     if (!content) return;
     showMedicationModal.value = false;
-    issueQuickAction('medication-prescription', { content }, { preview: true });
+    // Emitida: deixa de ser rascunho (o texto fica no modal pra reemitir).
+    if (await issueQuickAction('medication-prescription', { content }, { preview: true })) {
+        issuedDrafts.medication = content;
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -1551,11 +1651,13 @@ function clearProcedureSolicitation() {
     indSearchOpen.value = false;
 }
 
-function submitProcedureSolicitation() {
+async function submitProcedureSolicitation() {
     const content = (procedureLists.value || '').trim();
     if (!content) return;
     showProcedureModal.value = false;
-    issueQuickAction('procedure-request', { content }, { preview: true });
+    if (await issueQuickAction('procedure-request', { content }, { preview: true })) {
+        issuedDrafts.procedure = content;
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────

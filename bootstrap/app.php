@@ -183,6 +183,18 @@ return Application::configure(basePath: dirname(__DIR__))
             // Inertia requests: redireciona de volta com flash de erro em vez de
             // retornar HTML puro, que seria exibido como modal overlay no frontend.
             if ($request->hasHeader('X-Inertia')) {
+                // Sessão expirada (CSRF → 419) num save: o redirect seria seguido
+                // pelo XHR até o login e trocaria a página, descartando o que foi
+                // digitado (ex.: prontuário). Resposta não-Inertia aparece no
+                // diálogo do Inertia e a tela continua montada com os dados.
+                if ($e->getStatusCode() === 419) {
+                    return response(
+                        '<p style="font-family: system-ui, sans-serif; padding: 1.5rem; font-size: 1rem;">'
+                        . e(__('auth.session_expired_unsaved')) . '</p>',
+                        419,
+                    );
+                }
+
                 $message = $e->getMessage() ?: __('http-statuses.' . $e->getStatusCode(), [], null) ?? 'Error';
 
                 return redirect()->back()->with('error', $message);

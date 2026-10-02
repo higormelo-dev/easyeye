@@ -112,6 +112,7 @@ function closeView() {
             :exit-url="urls.list"
             :finish-url="urls.schedules"
             :submit-flow="(action) => recordForm?.submitFlow(action)"
+            :leave="(url) => recordForm?.saveAndLeave(url)"
         />
     </AppLayout>
 </template>

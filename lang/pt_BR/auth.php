@@ -33,6 +33,7 @@ return [
     'session_expiring_html'    => 'Sua sessão irá expirar em <strong id="swal-session-countdown">2:00</strong> por inatividade.',
     'session_stay'             => 'Continuar conectado',
     'session_logout'           => 'Sair agora',
+    'session_expired_unsaved'  => 'Sua sessão expirou e nada foi salvo. O que você digitou continua na tela: entre novamente em outra aba e tente de novo.',
 
     'register' => [
         /* meta */

@@ -11,7 +11,7 @@ import PricesToolbar from './PricesToolbar.vue';
 import PricesSaveBar from './PricesSaveBar.vue';
 import PriceAdjustModal from './PriceAdjustModal.vue';
 import PriceCopyModal from './PriceCopyModal.vue';
-import { useUnsavedChangesGuard } from './useUnsavedChangesGuard.js';
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
 import { useTrans } from '@/composables/useTrans.js';
 import { formatMoneyInput } from '@/utils/money.js';

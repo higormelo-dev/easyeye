@@ -4,6 +4,11 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from 'ziggy-js';
 import mask from './directives/mask.js';
+import { installPopstateGuard } from './Support/popstateGuard.js';
+
+// Antes do createInertiaApp: o listener do Voltar/Avançar precisa rodar antes
+// do Inertia (aviso de alterações não salvas — ver Support/popstateGuard.js).
+installPopstateGuard();
 
 createInertiaApp({
     resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),

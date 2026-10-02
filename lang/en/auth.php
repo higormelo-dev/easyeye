@@ -35,6 +35,7 @@ return [
     'session_expiring_html'    => 'Your session will expire in <strong id="swal-session-countdown">2:00</strong> due to inactivity.',
     'session_stay'             => 'Stay connected',
     'session_logout'           => 'Log out now',
+    'session_expired_unsaved'  => 'Your session has expired and nothing was saved. What you typed is still on the screen: sign in again in another tab and try again.',
 
     'register' => [
         /* meta */

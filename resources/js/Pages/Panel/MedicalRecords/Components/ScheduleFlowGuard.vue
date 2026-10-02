@@ -33,6 +33,9 @@ const props = defineProps({
     // MedicalRecordForm (salva o digitado + transita no backend + Agenda) em
     // vez do PATCH direto — mesma semântica dos botões da barra inferior.
     submitFlow: { type: Function, default: null },
+    // "Continuar atendimento": quando informado, sai por aqui (o prontuário
+    // grava o que foi digitado antes) em vez de ir direto pro exitUrl.
+    leave: { type: Function, default: null },
 });
 
 const FLOW_KEY = { 7: 'finish', 4: 'dilate', 5: 'exam' };
@@ -92,7 +95,8 @@ async function choose(target) {
     // Continuar atendimento: sai mantendo o status atual (Em consulta).
     if (target === null) {
         open.value = false;
-        router.visit(props.exitUrl);
+        if (typeof props.leave === 'function') props.leave(props.exitUrl);
+        else router.visit(props.exitUrl);
         return;
     }
 
@@ -152,7 +156,8 @@ const options = [
     {
         target: null,
         label: props.t.flow_continue ?? 'Continuar atendimento',
-        hint: props.t.flow_continue_hint ?? 'Sai da tela mantendo "Em consulta" — nada é finalizado.',
+        hint:
+            props.t.flow_continue_hint ?? 'Salva o que foi digitado e sai mantendo "Em consulta" — nada é finalizado.',
         icon: 'fas fa-user-md',
         btn: 'btn-outline-secondary',
     },

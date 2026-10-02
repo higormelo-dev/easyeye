@@ -681,8 +681,12 @@ onUnmounted(() => panelTour.stop());
                             class="breadcrumb-item"
                             :class="{ active: crumb.active }"
                         >
-                            <a v-if="!crumb.active" :href="crumb.url">{{ crumb.label }}</a>
-                            <span v-else class="breadcrumb-active">{{ crumb.label }}</span>
+                            <!-- Sem destino ("#"): texto, não link — o "#" criava entrada no
+                                 histórico e o Voltar seguinte remontava a tela. -->
+                            <a v-if="!crumb.active && crumb.url && crumb.url !== '#'" :href="crumb.url">{{
+                                crumb.label
+                            }}</a>
+                            <span v-else :class="{ 'breadcrumb-active': crumb.active }">{{ crumb.label }}</span>
                         </li>
                     </ol>
                 </nav>
