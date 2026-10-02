@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\DataAccessPurpose;
-use App\Models\DataAccessLog;
+use App\Models\{DataAccessLog, Patient};
 use App\Support\AuditContext;
 use Illuminate\Database\Eloquent\Model;
 use Log;
@@ -51,11 +51,16 @@ class DataAccessLogService
     }
 
     /**
-     * Tenta inferir o patient_id do model.
-     * Suporta: patient_id direto, ou via relação patient() HasOne/BelongsTo.
+     * Tenta inferir o patient_id do model: o próprio paciente (lista de
+     * prontuários, laudo de imagens…) ou o atributo patient_id. Sem isso o log
+     * de um acesso feito pelo Patient ficava fora de Patient::accessLogs().
      */
     private function inferPatientId(Model $resource): ?string
     {
+        if ($resource instanceof Patient) {
+            return (string) $resource->getKey();
+        }
+
         if ($resource->getAttribute('patient_id')) {
             return $resource->getAttribute('patient_id');
         }
