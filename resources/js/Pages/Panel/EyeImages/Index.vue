@@ -1797,7 +1797,7 @@ const printEntity = computed(() => props.entity ?? {});
                         </div>
                     </div>
 
-                    <div class="col-6 col-sm-3 col-md-2">
+                    <div class="col-12 col-sm-3 col-md-2">
                         <SearchSelect
                             v-model="period"
                             :options="[
@@ -1814,11 +1814,13 @@ const printEntity = computed(() => props.entity ?? {});
                         />
                     </div>
 
-                    <div v-if="period === 'custom'" class="col-auto d-flex align-items-center gap-1">
+                    <div
+                        v-if="period === 'custom'"
+                        class="col-12 col-sm-auto order-last order-sm-0 d-flex align-items-center gap-1"
+                    >
                         <input
                             type="date"
-                            class="form-control form-control-sm"
-                            style="width: 9.5rem"
+                            class="form-control form-control-sm ei-date-input"
                             v-model="customDateFrom"
                             :max="customDateTo || undefined"
                             aria-label="Data inicial"
@@ -1826,18 +1828,18 @@ const printEntity = computed(() => props.entity ?? {});
                         <span class="text-muted small">até</span>
                         <input
                             type="date"
-                            class="form-control form-control-sm"
-                            style="width: 9.5rem"
+                            class="form-control form-control-sm ei-date-input"
                             v-model="customDateTo"
                             :min="customDateFrom || undefined"
                             aria-label="Data final"
                         />
                     </div>
 
-                    <div class="col-6 col-sm-auto">
+                    <div class="col-auto">
                         <button
                             type="button"
                             class="btn btn-sm"
+                            :aria-expanded="showFilters ? 'true' : 'false'"
                             :class="showFilters ? 'btn-primary' : 'btn-outline-secondary'"
                             @click="showFilters = !showFilters"
                         >
@@ -1849,7 +1851,7 @@ const printEntity = computed(() => props.entity ?? {});
 
                     <!-- Cálculo de lentes de contato mudou para o Prontuário
                          (bloco de lentes), vinculado à consulta. -->
-                    <div class="col col-md d-flex justify-content-end gap-2">
+                    <div class="col-auto ms-auto d-flex justify-content-end gap-2">
                         <button type="button" class="btn btn-primary btn-sm" @click="openImportModal()">
                             <i class="fa fa-plus"></i> Novo
                         </button>
@@ -1857,10 +1859,10 @@ const printEntity = computed(() => props.entity ?? {});
                 </div>
 
                 <div v-show="showFilters" class="row g-2 mt-1 pt-2 border-top align-items-center">
-                    <div class="col-auto">
+                    <div class="col-12 col-md-auto">
                         <div class="d-flex align-items-center gap-2">
                             <span class="text-muted small fw-semibold" style="white-space: nowrap">Olho</span>
-                            <div class="btn-group btn-group-sm" role="group">
+                            <div class="btn-group btn-group-sm ei-lat-group" role="group" aria-label="Olho">
                                 <input
                                     type="radio"
                                     class="btn-check"
@@ -1904,7 +1906,7 @@ const printEntity = computed(() => props.entity ?? {});
                         </div>
                     </div>
 
-                    <div class="col-12 col-sm-6 col-lg-2">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect
                             v-model="examTypeId"
                             :options="examTypeOptions"
@@ -1912,7 +1914,7 @@ const printEntity = computed(() => props.entity ?? {});
                         />
                     </div>
 
-                    <div class="col-12 col-sm-6 col-lg-2">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect
                             v-model="equipmentId"
                             :options="equipmentOptions"
@@ -1920,7 +1922,7 @@ const printEntity = computed(() => props.entity ?? {});
                         />
                     </div>
 
-                    <div class="col-12 col-sm-6 col-lg-2">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect
                             v-model="cidCode"
                             :remote-search-url="urls.cid10_search"
@@ -1929,11 +1931,11 @@ const printEntity = computed(() => props.entity ?? {});
                         />
                     </div>
 
-                    <div class="col-12 col-sm-6 col-lg-2">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect v-model="doctorId" :options="doctors" :placeholder="'Todos médicos'" />
                     </div>
 
-                    <div class="col-12 col-sm-6 col-lg-2">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect
                             v-model="examStatus"
                             :options="[{ value: 'laudado', label: 'Laudado' }]"
@@ -1943,7 +1945,7 @@ const printEntity = computed(() => props.entity ?? {});
                         />
                     </div>
 
-                    <div class="col-12 col-sm-6 col-lg-2">
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect
                             v-model="examSource"
                             :options="[
@@ -1956,8 +1958,12 @@ const printEntity = computed(() => props.entity ?? {});
                         />
                     </div>
 
-                    <div class="col-auto">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" @click="clearFilters">
+                    <div class="col-12 col-sm-auto">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary ei-clear-btn"
+                            @click="clearFilters"
+                        >
                             <i class="fa fa-times me-1"></i> Limpar
                         </button>
                     </div>
@@ -3499,6 +3505,26 @@ const printEntity = computed(() => props.entity ?? {});
 </template>
 
 <style scoped>
+/* Barra de filtros: datas do período personalizado com largura fixa no
+   desktop; no celular dividem a linha inteira (2×9.5rem + "até" estourava
+   em telas de 320–375px). Grupo Olho e Limpar ocupam a largura toda. */
+.ei-date-input {
+    width: 9.5rem;
+}
+@media (max-width: 575.98px) {
+    .ei-date-input {
+        flex: 1 1 0;
+        width: auto;
+        min-width: 0;
+    }
+    .ei-lat-group {
+        flex: 1 1 auto;
+    }
+    .ei-clear-btn {
+        width: 100%;
+    }
+}
+
 .patient-item {
     cursor: pointer;
     transition: background 0.12s;

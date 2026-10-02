@@ -216,6 +216,20 @@ const selectedTitle = computed(() => {
     margin: 0;
 }
 
+/* Placeholder em uma linha só: a lib renderiza o texto solto num flex
+   absoluto sem nowrap, então em coluna estreita (barra de filtros do
+   Gerenciador de Imagens, col-lg-2) ele quebrava em 2-3 linhas e vazava
+   da caixa. Block + nowrap + ellipsis (mesmo tratamento que a lib já dá
+   ao valor selecionado em .multiselect-single-label-text); o padding-top
+   repõe a centralização vertical que o align-items do flex fazia. */
+.search-select .multiselect-placeholder {
+    display: block;
+    padding-top: var(--ms-py);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Variante compacta (prop `sm`) — mesma altura/fonte do .input-group-sm
    do Bootstrap (SearchInput), pra ficar no padrão quando usado lado a
    lado com a busca numa barra de filtro (ex.: report-settings). */
