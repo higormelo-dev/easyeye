@@ -110,7 +110,6 @@ class ScheduleImportsController extends Controller
         $path = $file->storeAs(
             "imports/schedules/{$entityId}",
             Str::uuid() . '.csv',
-            'private',
         );
 
         $import = ScheduleImport::create([
@@ -162,7 +161,7 @@ class ScheduleImportsController extends Controller
         abort_if($scheduleImport->status->isDone(), 409);
 
         if ($scheduleImport->confirmed_at === null) {
-            Storage::disk('private')->delete($scheduleImport->file_path);
+            Storage::disk()->delete($scheduleImport->file_path);
             $scheduleImport->delete();
 
             return redirect()
@@ -211,12 +210,19 @@ class ScheduleImportsController extends Controller
     /**
      * Faz o download do arquivo de erros de um import.
      */
-    public function errors(ScheduleImport $scheduleImport): StreamedResponse
+    public function errors(ScheduleImport $scheduleImport): StreamedResponse|RedirectResponse
     {
         abort_if((string) $scheduleImport->entity_id !== session('selected_entity_id'), 404);
         abort_if(! $scheduleImport->errors_file_path, 404);
 
-        return Storage::disk('private')->download(
+        // Registro aponta pro CSV mas o arquivo sumiu do disco (storage
+        // limpo/migrado, ambiente restaurado só com o banco): download()
+        // lançava UnableToRetrieveMetadata → 500. Volta pra tela com aviso.
+        if (! Storage::disk()->exists($scheduleImport->errors_file_path)) {
+            return back()->with('error', __('imports.errors_file_missing'));
+        }
+
+        return Storage::disk()->download(
             $scheduleImport->errors_file_path,
             "erros_importacao_{$scheduleImport->id}.csv",
         );

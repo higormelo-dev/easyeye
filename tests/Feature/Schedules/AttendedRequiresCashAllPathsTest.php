@@ -372,12 +372,12 @@ describe('PATCH situation', function () {
 
 describe('import de agendamentos', function () {
     it('importa consulta passada como Atendido mesmo com a clínica exigindo caixa', function () {
-        Storage::fake('private');
+        Storage::fake();
 
         $this->doctor->forceFill(['import_code' => 'DOC-ACR'])->save();
 
         $path = "imports/schedules/{$this->entity->id}/acr.csv";
-        Storage::disk('private')->put($path, "\xEF\xBB\xBF"
+        Storage::disk()->put($path, "\xEF\xBB\xBF"
             . "codigo_importacao_medico;nome_paciente;data_hora;situacao;codigo_importacao\n"
             . 'DOC-ACR;Paciente Historico;' . now()->subMonth()->format('d/m/Y') . " 09:00;Atendido;ACR-1\n");
 

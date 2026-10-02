@@ -351,9 +351,9 @@ describe('endurecimento (revisão de segurança)', function (): void {
     });
 
     it('importação: médico com login em outra clínica vira erro de linha orientando o convite (sem segundo login)', function (): void {
-        Storage::fake('private');
+        Storage::fake();
         $path = "imports/doctors/{$this->clinicB->id}/dci.csv";
-        Storage::disk('private')->put($path, "\xEF\xBB\xBFnome;apelido;cpf;crm;crm_especialidade;cor;email\nJOAO;Dr Joao;52998224725;CRM-9;Retina;#999999;joao.novo@example.com\n");
+        Storage::disk()->put($path, "\xEF\xBB\xBFnome;apelido;cpf;crm;crm_especialidade;cor;email\nJOAO;Dr Joao;52998224725;CRM-9;Retina;#999999;joao.novo@example.com\n");
         $import = DoctorImport::create([
             'entity_id' => $this->clinicB->id, 'user_id' => $this->adminB->id,
             'status'    => ImportStatus::Pending, 'file_path' => $path, 'original_name' => 'dci.csv',
@@ -362,7 +362,7 @@ describe('endurecimento (revisão de segurança)', function (): void {
         app(DoctorImportService::class)->process($import);
 
         $import->refresh();
-        $lines = array_values(array_filter(explode("\n", Storage::disk('private')->get($import->errors_file_path))));
+        $lines = array_values(array_filter(explode("\n", Storage::disk()->get($import->errors_file_path))));
         expect($import->imported_rows)->toBe(0)
             ->and(str_getcsv($lines[1], ';')[1])->toBe(__('doctors.invitation.import_use_invite'))
             ->and(User::query()->where('email', 'joao.novo@example.com')->exists())->toBeFalse();

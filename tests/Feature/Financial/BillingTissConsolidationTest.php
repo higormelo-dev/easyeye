@@ -49,7 +49,7 @@ it('creates a billing batch that generates a real tiss xml document via the rich
     $submitted->tissBatch->refresh();
     expect($submitted->tissBatch->status->value)->toBe('sent');
 
-    $xmlContent = Storage::disk('local')->get($submitted->xml_path);
+    $xmlContent = Storage::disk()->get($submitted->xml_path);
     expect($xmlContent)->toContain('guiaConsulta')
         ->and($xmlContent)->toContain('326305');
 });

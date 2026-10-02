@@ -178,12 +178,12 @@ test('anexo: show() e download() efetivamente respondem 200 com o arquivo (regre
     // a do Symfony diretamente). Nenhum teste anterior batia em show()/
     // download() pra anexo (só view()), então o bug nunca foi pego. Este
     // teste cobre exatamente o caminho que tinha o retorno quebrado.
-    Storage::fake('private');
+    Storage::fake();
 
     $f = makeSharePortalFixture();
 
     $path = 'medical-records/' . $f['record']->id . '/fake.pdf';
-    Storage::disk('private')->put($path, 'conteudo fake do anexo');
+    Storage::disk()->put($path, 'conteudo fake do anexo');
 
     $file = MedicalRecordFile::create([
         'medical_record_id' => $f['record']->id,

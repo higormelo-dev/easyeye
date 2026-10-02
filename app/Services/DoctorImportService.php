@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Concerns\OpensImportFile;
 use App\Enums\{ClientRule, FeatureKey, ImportStatus};
 use App\Models\{Doctor, DoctorImport, EntityUser, People, User};
 use Illuminate\Support\Facades\{DB, Log, Password, Storage};
@@ -49,6 +50,8 @@ use Throwable;
  */
 class DoctorImportService
 {
+    use OpensImportFile;
+
     /** Mapa cabeçalho normalizado → campo. Prefixo _ = campo de Doctor (não People). */
     private const COLUMN_MAP = [
         // people.full_name
@@ -145,13 +148,11 @@ class DoctorImportService
      */
     public function generatePreview(DoctorImport $import): array
     {
-        $path = Storage::disk('private')->path($import->file_path);
+        $handle = $this->openImportFile($import->file_path);
 
-        if (! file_exists($path)) {
+        if (! $handle) {
             return ['error' => 'Arquivo não encontrado.'];
         }
-
-        $handle = fopen($path, 'r');
         $this->skipBom($handle);
         $delimiter = $this->detectDelimiter($handle, 0);
 
@@ -250,13 +251,12 @@ class DoctorImportService
 
     private function doProcess(DoctorImport $import): void
     {
-        $path = Storage::disk('private')->path($import->file_path);
+        $handle = $this->openImportFile($import->file_path);
 
-        if (! file_exists($path)) {
+        if (! $handle) {
             throw new RuntimeException('Arquivo de importação não encontrado no disco.');
         }
 
-        $handle    = fopen($path, 'r');
         $bomOffset = $this->skipBom($handle);
         $delimiter = $this->detectDelimiter($handle, $bomOffset);
 
@@ -798,7 +798,7 @@ class DoctorImportService
         }
 
         rewind($stream);
-        Storage::disk('private')->put($path, stream_get_contents($stream));
+        Storage::disk()->put($path, stream_get_contents($stream));
         fclose($stream);
 
         $import->update(['errors_file_path' => $path]);

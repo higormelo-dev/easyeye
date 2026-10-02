@@ -125,7 +125,6 @@ class PatientImportsController extends Controller
         $path = $file->storeAs(
             "imports/patients/{$entityId}",
             Str::uuid() . '.csv',
-            'private',
         );
 
         $import = PatientImport::create([
@@ -178,7 +177,7 @@ class PatientImportsController extends Controller
         abort_if($patientImport->status->isDone(), 409);
 
         if ($patientImport->confirmed_at === null) {
-            Storage::disk('private')->delete($patientImport->file_path);
+            Storage::disk()->delete($patientImport->file_path);
             $patientImport->delete();
 
             return redirect()
@@ -227,12 +226,19 @@ class PatientImportsController extends Controller
     /**
      * Faz o download do arquivo de erros de um import.
      */
-    public function errors(PatientImport $patientImport): StreamedResponse
+    public function errors(PatientImport $patientImport): StreamedResponse|RedirectResponse
     {
         abort_if((string) $patientImport->entity_id !== session('selected_entity_id'), 404);
         abort_if(! $patientImport->errors_file_path, 404);
 
-        return Storage::disk('private')->download(
+        // Registro aponta pro CSV mas o arquivo sumiu do disco (storage
+        // limpo/migrado, ambiente restaurado só com o banco): download()
+        // lançava UnableToRetrieveMetadata → 500. Volta pra tela com aviso.
+        if (! Storage::disk()->exists($patientImport->errors_file_path)) {
+            return back()->with('error', __('imports.errors_file_missing'));
+        }
+
+        return Storage::disk()->download(
             $patientImport->errors_file_path,
             "erros_importacao_{$patientImport->id}.csv",
         );

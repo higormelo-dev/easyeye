@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Concerns\OpensImportFile;
 use App\Enums\{FeatureKey, ImportStatus};
 use App\Models\{Covenant, Patient, PatientImport, People};
 use Carbon\Carbon;
@@ -30,6 +31,8 @@ use Throwable;
  */
 class PatientImportService
 {
+    use OpensImportFile;
+
     /** Mapa cabeçalho normalizado → campo do modelo (prefixo _ = campo de Patient). */
     private const COLUMN_MAP = [
         // people.full_name
@@ -187,13 +190,11 @@ class PatientImportService
      */
     public function generatePreview(PatientImport $import): array
     {
-        $path = Storage::disk('private')->path($import->file_path);
+        $handle = $this->openImportFile($import->file_path);
 
-        if (! file_exists($path)) {
+        if (! $handle) {
             return ['error' => 'Arquivo não encontrado.'];
         }
-
-        $handle = fopen($path, 'r');
         $this->skipBom($handle);
         $delimiter = $this->detectDelimiter($handle, 0);
 
@@ -303,13 +304,12 @@ class PatientImportService
 
     private function doProcess(PatientImport $import): void
     {
-        $path = Storage::disk('private')->path($import->file_path);
+        $handle = $this->openImportFile($import->file_path);
 
-        if (! file_exists($path)) {
+        if (! $handle) {
             throw new RuntimeException('Arquivo de importação não encontrado no disco.');
         }
 
-        $handle    = fopen($path, 'r');
         $bomOffset = $this->skipBom($handle);
         $delimiter = $this->detectDelimiter($handle, $bomOffset);
 
@@ -839,7 +839,7 @@ class PatientImportService
         }
 
         rewind($stream);
-        Storage::disk('private')->put($path, stream_get_contents($stream));
+        Storage::disk()->put($path, stream_get_contents($stream));
         fclose($stream);
 
         $import->update(['errors_file_path' => $path]);

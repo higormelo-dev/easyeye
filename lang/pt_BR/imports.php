@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'errors_file_missing' => 'O relatório de erros desta importação não está mais disponível. Importe a planilha novamente para gerar um novo relatório.',
+
     'status' => [
         'pending'    => 'Aguardando',
         'processing' => 'Processando',

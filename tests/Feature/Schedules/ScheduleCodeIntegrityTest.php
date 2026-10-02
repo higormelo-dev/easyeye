@@ -170,11 +170,11 @@ it('POST /panel/schedules: violacao do indice de horario continua 422 com a mens
 });
 
 it('import: violacao unica que NAO e de horario vira erro traduzido na linha, sem SQL nem "horario ocupado"', function () {
-    Storage::fake('private');
+    Storage::fake();
     $this->doctor->update(['record' => '424242']);
 
     $path = "imports/schedules/{$this->entity->id}/sdl-integrity.csv";
-    Storage::disk('private')->put($path, "\xEF\xBB\xBFcrm_medico;nome_paciente;data_hora\n424242;Paciente Import;15/06/2027 14:30\n");
+    Storage::disk()->put($path, "\xEF\xBB\xBFcrm_medico;nome_paciente;data_hora\n424242;Paciente Import;15/06/2027 14:30\n");
 
     $import = ScheduleImport::create([
         'entity_id'     => $this->entity->id,
@@ -191,7 +191,7 @@ it('import: violacao unica que NAO e de horario vira erro traduzido na linha, se
     app(ScheduleImportService::class)->process($import);
 
     $import->refresh();
-    $errors = Storage::disk('private')->get($import->errors_file_path);
+    $errors = Storage::disk()->get($import->errors_file_path);
 
     expect($import->error_rows)->toBe(1)
         ->and($import->imported_rows)->toBe(0)

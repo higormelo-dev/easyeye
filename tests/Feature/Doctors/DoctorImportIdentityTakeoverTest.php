@@ -45,10 +45,10 @@ function ditEntity(): Entity
 
 function ditImport(Entity $entity, string $csv): DoctorImport
 {
-    Storage::fake('private');
+    Storage::fake();
 
     $path = "imports/doctors/{$entity->id}/dit.csv";
-    Storage::disk('private')->put($path, "\xEF\xBB\xBF" . $csv);
+    Storage::disk()->put($path, "\xEF\xBB\xBF" . $csv);
 
     return DoctorImport::create([
         'entity_id' => $entity->id, 'user_id' => User::factory()->create()->id,
@@ -74,7 +74,7 @@ function ditPartnerFor(User $user): Partner
 
 function ditErrorReason(DoctorImport $import): string
 {
-    $lines = array_values(array_filter(explode("\n", Storage::disk('private')->get($import->errors_file_path))));
+    $lines = array_values(array_filter(explode("\n", Storage::disk()->get($import->errors_file_path))));
 
     return str_getcsv($lines[1], ';')[1];
 }

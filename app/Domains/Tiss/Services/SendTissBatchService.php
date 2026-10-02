@@ -265,13 +265,13 @@ class SendTissBatchService
 
         if ($responseBody) {
             $relativePath = sprintf(
-                'private/tiss/%s/responses/%s_%s_ack.xml',
+                'tiss/%s/responses/%s_%s_ack.xml',
                 $batch->entity_id,
                 mb_strtolower((string) $batch->batch_number),
                 now()->format('YmdHis'),
             );
 
-            Storage::disk('local')->put($relativePath, $responseBody);
+            Storage::disk()->put($relativePath, $responseBody);
 
             $xmlDocument = TissXmlDocument::query()->create([
                 'entity_id'     => $batch->entity_id,

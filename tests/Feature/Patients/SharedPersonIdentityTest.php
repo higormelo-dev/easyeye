@@ -112,10 +112,10 @@ function spiPatientPayload(People $person, Covenant $covenant, array $overrides 
 
 function spiPatientImport(Entity $entity, string $csv): PatientImport
 {
-    Storage::fake('private');
+    Storage::fake();
 
     $path = "imports/patients/{$entity->id}/spi.csv";
-    Storage::disk('private')->put($path, "\xEF\xBB\xBF" . $csv);
+    Storage::disk()->put($path, "\xEF\xBB\xBF" . $csv);
 
     return PatientImport::create([
         'entity_id' => $entity->id, 'user_id' => User::factory()->create()->id,
@@ -125,10 +125,10 @@ function spiPatientImport(Entity $entity, string $csv): PatientImport
 
 function spiDoctorImport(Entity $entity, string $csv): DoctorImport
 {
-    Storage::fake('private');
+    Storage::fake();
 
     $path = "imports/doctors/{$entity->id}/spi.csv";
-    Storage::disk('private')->put($path, "\xEF\xBB\xBF" . $csv);
+    Storage::disk()->put($path, "\xEF\xBB\xBF" . $csv);
 
     return DoctorImport::create([
         'entity_id' => $entity->id, 'user_id' => User::factory()->create()->id,
@@ -138,7 +138,7 @@ function spiDoctorImport(Entity $entity, string $csv): DoctorImport
 
 function spiErrorReason(PatientImport|DoctorImport $import): string
 {
-    $lines = array_values(array_filter(explode("\n", Storage::disk('private')->get($import->errors_file_path))));
+    $lines = array_values(array_filter(explode("\n", Storage::disk()->get($import->errors_file_path))));
 
     return str_getcsv($lines[1], ';')[1];
 }

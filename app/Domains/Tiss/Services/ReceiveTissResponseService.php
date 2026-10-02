@@ -49,13 +49,13 @@ class ReceiveTissResponseService
 
         $return = DB::transaction(function () use ($entityId, $operatorId, $xmlContent, $parsed, $protocol, $batch, $validation, $metadata): TissReturn {
             $relativePath = sprintf(
-                'private/tiss/%s/returns/%s_%s.xml',
+                'tiss/%s/returns/%s_%s.xml',
                 $entityId,
                 mb_strtolower((string) ($parsed['protocol_number'] ?? $batch?->batch_number ?? 'return')),
                 now()->format('YmdHis'),
             );
 
-            Storage::disk('local')->put($relativePath, $xmlContent);
+            Storage::disk()->put($relativePath, $xmlContent);
 
             $xmlDocument = TissXmlDocument::query()->create([
                 'entity_id'         => $entityId,

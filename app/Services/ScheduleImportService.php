@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Concerns\OpensImportFile;
 use App\Enums\{ImportStatus, MedicalSpecialty, PatientMood, ScheduleAttendanceType, ScheduleSituation};
 use App\Models\{Covenant, Doctor, Patient, Schedule, ScheduleImport, VisitType};
 use Carbon\Carbon;
@@ -59,6 +60,8 @@ use Throwable;
  */
 class ScheduleImportService
 {
+    use OpensImportFile;
+
     /** Mapa cabeçalho normalizado → campo. Prefixo _ = campo resolvido/derivado, não coluna direta de `schedules`. */
     private const COLUMN_MAP = [
         // Médico (resolução obrigatória)
@@ -240,13 +243,11 @@ class ScheduleImportService
      */
     public function generatePreview(ScheduleImport $import): array
     {
-        $path = Storage::disk('private')->path($import->file_path);
+        $handle = $this->openImportFile($import->file_path);
 
-        if (! file_exists($path)) {
+        if (! $handle) {
             return ['error' => 'Arquivo não encontrado.'];
         }
-
-        $handle = fopen($path, 'r');
         $this->skipBom($handle);
         $delimiter = $this->detectDelimiter($handle, 0);
 
@@ -354,13 +355,12 @@ class ScheduleImportService
 
     private function doProcess(ScheduleImport $import): void
     {
-        $path = Storage::disk('private')->path($import->file_path);
+        $handle = $this->openImportFile($import->file_path);
 
-        if (! file_exists($path)) {
+        if (! $handle) {
             throw new RuntimeException('Arquivo de importação não encontrado no disco.');
         }
 
-        $handle    = fopen($path, 'r');
         $bomOffset = $this->skipBom($handle);
         $delimiter = $this->detectDelimiter($handle, $bomOffset);
 
@@ -922,7 +922,7 @@ class ScheduleImportService
         }
 
         rewind($stream);
-        Storage::disk('private')->put($path, stream_get_contents($stream));
+        Storage::disk()->put($path, stream_get_contents($stream));
         fclose($stream);
 
         $import->update(['errors_file_path' => $path]);

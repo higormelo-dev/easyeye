@@ -123,14 +123,14 @@ class DocumentsController extends Controller
 
     private function respondFile(MedicalRecordFile $file, bool $forDownload): StreamedResponse
     {
-        abort_unless(Storage::disk('private')->exists($file->file_path), 404);
+        abort_unless(Storage::disk()->exists($file->file_path), 404);
 
         // BUGFIX (revisão de segurança): nunca montar Content-Disposition por
         // concatenação manual — original_name é entrada do usuário (upload
         // do staff) e um `"` corrompe/estende o header. Omitir a chave deixa
         // o Laravel usar makeDisposition() (escapa corretamente).
         return $forDownload
-            ? Storage::disk('private')->download($file->file_path, $file->original_name)
-            : Storage::disk('private')->response($file->file_path, $file->original_name);
+            ? Storage::disk()->download($file->file_path, $file->original_name)
+            : Storage::disk()->response($file->file_path, $file->original_name);
     }
 }

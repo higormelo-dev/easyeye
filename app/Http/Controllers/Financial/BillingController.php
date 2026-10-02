@@ -664,7 +664,7 @@ class BillingController extends Controller
                 : __('financial_billing.errors.batch_xml_particular', ['code' => $batch->code]));
         }
 
-        if (blank($batch->xml_path) || ! Storage::disk('local')->exists($batch->xml_path)) {
+        if (blank($batch->xml_path) || ! Storage::disk()->exists($batch->xml_path)) {
             try {
                 $batch = $this->billingService->generateBatchXml($batch);
             } catch (ValidationException $e) {
@@ -674,7 +674,7 @@ class BillingController extends Controller
             }
         }
 
-        return Storage::disk('local')->download(
+        return Storage::disk()->download(
             $batch->xml_path,
             mb_strtolower($batch->code) . '.xml',
             ['Content-Type' => 'application/xml'],

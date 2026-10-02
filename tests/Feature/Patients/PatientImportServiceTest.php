@@ -30,10 +30,10 @@ function entityWithUnlimitedPatients(): Entity
 
 function makePatientImport(Entity $entity, string $csv): PatientImport
 {
-    Storage::fake('private');
+    Storage::fake();
 
     $path = "imports/patients/{$entity->id}/test.csv";
-    Storage::disk('private')->put($path, "\xEF\xBB\xBF" . $csv);
+    Storage::disk()->put($path, "\xEF\xBB\xBF" . $csv);
 
     return PatientImport::create([
         'entity_id'     => $entity->id,
@@ -146,7 +146,7 @@ it('convenio desconhecido vira erro legivel na linha, sem SQL cru no CSV de erro
     expect($import->imported_rows)->toBe(0);
     expect($import->error_rows)->toBe(1);
 
-    $errors = Storage::disk('private')->get($import->errors_file_path);
+    $errors = Storage::disk()->get($import->errors_file_path);
     expect($errors)->toContain('não encontrado')
         ->and($errors)->not->toContain('SQLSTATE');
     expect(Patient::where('entity_id', $this->entity->id)->count())->toBe(0);
@@ -165,7 +165,7 @@ it('cancelar antes de confirmar apaga o arquivo e o registro', function () {
         ->assertRedirect(route('panel.patients.import.index'));
 
     expect(PatientImport::find($import->id))->toBeNull();
-    expect(Storage::disk('private')->exists($import->file_path))->toBeFalse();
+    expect(Storage::disk()->exists($import->file_path))->toBeFalse();
 });
 
 it('cancelar depois de confirmado nao apaga o registro, so sinaliza — job nao roda mais', function () {
@@ -181,7 +181,7 @@ it('cancelar depois de confirmado nao apaga o registro, so sinaliza — job nao 
 
     $import->refresh();
     expect($import->status)->toBe(ImportStatus::Cancelled);
-    expect(Storage::disk('private')->exists($import->file_path))->toBeTrue();
+    expect(Storage::disk()->exists($import->file_path))->toBeTrue();
 
     // Simula o worker pegando o job depois do cancelamento (cenário real do
     // bug: fila parada, usuário cancela, worker volta e não deve processar).
@@ -203,4 +203,52 @@ it('nao deixa cancelar import ja concluido (409)', function () {
         ->withSession(panelSession($eu))
         ->deleteJson(route('panel.patients.import.cancel', $import))
         ->assertStatus(409);
+});
+
+it('baixa o relatorio de erros quando o arquivo existe', function () {
+    $import = makePatientImport($this->entity, "nome;celular\nFulano;11999999999\n");
+    $path   = "imports/patients/{$this->entity->id}/errors_{$import->id}.csv";
+    Storage::disk()->put($path, "linha;erro\n2;x\n");
+    $import->update(['status' => ImportStatus::Done, 'errors_file_path' => $path]);
+
+    $user = User::factory()->create();
+    $eu   = createEntityUser($this->entity, $user, 'admin');
+
+    $this->actingAs($user)
+        ->withSession(panelSession($eu))
+        ->get(route('panel.patients.import.errors', $import))
+        ->assertOk()
+        ->assertDownload("erros_importacao_{$import->id}.csv");
+});
+
+it('relatorio de erros ausente no disco volta com aviso em vez de erro 500', function () {
+    $import = makePatientImport($this->entity, "nome;celular\nFulano;11999999999\n");
+    $import->update([
+        'status'           => ImportStatus::Done,
+        'errors_file_path' => "imports/patients/{$this->entity->id}/errors_{$import->id}.csv",
+    ]);
+
+    $user = User::factory()->create();
+    $eu   = createEntityUser($this->entity, $user, 'admin');
+
+    $this->actingAs($user)
+        ->withSession(panelSession($eu))
+        ->from(route('panel.patients.import.index'))
+        ->get(route('panel.patients.import.errors', $import))
+        ->assertRedirect(route('panel.patients.import.index'))
+        ->assertSessionHas('error', __('imports.errors_file_missing'));
+});
+
+it('relatorio de erros de outra clinica continua 404', function () {
+    $import = makePatientImport($this->entity, "nome;celular\nFulano;11999999999\n");
+    $import->update(['errors_file_path' => 'imports/patients/x/errors.csv']);
+
+    $other = entityWithUnlimitedPatients();
+    $user  = User::factory()->create();
+    $eu    = createEntityUser($other, $user, 'admin');
+
+    $this->actingAs($user)
+        ->withSession(panelSession($eu))
+        ->get(route('panel.patients.import.errors', $import))
+        ->assertNotFound();
 });

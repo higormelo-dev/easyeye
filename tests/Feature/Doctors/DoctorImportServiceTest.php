@@ -49,10 +49,10 @@ function entityWithDoctorLimit(int $limit): Entity
 
 function makeDoctorImport(Entity $entity, string $csv): DoctorImport
 {
-    Storage::fake('private');
+    Storage::fake();
 
     $path = "imports/doctors/{$entity->id}/test.csv";
-    Storage::disk('private')->put($path, "\xEF\xBB\xBF" . $csv);
+    Storage::disk()->put($path, "\xEF\xBB\xBF" . $csv);
 
     return DoctorImport::create([
         'entity_id'     => $entity->id,
@@ -260,7 +260,7 @@ it('cancelar antes de confirmar apaga o arquivo e o registro', function () {
         ->assertRedirect(route('panel.doctors.import.index'));
 
     expect(DoctorImport::find($import->id))->toBeNull();
-    expect(Storage::disk('private')->exists($import->file_path))->toBeFalse();
+    expect(Storage::disk()->exists($import->file_path))->toBeFalse();
 });
 
 it('cancelar depois de confirmado nao apaga o registro, so sinaliza — job nao roda mais', function () {
@@ -277,7 +277,7 @@ it('cancelar depois de confirmado nao apaga o registro, so sinaliza — job nao 
 
     $import->refresh();
     expect($import->status)->toBe(ImportStatus::Cancelled);
-    expect(Storage::disk('private')->exists($import->file_path))->toBeTrue();
+    expect(Storage::disk()->exists($import->file_path))->toBeTrue();
 
     // Simula o worker pegando o job depois do cancelamento (fila parada,
     // usuário cancela, worker volta e não deve processar).

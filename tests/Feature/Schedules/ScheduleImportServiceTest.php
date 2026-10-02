@@ -16,10 +16,10 @@ use Illuminate\Support\Facades\Storage;
 
 function makeScheduleImport(Entity $entity, string $csv): ScheduleImport
 {
-    Storage::fake('private');
+    Storage::fake();
 
     $path = "imports/schedules/{$entity->id}/test.csv";
-    Storage::disk('private')->put($path, "\xEF\xBB\xBF" . $csv);
+    Storage::disk()->put($path, "\xEF\xBB\xBF" . $csv);
 
     return ScheduleImport::create([
         'entity_id'     => $entity->id,
@@ -262,7 +262,7 @@ it('cancelar antes de confirmar apaga o arquivo e o registro', function () {
         ->assertRedirect(route('panel.schedules.import.index'));
 
     expect(ScheduleImport::find($import->id))->toBeNull();
-    expect(Storage::disk('private')->exists($import->file_path))->toBeFalse();
+    expect(Storage::disk()->exists($import->file_path))->toBeFalse();
 });
 
 it('cancelar depois de confirmado nao apaga o registro, so sinaliza — job nao roda mais', function () {
@@ -280,7 +280,7 @@ it('cancelar depois de confirmado nao apaga o registro, so sinaliza — job nao 
 
     $import->refresh();
     expect($import->status)->toBe(ImportStatus::Cancelled);
-    expect(Storage::disk('private')->exists($import->file_path))->toBeTrue();
+    expect(Storage::disk()->exists($import->file_path))->toBeTrue();
 
     // Simula o worker pegando o job depois do cancelamento (fila parada,
     // usuário cancela, worker volta e não deve processar).

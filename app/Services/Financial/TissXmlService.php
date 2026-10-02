@@ -30,12 +30,12 @@ class TissXmlService
         $this->appendLoteGuias($dom, $ansTiss, $batch);
 
         $relativePath = sprintf(
-            'private/tiss/%s/%s.xml',
+            'tiss/%s/%s.xml',
             $batch->entity_id,
             mb_strtolower($batch->code),
         );
 
-        Storage::disk('local')->put($relativePath, $dom->saveXML());
+        Storage::disk()->put($relativePath, $dom->saveXML());
 
         return $relativePath;
     }

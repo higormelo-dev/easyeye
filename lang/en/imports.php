@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'errors_file_missing' => 'The error report for this import is no longer available. Import the spreadsheet again to generate a new report.',
+
     'status' => [
         'pending'    => 'Pending',
         'processing' => 'Processing',

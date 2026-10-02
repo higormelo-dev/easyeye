@@ -49,13 +49,13 @@ class GenerateTissXmlService
             $xml     = $builder->buildBatch($batch);
 
             $relativePath = sprintf(
-                'private/tiss/%s/batches/%s_%s.xml',
+                'tiss/%s/batches/%s_%s.xml',
                 $batch->entity_id,
                 mb_strtolower($batch->batch_number),
                 now()->format('YmdHis'),
             );
 
-            Storage::disk('local')->put($relativePath, $xml);
+            Storage::disk()->put($relativePath, $xml);
 
             $validation = $this->validateTissXmlService->validate($xml, (string) $batch->version?->code);
 

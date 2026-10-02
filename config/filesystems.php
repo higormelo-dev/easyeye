@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Default Filesystem Disk
@@ -13,6 +12,11 @@ return [
     |
     */
 
+    // Disco de todos os arquivos privados do sistema (planilhas e relatórios
+    // de importação, anexos de prontuário, XMLs TISS): o código usa
+    // Storage::disk() sem nome. Produção deve usar "s3" — disco local some
+    // em deploy/container novo e não é compartilhado entre servidores.
+    // Arquivos antigos do local: `php artisan storage:sync-local`.
     'default' => env('FILESYSTEM_DISK', 'local'),
 
     /*
@@ -29,24 +33,10 @@ return [
     */
 
     'disks' => [
-
         'local' => [
             'driver' => 'local',
             'root'   => storage_path('app/private'),
             'serve'  => true,
-            'throw'  => false,
-            'report' => false,
-        ],
-
-        // BUG-FIX (achado pelo E2E Cypress): PatientImportService e
-        // MedicalRecordFilesController usam Storage::disk('private'), mas o
-        // disco nunca foi declarado — upload de importação de pacientes e
-        // download de anexos de prontuário quebravam com 500 ("Disk [private]
-        // does not have a configured driver"). Mesmo root do disco local.
-        'private' => [
-            'driver' => 'local',
-            'root'   => storage_path('app/private'),
-            'serve'  => false,
             'throw'  => false,
             'report' => false,
         ],
@@ -72,7 +62,6 @@ return [
             'throw'                   => false,
             'report'                  => false,
         ],
-
     ],
 
     /*
@@ -89,5 +78,4 @@ return [
     'links' => [
         public_path('storage') => storage_path('app/public'),
     ],
-
 ];

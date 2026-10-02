@@ -46,7 +46,6 @@ class MedicalRecordFilesController extends Controller
             $path = $file->storeAs(
                 "medical-records/{$medicalrecord->id}",
                 Str::uuid() . '.' . $file->getClientOriginalExtension(),
-                'private',
             );
 
             $record = MedicalRecordFile::create([
@@ -85,7 +84,7 @@ class MedicalRecordFilesController extends Controller
 
         $this->logAccess($file, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
-        if (! Storage::disk('private')->exists($file->file_path)) {
+        if (! Storage::disk()->exists($file->file_path)) {
             abort(404);
         }
 
@@ -97,7 +96,7 @@ class MedicalRecordFilesController extends Controller
         // (FilesystemAdapter::response() só o usa se a chave NÃO existir no
         // array recebido). Omitir aqui deixa o framework montar com escape
         // correto — mesmo Content-Type continua auto-detectado.
-        return Storage::disk('private')->response($file->file_path, $file->original_name);
+        return Storage::disk()->response($file->file_path, $file->original_name);
     }
 
     /**

@@ -117,10 +117,10 @@ function pcnCloseProbe(Connection $probe): void
 
 function pcnPatientImport(Entity $entity, string $csv): PatientImport
 {
-    Storage::fake('private');
+    Storage::fake();
 
     $path = "imports/patients/{$entity->id}/pcn.csv";
-    Storage::disk('private')->put($path, "\xEF\xBB\xBF" . $csv);
+    Storage::disk()->put($path, "\xEF\xBB\xBF" . $csv);
 
     return PatientImport::create([
         'entity_id'     => $entity->id,
@@ -257,7 +257,7 @@ describe('colisão no índice (entity_id, code)', function (): void {
         expect($import->status)->toBe(ImportStatus::Done)
             ->and($import->error_rows)->toBe(1);
 
-        $csv   = Storage::disk('private')->get($import->errors_file_path);
+        $csv   = Storage::disk()->get($import->errors_file_path);
         $lines = array_values(array_filter(explode("\n", $csv)));
         $row   = str_getcsv($lines[1], ';');
 
