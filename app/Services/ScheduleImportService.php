@@ -507,13 +507,19 @@ class ScheduleImportService
 
         $situation = $this->resolveSituation((string) ($data['_situation'] ?? ''), (string) $data['date_time']);
 
+        // tipo_atendimento é fallback do tipo de consulta: a agenda só exibe o
+        // catálogo visit_types (as opções dos dois campos eram as mesmas).
+        $attendanceType = $this->resolveAttendanceType($data['_attendance_type'] ?? null);
+        $visitId        = $this->resolveVisitId($data['_visit'] ?? null, $visitTypesMap)
+            ?? $this->resolveVisitId(ScheduleAttendanceType::tryFrom((int) $attendanceType)?->visitTypeName(), $visitTypesMap);
+
         $scheduleData = [
             'entity_id'           => $entityId,
             'doctor_id'           => $doctor->id,
             'patient_id'          => $patient?->id,
             'covenant_id'         => $this->resolveCovenantId($data['_covenant'] ?? null, $covenantsMap),
-            'visit_id'            => $this->resolveVisitId($data['_visit'] ?? null, $visitTypesMap),
-            'attendance_type'     => $this->resolveAttendanceType($data['_attendance_type'] ?? null),
+            'visit_id'            => $visitId,
+            'attendance_type'     => $attendanceType,
             'specialty_area'      => $this->resolveSpecialty($data['_specialty_area'] ?? null),
             'full_name'           => mb_strtoupper(trim((string) $data['full_name']), 'UTF-8'),
             'date_time'           => $data['date_time'],

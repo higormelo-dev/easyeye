@@ -39,6 +39,25 @@ enum ScheduleAttendanceType: int
     }
 
     /**
+     * Nome do "Tipo de consulta" global equivalente (catálogo visit_types,
+     * ver migration clean_and_dedupe_visit_types). O formulário da agenda só
+     * usa o catálogo; este enum sobrevive para dados legados e para a coluna
+     * `tipo_atendimento` do import, que vira fallback do tipo de consulta.
+     */
+    public function visitTypeName(): string
+    {
+        return match ($this) {
+            self::Consultation     => 'CONSULTA',
+            self::Return           => 'RETORNO',
+            self::Urgency          => 'URGÊNCIA',
+            self::PreOpEvaluation  => 'AVALIAÇÃO PRÉ-OPERATÓRIA',
+            self::PostOpEvaluation => 'AVALIAÇÃO PÓS-OPERATÓRIA',
+            self::SecondOpinion    => 'SEGUNDA OPINIÃO',
+            self::Teleconsultation => 'TELECONSULTA',
+        };
+    }
+
+    /**
      * @return array<int, array{id: int, name: string}>
      */
     public static function options(): array

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{CashEntryReferenceType, ClientRule, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleAttendanceType, ScheduleSituation};
+use App\Enums\{CashEntryReferenceType, ClientRule, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleSituation};
 use App\Exceptions\AttendanceRequiresCashEntryException;
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
@@ -54,11 +54,9 @@ class SchedulesController extends Controller
             'visitTypes' => fn () => VisitType::where(function ($q) use ($entityId) {
                 $q->where('entity_id', $entityId)->orWhereNull('entity_id');
             })->where('active', true)->orderBy('name')->get(['id', 'name']),
-            // Listas fixas (não são catálogo configurável por entity como
-            // covenants/visitTypes acima) — ver App\Enums\ScheduleAttendanceType
-            // e App\Enums\MedicalSpecialty.
-            'attendanceTypes' => ScheduleAttendanceType::options(),
-            'specialties'     => MedicalSpecialty::options(),
+            // Lista fixa (não é catálogo configurável por entity como
+            // covenants/visitTypes acima) — ver App\Enums\MedicalSpecialty.
+            'specialties' => MedicalSpecialty::options(),
             // Cadastro completo do paciente embutido no "+ Cadastrar" (mesmos
             // dados de Panel/Patients/Index — ver PatientsController::index()).
             'skinTypes'       => fn () => SkinType::all()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()->toArray(),

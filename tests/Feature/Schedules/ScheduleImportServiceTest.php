@@ -10,7 +10,7 @@
  */
 
 use App\Enums\{ClientRule, ImportStatus, ScheduleSituation};
-use App\Models\{Doctor, Entity, Patient, People, Schedule, ScheduleImport, User};
+use App\Models\{Doctor, Entity, Patient, People, Schedule, ScheduleImport, User, VisitType};
 use App\Services\ScheduleImportService;
 use Illuminate\Support\Facades\Storage;
 
@@ -333,4 +333,34 @@ it('AUSENTE vira Faltou no passado e Agendado no futuro', function () {
     expect($import->fresh()->error_rows)->toBe(0);
     expect(Schedule::where('full_name', 'PASSADO')->first()->situation)->toBe(ScheduleSituation::NoShow);
     expect(Schedule::where('full_name', 'FUTURO')->first()->situation)->toBe(ScheduleSituation::Scheduled);
+});
+
+it('tipo_atendimento vira o tipo de consulta equivalente quando a planilha nao traz tipo_visita', function () {
+    createImportableDoctor($this->entity, record: '444444');
+    $when    = now()->addDay()->format('d/m/Y H:i');
+    $retorno = VisitType::whereNull('entity_id')->where('name', 'RETORNO')->value('id');
+    $import  = makeScheduleImport(
+        $this->entity,
+        "crm_medico;nome_paciente;data_hora;tipo_atendimento\n444444;Fulano;{$when};Retorno\n",
+    );
+
+    app(ScheduleImportService::class)->process($import);
+
+    expect($import->fresh()->error_rows)->toBe(0)
+        ->and($retorno)->not->toBeNull()
+        ->and(Schedule::first()->visit_id)->toBe($retorno);
+});
+
+it('tipo_visita explicito prevalece sobre tipo_atendimento', function () {
+    createImportableDoctor($this->entity, record: '555555');
+    $when     = now()->addDay()->format('d/m/Y H:i');
+    $consulta = VisitType::whereNull('entity_id')->where('name', 'CONSULTA')->value('id');
+    $import   = makeScheduleImport(
+        $this->entity,
+        "crm_medico;nome_paciente;data_hora;tipo_visita;tipo_atendimento\n555555;Fulano;{$when};CONSULTA;Retorno\n",
+    );
+
+    app(ScheduleImportService::class)->process($import);
+
+    expect(Schedule::first()->visit_id)->toBe($consulta);
 });

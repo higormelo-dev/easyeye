@@ -278,7 +278,8 @@ function copyNumericCode(field, code) {
                         <span class="detail-label">{{ t.drawer_label_covenant ?? 'Convênio' }}</span>
                         <span class="detail-value">{{ schedule.covenant_name ?? '—' }}</span>
                     </div>
-                    <div v-if="schedule.attendance_type_name" class="detail-row">
+                    <!-- Legado: só aparece em agendamento antigo sem Tipo de consulta. -->
+                    <div v-if="schedule.attendance_type_name && !schedule.visit_type_name" class="detail-row">
                         <span class="detail-label">{{ t.form_attendance_type ?? 'Tipo de atendimento' }}</span>
                         <span class="detail-value">{{ schedule.attendance_type_name }}</span>
                     </div>

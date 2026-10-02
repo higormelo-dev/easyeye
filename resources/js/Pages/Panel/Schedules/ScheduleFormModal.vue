@@ -13,7 +13,6 @@ const props = defineProps({
     doctors: { type: Array, default: () => [] },
     covenants: { type: Array, default: () => [] },
     visitTypes: { type: Array, default: () => [] },
-    attendanceTypes: { type: Array, default: () => [] },
     specialties: { type: Array, default: () => [] },
     // Cadastro completo do paciente DENTRO do agendamento: as abas
     // Pessoal/Clínico/Contato/Endereço (mesmos campos de Pacientes >
@@ -52,7 +51,6 @@ const form = ref({
     notes: '',
     covenant_id: '',
     visit_id: '',
-    attendance_type: '',
     specialty_area: '',
     resource_ids: [],
     waiting_list_id: '',
@@ -222,7 +220,6 @@ watch(
                 notes: s.notes ?? '',
                 covenant_id: s.covenant_id ?? '',
                 visit_id: s.visit_id ?? '',
-                attendance_type: s.attendance_type ?? '',
                 specialty_area: s.specialty_area ?? '',
                 resource_ids: (s.resources ?? []).map((r) => r.id),
                 waiting_list_id: '',
@@ -255,7 +252,6 @@ watch(
                 notes: p?.notes ?? '',
                 covenant_id: p?.covenant_id ?? '',
                 visit_id: p?.visit_id ?? '',
-                attendance_type: p?.attendance_type ?? '',
                 specialty_area: p?.specialty_area ?? '',
                 resource_ids: [],
                 waiting_list_id: p?.id ?? '',
@@ -490,34 +486,59 @@ async function onSubmit() {
                     <div v-if="errors.full_name" class="invalid-feedback">{{ errors.full_name[0] }}</div>
                 </div>
 
-                <!-- ── Convênio + Tipo de consulta ───────────────────────────── -->
+                <!-- ── Contato (preenchido ao escolher o paciente) ──────────── -->
                 <div class="row g-2 mb-3">
                     <div class="col-6">
-                        <label class="form-label fw-semibold">{{ t.form_covenant }}</label>
-                        <SearchSelect v-model="form.covenant_id" :options="covenants" :placeholder="t.form_none" />
+                        <label class="form-label fw-semibold" for="schedule-telephone">{{ t.form_telephone }}</label>
+                        <input
+                            id="schedule-telephone"
+                            v-model="form.telephone"
+                            v-mask="'phone'"
+                            type="text"
+                            inputmode="numeric"
+                            class="form-control"
+                            placeholder="(00) 0000-0000"
+                        />
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-semibold">{{ t.form_visit_type }}</label>
-                        <SearchSelect v-model="form.visit_id" :options="visitTypes" :placeholder="t.form_none" />
+                        <label class="form-label fw-semibold" for="schedule-cellphone">{{ t.form_cellphone }}</label>
+                        <input
+                            id="schedule-cellphone"
+                            v-model="form.cellphone"
+                            v-mask="'phone'"
+                            type="text"
+                            inputmode="numeric"
+                            class="form-control"
+                            placeholder="(00) 00000-0000"
+                        />
+                        <div class="form-check mt-1">
+                            <input
+                                id="whatsapp"
+                                v-model="form.cellphone_whatsapp"
+                                type="checkbox"
+                                class="form-check-input"
+                            />
+                            <label for="whatsapp" class="form-check-label small">
+                                <i class="fab fa-whatsapp text-success me-1"></i>{{ t.form_whatsapp }}
+                            </label>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ── Tipo de atendimento + Especialidade/Área ─────────────── -->
+                <!-- ── Convênio + Tipo de consulta + Especialidade/Área ─────────
+                     "Tipo de atendimento" (enum ScheduleAttendanceType) saiu:
+                     repetia as opções do "Tipo de consulta" (catálogo
+                     visit_types), que é o que alimenta faturamento/repasse. -->
                 <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label fw-semibold">{{ t.form_attendance_type }}</label>
-                        <SearchSelect
-                            v-model="form.attendance_type"
-                            :options="attendanceTypes"
-                            :placeholder="t.form_none"
-                            :searchable="false"
-                            :invalid="!!errors.attendance_type"
-                        />
-                        <div v-if="errors.attendance_type" class="invalid-feedback d-block">
-                            {{ errors.attendance_type[0] }}
-                        </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label fw-semibold">{{ t.form_covenant }}</label>
+                        <SearchSelect v-model="form.covenant_id" :options="covenants" :placeholder="t.form_none" />
                     </div>
-                    <div class="col-6">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label fw-semibold">{{ t.form_visit_type }}</label>
+                        <SearchSelect v-model="form.visit_id" :options="visitTypes" :placeholder="t.form_none" />
+                    </div>
+                    <div class="col-12 col-md-4">
                         <label class="form-label fw-semibold">{{ t.form_specialty_area }}</label>
                         <SearchSelect
                             v-model="form.specialty_area"
@@ -576,38 +597,6 @@ async function onSubmit() {
                             </label>
                         </div>
                     </div>
-                </div>
-
-                <!-- ── Telefones ─────────────────────────────────────────────── -->
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label fw-semibold">{{ t.form_telephone }}</label>
-                        <input
-                            v-model="form.telephone"
-                            v-mask="'phone'"
-                            type="text"
-                            inputmode="numeric"
-                            class="form-control"
-                            placeholder="(00) 0000-0000"
-                        />
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label fw-semibold">{{ t.form_cellphone }}</label>
-                        <input
-                            v-model="form.cellphone"
-                            v-mask="'phone'"
-                            type="text"
-                            inputmode="numeric"
-                            class="form-control"
-                            placeholder="(00) 00000-0000"
-                        />
-                    </div>
-                </div>
-                <div class="form-check mb-3">
-                    <input id="whatsapp" v-model="form.cellphone_whatsapp" type="checkbox" class="form-check-input" />
-                    <label for="whatsapp" class="form-check-label small">
-                        <i class="fab fa-whatsapp text-success me-1"></i>{{ t.form_whatsapp }}
-                    </label>
                 </div>
 
                 <!-- ── Observações ───────────────────────────────────────────── -->
