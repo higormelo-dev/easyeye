@@ -7,9 +7,13 @@ declare(strict_types=1);
  * O titular baixa os próprios dados de uma clínica sem depender do staff.
  */
 
+use App\Domains\AI\Models\AiRun;
 use App\Enums\{ClientRule, DocumentationType, LgpdRequestStatus, LgpdRequestType};
+use App\Enums\ScheduleSituation;
 use App\Models\{Covenant, DataAccessLog, Doctor, Entity, LgpdRequest, MedicalRecord,
     MedicalRecordDocumentation, Patient, PatientAccount, People, User};
+use App\Models\{MedicalRecordEvolution, Schedule, VisualAcuityType};
+use App\Services\ContactLensCalculator;
 
 function makeLgpdExportFixture(): array
 {
@@ -85,6 +89,23 @@ test('titular baixa os proprios dados: 200, JSON com o conteudo clinico real, e 
     expect($lgpdRequest->responded_at)->not->toBeNull();
 });
 
+test('exportacao traz o calculo de lentes de contato gravado na consulta', function () {
+    $f = makeLgpdExportFixture();
+    $f['record']->update([
+        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate([
+            'vertex_od' => -6, 'se_od_sphere' => -2, 'se_od_cylinder' => -1,
+        ]),
+    ]);
+    loginAsPatient($f['account']);
+
+    $data = json_decode($this->get(route('patient-portal.clinics.export', $f['patient']))->getContent(), true);
+    $clc  = $data['medical_records'][0]['contact_lens_calculation'];
+
+    expect($clc['vertex_od'])->toEqual(-6)
+        ->and($clc['vertex_od_result'])->toEqual(-5.6)
+        ->and($clc['se_od_result'])->toEqual(-2.5);
+});
+
 test('registra data_access_log com patient_account_id (nao user_id) e purpose lgpd_request', function () {
     $f = makeLgpdExportFixture();
     loginAsPatient($f['account']);
@@ -117,4 +138,50 @@ test('sem sessao patient nega acesso, nunca vaza dados', function () {
     $this->getJson(route('patient-portal.clinics.export', $f['patient']))->assertUnauthorized();
 
     expect(LgpdRequest::query()->count())->toBe(0);
+});
+
+test('exportacao completa: exame, evolucao, versoes, agenda e IA — sem prompt interno nem dados de outra clinica', function () {
+    $f  = makeLgpdExportFixture();
+    $av = VisualAcuityType::create(['scale' => 2, 'name' => '20/20', 'active' => true]);
+    $f['record']->update([
+        'dynamic_spherical_right'                   => '-1.50',
+        'tonometer_right'                           => 14,
+        'biomicroscopy_right'                       => 'Córnea transparente',
+        'visual_acuity_without_correction_right_id' => $av->id,
+        'medications_in_use'                        => 'Colírio X',
+    ]);
+    MedicalRecordEvolution::create([
+        'entity_id'         => $f['entity']->id, 'patient_id' => $f['patient']->id,
+        'medical_record_id' => $f['record']->id, 'doctor_id' => $f['doctor']->id, 'content' => 'Evolução do retorno',
+    ]);
+    Schedule::create([
+        'entity_id' => $f['entity']->id, 'doctor_id' => $f['doctor']->id, 'patient_id' => $f['patient']->id,
+        'full_name' => 'Paciente Teste', 'date_time' => now(), 'situation' => ScheduleSituation::Scheduled->value, 'active' => true,
+    ]);
+    AiRun::factory()->create([
+        'entity_id'     => $f['entity']->id, 'patient_id' => $f['patient']->id,
+        'input_summary' => ['user_prompt' => 'Analise a refração', 'system_prompt' => 'INSTRUCAO-INTERNA-SECRETA', 'context' => ['idade' => 40]],
+    ]);
+    $other = makeLgpdExportFixture(); // outra clínica, outro titular
+
+    loginAsPatient($f['account']);
+    $raw  = $this->get(route('patient-portal.clinics.export', $f['patient']))->assertOk()->getContent();
+    $data = json_decode($raw, true);
+    $mr   = $data['medical_records'][0];
+
+    expect($mr['exam']['refraction']['dynamic']['od']['spherical'])->toBe('-1.50')
+        ->and((int) $mr['exam']['tonometry']['od'])->toBe(14)
+        ->and($mr['exam']['biomicroscopy']['od'])->toBe('Córnea transparente')
+        ->and($mr['exam']['visual_acuity']['without_correction']['od'])->toBe('20/20')
+        ->and($mr['anamnesis']['medications_in_use'])->toBe('Colírio X')
+        ->and($mr['evolutions'][0]['content'])->toBe('Evolução do retorno')
+        ->and($mr['versions'][0]['content_before_change']['exam']['biomicroscopy']['od'])->not->toBe('Córnea transparente')
+        ->and($data['appointments'])->toHaveCount(1)
+        ->and($data['ai_processing'][0]['data_sent']['question'])->toBe('Analise a refração')
+        ->and($data['export_scope']['not_included'])->not->toBeEmpty()
+        ->and(array_keys($data))->toContain('financial', 'tiss_guides', 'messages', 'waiting_list', 'lgpd_requests', 'portal_account');
+
+    expect($raw)->not->toContain('INSTRUCAO-INTERNA-SECRETA')
+        ->and($raw)->not->toContain($other['record']->code)
+        ->and($raw)->not->toContain('"password"');
 });
