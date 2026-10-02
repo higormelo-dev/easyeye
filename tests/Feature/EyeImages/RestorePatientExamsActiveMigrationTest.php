@@ -5,7 +5,7 @@
  * 02/02/2026 nasceram inativos por engano (default da coluna). O backfill
  * reabilita só os que ninguém desabilitou (desabilitar sempre gera audit_log
  * com `active`), mantém importação externa e exames antigos como estão e
- * deixa um audit_log por exame reabilitado; o down desfaz só esses.
+ * deixa um audit_log por exame reabilitado; o down reverte só o esquema.
  */
 
 use App\Models\{Entity, ExamType, Patient, PatientExam};
@@ -29,7 +29,7 @@ function restoreActiveExam($test, array $attrs): PatientExam
     return $exam;
 }
 
-it('reabilita só os exames inativos por engano, com trilha de auditoria, e o down desfaz só esses', function () {
+it('reabilita só os exames inativos por engano, com trilha de auditoria; o down mantém dados e trilha', function () {
     $stuck     = restoreActiveExam($this, ['source' => 'integrator', 'active' => false]);
     $disabled  = restoreActiveExam($this, ['source' => 'integrator', 'active' => false]);
     $external  = restoreActiveExam($this, ['source' => 'external_import', 'active' => false]);
@@ -63,11 +63,27 @@ it('reabilita só os exames inativos por engano, com trilha de auditoria, e o do
     ], 'id');
     expect((bool) DB::table('patient_exams')->where('id', $fresh)->value('active'))->toBeTrue();
 
+    // Rollback volta só o esquema: desabilitar de novo reintroduziria o bug
+    // (e sobrescreveria decisões posteriores do médico); a trilha fica.
     $this->migration->down();
 
-    expect((bool) $stuck->fresh()->active)->toBeFalse()
+    expect((bool) $stuck->fresh()->active)->toBeTrue()
         ->and((bool) $alreadyOn->fresh()->active)->toBeTrue()
-        ->and(DB::table('audit_logs')->where('user_agent', 'like', 'migration:2026_09_30_100000%')->count())->toBe(0);
+        ->and(DB::table('audit_logs')->where('user_agent', 'like', 'migration:2026_09_30_100000%')->count())->toBe(1);
 
     $this->migration->up(); // estado final igual ao das outras suítes
+});
+
+it('exame criado sem informar active nasce habilitado mesmo num banco com o default antigo (false)', function () {
+    // beforeEach rodou o down(): a coluna está com default false, como em
+    // ambiente ainda sem esta migration. A proteção vem do default do model.
+    $data = PatientExam::factory()->raw(['patient_id' => $this->patient->id, 'exam_id' => $this->type->id]);
+    unset($data['active']);
+
+    $exam = PatientExam::create($data);
+
+    expect(DB::table('patient_exams')->where('id', $exam->id)->value('active'))->toBeTrue()
+        ->and($exam->fresh()->active)->toBeTrue();
+
+    $this->migration->up();
 });

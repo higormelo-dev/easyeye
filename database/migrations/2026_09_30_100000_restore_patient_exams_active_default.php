@@ -23,7 +23,8 @@ use Illuminate\Support\Str;
  *   que NUNCA foram desabilitados por alguém — desabilitar só existe desde
  *   09/09/2026 (EyeImageExamActionsController::toggleActive) e sempre gera
  *   audit_log com `active`; a importação externa já nascia ativa. Cada exame
- *   reabilitado ganha um audit_log (rastreável e reversível);
+ *   reabilitado ganha um audit_log (rastreável); o down reverte só o
+ *   esquema — os dados reabilitados e a trilha ficam;
  * - índice em schedule_id: o repasse busca os exames de cada agendamento.
  *
  * Fora de uma transação única (`withinTransaction = false`): no PostgreSQL a
@@ -72,17 +73,9 @@ return new class() extends Migration {
 
     public function down(): void
     {
-        // Desfaz só o que este backfill reabilitou e ninguém mexeu depois.
-        DB::table('patient_exams as pe')
-            ->whereExists(fn (Builder $q) => $q->from('audit_logs as al')
-                ->whereColumn('al.auditable_id', 'pe.id')
-                ->where('al.auditable_type', PatientExam::class)
-                ->where('al.user_agent', self::MIGRATION_AGENT))
-            ->where('pe.active', true)
-            ->update(['active' => false]);
-
-        DB::table('audit_logs')->where('user_agent', self::MIGRATION_AGENT)->delete();
-
+        // Só o esquema. Os dados não voltam: desabilitar de novo os exames
+        // reabilitados reintroduziria o bug (e sobrescreveria decisões
+        // posteriores do médico), e a trilha em audit_logs é append-only.
         $this->dropScheduleIndex();
 
         Schema::table('patient_exams', function (Blueprint $table) {

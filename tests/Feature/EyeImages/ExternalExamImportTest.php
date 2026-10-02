@@ -68,6 +68,8 @@ it('médico importa exame externo com 1 arquivo — PatientExam criado com sourc
     expect($exam)->not->toBeNull();
     expect($exam->source)->toBe(ExamSource::ExternalImport);
     expect($exam->exam_id)->toBe($this->examType->id);
+    // Importado nasce habilitado (válido para laudo, IA e repasse).
+    expect($exam->active)->toBeTrue();
     Storage::disk('s3')->assertExists($exam->archive);
 });
 

@@ -22,6 +22,18 @@ class PatientExam extends Model
     protected $primaryKey = 'id';
 
     /**
+     * Exame nasce habilitado (válido para laudo, IA e repasse); desabilitar é
+     * decisão do médico no Gerenciador de Imagens. Default no model, não só no
+     * banco: um ponto de criação que esqueça a chave não repete o bug de
+     * 02/02/2026 (todo exame do integrador nascia "Desabilitada").
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'active' => true,
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -89,6 +101,7 @@ class PatientExam extends Model
         return [
             'laterality'        => 'integer',
             'quality_rating'    => 'integer',
+            'active'            => 'boolean',
             'diagnosis_cids'    => 'array',
             'source'            => ExamSource::class,
             'exam_performed_at' => 'datetime',

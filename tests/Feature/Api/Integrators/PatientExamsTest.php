@@ -191,6 +191,24 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
         Storage::disk('s3')->assertExists($exam->archive);
     });
 
+    // Exame capturado nasce habilitado: de 02/02 a 30/09/2026 todo exame do
+    // integrador nascia `active=false` e o Gerenciador de Imagens mostrava o
+    // selo "Desabilitada" (fora de laudo, IA e repasse).
+    it('exame enviado pelo integrador nasce habilitado', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('topografia.jpg'),
+                'name'                => 'Topografia Corneana 01',
+            ],
+            $this->ctx['headers'],
+        )->assertCreated();
+
+        expect((bool) PatientExam::where('name', 'Topografia Corneana 01')->sole()->active)->toBeTrue();
+    });
+
     it('resolves doctor_id from schedule', function () {
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
