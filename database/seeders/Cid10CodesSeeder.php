@@ -206,6 +206,15 @@ class Cid10CodesSeeder extends Seeder
             ['code' => 'H59.0', 'description' => 'Síndrome do vítreo após cirurgia de catarata', 'category' => 'Outros'],
             ['code' => 'H59.8', 'description' => 'Outros transtornos do olho e anexos após procedimentos', 'category' => 'Outros'],
 
+            // ── Z00–Z99 Fatores que influenciam o estado de saúde ─────────────
+            ['code' => 'Z01.0', 'description' => 'Exame dos olhos e da visão', 'category' => 'Exames e Acompanhamento'],
+            ['code' => 'Z13.5', 'description' => 'Exame especial de rastreamento de doenças dos olhos e dos ouvidos', 'category' => 'Exames e Acompanhamento'],
+            ['code' => 'Z46.0', 'description' => 'Colocação e ajustamento de óculos e lentes de contato', 'category' => 'Exames e Acompanhamento'],
+            ['code' => 'Z83.5', 'description' => 'História familiar de transtornos dos olhos e dos ouvidos', 'category' => 'Exames e Acompanhamento'],
+            ['code' => 'Z94.7', 'description' => 'Córnea transplantada', 'category' => 'Exames e Acompanhamento'],
+            ['code' => 'Z96.1', 'description' => 'Presença de lente intra-ocular', 'category' => 'Exames e Acompanhamento'],
+            ['code' => 'Z97.3', 'description' => 'Presença de óculos e de lentes de contato', 'category' => 'Exames e Acompanhamento'],
+
             // ── Doenças sistêmicas com repercussão oftalmológica ──────────────
             ['code' => 'E10.3', 'description' => 'Diabetes mellitus tipo 1 com complicações oftálmicas', 'category' => 'Sistêmico'],
             ['code' => 'E11.3', 'description' => 'Diabetes mellitus tipo 2 com complicações oftálmicas', 'category' => 'Sistêmico'],
