@@ -49,7 +49,7 @@ async function load() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         data.value = await res.json();
     } catch (e) {
-        errorMsg.value = e.message;
+        errorMsg.value = tt('view_error', 'Não foi possível carregar o prontuário.');
         // eslint-disable-next-line no-console
         console.error('[MedicalRecordView] falha ao carregar prontuário:', e);
     } finally {
@@ -62,13 +62,18 @@ function close() {
 }
 
 // ── Montagem das seções (apenas campos preenchidos) ────────────────────────
-const yn = (v) => (v ? (props.t.yes ?? 'Sim') : (props.t.no ?? 'Não'));
+const tt = (key, fallback) => props.t[key] ?? fallback;
 const pair = (r, l) => {
     const parts = [];
-    if (r !== null && r !== undefined && r !== '') parts.push(`OD: ${r}`);
-    if (l !== null && l !== undefined && l !== '') parts.push(`OE: ${l}`);
+    if (r !== null && r !== undefined && r !== '') parts.push(`${tt('od', 'OD')}: ${r}`);
+    if (l !== null && l !== undefined && l !== '') parts.push(`${tt('oe', 'OE')}: ${l}`);
     return parts.join('  ·  ');
 };
+// Antecedente: paciente e/ou família (switches independentes no form) —
+// histórico só familiar também aparece.
+const risk = (self, family) =>
+    [self ? tt('self', 'Próprio') : '', family ? tt('family', 'Familiar') : ''].filter(Boolean).join(' · ');
+const followUp = (days) => (days ? `${days} ${tt('days', 'dias')}` : '');
 
 const { locale } = useLocaleFormat();
 
@@ -84,59 +89,70 @@ const sections = computed(() => {
     const out = [];
 
     const anamnese = rows([
-        ['Queixa principal', d.main_complaint],
-        ['HDA', d.hda],
-        ['Cirurgias oculares', d.ocular_surgical_history],
-        ['Medicações em uso', d.medications_in_use],
-        ['Diabético', d.diabetic ? `${yn(d.diabetic)}${d.diabetic_family ? ' · familiar' : ''}` : ''],
-        ['Hipertenso', d.hypertensive ? `${yn(d.hypertensive)}${d.hypertensive_family ? ' · familiar' : ''}` : ''],
-        ['Glaucomatoso', d.glaucomatous ? `${yn(d.glaucomatous)}${d.glaucomatous_family ? ' · familiar' : ''}` : ''],
+        [tt('complaint', 'Queixa principal'), d.main_complaint],
+        [tt('hda_short', 'HDA'), d.hda],
+        [tt('ocular_surgical_history', 'Histórico cirúrgico ocular'), d.ocular_surgical_history],
+        [tt('medications_in_use', 'Medicamentos em uso'), d.medications_in_use],
+        [tt('diabetic', 'Diabético'), risk(d.diabetic, d.diabetic_family)],
+        [tt('hypertensive', 'Hipertenso'), risk(d.hypertensive, d.hypertensive_family)],
+        [tt('glaucomatous', 'Glaucomatoso'), risk(d.glaucomatous, d.glaucomatous_family)],
     ]);
-    if (anamnese.length) out.push({ title: 'Anamnese', icon: 'fa-comment-medical', rows: anamnese });
+    if (anamnese.length)
+        out.push({ title: tt('tab_anamnesis', 'Anamnese'), icon: 'fa-comment-medical', rows: anamnese });
 
     const exame = rows([
-        ['Acuidade visual', d.visual_acuity_type],
-        ['Motilidade ocular', d.ocular_motility],
-        ['Tonometria', pair(d.tonometer_right, d.tonometer_left)],
-        ['Horário tonometria', d.tonometer_time],
-        ['Paquimetria', pair(d.pachymetry_right, d.pachymetry_left)],
-        ['Gonioscopia', pair(d.gonioscopy_right, d.gonioscopy_left)],
-        ['Cover test', d.cover_test_type],
-        ['Visão de cores', d.color_vision_type],
-        ['Ponto próximo convergência', d.near_point_convergence],
+        [tt('visual_acuity', 'Acuidade visual'), d.visual_acuity_type],
+        [tt('ocular_motility', 'Motilidade ocular'), d.ocular_motility],
+        [tt('tonometry', 'Tonometria'), pair(d.tonometer_right, d.tonometer_left)],
+        [tt('tonometry_time', 'Horário da tonometria'), d.tonometer_time],
+        [tt('pachymetry', 'Paquimetria'), pair(d.pachymetry_right, d.pachymetry_left)],
+        [tt('gonioscopy', 'Gonioscopia'), pair(d.gonioscopy_right, d.gonioscopy_left)],
+        [tt('cover_test', 'Cover Test'), d.cover_test_type],
+        [tt('chromatic_vision', 'Vis. Cromática'), d.color_vision_type],
+        [tt('near_point_convergence', 'Ponto próximo de convergência'), d.near_point_convergence],
     ]);
-    if (exame.length) out.push({ title: 'Exame físico', icon: 'fa-eye', rows: exame });
+    if (exame.length) out.push({ title: tt('tab_exam', 'Exame Físico'), icon: 'fa-eye', rows: exame });
 
     const refracao = rows([
-        ['AV sem correção', pair(d.visual_acuity_without_correction_right, d.visual_acuity_without_correction_left)],
-        ['AV com correção', pair(d.visual_acuity_with_correction_right, d.visual_acuity_with_correction_left)],
-        ['Esférico dinâmico', pair(d.dynamic_spherical_right, d.dynamic_spherical_left)],
-        ['Cilíndrico dinâmico', pair(d.dynamic_cylindrical_right, d.dynamic_cylindrical_left)],
-        ['Eixo dinâmico', pair(d.dynamic_axis_right, d.dynamic_axis_left)],
-        ['Esférico estático', pair(d.static_spherical_right, d.static_spherical_left)],
-        ['Cilíndrico estático', pair(d.static_cylindrical_right, d.static_cylindrical_left)],
-        ['Eixo estático', pair(d.static_axis_right, d.static_axis_left)],
-        ['Adição', d.addition_type],
-        ['Lente longe', d.lens_away],
-        ['Lente perto', d.lens_near],
+        [
+            tt('av_without', 'A/V sem correção'),
+            pair(d.visual_acuity_without_correction_right, d.visual_acuity_without_correction_left),
+        ],
+        [
+            tt('av_with', 'A/V com correção'),
+            pair(d.visual_acuity_with_correction_right, d.visual_acuity_with_correction_left),
+        ],
+        [tt('dynamic_spherical', 'Esférico dinâmico'), pair(d.dynamic_spherical_right, d.dynamic_spherical_left)],
+        [
+            tt('dynamic_cylindrical', 'Cilíndrico dinâmico'),
+            pair(d.dynamic_cylindrical_right, d.dynamic_cylindrical_left),
+        ],
+        [tt('dynamic_axis', 'Eixo dinâmico'), pair(d.dynamic_axis_right, d.dynamic_axis_left)],
+        [tt('static_spherical', 'Esférico estático'), pair(d.static_spherical_right, d.static_spherical_left)],
+        [tt('static_cylindrical', 'Cilíndrico estático'), pair(d.static_cylindrical_right, d.static_cylindrical_left)],
+        [tt('static_axis', 'Eixo estático'), pair(d.static_axis_right, d.static_axis_left)],
+        [tt('addition', 'Adição'), d.addition_type],
+        [tt('lens_away_label', 'Lente longe'), d.lens_away],
+        [tt('lens_near_label', 'Lente perto'), d.lens_near],
         // Cálculo de lentes de contato vinculado à consulta.
         ...contactLensSummary(d.contact_lens_calculation, props.t, locale.value).map((row) => [row.label, row.value]),
     ]);
-    if (refracao.length) out.push({ title: 'Refração', icon: 'fa-glasses', rows: refracao });
+    if (refracao.length) out.push({ title: tt('tab_refraction', 'Refração'), icon: 'fa-glasses', rows: refracao });
 
     const achados = rows([
-        ['Biomicroscopia', pair(d.biomicroscopy_right, d.biomicroscopy_left)],
-        ['Fundoscopia', pair(d.fundoscopy_right, d.fundoscopy_left)],
-        ['Observação geral', d.observation_general],
-        ['Observação de lentes', d.observation_of_lenses],
+        [tt('biomicroscopy', 'Biomicroscopia'), pair(d.biomicroscopy_right, d.biomicroscopy_left)],
+        [tt('fundoscopy', 'Fundoscopia'), pair(d.fundoscopy_right, d.fundoscopy_left)],
+        [tt('general_obs', 'Observação geral'), d.observation_general],
+        [tt('lenses_obs', 'Observação de lentes'), d.observation_of_lenses],
     ]);
-    if (achados.length) out.push({ title: 'Achados', icon: 'fa-magnifying-glass', rows: achados });
+    if (achados.length) out.push({ title: tt('tab_findings', 'Achados'), icon: 'fa-magnifying-glass', rows: achados });
 
     const conduta = rows([
-        ['Conduta clínica', d.clinical_conduct],
-        ['Retorno (dias)', d.follow_up_days],
+        [tt('clinical_conduct', 'Conduta clínica'), d.clinical_conduct],
+        [tt('follow_up', 'Retorno'), followUp(d.follow_up_days)],
     ]);
-    if (conduta.length) out.push({ title: 'Diagnóstico & conduta', icon: 'fa-notes-medical', rows: conduta });
+    if (conduta.length)
+        out.push({ title: tt('diagnosis_conduct', 'Diagnóstico & conduta'), icon: 'fa-notes-medical', rows: conduta });
 
     return out;
 });
@@ -159,18 +175,26 @@ const documentations = computed(() => data.value?.documentations ?? []);
             v-if="open"
             class="modal fade show d-block"
             tabindex="-1"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="medicalRecordViewTitle"
             style="background: rgba(15, 23, 42, 0.55)"
             @click.self="close"
         >
             <div class="modal-dialog modal-lg modal-dialog-scrollable" style="max-width: 760px">
                 <div class="modal-content border-0 shadow-lg">
                     <div class="modal-header py-2 border-0">
-                        <h6 class="modal-title d-flex align-items-center gap-2 mb-0">
+                        <h6 id="medicalRecordViewTitle" class="modal-title d-flex align-items-center gap-2 mb-0">
                             <i class="fas fa-file-medical text-primary"></i>
                             {{ t.view_title ?? 'Prontuário' }}
                             <small v-if="record?.code" class="text-muted fw-normal">{{ record.code }}</small>
                         </h6>
-                        <button type="button" class="btn-close" @click="close"></button>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            :aria-label="tt('close', 'Fechar')"
+                            @click="close"
+                        ></button>
                     </div>
 
                     <div class="modal-body">
@@ -271,9 +295,13 @@ const documentations = computed(() => data.value?.documentations ?? []);
                                                 <span
                                                     v-if="doc.is_ai"
                                                     class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle ms-1"
-                                                    :title="doc.ai_workflow_label || 'IA'"
+                                                    :title="
+                                                        doc.ai_workflow_label || tt('ai_generated', 'Gerado por IA')
+                                                    "
+                                                    data-ai-badge
                                                 >
-                                                    <i class="fas fa-robot"></i> IA
+                                                    <i class="fas fa-robot" aria-hidden="true"></i>
+                                                    {{ tt('ai_badge', 'IA') }}
                                                 </span>
                                             </div>
                                             <div class="text-muted" style="font-size: 0.72rem">
@@ -285,8 +313,10 @@ const documentations = computed(() => data.value?.documentations ?? []);
                                             :href="doc.pdf_url"
                                             target="_blank"
                                             class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                                            :aria-label="tt('open_pdf', 'Abrir PDF')"
+                                            :title="tt('open_pdf', 'Abrir PDF')"
                                         >
-                                            <i class="fas fa-file-pdf"></i>
+                                            <i class="fas fa-file-pdf" aria-hidden="true"></i>
                                         </a>
                                     </li>
                                 </ul>

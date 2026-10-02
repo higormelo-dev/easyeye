@@ -79,6 +79,29 @@ it('serializa o resumo clínico da consulta anterior (AV, refração, PIO, diagn
         ->and($summary['conduct'])->toBe('Prescrição de óculos e retorno em 1 ano.');
 });
 
+it('resumo segue o idioma do usuário (inglês: OS para o olho esquerdo)', function () {
+    $av2020 = VisualAcuityType::create(['scale' => 2, 'name' => '20/20', 'active' => true]);
+    $av2025 = VisualAcuityType::create(['scale' => 3, 'name' => '20/25', 'active' => true]);
+
+    MedicalRecord::create([
+        'patient_id'                                => $this->patient->id,
+        'doctor_id'                                 => $this->doctor->id,
+        'main_complaint'                            => 'Blurred vision',
+        'visual_acuity_without_correction_right_id' => $av2020->id,
+        'visual_acuity_without_correction_left_id'  => $av2025->id,
+        'tonometer_right'                           => 14,
+        'tonometer_left'                            => 15,
+    ]);
+
+    $summary = $this->withSession(['locale' => 'en'])
+        ->get(route('panel.patients.medicalrecords.create', $this->patient))
+        ->assertOk()
+        ->viewData('page')['props']['previousRecords'][0]['summary'];
+
+    expect($summary['av_sc'])->toBe('OD 20/20 | OS 20/25')
+        ->and($summary['pio'])->toBe('OD 14 | OS 15 mmHg');
+});
+
 it('omite linhas sem dado (null) — a UI esconde a linha inteira', function () {
     MedicalRecord::create([
         'patient_id'     => $this->patient->id,

@@ -44,8 +44,12 @@ function toggleExpand(record) {
         <div
             class="card-header py-2 d-flex align-items-center gap-2 prev-records__header"
             role="button"
+            tabindex="0"
+            :aria-expanded="String(!collapsed)"
             :title="collapsed ? (t.expand_panel ?? 'Mostrar histórico') : (t.collapse_panel ?? 'Minimizar histórico')"
             @click="collapsed = !collapsed"
+            @keydown.enter.prevent="collapsed = !collapsed"
+            @keydown.space.prevent="collapsed = !collapsed"
         >
             <i class="fas fa-clock-rotate-left text-primary"></i>
             <span class="fw-semibold small">{{ t.previous_records ?? 'Consultas anteriores' }}</span>
@@ -64,6 +68,7 @@ function toggleExpand(record) {
                 :class="{ 'prev-records__item--expanded': expandedId === r.id }"
                 role="button"
                 tabindex="0"
+                :aria-expanded="String(expandedId === r.id)"
                 @click="toggleExpand(r)"
                 @keydown.enter="toggleExpand(r)"
                 @keydown.space.prevent="toggleExpand(r)"
@@ -98,32 +103,37 @@ function toggleExpand(record) {
                      quebrar linha do que esconder o grau (ticket). -->
                 <div v-if="r.summary" class="prev-records__summary mt-1">
                     <div v-if="r.summary.av_sc" class="prev-records__summary-line">
-                        <span class="prev-records__tag">AV s/c</span>{{ r.summary.av_sc }}
+                        <span class="prev-records__tag" :title="t.av_without">{{ t.av_sc_short ?? 'AV s/c' }}</span
+                        >{{ r.summary.av_sc }}
                     </div>
                     <div v-if="r.summary.av_cc" class="prev-records__summary-line">
-                        <span class="prev-records__tag">AV c/c</span>{{ r.summary.av_cc }}
+                        <span class="prev-records__tag" :title="t.av_with">{{ t.av_cc_short ?? 'AV c/c' }}</span
+                        >{{ r.summary.av_cc }}
                     </div>
                     <template v-if="r.summary.refraction_od || r.summary.refraction_oe">
                         <div class="prev-records__summary-line prev-records__summary-line--strong">
-                            <span class="prev-records__tag">Ref</span>
+                            <span class="prev-records__tag" :title="t.refraction">{{
+                                t.refraction_short ?? 'Ref'
+                            }}</span>
                         </div>
                         <div
                             v-if="r.summary.refraction_od"
                             class="prev-records__summary-line prev-records__summary-line--indent"
                         >
-                            <span class="prev-records__eye">OD:</span>{{ r.summary.refraction_od }}
+                            <span class="prev-records__eye">{{ t.od ?? 'OD' }}:</span>{{ r.summary.refraction_od }}
                         </div>
                         <div
                             v-if="r.summary.refraction_oe"
                             class="prev-records__summary-line prev-records__summary-line--indent"
                         >
-                            <span class="prev-records__eye">OE:</span>{{ r.summary.refraction_oe }}
+                            <span class="prev-records__eye">{{ t.oe ?? 'OE' }}:</span>{{ r.summary.refraction_oe }}
                         </div>
                         <div
                             v-if="r.summary.addition"
                             class="prev-records__summary-line prev-records__summary-line--indent"
                         >
-                            <span class="prev-records__eye">Ad:</span>{{ r.summary.addition }}
+                            <span class="prev-records__eye" :title="t.addition">{{ t.addition_short ?? 'Ad' }}:</span
+                            >{{ r.summary.addition }}
                         </div>
                     </template>
                     <!-- Cálculo de lentes de contato da consulta (só quando houve):
@@ -139,12 +149,13 @@ function toggleExpand(record) {
                         >{{ row.value }}
                     </div>
                     <div v-if="r.summary.pio" class="prev-records__summary-line">
-                        <span class="prev-records__tag">PIO</span>{{ r.summary.pio }}
+                        <span class="prev-records__tag" :title="t.tonometry">{{ t.iop_short ?? 'PIO' }}</span
+                        >{{ r.summary.pio }}
                     </div>
                 </div>
 
                 <!-- Expansão in-panel: diagnósticos + conduta + queixa -->
-                <div v-if="expandedId === r.id" class="prev-records__detail mt-2" @click.stop>
+                <div v-if="expandedId === r.id" class="prev-records__detail mt-2" @click.stop @keydown.stop>
                     <div v-if="r.summary?.diagnoses?.length" class="mb-1">
                         <div class="prev-records__detail-label">{{ t.diagnoses ?? 'Diagnósticos' }}</div>
                         <span

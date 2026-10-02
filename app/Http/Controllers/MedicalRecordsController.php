@@ -299,21 +299,7 @@ class MedicalRecordsController extends Controller
             'edit_url'      => route('panel.patients.medicalrecords.edit', [$patient, $medicalrecord]),
             'pdf_url'       => route('panel.patients.medicalrecords.pdf', [$patient, $medicalrecord]),
             'templates_url' => route('panel.patients.medicalrecords.templates', [$patient, $medicalrecord]),
-            // Labels i18n consumidos pelo `buildDetailHtml` no offcanvas.
-            'labels' => [
-                'yes'          => __('actions.medical_records.yes'),
-                'no'           => __('actions.medical_records.no'),
-                'not_informed' => __('actions.medical_records.not_informed'),
-                'complaint'    => __('actions.medical_records.complaint'),
-                'history'      => __('actions.medical_records.history'),
-                'diabetic'     => __('actions.medical_records.diabetic'),
-                'hypertensive' => __('actions.medical_records.hypertensive'),
-                'glaucomatous' => __('actions.medical_records.glaucomatous'),
-                'family'       => __('actions.medical_records.family'),
-                'tonometry'    => __('actions.medical_records.tonometry'),
-                'general_obs'  => __('actions.medical_records.general_obs'),
-                'lenses_obs'   => __('actions.medical_records.lenses_obs'),
-            ],
+            // Rótulos: prop `t` (actions.medical_records) de quem abre a consulta.
         ]);
     }
 
@@ -658,19 +644,19 @@ class MedicalRecordsController extends Controller
     }
 
     /**
-     * "OD x | OE y" — omite o olho sem dado; null quando ambos vazios
-     * (a UI esconde a linha inteira).
+     * "OD x | OE y" (en: "OD x | OS y") — omite o olho sem dado; null quando
+     * ambos vazios (a UI esconde a linha inteira).
      */
     private function eyePair(mixed $right, mixed $left, string $suffix = ''): ?string
     {
         $parts = [];
 
         if ($right !== null && $right !== '') {
-            $parts[] = 'OD ' . $right;
+            $parts[] = __('actions.medical_records.od') . ' ' . $right;
         }
 
         if ($left !== null && $left !== '') {
-            $parts[] = 'OE ' . $left;
+            $parts[] = __('actions.medical_records.oe') . ' ' . $left;
         }
 
         return $parts === [] ? null : implode(' | ', $parts) . $suffix;

@@ -321,6 +321,7 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
                 :open="detailOpen"
                 :record="detailRecord"
                 :patient="patient"
+                :t="t"
                 @close="detailOpen = false"
             />
 

@@ -17,7 +17,11 @@ const props = defineProps({
     open: { type: Boolean, required: true },
     record: { type: Object, default: null },
     patient: { type: Object, required: true },
+    /** Traduções actions.medical_records (mesma prop `t` da página). */
+    t: { type: Object, default: () => ({}) },
 });
+
+const tt = (key, fallback) => props.t[key] ?? fallback;
 
 defineEmits(['close']);
 
@@ -53,10 +57,10 @@ function valOr(v, alt = '—') {
     return v === null || v === undefined || v === '' ? alt : v;
 }
 
-function boolLabel(v, labels) {
-    if (v === true) return labels?.yes ?? 'Sim';
-    if (v === false) return labels?.no ?? 'Não';
-    return labels?.not_informed ?? 'Não informado';
+function boolLabel(v) {
+    if (v === true) return tt('yes', 'Sim');
+    if (v === false) return tt('no', 'Não');
+    return tt('not_informed', 'Não informado');
 }
 
 /**
@@ -116,14 +120,14 @@ function closePdfPreview() {
         :open="open"
         :width="680"
         :loading="loading"
-        loading-label="Carregando prontuário..."
+        :loading-label="tt('loading', 'Carregando…')"
         @close="$emit('close')"
     >
         <template #header>
             <div>
                 <h5 class="mb-0 fw-semibold">
                     <i class="ti ti-file-text me-2 text-info"></i>
-                    Prontuário
+                    {{ tt('view_title', 'Prontuário') }}
                 </h5>
                 <code v-if="detail" class="text-muted small">{{ detail.code }}</code>
             </div>
@@ -132,7 +136,7 @@ function closePdfPreview() {
                     v-if="detail.is_signed"
                     class="badge badge-soft-success rounded text-success border border-success fs-11"
                 >
-                    <i class="ti ti-shield-check me-1"></i>Assinado
+                    <i class="ti ti-shield-check me-1"></i>{{ tt('signed', 'Assinado') }}
                 </span>
                 <a
                     v-if="record?.pdf_url"
@@ -143,7 +147,8 @@ function closePdfPreview() {
                     <i class="ti ti-file-download me-1"></i>PDF
                 </a>
                 <a v-if="record?.edit_url" :href="record.edit_url" class="btn btn-sm btn-outline-primary">
-                    <i class="ti ti-edit me-1"></i>{{ detail?.is_locked ? 'Ver' : 'Editar' }}
+                    <i class="ti ti-edit me-1"></i
+                    >{{ detail?.is_locked ? tt('view_short', 'Ver') : tt('edit_short', 'Editar') }}
                 </a>
             </div>
         </template>
@@ -163,20 +168,24 @@ function closePdfPreview() {
                     <button
                         type="button"
                         class="nav-link"
+                        role="tab"
+                        :aria-selected="String(activeTab === 'info')"
                         :class="{ active: activeTab === 'info' }"
                         @click="activeTab = 'info'"
                     >
-                        <i class="ti ti-clipboard-text me-1"></i>Informações
+                        <i class="ti ti-clipboard-text me-1"></i>{{ tt('tab_info', 'Informações') }}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button
                         type="button"
                         class="nav-link d-flex align-items-center gap-1"
+                        role="tab"
+                        :aria-selected="String(activeTab === 'docs')"
                         :class="{ active: activeTab === 'docs' }"
                         @click="activeTab = 'docs'"
                     >
-                        <i class="ti ti-paperclip me-1"></i>Documentos
+                        <i class="ti ti-paperclip me-1"></i>{{ tt('documentations', 'Documentações') }}
                         <span
                             v-if="docCount > 0"
                             class="badge rounded-pill bg-info-subtle text-info border border-info-subtle ms-1"
@@ -192,76 +201,83 @@ function closePdfPreview() {
                 <!-- Anamnese -->
                 <section class="detail-section">
                     <h6 class="detail-section__title">
-                        <i class="ti ti-message me-1"></i>{{ detail.labels?.complaint ?? 'Queixa & Anamnese' }}
+                        <i class="ti ti-message me-1"></i>{{ tt('tab_anamnesis', 'Anamnese') }}
                     </h6>
                     <div class="detail-row">
-                        <span class="detail-label">{{ detail.labels?.complaint ?? 'Queixa principal' }}</span
+                        <span class="detail-label">{{ tt('complaint', 'Queixa principal') }}</span
                         ><span class="detail-value">{{ valOr(detail.main_complaint) }}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">{{ detail.labels?.history ?? 'HDA' }}</span
+                        <span class="detail-label">{{ tt('hda_short', 'HDA') }}</span
                         ><span class="detail-value">{{ valOr(detail.hda) }}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">{{ detail.labels?.diabetic ?? 'Diabético' }}</span
+                        <span class="detail-label">{{ tt('diabetic', 'Diabético') }}</span
                         ><span class="detail-value"
-                            >{{ boolLabel(detail.diabetic, detail.labels) }}
+                            >{{ boolLabel(detail.diabetic) }}
                             <small v-if="detail.diabetic_family" class="text-muted"
-                                >({{ detail.labels?.family }})</small
+                                >({{ tt('family', 'Familiar') }})</small
                             ></span
                         >
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">{{ detail.labels?.hypertensive ?? 'Hipertenso' }}</span
+                        <span class="detail-label">{{ tt('hypertensive', 'Hipertenso') }}</span
                         ><span class="detail-value"
-                            >{{ boolLabel(detail.hypertensive, detail.labels) }}
+                            >{{ boolLabel(detail.hypertensive) }}
                             <small v-if="detail.hypertensive_family" class="text-muted"
-                                >({{ detail.labels?.family }})</small
+                                >({{ tt('family', 'Familiar') }})</small
                             ></span
                         >
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">{{ detail.labels?.glaucomatous ?? 'Glaucomatoso' }}</span
+                        <span class="detail-label">{{ tt('glaucomatous', 'Glaucomatoso') }}</span
                         ><span class="detail-value"
-                            >{{ boolLabel(detail.glaucomatous, detail.labels) }}
+                            >{{ boolLabel(detail.glaucomatous) }}
                             <small v-if="detail.glaucomatous_family" class="text-muted"
-                                >({{ detail.labels?.family }})</small
+                                >({{ tt('family', 'Familiar') }})</small
                             ></span
                         >
                     </div>
                     <div v-if="detail.ocular_surgical_history" class="detail-row">
-                        <span class="detail-label">Histórico cirúrgico</span
+                        <span class="detail-label">{{
+                            tt('ocular_surgical_history', 'Histórico cirúrgico ocular')
+                        }}</span
                         ><span class="detail-value">{{ detail.ocular_surgical_history }}</span>
                     </div>
                     <div v-if="detail.medications_in_use" class="detail-row">
-                        <span class="detail-label">Medicações em uso</span
+                        <span class="detail-label">{{ tt('medications_in_use', 'Medicamentos em uso') }}</span
                         ><span class="detail-value">{{ detail.medications_in_use }}</span>
                     </div>
                 </section>
 
                 <!-- Exame físico -->
                 <section class="detail-section">
-                    <h6 class="detail-section__title"><i class="ti ti-eye me-1"></i>Exame físico</h6>
+                    <h6 class="detail-section__title">
+                        <i class="ti ti-eye me-1"></i>{{ tt('tab_exam', 'Exame Físico') }}
+                    </h6>
                     <div class="detail-row">
-                        <span class="detail-label">Acuidade visual</span
+                        <span class="detail-label">{{ tt('visual_acuity', 'Acuidade visual') }}</span
                         ><span class="detail-value">{{ valOr(detail.visual_acuity_type) }}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">Conv. ponto próximo</span
+                        <span class="detail-label">{{
+                            tt('near_point_convergence', 'Ponto próximo de convergência')
+                        }}</span
                         ><span class="detail-value">{{ valOr(detail.near_point_convergence) }}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">Cover test</span
+                        <span class="detail-label">{{ tt('cover_test', 'Cover Test') }}</span
                         ><span class="detail-value">{{ valOr(detail.cover_test_type) }}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="detail-label">Visão de cores</span
+                        <span class="detail-label">{{ tt('chromatic_vision', 'Vis. Cromática') }}</span
                         ><span class="detail-value">{{ valOr(detail.color_vision_type) }}</span>
                     </div>
                     <div v-if="detail.tonometer_right || detail.tonometer_left" class="detail-row">
-                        <span class="detail-label">{{ detail.labels?.tonometry ?? 'Tonometria' }}</span>
+                        <span class="detail-label">{{ tt('tonometry', 'Tonometria') }}</span>
                         <span class="detail-value">
-                            OD: <code>{{ valOr(detail.tonometer_right) }}</code> / OE:
+                            {{ tt('od', 'OD') }}: <code>{{ valOr(detail.tonometer_right) }}</code> /
+                            {{ tt('oe', 'OE') }}:
                             <code>{{ valOr(detail.tonometer_left) }}</code>
                             <small v-if="detail.tonometer_time" class="text-muted ms-2">{{
                                 detail.tonometer_time
@@ -269,9 +285,10 @@ function closePdfPreview() {
                         </span>
                     </div>
                     <div v-if="detail.pachymetry_right || detail.pachymetry_left" class="detail-row">
-                        <span class="detail-label">Paquimetria</span>
+                        <span class="detail-label">{{ tt('pachymetry', 'Paquimetria') }}</span>
                         <span class="detail-value">
-                            OD: <code>{{ valOr(detail.pachymetry_right) }}</code> / OE:
+                            {{ tt('od', 'OD') }}: <code>{{ valOr(detail.pachymetry_right) }}</code> /
+                            {{ tt('oe', 'OE') }}:
                             <code>{{ valOr(detail.pachymetry_left) }}</code>
                         </span>
                     </div>
@@ -284,19 +301,21 @@ function closePdfPreview() {
                     "
                     class="detail-section"
                 >
-                    <h6 class="detail-section__title"><i class="ti ti-eyeglass-2 me-1"></i>Refração</h6>
+                    <h6 class="detail-section__title">
+                        <i class="ti ti-eyeglass-2 me-1"></i>{{ tt('tab_refraction', 'Refração') }}
+                    </h6>
                     <div class="small">
                         <table class="table table-sm table-borderless mb-2">
                             <thead class="table-light">
                                 <tr>
                                     <th></th>
-                                    <th>OD</th>
-                                    <th>OE</th>
+                                    <th>{{ tt('od', 'OD') }}</th>
+                                    <th>{{ tt('oe', 'OE') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td class="fw-medium">Dinâmica esf/cil/eixo</td>
+                                    <td class="fw-medium">{{ tt('dynamic_sca', 'Dinâmica esf/cil/eixo') }}</td>
                                     <td>
                                         <code
                                             >{{ valOr(detail.dynamic_spherical_right) }} /
@@ -313,7 +332,7 @@ function closePdfPreview() {
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td class="fw-medium">Estática esf/cil/eixo</td>
+                                    <td class="fw-medium">{{ tt('static_sca', 'Estática esf/cil/eixo') }}</td>
                                     <td>
                                         <code
                                             >{{ valOr(detail.static_spherical_right) }} /
@@ -332,15 +351,15 @@ function closePdfPreview() {
                             </tbody>
                         </table>
                         <div class="detail-row">
-                            <span class="detail-label">Adição</span
+                            <span class="detail-label">{{ tt('addition', 'Adição') }}</span
                             ><span class="detail-value">{{ valOr(detail.addition_type) }}</span>
                         </div>
                         <div class="detail-row">
-                            <span class="detail-label">Lente longe</span
+                            <span class="detail-label">{{ tt('lens_away_label', 'Lente longe') }}</span
                             ><span class="detail-value">{{ valOr(detail.lens_away) }}</span>
                         </div>
                         <div class="detail-row">
-                            <span class="detail-label">Lente perto</span
+                            <span class="detail-label">{{ tt('lens_near_label', 'Lente perto') }}</span
                             ><span class="detail-value">{{ valOr(detail.lens_near) }}</span>
                         </div>
                     </div>
@@ -351,23 +370,25 @@ function closePdfPreview() {
                     v-if="detail.biomicroscopy_right || detail.fundoscopy_right || detail.observation_general"
                     class="detail-section"
                 >
-                    <h6 class="detail-section__title"><i class="ti ti-microscope me-1"></i>Achados</h6>
+                    <h6 class="detail-section__title">
+                        <i class="ti ti-microscope me-1"></i>{{ tt('tab_findings', 'Achados') }}
+                    </h6>
                     <div v-if="detail.biomicroscopy_right || detail.biomicroscopy_left" class="detail-row">
-                        <span class="detail-label">Biomicroscopia</span>
+                        <span class="detail-label">{{ tt('biomicroscopy', 'Biomicroscopia') }}</span>
                         <span class="detail-value small">
-                            <strong>OD:</strong> {{ valOr(detail.biomicroscopy_right) }}<br />
-                            <strong>OE:</strong> {{ valOr(detail.biomicroscopy_left) }}
+                            <strong>{{ tt('od', 'OD') }}:</strong> {{ valOr(detail.biomicroscopy_right) }}<br />
+                            <strong>{{ tt('oe', 'OE') }}:</strong> {{ valOr(detail.biomicroscopy_left) }}
                         </span>
                     </div>
                     <div v-if="detail.fundoscopy_right || detail.fundoscopy_left" class="detail-row">
-                        <span class="detail-label">Fundoscopia</span>
+                        <span class="detail-label">{{ tt('fundoscopy', 'Fundoscopia') }}</span>
                         <span class="detail-value small">
-                            <strong>OD:</strong> {{ valOr(detail.fundoscopy_right) }}<br />
-                            <strong>OE:</strong> {{ valOr(detail.fundoscopy_left) }}
+                            <strong>{{ tt('od', 'OD') }}:</strong> {{ valOr(detail.fundoscopy_right) }}<br />
+                            <strong>{{ tt('oe', 'OE') }}:</strong> {{ valOr(detail.fundoscopy_left) }}
                         </span>
                     </div>
                     <div v-if="detail.observation_general" class="detail-row">
-                        <span class="detail-label">{{ detail.labels?.general_obs ?? 'Observação geral' }}</span>
+                        <span class="detail-label">{{ tt('general_obs', 'Observação geral') }}</span>
                         <span class="detail-value">{{ detail.observation_general }}</span>
                     </div>
                 </section>
@@ -375,7 +396,7 @@ function closePdfPreview() {
                 <!-- Diagnóstico & conduta -->
                 <section v-if="detail.diagnosis_cids?.length > 0 || detail.clinical_conduct" class="detail-section">
                     <h6 class="detail-section__title">
-                        <i class="ti ti-clipboard-text me-1"></i>Diagnóstico & Conduta
+                        <i class="ti ti-clipboard-text me-1"></i>{{ tt('diagnosis_conduct', 'Diagnóstico & conduta') }}
                     </h6>
                     <div v-if="detail.diagnosis_cids?.length > 0" class="mb-2">
                         <span
@@ -387,29 +408,30 @@ function closePdfPreview() {
                         </span>
                     </div>
                     <div v-if="detail.clinical_conduct" class="detail-row">
-                        <span class="detail-label">Conduta clínica</span>
+                        <span class="detail-label">{{ tt('clinical_conduct', 'Conduta clínica') }}</span>
                         <span class="detail-value">{{ detail.clinical_conduct }}</span>
                     </div>
                     <div v-if="detail.follow_up_days" class="detail-row">
-                        <span class="detail-label">Retorno</span>
-                        <span class="detail-value">{{ detail.follow_up_days }} dias</span>
+                        <span class="detail-label">{{ tt('follow_up', 'Retorno') }}</span>
+                        <span class="detail-value">{{ detail.follow_up_days }} {{ tt('days', 'dias') }}</span>
                     </div>
                 </section>
 
                 <!-- Assinatura -->
                 <section v-if="detail.is_signed" class="detail-section">
                     <h6 class="detail-section__title">
-                        <i class="ti ti-shield-check me-1 text-success"></i>Assinatura digital
+                        <i class="ti ti-shield-check me-1 text-success"></i
+                        >{{ tt('digital_signature', 'Assinatura digital') }}
                     </h6>
                     <div class="alert alert-success small mb-0">
                         <i class="ti ti-check me-1"></i>
-                        Assinado em <strong>{{ detail.signed_at_formatted }}</strong>
+                        {{ tt('signed_on', 'Assinado em') }} <strong>{{ detail.signed_at_formatted }}</strong>
                         <span v-if="detail.signed_by_name"
-                            >por <strong>{{ detail.signed_by_name }}</strong></span
+                            >{{ tt('signed_by', 'por') }} <strong>{{ detail.signed_by_name }}</strong></span
                         >
-                        <small class="d-block mt-1 text-muted"
-                            >CFM Res. 2.227/2018 — prontuário travado para edição.</small
-                        >
+                        <small class="d-block mt-1 text-muted">{{
+                            tt('signed_lock_note', 'CFM Res. 2.227/2018 — prontuário travado para edição.')
+                        }}</small>
                     </div>
                 </section>
             </div>
@@ -418,17 +440,17 @@ function closePdfPreview() {
             <div v-show="activeTab === 'docs'">
                 <div v-if="documentations.length === 0" class="text-center py-5 text-muted">
                     <i class="ti ti-paperclip fs-1 d-block mb-2 opacity-25"></i>
-                    <p class="mb-0 small">Nenhum documento gerado neste prontuário.</p>
+                    <p class="mb-0 small">{{ tt('no_documentations', 'Nenhuma documentação cadastrada.') }}</p>
                 </div>
 
                 <div v-else class="table-responsive">
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 110px">Hora</th>
-                                <th style="width: 140px">Tipo</th>
-                                <th>Título</th>
-                                <th style="width: 70px" class="text-end">Ações</th>
+                                <th style="width: 110px">{{ tt('doc_time', 'Hora') }}</th>
+                                <th style="width: 140px">{{ tt('doc_type', 'Tipo') }}</th>
+                                <th>{{ tt('doc_title', 'Título') }}</th>
+                                <th style="width: 70px" class="text-end">{{ tt('doc_actions', 'Ações') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -443,9 +465,9 @@ function closePdfPreview() {
                                     <span
                                         v-if="doc.is_ai"
                                         class="badge bg-info text-dark ms-1"
-                                        :title="doc.ai_workflow_label || 'Gerado por IA'"
+                                        :title="doc.ai_workflow_label || tt('ai_generated', 'Gerado por IA')"
                                     >
-                                        <i class="ti ti-robot me-1"></i>IA
+                                        <i class="ti ti-robot me-1" aria-hidden="true"></i>{{ tt('ai_badge', 'IA') }}
                                     </span>
                                 </td>
                                 <td>
@@ -458,7 +480,7 @@ function closePdfPreview() {
                                     <div class="d-inline-flex align-items-center gap-1">
                                         <ActionIconButton
                                             icon="ti ti-eye"
-                                            title="Visualizar documento"
+                                            :title="tt('view_document', 'Visualizar documento')"
                                             variant="default"
                                             @click="openPdfPreview(doc)"
                                         />
