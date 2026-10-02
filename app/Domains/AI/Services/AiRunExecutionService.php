@@ -253,9 +253,13 @@ class AiRunExecutionService
         $examIds = array_values(array_filter((array) ($summary['exam_ids'] ?? [])));
 
         if ($examIds !== []) {
+            // Ordem da seleção do médico — a mesma de context.selected_exams
+            // (AiPayloadEnricher), pra imagem N bater com o exame N.
             $exams = PatientExam::query()
                 ->whereIn('id', $examIds)
-                ->get();
+                ->get()
+                ->sortBy(fn (PatientExam $exam) => array_search((string) $exam->id, $examIds, true))
+                ->values();
 
             return $this->eyeImageAttachments->build($exams);
         }

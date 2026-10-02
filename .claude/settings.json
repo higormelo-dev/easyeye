@@ -75,15 +75,13 @@
       "Bash(./vendor/bin/pest tests/Feature/PatientPortal/ --colors=never)",
       "Bash(./vendor/bin/pint --test app/Http/Controllers/PatientPortal app/Http/Controllers/PatientPortalInvitationsController.php app/Http/Middleware/EnsurePatientAuthenticated.php app/Models/PatientAccount.php app/Notifications/PatientPortalInvitation.php app/Models/People.php app/Providers/AppServiceProvider.php config/auth.php routes/web.php routes/patient-portal.php routes/patient-portal-auth.php database/factories/PatientAccountFactory.php database/migrations/2026_09_05_100000_create_patient_accounts_table.php database/migrations/2026_09_05_100001_create_patient_account_password_reset_tokens_table.php tests/Pest.php tests/Feature/PatientPortal)",
       "Bash(./vendor/bin/pest tests/Feature/ACL --compact)",
-      "Bash(grep -n 'priority\\\\b\\\\|\\\\$priority\\\\b' -n /Users/higormelo/Sites/MyStartup/easyeye/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/Middleware.php)"
+      "Bash(grep -n 'priority\\\\b\\\\|\\\\$priority\\\\b' -n /Users/higormelo/Sites/MyStartup/easyeye/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/Middleware.php)",
+      "mcp__claude-in-chrome__tabs_context_mcp"
     ],
     "additionalDirectories": [
       "/home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/public/system/images",
       "/Users/higormelo/Sites/MyStartup/easyeye/tests/Support"
     ]
-  },
-  "enabledPlugins": {
-    "ecc@ecc": true
   },
   "hooks": {
     "PreToolUse": [
@@ -99,5 +97,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "ecc@ecc": true
   }
 }

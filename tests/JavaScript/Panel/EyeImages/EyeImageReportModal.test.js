@@ -3,126 +3,12 @@ import { mount, flushPromises } from '@vue/test-utils';
 import EyeImageReportModal from '@/Pages/Panel/EyeImages/EyeImageReportModal.vue';
 
 /**
- * Cobre o laudo em lote (Index.vue::openReportModal quando a seleção cobre
- * 2+ grupos de exame — ver docblock lá): as props/emit novas
- * (queueProgress/queueSummary/nextLabel/@next) são só orquestração do
- * PARENT; aqui testamos só a renderização condicional deste componente,
- * garantindo que fora do laudo em lote (props ausentes) nada muda.
- *
  * form.content é setado direto via wrapper.vm (script setup expõe os
  * bindings do topo em dev/test) em vez de digitar no TinyMCE: o stub global
  * de window.tinymce (tests/JavaScript/setup.js) não dispara os callbacks
  * registrados via editor.on(...), então não há como simular digitação real
  * — mesmo padrão já usado em AiAssistantPanel.test.js (vm.runId = ...).
  */
-describe('EyeImageReportModal — laudo em lote', () => {
-    const urls = {
-        templates: '/_routes/eye-images.report-templates.index',
-        preview: '/_routes/eye-images.report-templates.preview',
-        store: '/_routes/eye-images.reports.store',
-    };
-    const patient = { id: 'pat-1', code: '123', name: 'Amanda Alves de Moura' };
-
-    function mountModal(propsOverride = {}) {
-        return mount(EyeImageReportModal, {
-            attachTo: document.body,
-            props: {
-                open: true,
-                patient,
-                examIds: ['exam-1'],
-                urls,
-                t: {},
-                ...propsOverride,
-            },
-        });
-    }
-
-    beforeEach(() => {
-        document.body.innerHTML = '';
-        globalThis.window.axios = {
-            get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
-            post: vi.fn(() => Promise.resolve({ data: { title: 'Laudo Pentacan', pdf_url: '/pdf/1' } })),
-        };
-    });
-
-    async function save(wrapper, content = 'Conteúdo do laudo de teste.') {
-        wrapper.vm.form.content = content;
-        await wrapper.vm.save(false);
-        await flushPromises();
-    }
-
-    it('sem queueProgress, não mostra a barra de progresso (fluxo normal preservado)', async () => {
-        const wrapper = mountModal();
-        await flushPromises();
-
-        expect(document.body.querySelector('.ti-list-numbers')).toBeNull();
-        wrapper.unmount();
-    });
-
-    it('com queueProgress, mostra "Laudo 1 de 2 — Pentacan"', async () => {
-        const wrapper = mountModal({ queueProgress: { current: 1, total: 2, label: 'Pentacan' } });
-        await flushPromises();
-
-        const bar = document.body.querySelector('.ti-list-numbers')?.parentElement;
-        expect(bar).not.toBeNull();
-        expect(bar.textContent).toContain('1');
-        expect(bar.textContent).toContain('2');
-        expect(bar.textContent).toContain('Pentacan');
-        wrapper.unmount();
-    });
-
-    it('após salvar com nextLabel definido, mostra botão de avançar e emite "next" ao clicar', async () => {
-        const wrapper = mountModal({ nextLabel: 'Próximo laudo: Retinografia' });
-        await flushPromises();
-        await save(wrapper);
-
-        expect(wrapper.emitted('saved')).toBeTruthy();
-
-        const nextBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-            b.textContent.includes('Próximo laudo: Retinografia'),
-        );
-        expect(nextBtn).toBeTruthy();
-
-        nextBtn.click();
-        await wrapper.vm.$nextTick();
-
-        expect(wrapper.emitted('next')).toBeTruthy();
-        wrapper.unmount();
-    });
-
-    it('após salvar SEM nextLabel (último passo ou fluxo normal), não mostra botão de avançar', async () => {
-        const wrapper = mountModal();
-        await flushPromises();
-        await save(wrapper);
-
-        const nextBtn = Array.from(document.body.querySelectorAll('button')).find((b) =>
-            b.textContent.includes('Próximo laudo'),
-        );
-        expect(nextBtn).toBeUndefined();
-        wrapper.unmount();
-    });
-
-    it('mostra a lista de laudos já gerados (queueSummary) com link de download', async () => {
-        const wrapper = mountModal({
-            queueSummary: [{ label: 'Pentacan', title: 'Laudo Pentacan', pdf_url: '/pdf/pentacan' }],
-        });
-        await flushPromises();
-        await save(wrapper, 'Conteúdo do 2º laudo.');
-
-        expect(document.body.textContent).toContain('Laudos já gerados nesta sessão');
-        expect(document.body.textContent).toContain('Pentacan');
-        wrapper.unmount();
-    });
-
-    it('sem queueSummary, não mostra a lista de laudos anteriores', async () => {
-        const wrapper = mountModal();
-        await flushPromises();
-        await save(wrapper);
-
-        expect(document.body.textContent).not.toContain('Laudos já gerados nesta sessão');
-        wrapper.unmount();
-    });
-});
 
 /**
  * Cobre as 3 adaptações do benchmark 18/09/2026 (Wizard/"Auto Load Image"/
@@ -262,6 +148,189 @@ describe('EyeImageReportModal — inserir imagem / frases rápidas / extrair PDF
         await flushPromises();
 
         expect(findButton('Extrair texto do PDF')).toBeUndefined();
+        wrapper.unmount();
+    });
+});
+
+describe('EyeImageReportModal — laudo conjunto (vários exames)', () => {
+    const urls = { templates: '/t', preview: '/p', store: '/s' };
+    const patient = { id: 'pat-1', code: '123', name: 'Paciente Teste' };
+    const examGroups = [
+        {
+            key: 'g1',
+            label: 'RETINOGRAFIA — 30/09/2026',
+            eyes: [
+                { key: '1', label: 'OD', examIds: ['e1'], images: [{ id: 'e1', url: '/img/e1.jpg', label: 'OD' }] },
+                { key: '2', label: 'OE', examIds: ['e2'], images: [{ id: 'e2', url: '/img/e2.jpg', label: 'OE' }] },
+            ],
+        },
+        {
+            key: 'g2',
+            label: 'OCT — 30/09/2026',
+            eyes: [{ key: '1', label: 'OD', examIds: ['e3'], images: [{ id: 'e3', url: '/img/e3.jpg', label: 'OD' }] }],
+        },
+    ];
+
+    // Abre como o botão Laudo de um painel: exame g1 (OD + OE) marcado.
+    function mountModal(propsOverride = {}) {
+        return mount(EyeImageReportModal, {
+            attachTo: document.body,
+            props: { open: true, patient, examIds: ['e1', 'e2'], urls, t: {}, examGroups, ...propsOverride },
+        });
+    }
+
+    const eyeBox = (value) => document.body.querySelector(`input[type="checkbox"][value="${value}"]`);
+    const examBox = (label) =>
+        [...document.body.querySelectorAll('li label')]
+            .find((l) => l.textContent.includes(label))
+            .querySelector('input');
+
+    async function save(wrapper) {
+        wrapper.vm.form.content = '<p>Achados.</p>';
+        await wrapper.vm.save(false);
+        await flushPromises();
+    }
+
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        globalThis.window.axios = {
+            get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
+            post: vi.fn(() => Promise.resolve({ data: { title: 'Laudo', pdf_url: '/pdf/1' } })),
+        };
+    });
+
+    const savedExamIds = () => window.axios.post.mock.calls.find(([url]) => url === '/s')?.[1].exam_ids;
+
+    it('lista os exames com um item por olho', async () => {
+        const wrapper = mountModal();
+        await flushPromises();
+
+        const text = document.body.textContent;
+        expect(text).toContain('Exames neste laudo');
+        expect(text).toContain('RETINOGRAFIA — 30/09/2026');
+        expect(text).toContain('OCT — 30/09/2026');
+        expect(eyeBox('g1|1')).not.toBeNull();
+        expect(eyeBox('g1|2')).not.toBeNull();
+        wrapper.unmount();
+    });
+
+    it('abre com os olhos do exame do painel marcados e o outro exame desmarcado', async () => {
+        const wrapper = mountModal();
+        await flushPromises();
+
+        expect(eyeBox('g1|1').checked).toBe(true);
+        expect(eyeBox('g1|2').checked).toBe(true);
+        expect(eyeBox('g2|1').checked).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('desmarcar um olho lauda só o outro olho do mesmo exame', async () => {
+        const wrapper = mountModal();
+        await flushPromises();
+
+        eyeBox('g1|2').click();
+        await flushPromises();
+        await save(wrapper);
+
+        expect(savedExamIds()).toEqual(['e1']);
+        wrapper.unmount();
+    });
+
+    it('marcar olho de outro exame vira laudo conjunto', async () => {
+        const wrapper = mountModal();
+        await flushPromises();
+
+        eyeBox('g2|1').click();
+        await flushPromises();
+        await save(wrapper);
+
+        expect(savedExamIds()).toEqual(['e1', 'e2', 'e3']);
+        wrapper.unmount();
+    });
+
+    it('caixa do exame marca/desmarca todos os olhos e fica indeterminada com marcação parcial', async () => {
+        const wrapper = mountModal();
+        await flushPromises();
+
+        eyeBox('g1|2').click();
+        await flushPromises();
+        expect(examBox('RETINOGRAFIA').indeterminate).toBe(true);
+
+        examBox('RETINOGRAFIA').click();
+        await flushPromises();
+        expect(eyeBox('g1|1').checked).toBe(true);
+        expect(eyeBox('g1|2').checked).toBe(true);
+
+        examBox('RETINOGRAFIA').click();
+        await flushPromises();
+        expect(eyeBox('g1|1').checked).toBe(false);
+        expect(eyeBox('g1|2').checked).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('nenhum olho marcado: não salva e avisa', async () => {
+        const wrapper = mountModal();
+        await flushPromises();
+
+        examBox('RETINOGRAFIA').click();
+        await flushPromises();
+        await save(wrapper);
+
+        expect(savedExamIds()).toBeUndefined();
+        expect(document.body.textContent).toContain('Marque ao menos um exame para laudar.');
+        wrapper.unmount();
+    });
+
+    it('"Inserir imagem" oferece só imagens dos olhos marcados', async () => {
+        const wrapper = mountModal();
+        await flushPromises();
+
+        expect(wrapper.vm.availableImages.map((i) => i.id)).toEqual(['e1', 'e2']);
+        eyeBox('g1|1').click();
+        await flushPromises();
+        eyeBox('g2|1').click();
+        await flushPromises();
+        expect(wrapper.vm.availableImages.map((i) => i.id)).toEqual(['e2', 'e3']);
+        wrapper.unmount();
+    });
+
+    it('sem examGroups, não mostra a faixa de exames', async () => {
+        const wrapper = mountModal({ examGroups: [] });
+        await flushPromises();
+
+        expect(document.body.textContent).not.toContain('Exames neste laudo');
+        wrapper.unmount();
+    });
+
+    it('encaixado (docked): painel à direita sem fundo escuro, e sobe SweetAlert/TinyMCE acima dele', async () => {
+        const wrapper = mountModal({ docked: true });
+        await flushPromises();
+
+        expect(document.body.querySelector('.ei-report-dock')).not.toBeNull();
+        expect(document.body.querySelector('.modal.show')).toBeNull();
+        expect(document.body.classList.contains('ei-report-docked')).toBe(true);
+
+        await wrapper.setProps({ open: false });
+        expect(document.body.classList.contains('ei-report-docked')).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('sem docked continua modal centralizado (comportamento antigo)', async () => {
+        const wrapper = mountModal();
+        await flushPromises();
+
+        expect(document.body.querySelector('.modal.show')).not.toBeNull();
+        expect(document.body.querySelector('.ei-report-dock')).toBeNull();
+        expect(document.body.classList.contains('ei-report-docked')).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('expõe close() (visualizador fecha o laudo pelo mesmo caminho do X)', async () => {
+        const wrapper = mountModal({ docked: true });
+        await flushPromises();
+
+        await wrapper.vm.close();
+        expect(wrapper.emitted('close')).toHaveLength(1);
         wrapper.unmount();
     });
 });

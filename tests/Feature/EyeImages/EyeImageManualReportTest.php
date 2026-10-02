@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\{ClientRule, DocumentationType, ReportSettingStatus};
-use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, People, ReportCategory, ReportSetting, ReportSettingContent, User};
+use App\Models\{Doctor, Entity, ExamType, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, People, ReportCategory, ReportSetting, ReportSettingContent, User};
+use App\Services\EyeImages\ReportExamSummary;
+use Barryvdh\Snappy\Facades\SnappyPdf;
 
 /**
  * Laudo manual do Gerenciador de Imagens (Modelos) — EyeImageReportController.
@@ -305,5 +307,92 @@ describe('store()', function () {
             'content'             => '<p>Tentativa cross-tenant.</p>',
             'confirm_open_record' => true,
         ])->assertNotFound();
+    });
+});
+
+describe('laudo conjunto (vários exames do mesmo paciente)', function () {
+    beforeEach(function () {
+        $this->oct = PatientExam::factory()->create([
+            'patient_id'  => $this->patient->id,
+            'schedule_id' => $this->schedule->id,
+            'exam_id'     => ExamType::factory()->create(['name' => 'OCT de mácula'])->id,
+            'laterality'  => 2,
+        ]);
+        $this->exam->examType->update(['name' => 'Retinografia']);
+    });
+
+    it('um laudo só registra todos os exames selecionados e o PDF lista cada um', function () {
+        actingAsDoctor($this)->postJson(route('panel.eye-images.reports.store'), [
+            'patient_id'          => $this->patient->id,
+            'exam_ids'            => [$this->exam->id, $this->oct->id],
+            'content'             => '<p>Achados conjuntos.</p>',
+            'confirm_open_record' => true,
+        ])->assertCreated();
+
+        $doc = MedicalRecordDocumentation::query()->sole();
+
+        expect($doc->patientExams()->pluck('patient_exams.id')->map(fn ($id) => (string) $id)->sort()->values()->all())
+            ->toBe(collect([$this->exam->id, $this->oct->id])->map(fn ($id) => (string) $id)->sort()->values()->all());
+
+        $summary = app(ReportExamSummary::class)->forDocumentation($doc);
+        expect(collect($summary)->pluck('type')->sort()->values()->all())->toBe(['OCT DE MÁCULA', 'RETINOGRAFIA'])
+            ->and(collect($summary)->firstWhere('type', 'RETINOGRAFIA')['eyes'])->toBe(['OD'])
+            ->and(collect($summary)->firstWhere('type', 'OCT DE MÁCULA')['eyes'])->toBe(['OE']);
+    });
+
+    it('o PDF do laudo conjunto mostra a lista de exames', function () {
+        SnappyPdf::fake();
+
+        $created = actingAsDoctor($this)->postJson(route('panel.eye-images.reports.store'), [
+            'patient_id'          => $this->patient->id,
+            'exam_ids'            => [$this->exam->id, $this->oct->id],
+            'content'             => '<p>Achados conjuntos.</p>',
+            'confirm_open_record' => true,
+        ])->assertCreated();
+
+        actingAsDoctor($this)->get($created->json('pdf_url'))->assertOk();
+
+        SnappyPdf::assertViewIs('pdf.documentation');
+        SnappyPdf::assertSee(__('eye_images.report_exams_title'));
+        SnappyPdf::assertSee('RETINOGRAFIA');
+        SnappyPdf::assertSee('OCT DE MÁCULA');
+    });
+
+    it('laudo de um exame só continua funcionando e registra só ele', function () {
+        actingAsDoctor($this)->postJson(route('panel.eye-images.reports.store'), [
+            'patient_id'          => $this->patient->id,
+            'exam_ids'            => [$this->exam->id],
+            'content'             => '<p>Normal.</p>',
+            'confirm_open_record' => true,
+        ])->assertCreated();
+
+        expect(MedicalRecordDocumentation::query()->sole()->patientExams()->count())->toBe(1);
+    });
+
+    it('[SEGURANÇA] exame de OUTRO paciente da mesma clínica é recusado (422) e nada é gravado', function () {
+        $other     = Patient::factory()->create(['entity_id' => $this->entity->id]);
+        $otherExam = PatientExam::factory()->create(['patient_id' => $other->id]);
+
+        actingAsDoctor($this)->postJson(route('panel.eye-images.reports.store'), [
+            'patient_id'          => $this->patient->id,
+            'exam_ids'            => [$this->exam->id, $otherExam->id],
+            'content'             => '<p>x</p>',
+            'confirm_open_record' => true,
+        ])->assertStatus(422)->assertJson(['message' => __('eye_images.report_same_patient')]);
+
+        expect(MedicalRecordDocumentation::count())->toBe(0)
+            ->and(MedicalRecord::count())->toBe(0);
+    });
+
+    it('[SEGURANÇA] preview com exame de outro paciente também é recusado', function () {
+        $otherExam = PatientExam::factory()->create([
+            'patient_id' => Patient::factory()->create(['entity_id' => $this->entity->id])->id,
+        ]);
+
+        actingAsDoctor($this)->postJson(route('panel.eye-images.report-templates.preview'), [
+            'report_setting_content_id' => $this->content->id,
+            'patient_id'                => $this->patient->id,
+            'exam_ids'                  => [$otherExam->id],
+        ])->assertStatus(422);
     });
 });

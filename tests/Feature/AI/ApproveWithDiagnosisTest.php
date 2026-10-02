@@ -4,7 +4,7 @@ use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\AiCreditWalletService;
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
-use App\Models\{Doctor, Entity, Patient, PatientExam, People, Plan, PlanFeature, Subscription, User};
+use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, People, Plan, PlanFeature, Subscription, User};
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -143,4 +143,19 @@ it('approve de run sem exames vinculados (record_assist) ignora diagnosis_cids s
 
     expect($this->exam->fresh()->diagnosis_cids)->toBeNull()
         ->and($run->fresh()->status)->toBe(AiRunStatus::Approved);
+});
+
+it('laudo de IA aprovado registra os exames analisados (lista do PDF)', function () {
+    MedicalRecord::query()->create([
+        'entity_id'  => $this->entity->id,
+        'patient_id' => $this->patient->id,
+        'doctor_id'  => Doctor::query()->where('entity_user_id', $this->doctorUser->id)->value('id'),
+    ]);
+    $run = waitingEyeRunForExam($this, $this->exam);
+
+    approveWithPayload($this, $run)->assertOk();
+
+    $doc = MedicalRecordDocumentation::query()->where('ai_run_id', $run->id)->sole();
+    expect($doc->patientExams()->pluck('patient_exams.id')->map(fn ($id) => (string) $id)->all())
+        ->toBe([(string) $this->exam->id]);
 });

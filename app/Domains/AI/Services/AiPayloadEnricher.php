@@ -102,7 +102,11 @@ class AiPayloadEnricher
         $payload['attachments'] = [];
 
         if ($workflow === 'eye_image_analysis') {
-            $payload['exam_ids']     = $this->authorizeExamIds((array) ($payload['exam_ids'] ?? []), $entityId);
+            $payload['exam_ids'] = $this->authorizeExamIds(
+                (array) ($payload['exam_ids'] ?? []),
+                $entityId,
+                ! empty($payload['patient_id']) ? (string) $payload['patient_id'] : null,
+            );
             $payload['attachments']  = [];
             $payload['_image_count'] = count($payload['exam_ids']);
         }
@@ -310,6 +314,13 @@ class AiPayloadEnricher
 
         $workflow = (string) ($payload['workflow'] ?? '');
 
+        // Laudo conjunto: a IA recebe só as imagens — sem isto não sabe que
+        // uma é retinografia e outra OCT, nem de que olho/data. Montado no
+        // servidor (nunca do cliente), na ordem dos anexos.
+        if ($workflow === 'eye_image_analysis' && ! empty($payload['exam_ids'])) {
+            $context['selected_exams'] = $this->selectedExamsContext((array) $payload['exam_ids']);
+        }
+
         if (in_array($workflow, self::CHAT_WORKFLOWS, true) && ! empty($payload['conversation_id'])) {
             $history = $this->buildConversationHistory((string) $payload['conversation_id'], $entityId, $workflow);
 
@@ -319,6 +330,32 @@ class AiPayloadEnricher
         }
 
         return $context;
+    }
+
+    /**
+     * @param list<string> $examIds já autorizados (tenant + paciente)
+     *
+     * @return list<array{image: int, exam_type: ?string, eye: string, exam_date: ?string}>
+     */
+    private function selectedExamsContext(array $examIds): array
+    {
+        $exams = PatientExam::query()->with('examType')->whereIn('id', $examIds)->get()->keyBy('id');
+
+        return collect($examIds)
+            ->map(fn (string $id) => $exams->get($id))
+            ->filter()
+            ->values()
+            ->map(fn (PatientExam $exam, int $i) => [
+                'image'     => $i + 1,
+                'exam_type' => $exam->examType?->name,
+                'eye'       => match ((int) $exam->laterality) {
+                    1       => 'OD',
+                    2       => 'OS',
+                    default => 'OU',
+                },
+                'exam_date' => ($exam->exam_performed_at ?? $exam->created_at)?->toDateString(),
+            ])
+            ->all();
     }
 
     /**
@@ -394,7 +431,7 @@ class AiPayloadEnricher
      *
      * @return list<string>
      */
-    private function authorizeExamIds(array $examIds, string $entityId): array
+    private function authorizeExamIds(array $examIds, string $entityId, ?string $patientId = null): array
     {
         $examIds = array_values(array_unique(array_filter(array_map('strval', $examIds))));
 
@@ -411,14 +448,25 @@ class AiPayloadEnricher
         // na revisão de segurança 09/09/2026).
         abort_if(count($examIds) > 50, 422);
 
-        $owned = PatientExam::query()
+        $ownedPatients = PatientExam::query()
             ->whereIn('patient_exams.id', $examIds)
             ->whereHas('patient', fn ($q) => $q->where('entity_id', $entityId))
-            ->pluck('patient_exams.id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
+            ->pluck('patient_id', 'patient_exams.id');
 
-        abort_if(count($owned) !== count($examIds), 403);
+        abort_if($ownedPatients->count() !== count($examIds), 403);
+
+        // Análise conjunta é sempre de UM paciente: exame de outro paciente
+        // da mesma clínica misturaria dados clínicos de pessoas diferentes no
+        // mesmo laudo (LGPD). Com patient_id no payload, tem que ser ele.
+        $patients = $ownedPatients->map(fn ($id) => (string) $id)->unique();
+        abort_if(
+            $patients->count() > 1 || ($patientId !== null && $patients->first() !== $patientId),
+            422,
+            __('ai.eye_image_one_patient'),
+        );
+
+        // Ordem da seleção do médico (o whereIn não garante ordem).
+        $owned = $examIds;
 
         // Imagem desabilitada (menu de contexto do Gerenciador de Imagens)
         // nunca entra numa análise de IA nova — 422 de regra de negócio, DE

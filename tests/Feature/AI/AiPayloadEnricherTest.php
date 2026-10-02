@@ -2,7 +2,7 @@
 
 use App\Domains\AI\Services\AiPayloadEnricher;
 use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
-use App\Models\{Doctor, Entity, MedicalRecord, Patient, PatientExam, People, Plan, PlanFeature, Subscription, User};
+use App\Models\{Doctor, Entity, ExamType, MedicalRecord, Patient, PatientExam, People, Plan, PlanFeature, Subscription, User};
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -260,4 +260,54 @@ it('aplica guardrails e devolve flag _guardrails no payload', function () {
 
     expect($out)->toHaveKey('_guardrails')
         ->and($out['_guardrails'])->toBeArray();
+});
+
+describe('laudo conjunto de vários exames', function () {
+    function eyeImagePayload(array $examIds, ?string $patientId = null): array
+    {
+        return array_filter([
+            'workflow'    => 'eye_image_analysis',
+            'mode'        => 'validated',
+            'risk_level'  => 'medium',
+            'user_prompt' => 'Avaliar os exames em conjunto.',
+            'patient_id'  => $patientId,
+            'exam_ids'    => $examIds,
+        ]);
+    }
+
+    it('[SEGURANÇA] recusa (422) exame de outro paciente da mesma clínica', function () {
+        $mine   = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        $others = PatientExam::factory()->create([
+            'patient_id' => Patient::factory()->create(['entity_id' => $this->entity->id])->id,
+        ]);
+
+        try {
+            $this->enricher->enrich(eyeImagePayload([(string) $mine->id, (string) $others->id], (string) $this->patient->id), $this->entity->id, false);
+            $this->fail('deveria abortar');
+        } catch (HttpException $e) {
+            expect($e->getStatusCode())->toBe(422)
+                ->and($e->getMessage())->toBe(__('ai.eye_image_one_patient'));
+        }
+    });
+
+    it('[SEGURANÇA] sem patient_id, exames de pacientes diferentes também são recusados', function () {
+        $a = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        $b = PatientExam::factory()->create([
+            'patient_id' => Patient::factory()->create(['entity_id' => $this->entity->id])->id,
+        ]);
+
+        expect(fn () => $this->enricher->enrich(eyeImagePayload([(string) $a->id, (string) $b->id]), $this->entity->id, false))
+            ->toThrow(HttpException::class);
+    });
+
+    it('envia à IA tipo, olho e data de cada exame, na ordem da seleção', function () {
+        $oct  = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'laterality' => 2, 'exam_id' => ExamType::factory()->create(['name' => 'OCT'])->id]);
+        $reti = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'laterality' => 1, 'exam_id' => ExamType::factory()->create(['name' => 'Retinografia'])->id]);
+
+        $out = $this->enricher->enrich(eyeImagePayload([(string) $reti->id, (string) $oct->id], (string) $this->patient->id), $this->entity->id, false);
+
+        expect($out['exam_ids'])->toBe([(string) $reti->id, (string) $oct->id])
+            ->and(collect($out['context']['selected_exams'])->pluck('exam_type')->all())->toBe(['RETINOGRAFIA', 'OCT'])
+            ->and(collect($out['context']['selected_exams'])->pluck('eye')->all())->toBe(['OD', 'OS']);
+    });
 });

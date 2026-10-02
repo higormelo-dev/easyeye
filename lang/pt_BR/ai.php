@@ -13,6 +13,7 @@ return [
     'feature_chat_unavailable'      => 'Seu plano não possui o assistente virtual de IA.',
     'eye_image_exams_required'      => 'Selecione ao menos uma imagem para a análise com IA.',
     'eye_image_exam_inactive'       => 'Uma ou mais imagens selecionadas estão desabilitadas — habilite-as antes de analisar com IA.',
+    'eye_image_one_patient'         => 'As imagens selecionadas precisam ser todas do mesmo paciente.',
     'record_opened'                 => 'Prontuário aberto e laudo registrado.',
     'record_patient_missing'        => 'Não foi possível identificar o paciente para abrir o prontuário.',
     'record_doctor_required'        => 'Apenas um médico pode abrir um prontuário para registrar o laudo.',

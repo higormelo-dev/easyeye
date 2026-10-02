@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\{DocumentationType, PaperSize};
 use App\Models\Entity;
 use App\Models\{MedicalRecord, MedicalRecordDocumentation, ReportSetting};
+use App\Services\EyeImages\ReportExamSummary;
 use App\Support\BrazilianFormat;
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\Response;
@@ -233,7 +234,13 @@ class MedicalRecordPdfService
             ? max((float) ($setting?->margin_bottom ?? 0), 0.8)
             : (float) ($setting?->margin_bottom ?? 0);
 
-        $pdf = SnappyPdf::loadView('pdf.documentation', compact('doc', 'setting'))
+        // Laudo: quais exames ele cobre (pode ser mais de um — laudo conjunto
+        // do Gerenciador de Imagens). Vazio pra laudo sem exame vinculado.
+        $examSummary = $doc->type === DocumentationType::Report
+            ? app(ReportExamSummary::class)->forDocumentation($doc)
+            : [];
+
+        $pdf = SnappyPdf::loadView('pdf.documentation', compact('doc', 'setting', 'examSummary'))
             ->setPaper($setting?->paper_size?->value ?? PaperSize::A4->value)
             ->setOption('margin-top', ($setting?->margin_top ?? 0) . 'cm')
             ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')

@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { reactive, ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
 
 /**
@@ -18,25 +18,74 @@ import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
 const props = defineProps({
     open: { type: Boolean, required: true },
     patient: { type: Object, default: null }, // { id, code, name }
+    // Com examGroups: exames que já abrem MARCADOS. Sem examGroups: exames
+    // do laudo (uso fora do visualizador).
     examIds: { type: Array, default: () => [] },
     urls: { type: Object, required: true }, // { templates, preview, store }
     t: { type: Object, default: () => ({}) },
-    // Laudo em lote (Index.vue::openReportModal quando a seleção cobre 2+
-    // grupos de exame): progresso/rótulo do passo atual, resumo dos laudos
-    // já salvos nesta sessão, e rótulo do botão "próximo grupo". Todos
-    // opcionais — fora do fluxo em lote o modal se comporta como sempre.
-    queueProgress: { type: Object, default: null }, // { current, total, label }
-    queueSummary: { type: Array, default: () => [] }, // [{ label, title, pdf_url }]
-    nextLabel: { type: String, default: null },
-    // Imagens do(s) exame(s) deste passo — botão "Inserir imagem do exame"
+    // Imagens do(s) exame(s) — sem examGroups — botão "Inserir imagem do exame"
     // (adaptação do "Auto Load Image" do concorrente: aqui o editor é um
     // bloco de rich-text só, sem campos OD/OE endereçáveis, então em vez de
     // carregar automaticamente NUM campo específico, o médico insere a
     // imagem no cursor de onde estiver escrevendo).
     examImages: { type: Array, default: () => [] }, // [{ id, url, label }]
+    // Exames abertos no visualizador que PODEM entrar no laudo — o médico
+    // marca exame e olho (OD/OE/AO) que entram (um ou vários: laudo
+    // conjunto). Cada um: { key, label, eyes: [{ key, label, examIds
+    // (imagens ativas daquele olho), images: [{ id, url, label }] }] }.
+    examGroups: { type: Array, default: () => [] },
+    // Encaixado à direita do visualizador de imagens (fluxo do EyeImages:
+    // painéis visíveis à esquerda enquanto o médico escreve) em vez de modal
+    // centralizado com fundo escuro.
+    docked: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['close', 'saved', 'next']);
+const emit = defineEmits(['close', 'saved']);
+
+// Olhos marcados pelo médico em "Exames neste laudo" ("grupo|olho"). Abre
+// com os olhos que têm imagem em examIds; exame que aparecer depois
+// (painel trocado no visualizador) entra desmarcado.
+const checkedEyeKeys = ref([]);
+const eyeKey = (group, eye) => `${group.key}|${eye.key}`;
+
+watch(
+    () => props.open,
+    (isOpen) => {
+        if (!isOpen) return;
+        const initial = new Set(props.examIds);
+        checkedEyeKeys.value = props.examGroups.flatMap((g) =>
+            g.eyes.filter((e) => e.examIds.some((id) => initial.has(id))).map((e) => eyeKey(g, e)),
+        );
+    },
+    { immediate: true },
+);
+
+const checkedEyes = computed(() =>
+    props.examGroups.flatMap((g) => g.eyes.filter((e) => checkedEyeKeys.value.includes(eyeKey(g, e)))),
+);
+const selectedExamIds = computed(() =>
+    props.examGroups.length ? checkedEyes.value.flatMap((e) => e.examIds) : props.examIds,
+);
+const availableImages = computed(() =>
+    props.examGroups.length ? checkedEyes.value.flatMap((e) => e.images ?? []) : props.examImages,
+);
+const noExamChecked = computed(() => props.examGroups.length > 0 && selectedExamIds.value.length === 0);
+
+// Caixa do exame: marca/desmarca todos os olhos dele (indeterminada quando
+// só parte dos olhos está marcada).
+function groupState(group) {
+    const enabled = group.eyes.filter((e) => e.examIds.length);
+    const checked = enabled.filter((e) => checkedEyeKeys.value.includes(eyeKey(group, e))).length;
+    return { all: enabled.length > 0 && checked === enabled.length, some: checked > 0, enabled };
+}
+
+function toggleGroup(group) {
+    const { all, enabled } = groupState(group);
+    const keys = enabled.map((e) => eyeKey(group, e));
+    checkedEyeKeys.value = all
+        ? checkedEyeKeys.value.filter((k) => !keys.includes(k))
+        : [...new Set([...checkedEyeKeys.value, ...keys])];
+}
 
 function tt(key, fallback = '') {
     return props.t?.[key] ?? fallback;
@@ -135,10 +184,10 @@ async function savePhraseFromSelection() {
 const extractingPdf = ref(false);
 
 async function extractPdfText() {
-    if (!props.urls.extractPdfText || !props.examIds.length || extractingPdf.value) return;
+    if (!props.urls.extractPdfText || !selectedExamIds.value.length || extractingPdf.value) return;
     extractingPdf.value = true;
     try {
-        const { data } = await window.axios.post(props.urls.extractPdfText, { exam_ids: props.examIds });
+        const { data } = await window.axios.post(props.urls.extractPdfText, { exam_ids: selectedExamIds.value });
         editorRef.value?.insertContent(
             data.text
                 .split(/\n{2,}/)
@@ -238,7 +287,7 @@ async function onTemplateChange() {
         const { data } = await window.axios.post(props.urls.preview, {
             report_setting_content_id: form.report_setting_content_id,
             patient_id: props.patient.id,
-            exam_ids: props.examIds,
+            exam_ids: selectedExamIds.value,
         });
         form.content = data?.content ?? '';
 
@@ -277,6 +326,11 @@ async function confirmOpenRecord(consultationDate) {
 async function save(confirmOpen = false) {
     if (!props.patient?.id) return;
 
+    if (noExamChecked.value) {
+        error.value = tt('report_select_exam', 'Marque ao menos um exame para laudar.');
+        return;
+    }
+
     const plain = form.content.replace(/<[^>]*>/g, '').trim();
     if (!plain) {
         error.value = tt('report_content_required', 'Escreva o conteúdo do laudo antes de salvar.');
@@ -289,7 +343,7 @@ async function save(confirmOpen = false) {
     try {
         const { data } = await window.axios.post(props.urls.store, {
             patient_id: props.patient.id,
-            exam_ids: props.examIds,
+            exam_ids: selectedExamIds.value,
             report_setting_content_id: form.report_setting_content_id || null,
             title: form.title || null,
             content: form.content,
@@ -344,23 +398,37 @@ async function close() {
     if (isDirty() && !(await confirmDiscard())) return;
     emit('close');
 }
+
+// Encaixado, o laudo fica acima do visualizador (z-index 9998): SweetAlert
+// (1060) e menus do TinyMCE (1300) ficariam escondidos atrás dele — a
+// classe no body sobe os dois (estilo global no fim do arquivo).
+watch(
+    () => props.open && props.docked,
+    (on) => document.body.classList.toggle('ei-report-docked', on),
+    { immediate: true },
+);
+onBeforeUnmount(() => document.body.classList.remove('ei-report-docked'));
+
+// Visualizador fecha o laudo pelo mesmo caminho do X (pergunta antes de
+// descartar rascunho).
+defineExpose({ close });
 </script>
 
 <template>
     <Teleport to="body">
         <div
             v-if="open"
-            class="modal fade show d-block"
+            :class="docked ? 'ei-report-dock' : 'modal fade show d-block'"
             tabindex="-1"
-            style="background: rgba(0, 0, 0, 0.55)"
+            :style="docked ? null : 'background: rgba(0, 0, 0, 0.55)'"
             role="dialog"
-            aria-modal="true"
+            :aria-modal="docked ? 'false' : 'true'"
             aria-labelledby="eyeReportModalTitle"
-            @click.self="close"
+            @click.self="docked || close()"
             @keydown.escape.window="close"
         >
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
+            <div :class="docked ? 'h-100' : 'modal-dialog modal-lg modal-dialog-scrollable'">
+                <div class="modal-content" :class="{ 'h-100 rounded-0 border-0': docked }">
                     <div class="modal-header py-2">
                         <h6 id="eyeReportModalTitle" class="modal-title">
                             <i class="ti ti-file-text me-2 text-primary"></i>{{ tt('report_new', 'Novo laudo') }}
@@ -371,17 +439,55 @@ async function close() {
                         <button type="button" class="btn-close" @click="close"></button>
                     </div>
 
-                    <div
-                        v-if="queueProgress"
-                        class="px-3 py-1 bg-body-secondary border-bottom small text-muted d-flex align-items-center gap-1"
-                    >
-                        <i class="ti ti-list-numbers"></i>
-                        {{ tt('report_queue_label', 'Laudo') }} {{ queueProgress.current }}
-                        {{ tt('report_queue_of', 'de') }} {{ queueProgress.total }}
-                        <span class="fw-semibold text-body">— {{ queueProgress.label }}</span>
+                    <div v-if="examGroups.length && !savedResult" class="px-3 py-2 border-bottom small">
+                        <div class="text-muted fw-semibold mb-1">
+                            <i class="ti ti-stack-2 me-1"></i>{{ tt('report_exams_label', 'Exames neste laudo') }}
+                            <span class="fw-normal">— {{ tt('report_exams_hint', 'marque quais entram') }}</span>
+                        </div>
+                        <ul class="list-unstyled mb-0 d-flex flex-column gap-1">
+                            <li
+                                v-for="group in examGroups"
+                                :key="group.key"
+                                class="d-flex align-items-center flex-wrap gap-2 border rounded px-2 py-1"
+                                :class="groupState(group).some ? 'border-primary bg-primary-subtle' : ''"
+                                style="font-size: 0.74rem"
+                            >
+                                <label class="d-inline-flex align-items-center gap-1 mb-0" style="cursor: pointer">
+                                    <input
+                                        type="checkbox"
+                                        class="form-check-input m-0"
+                                        :checked="groupState(group).all"
+                                        :indeterminate="groupState(group).some && !groupState(group).all"
+                                        :disabled="!groupState(group).enabled.length"
+                                        @change="toggleGroup(group)"
+                                    />
+                                    <span>{{ group.label }}</span>
+                                </label>
+                                <span class="d-inline-flex gap-1 ms-auto">
+                                    <label
+                                        v-for="eye in group.eyes"
+                                        :key="eye.key"
+                                        class="d-inline-flex align-items-center gap-1 mb-0 border rounded px-1 bg-body"
+                                        style="cursor: pointer"
+                                    >
+                                        <input
+                                            v-model="checkedEyeKeys"
+                                            type="checkbox"
+                                            class="form-check-input m-0"
+                                            :value="eyeKey(group, eye)"
+                                            :disabled="!eye.examIds.length"
+                                        />
+                                        {{ eye.label }}
+                                    </label>
+                                </span>
+                            </li>
+                        </ul>
+                        <small v-if="noExamChecked" class="text-danger d-block mt-1">
+                            {{ tt('report_select_exam', 'Marque ao menos um exame para laudar.') }}
+                        </small>
                     </div>
 
-                    <div class="modal-body">
+                    <div class="modal-body" :class="{ 'overflow-auto': docked }">
                         <div v-if="error" class="alert alert-danger py-2 small">{{ error }}</div>
 
                         <template v-if="!savedResult">
@@ -431,7 +537,11 @@ async function close() {
                                     </span>
 
                                     <span class="ms-auto d-flex align-items-center gap-1">
-                                        <span v-if="examImages.length" ref="imagePickerRef" class="position-relative">
+                                        <span
+                                            v-if="availableImages.length"
+                                            ref="imagePickerRef"
+                                            class="position-relative"
+                                        >
                                             <button
                                                 type="button"
                                                 class="btn btn-outline-secondary btn-sm py-0 px-2"
@@ -447,7 +557,7 @@ async function close() {
                                                 style="z-index: 20; min-width: 220px"
                                             >
                                                 <button
-                                                    v-for="img in examImages"
+                                                    v-for="img in availableImages"
                                                     :key="img.id"
                                                     type="button"
                                                     class="dropdown-item d-flex align-items-center gap-2 py-1 px-2 small w-100 text-start border-0 bg-transparent"
@@ -529,7 +639,7 @@ async function close() {
                                         </span>
 
                                         <button
-                                            v-if="examIds.length"
+                                            v-if="selectedExamIds.length"
                                             type="button"
                                             class="btn btn-outline-secondary btn-sm py-0 px-2"
                                             style="font-size: 0.72rem"
@@ -582,28 +692,6 @@ async function close() {
                             <a :href="savedResult.pdf_url" target="_blank" class="btn btn-primary btn-sm">
                                 <i class="ti ti-file-download me-1"></i>{{ tt('download_pdf', 'Baixar PDF') }}
                             </a>
-
-                            <div
-                                v-if="queueSummary.length"
-                                class="text-start mt-4 pt-3 border-top mx-auto"
-                                style="max-width: 360px"
-                            >
-                                <p class="small fw-semibold mb-2">
-                                    {{ tt('report_queue_previous', 'Laudos já gerados nesta sessão:') }}
-                                </p>
-                                <ul class="list-unstyled small mb-0">
-                                    <li
-                                        v-for="(item, idx) in queueSummary"
-                                        :key="idx"
-                                        class="d-flex justify-content-between align-items-center mb-1"
-                                    >
-                                        <span class="text-muted">{{ item.label }}</span>
-                                        <a :href="item.pdf_url" target="_blank" class="ms-2">
-                                            <i class="ti ti-file-download"></i>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
                         </div>
                     </div>
 
@@ -615,19 +703,11 @@ async function close() {
                             v-if="!savedResult"
                             type="button"
                             class="btn btn-primary btn-sm"
-                            :disabled="saving || previewing"
+                            :disabled="saving || previewing || noExamChecked"
                             @click="save(false)"
                         >
                             <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
                             <i v-else class="ti ti-device-floppy me-1"></i>{{ tt('report_save', 'Salvar laudo') }}
-                        </button>
-                        <button
-                            v-if="savedResult && nextLabel"
-                            type="button"
-                            class="btn btn-primary btn-sm"
-                            @click="emit('next')"
-                        >
-                            {{ nextLabel }} <i class="ti ti-arrow-right ms-1"></i>
                         </button>
                     </div>
                 </div>
@@ -635,3 +715,35 @@ async function close() {
         </div>
     </Teleport>
 </template>
+
+<style scoped>
+.ei-report-dock {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--ei-report-dock-width, min(46vw, 760px));
+    z-index: 10001;
+    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.45);
+}
+.ei-report-dock .modal-content {
+    display: flex;
+    flex-direction: column;
+}
+.ei-report-dock .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+@media (max-width: 991.98px) {
+    .ei-report-dock {
+        width: 100%;
+    }
+}
+</style>
+
+<style>
+body.ei-report-docked .swal2-container,
+body.ei-report-docked .tox-tinymce-aux {
+    z-index: 10020 !important;
+}
+</style>

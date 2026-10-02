@@ -734,14 +734,93 @@ function setPanelError(pi) {
 }
 
 function setViewerPanelCount(n) {
-    n = Math.min(n, viewerExams.value.length || 1);
+    n = Math.min(n, Math.max(viewerExams.value.length, groupedExams.value.length) || 1);
     viewerPanelCount.value = n;
     viewerSplitMode.value = false;
     for (let i = 0; i < n; i++) {
-        if (!viewerPanelExams.value[i] && viewerExams.value[i]) {
-            setPanelExam(i, viewerExams.value[i]);
+        if (!viewerPanelExams.value[i]) {
+            // Painel novo abre num exame (grupo) que ainda não está na tela.
+            const shown = new Set(viewerPanelExams.value.filter(Boolean).map((e) => examGroupKey(e).key));
+            const next = groupedExams.value.find((g) => !shown.has(g.key));
+            const exam = next ? firstActiveExam(next) : viewerExams.value[i];
+            if (exam) setPanelExam(i, exam);
         }
     }
+}
+
+// ── Cabeçalho de cada painel (tipo de exame / data / Laudo) ───────────────
+// Mesmo fluxo do EyeImages: cada painel escolhe o tipo de exame e a data
+// (grupo da galeria) e tem o seu botão Laudo; o laudo abre encaixado à
+// direita com os painéis visíveis.
+function typeKeyOf(group) {
+    return group?.examType?.id ?? '';
+}
+
+function firstActiveExam(group) {
+    return group?.exams.find((e) => e.active !== false) ?? group?.exams[0] ?? null;
+}
+
+function panelGroup(pi) {
+    const exam = viewerPanelExams.value[pi];
+    if (!exam) return null;
+    const { key } = examGroupKey(exam);
+    return groupedExams.value.find((g) => g.key === key) ?? null;
+}
+
+const viewerTypeOptions = computed(() => {
+    const seen = new Map();
+    for (const g of groupedExams.value) {
+        if (!seen.has(typeKeyOf(g))) seen.set(typeKeyOf(g), g.examType?.name || 'Exame');
+    }
+    return [...seen].map(([key, name]) => ({ key, name }));
+});
+
+function groupsOfType(typeKey) {
+    return groupedExams.value.filter((g) => typeKeyOf(g) === typeKey);
+}
+
+// Só a data (como no EyeImages); o equipamento entra só quando o mesmo tipo
+// de exame tem 2+ exames no mesmo dia.
+function groupDateLabel(group) {
+    const sameDay = groupsOfType(typeKeyOf(group)).filter((g) => g.date === group.date).length > 1;
+    const date = formatDateFull(group.date);
+    return sameDay && group.equipment ? `${date} — ${group.equipment.name}` : date;
+}
+
+function onPanelTypeChange(pi, typeKey) {
+    const exam = firstActiveExam(groupsOfType(typeKey)[0]);
+    if (exam) setPanelExam(pi, exam);
+}
+
+function onPanelGroupChange(pi, key) {
+    const exam = firstActiveExam(groupedExams.value.find((g) => g.key === key));
+    if (exam) setPanelExam(pi, exam);
+}
+
+function activeExamIdsOf(groups) {
+    return groups.flatMap((g) => g.exams.filter((e) => e.active !== false).map((e) => e.id));
+}
+
+// Exames (grupos) distintos abertos nos painéis — opções da lista "Exames
+// neste laudo".
+const viewerPanelGroups = computed(() => {
+    const groups = [];
+    for (let i = 0; i < viewerPanelCount.value; i++) {
+        const g = panelGroup(i);
+        if (g && !groups.some((x) => x.key === g.key)) groups.push(g);
+    }
+    return groups;
+});
+
+// Botão Laudo do painel: abre o laudo com o exame daquele painel marcado;
+// os outros exames dos painéis aparecem na lista do laudo pra marcar junto.
+function openPanelReport(pi) {
+    const group = panelGroup(pi);
+    if (!group || reportModalOpen.value) return;
+    const examIds = activeExamIdsOf([group]);
+    if (!examIds.length) return;
+    reportExamIds.value = examIds;
+    reportModalOpen.value = true;
 }
 
 function viewerToggleAll() {
@@ -804,7 +883,9 @@ function allGridExams() {
 }
 
 function panelStripExams(pi) {
-    if (!viewerSplitMode.value) return viewerExams.value;
+    // Como no EyeImages: a faixa de cada painel mostra as imagens do exame
+    // (grupo) escolhido no cabeçalho do painel.
+    if (!viewerSplitMode.value) return panelGroup(pi)?.exams ?? viewerExams.value;
     const exam = viewerPanelExams.value[pi];
     if (!exam) return viewerExams.value;
     const lat = exam.laterality;
@@ -992,6 +1073,10 @@ async function downloadMontage() {
 // ── Keyboard nav ──────────────────────────────────────────────────────────
 function onKeyDown(e) {
     if (!showViewerModal.value) return;
+    // Laudo encaixado aberto: Esc é dele (pergunta antes de descartar o
+    // rascunho) e setas/Esc digitados nos campos do laudo não podem trocar a
+    // imagem nem fechar o visualizador.
+    if (reportModalOpen.value) return;
     if (e.key === 'Escape') {
         showViewerModal.value = false;
     }
@@ -1358,100 +1443,102 @@ function openDiagnosisModal() {
 
 // ── Laudo manual (Modelos) ───────────────────────────────────────────────
 const reportModalOpen = ref(false);
-// Desacoplado de selectedExamIds: no laudo em lote cada passo da fila troca
-// isto pro grupo da vez, sem mexer na seleção real do médico na galeria.
+// Exames que abrem MARCADOS no laudo (o médico marca/desmarca os demais na
+// própria lista "Exames neste laudo"). Desacoplado de selectedExamIds pra
+// não mexer na seleção da galeria.
 const reportExamIds = ref([]);
 
-// Laudo em lote: seleção cobrindo 2+ grupos de exame vira 1
-// MedicalRecordDocumentation por grupo, em sequência, reaproveitando o
-// MESMO endpoint/modal de sempre (chamado uma vez por grupo) — nunca um
-// laudo só com o conteúdo de tipos de exame diferentes misturado.
-const reportQueue = ref([]); // grupos restantes (ver selectedExamGroups)
-const reportQueueIndex = ref(0);
-const reportQueueResults = ref([]); // [{ label, title, pdf_url }] já salvos nesta sessão
-
-const reportQueueActive = computed(() => reportQueue.value.length > 1);
-
-const reportQueueProgress = computed(() =>
-    reportQueueActive.value
-        ? {
-              current: reportQueueIndex.value + 1,
-              total: reportQueue.value.length,
-              label: reportQueue.value[reportQueueIndex.value]?.label ?? '',
-          }
-        : null,
-);
-
-const reportNextLabel = computed(() => {
-    if (!reportQueueActive.value) return null;
-    const next = reportQueue.value[reportQueueIndex.value + 1];
-    return next ? `${tt('report_queue_next', 'Próximo laudo')}: ${next.label}` : null;
-});
-
-async function confirmMultiGroupReport(groups) {
-    const intro = tt(
-        'report_queue_confirm_text',
-        'Vai ser criado um laudo separado para cada um dos exames selecionados:',
-    );
-    if (window.Swal) {
-        // html (não text): SweetAlert2 renderiza `text` como textContent puro
-        // — \n vira espaço, a lista de grupos saía tudo numa linha só. Nomes
-        // de exame vêm de cadastro configurável pela clínica (ExamType), não
-        // são literal fixo — escapar antes de injetar como HTML.
-        const escape = (s) =>
-            String(s).replace(
-                /[&<>"']/g,
-                (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-            );
-        const list = groups.map((g) => `• ${escape(g.label)}`).join('<br>');
-        const result = await window.Swal.fire({
-            icon: 'question',
-            title: tt('report_queue_confirm_title', 'Laudar exames separadamente?'),
-            html: `${escape(intro)}<br><br>${list}`,
-            showCancelButton: true,
-            confirmButtonText: tt('report_queue_confirm_ok', 'Começar'),
-            cancelButtonText: tt('cancel', 'Cancelar'),
-        });
-        return result.isConfirmed;
-    }
-    const message = intro + '\n\n' + groups.map((g) => `• ${g.label}`).join('\n');
-    return window.confirm(message);
-}
-
-async function openReportModal() {
+// Laudo sempre ao lado das imagens (fluxo do EyeImages): abre o
+// visualizador com um exame diferente em cada painel e o laudo encaixado
+// à direita, já com os exames selecionados na galeria marcados. Nada
+// selecionado: abre os exames mais recentes, sem nenhum marcado.
+function openReportModal() {
     if (!selectedPatient.value) return;
-
-    const groups = selectedExamGroups.value;
-    if (groups.length > 1) {
-        if (!(await confirmMultiGroupReport(groups))) return;
-        reportQueue.value = groups;
-        reportQueueIndex.value = 0;
-        reportQueueResults.value = [];
-        reportExamIds.value = groups[0].examIds;
-    } else {
-        reportQueue.value = [];
-        reportExamIds.value = selectedExamIds.value;
-    }
-
+    reportExamIds.value = [...selectedExamIds.value];
+    openViewerForReport(
+        reportExamIds.value.length
+            ? reportExamIds.value
+            : groupedExams.value.slice(0, 4).flatMap((g) => g.exams.map((e) => e.id)),
+    );
     reportModalOpen.value = true;
 }
 
-// Imagens do passo ATUAL da fila (ou da seleção, fora do laudo em lote) —
-// pro botão "Inserir imagem do exame" no editor (item 2 do benchmark
-// 18/09/2026). Mesmo padrão de label de compareImages; URLs já resolvidas
-// pelo pai (examUrls), sem round-trip novo ao abrir o modal.
-const reportExamImages = computed(() =>
-    reportExamIds.value
-        .map((id) => {
-            const exam = selectedPatient.value?.exams?.find((e) => e.id === id);
-            return {
-                id,
-                url: examUrls.value[id] ?? '',
-                label: [exam?.exam_type?.name, latLabel(exam?.laterality)].filter(Boolean).join(' — ') || 'Imagem',
-            };
-        })
-        .filter((img) => img.url),
-);
+function openViewerForReport(examIds) {
+    if (showViewerModal.value) return;
+    const ids = new Set(examIds);
+    const groups = groupedExams.value
+        .map((g) => g.exams.filter((e) => ids.has(e.id)))
+        .filter((exams) => exams.length > 0);
+    if (!groups.length) return;
+    const firsts = groups.map((exams) => exams[0]);
+    const rest = groups.flatMap((exams) => exams.slice(1));
+    openViewerModal([...firsts, ...rest], 0, Math.min(groups.length, 4));
+}
+
+// Opções de "Exames neste laudo": exames abertos nos painéis + os que
+// abriram marcados (se não estiverem em painel nenhum). Painel trocado com
+// o laudo aberto faz o exame novo aparecer na lista, desmarcado.
+const reportExamGroups = computed(() => {
+    const initial = new Set(reportExamIds.value);
+    const keys = new Set(viewerPanelGroups.value.map((g) => g.key));
+    const groups = [
+        ...viewerPanelGroups.value,
+        ...groupedExams.value.filter((g) => !keys.has(g.key) && g.exams.some((e) => initial.has(e.id))),
+    ];
+    // Um item por olho (OD/OE/AO) dentro de cada exame — o médico pode laudar
+    // só um olho de um exame com os dois.
+    const eyeOrder = { 1: 0, 2: 1 };
+    return groups.map((g) => ({
+        key: g.key,
+        label: [g.examType?.name || 'Exame', formatDateFull(g.date), g.equipment?.name].filter(Boolean).join(' — '),
+        eyes: [...new Set(g.exams.map((e) => e.laterality))]
+            .sort((a, b) => (eyeOrder[a] ?? 2) - (eyeOrder[b] ?? 2))
+            .map((lat) => {
+                const active = g.exams.filter((e) => e.laterality === lat && e.active !== false);
+                return {
+                    key: String(lat ?? 0),
+                    label: lat === 1 ? tt('eye_od', 'OD') : lat === 2 ? tt('eye_oe', 'OE') : tt('eye_ao', 'AO'),
+                    examIds: active.map((e) => e.id),
+                    // "Inserir imagem do exame" no editor — URLs já resolvidas
+                    // pelo pai (examUrls), sem round-trip novo.
+                    images: active
+                        .map((e) => ({
+                            id: e.id,
+                            url: examUrls.value[e.id] ?? '',
+                            label: [e.exam_type?.name, latLabel(e.laterality)].filter(Boolean).join(' — ') || 'Imagem',
+                        }))
+                        .filter((img) => img.url),
+                };
+            }),
+    }));
+});
+
+// Laudo encaixado ocupa a direita: o visualizador encolhe pra esquerda em
+// vez de ficar coberto (abaixo de 992px o laudo ocupa a tela toda). Mesma
+// largura de .ei-report-dock (EyeImageReportModal.vue).
+const REPORT_DOCK_WIDTH = 'min(46vw, 760px)';
+const wideViewportQuery = window.matchMedia?.('(min-width: 992px)');
+const isWideViewport = ref(wideViewportQuery?.matches ?? true);
+const onViewportChange = (e) => (isWideViewport.value = e.matches);
+onMounted(() => wideViewportQuery?.addEventListener?.('change', onViewportChange));
+onBeforeUnmount(() => wideViewportQuery?.removeEventListener?.('change', onViewportChange));
+
+const viewerRightOffset = computed(() => (reportModalOpen.value && isWideViewport.value ? REPORT_DOCK_WIDTH : '0px'));
+
+// Fechar o visualizador com laudo aberto passa pelo X do laudo (pergunta
+// antes de descartar o rascunho); só fecha os dois se o médico confirmar.
+const reportModalRef = ref(null);
+const closeViewerAfterReport = ref(false);
+
+async function closeViewer() {
+    if (reportModalOpen.value) {
+        closeViewerAfterReport.value = true;
+        await reportModalRef.value?.close();
+        if (reportModalOpen.value) closeViewerAfterReport.value = false;
+        return;
+    }
+    showViewerModal.value = false;
+}
 
 const reportPatientPayload = computed(() =>
     selectedPatient.value
@@ -1476,55 +1563,20 @@ const reportUrls = computed(() => ({
     phrasesDestroy: props.urls?.report_phrases_destroy ?? '', // template __ID__
 }));
 
-// Guarda só o resultado do passo atual — vira entrada de reportQueueResults
-// quando o médico avança (onReportNext), nunca antes: a tela de sucesso do
-// passo atual já mostra esse PDF sozinha (savedResult, no modal), então
-// queueSummary só deve listar os passos ANTERIORES, senão duplicaria.
-const reportLastSaved = ref(null);
-// Refetch só dispara ao FECHAR o modal (onReportModalClosed), nunca entre
-// passos da fila: fetchPatients() sempre busca a página 1 (Index.vue:493-523)
-// e reselectPatientAfterFetch() zera selectedPatient quando ele não está
-// nessa página — um médico que abriu o paciente via "carregar mais"
-// (página 2+) perderia a seleção NO MEIO da fila, quebrando os passos
-// restantes silenciosamente. Um refresh só, no final, é seguro e evita isso.
+// Refetch só ao FECHAR o laudo: atualiza badge/histórico de laudos do
+// paciente uma vez, no fim.
 const reportAnySaved = ref(false);
 
-function onReportSaved(data) {
+function onReportSaved() {
     reportAnySaved.value = true;
-    if (reportQueueActive.value) reportLastSaved.value = data;
 }
 
-// Botão "Próximo laudo" na tela de sucesso: fecha e reabre o modal pro
-// próximo grupo da fila — reaproveita o reset() interno dele (watch(open)
-// já limpa formulário/erro e busca os modelos de novo pro grupo seguinte).
-function onReportNext() {
-    if (reportLastSaved.value) {
-        reportQueueResults.value.push({
-            label: reportQueue.value[reportQueueIndex.value]?.label ?? '',
-            title: reportLastSaved.value.title,
-            pdf_url: reportLastSaved.value.pdf_url,
-        });
-        reportLastSaved.value = null;
-    }
-
-    reportModalOpen.value = false;
-    reportQueueIndex.value += 1;
-    nextTick(() => {
-        reportExamIds.value = reportQueue.value[reportQueueIndex.value].examIds;
-        reportModalOpen.value = true;
-    });
-}
-
-// Fechar (X, backdrop, Esc ou "Fechar" no último passo) sempre limpa o
-// estado da fila — parar no meio não desfaz os laudos já salvos, só não
-// oferece os grupos restantes; o médico pode retomá-los individualmente
-// pelo menu de contexto de cada exame.
 function onReportModalClosed() {
     reportModalOpen.value = false;
-    reportQueue.value = [];
-    reportQueueIndex.value = 0;
-    reportQueueResults.value = [];
-    reportLastSaved.value = null;
+    if (closeViewerAfterReport.value) {
+        closeViewerAfterReport.value = false;
+        showViewerModal.value = false;
+    }
     if (reportAnySaved.value) {
         reportAnySaved.value = false;
         fetchPatients(); // atualiza badge/histórico de laudos do paciente
@@ -2251,7 +2303,12 @@ const printEntity = computed(() => props.entity ?? {});
                             class="btn btn-sm btn-outline-primary"
                             @click="openReportModal"
                         >
-                            <i class="ti ti-file-text me-1"></i>{{ tt('report_new', 'Novo laudo') }}
+                            <i class="ti ti-file-text me-1"></i
+                            ><template v-if="selectedExamGroups.length > 1"
+                                >{{ tt('report_selected', 'Laudar selecionados') }} ({{
+                                    selectedExamGroups.length
+                                }})</template
+                            ><template v-else>{{ tt('report_new', 'Novo laudo') }}</template>
                         </button>
                         <div class="flex-grow-1"></div>
                         <span v-if="selectedExamIds.length > 0" class="text-muted" style="font-size: 0.7rem">
@@ -2673,9 +2730,12 @@ const printEntity = computed(() => props.entity ?? {});
         <Teleport to="body">
             <div
                 v-show="showViewerModal"
+                :style="{ right: viewerRightOffset }"
                 style="
                     position: fixed;
-                    inset: 0;
+                    top: 0;
+                    bottom: 0;
+                    left: 0;
                     z-index: 9998;
                     background: #0a0a0a;
                     display: flex;
@@ -2696,7 +2756,7 @@ const printEntity = computed(() => props.entity ?? {});
                             class="btn fw-semibold"
                             :class="viewerPanelCount === n ? 'btn-primary' : 'btn-outline-secondary'"
                             style="min-width: 26px; font-size: 0.72rem"
-                            :disabled="n > viewerExams.length"
+                            :disabled="n > Math.max(viewerExams.length, groupedExams.length)"
                             @click="setViewerPanelCount(n)"
                         >
                             {{ n }}
@@ -2792,7 +2852,32 @@ const printEntity = computed(() => props.entity ?? {});
                     <div class="vr opacity-25 mx-1"></div>
                     <div class="flex-grow-1"></div>
 
-                    <button type="button" class="btn btn-sm btn-outline-danger" @click="showViewerModal = false">
+                    <!-- Paciente (como a barra do EyeImages: nome, ID, sexo, idade) -->
+                    <div
+                        v-if="selectedPatient"
+                        class="d-flex align-items-center gap-2 px-2 text-light"
+                        style="font-size: 0.75rem; min-width: 0"
+                    >
+                        <span class="fw-semibold text-truncate">{{
+                            selectedPatient.person?.full_name ?? selectedPatient.full_name
+                        }}</span>
+                        <span class="text-secondary text-nowrap"
+                            >{{ tt('viewer_patient_id', 'ID') }}: {{ selectedPatient.code }}</span
+                        >
+                        <span v-if="selectedPatient.person?.gender_label" class="text-secondary text-nowrap">{{
+                            selectedPatient.person.gender_label
+                        }}</span>
+                        <span v-if="selectedPatient.person?.age != null" class="text-secondary text-nowrap">{{
+                            tt('age_years', ':years anos').replace(':years', selectedPatient.person.age)
+                        }}</span>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger"
+                        :aria-label="tt('close', 'Fechar')"
+                        @click="closeViewer"
+                    >
                         <i class="fa fa-times"></i>
                     </button>
                 </div>
@@ -2806,6 +2891,65 @@ const printEntity = computed(() => props.entity ?? {});
                         :style="`background:#111;border-radius:3px;min-height:0;cursor:pointer;overflow:hidden;outline:${viewerActivePanel === pi - 1 ? '2px solid #0d6efd' : '1px solid #2a2a2a'};`"
                         @click="viewerActivePanel = pi - 1"
                     >
+                        <!-- Cabeçalho do painel: tipo de exame, data e Laudo -->
+                        <div
+                            v-if="panelGroup(pi - 1)"
+                            class="d-flex align-items-center gap-1 px-2 py-1 flex-shrink-0 flex-wrap"
+                            style="
+                                background: #1b1b1b;
+                                border-bottom: 1px solid #2a2a2a;
+                                font-size: 0.72rem;
+                                row-gap: 3px;
+                            "
+                            @click.stop="viewerActivePanel = pi - 1"
+                        >
+                            <select
+                                class="form-select form-select-sm ei-viewer-select"
+                                :value="typeKeyOf(panelGroup(pi - 1))"
+                                :aria-label="tt('viewer_exam_type', 'Tipo de exame')"
+                                @change="onPanelTypeChange(pi - 1, $event.target.value)"
+                            >
+                                <option v-for="opt in viewerTypeOptions" :key="opt.key" :value="opt.key">
+                                    {{ opt.name }}
+                                </option>
+                            </select>
+                            <span class="text-secondary">
+                                ({{ groupsOfType(typeKeyOf(panelGroup(pi - 1))).length }})
+                            </span>
+                            <select
+                                class="form-select form-select-sm ei-viewer-select"
+                                :value="panelGroup(pi - 1).key"
+                                :aria-label="tt('viewer_exam_date', 'Data do exame')"
+                                @change="onPanelGroupChange(pi - 1, $event.target.value)"
+                            >
+                                <option
+                                    v-for="g in groupsOfType(typeKeyOf(panelGroup(pi - 1)))"
+                                    :key="g.key"
+                                    :value="g.key"
+                                >
+                                    {{ groupDateLabel(g) }}
+                                </option>
+                            </select>
+                            <span class="text-secondary">({{ panelGroup(pi - 1).exams.length }})</span>
+                            <button
+                                v-if="isDoctor"
+                                type="button"
+                                class="btn btn-sm py-0 px-2 ms-auto ei-viewer-report-btn"
+                                :disabled="reportModalOpen"
+                                :title="
+                                    reportModalOpen
+                                        ? tt(
+                                              'viewer_report_open_hint',
+                                              'Laudo aberto: marque o exame na lista do laudo',
+                                          )
+                                        : null
+                                "
+                                @click.stop="openPanelReport(pi - 1)"
+                            >
+                                <i class="ti ti-file-text me-1"></i>{{ tt('viewer_report', 'Laudo') }}
+                            </button>
+                        </div>
+
                         <div
                             class="flex-grow-1 position-relative d-flex"
                             :class="
@@ -2909,7 +3053,7 @@ const printEntity = computed(() => props.entity ?? {});
                                     {{ viewerPanelExams[pi - 1].exam_type?.name ?? '—' }}
                                 </span>
                                 <span class="text-secondary opacity-50 flex-shrink-0 ms-auto">
-                                    {{ formatDateFull(viewerPanelExams[pi - 1].created_at?.substring(0, 10)) }}
+                                    {{ formatDateFull(examGroupKey(viewerPanelExams[pi - 1]).date) }}
                                 </span>
                             </span>
                             <span v-else class="text-secondary" style="opacity: 0.3">Painel {{ pi }}</span>
@@ -3464,18 +3608,16 @@ const printEntity = computed(() => props.entity ?? {});
 
         <!-- Laudo manual (Modelos) -->
         <EyeImageReportModal
+            ref="reportModalRef"
             :open="reportModalOpen"
             :patient="reportPatientPayload"
             :exam-ids="reportExamIds"
             :urls="reportUrls"
             :t="t"
-            :queue-progress="reportQueueProgress"
-            :queue-summary="reportQueueResults"
-            :next-label="reportNextLabel"
-            :exam-images="reportExamImages"
+            :exam-groups="reportExamGroups"
+            docked
             @close="onReportModalClosed"
             @saved="onReportSaved"
-            @next="onReportNext"
         />
 
         <!-- Comparar / Alinhar exames -->
@@ -3505,6 +3647,35 @@ const printEntity = computed(() => props.entity ?? {});
 </template>
 
 <style scoped>
+/* Seletores de tipo de exame/data no cabeçalho de cada painel do
+   visualizador (fundo escuro, como o resto do visualizador). */
+.ei-viewer-select {
+    width: auto;
+    max-width: 12rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+    font-size: 0.72rem;
+    background-color: #222;
+    color: #e9ecef;
+    border-color: #3a3a3a;
+}
+
+.ei-viewer-report-btn {
+    font-size: 0.72rem;
+    color: #e9ecef;
+    background-color: #2b2b2b;
+    border: 1px solid #4a4a4a;
+}
+.ei-viewer-report-btn:hover:not(:disabled) {
+    background-color: #3a3a3a;
+    color: #fff;
+}
+.ei-viewer-report-btn:disabled {
+    color: #8a8a8a;
+    background-color: #222;
+    opacity: 1;
+}
+
 /* Barra de filtros: datas do período personalizado com largura fixa no
    desktop; no celular dividem a linha inteira (2×9.5rem + "até" estourava
    em telas de 320–375px). Grupo Olho e Limpar ocupam a largura toda. */

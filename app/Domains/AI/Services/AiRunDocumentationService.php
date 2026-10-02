@@ -125,7 +125,7 @@ class AiRunDocumentationService
         // mesmo profile "medical" usado no fluxo manual antes de persistir.
         $sanitizedOutput = Purifier::clean($finalOutput, 'medical');
 
-        MedicalRecordDocumentation::query()->updateOrCreate(
+        $documentation = MedicalRecordDocumentation::query()->updateOrCreate(
             ['ai_run_id' => $aiRun->id],
             [
                 'medical_record_id' => $record->id,
@@ -136,6 +136,14 @@ class AiRunDocumentationService
                 'content'           => $sanitizedOutput,
             ],
         );
+
+        // Mesmo registro do laudo manual: quais exames o laudo cobre (o PDF
+        // lista). Os ids já foram validados (tenant/paciente) na criação do run.
+        $examIds = array_values(array_map('strval', (array) ($aiRun->input_summary['exam_ids'] ?? [])));
+
+        if ($examIds !== []) {
+            $documentation->syncExams($examIds, (string) $aiRun->entity_id);
+        }
     }
 
     /**

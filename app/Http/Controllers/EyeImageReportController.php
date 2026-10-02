@@ -11,7 +11,7 @@ use App\Services\{ConsultationRecordResolver, MedicalRecordDocumentationService}
 use App\Services\EyeImages\PdfTextExtractionService;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request};
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\{DB, Gate};
 use Mews\Purifier\Facades\Purifier;
 
 /**
@@ -86,7 +86,7 @@ class EyeImageReportController extends Controller
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
         $this->documentationService->assertTemplateBelongsToEntity($content, $entityId);
 
-        $examIds = $this->ownedExamIds($validated['exam_ids'] ?? [], $entityId);
+        $examIds = $this->ownedExamIds($validated['exam_ids'] ?? [], $entityId, (string) $patient->id);
         $this->assertExamsActive($examIds);
 
         $doctorId = $this->resolveDoctorId($entityId, $examIds);
@@ -163,7 +163,7 @@ class EyeImageReportController extends Controller
         ]);
 
         $patient = Patient::query()->where('entity_id', $entityId)->findOrFail($validated['patient_id']);
-        $examIds = $this->ownedExamIds($validated['exam_ids'] ?? [], $entityId);
+        $examIds = $this->ownedExamIds($validated['exam_ids'] ?? [], $entityId, (string) $patient->id);
         $this->assertExamsActive($examIds);
 
         // Resolvido uma vez só e reaproveitado tanto pra abrir o prontuário
@@ -209,25 +209,34 @@ class EyeImageReportController extends Controller
 
         if ($reportContent) {
             $this->documentationService->assertTemplateBelongsToEntity($reportContent, $entityId);
-
-            $documentation = $this->documentationService->store(
-                $record,
-                $reportContent,
-                $sanitized,
-                $validated['title'] ?? null,
-                (string) $doctorId,
-            );
-        } else {
-            // Laudo em branco (sem modelo) — mesmo default de título do laudo de IA.
-            $documentation = MedicalRecordDocumentation::create([
-                'medical_record_id' => $record->id,
-                'patient_id'        => $record->patient_id,
-                'doctor_id'         => $doctorId,
-                'type'              => DocumentationType::Report->value,
-                'title'             => $validated['title'] ?? __('eye_images.report_default_title'),
-                'content'           => $sanitized,
-            ]);
         }
+
+        // Laudo + vínculo com os exames na mesma transação: nunca um laudo
+        // salvo sem registro de quais exames ele cobre (o PDF lista esses
+        // exames — ReportExamSummary; pode ser mais de um, laudo conjunto).
+        $documentation = DB::transaction(function () use ($reportContent, $record, $sanitized, $validated, $doctorId, $examIds, $entityId) {
+            $documentation = $reportContent
+                ? $this->documentationService->store(
+                    $record,
+                    $reportContent,
+                    $sanitized,
+                    $validated['title'] ?? null,
+                    (string) $doctorId,
+                )
+                // Laudo em branco (sem modelo) — mesmo default de título do laudo de IA.
+                : MedicalRecordDocumentation::create([
+                    'medical_record_id' => $record->id,
+                    'patient_id'        => $record->patient_id,
+                    'doctor_id'         => $doctorId,
+                    'type'              => DocumentationType::Report->value,
+                    'title'             => $validated['title'] ?? __('eye_images.report_default_title'),
+                    'content'           => $sanitized,
+                ]);
+
+            $documentation->syncExams($examIds, $entityId);
+
+            return $documentation;
+        });
 
         return response()->json([
             'id'                => $documentation->id,

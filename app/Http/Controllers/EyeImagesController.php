@@ -350,11 +350,17 @@ class EyeImagesController extends Controller
             ->whereNull('revoked_at')
             ->pluck('id', 'shareable_id');
 
+        // person.gender_label/age: barra do paciente no visualizador (mesmo
+        // cabeçalho do PDF do laudo).
         return $patients->map(fn (Patient $p) => [
-            'id'              => (string) $p->id,
-            'code'            => $p->code,
-            'full_name'       => $p->person?->full_name,
-            'person'          => ['full_name' => $p->person?->full_name],
+            'id'        => (string) $p->id,
+            'code'      => $p->code,
+            'full_name' => $p->person?->full_name,
+            'person'    => [
+                'full_name'    => $p->person?->full_name,
+                'gender_label' => $p->person?->gender_label,
+                'age'          => $p->person?->age,
+            ],
             'priority_rating' => $p->priority_rating,
             'exams'           => $p->exams->map(fn (PatientExam $e) => [
                 'id'             => (string) $e->id,

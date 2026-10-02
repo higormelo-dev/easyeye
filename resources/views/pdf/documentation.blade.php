@@ -67,6 +67,15 @@
         font-size: 10pt;
     }
     .patient-block strong { color: #1976d2; }
+    .exams-block {
+        border: 1px solid #d0e4f7;
+        border-radius: 4px;
+        padding: 6px 12px;
+        margin-bottom: 18px;
+        font-size: 9.5pt;
+    }
+    .exams-block strong { color: #1976d2; }
+    .exams-block ul { margin: 4px 0 0; padding-left: 18px; }
 
     /* ── Content ─────────────────────────────────────────────────── */
     .content-body {
@@ -166,6 +175,27 @@
     @endif
     &nbsp;|&nbsp; <strong>{{ __('pdf.date') }}:</strong> {{ \Illuminate\Support\Carbon::now()->isoFormat('L') }}
 </div>
+
+<!-- ─── EXAMES DO LAUDO ──────────────────────────────────────────────────────
+     Laudo do Gerenciador de Imagens: registra quais exames fizeram parte
+     (um laudo pode cobrir vários exames do mesmo paciente). Ver
+     App\Services\EyeImages\ReportExamSummary. -->
+@if(! empty($examSummary))
+<div class="exams-block">
+    <strong>{{ __('eye_images.report_exams_title') }}:</strong>
+    <ul>
+        @foreach($examSummary as $exam)
+        <li>
+            {{ $exam['type'] ?? '—' }}
+            @if($exam['date']) — {{ $exam['date'] }}@endif
+            @if($exam['eyes']) — {{ implode(', ', $exam['eyes']) }}@endif
+            @if($exam['equipment']) — {{ $exam['equipment'] }}@endif
+            ({{ trans_choice('eye_images.report_exams_images', $exam['images'], ['count' => $exam['images']]) }})
+        </li>
+        @endforeach
+    </ul>
+</div>
+@endif
 
 <!-- ─── CONTEÚDO ─────────────────────────────────────────────────────────────
      `contentForRender()` remove o cabeçalho de data resolvido (CIDADE, DD de MÊS de YYYY)

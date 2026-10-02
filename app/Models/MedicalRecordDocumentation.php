@@ -7,7 +7,7 @@ use App\Enums\DocumentationType;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany};
 
 class MedicalRecordDocumentation extends Model
 {
@@ -71,6 +71,32 @@ class MedicalRecordDocumentation extends Model
     public function aiRun(): BelongsTo
     {
         return $this->belongsTo(AiRun::class, 'ai_run_id');
+    }
+
+    /**
+     * Imagens de exame que fizeram parte deste laudo (manual ou de IA) — um
+     * laudo pode cobrir vários exames do mesmo paciente. Ver
+     * ReportExamSummary pra versão agrupada exibida no PDF.
+     */
+    public function patientExams(): BelongsToMany
+    {
+        return $this->belongsToMany(PatientExam::class, 'medical_record_documentation_exams')
+            ->withPivot('entity_id');
+    }
+
+    /**
+     * Vincula as imagens laudadas (substitui o vínculo anterior).
+     *
+     * @param list<string> $examIds
+     */
+    public function syncExams(array $examIds, string $entityId): void
+    {
+        $this->patientExams()->sync(
+            collect($examIds)->mapWithKeys(fn (string $id) => [$id => [
+                'entity_id'  => $entityId,
+                'created_at' => now(),
+            ]])->all(),
+        );
     }
 
     public function getTypeLabel(): string
