@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\{LgpdRequestStatus, LgpdRequestType};
-use App\Models\{EntityUser, LgpdRequest, 
-    Patient};
+use App\Models\{EntityUser, LgpdRequest, Patient};
 use App\Services\Lgpd\PatientDataExporter;
 use Illuminate\Database\Eloquent\Collection;
 
