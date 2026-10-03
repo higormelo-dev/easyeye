@@ -87,6 +87,7 @@ final class AiSystemPromptResolver
             'assistant_chat'          => __('ai.assistant_chat_system_prompt'),
             'platform_finance_digest' => __('ai.platform_finance_digest_system_prompt'),
             'platform_finance_chat'   => __('ai.platform_finance_chat_system_prompt'),
+            'medicine_posology'       => __('ai.medicine_posology_system_prompt'),
             'exam_assistant'          => __('ai.exam_assistant_system_prompt'),
             'report_drafting'         => __('ai.report_drafting_system_prompt'),
             'consensus_review'        => __('ai.consensus_review_system_prompt'),

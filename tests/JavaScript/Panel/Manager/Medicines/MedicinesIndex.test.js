@@ -41,13 +41,33 @@ vi.mock('@/composables/useImportProgress', async () => {
 });
 vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { props: ['title'], template: '<div><slot /></div>' } }));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
-    default: { props: ['title', 'subtitle'], template: '<header><h1>{{ title }}</h1><slot name="actions" /></header>' },
+    default: {
+        props: ['title', 'total', 'view', 'showViewToggle'],
+        emits: ['set-view'],
+        template: `<header><h1>{{ title }}</h1><span class="total">{{ total }}</span>
+            <button v-if="showViewToggle" class="to-cards" @click="$emit('set-view', 'cards')" />
+            <slot name="actions" /></header>`,
+    },
 }));
 vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { props: ['data'], template: '<nav />' } }));
 vi.mock('@/Pages/Panel/Manager/Medicines/MedicineFormModal.vue', () => ({
     default: {
         props: ['open', 'medicine'],
         template: '<div class="form-stub" :data-open="String(open)" :data-medicine="medicine?.id ?? \'\'" />',
+    },
+}));
+vi.mock('@/Pages/Panel/Manager/Medicines/MedicineDetailDrawer.vue', () => ({
+    default: {
+        props: ['open', 'medicine'],
+        template: '<div class="drawer-stub" :data-open="String(open)" :data-medicine="medicine?.id ?? \'\'" />',
+    },
+}));
+vi.mock('@/Components/Panel/ConfirmationWithReasonModal.vue', () => ({
+    default: {
+        props: ['open', 'title', 'message', 'error'],
+        emits: ['confirm', 'close'],
+        template: `<div class="reason-stub" :data-open="String(open)">{{ message }}
+            <button class="reason-confirm" @click="$emit('confirm', 'Cadastro duplicado do item da CMED.')" /></div>`,
     },
 }));
 
@@ -89,8 +109,9 @@ const rows = [
 
 function mountPage(props = {}) {
     return mount(MedicinesIndex, {
+        global: { stubs: { teleport: true } },
         props: {
-            medicines: { data: rows, links: [], last_page: 1 },
+            medicines: { data: rows, links: [], last_page: 1, total: 2 },
             filters: {},
             stats: { active: 21393, cmed: 21341, manual: 52, ophthalmic: 400 },
             imports: [],
@@ -116,20 +137,112 @@ describe('Manager → Medicamentos', () => {
         expect(text).toContain('21.393');
     });
 
-    it('item da CMED só tem "editar posologia"; curado tem ativar/desativar e excluir', () => {
-        const wrapper = mountPage();
-        const [cmedRow, manualRow] = wrapper.findAll('tbody tr');
+    // Ações iguais às de Manager → Planos: ver detalhes + menu (⋮).
+    async function openMenu(row) {
+        await row.find('button[aria-haspopup="menu"]').trigger('click');
+        return row.findAll('.dropdown-item').map((item) => item.text());
+    }
 
-        expect(cmedRow.findAll('button')).toHaveLength(1);
-        expect(cmedRow.find('button').attributes('aria-label')).toBe('edit_posology');
-        expect(manualRow.findAll('button')).toHaveLength(3);
+    it('cada linha tem "ver detalhes" e o menu de ações', () => {
+        const [cmedRow, manualRow] = mountPage().findAll('tbody tr');
+
+        for (const row of [cmedRow, manualRow]) {
+            expect(row.find('button[title="action_view"]').exists()).toBe(true);
+            expect(row.find('button[aria-haspopup="menu"]').attributes('aria-label')).toBe('more_actions');
+        }
     });
 
-    it('editar abre o formulário com o item', async () => {
+    it('menu da CMED só tem "editar posologia"; curado tem editar, desativar e excluir', async () => {
+        const [cmedRow, manualRow] = mountPage().findAll('tbody tr');
+
+        expect(await openMenu(cmedRow)).toEqual(['edit_posology']);
+        expect(await openMenu(manualRow)).toEqual(['edit', 'deactivate', 'delete']);
+    });
+
+    it('editar (no menu) abre o formulário com o item', async () => {
         const wrapper = mountPage();
-        await wrapper.find('tbody tr button').trigger('click');
+        const row = wrapper.findAll('tbody tr')[0];
+        await openMenu(row);
+        await row.find('.dropdown-item').trigger('click');
+
         expect(wrapper.find('.form-stub').attributes('data-medicine')).toBe('cmed-1');
         expect(wrapper.find('.form-stub').attributes('data-open')).toBe('true');
+    });
+
+    it('"ver detalhes" abre o drawer com o item', async () => {
+        const wrapper = mountPage();
+        await wrapper.findAll('tbody tr')[1].find('button[title="action_view"]').trigger('click');
+
+        expect(wrapper.find('.drawer-stub').attributes('data-open')).toBe('true');
+        expect(wrapper.find('.drawer-stub').attributes('data-medicine')).toBe('man-1');
+    });
+
+    it('excluir pede justificativa e envia o motivo ao servidor', async () => {
+        const wrapper = mountPage();
+        const row = wrapper.findAll('tbody tr')[1];
+        await openMenu(row);
+        await row.findAll('.dropdown-item').at(-1).trigger('click');
+
+        expect(wrapper.find('.reason-stub').attributes('data-open')).toBe('true');
+        expect(router.delete).not.toHaveBeenCalled();
+
+        await wrapper.find('.reason-confirm').trigger('click');
+        expect(router.delete).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ data: { reason: 'Cadastro duplicado do item da CMED.' } }),
+        );
+    });
+
+    it('item da CMED ativo e não comercializado mostra aviso curto ao lado do status, com explicação no tooltip', async () => {
+        const base = { source: 'cmed', source_label: 'CMED/Anvisa', is_ophthalmic: false };
+        const medicines = {
+            data: [
+                { ...base, id: 'a', name: 'SEM VENDA', active: true, is_marketed: false },
+                { ...base, id: 'b', name: 'COM VENDA', active: true, is_marketed: true },
+                { ...base, id: 'c', name: 'INATIVO', active: false, is_marketed: false },
+                { id: 'd', name: 'CURADO', source: 'manual', source_label: 'Curado', active: true, is_marketed: false },
+            ],
+            links: [],
+            total: 4,
+        };
+        const wrapper = mountPage({ medicines });
+        const warnings = () => wrapper.findAll('.badge-soft-warning');
+
+        expect(warnings()).toHaveLength(1);
+        expect(warnings()[0].text()).toBe('not_marketed');
+        expect(warnings()[0].attributes('title')).toBe('not_marketed_hint');
+        expect(warnings()[0].element.closest('tr').textContent).toContain('SEM VENDA');
+
+        // Mesmo aviso nos cards.
+        await wrapper.find('.to-cards').trigger('click');
+        expect(warnings()).toHaveLength(1);
+        localStorage.removeItem('mgr_medicines_view');
+    });
+
+    it('clicar na coluna ordena no servidor, mantendo os filtros', async () => {
+        const wrapper = mountPage({ filters: { source: 'manual' } });
+        const labHeader = wrapper.findAll('th').find((th) => th.text().includes('col_laboratory'));
+        await labHeader.find('button').trigger('click');
+
+        expect(router.get).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ sort: 'laboratory', direction: 'asc', source: 'manual' }),
+            expect.objectContaining({ only: ['medicines', 'filters'] }),
+        );
+    });
+
+    it('alterna para cards (mesmos itens) e lembra a escolha', async () => {
+        localStorage.removeItem('mgr_medicines_view');
+        const wrapper = mountPage();
+        await wrapper.find('.to-cards').trigger('click');
+
+        expect(wrapper.find('table.table-nowrap').exists()).toBe(false);
+        expect(wrapper.findAll('.card.card-body h6').map((h) => h.text())).toEqual([
+            'PREDOPTIC 10 MG/ML',
+            'TOBRAMICINA 0,3%',
+        ]);
+        expect(localStorage.getItem('mgr_medicines_view')).toBe('cards');
+        localStorage.removeItem('mgr_medicines_view');
     });
 
     it('filtro de origem consulta o servidor', async () => {

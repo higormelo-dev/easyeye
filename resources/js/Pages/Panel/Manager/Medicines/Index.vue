@@ -4,8 +4,12 @@ import { router, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchInput from '@/Components/Panel/SearchInput.vue';
-import TablePagination from '@/Components/Panel/TablePagination.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
+import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
+import MedicineTable from './MedicineTable.vue';
+import MedicineCards from './MedicineCards.vue';
+import MedicineDetailDrawer from './MedicineDetailDrawer.vue';
 import MedicineFormModal from './MedicineFormModal.vue';
 import { useImportProgress } from '@/composables/useImportProgress';
 
@@ -22,6 +26,8 @@ const props = defineProps({
     // Importação na fila/processando (progressPayload do servidor) ou null.
     runningImport: { type: Object, default: null },
     presentations: { type: Array, default: () => [] },
+    // Há provedor de IA configurado (botão "Gerar com IA" no formulário).
+    aiAvailable: { type: Boolean, default: false },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -30,11 +36,34 @@ const page = usePage();
 
 const tab = ref(props.runningImport ? 'imports' : 'catalog');
 
-// ── Filtros (server-side) ────────────────────────────────────────────────
+// ── Tabela / cards (mesmo padrão de Planos) ──────────────────────────────
+const VIEW_KEY = 'mgr_medicines_view';
+const view = ref(readView());
+
+function readView() {
+    try {
+        return localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'table';
+    } catch {
+        return 'table';
+    }
+}
+
+function setView(value) {
+    view.value = value;
+    try {
+        localStorage.setItem(VIEW_KEY, value);
+    } catch {
+        // armazenamento bloqueado: vale só nesta visita
+    }
+}
+
+// ── Filtros e ordenação (server-side) ────────────────────────────────────
 const search = ref(props.filters.search ?? '');
 const source = ref(props.filters.source ?? '');
 const status = ref(props.filters.status ?? '');
 const ophthalmic = ref(!!props.filters.ophthalmic);
+const sort = ref(props.filters.sort ?? 'name');
+const direction = ref(props.filters.direction ?? 'asc');
 
 function applyFilters() {
     router.get(
@@ -44,9 +73,18 @@ function applyFilters() {
             source: source.value || undefined,
             status: status.value || undefined,
             ophthalmic: ophthalmic.value ? 1 : undefined,
+            // Ordem padrão (nome A→Z) fica fora da URL.
+            sort: sort.value !== 'name' || direction.value !== 'asc' ? sort.value : undefined,
+            direction: sort.value !== 'name' || direction.value !== 'asc' ? direction.value : undefined,
         },
         { preserveState: true, preserveScroll: true, replace: true, only: ['medicines', 'filters'] },
     );
+}
+
+function onSort(payload) {
+    sort.value = payload.sort;
+    direction.value = payload.direction;
+    applyFilters();
 }
 
 let searchTimer = null;
@@ -74,21 +112,65 @@ function toggleActive(medicine) {
     router.put(route('manager.medicines.update', medicine.id), { active: !medicine.active }, { preserveScroll: true });
 }
 
-async function remove(medicine) {
-    const message = (props.t.confirm_delete_text ?? '').replace(':name', medicine.name);
-    const confirmed = window.Swal
-        ? (
-              await window.Swal.fire({
-                  icon: 'warning',
-                  title: props.t.confirm_delete_title,
-                  text: message,
-                  showCancelButton: true,
-                  confirmButtonText: props.t.delete,
-                  cancelButtonText: props.t.cancel,
-              })
-          ).isConfirmed
-        : window.confirm(message);
-    if (confirmed) router.delete(route('manager.medicines.destroy', medicine.id), { preserveScroll: true });
+// ── Detalhes ─────────────────────────────────────────────────────────────
+const detail = ref(null);
+const detailOpen = ref(false);
+
+function openDetail(medicine) {
+    detail.value = medicine;
+    detailOpen.value = true;
+}
+
+function editFromDetail(medicine) {
+    detailOpen.value = false;
+    openEdit(medicine);
+}
+
+// A linha mudou (ativar/editar): o drawer aberto acompanha.
+watch(
+    () => props.medicines.data,
+    (rows) => {
+        if (detail.value) detail.value = rows.find((r) => r.id === detail.value.id) ?? detail.value;
+    },
+);
+
+// ── Exclusão: justificativa obrigatória + auditoria (padrão do manager) ──
+const {
+    state: reasonModal,
+    open: openReasonModal,
+    close: closeReasonModal,
+    handle: handleReasonConfirm,
+} = useConfirmationWithReason();
+const deleteError = ref('');
+
+function remove(medicine) {
+    deleteError.value = '';
+    openReasonModal({
+        title: props.t.confirm_delete_title,
+        message: (props.t.confirm_delete_text ?? '').replace(':name', medicine.name),
+        confirmLabel: props.t.delete,
+        confirmVariant: 'danger',
+        onConfirm: (reason) =>
+            new Promise((resolve, reject) => {
+                router.delete(route('manager.medicines.destroy', medicine.id), {
+                    data: { reason },
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        if (detail.value?.id === medicine.id) detailOpen.value = false;
+                        resolve();
+                    },
+                    onError: (errors) => {
+                        deleteError.value = errors.reason ?? Object.values(errors)[0] ?? '';
+                        reject(errors);
+                    },
+                });
+            }),
+    });
+}
+
+function confirmDelete(reason) {
+    // Erro do servidor fica no modal (prop error); não é exceção da página.
+    return handleReasonConfirm(reason).catch(() => {});
 }
 
 // ── Importação CMED/Anvisa ───────────────────────────────────────────────
@@ -148,13 +230,34 @@ const breadcrumbs = [
 
 <template>
     <AppLayout :title="t.page_title" :breadcrumbs="breadcrumbs">
-        <PageHeader :title="t.page_title" :subtitle="t.page_subtitle">
+        <PageHeader
+            :title="t.page_title"
+            :total="medicines.total ?? null"
+            :total-label="t.total_label"
+            :view="view"
+            :view-table-title="t.view_table"
+            :view-cards-title="t.view_cards"
+            :show-view-toggle="tab === 'catalog'"
+            @set-view="setView"
+        >
             <template #actions>
-                <button type="button" class="btn btn-outline-primary fs-13" @click="tab = 'imports'">
-                    <i class="ti ti-file-import me-1"></i>{{ t.btn_import }}
+                <button
+                    type="button"
+                    class="btn btn-outline-primary fs-13"
+                    :title="t.btn_import"
+                    :aria-label="t.btn_import"
+                    @click="tab = 'imports'"
+                >
+                    <i class="ti ti-file-import"></i><span class="d-none d-md-inline ms-1">{{ t.btn_import }}</span>
                 </button>
-                <button type="button" class="btn btn-primary fs-13" @click="openCreate">
-                    <i class="ti ti-plus me-1"></i>{{ t.btn_new }}
+                <button
+                    type="button"
+                    class="btn btn-primary fs-13"
+                    :title="t.btn_new"
+                    :aria-label="t.btn_new"
+                    @click="openCreate"
+                >
+                    <i class="ti ti-plus"></i><span class="d-none d-sm-inline ms-1">{{ t.btn_new }}</span>
                 </button>
             </template>
         </PageHeader>
@@ -224,120 +327,26 @@ const breadcrumbs = [
                 </div>
             </div>
 
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>{{ t.col_medicine }}</th>
-                                <th class="d-none d-lg-table-cell">{{ t.col_presentation }}</th>
-                                <th class="d-none d-md-table-cell">{{ t.col_laboratory }}</th>
-                                <th>{{ t.col_source }}</th>
-                                <th>{{ t.col_status }}</th>
-                                <th class="text-end">{{ t.col_actions }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="!medicines.data.length">
-                                <td colspan="6" class="text-center text-muted py-4">{{ t.empty }}</td>
-                            </tr>
-                            <tr v-for="m in medicines.data" :key="m.id">
-                                <td>
-                                    <div class="fw-semibold">
-                                        {{ m.name }}
-                                        <span v-if="m.concentration" class="fw-normal">{{ m.concentration }}</span>
-                                        <span
-                                            v-if="m.is_ophthalmic"
-                                            class="badge bg-info-subtle text-info ms-1"
-                                            :title="t.ophthalmic"
-                                            ><i class="ti ti-eye"></i
-                                        ></span>
-                                    </div>
-                                    <div v-if="m.active_ingredient" class="small text-muted">
-                                        {{ m.active_ingredient }}
-                                    </div>
-                                    <div v-if="m.dosage || m.frequency" class="small text-primary">
-                                        <i class="ti ti-clipboard-text me-1"></i>
-                                        {{ [m.dosage, m.frequency, m.duration].filter(Boolean).join(' · ') }}
-                                    </div>
-                                </td>
-                                <td class="d-none d-lg-table-cell small">
-                                    <div>{{ m.form ?? '—' }}</div>
-                                    <div v-if="m.presentation_detail" class="text-muted">
-                                        {{ m.presentation_detail }}
-                                    </div>
-                                </td>
-                                <td class="d-none d-md-table-cell small">
-                                    <div>{{ m.laboratory ?? '—' }}</div>
-                                    <div v-if="m.category" class="text-muted">{{ m.category }}</div>
-                                </td>
-                                <td>
-                                    <span
-                                        class="badge"
-                                        :class="
-                                            m.source === 'cmed'
-                                                ? 'bg-secondary-subtle text-secondary'
-                                                : 'bg-primary-subtle text-primary'
-                                        "
-                                        >{{ m.source_label }}</span
-                                    >
-                                </td>
-                                <td>
-                                    <span
-                                        class="badge"
-                                        :class="m.active ? 'bg-success' : 'bg-light text-muted border'"
-                                        >{{ m.active ? t.status_active : t.status_inactive }}</span
-                                    >
-                                    <div v-if="m.source === 'cmed' && !m.is_marketed" class="small text-muted">
-                                        {{ t.not_marketed }}
-                                    </div>
-                                </td>
-                                <td class="text-end text-nowrap">
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        :title="m.source === 'cmed' ? t.edit_posology : t.edit"
-                                        :aria-label="m.source === 'cmed' ? t.edit_posology : t.edit"
-                                        @click="openEdit(m)"
-                                    >
-                                        <i class="ti ti-pencil"></i>
-                                    </button>
-                                    <template v-if="m.source === 'manual'">
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-secondary ms-1"
-                                            :title="m.active ? t.deactivate : t.activate"
-                                            :aria-label="m.active ? t.deactivate : t.activate"
-                                            @click="toggleActive(m)"
-                                        >
-                                            <i :class="m.active ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-danger ms-1"
-                                            :title="t.delete"
-                                            :aria-label="t.delete"
-                                            @click="remove(m)"
-                                        >
-                                            <i class="ti ti-trash"></i>
-                                        </button>
-                                    </template>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="card-footer bg-transparent">
-                    <TablePagination
-                        :data="medicines"
-                        :showing-from="t.showing_from"
-                        :showing-of="t.showing_of"
-                        :showing-suffix="t.showing_suffix"
-                        :previous-label="t.previous"
-                        :next-label="t.next"
-                    />
-                </div>
-            </div>
+            <MedicineTable
+                v-if="view === 'table'"
+                :medicines="medicines"
+                :filters="filters"
+                :t="t"
+                @sort="onSort"
+                @view="openDetail"
+                @edit="openEdit"
+                @delete="remove"
+                @toggle-active="toggleActive"
+            />
+            <MedicineCards
+                v-else
+                :medicines="medicines"
+                :t="t"
+                @view="openDetail"
+                @edit="openEdit"
+                @delete="remove"
+                @toggle-active="toggleActive"
+            />
         </div>
 
         <!-- ════════ Importações ════════ -->
@@ -555,8 +564,30 @@ const breadcrumbs = [
             :open="formOpen"
             :medicine="editing"
             :presentations="presentations"
+            :ai-available="aiAvailable"
             :t="t"
             @close="formOpen = false"
+        />
+
+        <MedicineDetailDrawer
+            :open="detailOpen"
+            :medicine="detail"
+            :t="t"
+            @close="detailOpen = false"
+            @edit="editFromDetail"
+        />
+
+        <!-- Confirmação destrutiva com justificativa -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-label="reasonModal.confirmLabel"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            :error="deleteError"
+            @close="closeReasonModal"
+            @confirm="confirmDelete"
         />
     </AppLayout>
 </template>

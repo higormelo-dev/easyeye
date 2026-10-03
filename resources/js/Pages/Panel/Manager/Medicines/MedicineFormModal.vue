@@ -1,6 +1,7 @@
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
+import axios from 'axios';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 
 /**
@@ -12,6 +13,7 @@ const props = defineProps({
     open: { type: Boolean, required: true },
     medicine: { type: Object, default: null }, // null = novo
     presentations: { type: Array, default: () => [] },
+    aiAvailable: { type: Boolean, default: false },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -49,8 +51,67 @@ watch(
         form.instructions = m.instructions ?? '';
         form.is_ophthalmic = m.is_ophthalmic ?? false;
         form.active = m.active ?? true;
+        resetAi();
     },
 );
+
+// ── Sugestão de posologia por IA (opcional) ─────────────────────────────
+// Só preenche os campos; nada é salvo até o admin clicar em Salvar.
+const POSOLOGY_FIELDS = ['dosage', 'frequency', 'duration', 'instructions'];
+const ai = ref({ loading: false, error: '', note: '', previous: null });
+let aiRequest = 0;
+
+function resetAi() {
+    aiRequest++; // resposta de um pedido anterior (outro item) é descartada
+    ai.value = { loading: false, error: '', note: '', previous: null };
+}
+
+const canGenerate = computed(() => props.aiAvailable && (isCmed.value || form.name.trim() !== ''));
+
+async function generateWithAi() {
+    if (ai.value.loading || !canGenerate.value) return;
+
+    const request = ++aiRequest;
+    ai.value = { loading: true, error: '', note: '', previous: null };
+
+    // CMED: o servidor usa os dados do banco. Curado: o que está digitado.
+    const payload = isCmed.value
+        ? { medicine_id: props.medicine.id }
+        : {
+              name: form.name,
+              active_ingredient: form.active_ingredient || null,
+              concentration: form.concentration || null,
+              medicine_presentation_id: form.medicine_presentation_id || null,
+              is_ophthalmic: form.is_ophthalmic,
+          };
+
+    try {
+        const { data } = await axios.post(route('manager.medicines.ai-posology'), payload);
+        if (request !== aiRequest) return;
+
+        const previous = Object.fromEntries(POSOLOGY_FIELDS.map((field) => [field, form[field]]));
+        POSOLOGY_FIELDS.forEach((field) => {
+            form[field] = data.suggestion?.[field] ?? '';
+        });
+        ai.value = { loading: false, error: '', note: data.suggestion?.note ?? '', previous };
+    } catch (error) {
+        if (request !== aiRequest) return;
+
+        const message =
+            error.response?.status === 429
+                ? props.t.ai_rate_limited
+                : (error.response?.data?.message ?? props.t.ai_failed);
+        ai.value = { loading: false, error: message, note: '', previous: null };
+    }
+}
+
+function undoAi() {
+    if (!ai.value.previous) return;
+    POSOLOGY_FIELDS.forEach((field) => {
+        form[field] = ai.value.previous[field];
+    });
+    ai.value = { loading: false, error: '', note: '', previous: null };
+}
 
 function submit() {
     const options = { preserveScroll: true, onSuccess: () => emit('close') };
@@ -171,8 +232,41 @@ function submit() {
                 </div>
             </template>
 
-            <h6 class="fw-semibold mb-1">{{ t.posology_title }}</h6>
-            <p class="text-muted small mb-2">{{ t.posology_hint }}</p>
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                <div>
+                    <h6 class="fw-semibold mb-1">{{ t.posology_title }}</h6>
+                    <p class="text-muted small mb-0">{{ t.posology_hint }}</p>
+                </div>
+                <button
+                    v-if="aiAvailable"
+                    type="button"
+                    class="btn btn-sm btn-soft-primary flex-shrink-0"
+                    :disabled="!canGenerate || ai.loading"
+                    :title="t.ai_generate_hint"
+                    @click="generateWithAi"
+                >
+                    <span v-if="ai.loading" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    <i v-else class="ti ti-sparkles me-1" aria-hidden="true"></i>
+                    {{ ai.loading ? t.ai_generating : t.ai_generate }}
+                </button>
+            </div>
+
+            <div aria-live="polite">
+                <div v-if="ai.previous" class="alert alert-warning py-2 small d-flex align-items-start gap-2 mb-2">
+                    <i class="ti ti-sparkles mt-1" aria-hidden="true"></i>
+                    <div class="flex-grow-1">
+                        {{ t.ai_filled }}
+                        <div v-if="ai.note" class="mt-1">{{ ai.note }}</div>
+                    </div>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-nowrap" @click="undoAi">
+                        <i class="ti ti-arrow-back-up me-1" aria-hidden="true"></i>{{ t.ai_undo }}
+                    </button>
+                </div>
+                <div v-else-if="ai.error" class="alert alert-danger py-2 small mb-2" role="alert">
+                    {{ ai.error }}
+                </div>
+            </div>
+
             <div class="row g-2">
                 <div class="col-12 col-md-4">
                     <label class="form-label small" for="med-dosage">{{ t.field_dosage }}</label>
@@ -180,6 +274,7 @@ function submit() {
                         id="med-dosage"
                         v-model="form.dosage"
                         type="text"
+                        :disabled="ai.loading"
                         class="form-control form-control-sm"
                         :placeholder="t.field_dosage_ph"
                         maxlength="255"
@@ -191,6 +286,7 @@ function submit() {
                         id="med-frequency"
                         v-model="form.frequency"
                         type="text"
+                        :disabled="ai.loading"
                         class="form-control form-control-sm"
                         :placeholder="t.field_frequency_ph"
                         maxlength="255"
@@ -202,6 +298,7 @@ function submit() {
                         id="med-duration"
                         v-model="form.duration"
                         type="text"
+                        :disabled="ai.loading"
                         class="form-control form-control-sm"
                         :placeholder="t.field_duration_ph"
                         maxlength="255"
@@ -212,6 +309,7 @@ function submit() {
                     <textarea
                         id="med-instructions"
                         v-model="form.instructions"
+                        :disabled="ai.loading"
                         class="form-control form-control-sm"
                         rows="2"
                         maxlength="2000"
@@ -225,7 +323,12 @@ function submit() {
 
         <template #footer>
             <button type="button" class="btn btn-light" @click="emit('close')">{{ t.cancel }}</button>
-            <button type="submit" form="medicine-form" class="btn btn-primary" :disabled="form.processing">
+            <button
+                type="submit"
+                form="medicine-form"
+                class="btn btn-primary"
+                :disabled="form.processing || ai.loading"
+            >
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                 {{ t.save }}
             </button>

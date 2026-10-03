@@ -327,6 +327,10 @@ Route::group([
         Route::post('medicines/imports', [MedicineImportsController::class, 'store'])
             ->middleware('throttle:manager-destructive')
             ->name('medicines.imports.store');
+        // Sugestão de posologia por IA (chamada paga ao provedor): limite próprio.
+        Route::post('medicines/ai-posology', [MedicinesController::class, 'aiPosology'])
+            ->middleware('throttle:10,1')
+            ->name('medicines.ai-posology');
     });
 });
 

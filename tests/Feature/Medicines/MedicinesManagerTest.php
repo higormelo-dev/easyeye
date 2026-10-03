@@ -4,7 +4,7 @@ use App\Enums\{ImportStatus, MedicineSource, SaasRule};
 use App\Jobs\ProcessMedicineImportJob;
 use App\Models\{Entity, Medicine, MedicineImport, User};
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\{Queue, Storage};
+use Illuminate\Support\Facades\{DB, Queue, Storage};
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia;
 
@@ -82,8 +82,53 @@ it('desativa e exclui (soft) item curado', function () {
     asMedicinesAdmin()->put(route('manager.medicines.update', $m->id), ['active' => false])->assertRedirect();
     expect($m->fresh()->active)->toBeFalse();
 
-    asMedicinesAdmin()->delete(route('manager.medicines.destroy', $m->id))->assertRedirect();
+    asMedicinesAdmin()->delete(route('manager.medicines.destroy', $m->id), ['reason' => 'Duplicado do item importado da CMED.'])
+        ->assertRedirect()->assertSessionHasNoErrors();
     expect(Medicine::withoutGlobalScopes()->withTrashed()->find($m->id)->trashed())->toBeTrue();
+});
+
+it('[AUDITORIA] excluir exige justificativa (mín. 20) e grava a trilha administrativa', function () {
+    $m = Medicine::withoutGlobalScopes()->create(['name' => 'CURADO', 'active' => true]);
+
+    asMedicinesAdmin()->delete(route('manager.medicines.destroy', $m->id))->assertSessionHasErrors('reason');
+    asMedicinesAdmin()->delete(route('manager.medicines.destroy', $m->id), ['reason' => 'curto'])->assertSessionHasErrors('reason');
+    expect($m->fresh())->not->toBeNull();
+
+    asMedicinesAdmin()->delete(route('manager.medicines.destroy', $m->id), ['reason' => 'Cadastro errado, substituído pelo da CMED.'])
+        ->assertSessionHasNoErrors();
+
+    $log = DB::table('audit_logs')->where('event', 'manager.medicine.destroy')->sole();
+    expect($log->auditable_id)->toBe((string) $m->id)
+        ->and($log->user_id)->toBe((string) $this->admin->id)
+        ->and($log->reason)->toBe('Cadastro errado, substituído pelo da CMED.');
+});
+
+it('ordena pela coluna escolhida; coluna fora da lista é ignorada', function () {
+    Medicine::withoutGlobalScopes()->create(['name' => 'B MED', 'laboratory' => 'ZETA', 'active' => true]);
+    Medicine::withoutGlobalScopes()->create(['name' => 'A MED', 'laboratory' => 'ALFA', 'active' => true]);
+    Medicine::withoutGlobalScopes()->create(['name' => 'C MED', 'laboratory' => 'MEIO', 'active' => true]);
+
+    $names = fn (array $query) => asMedicinesAdmin()->get(route('manager.medicines.index', $query))
+        ->assertOk()
+        ->viewData('page')['props']['medicines']['data'];
+
+    expect(array_column($names([]), 'name'))->toBe(['A MED', 'B MED', 'C MED'])
+        ->and(array_column($names(['sort' => 'laboratory', 'direction' => 'desc']), 'name'))->toBe(['B MED', 'C MED', 'A MED'])
+        ->and(array_column($names(['sort' => 'name;drop table medicines', 'direction' => 'sideways']), 'name'))->toBe(['A MED', 'B MED', 'C MED']);
+
+    asMedicinesAdmin()->get(route('manager.medicines.index', ['sort' => 'deleted_at']))
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('filters.sort', 'name')->where('filters.direction', 'asc'));
+});
+
+it('busca mantém a ordenação escolhida', function () {
+    Medicine::withoutGlobalScopes()->create(['name' => 'TIMOLOL GENÉRICO', 'source' => MedicineSource::Cmed, 'source_code' => '9', 'active' => true]);
+    Medicine::withoutGlobalScopes()->create(['name' => 'TIMOLOL CURADO', 'active' => true]);
+
+    $names = fn (array $query) => array_column(asMedicinesAdmin()->get(route('manager.medicines.index', $query))
+        ->viewData('page')['props']['medicines']['data'], 'name');
+
+    expect($names(['search' => 'timolol']))->toBe(['TIMOLOL CURADO', 'TIMOLOL GENÉRICO'])
+        ->and($names(['search' => 'timolol', 'sort' => 'name', 'direction' => 'desc']))->toBe(['TIMOLOL GENÉRICO', 'TIMOLOL CURADO']);
 });
 
 it('[SEGURANÇA] medicamento de clínica não é alcançável pelo manager (404)', function () {
