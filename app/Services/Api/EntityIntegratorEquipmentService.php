@@ -30,13 +30,22 @@ class EntityIntegratorEquipmentService
     public function update(EntityIntegratorEquipment $equipment, EntityIntegratorEquipmentRequest $request): EntityIntegratorEquipment
     {
         return DB::transaction(static function () use ($equipment, $request) {
-            $data = $request->only(self::FILLABLE_FIELDS);
+            if ($request->has('operation_id') && ! $request->filled('expected_config_generation')) {
+                abort(response()->json(['code' => 'equipment_config_generation_required'], 422));
+            }
+            $equipment = EntityIntegratorEquipment::whereKey($equipment->id)->lockForUpdate()->firstOrFail();
+
+            if ($request->filled('expected_config_generation') && (int) $request->input('expected_config_generation') !== (int) $equipment->config_generation) {
+                abort(response()->json(['code' => 'equipment_config_generation_conflict'], 409));
+            }
+            $data                      = $request->only(self::FILLABLE_FIELDS);
+            $data['config_generation'] = $equipment->config_generation + 1;
 
             if ($request->has('active')) {
                 $data['active'] = $request->boolean('active');
             }
 
-            $equipment->update(array_filter($data, static fn ($value) => $value !== null));
+            $equipment->update($request->has('operation_id') ? $data : array_filter($data, static fn ($value) => $value !== null));
 
             return $equipment->refresh();
         });
@@ -82,6 +91,10 @@ class EntityIntegratorEquipmentService
         $integrator = request()->attributes->get('integrator');
         $recordData = $request->only(self::FILLABLE_FIELDS);
 
+        if ($request->has('operation_id')) {
+            return EntityIntegratorEquipment::create([...$recordData, 'integrator_id' => $integrator->id, 'active' => true, 'config_generation' => 1]);
+        }
+
         // Só sobrescreve 'active' quando o request o envia explicitamente —
         // mesmo guard usado por update() (if ($request->has('active'))).
         // EntityIntegratorEquipmentRequest não inclui 'active' no seu
@@ -117,6 +130,7 @@ class EntityIntegratorEquipmentService
                         $query->orWhere($column, $value);
                     }
                 })
+                ->lockForUpdate()
                 ->first();
 
         if ($existingRecord) {
@@ -130,6 +144,7 @@ class EntityIntegratorEquipmentService
                 $recordData['active'] = true;
             }
 
+            $recordData['config_generation'] = $existingRecord->config_generation + 1;
             $existingRecord->update($recordData);
 
             return $existingRecord->refresh();

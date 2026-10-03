@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\ActivationStep;
 use App\Models\{EntityIntegrator, PatientExam};
+use App\Services\ActivationService;
 use Closure;
 use Illuminate\Http\{Request, UploadedFile};
 use Illuminate\Support\Facades\{Crypt,DB};
@@ -16,6 +18,10 @@ class ApiIdempotency
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if ($request->has('operation_id') && $request->routeIs('integrators.v1.equipments.store', 'integrators.v1.equipments.update')) {
+            return $next($request);
+        }
+
         $key = $request->header('Idempotency-Key');
 
         if (! $key || $request->isMethodSafe()) {
@@ -90,6 +96,10 @@ class ApiIdempotency
                 'status'       => $response->getStatusCode(), 'response' => Crypt::encryptString($response->getContent()),
                 'content_type' => $response->headers->get('Content-Type', 'application/json'), 'updated_at' => now(),
             ]);
+
+            if ($request->filled('capture_id') && $response->getStatusCode() === 201) {
+                app(ActivationService::class)->complete($integrator->user->entity_id, ActivationStep::IntegratorReceiptConfirmed);
+            }
             DB::commit();
 
             return $response;

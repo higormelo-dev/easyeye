@@ -33,6 +33,7 @@ class EntityIntegrator extends Model
         'ip',
         'mac',
         'active',
+        'token_profile', 'update_channel', 'update_cohort',
     ];
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\IntegratorCommand;
+use Illuminate\Support\Str;
 
 describe('GET /api/integrators/v1/commands', function () {
     beforeEach(function () {
@@ -63,13 +64,13 @@ describe('POST /api/integrators/v1/commands/{command}/ack', function () {
 
         $this->postJson(
             "/api/integrators/v1/commands/{$command->id}/ack",
-            ['status' => 'completed', 'result' => ['queue_pending' => 3]],
+            ['status' => 'completed', 'result' => ['pending' => 3]],
             $this->ctx['headers'],
         )->assertNoContent();
 
         $command->refresh();
         expect($command->status)->toBe('completed')
-            ->and($command->result)->toBe(['queue_pending' => 3])
+            ->and($command->result)->toBe(['pending' => 3])
             ->and($command->acked_at)->not->toBeNull();
     });
 
@@ -100,7 +101,7 @@ describe('POST /api/integrators/v1/commands/{command}/ack', function () {
 
         $this->postJson(
             "/api/integrators/v1/commands/{$command->id}/ack",
-            ['status' => 'completed', 'result' => ['run' => 1]],
+            ['status' => 'completed', 'result' => ['sent' => 1]],
             $this->ctx['headers'],
         )->assertNoContent();
 
@@ -109,13 +110,13 @@ describe('POST /api/integrators/v1/commands/{command}/ack', function () {
         // command back to failed, or overwrite its result.
         $this->postJson(
             "/api/integrators/v1/commands/{$command->id}/ack",
-            ['status' => 'failed', 'result' => ['run' => 2]],
+            ['status' => 'failed', 'result' => ['error_code' => 'resync_failed']],
             $this->ctx['headers'],
         )->assertNoContent();
 
         $command->refresh();
         expect($command->status)->toBe('completed')
-            ->and($command->result)->toBe(['run' => 1]);
+            ->and($command->result)->toBe(['sent' => 1]);
     });
 
     it('rejects an ack for another integrator\'s command', function () {
@@ -153,7 +154,7 @@ describe('POST /api/integrators/v1/commands/{command}/ack', function () {
 
     it('returns 404 for a command id that does not exist', function () {
         $this->postJson(
-            '/api/integrators/v1/commands/' . \Illuminate\Support\Str::uuid() . '/ack',
+            '/api/integrators/v1/commands/' . Str::uuid() . '/ack',
             ['status' => 'completed'],
             $this->ctx['headers'],
         )->assertNotFound();

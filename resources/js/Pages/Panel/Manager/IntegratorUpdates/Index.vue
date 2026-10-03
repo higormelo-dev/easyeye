@@ -14,7 +14,8 @@ import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
  * integrator, máquina que guarda a chave privada) — esta tela só sobe o
  * arquivo e cola a assinatura; o SaaS nunca vê a chave.
  */
-const props = defineProps({
+defineOptions({ name: 'IntegratorUpdatesIndex' });
+defineProps({
     updates: { type: Array, required: true },
 });
 
@@ -29,6 +30,8 @@ const form = useForm({
     platform: 'windows',
     arch: 'x86',
     signature: '',
+    metadata: '',
+    manifest_signature: '',
 });
 
 const flash = computed(() => usePage().props.flash ?? {});
@@ -71,7 +74,25 @@ function toggleActive(update) {
                         </span>
                     </div>
 
-                    <form @submit.prevent="submit" class="row g-3">
+                    <form class="row g-3" @submit.prevent="submit">
+                        <div class="col-12">
+                            <label class="form-label">Metadados assinados do lançamento</label
+                            ><textarea
+                                v-model="form.metadata"
+                                class="form-control"
+                                rows="5"
+                                placeholder="JSON v2: canal, coorte, compatibilidade, validade e sequência"
+                            />
+                            <div v-if="form.errors.metadata" class="text-danger">{{ form.errors.metadata }}</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Assinatura dos metadados</label
+                            ><input v-model="form.manifest_signature" class="form-control" />
+                            <p class="small">
+                                Lançamentos sem metadados verificados permanecem visíveis como legados; a instalação nos
+                                clientes novos fica bloqueada.
+                            </p>
+                        </div>
                         <div class="col-md-6">
                             <label class="form-label">Instalador (MSI)</label>
                             <input

@@ -29,6 +29,10 @@ class ApiCheckPlanAccess
             return response()->json(['message' => __('http-statuses.401')], Response::HTTP_UNAUTHORIZED);
         }
 
+        // Operational recovery contains no clinical reads or writes.
+        if ($request->routeIs('integrators.v1.updates.*', 'integrators.v1.queue-health.*', 'integrators.v1.commands.*')) {
+            return $next($request);
+        }
         $entityId = $integrator->user->entity_id;
 
         $subscription = Subscription::forEntity($entityId)

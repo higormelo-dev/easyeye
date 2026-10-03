@@ -29,12 +29,13 @@ it('apaga comandos terminais com mais de 30 dias', function () {
         ->and(IntegratorCommand::query()->find($fresh->id))->not->toBeNull();
 });
 
-it('nunca apaga comandos pending, mesmo muito antigos', function () {
+it('nunca apaga comandos pending dentro do prazo, mesmo cadastro antigo', function () {
     $pending = IntegratorCommand::create([
         'integrator_id' => $this->ctx['integrator']->id,
         'type'          => 'resync_now',
         'payload'       => [],
         'status'        => 'pending',
+        'expires_at'    => now()->addHour(),
     ]);
     $pending->forceFill(['created_at' => now()->subDays(400)])->saveQuietly();
 

@@ -36,7 +36,8 @@ class DataAccessLogService
         }
 
         DataAccessLog::create([
-            'entity_id'          => session('selected_entity_id') ?? $resource->getAttribute('entity_id'),
+            'entity_id' => session('selected_entity_id') ?? $resource->getAttribute('entity_id'),
+            ...AuditContext::integratorActor(),
             'user_id'            => AuditContext::userId(),
             'patient_account_id' => AuditContext::patientAccountId(),
             'resource_type'      => get_class($resource),
@@ -55,6 +56,16 @@ class DataAccessLogService
      * prontuários, laudo de imagens…) ou o atributo patient_id. Sem isso o log
      * de um acesso feito pelo Patient ficava fora de Patient::accessLogs().
      */
+    public function aggregate(string $kind, int $count, array $filters = []): void
+    {
+        $integrator = request()->attributes->get('integrator');
+
+        if (! $integrator) {
+            return;
+        }
+        DataAccessLog::create(['entity_id' => $integrator->user->entity_id, 'user_id' => null, 'resource_type' => $kind, 'resource_id' => $integrator->id, 'purpose' => DataAccessPurpose::ApiAccess, 'access_summary' => ['count' => $count, 'filters' => array_intersect_key($filters, array_flip(['date', 'clinic_resource_id', 'date_from', 'date_to', 'page']))], 'ip_address' => request()->ip(), 'user_agent' => substr((string) request()->userAgent(), 0, 512), 'accessed_at' => now(), ...AuditContext::integratorActor()]);
+    }
+
     private function inferPatientId(Model $resource): ?string
     {
         if ($resource instanceof Patient) {

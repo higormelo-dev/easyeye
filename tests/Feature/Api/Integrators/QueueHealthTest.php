@@ -40,7 +40,11 @@ describe('PUT /api/integrators/v1/queue-health', function () {
             ->and($row->pending_count)->toBe(3)
             ->and($row->blocked_count)->toBe(2)
             ->and($row->problems)->toHaveCount(1)
-            ->and($row->problems[0]['schedule_identifier'])->toBe('SDL-0000000722');
+            ->and($row->problems[0]['schedule_identifier'])->toBeNull()
+            ->and($row->problems[0]['patient_identifier'])->toBeNull()
+            ->and($row->problems[0]['last_error'])->toBeNull()
+            ->and($row->problems[0]['error_code'])->toBe('upload_failed')
+            ->and(json_encode($row->problems))->not->toContain('SDL-0000000722', 'file exceeds');
     });
 
     it('also records a history point on every sync (unlike the snapshot, which upserts)', function () {

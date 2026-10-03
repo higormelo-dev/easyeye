@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Manager;
 
 use App\Http\Controllers\Controller;
 use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator, IntegratorQueueHealth, IntegratorQueueHealthHistory};
+use App\Services\IntegratorHealthMinimizer;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 /**
@@ -77,7 +78,7 @@ class EntityIntegratorQueueHealthController extends Controller
                 'failed_count'        => $health->failed_count,
                 'blocked_count'       => $health->blocked_count,
                 'sent_last_24h_count' => $health->sent_last_24h_count,
-                'problems'            => $health->problems,
+                'problems'            => app(IntegratorHealthMinimizer::class)->problems($health->problems ?? []),
                 'operational'         => $health->operational,
                 'synced_at'           => $health->synced_at->toIso8601String(),
             ],

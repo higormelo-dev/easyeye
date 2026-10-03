@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\DataAccessPurpose;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\ScheduleResource;
+use App\Http\Resources\Api\IntegratorScheduleResource as ScheduleResource;
 use App\Models\Schedule;
+use App\Services\DataAccessLogService;
 use App\Support\IntegratorClinicalIdentifier;
 use Carbon\Carbon;
 use Closure;
@@ -83,6 +85,8 @@ class SchedulesController extends Controller
 
         $schedules = $schedules->paginate($this->perPage());
 
+        app(DataAccessLogService::class)->aggregate('schedules', $schedules->count(), request()->only(['date', 'clinic_resource_id', 'page']));
+
         return ScheduleResource::collection($schedules);
     }
 
@@ -155,6 +159,8 @@ class SchedulesController extends Controller
             HttpResponse::HTTP_CONFLICT,
             __('record_codes.ambiguous_identifier.schedule'),
         );
+
+        app(DataAccessLogService::class)->log($matches->first(), DataAccessPurpose::ApiAccess);
 
         return new ScheduleResource($matches->first());
     }

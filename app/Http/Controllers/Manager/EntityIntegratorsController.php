@@ -159,10 +159,13 @@ class EntityIntegratorsController extends Controller
             ->findOrFail($integrator);
 
         return response()->json(['data' => [
-            'name'   => $record->name,
-            'ip'     => $record->ip,
-            'mac'    => $record->mac,
-            'active' => (bool) $record->active,
+            'name'           => $record->name,
+            'ip'             => $record->ip,
+            'mac'            => $record->mac,
+            'active'         => (bool) $record->active,
+            'token_profile'  => $record->token_profile,
+            'update_channel' => $record->update_channel,
+            'update_cohort'  => $record->update_cohort,
         ]]);
     }
 
@@ -232,22 +235,25 @@ class EntityIntegratorsController extends Controller
         $mode         = $isDeleted ? 'restore' : 'full';
 
         return [
-            'id'             => $integratorId,
-            'code'           => (string) $integrator->code,
-            'name'           => (string) $integrator->name,
-            'ip'             => $integrator->ip,
-            'mac'            => $integrator->mac,
-            'active'         => (bool) $integrator->active,
-            'deleted'        => $isDeleted,
-            'created_at'     => $integrator->created_at?->format('d/m/Y H:i'),
-            'mode'           => $mode,
-            'edit_data_url'  => route('manager.entities.user-integrators.integrators.edit-data', [$entityId, $userId, $integratorId]),
-            'update_url'     => route('manager.entities.user-integrators.integrators.update', [$entityId, $userId, $integratorId]),
-            'destroy_url'    => route('manager.entities.user-integrators.integrators.destroy', [$entityId, $userId, $integratorId]),
-            'activate_url'   => route('manager.entities.user-integrators.integrators.activate', [$entityId, $userId, $integratorId]),
-            'restore_url'    => route('manager.entities.user-integrators.integrators.restore', [$entityId, $userId, $integratorId]),
-            'show_url'       => route('manager.entities.user-integrators.integrators.show', [$entityId, $userId, $integratorId]),
-            'equipments_url' => route('manager.entities.user-integrators.integrators.equipments.index', [$entityId, $userId, $integratorId]),
+            'token_profile'    => $integrator->token_profile ?? 'capture', 'update_channel' => $integrator->update_channel ?? 'stable', 'update_cohort' => $integrator->update_cohort ?? 'all',
+            'id'               => $integratorId,
+            'code'             => (string) $integrator->code,
+            'name'             => (string) $integrator->name,
+            'ip'               => $integrator->ip,
+            'mac'              => $integrator->mac,
+            'active'           => (bool) $integrator->active,
+            'deleted'          => $isDeleted,
+            'created_at'       => $integrator->created_at?->format('d/m/Y H:i'),
+            'mode'             => $mode,
+            'edit_data_url'    => route('manager.entities.user-integrators.integrators.edit-data', [$entityId, $userId, $integratorId]),
+            'update_url'       => route('manager.entities.user-integrators.integrators.update', [$entityId, $userId, $integratorId]),
+            'destroy_url'      => route('manager.entities.user-integrators.integrators.destroy', [$entityId, $userId, $integratorId]),
+            'activate_url'     => route('manager.entities.user-integrators.integrators.activate', [$entityId, $userId, $integratorId]),
+            'restore_url'      => route('manager.entities.user-integrators.integrators.restore', [$entityId, $userId, $integratorId]),
+            'show_url'         => route('manager.entities.user-integrators.integrators.show', [$entityId, $userId, $integratorId]),
+            'commands_url'     => route('manager.entities.user-integrators.integrators.commands.index', [$entityId, $userId, $integratorId]),
+            'queue_health_url' => route('manager.entities.user-integrators.integrators.queue-health', [$entityId, $userId, $integratorId]),
+            'equipments_url'   => route('manager.entities.user-integrators.integrators.equipments.index', [$entityId, $userId, $integratorId]),
         ];
     }
 }

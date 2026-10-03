@@ -110,7 +110,15 @@ class ExternalExamImportService
 
                     // afterCommit: em fila, só roda se a transação do lote
                     // confirmar — evita derivado de exame que sofreu rollback.
-                    GenerateExamDerivatives::dispatch($record->id)->afterCommit();
+                    DB::afterCommit(static function () use ($record): void {
+                        try {
+                            GenerateExamDerivatives::dispatch($record->id, $record->archive)->beforeCommit();
+                        } catch (Throwable $error) {
+                            // The primary is committed. Failed derivatives remain
+                            // explicit/recoverable and cannot turn its upload into500.
+                            report($error);
+                        }
+                    });
 
                     return $record;
                 });

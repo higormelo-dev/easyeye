@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\DataAccessPurpose;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\PatientResource;
+use App\Http\Resources\Api\IntegratorPatientResource as PatientResource;
 use App\Models\Patient;
 use App\Services\Api\PatientExamService;
+use App\Services\DataAccessLogService;
 use App\Traits\LogsDataAccess;
 
 class PatientsController extends Controller
@@ -47,6 +48,8 @@ class PatientsController extends Controller
         }
 
         $patients = $patients->paginate($this->perPage());
+
+        app(DataAccessLogService::class)->aggregate('patients', $patients->count(), request()->only(['date', 'clinic_resource_id', 'page']));
 
         return PatientResource::collection($patients);
     }

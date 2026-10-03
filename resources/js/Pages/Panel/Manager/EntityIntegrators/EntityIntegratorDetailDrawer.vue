@@ -13,7 +13,7 @@ const props = defineProps({
     t: { type: Object, default: () => ({}) },
 });
 
-const emit = defineEmits(['close', 'edit']);
+defineEmits(['close', 'edit']);
 const loading = ref(false);
 const item = ref(null);
 
@@ -70,6 +70,13 @@ watch(
 
         <!-- Body -->
         <template v-if="item">
+            <div class="d-flex gap-2 mb-3">
+                <a v-if="item.commands_url" :href="item.commands_url" class="btn btn-outline-primary"
+                    >Comandos e diagnóstico</a
+                ><a v-if="item.queue_health_url" :href="item.queue_health_url" class="btn btn-outline-secondary"
+                    >Saúde da aquisição</a
+                >
+            </div>
             <!-- Status -->
             <div class="mb-4">
                 <span v-if="item.deleted" class="badge bg-secondary">

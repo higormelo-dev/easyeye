@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\IntegratorQueueHealthHistory;
+use App\Models\{IntegratorQueueHealth, IntegratorQueueHealthHistory};
 use Illuminate\Console\Command;
 
 /**
@@ -31,6 +31,11 @@ class PruneIntegratorQueueHealthHistoryCommand extends Command
         $days   = max(1, (int) $this->option('days'));
         $cutoff = now()->subDays($days);
         $dryRun = (bool) $this->option('dry-run');
+
+        if (! $dryRun) {
+            IntegratorQueueHealth::where('synced_at', '<', now()->subDays(30))
+                ->update(['problems' => '[]', 'operational' => null]);
+        }
 
         $query = IntegratorQueueHealthHistory::query()->where('synced_at', '<', $cutoff);
         $count = $query->count();

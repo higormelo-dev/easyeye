@@ -136,10 +136,9 @@ describe('POST /api/integrators/check-token', function () {
             ->assertJsonFragment(['valid' => true, 'renewed' => false]);
     });
 
-    it('returns 400 when no token is provided', function () {
+    it('returns 422 when no token is provided', function () {
         $this->postJson('/api/integrators/check-token', [])
-            ->assertBadRequest()
-            ->assertJsonFragment(['valid' => false]);
+            ->assertUnprocessable()->assertJsonValidationErrors(['token']);
     });
 
     it('returns 401 for an invalid token string', function () {

@@ -11,8 +11,10 @@ use App\Http\Controllers\Api\{ClinicResourcesController,
     PatientExamsController,
     PatientsController,
     SchedulesController};
+use App\Http\Controllers\Api\{EquipmentOperationReceiptController, OfflineSnapshotController};
 use App\Http\Controllers\Api\{ReceiptReconciliationController, WhatsAppWebhookController};
 use App\Http\Controllers\Billing\WebhookController;
+use App\Http\Middleware\IntegratorEquipmentOperation;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
@@ -30,8 +32,10 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
         Route::group([
             'prefix'     => 'v1',
             'as'         => 'v1.',
-            'middleware' => ['throttle:integrators-api', 'token.scope', 'idempotency'],
+            'middleware' => ['throttle:integrators-api', 'token.scope', IntegratorEquipmentOperation::class, 'idempotency'],
         ], function () {
+            Route::get('equipment-operations/{operation}', [EquipmentOperationReceiptController::class, 'show'])->name('equipment-operations.show');
+            Route::get('offline-snapshot', [OfflineSnapshotController::class, 'index'])->name('offline-snapshot.index');
             Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)
                 ->except(['create', 'edit']);
             // Recursos de agenda (type=equipment) disponíveis para vincular a

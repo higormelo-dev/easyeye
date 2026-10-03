@@ -27,6 +27,7 @@ class EntityIntegratorEquipment extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'config_generation',
         'integrator_id',
         'code',
         'name',

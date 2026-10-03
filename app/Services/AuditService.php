@@ -42,7 +42,8 @@ class AuditService
         );
 
         $attributes = [
-            'entity_id'          => $this->resolveEntityId($model),
+            'entity_id' => $this->resolveEntityId($model),
+            ...AuditContext::integratorActor(),
             'user_id'            => AuditContext::userId(),
             'patient_account_id' => AuditContext::patientAccountId(),
             'auditable_type'     => get_class($model),

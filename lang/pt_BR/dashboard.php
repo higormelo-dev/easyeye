@@ -123,13 +123,14 @@ return [
 
     // Etapas do cartão "Configure sua clínica" (App\Enums\ActivationStep)
     'activation_steps' => [
+        'integrator_registered'    => 'Integrador cadastrado', 'integrator_capture_observed' => 'Captura observada no integrador', 'integrator_receipt_confirmed' => 'Primeiro recibo confirmado',
         'entity_profile_completed' => 'Perfil da clínica preenchido',
         'first_doctor_added'       => 'Primeiro médico cadastrado',
         'first_patient_added'      => 'Primeiro paciente cadastrado',
         'first_schedule_created'   => 'Primeira consulta agendada',
         'first_medical_record'     => 'Primeiro prontuário criado',
         'team_member_invited'      => 'Membro da equipe convidado',
-        'integrator_connected'     => 'Equipamento conectado',
+        'integrator_connected'     => 'Integrador autenticado',
     ],
 
     // Agenda de hoje: lista limitada

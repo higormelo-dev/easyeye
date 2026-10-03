@@ -82,7 +82,7 @@ class ActivationObserver
 
     public function entityIntegratorCreated(EntityIntegrator $integrator): void
     {
-        $this->fire(fn () => $integrator->entity_id, ActivationStep::IntegratorConnected);
+        $this->fire(fn () => $integrator->user?->entity_id, ActivationStep::IntegratorRegistered);
     }
 
     // -------------------------------------------------------------------------

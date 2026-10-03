@@ -34,6 +34,7 @@ class PatientExamResource extends JsonResource
                 'schedule_id'                    => $this->schedule_id,
                 'entity_integrator_equipment_id' => $this->entity_integrator_equipment_id,
                 'code'                           => $this->code,
+                'derivative_status'              => $this->derivative_status ?? 'pending', 'derivative_error_code' => $this->derivative_error_code,
                 'archive'                        => $this->archive_url,
                 'name'                           => $this->name,
                 'laterality'                     => $this->laterality,

@@ -8,6 +8,7 @@ use App\Http\Resources\Api\IntegratorCommandResource;
 use App\Models\IntegratorCommand;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Canal de comando do backend pro desktop (Rust) — até aqui toda a API de
@@ -29,11 +30,12 @@ class IntegratorCommandsController extends Controller
     {
         $integrator = request()->attributes->get('integrator');
 
+        IntegratorCommand::where('integrator_id', $integrator->id)->where('status', 'pending')->whereRaw(IntegratorCommand::deadlineSql() . ' <= ?', [now()->toIso8601String()])->update(['status' => 'expired', 'acked_at' => DB::raw(IntegratorCommand::deadlineSql())]);
         $commands = IntegratorCommand::query()
             ->where('integrator_id', $integrator->id)
             ->where('status', 'pending')
             ->orderBy('created_at')
-            ->get();
+            ->limit(20)->get();
 
         return IntegratorCommandResource::collection($commands);
     }
@@ -46,19 +48,14 @@ class IntegratorCommandsController extends Controller
             ->where('integrator_id', $integrator->id)
             ->findOrFail($command);
 
-        // Idempotente por si mesmo, independente do middleware `idempotency`
-        // (TTL 24h, opt-in via header `Idempotency-Key`) — um integrador
-        // offline por dias faz retry fora dessa janela e ainda assim não
-        // pode reprocessar/sobrescrever um ack já gravado.
-        if ($model->status !== 'pending') {
-            return response()->noContent();
-        }
+        $result = $request->validated('result');
 
-        $model->update([
-            'status'   => $request->validated('status'),
-            'result'   => $request->validated('result'),
-            'acked_at' => now(),
-        ]);
+        // Legacy free-text failures are accepted for compatibility but never persisted.
+        if (is_array($result) && array_key_exists('error', $result)) {
+            $result = ['error_code' => 'command_failed'];
+        }
+        $expired = IntegratorCommand::whereKey($model->id)->where('integrator_id', $integrator->id)->where('status', 'pending')->whereRaw(IntegratorCommand::deadlineSql() . ' <= ?', [now()->toIso8601String()])->update(['status' => 'expired', 'acked_at' => DB::raw(IntegratorCommand::deadlineSql())]);
+        IntegratorCommand::whereKey($model->id)->where('integrator_id', $integrator->id)->where('status', 'pending')->update(['status' => $request->validated('status'), 'result' => $result === null ? null : json_encode($result, JSON_THROW_ON_ERROR), 'acked_at' => now()->toIso8601String()]);
 
         return response()->noContent();
     }

@@ -20,12 +20,14 @@ class DataAccessLog extends Model
     public $timestamps = false;
 
     protected $fillable = [
+        'actor_type', 'entity_user_integrator_id', 'integrator_id', 'token_id', 'installation_id',
         'entity_id',
         'user_id',
         'patient_account_id',
         'resource_type',
         'resource_id',
         'patient_id',
+        'access_summary',
         'purpose',
         'justification',
         'ip_address',
@@ -36,8 +38,9 @@ class DataAccessLog extends Model
     protected function casts(): array
     {
         return [
-            'purpose'     => DataAccessPurpose::class,
-            'accessed_at' => 'datetime',
+            'access_summary' => 'array',
+            'purpose'        => DataAccessPurpose::class,
+            'accessed_at'    => 'datetime',
         ];
     }
 

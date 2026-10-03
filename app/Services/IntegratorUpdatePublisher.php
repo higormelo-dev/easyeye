@@ -49,7 +49,12 @@ class IntegratorUpdatePublisher
         string $arch,
         string $signature,
         bool $keepPrevious = false,
+        ?array $metadata = null,
+        ?string $manifestSignature = null,
     ): IntegratorUpdate {
+        if ($metadata === null || $manifestSignature === null) {
+            throw new InvalidArgumentException('manifest_v2_required');
+        }
         $signatureBytes = base64_decode($signature, true);
 
         if ($signatureBytes === false || strlen($signatureBytes) !== SODIUM_CRYPTO_SIGN_BYTES) {
@@ -62,23 +67,112 @@ class IntegratorUpdatePublisher
 
         $this->verifySignature($sha256, $signatureBytes);
 
-        $path = sprintf('integrator-updates/%s/%s', $version, $fileName);
+        if (! in_array($platform, self::PLATFORMS, true) || ! in_array($arch, self::ARCHS, true) || ! preg_match('/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/', $version) || ! preg_match('/^[A-Za-z0-9._-]{1,200}$/', $fileName) || str_contains($fileName, '..')) {
+            throw new InvalidArgumentException('release_target_or_filename_invalid');
+        }
+        $size = filesize($localPath);
 
-        Storage::disk('s3')->put($path, fopen($localPath, 'rb'));
+        if (! $size || $size > 268435456) {
+            throw new InvalidArgumentException('release_size_invalid');
+        }
 
-        return DB::transaction(function () use ($version, $platform, $arch, $path, $sha256, $signature, $keepPrevious) {
-            if (! $keepPrevious) {
-                IntegratorUpdate::query()
-                    ->where('platform', $platform)
-                    ->where('arch', $arch)
-                    ->update(['active' => false]);
+        if ($metadata !== null) {
+            $metadata = app(IntegratorUpdateManifest::class)->validate($metadata, (string) $manifestSignature);
+
+            foreach (['version' => $version, 'platform' => $platform, 'arch' => $arch, 'sha256' => $sha256, 'size_bytes' => $size, 'asset_signature' => $signature] as $key => $value) {
+                if ($metadata[$key] !== $value) {
+                    throw new InvalidArgumentException('manifest_artifact_mismatch');
+                }
+            }
+        }
+        $channel = $metadata['channel'] ?? 'stable';
+        $cohort  = $metadata['cohort'] ?? 'all';
+        $path    = sprintf('integrator-updates/%s/%s/%s/%s/%s', $platform, $arch, $version, $sha256, $fileName);
+
+        return DB::transaction(function () use ($localPath, $version, $platform, $arch, $path, $sha256, $signature, $size, $keepPrevious, $metadata, $manifestSignature, $channel, $cohort) {
+            if (DB::getDriverName() === 'pgsql') {
+                DB::select('select pg_advisory_xact_lock(hashtext(?))', ['artifact:' . $platform . ':' . $arch . ':' . $version]);
+                DB::select('select pg_advisory_xact_lock(hashtext(?))', ['cohort:' . $platform . ':' . $arch . ':' . $channel . ':' . $cohort]);
             }
 
-            return IntegratorUpdate::updateOrCreate(
-                ['platform' => $platform, 'arch' => $arch, 'version' => $version],
-                ['archive' => $path, 'sha256' => $sha256, 'signature' => $signature, 'active' => true],
-            );
+            if (IntegratorUpdate::where('platform', $platform)->where('arch', $arch)->where('version', $version)->where('sha256', '!=', $sha256)->exists()) {
+                throw new InvalidArgumentException('release_immutable_conflict');
+            }
+            $old = IntegratorUpdate::where('platform', $platform)->where('arch', $arch)->where('version', $version)->where('channel', $channel)->where('cohort', $cohort)->first();
+
+            if ($old) {
+                if (! hash_equals($old->sha256, $sha256) || $old->metadata !== $metadata || $old->manifest_signature !== $manifestSignature) {
+                    throw new InvalidArgumentException('release_immutable_conflict');
+                }$this->verifyObject($old->archive, $sha256, $size);
+
+                return $old;
+            }
+
+            if ($metadata !== null && IntegratorUpdate::where('platform', $platform)->where('arch', $arch)->where('channel', $channel)->where('cohort', $cohort)->where('sequence', '>=', $metadata['sequence'])->exists()) {
+                throw new InvalidArgumentException('release_sequence_replayed');
+            }
+            $disk = Storage::disk('s3');
+
+            if (! $disk->exists($path)) {
+                $stream = fopen($localPath, 'rb');
+
+                try {
+                    if (! $disk->put($path, $stream, ['visibility' => 'private'])) {
+                        throw new InvalidArgumentException('release_storage_write_failed');
+                    }
+                } finally {
+                    fclose($stream);
+                }
+            }
+            $this->verifyObject($path, $sha256, $size);
+
+            if (! $keepPrevious) {
+                IntegratorUpdate::where('platform', $platform)->where('arch', $arch)->where('channel', $channel)->where('cohort', $cohort)->update(['active' => false]);
+            }
+
+            return IntegratorUpdate::create(['platform' => $platform, 'arch' => $arch, 'version' => $version, 'archive' => $path, 'sha256' => $sha256, 'signature' => $signature, 'active' => true, 'metadata' => $metadata, 'manifest_signature' => $manifestSignature, 'release_id' => $metadata['release_id'] ?? null, 'sequence' => $metadata['sequence'] ?? null, 'channel' => $channel, 'cohort' => $cohort]);
         });
+    }
+
+    private function verifyObject(string $path, string $hash, int $size): void
+    {
+        $stream = Storage::disk('s3')->readStream($path);
+
+        if (! is_resource($stream)) {
+            throw new InvalidArgumentException('release_storage_unavailable');
+        }
+
+        try {
+            $ctx        = hash_init('sha256');
+            $count      = 0;
+            $started    = hrtime(true);
+            $emptyReads = 0;
+            stream_set_timeout($stream, 10);
+
+            while (! feof($stream)) {
+                if (hrtime(true) - $started > 15_000_000_000) {
+                    throw new InvalidArgumentException('release_storage_read_timeout');
+                }$chunk = fread($stream, 65536);
+
+                if ($chunk === '' && ! feof($stream) && ++$emptyReads > 2) {
+                    throw new InvalidArgumentException('release_storage_read_stalled');
+                }
+
+if ($chunk === false) {
+                    throw new InvalidArgumentException('release_storage_read_failed');
+                }$count += strlen($chunk);
+
+                if ($count > $size) {
+                    throw new InvalidArgumentException('release_storage_size_mismatch');
+                }hash_update($ctx, $chunk);
+            }
+
+if ($count !== $size || ! hash_equals($hash, hash_final($ctx))) {
+                throw new InvalidArgumentException('release_storage_hash_mismatch');
+            }
+        } finally {
+            fclose($stream);
+        }
     }
 
     /**

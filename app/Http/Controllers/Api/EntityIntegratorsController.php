@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ActivationStep;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\EntityIntegratorResource;
 use App\Models\{EntityIntegrator, EntityUserIntegrator};
+use App\Services\{ActivationService, IntegratorTokenPolicy};
 use App\Traits\HasBusinessDays;
 use Carbon\Carbon;
 use Illuminate\Http\{JsonResponse, Request};
@@ -45,7 +47,8 @@ class EntityIntegratorsController extends Controller
             'code'     => ['required', 'string'],
             // Escopo opcional do token. Ausente = acesso total (read+write),
             // preservando o comportamento dos clientes que não enviam o campo.
-            'scope' => ['sometimes', 'string', 'in:read,write'],
+            'scope'           => ['sometimes', 'string', 'in:read,write'],
+            'installation_id' => ['nullable', 'uuid'],
         ]);
 
         $user = $this->model->query()
@@ -83,9 +86,11 @@ class EntityIntegratorsController extends Controller
 
         $token = $user->createToken(
             'integrator-token',
-            $this->abilitiesFor($integrator->id, $credentials['scope'] ?? null),
+            app(IntegratorTokenPolicy::class)->abilities($integrator, $credentials['scope'] ?? null, $credentials['installation_id'] ?? null),
             Carbon::now()->addDays(7),
         );
+
+        app(ActivationService::class)->complete($user->entity_id, ActivationStep::IntegratorConnected);
 
         return response()->json(
             (new EntityIntegratorResource($integrator, $token)),
@@ -117,54 +122,25 @@ class EntityIntegratorsController extends Controller
 
     public function checkToken(Request $request): JsonResponse
     {
-        $token = $request->get('token');
+        $validated = $request->validate(['token' => ['required', 'string', 'max:512']]);
 
-        if (! $token) {
-            return $this->invalidResponse('auth.token_not_provided', HttpResponse::HTTP_BAD_REQUEST);
+        if (! $request->request->has('token')) {
+            return response()->json(['code' => 'token_body_required', 'valid' => false], 422);
         }
-
-        $accessToken = PersonalAccessToken::findToken($token);
+        $accessToken = PersonalAccessToken::findToken($validated['token']);
 
         if (! $accessToken) {
             return $this->invalidResponse('auth.token_invalid');
         }
+        $policy = app(IntegratorTokenPolicy::class);
 
-        if ($accessToken->expires_at && $accessToken->expires_at->isPast()) {
+        if ($reason = $policy->reason($accessToken)) {
             $accessToken->delete();
 
-            return $this->invalidResponse('auth.token_expired');
+            return $this->invalidResponse($reason);
         }
-
-        $integratorId = EntityIntegrator::idFromTokenAbilities($accessToken->abilities);
-
-        if (! $integratorId) {
-            $accessToken->delete();
-
-            return $this->invalidResponse('auth.token_invalid');
-        }
-
-        $integrator = EntityIntegrator::query()
-            ->with('user.entity')
-            ->find($integratorId);
-
-        $blockReason = $integrator ? $integrator->accessBlockReason() : 'auth.integrator_inactive';
-
-        if ($blockReason !== null) {
-            $accessToken->delete();
-
-            return $this->invalidResponse($blockReason);
-        }
-
-        // Verifica se o token vai expirar em 1 dia útil e renova automaticamente
-        $renewed   = false;
+        $renewed   = $policy->renew($accessToken);
         $expiresAt = $accessToken->expires_at;
-
-        if ($expiresAt && $this->willExpireInOneBusinessDay($expiresAt)) {
-            $accessToken->expires_at = Carbon::now()->addDays(7);
-            $accessToken->save();
-            $expiresAt = $accessToken->expires_at;
-            $renewed   = true;
-        }
 
         return response()->json([
             'message'    => $renewed ? __('auth.token_renewed') : __('auth.token_valid'),

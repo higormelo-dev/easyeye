@@ -56,7 +56,9 @@ it('renders the last synced snapshot for the integrator', function () {
             ->component('Panel/Manager/EntityIntegratorQueueHealth/Index')
             ->where('health.pending_count', 4)
             ->where('health.blocked_count', 2)
-            ->where('health.problems.0.schedule_identifier', 'SDL-0000000722'));
+            ->where('health.problems.0.schedule_identifier', null)
+            ->where('health.problems.0.last_error', null)
+            ->where('health.problems.0.error_code', 'upload_failed'));
 });
 
 it('returns the recent history trend, most recent first', function () {

@@ -7,7 +7,10 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\{Covenant, Doctor, Entity, EntityIntegrator, EntityUser, EntityUserIntegrator, Patient, PatientAccount, People, Plan, PlanFeature, Schedule, Subscription, User};
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Symfony\Component\HttpFoundation\Request;
 use Tests\TestCase;
+
+require_once __DIR__ . '/P2ManifestFixture.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -17,6 +20,11 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    // Symfony stores host patterns globally. A test exercising production
+    // middleware must not leave its request policy in the next fresh application.
+    ->beforeEach(function () {
+        Request::setTrustedHosts([]);
+    })
     ->in('Feature');
 
 /*

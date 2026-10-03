@@ -123,13 +123,14 @@ return [
 
     // Steps of the "Set up your clinic" card (App\Enums\ActivationStep)
     'activation_steps' => [
+        'integrator_registered'    => 'Integrator registered', 'integrator_capture_observed' => 'Capture observed by integrator', 'integrator_receipt_confirmed' => 'First receipt confirmed',
         'entity_profile_completed' => 'Clinic profile completed',
         'first_doctor_added'       => 'First doctor registered',
         'first_patient_added'      => 'First patient registered',
         'first_schedule_created'   => 'First appointment booked',
         'first_medical_record'     => 'First medical record created',
         'team_member_invited'      => 'Team member invited',
-        'integrator_connected'     => 'Equipment connected',
+        'integrator_connected'     => 'Integrator authenticated',
     ],
 
     // Today's schedule: limited list

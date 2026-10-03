@@ -106,6 +106,7 @@ Route::group([
         // ── Comando remoto pro desktop (resync/diagnóstico) ────────────────────
         // Infra mínima (JSON, sem tela própria ainda) — enfileira, o
         // integrador busca no próximo poll (ver Api\IntegratorCommandsController).
+        Route::get('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/commands', [EntityIntegratorCommandsController::class, 'index'])->name('entities.user-integrators.integrators.commands.index');
         Route::post(
             'entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/commands',
             [EntityIntegratorCommandsController::class, 'store'],

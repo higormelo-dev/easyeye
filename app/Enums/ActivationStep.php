@@ -10,13 +10,16 @@ namespace App\Enums;
  */
 enum ActivationStep: string
 {
-    case EntityProfileCompleted = 'entity_profile_completed'; // Dados da clínica preenchidos
-    case FirstDoctorAdded       = 'first_doctor_added';       // Primeiro médico cadastrado
-    case FirstPatientAdded      = 'first_patient_added';      // Primeiro paciente cadastrado
-    case FirstScheduleCreated   = 'first_schedule_created';   // Primeira consulta agendada
-    case FirstMedicalRecord     = 'first_medical_record';     // Primeiro prontuário criado
-    case TeamMemberInvited      = 'team_member_invited';      // Membro da equipe convidado
-    case IntegratorConnected    = 'integrator_connected';     // Equipamento conectado via API
+    case EntityProfileCompleted     = 'entity_profile_completed'; // Dados da clínica preenchidos
+    case FirstDoctorAdded           = 'first_doctor_added';       // Primeiro médico cadastrado
+    case FirstPatientAdded          = 'first_patient_added';      // Primeiro paciente cadastrado
+    case FirstScheduleCreated       = 'first_schedule_created';   // Primeira consulta agendada
+    case FirstMedicalRecord         = 'first_medical_record';     // Primeiro prontuário criado
+    case TeamMemberInvited          = 'team_member_invited';      // Membro da equipe convidado
+    case IntegratorRegistered       = 'integrator_registered';
+    case IntegratorCaptureObserved  = 'integrator_capture_observed';
+    case IntegratorReceiptConfirmed = 'integrator_receipt_confirmed';
+    case IntegratorConnected        = 'integrator_connected';     // Equipamento conectado via API
 
     /** Rótulo no idioma do usuário (dashboard.activation_steps nos arquivos de idioma). */
     public function label(): string
@@ -35,6 +38,7 @@ enum ActivationStep: string
             self::FirstMedicalRecord     => 20,
             self::TeamMemberInvited      => 10,
             self::IntegratorConnected    => 10,
+            self::IntegratorRegistered,self::IntegratorCaptureObserved,self::IntegratorReceiptConfirmed => 0,
         };
     }
 
@@ -53,7 +57,7 @@ enum ActivationStep: string
     public function required(): bool
     {
         return match ($this) {
-            self::TeamMemberInvited, self::IntegratorConnected => false,
+            self::TeamMemberInvited,self::IntegratorRegistered,self::IntegratorCaptureObserved,self::IntegratorReceiptConfirmed,self::IntegratorConnected => false,
             default => true,
         };
     }
@@ -72,7 +76,7 @@ enum ActivationStep: string
             self::FirstScheduleCreated,
             self::FirstMedicalRecord,
             self::TeamMemberInvited,
-            self::IntegratorConnected,
+            self::IntegratorRegistered, self::IntegratorConnected, self::IntegratorCaptureObserved, self::IntegratorReceiptConfirmed,
         ];
     }
 }

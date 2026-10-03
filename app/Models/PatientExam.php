@@ -5,12 +5,12 @@ namespace App\Models;
 use App\Domains\AI\Models\AiRun;
 use App\Enums\ExamSource;
 use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\{Builder, Model};
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany};
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\{DB, Storage};
 
 class PatientExam extends Model
 {
@@ -68,6 +68,16 @@ class PatientExam extends Model
     /**
      * Generated code for the entity_id field.
      */
+    /** Serialize scoped EXM allocation for every producer, including web imports. */
+    protected function performInsert(Builder $query): bool
+    {
+        return DB::transaction(function () use ($query): bool {
+            Patient::whereKey($this->patient_id)->lockForUpdate()->firstOrFail();
+
+            return parent::performInsert($query);
+        });
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $patientExam) {

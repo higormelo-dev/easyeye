@@ -18,6 +18,7 @@ class EntityIntegratorEquipmentResource extends JsonResource
             'type'       => 'equipment',
             'id'         => $this->id,
             'attributes' => [
+                'config_generation'  => (int) ($this->config_generation ?? 1),
                 'integrator_id'      => $this->integrator_id,
                 'code'               => $this->code,
                 'name'               => $this->name,

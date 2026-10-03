@@ -23,6 +23,8 @@ class PublishIntegratorUpdateCommand extends Command
         {--platform=windows : Plataforma (windows|linux|macos, como o Rust reporta)}
         {--arch= : Arquitetura (x86|x86_64|aarch64, como o Rust reporta)}
         {--signature= : Assinatura ed25519 em base64 sobre os bytes do digest SHA-256}
+        {--metadata= : Caminho JSON de metadados v2 assinados}
+        {--manifest-signature= : Assinatura Ed25519 dos metadados v2}
         {--keep-previous : Não desativar as versões anteriores da mesma plataforma/arch}';
 
     protected $description = 'Publica um instalador do integrador no S3 e registra o manifesto de auto-atualização';
@@ -40,6 +42,7 @@ class PublishIntegratorUpdateCommand extends Command
 
             return self::FAILURE;
         }
+
         foreach (['release-version' => $version, 'arch' => $arch, 'signature' => $signature] as $name => $value) {
             if ($value === '') {
                 $this->error("--{$name} é obrigatório.");
@@ -57,6 +60,8 @@ class PublishIntegratorUpdateCommand extends Command
                 arch: $arch,
                 signature: $signature,
                 keepPrevious: (bool) $this->option('keep-previous'),
+                metadata: $this->option('metadata') ? json_decode(file_get_contents($this->option('metadata')), true, 32, JSON_THROW_ON_ERROR) : null,
+                manifestSignature: $this->option('manifest-signature') ?: null,
             );
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());

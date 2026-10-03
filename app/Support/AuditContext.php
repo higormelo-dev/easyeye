@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Models\EntityUserIntegrator;
 use App\Models\{PatientAccount, User};
 use Illuminate\Support\Facades\Auth;
 
@@ -20,6 +21,26 @@ use Illuminate\Support\Facades\Auth;
  */
 class AuditContext
 {
+    public static function integratorActor(): array
+    {
+        $user       = request()->user();
+        $integrator = request()->attributes->get('integrator');
+
+        if (! $user instanceof EntityUserIntegrator || ! $integrator || $integrator->entity_user_integrator_id !== $user->id) {
+            return [];
+        }
+        $token        = $user->currentAccessToken();
+        $installation = null;
+
+        foreach ((array) ($token?->abilities ?? []) as $ability) {
+            if (str_starts_with($ability, 'installation_id:')) {
+                $installation = substr($ability, 16);
+            }
+        }
+
+        return ['entity_id' => $integrator->user->entity_id, 'actor_type' => 'integrator', 'entity_user_integrator_id' => $user->id, 'integrator_id' => $integrator->id, 'token_id' => $token?->id, 'installation_id' => $installation];
+    }
+
     private static ?string $userId = null;
 
     private static ?string $patientAccountId = null;

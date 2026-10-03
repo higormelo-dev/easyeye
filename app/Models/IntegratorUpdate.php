@@ -10,6 +10,7 @@ class IntegratorUpdate extends Model
     use HasUuids;
 
     protected $fillable = [
+        'metadata', 'manifest_signature', 'release_id', 'sequence', 'channel', 'cohort',
         'version',
         'platform',
         'arch',
@@ -22,7 +23,8 @@ class IntegratorUpdate extends Model
     protected function casts(): array
     {
         return [
-            'active' => 'boolean',
+            'metadata' => 'array', 'sequence' => 'integer',
+            'active'   => 'boolean',
         ];
     }
 }

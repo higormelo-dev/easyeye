@@ -2,62 +2,37 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\IntegratorTokenPolicy;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * Enforce least-privilege por verbo nas rotas da API de integradores.
- *
- * Tokens emitidos a partir do hardening de escopo carregam abilities
- * `api:read` e/ou `api:write` (ver EntityIntegratorsController::abilitiesFor).
- * Métodos seguros (GET/HEAD) exigem `api:read`; os demais exigem `api:write`.
- *
- * Compatibilidade: tokens LEGADOS (emitidos antes do escopo) só têm a ability
- * `integrator_id:<uuid>` — sem nenhuma `api:*`. Para não quebrar clientes já
- * implantados em campo, esses tokens recebem acesso total (a restrição só é
- * aplicada quando o token foi explicitamente emitido com escopo). Tokens são
- * sempre emitidos pelo servidor e hasheados, então a ausência de escopo é
- * confiável — não pode ser forjada pelo cliente.
- *
- * Pré-requisito: rodar após auth:sanctum (precisa do token autenticado).
- */
 class EnsureTokenScope
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $user  = $request->user();
-        $token = $user?->currentAccessToken();
+        $token = $request->user()?->currentAccessToken();
 
-        // Sem token autenticado: deixa as camadas de auth anteriores decidirem.
         if (! $token) {
             return $next($request);
         }
+        $abilities = (array) $token->abilities;
+        $required  = $request->isMethodSafe() ? 'api:read' : 'api:write';
+        $declared  = in_array('api:read', $abilities, true) || in_array('api:write', $abilities, true);
+        $path      = $request->path();
+        $purpose   = match(true) {
+            str_contains($path, 'queue-health')                                                                                    => 'telemetry:write',str_contains($path, 'updates') => 'updates:read',
+            str_contains($path, 'commands/') && str_ends_with($path, '/ack')                                                       => 'commands:ack',str_ends_with($path, '/commands') => 'commands:read',
+            str_contains($path, 'equipments') || str_contains($path, 'equipment-operations')                                       => 'equipment:write',
+            str_contains($path, 'schedules') || str_contains($path, 'clinic-resources') || str_contains($path, 'offline-snapshot') => 'worklist:read',
+            str_contains($path, 'exams') && ! $request->isMethodSafe()                                                             => 'exams:write',default => 'patients:resolve',
+        };
+        $model   = $request->attributes->get('integrator');
+        $allowed = IntegratorTokenPolicy::PROFILES[$model?->token_profile] ?? [];
 
-        $abilities = (array) ($token->abilities ?? []);
-
-        $hasScopes = false;
-
-        foreach ($abilities as $ability) {
-            if (is_string($ability) && str_starts_with($ability, 'api:')) {
-                $hasScopes = true;
-
-                break;
-            }
-        }
-
-        // Token legado, sem escopo declarado → acesso total (compat).
-        if (! $hasScopes) {
-            return $next($request);
-        }
-
-        $required = $request->isMethodSafe() ? 'api:read' : 'api:write';
-
-        if (! $user->tokenCan($required)) {
-            return response()->json([
-                'message' => __('auth.token_scope_insufficient'),
-                'valid'   => false,
-            ], Response::HTTP_FORBIDDEN);
+        // Legacy tokens retain verb compatibility until renewal, always intersect the server-authorized profile.
+        if (($declared && ! in_array($required, $abilities, true)) || ! in_array($purpose, $allowed, true) || (in_array('purpose:v1', $abilities, true) && ! in_array($purpose, $abilities, true))) {
+            return response()->json(['code' => 'token_purpose_insufficient', 'message' => __('auth.token_scope_insufficient'), 'valid' => false], 403);
         }
 
         return $next($request);

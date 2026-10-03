@@ -63,6 +63,13 @@ const minutesSinceSync = computed(() => {
 });
 
 const isStale = computed(() => minutesSinceSync.value !== null && minutesSinceSync.value > STALE_AFTER_MINUTES);
+const commandsUrl = computed(() =>
+    route('manager.entities.user-integrators.integrators.commands.index', [
+        props.entity.id,
+        props.userIntegrator.id,
+        props.integrator.id,
+    ]),
+);
 const operational = computed(() => props.health?.operational ?? null);
 const captureNeedsAttention = computed(
     () =>
@@ -128,6 +135,25 @@ function statusBadgeClass(status) {
         : 'badge-soft-warning text-warning border border-warning';
 }
 
+function technicalStateLabel(state) {
+    return (
+        {
+            fresh: 'Agenda atual',
+            offline_snapshot: 'Snapshot offline válido',
+            blocked: 'Bloqueado',
+            unavailable: 'Indisponível',
+            refresh_failed: 'Falha ao atualizar agenda',
+            not_configured: 'Sem atualização configurada',
+            prepared: 'Atualização preparada',
+            downloaded: 'Download concluído',
+            installing: 'Instalação em andamento',
+            awaiting_restart: 'Aguardando reinício',
+            reboot_required: 'Reinício necessário',
+            failed: 'Falhou',
+            installed: 'Versão instalada confirmada',
+        }[state] ?? 'Estado desconhecido'
+    );
+}
 function statusLabel(status) {
     return status === 'blocked' ? 'Bloqueado' : 'Falha';
 }
@@ -143,6 +169,30 @@ function statusLabel(status) {
                     </a>
                 </template>
             </PageHeader>
+            <a :href="commandsUrl" class="btn btn-outline-primary mb-3">Solicitar diagnóstico ou sincronização</a>
+            <div
+                v-if="operational?.configuration_sync || operational?.worklist || operational?.update"
+                class="card mb-3"
+            >
+                <div class="card-body">
+                    <h2 class="h5">Configuração, agenda e atualização</h2>
+                    <p v-if="operational.configuration_sync">
+                        Configurações: {{ operational.configuration_sync.pending }} pendentes ·
+                        {{ operational.configuration_sync.needs_review }} para revisão.
+                    </p>
+                    <ul v-if="operational.worklist?.length">
+                        <li v-for="worklist in operational.worklist" :key="worklist.equipment_id">
+                            Aparelho {{ worklist.equipment_id }}: {{ technicalStateLabel(worklist.state) }} · validade
+                            {{ worklist.expires_at ?? 'indisponível' }}
+                        </li>
+                    </ul>
+                    <p v-if="operational.update">
+                        Atualização {{ technicalStateLabel(operational.update.state) }} · versão instalada
+                        {{ operational.update.installed_version ?? operational.version }} · canal
+                        {{ operational.update.channel }}
+                    </p>
+                </div>
+            </div>
 
             <div class="mb-3 text-muted small">
                 {{ integrator.name }} <code class="ms-1">{{ integrator.code }}</code>

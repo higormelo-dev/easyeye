@@ -21,7 +21,7 @@ function makeCommandsClientChain(): array
 {
     $entity         = Entity::factory()->create(['is_client' => true, 'active' => true]);
     $userIntegrator = EntityUserIntegrator::factory()->create(['entity_id' => $entity->id]);
-    $integrator     = EntityIntegrator::factory()->create(['entity_user_integrator_id' => $userIntegrator->id]);
+    $integrator     = EntityIntegrator::factory()->create(['entity_user_integrator_id' => $userIntegrator->id, 'active' => true]);
 
     return [$entity, $userIntegrator, $integrator];
 }
@@ -42,6 +42,15 @@ it('enqueues a pending command for the integrator', function () {
     $command = IntegratorCommand::where('integrator_id', $integrator->id)->sole();
     expect($command->status)->toBe('pending')
         ->and($command->type)->toBe('resync_now');
+});
+
+it('refuses a command for an inactive integrator without creating backlog', function () {
+    [$entity, $userIntegrator, $integrator] = makeCommandsClientChain();
+    $integrator->update(['active' => false]);
+    $url = route('manager.entities.user-integrators.integrators.commands.store', [$entity->id, $userIntegrator->id, $integrator->id]);
+    $this->actingAs($this->admin)->withSession(commandsAdminSession($this->saas))
+        ->postJson($url, ['type' => 'resync_now'])->assertUnprocessable();
+    expect(IntegratorCommand::count())->toBe(0);
 });
 
 it('rejects a command type outside the known set', function () {

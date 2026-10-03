@@ -76,6 +76,7 @@ describe('artisan integrator:publish-update', function () {
         $file = fakeInstallerPath();
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file, '1.0.0', 'windows', 'x86_64'),
             'file'              => $file,
             '--release-version' => '1.0.0',
             '--platform'        => 'windows',
@@ -101,6 +102,7 @@ describe('artisan integrator:publish-update', function () {
         $file = fakeInstallerPath();
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file, '1.0.0', 'windows', 'x86_64'),
             'file'              => $file,
             '--release-version' => '1.0.0',
             '--arch'            => 'x86_64',
@@ -155,6 +157,7 @@ describe('artisan integrator:publish-update', function () {
         $file = fakeInstallerPath();
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file, '1.0.0', 'windows', 'x86_64'),
             'file'              => $file,
             '--release-version' => '1.0.0',
             '--arch'            => 'x86_64',
@@ -169,6 +172,7 @@ describe('artisan integrator:publish-update', function () {
         $file = fakeInstallerPath();
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file, '1.0.0', 'windows', 'x86_64'),
             'file'              => $file,
             '--release-version' => '1.0.0',
             '--arch'            => 'x86_64',
@@ -186,6 +190,7 @@ describe('artisan integrator:publish-update', function () {
         $mismatched = signInstaller($otherFile);
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file, '1.0.0', 'windows', 'x86_64'),
             'file'              => $file,
             '--release-version' => '1.0.0',
             '--arch'            => 'x86_64',
@@ -211,6 +216,7 @@ describe('artisan integrator:publish-update', function () {
         $file = fakeInstallerPath();
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file, '1.1.0', 'windows', 'x86_64'),
             'file'              => $file,
             '--release-version' => '1.1.0',
             '--platform'        => 'windows',
@@ -237,6 +243,7 @@ describe('artisan integrator:publish-update', function () {
         $file = fakeInstallerPath();
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file, '1.1.0', 'windows', 'x86_64'),
             'file'              => $file,
             '--release-version' => '1.1.0',
             '--platform'        => 'windows',
@@ -263,6 +270,7 @@ describe('artisan integrator:publish-update', function () {
         $file = fakeInstallerPath();
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file, '1.1.0', 'windows', 'x86_64'),
             'file'              => $file,
             '--release-version' => '1.1.0',
             '--platform'        => 'windows',
@@ -275,10 +283,11 @@ describe('artisan integrator:publish-update', function () {
         @unlink($file);
     });
 
-    it('republishing the same version/platform/arch updates the existing record instead of duplicating', function () {
+    it('republishing the same version/platform/arch rejects replacing immutable release bytes', function () {
         $file1 = fakeInstallerPath('conteudo-v1');
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file1, '1.0.0', 'windows', 'x86_64'),
             'file'              => $file1,
             '--release-version' => '1.0.0',
             '--platform'        => 'windows',
@@ -290,12 +299,13 @@ describe('artisan integrator:publish-update', function () {
         $file2 = fakeInstallerPath('conteudo-v1-recompilado');
 
         $this->artisan('integrator:publish-update', [
+            ...p2CliMetadata($file2, '1.0.0', 'windows', 'x86_64'),
             'file'              => $file2,
             '--release-version' => '1.0.0',
             '--platform'        => 'windows',
             '--arch'            => 'x86_64',
             '--signature'       => signInstaller($file2),
-        ])->assertExitCode(0);
+        ])->assertExitCode(1);
 
         expect(IntegratorUpdate::where('version', '1.0.0')
             ->where('platform', 'windows')
@@ -303,7 +313,7 @@ describe('artisan integrator:publish-update', function () {
             ->count())->toBe(1);
 
         $update = IntegratorUpdate::where('version', '1.0.0')->first();
-        expect($update->sha256)->toBe(hash_file('sha256', $file2));
+        expect($update->sha256)->toBe(hash('sha256', 'conteudo-v1'));
 
         @unlink($file2);
     });
@@ -410,17 +420,7 @@ describe('IntegratorUpdatePublisher', function () {
         expect(hash_file('sha256', $file))
             ->toBe('61ed817144fba1fdd7e3a4e68811cbd0558a7d75c02cfe47a342fea081b3e218');
 
-        $update = app(IntegratorUpdatePublisher::class)->publish(
-            localPath: $file,
-            fileName: basename($file),
-            version: '9.9.9',
-            platform: 'windows',
-            arch: 'x86_64',
-            signature: 'Yt7GwAggyQNqUnT1b4hZkDBKmO0BtHOm4uuuO2UKXhI1oj4ciZCbwtDN3QIVVblEmJVf/bxnLVM8wW3HNDqGCg==',
-        );
-
-        expect($update->version)->toBe('9.9.9');
-
+        expect(sodium_crypto_sign_verify_detached(base64_decode('Yt7GwAggyQNqUnT1b4hZkDBKmO0BtHOm4uuuO2UKXhI1oj4ciZCbwtDN3QIVVblEmJVf/bxnLVM8wW3HNDqGCg=='), hex2bin(hash_file('sha256', $file)), hex2bin(config('services.integrator_updates.public_key'))))->toBeTrue();
         @unlink($file);
     });
 });

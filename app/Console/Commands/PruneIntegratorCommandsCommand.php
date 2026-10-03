@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\IntegratorCommand;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Expurgo do canal de comando do backend pro desktop (`integrator_commands`
@@ -39,9 +40,16 @@ class PruneIntegratorCommandsCommand extends Command
         $cutoff = now()->subDays($days);
         $dryRun = (bool) $this->option('dry-run');
 
+        if (! $dryRun) {
+            IntegratorCommand::where('status', 'pending')->whereRaw(IntegratorCommand::deadlineSql() . ' <= ?', [now()->toIso8601String()])->update(['status' => 'expired', 'acked_at' => DB::raw(IntegratorCommand::deadlineSql())]);
+        }
+
+        if (! $dryRun) {
+            IntegratorCommand::where('status', 'expired')->whereNull('acked_at')->update(['acked_at' => DB::raw(IntegratorCommand::deadlineSql())]);
+        }
         $query = IntegratorCommand::query()
-            ->whereIn('status', ['completed', 'failed'])
-            ->where('acked_at', '<', $cutoff);
+            ->whereIn('status', ['completed', 'failed', 'expired'])
+            ->where('acked_at', '<', $cutoff->toIso8601String());
         $count = $query->count();
 
         $this->info(($dryRun ? '[dry-run] ' : '') . "Comandos terminais > {$days} dias: {$count}");

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api;
 
 use App\Models\EntityIntegratorEquipment;
 use App\Models\{ExamType, Schedule};
+use App\Rules\IntegratorExamArchive;
 use App\Support\IntegratorClinicalIdentifier;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -106,7 +107,7 @@ class PatientExamRequest extends FormRequest
                 },
             ],
             'name'                 => ['required', 'string', 'max:255', 'min:3'],
-            'archive'              => 'required|file|mimes:jpg,jpeg,png,emr|max:10240',
+            'archive'              => ['required', 'file', new IntegratorExamArchive()],
             'laterality'           => ['nullable', 'integer', 'in:0,1,2'],
             'exam_performed_at'    => ['nullable', 'date'],
             'observation'          => ['nullable', 'string', 'max:1000'],

@@ -2,6 +2,7 @@
 
 use App\Enums\{ClientRule, ExamSource};
 use App\Models\{Entity, EntityCustomDiagnosis, ExamType, Patient, PatientExam, User};
+use App\Services\BoundedPdfProcess;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -71,6 +72,21 @@ it('médico importa exame externo com 1 arquivo — PatientExam criado com sourc
     // Importado nasce habilitado (válido para laudo, IA e repasse).
     expect($exam->active)->toBeTrue();
     Storage::disk('s3')->assertExists($exam->archive);
+});
+
+it('preserves a committed original and failed derivative status when the synchronous PDF renderer rejects it', function () {
+    $file = UploadedFile::fake()->createWithContent('invalid.pdf', "%PDF-1.4\nnot a valid document\n");
+    importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this, ['files' => [$file]]))
+        ->assertRedirect(route('panel.eye-images.index'));
+    $exam = PatientExam::where('patient_id', $this->patient->id)->sole();
+    Storage::disk('s3')->assertExists($exam->archive);
+    expect($exam->display_archive)->toBeNull()->and($exam->thumb_archive)->toBeNull();
+
+    if (extension_loaded('imagick') && BoundedPdfProcess::hasIsolation()) {
+        expect($exam->derivative_status)->toBe('failed')->and($exam->derivative_error_code)->toBe('derivative_generation_failed');
+    } else {
+        expect($exam->derivative_status)->toBe('unsupported');
+    }
 });
 
 it('laterality (OD/OE) enviado no import é persistido no PatientExam; omitido fica null (AO)', function () {

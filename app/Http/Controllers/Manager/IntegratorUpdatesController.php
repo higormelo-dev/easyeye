@@ -7,8 +7,7 @@ namespace App\Http\Controllers\Manager;
 use App\Http\Controllers\Controller;
 use App\Models\IntegratorUpdate;
 use App\Services\IntegratorUpdatePublisher;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Validation\Rule;
 use Inertia\{Inertia, Response as InertiaResponse};
 use InvalidArgumentException;
@@ -45,12 +44,14 @@ class IntegratorUpdatesController extends Controller
             'platform'  => ['required', Rule::in(IntegratorUpdatePublisher::PLATFORMS)],
             'arch'      => ['required', Rule::in(IntegratorUpdatePublisher::ARCHS)],
             'signature' => ['required', 'string', 'max:120'],
+            'metadata'  => ['nullable', 'string', 'max:8192', 'json'], 'manifest_signature' => ['nullable', 'string', 'max:128'],
         ], [
             'version.regex' => 'Versão deve ser semver (ex.: 0.2.0).',
         ]);
 
         $file      = $request->file('file');
         $extension = strtolower($file->getClientOriginalExtension());
+
         if (! in_array($extension, ['msi', 'exe', 'appimage', 'dmg', 'deb'], true)) {
             return back()->withErrors(['file' => 'Arquivo deve ser um instalador (.msi, .exe, .AppImage, .dmg, .deb).']);
         }
@@ -63,6 +64,8 @@ class IntegratorUpdatesController extends Controller
                 platform: $validated['platform'],
                 arch: $validated['arch'],
                 signature: trim($validated['signature']),
+                metadata: empty($validated['metadata']) ? null : json_decode($validated['metadata'], true, 32, JSON_THROW_ON_ERROR),
+                manifestSignature: $validated['manifest_signature'] ?? null,
             );
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['signature' => $e->getMessage()]);

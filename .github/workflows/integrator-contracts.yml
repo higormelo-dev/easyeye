@@ -1,0 +1,68 @@
+name: Integrator contracts
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: easyeye_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:cDItc3ludGhldGljLWtleS1vbmx5LTMyLWJ5dGVzISE=
+      APP_LOCALE: pt_BR
+      APP_FAKER_LOCALE: pt_BR
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: easyeye_test
+      DB_USERNAME: postgres
+      DB_PASSWORD: synthetic-ci-only
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      BROADCAST_CONNECTION: 'null'
+      AI_PROVIDER_RUNTIME: fake
+      AWS_ACCESS_KEY_ID: synthetic-only
+      AWS_SECRET_ACCESS_KEY: synthetic-only
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: synthetic-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, gd, mbstring, calendar, sodium, zip, pcntl, posix
+          coverage: none
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y util-linux ghostscript
+      - run: composer install --no-interaction --prefer-dist
+      - run: npm ci
+      - run: python3 scripts/check-integrator-style.py
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - run: node node_modules/vitest/vitest.mjs run
+      - run: npm run build
+      - run: php vendor/bin/pest tests/Feature tests/Unit tests/Integration --compact
+      - run: php scripts/validate-integrator-contracts.php
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: synthetic-integrator-contracts
+          path: storage/framework/testing/p2

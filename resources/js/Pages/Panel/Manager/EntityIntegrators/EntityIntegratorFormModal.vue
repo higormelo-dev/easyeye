@@ -40,12 +40,23 @@ const form = ref({
     ip: '',
     mac: '',
     active: true,
+    token_profile: 'capture',
+    update_channel: 'stable',
+    update_cohort: 'all',
 });
 
 const errors = ref({});
 
 function reset() {
-    form.value = { name: '', ip: '', mac: '', active: true };
+    form.value = {
+        name: '',
+        ip: '',
+        mac: '',
+        active: true,
+        token_profile: 'capture',
+        update_channel: 'stable',
+        update_cohort: 'all',
+    };
     errors.value = {};
     loadErr.value = '';
 }
@@ -57,11 +68,22 @@ async function loadEditData() {
         const res = await fetch(props.editDataUrl, { headers: { Accept: 'application/json' } });
         const json = await res.json();
         if (!res.ok) throw new Error(json.message ?? '');
+        if (
+            !['capture', 'worklist', 'support'].includes(json.data.token_profile) ||
+            !['stable', 'pilot'].includes(json.data.update_channel) ||
+            typeof json.data.update_cohort !== 'string' ||
+            !json.data.update_cohort
+        ) {
+            throw new Error('Incomplete authorization state');
+        }
         form.value = {
             name: json.data.name ?? '',
             ip: json.data.ip ?? '',
             mac: json.data.mac ?? '',
             active: json.data.active ?? true,
+            token_profile: json.data.token_profile,
+            update_channel: json.data.update_channel,
+            update_cohort: json.data.update_cohort,
         };
     } catch {
         loadErr.value = props.t.detail_loading_error ?? 'Erro ao carregar dados.';
@@ -86,6 +108,7 @@ function csrf() {
 }
 
 async function submit() {
+    if (loading.value || loadErr.value) return;
     saving.value = true;
     errors.value = {};
 
@@ -153,6 +176,27 @@ function firstError(field) {
                 </div>
 
                 <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label>Finalidade do integrador</label
+                            ><select v-model="form.token_profile" class="form-select">
+                                <option value="capture">Aquisição</option>
+                                <option value="worklist">Agenda de equipamentos</option>
+                                <option value="support">Suporte operacional</option>
+                            </select>
+                        </div>
+                        <div class="col">
+                            <label>Canal de atualização</label
+                            ><select v-model="form.update_channel" class="form-select">
+                                <option value="stable">Estável</option>
+                                <option value="pilot">Piloto</option>
+                            </select>
+                        </div>
+                        <div class="col">
+                            <label>Coorte</label
+                            ><input v-model="form.update_cohort" class="form-control" maxlength="64" />
+                        </div>
+                    </div>
                     <div v-if="loading" class="text-center text-muted py-3">
                         <span class="spinner-border spinner-border-sm me-2"></span>
                         {{ t.detail_loading ?? 'Carregando...' }}
@@ -162,7 +206,7 @@ function firstError(field) {
                         {{ loadErr }}
                     </div>
 
-                    <form v-else @submit.prevent="submit" class="row g-3">
+                    <form v-else class="row g-3" @submit.prevent="submit">
                         <div class="col-12">
                             <label class="form-label">
                                 {{ t.field_name ?? 'Nome' }} <span class="text-danger">*</span>
@@ -234,7 +278,12 @@ function firstError(field) {
                     <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="saving" @click="close">
                         {{ t.btn_cancel ?? 'Cancelar' }}
                     </button>
-                    <button type="button" class="btn btn-primary btn-sm" :disabled="saving || loading" @click="submit">
+                    <button
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                        :disabled="saving || loading || !!loadErr"
+                        @click="submit"
+                    >
                         <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
                         <i v-else class="ti ti-check me-1"></i>
                         {{ isEdit ? (t.btn_save ?? 'Salvar') : (t.btn_create ?? 'Cadastrar') }}

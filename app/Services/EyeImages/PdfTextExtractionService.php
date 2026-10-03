@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\EyeImages;
 
 use App\Models\PatientExam;
+use App\Services\{BoundedExamArchive, BoundedPdfProcess};
 use Illuminate\Support\Facades\Storage;
 use Smalot\PdfParser\Parser;
 use Throwable;
@@ -41,8 +42,19 @@ class PdfTextExtractionService
         }
 
         try {
-            $content = Storage::disk('s3')->get($exam->archive);
-            $text    = $this->parser->parseContent($content)->getText();
+            $content = app(BoundedExamArchive::class)->read($exam->archive);
+            $tmp     = tempnam(sys_get_temp_dir(), 'pdf-text-');
+
+            if ($tmp === false) {
+                return null;
+            }
+
+            try {
+                file_put_contents($tmp, $content);
+                $text = app(BoundedPdfProcess::class)->run('text', $tmp);
+            } finally {
+                @unlink($tmp);
+            }
         } catch (Throwable) {
             return null;
         }

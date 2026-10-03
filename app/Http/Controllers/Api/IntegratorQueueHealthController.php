@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ActivationStep;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\IntegratorQueueHealthRequest;
 use App\Models\{IntegratorQueueHealth, IntegratorQueueHealthHistory};
+use App\Services\{ActivationService, IntegratorHealthMinimizer};
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 
@@ -40,7 +42,7 @@ class IntegratorQueueHealthController extends Controller
                 ['integrator_id' => $integrator->id],
                 [
                     ...$counts,
-                    'problems'    => $request->input('problems'),
+                    'problems'    => app(IntegratorHealthMinimizer::class)->problems($request->validated('problems')),
                     'operational' => $request->validated('operational'),
                     'synced_at'   => $synced_at,
                 ],
@@ -52,6 +54,10 @@ class IntegratorQueueHealthController extends Controller
                 'synced_at' => $synced_at,
             ]);
         });
+
+        if (collect($request->validated('operational.devices') ?? [])->contains(fn ($device) => ! empty($device['last_accepted_at']))) {
+            app(ActivationService::class)->complete($integrator->user->entity_id, ActivationStep::IntegratorCaptureObserved);
+        }
 
         return response()->noContent();
     }

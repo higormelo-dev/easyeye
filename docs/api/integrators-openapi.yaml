@@ -4,7 +4,7 @@
 openapi: 3.0.3
 info:
   title: EasyEye — Integrators API
-  version: "1.0.0"
+  version: "1.1.0"
   description: |
     API consumida pelo integrador desktop (EasyEye Integrator, em Rust).
 
@@ -34,7 +34,7 @@ info:
       - O signin aceita `scope` (`read` | `write`). `read` emite token somente
         leitura; `write` ou ausente emite leitura+escrita. Operações de escrita
         com token read-only retornam `403`.
-      - Tokens antigos (sem escopo) mantêm acesso total por compatibilidade.
+      - Tokens antigos mantêm compatibilidade por verbo até a renovação, sempre limitados ao perfil capture/worklist/support autorizado no Manager; renovação emite abilities por finalidade. O payload de signin nunca escolhe um perfil mais amplo.
 
     Idempotência:
       - Operações de escrita aceitam o header opcional `Idempotency-Key`
@@ -233,6 +233,33 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+
+    patch:
+      tags:
+      - Equipments
+      summary: Atualiza um equipamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EquipmentUpsert'
+      responses:
+        '200':
+          description: Equipamento atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EquipmentResource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/integrators/v1/patients:
     get:
       tags: [Patients]
@@ -441,6 +468,58 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+
+    patch:
+      tags:
+      - Patient Exams
+      summary: Atualiza um exame
+      description: 'Consome 1 da cota mensal `api_monthly_exam_sends` (reserva atômica).
+
+        Para reenviar o arquivo, use a variante multipart via POST nesta mesma URL.
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExamUpload'
+      responses:
+        '200':
+          description: Exame atualizado
+          headers:
+            Idempotency-Replayed:
+              schema:
+                type: boolean
+              description: Presente (`true`) quando a resposta é replay de um `Idempotency-Key`
+                anterior.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PatientExamResource'
+        '400':
+          description: '`Idempotency-Key` com formato inválido'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /api/integrators/v1/exams:
     post:
       tags: [Exams]
@@ -596,6 +675,260 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/integrators/v1/clinic-resources:
+    get:
+      summary: Recursos de agenda da clínica
+      description: Token worklist:read; plano clínico necessário.
+      responses:
+        '200':
+          description: Resposta válida
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClinicResource'
+                  links:
+                    type: object
+                    additionalProperties: false
+                    properties: {}
+                  meta:
+                    $ref: '#/components/schemas/Page'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/integrators/v1/updates:
+    get:
+      summary: Atualização da coorte autorizada
+      description: Token updates:read; disponível para recuperação operacional sem licença clínica. Canal/coorte obtidos
+        do cadastro autenticado, nunca do query. Win7 SP1 mínimo 6.1.7601, conforme metadados assinados. Legacy unsigned
+        installable=false. URL efêmera fora da assinatura; cliente usa allowlist HTTPS sem bearer/redirect. Sequência/validade/key_id/minOS/minclient/mincontract/rollback
+        são assinados.
+      responses:
+        '200':
+          description: Resposta válida
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UpdateManifest'
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+      - name: platform
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: arch
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: os_version
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: current_version
+        in: query
+        required: false
+        schema:
+          type: string
+  /api/integrators/v1/queue-health:
+    put:
+      summary: Saúde operacional minimizada
+      description: Token telemetry:write. Máximo64KiB; array problems50 e devices100; dados validados whitelist. Snapshot
+        atual e histórico7dias; estado observado não prova revisão clínica.
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueHealth'
+  /api/integrators/v1/commands:
+    get:
+      summary: Até20 comandos pendentes não expirados
+      description: Token commands:read. Entrega pelo menos uma vez; efeito idempotente no cliente; prazo obrigatório
+        nos novos comandos.
+      responses:
+        '200':
+          description: Resposta válida
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    maxItems: 20
+                    items:
+                      $ref: '#/components/schemas/CommandResource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/integrators/v1/commands/{command}/ack:
+    post:
+      summary: Resultado terminal atômico, primeiro vencedor
+      description: Token commands:ack. Resultado <=16KiB, schema whitelist por tipo. ACK concorrente nunca altera
+        terminal. Expiração vence ACK tardio. Legacy errorstring aceito e descartado, persistido somente código genérico.
+      responses:
+        '204':
+          description: Sem conteúdo
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandAck'
+      parameters:
+      - name: command
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/integrators/v1/equipment-operations/{operation}:
+    get:
+      summary: Recibo durável de operação de equipamento
+      description: Token equipment:write e licença clínica; scoped integrator/actor. Replay de create/update permanece
+        além24h, mesmo UUID equipamento. Conflito immutablepayload409.
+      responses:
+        '200':
+          description: Resposta válida
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EquipmentResource'
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      operation_id:
+                        type: string
+                        format: uuid
+                      config_generation:
+                        type: integer
+                        minimum: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+      - name: operation
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/integrators/v1/offline-snapshot:
+    get:
+      summary: Snapshot completo por recurso e calendário
+      description: Token worklist:read e licença clínica. Janela<=7dias, <=500registros combinados patients+schedules
+        e JSON<=1MiB; TTL24h. Somente pacientes referenciados. Excesso422 snapshot_limit_exceeded exige janela menor,
+        nunca partialcomplete. clinic_date/local_date_time calculados no clinic_timezone; date_time serializa UTC.
+        Cache não autoriza upload; alterações do servidor são revalidadas na escrita.
+      responses:
+        '200':
+          description: Resposta válida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      parameters:
+      - name: clinic_resource_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: date_from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: date_to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+
 components:
   securitySchemes:
     bearerAuth:
@@ -677,7 +1010,10 @@ components:
     SigninRequest:
       type: object
       description: Credenciais do usuário integrador + código do integrador (dispositivo).
-      required: [email, password, code]
+      required:
+      - email
+      - password
+      - code
       properties:
         email:
           type: string
@@ -688,34 +1024,37 @@ components:
           type: string
           format: password
           description: Senha do usuário integrador.
-          example: "S3nh@Forte!2026"
+          example: S3nh@Forte!2026
         code:
           type: string
-          description: >-
-            Código do integrador vinculado ao usuário. Aceita o formato canônico
-            com zero-padding (`EI-0000000001`), o formato abreviado (`EI-1`) ou
-            lower-case (`ei-1`) — todos são normalizados internamente.
-            Cada instalação do EasyEye Integrator usa o seu próprio código.
+          description: Código do integrador vinculado ao usuário. Aceita o formato canônico com zero-padding (`EI-0000000001`),
+            o formato abreviado (`EI-1`) ou lower-case (`ei-1`) — todos são normalizados internamente. Cada instalação
+            do EasyEye Integrator usa o seu próprio código.
           example: EI-1
         scope:
           type: string
-          enum: [read, write]
-          description: >-
-            Escopo opcional do token. `read` emite token somente leitura;
-            `write` (ou ausente) emite token de leitura+escrita. Tokens são
-            barrados por verbo: escrita exige escopo `write`.
+          enum:
+          - read
+          - write
+          description: 'Escopo opcional do token. `read` emite token somente leitura; `write` (ou ausente) emite token
+            de leitura+escrita. Tokens são barrados por verbo: escrita exige escopo `write`.'
           example: write
+        installation_id:
+          type: string
+          format: uuid
+          nullable: true
 
     CheckTokenRequest:
       type: object
-      required: [token]
+      required:
+      - token
       properties:
         token:
           type: string
-          description: >-
-            Token Bearer completo emitido no signin (campo access_token),
-            incluindo o prefixo numérico do Sanctum.
-          example: "12|wXyZ9aBcDeFgHiJkLmNoPqRsTuVw0123456789ab"
+          description: Somente string no corpo JSON/form. Validade, ator proprietário e inatividade usam a mesma política
+            da API.
+          example: 12|wXyZ9aBcDeFgHiJkLmNoPqRsTuVw0123456789ab
+          maxLength: 512
 
     Error:
       type: object
@@ -834,22 +1173,53 @@ components:
     EquipmentResource:
       type: object
       properties:
-        id: { type: string, format: uuid }
+        id:
+          type: string
+          format: uuid
         attributes:
           type: object
           properties:
-            integrator_id: { type: string, format: uuid, nullable: true }
-            code: { type: string, nullable: true }
-            name: { type: string }
-            ip: { type: string, nullable: true }
-            mac: { type: string, nullable: true }
-            serial_number: { type: string, nullable: true }
-            active: { type: boolean, nullable: true }
+            integrator_id:
+              type: string
+              format: uuid
+              nullable: true
+            code:
+              type: string
+              nullable: true
+            name:
+              type: string
+            ip:
+              type: string
+              nullable: true
+            mac:
+              type: string
+              nullable: true
+            serial_number:
+              type: string
+              nullable: true
+            active:
+              type: boolean
+              nullable: true
+            clinic_resource_id:
+              type: string
+              format: uuid
+              nullable: true
+            config_generation:
+              type: integer
+              minimum: 1
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
 
     EquipmentUpsert:
       type: object
-      description: Dados do equipamento oftalmológico conectado ao integrador. name/ip/mac/serial são únicos por integrador.
-      required: [name, ip, mac, serial_number]
+      description: Equipamento escopado. operation_id e Idempotency-Key iguais garantem replay durável; expected_config_generation
+        impede atualizar configuração obsoleta. Campos nullable podem ser limpos nas operações P2.
+      required:
+      - name
       properties:
         name:
           type: string
@@ -858,33 +1228,126 @@ components:
           example: RETINOGRAFO CANON CR-2
         ip:
           type: string
-          format: ipv4
           description: IP do equipamento na rede local da clínica.
           example: 192.168.0.45
+          nullable: true
         mac:
           type: string
-          pattern: "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+          pattern: ^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$
           description: Endereço MAC da interface de rede (separado por dois-pontos ou hífen).
-          example: "A4:5E:60:D1:2B:9C"
+          example: A4:5E:60:D1:2B:9C
+          nullable: true
         serial_number:
           type: string
           maxLength: 100
           description: Número de série do fabricante.
           example: CR2-2024-008731
+          nullable: true
+        clinic_resource_id:
+          type: string
+          format: uuid
+          nullable: true
+        operation_id:
+          type: string
+          format: uuid
+        installation_id:
+          type: string
+          format: uuid
+        expected_config_generation:
+          type: integer
+          minimum: 1
 
     PatientResource:
       type: object
+      additionalProperties: false
       properties:
-        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum:
+          - patient
+        id:
+          type: string
+          format: uuid
         attributes:
           type: object
+          additionalProperties: false
           properties:
-            entity_id: { type: string, format: uuid, nullable: true }
-            person_id: { type: string, format: uuid, nullable: true }
-            covenant_id: { type: string, format: uuid, nullable: true }
-            code: { type: string }
-            card_number: { type: string, nullable: true }
-            active: { type: boolean, nullable: true }
+            entity_id:
+              type: string
+              format: uuid
+            person_id:
+              type: string
+              format: uuid
+            code:
+              type: string
+            import_code:
+              type: string
+              nullable: true
+            full_name:
+              type: string
+              nullable: true
+            birth_date:
+              type: string
+              format: date
+              nullable: true
+            sex:
+              type: string
+              enum:
+              - F
+              - M
+              nullable: true
+            active:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+          required:
+          - entity_id
+          - person_id
+          - code
+          - import_code
+          - full_name
+          - birth_date
+          - sex
+          - active
+          - created_at
+          - updated_at
+        relationships:
+          type: object
+          additionalProperties: false
+          properties:
+            person:
+              type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                full_name:
+                  type: string
+                  nullable: true
+                birth_date:
+                  type: string
+                  format: date
+                  nullable: true
+                gender:
+                  type: integer
+                  nullable: true
+            entity:
+              type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: string
+                  format: uuid
+      required:
+      - type
+      - id
+      - attributes
+      - relationships
 
     ExamTypeResource:
       type: object
@@ -902,77 +1365,251 @@ components:
 
     ScheduleResource:
       type: object
+      additionalProperties: false
       properties:
-        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum:
+          - schedule
+        id:
+          type: string
+          format: uuid
         attributes:
           type: object
+          additionalProperties: false
           properties:
-            entity_id: { type: string, format: uuid, nullable: true }
-            doctor_id: { type: string, format: uuid, nullable: true }
-            patient_id: { type: string, format: uuid, nullable: true }
-            code: { type: string }
-            full_name: { type: string, nullable: true }
-            date_time: { type: string, format: date-time, nullable: true }
-            situation: { type: integer, nullable: true }
-            active: { type: boolean, nullable: true }
+            clinic_date:
+              type: string
+              format: date
+            entity_id:
+              type: string
+              format: uuid
+            patient_id:
+              type: string
+              format: uuid
+              nullable: true
+            doctor_id:
+              type: string
+              format: uuid
+              nullable: true
+            code:
+              type: string
+            import_code:
+              type: string
+              nullable: true
+            full_name:
+              type: string
+              nullable: true
+            date_time:
+              type: string
+              format: date-time
+            local_date_time:
+              type: string
+              format: date-time
+            patient_birth_date:
+              type: string
+              format: date
+              nullable: true
+            patient_sex:
+              type: string
+              enum:
+              - F
+              - M
+              nullable: true
+            clinic_resource_ids:
+              type: array
+              items:
+                type: string
+                format: uuid
+            situation:
+              type: integer
+              nullable: true
+            active:
+              type: boolean
+            fulfillment:
+              type: string
+              enum:
+              - unknown
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+          required:
+          - clinic_date
+          - entity_id
+          - patient_id
+          - doctor_id
+          - code
+          - import_code
+          - full_name
+          - date_time
+          - local_date_time
+          - patient_birth_date
+          - patient_sex
+          - clinic_resource_ids
+          - situation
+          - active
+          - fulfillment
+          - created_at
+          - updated_at
+      required:
+      - type
+      - id
+      - attributes
 
     PatientExamResource:
       type: object
       properties:
-        type: { type: string, example: patient_exams }
-        id: { type: string, format: uuid }
+        type:
+          type: string
+          example: patient_exams
+        id:
+          type: string
+          format: uuid
         attributes:
           type: object
           properties:
-            capture_id: { type: string, format: uuid, nullable: true }
-            entity_id: { type: string, format: uuid, nullable: true }
-            integrator_id: { type: string, format: uuid, nullable: true }
-            content_sha256: { type: string, nullable: true, pattern: '^[a-f0-9]{64}$' }
-            content_bytes: { type: integer, nullable: true }
-            exam_id: { type: string, format: uuid, nullable: true }
-            session_id: { type: string, format: uuid, nullable: true }
-            availability: { type: string, enum: [original_available, unavailable] }
-            review_state: { type: string, enum: [unknown] }
-            fulfillment_state: { type: string, enum: [unknown] }
-            review_url: { type: string, description: 'Caminho relativo autorizado /panel/eye-images com paciente e exame exatos; não implica revisão clínica.' }
-            exam_performed_at: { type: string, format: date-time, nullable: true }
-            patient_id: { type: string, format: uuid, nullable: true }
-            doctor_id: { type: string, format: uuid, nullable: true }
-            schedule_id: { type: string, format: uuid, nullable: true }
-            entity_integrator_equipment_id: { type: string, format: uuid, nullable: true }
-            code: { type: string, nullable: true }
+            capture_id:
+              type: string
+              format: uuid
+              nullable: true
+            entity_id:
+              type: string
+              format: uuid
+              nullable: true
+            integrator_id:
+              type: string
+              format: uuid
+              nullable: true
+            content_sha256:
+              type: string
+              nullable: true
+              pattern: ^[a-f0-9]{64}$
+            content_bytes:
+              type: integer
+              nullable: true
+            exam_id:
+              type: string
+              format: uuid
+              nullable: true
+            session_id:
+              type: string
+              format: uuid
+              nullable: true
+            availability:
+              type: string
+              enum:
+              - original_available
+              - unavailable
+            review_state:
+              type: string
+              enum:
+              - unknown
+            fulfillment_state:
+              type: string
+              enum:
+              - unknown
+            review_url:
+              type: string
+              description: Caminho relativo autorizado /panel/eye-images com paciente e exame exatos; não implica revisão
+                clínica.
+            exam_performed_at:
+              type: string
+              format: date-time
+              nullable: true
+            patient_id:
+              type: string
+              format: uuid
+              nullable: true
+            doctor_id:
+              type: string
+              format: uuid
+              nullable: true
+            schedule_id:
+              type: string
+              format: uuid
+              nullable: true
+            entity_integrator_equipment_id:
+              type: string
+              format: uuid
+              nullable: true
+            code:
+              type: string
+              nullable: true
             archive:
               type: string
               nullable: true
               description: URL ASSINADA temporária (~24h) para o arquivo privado no S3.
-            name: { type: string, nullable: true }
+            name:
+              type: string
+              nullable: true
             laterality:
               type: integer
               nullable: true
-              enum: [0, 1, 2]
-              description: "0=ambos/indefinido, 1=OD, 2=OE (conforme regra de negócio)."
-            active: { type: boolean, nullable: true }
-            created_at: { type: string, format: date-time }
-            updated_at: { type: string, format: date-time }
+              enum:
+              - 0
+              - 1
+              - 2
+              description: 0=ambos/indefinido, 1=OD, 2=OE (conforme regra de negócio).
+            active:
+              type: boolean
+              nullable: true
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            observation:
+              type: string
+              nullable: true
+              maxLength: 1000
+            derivative_status:
+              type: string
+              enum:
+              - pending
+              - ready
+              - unsupported
+              - failed
+            derivative_error_code:
+              type: string
+              nullable: true
         relationships:
           type: object
           description: Presente apenas em respostas single (não em listagens). Campos minimizados (LGPD).
           properties:
-            patient: { $ref: "#/components/schemas/RelationPerson" }
-            doctor: { $ref: "#/components/schemas/RelationPerson" }
+            patient:
+              $ref: '#/components/schemas/RelationPerson'
+            doctor:
+              $ref: '#/components/schemas/RelationPerson'
             schedule:
               type: object
               properties:
-                id: { type: string, format: uuid }
-                code: { type: string }
-                date_time: { type: string, format: date-time, nullable: true }
-                situation: { type: integer, nullable: true }
+                id:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                date_time:
+                  type: string
+                  format: date-time
+                  nullable: true
+                situation:
+                  type: integer
+                  nullable: true
             equipment:
               type: object
               properties:
-                id: { type: string, format: uuid }
-                code: { type: string, nullable: true }
-                name: { type: string }
+                id:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  nullable: true
+                name:
+                  type: string
 
     RelationPerson:
       type: object
@@ -985,13 +1622,38 @@ components:
     ExamUpload:
       type: object
       description: Envio de exame para um paciente já identificado na URL (multipart/form-data).
-      required: [exam_identifier, name, archive]
+      required:
+      - exam_identifier
+      - name
+      - archive
       properties:
-        capture_id: { type: string, format: uuid, nullable: true, description: 'UUID da aquisição, igual ao Idempotency-Key; obrigatório nos novos integradores.' }
-        content_sha256: { type: string, pattern: '^[a-f0-9]{64}$', description: 'Obrigatório com capture_id; calculado sobre o original enviado e verificado no servidor.' }
-        schedule_identifier_namespace: { type: string, nullable: true, enum: [uuid, system, import] }
-        patient_identifier_namespace: { type: string, nullable: true, enum: [uuid, system, import] }
-        exam_performed_at: { type: string, format: date-time, nullable: true, description: 'Data real da aquisição; não inferida do momento do upload.' }
+        capture_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID da aquisição, igual ao Idempotency-Key; obrigatório nos novos integradores.
+        content_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Obrigatório com capture_id; calculado sobre o original enviado e verificado no servidor.
+        schedule_identifier_namespace:
+          type: string
+          nullable: true
+          enum:
+          - uuid
+          - system
+          - import
+        patient_identifier_namespace:
+          type: string
+          nullable: true
+          enum:
+          - uuid
+          - system
+          - import
+        exam_performed_at:
+          type: string
+          format: date-time
+          nullable: true
         exam_identifier:
           type: string
           description: Tipo de exame (ExamType) — aceita UUID, código (ETP-XXXXXXXXXX) ou só o número.
@@ -1009,38 +1671,73 @@ components:
         doctor_identifier:
           type: string
           nullable: true
-          description: Médico solicitante (opcional) — UUID, código (DOC-XXXXXXXXXX) ou número. Se ausente, herda o médico do agendamento.
+          description: Médico solicitante (opcional) — UUID, código (DOC-XXXXXXXXXX) ou número. Se ausente, herda o
+            médico do agendamento.
           example: DOC-0000000031
         name:
           type: string
           minLength: 3
           maxLength: 255
-          description: Rótulo de exibição. Nome e hash iguais não identificam uma aquisição; uma nova captura cria outro registro. capture_id comprovado impede substituição do original.
+          description: Rótulo de exibição. Nome e hash iguais não identificam uma aquisição; uma nova captura cria outro
+            registro. capture_id comprovado impede substituição do original.
           example: OCT-MACULA-20260610-PAC123-OD
         laterality:
           type: integer
           nullable: true
-          enum: [0, 1, 2]
-          description: "Lateralidade do exame: 0 = ambos os olhos (AO), 1 = olho direito (OD), 2 = olho esquerdo (OE)."
+          enum:
+          - 0
+          - 1
+          - 2
+          description: 'Lateralidade do exame: 0 = ambos os olhos (AO), 1 = olho direito (OD), 2 = olho esquerdo (OE).'
           example: 1
         archive:
           type: string
           format: binary
-          description: Arquivo do exame — jpg, jpeg, png ou emr. Máx 10 MB.
+          description: JPEG/PNG/BMP/PDF <=10MiB; arquivo .emr OCULUS-PDM-text-v1 UTF8 (BOM opcional), <=1MiB, onze labels
+            whitelist, Patient ID obrigatório, sem HTML/controles/duplicatas. Não aceita binário arbitrário renomeado.
+            Mesmo contrato flat/aninhado.
+        observation:
+          type: string
+          nullable: true
+          maxLength: 1000
 
     ExamUploadByIdentifier:
       type: object
-      description: >-
-        Envio de exame resolvendo o paciente automaticamente: informe
-        schedule_identifier (paciente e médico vêm do agendamento) OU
-        patient_identifier (não infere agendamento). Se ambos forem enviados, devem identificar o mesmo paciente.
-      required: [exam_identifier, name, archive]
+      description: 'Envio de exame resolvendo o paciente automaticamente: informe schedule_identifier (paciente e médico
+        vêm do agendamento) OU patient_identifier (não infere agendamento). Se ambos forem enviados, devem identificar
+        o mesmo paciente.'
+      required:
+      - exam_identifier
+      - name
+      - archive
       properties:
-        capture_id: { type: string, format: uuid, nullable: true, description: 'UUID da aquisição, igual ao Idempotency-Key; obrigatório nos novos integradores.' }
-        content_sha256: { type: string, pattern: '^[a-f0-9]{64}$', description: 'Obrigatório com capture_id; calculado sobre o original enviado e verificado no servidor.' }
-        schedule_identifier_namespace: { type: string, nullable: true, enum: [uuid, system, import] }
-        patient_identifier_namespace: { type: string, nullable: true, enum: [uuid, system, import] }
-        exam_performed_at: { type: string, format: date-time, nullable: true, description: 'Data real da aquisição; não inferida do momento do upload.' }
+        capture_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID da aquisição, igual ao Idempotency-Key; obrigatório nos novos integradores.
+        content_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Obrigatório com capture_id; calculado sobre o original enviado e verificado no servidor.
+        schedule_identifier_namespace:
+          type: string
+          nullable: true
+          enum:
+          - uuid
+          - system
+          - import
+        patient_identifier_namespace:
+          type: string
+          nullable: true
+          enum:
+          - uuid
+          - system
+          - import
+        exam_performed_at:
+          type: string
+          format: date-time
+          nullable: true
         exam_identifier:
           type: string
           description: Tipo de exame (ExamType) — aceita UUID, código (ETP-XXXXXXXXXX) ou só o número.
@@ -1064,18 +1761,28 @@ components:
           type: string
           minLength: 3
           maxLength: 255
-          description: Rótulo de exibição. Nome e hash iguais não identificam uma aquisição; uma nova captura cria outro registro. capture_id comprovado impede substituição do original.
+          description: Rótulo de exibição. Nome e hash iguais não identificam uma aquisição; uma nova captura cria outro
+            registro. capture_id comprovado impede substituição do original.
           example: OCT-MACULA-20260610-PAC123-OD
         laterality:
           type: integer
           nullable: true
-          enum: [0, 1, 2]
-          description: "Lateralidade do exame: 0 = ambos os olhos (AO), 1 = olho direito (OD), 2 = olho esquerdo (OE)."
+          enum:
+          - 0
+          - 1
+          - 2
+          description: 'Lateralidade do exame: 0 = ambos os olhos (AO), 1 = olho direito (OD), 2 = olho esquerdo (OE).'
           example: 1
         archive:
           type: string
           format: binary
-          description: Arquivo do exame — jpg, jpeg, png ou emr. Máx 10 MB.
+          description: JPEG/PNG/BMP/PDF <=10MiB; arquivo .emr OCULUS-PDM-text-v1 UTF8 (BOM opcional), <=1MiB, onze labels
+            whitelist, Patient ID obrigatório, sem HTML/controles/duplicatas. Não aceita binário arbitrário renomeado.
+            Mesmo contrato flat/aninhado.
+        observation:
+          type: string
+          nullable: true
+          maxLength: 1000
 
     ReceiptReconciliation:
       type: object
@@ -1090,3 +1797,720 @@ components:
         equipment_identifier: { type: string, format: uuid }
         laterality: { type: integer, nullable: true, enum: [0, 1, 2] }
         exam_performed_at: { type: string, format: date-time, nullable: true }
+
+    EmrOculusText:
+      type: string
+      description: 'UTF8 texto labels: Last Name, First Name, Patient ID, Exam Eye, Exam Date, Exam Time, Display, Exam
+        Infotext. Patient ID obrigatório; datas DD.MM.YYYY; hora HH:MM[:SS]; olho R/L/Right/Left/Both/OD/OE/AO; labels
+        únicas; cada valor <=512 caracteres; total <=512 linhas/1MiB; HTML/controles e desconhecidos rejeitados. Labels
+        opcionais adicionais do export original: Date of Birth (DD.MM.YYYY), Patient Comment 1, Patient Comment 2; comentários
+        vazios permitidos. Sem inferir identidade clínica dessas strings. Labels opcionais adicionais do export original:
+        Date of Birth (DD.MM.YYYY), Patient Comment 1, Patient Comment 2; comentários vazios permitidos. Sem inferir
+        identidade clínica dessas strings. Labels opcionais adicionais do export original: Date of Birth (DD.MM.YYYY),
+        Patient Comment 1, Patient Comment 2; comentários vazios permitidos. Sem inferir identidade clínica dessas strings.
+        Labels opcionais adicionais do export original: Date of Birth (DD.MM.YYYY), Patient Comment 1, Patient Comment
+        2; comentários vazios permitidos. Sem inferir identidade clínica dessas strings. Labels opcionais adicionais
+        do export original: Date of Birth (DD.MM.YYYY), Patient Comment 1, Patient Comment 2; comentários vazios permitidos.
+        Sem inferir identidade clínica dessas strings.'
+
+    UpdateMetadata:
+      type: object
+      additionalProperties: false
+      properties:
+        release_id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        platform:
+          type: string
+          enum:
+          - windows
+          - linux
+          - macos
+        arch:
+          type: string
+          enum:
+          - x86
+          - x86_64
+          - aarch64
+        sha256:
+          type: string
+        issued_at:
+          type: string
+        expires_at:
+          type: string
+        channel:
+          type: string
+          enum:
+          - pilot
+          - stable
+        cohort:
+          type: string
+        min_client_version:
+          type: string
+        min_os_version:
+          type: string
+        asset_signature:
+          type: string
+        key_id:
+          type: string
+          enum:
+          - release-v1
+        schema_version:
+          type: integer
+          enum:
+          - 2
+        sequence:
+          type: integer
+          minimum: 1
+        size_bytes:
+          type: integer
+          minimum: 1
+          maximum: 268435456
+        min_contract_version:
+          type: integer
+          minimum: 1
+        max_os_version:
+          type: string
+          nullable: true
+        rollback_from:
+          type: string
+          nullable: true
+      required:
+      - release_id
+      - version
+      - platform
+      - arch
+      - sha256
+      - issued_at
+      - expires_at
+      - channel
+      - cohort
+      - min_client_version
+      - min_os_version
+      - asset_signature
+      - key_id
+      - schema_version
+      - sequence
+      - size_bytes
+      - min_contract_version
+      - max_os_version
+      - rollback_from
+    UpdateManifest:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: string
+        platform:
+          type: string
+        arch:
+          type: string
+        url:
+          type: string
+          format: uri
+          nullable: false
+        sha256:
+          type: string
+        signature:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/UpdateMetadata'
+          nullable: true
+        manifest_signature:
+          type: string
+          nullable: true
+        metadata_verified:
+          type: boolean
+        installable:
+          type: boolean
+        blocked_reason:
+          type: string
+          nullable: true
+
+    Snapshot:
+      type: object
+      additionalProperties: false
+      properties:
+        clinic_timezone:
+          type: string
+        contract_version:
+          type: integer
+          enum:
+          - 1
+        snapshot_id:
+          type: string
+          format: uuid
+        entity_id:
+          type: string
+          format: uuid
+        integrator_id:
+          type: string
+          format: uuid
+        clinic_resource_id:
+          type: string
+          format: uuid
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+        generated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        complete:
+          type: boolean
+          enum:
+          - true
+        truncated:
+          type: boolean
+          enum:
+          - false
+        patients:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/PatientResource'
+        schedules:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/ScheduleResource'
+      required:
+      - clinic_timezone
+      - contract_version
+      - snapshot_id
+      - entity_id
+      - integrator_id
+      - clinic_resource_id
+      - date_from
+      - date_to
+      - generated_at
+      - expires_at
+      - complete
+      - truncated
+      - patients
+      - schedules
+    QueueHealth:
+      type: object
+      additionalProperties: false
+      properties:
+        pending_count:
+          type: integer
+          minimum: 0
+        failed_count:
+          type: integer
+          minimum: 0
+        blocked_count:
+          type: integer
+          minimum: 0
+        sent_last_24h_count:
+          type: integer
+          minimum: 0
+        problems:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: integer
+              file_name:
+                type: string
+                maxLength: 255
+              status:
+                type: string
+                enum:
+                - failed
+                - blocked
+              schedule_identifier:
+                type: string
+                nullable: true
+                maxLength: 32
+              patient_identifier:
+                type: string
+                nullable: true
+                maxLength: 64
+              last_error:
+                type: string
+                nullable: true
+                maxLength: 500
+              attempts:
+                type: integer
+                minimum: 0
+              api_status:
+                type: integer
+                nullable: true
+              updated_at:
+                type: string
+                format: date-time
+            required:
+            - id
+            - file_name
+            - status
+            - attempts
+            - updated_at
+        operational:
+          type: object
+          additionalProperties: false
+          properties:
+            version:
+              type: string
+              maxLength: 32
+              pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[A-Za-z0-9.-]+)?$
+            scope:
+              type: string
+              pattern: ^[a-f0-9]{64}$
+            heartbeat_at:
+              type: string
+              format: date-time
+              nullable: true
+            capabilities:
+              type: object
+              additionalProperties: false
+              properties:
+                folder_capture:
+                  type: boolean
+                dicom_storage:
+                  type: boolean
+                dicom_mwl:
+                  type: boolean
+                ocr:
+                  type: boolean
+                rpa:
+                  type: boolean
+            watcher_state:
+              type: string
+              enum:
+              - unknown
+              - active
+              - inactive
+              nullable: true
+            mwl_state:
+              type: string
+              enum:
+              - unknown
+              - active
+              - inactive
+              nullable: true
+            ingest_pending:
+              type: integer
+              minimum: 0
+            quarantined:
+              type: integer
+              minimum: 0
+            acquisition_rejected:
+              type: integer
+              minimum: 0
+            unconfirmed_sent:
+              type: integer
+              minimum: 0
+            originals_pending_remote_archive:
+              type: integer
+              minimum: 0
+            oldest_pending_at:
+              type: string
+              format: date-time
+              nullable: true
+            disk_free_bytes:
+              type: integer
+              minimum: 0
+            devices:
+              type: array
+              maxItems: 100
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  equipment_id:
+                    type: integer
+                    minimum: 1
+                  remote_equipment_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  last_observed_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  last_accepted_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  rejected_count:
+                    type: integer
+                    minimum: 0
+                  issue:
+                    type: string
+                    enum:
+                    - dicom_invalid_or_unavailable
+                    - source_or_spool_unavailable
+                    - upload_size_exceeded
+                    - unsupported_file_type
+                    - format_incomplete
+                    - file_not_ready
+                    - pdf_tools_unavailable
+                    - pdf_parse_failed
+                    - pdf_identity_conflict
+                    - pdf_resource_limit
+                    - emr_invalid_structure
+                    - emr_duplicate_field
+                    - emr_unsupported_field
+                    - emr_encoding_invalid
+                    nullable: true
+            next_action:
+              type: string
+            configuration_sync:
+              type: object
+              additionalProperties: false
+              properties:
+                pending:
+                  type: integer
+                  minimum: 0
+                  maximum: 4294967295
+                needs_review:
+                  type: integer
+                  minimum: 0
+                  maximum: 4294967295
+                last_success_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+              required:
+              - pending
+              - needs_review
+            worklist:
+              type: array
+              maxItems: 100
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  equipment_id:
+                    type: integer
+                    minimum: 1
+                  state:
+                    type: string
+                    enum:
+                    - fresh
+                    - offline_snapshot
+                    - blocked
+                    - unavailable
+                    - refresh_failed
+                  source:
+                    type: string
+                    enum:
+                    - snapshot_api
+                    - cache
+                    - policy
+                    - api
+                  fetched_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  resource_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  last_error_code:
+                    type: string
+                    enum:
+                    - resource_required
+                    - agenda_unavailable
+                    - snapshot_refresh_failed
+                    nullable: true
+                required:
+                - equipment_id
+                - state
+                - source
+            update:
+              type: object
+              additionalProperties: false
+              properties:
+                state:
+                  type: string
+                  enum:
+                  - not_configured
+                  - prepared
+                  - downloaded
+                  - installing
+                  - awaiting_restart
+                  - reboot_required
+                  - failed
+                  - installed
+                  nullable: true
+                channel:
+                  type: string
+                  enum:
+                  - pilot
+                  - stable
+                  nullable: true
+                cohort:
+                  type: string
+                  pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                  nullable: true
+                installed_version:
+                  type: string
+                  maxLength: 32
+                  nullable: true
+                  pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[A-Za-z0-9.-]+)?$
+                last_error_code:
+                  type: string
+                  enum:
+                  - interrupted_installation_review_required
+                  - installer_failed
+                  - installer_outcome_uncertain
+                  - installer_not_started
+                  - operator_recovery_confirmed
+                  nullable: true
+          required:
+          - version
+          - scope
+          - ingest_pending
+          - quarantined
+          - acquisition_rejected
+          - devices
+          - next_action
+          nullable: true
+      required:
+      - pending_count
+      - failed_count
+      - blocked_count
+      - sent_last_24h_count
+      - problems
+      description: Bounded legacy problem input is accepted, but patient/schedule identifiers and free error text are
+        never persisted or returned. File names become a server-secret HMAC technical reference. Only counters, timestamps,
+        typed issue codes and HTTP status survive. Current stale snapshot minimized after30days; aggregate trend retained7days.
+
+    CommandResult:
+      type: object
+      additionalProperties: false
+      properties:
+        scanned_folders:
+          type: integer
+          minimum: 0
+        queued_files:
+          type: integer
+          minimum: 0
+        sent:
+          type: integer
+          minimum: 0
+        failed_or_blocked:
+          type: integer
+          minimum: 0
+        pending:
+          type: integer
+          minimum: 0
+        failed:
+          type: integer
+          minimum: 0
+        blocked:
+          type: integer
+          minimum: 0
+        ingest_pending:
+          type: integer
+          minimum: 0
+        quarantined:
+          type: integer
+          minimum: 0
+        rejected:
+          type: integer
+          minimum: 0
+        disk_free_bytes:
+          type: integer
+          minimum: 0
+        configuration_generation:
+          type: integer
+          minimum: 0
+        schema_version:
+          type: integer
+          enum:
+          - 1
+        app_version:
+          type: string
+          maxLength: 32
+        reloaded:
+          type: boolean
+        semantics:
+          type: string
+          enum:
+          - configuration_read_on_use
+        capabilities:
+          type: object
+          additionalProperties: false
+          properties:
+            pdf:
+              type: boolean
+            rpa:
+              type: boolean
+            dicom:
+              type: boolean
+            emr:
+              type: boolean
+        devices:
+          type: array
+          maxItems: 32
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              equipment_id:
+                type: integer
+                minimum: 1
+              remote_equipment_id:
+                type: string
+                format: uuid
+                nullable: true
+              last_observed_at:
+                type: string
+                format: date-time
+                nullable: true
+              last_accepted_at:
+                type: string
+                format: date-time
+                nullable: true
+              rejected_count:
+                type: integer
+                minimum: 0
+              issue:
+                type: string
+                enum:
+                - dicom_invalid_or_unavailable
+                - source_or_spool_unavailable
+                - upload_size_exceeded
+                - unsupported_file_type
+                - format_incomplete
+                - file_not_ready
+                - pdf_tools_unavailable
+                - pdf_parse_failed
+                - pdf_identity_conflict
+                - pdf_resource_limit
+                - emr_invalid_structure
+                - emr_duplicate_field
+                - emr_unsupported_field
+                - emr_encoding_invalid
+                nullable: true
+              issue_code:
+                type: string
+                enum:
+                - dicom_invalid_or_unavailable
+                - source_or_spool_unavailable
+                - upload_size_exceeded
+                - unsupported_file_type
+                - format_incomplete
+                - file_not_ready
+                - pdf_tools_unavailable
+                - pdf_parse_failed
+                - pdf_identity_conflict
+                - pdf_resource_limit
+                - emr_invalid_structure
+                - emr_duplicate_field
+                - emr_unsupported_field
+                - emr_encoding_invalid
+                nullable: true
+        watcher_state:
+          type: string
+          enum:
+          - unknown
+          - active
+          - inactive
+        mwl_state:
+          type: string
+          enum:
+          - unknown
+          - active
+          - inactive
+        error_code:
+          type: string
+          enum:
+          - diagnostics_failed
+          - resync_failed
+          - reload_failed
+          - unsupported_command
+          - scope_changed
+          - command_expired
+          - command_failed
+        total_devices:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+        devices_truncated:
+          type: boolean
+
+    CommandAck:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+          - completed
+          - failed
+        result:
+          $ref: '#/components/schemas/CommandResult'
+          nullable: true
+      required:
+      - status
+    CommandResource:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          format: uuid
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            type:
+              type: string
+              enum:
+              - resync_now
+              - run_diagnostics
+              - reload_config
+            payload:
+              type: object
+              additionalProperties: false
+              properties: {}
+            created_at:
+              type: string
+              format: date-time
+            expires_at:
+              type: string
+              format: date-time
+    ClinicResource:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+          format: uuid
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            entity_id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            type:
+              type: string
+              enum:
+              - equipment
+            active:
+              type: boolean

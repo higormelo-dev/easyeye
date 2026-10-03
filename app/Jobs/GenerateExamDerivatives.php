@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\PatientExam;
+use App\Services\{BoundedExamArchive, BoundedPdfProcess, EmrReport};
+use App\Services\RasterMemoryBudget;
 use GdImage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
-use Illuminate\Support\Facades\Storage;
 use Imagick;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -26,8 +28,9 @@ use Throwable;
  *   fallback (ícone/arquivo original);
  * - demais (emr, …): sem derivado.
  *
- * Falhas aqui nunca podem derrubar o upload: em fila, o job falha isolado;
- * em QUEUE_CONNECTION=sync, qualquer exceção é reportada e engolida.
+ * Falhas registram estado recuperável sem alterar o original. Em fila, o
+ * job falha isolado; chamadores síncronos tratam a exceção após o commit
+ * (importador externo) ou preservam o intent durável (publisher outbox).
  */
 class GenerateExamDerivatives implements ShouldQueue
 {
@@ -52,10 +55,18 @@ class GenerateExamDerivatives implements ShouldQueue
 
     public function handle(): void
     {
+        $this->expectedArchive ??= PatientExam::whereKey($this->patientExamId)->value('archive');
+
+        if ($this->expectedArchive === null) {
+            return;
+        }
+
         try {
             $this->generate();
         } catch (Throwable $e) {
-            report($e);
+            PatientExam::whereKey($this->patientExamId)->when($this->expectedArchive, fn ($q) => $q->where('archive', $this->expectedArchive))->update(['derivative_status' => 'failed', 'derivative_error_code' => 'derivative_generation_failed']);
+
+            throw $e;
         }
     }
 
@@ -67,21 +78,28 @@ class GenerateExamDerivatives implements ShouldQueue
             return;
         }
 
-        $raw = Storage::disk('s3')->get($exam->archive);
-
-        if ($raw === null) {
-            return;
-        }
+        $raw = app(BoundedExamArchive::class)->read($exam->archive);
 
         $extension = strtolower(pathinfo($exam->archive, PATHINFO_EXTENSION));
 
+        if ($extension === 'emr') {
+            $report = app(EmrReport::class)->parse($raw);
+            $svg    = app(EmrReport::class)->svg($report);
+            $base   = preg_replace('/\.[^.\/]+$/', '', $exam->archive);
+            app(BoundedExamArchive::class)->putVerified($base . '_display.svg', $svg);
+            PatientExam::whereKey($exam->id)->where('archive', $exam->archive)->update(['display_archive' => $base . '_display.svg', 'thumb_archive' => $base . '_display.svg', 'derivative_status' => 'ready', 'derivative_error_code' => null]);
+
+            return;
+        }
         $image = match (true) {
-            in_array($extension, ['jpg', 'jpeg', 'png', 'bmp'], true) => $this->imageFromRaster($raw),
-            $extension === 'pdf' && extension_loaded('imagick')       => $this->imageFromPdf($raw),
-            default                                                   => null,
+            in_array($extension, ['jpg', 'jpeg', 'png', 'bmp'], true)                                => $this->imageFromRaster($raw),
+            $extension === 'pdf' && extension_loaded('imagick') && BoundedPdfProcess::hasIsolation() => $this->imageFromPdf($raw),
+            default                                                                                  => null,
         };
 
         if ($image === null) {
+            PatientExam::whereKey($exam->id)->where('archive', $exam->archive)->update(['derivative_status' => 'unsupported', 'derivative_error_code' => $extension === 'pdf' ? 'pdf_renderer_unavailable' : 'format_no_derivative']);
+
             return;
         }
 
@@ -89,35 +107,52 @@ class GenerateExamDerivatives implements ShouldQueue
         $thumb   = $this->encodeJpeg($image, self::THUMB_MAX_EDGE, self::THUMB_QUALITY);
 
         if ($display === null || $thumb === null) {
-            return;
+            throw new RuntimeException('raster_encode_failed');
         }
 
         $base        = preg_replace('/\.[^.\/]+$/', '', $exam->archive);
         $displayPath = "{$base}_display.jpg";
         $thumbPath   = "{$base}_thumb.jpg";
 
-        Storage::disk('s3')->put($displayPath, $display);
-        Storage::disk('s3')->put($thumbPath, $thumb);
+        app(BoundedExamArchive::class)->putVerified($displayPath, $display);
+        app(BoundedExamArchive::class)->putVerified($thumbPath, $thumb);
 
         PatientExam::whereKey($exam->id)->where('archive', $exam->archive)->update([
-            'display_archive' => $displayPath,
-            'thumb_archive'   => $thumbPath,
+            'derivative_status' => 'ready', 'derivative_error_code' => null,
+            'display_archive'   => $displayPath,
+            'thumb_archive'     => $thumbPath,
         ]);
     }
 
     /** Decodifica jpg/png/bmp via GD, achatando transparência sobre branco. */
     private function imageFromRaster(string $raw): ?GdImage
     {
+        $dimensions = @getimagesizefromstring($raw);
+
+        if (! $dimensions || $dimensions[0] > 16000 || $dimensions[1] > 16000 || $dimensions[0] * $dimensions[1] > 40000000) {
+            throw new RuntimeException('raster_pixel_limit');
+        }
+        $pixels   = $dimensions[0] * $dimensions[1];
+        $estimate = $pixels * 16 + min($pixels, 2560 * 2560) * 4 + strlen($raw) * 2 + 16777216;
+        $budget   = app(RasterMemoryBudget::class)->available();
+
+        if ($estimate > $budget) {
+            throw new RuntimeException('raster_memory_limit');
+        }
         $image = @imagecreatefromstring($raw);
 
         if ($image === false) {
-            return null;
+            throw new RuntimeException('raster_decode_failed');
         }
 
         // PNG com alfa sobre fundo branco (laudos/plots exportados com
         // transparência ficariam pretos no JPEG).
         $flattened = imagecreatetruecolor(imagesx($image), imagesy($image));
-        $white     = imagecolorallocate($flattened, 255, 255, 255);
+
+        if ($flattened === false) {
+            throw new RuntimeException('raster_flatten_failed');
+        }
+        $white = imagecolorallocate($flattened, 255, 255, 255);
         imagefill($flattened, 0, 0, $white);
         imagecopy($flattened, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
 
@@ -130,24 +165,14 @@ class GenerateExamDerivatives implements ShouldQueue
         $tmp = tempnam(sys_get_temp_dir(), 'exam-pdf-');
 
         if ($tmp === false) {
-            return null;
+            throw new RuntimeException('pdf_temp_failed');
         }
 
         try {
             file_put_contents($tmp, $raw);
+            $bytes = app(BoundedPdfProcess::class)->run('render', $tmp);
 
-            $imagick = new Imagick();
-            $imagick->setResolution(self::PDF_RENDER_DPI, self::PDF_RENDER_DPI);
-            $imagick->readImage($tmp . '[0]');
-            $imagick->setImageBackgroundColor('white');
-            $imagick = $imagick->flattenImages();
-            $imagick->setImageFormat('jpeg');
-            $jpeg = $imagick->getImageBlob();
-            $imagick->clear();
-
-            return $this->imageFromRaster($jpeg);
-        } catch (Throwable) {
-            return null;
+            return $this->imageFromRaster($bytes);
         } finally {
             @unlink($tmp);
         }

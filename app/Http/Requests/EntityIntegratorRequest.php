@@ -2,12 +2,28 @@
 
 namespace App\Http\Requests;
 
+use App\Services\IntegratorTokenPolicy;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class EntityIntegratorRequest extends FormRequest
 {
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            if (! $this->hasAny(['update_channel', 'update_cohort'])) {
+                return;
+            }
+            $channel = $this->input('update_channel', 'stable');
+            $cohort  = $this->input('update_cohort', 'all');
+
+            if (($channel === 'pilot' && $cohort === 'all') || ($channel === 'stable' && $cohort !== 'all')) {
+                $validator->errors()->add('update_cohort', 'Piloto exige coorte específica; estável exige all.');
+            }
+        });
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -24,7 +40,10 @@ class EntityIntegratorRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'name' => [
+            'token_profile'  => ['sometimes', Rule::in(array_keys(IntegratorTokenPolicy::PROFILES))],
+            'update_channel' => ['sometimes', Rule::in(['pilot', 'stable'])],
+            'update_cohort'  => ['sometimes', 'string', 'regex:/^[a-z0-9][a-z0-9_-]{0,63}$/'],
+            'name'           => [
                 'required',
                 'string',
                 'max:255',

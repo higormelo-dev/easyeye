@@ -53,29 +53,31 @@ it('publishes an installer and deactivates previous builds of the same target', 
         'sha256'  => str_repeat('cd', 32), 'signature' => validSignature(), 'active' => true,
     ]);
 
-    $file      = UploadedFile::fake()->create('EasyEye-Integrator-0.2.0-x86.msi', 512);
+    $file      = UploadedFile::fake()->createWithContent('EasyEye-Integrator-0.2.0-x86.msi', 'synthetic installer bytes');
     $digest    = hash_file('sha256', $file->getRealPath(), true);
     $signature = base64_encode(sodium_crypto_sign_detached($digest, $secretKey));
 
+    $fixture = p2ManifestFixture($file->getRealPath(), '0.2.0', 'windows', 'x86', $secretKey);
     storeUpdate([
         'version'   => '0.2.0',
         'platform'  => 'windows',
         'arch'      => 'x86',
         'signature' => $signature,
+        'metadata'  => json_encode($fixture['metadata']), 'manifest_signature' => $fixture['manifestSignature'],
     ], $file);
 
     $published = IntegratorUpdate::where('version', '0.2.0')->first();
     expect($published)->not->toBeNull()
         ->and($published->active)->toBeTrue()
-        ->and($published->archive)->toBe('integrator-updates/0.2.0/EasyEye-Integrator-0.2.0-x86.msi')
+        ->and($published->archive)->toBe('integrator-updates/windows/x86/0.2.0/' . hash_file('sha256', $file->getRealPath()) . '/EasyEye-Integrator-0.2.0-x86.msi')
         ->and(strlen($published->sha256))->toBe(64)
         ->and(IntegratorUpdate::where('version', '0.1.0')->first()->active)->toBeFalse();
 
-    Storage::disk('s3')->assertExists('integrator-updates/0.2.0/EasyEye-Integrator-0.2.0-x86.msi');
+    Storage::disk('s3')->assertExists($published->archive);
 });
 
 it('rejects a malformed signature without storing anything', function () {
-    $file = UploadedFile::fake()->create('EasyEye-Integrator-0.2.0-x86.msi', 512);
+    $file = UploadedFile::fake()->createWithContent('EasyEye-Integrator-0.2.0-x86.msi', 'synthetic installer bytes');
 
     storeUpdate([
         'version'   => '0.2.0',

@@ -4,12 +4,13 @@ namespace App\Http\Resources\Api;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 
 /**
- * @property string $id
- * @property string $type
+ * @property string               $id
+ * @property string               $type
  * @property array<string, mixed> $payload
- * @property \Illuminate\Support\Carbon $created_at
+ * @property Carbon               $created_at
  */
 class IntegratorCommandResource extends JsonResource
 {
@@ -27,6 +28,7 @@ class IntegratorCommandResource extends JsonResource
             'attributes' => [
                 'type'       => $this->type,
                 'payload'    => $this->payload,
+                'expires_at' => $this->expires_at?->toIso8601String() ?? $this->created_at?->copy()->addHour()->toIso8601String(),
                 'created_at' => $this->created_at->toIso8601String(),
             ],
         ];
