@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator, IntegratorQueueHealth, IntegratorQueueHealthHistory, User};
+use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator, IntegratorQueueHealth, IntegratorQueueHealthHistory, User};
 
 beforeEach(function () {
     $this->saas  = Entity::factory()->create(['is_client' => false, 'active' => true]);
@@ -85,6 +85,26 @@ it('returns the recent history trend, most recent first', function () {
             ->component('Panel/Manager/EntityIntegratorQueueHealth/Index')
             ->where('history.0.pending_count', 5)
             ->where('history.1.pending_count', 1));
+});
+
+it('maps operational device identities only within the selected integrator', function () {
+    [$entity, $userIntegrator, $integrator] = makeClientChain();
+    [, , $other]                            = makeClientChain();
+    $owned                                  = EntityIntegratorEquipment::factory()->create(['integrator_id' => $integrator->id]);
+    $foreign                                = EntityIntegratorEquipment::factory()->create(['integrator_id' => $other->id]);
+    IntegratorQueueHealth::create([
+        'integrator_id'       => $integrator->id, 'pending_count' => 0, 'failed_count' => 0, 'blocked_count' => 0,
+        'sent_last_24h_count' => 0, 'problems' => [], 'synced_at' => now(),
+        'operational'         => ['devices' => [
+            ['equipment_id' => 1, 'remote_equipment_id' => $owned->id],
+            ['equipment_id' => 2, 'remote_equipment_id' => $foreign->id],
+        ]],
+    ]);
+    $url = route('manager.entities.user-integrators.integrators.queue-health', [$entity->id, $userIntegrator->id, $integrator->id]);
+    $this->actingAs($this->admin)->withSession(queueHealthAdminSession($this->saas))->get($url)->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Panel/Manager/EntityIntegratorQueueHealth/Index')
+            ->has('equipmentNames', 1)->where('equipmentNames.' . $owned->id . '.name', $owned->name)
+            ->missing('equipmentNames.' . $foreign->id));
 });
 
 it('never mixes another integrator\'s history into this one\'s trend', function () {

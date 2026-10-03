@@ -40,8 +40,9 @@ class IntegratorQueueHealthController extends Controller
                 ['integrator_id' => $integrator->id],
                 [
                     ...$counts,
-                    'problems'  => $request->input('problems'),
-                    'synced_at' => $synced_at,
+                    'problems'    => $request->input('problems'),
+                    'operational' => $request->validated('operational'),
+                    'synced_at'   => $synced_at,
                 ],
             );
 

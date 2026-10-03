@@ -14,10 +14,10 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '3',
         ]);
-        $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient  = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $this->examType = ExamType::factory()->create(['entity_id' => null]);
 
-        $schedCtx       = createScheduleForEntity($this->ctx['entity']);
+        $schedCtx       = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $this->patient->id]);
         $this->schedule = $schedCtx['schedule'];
     });
 
@@ -35,7 +35,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Bloqueado',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertForbidden()->assertJsonStructure(['message', 'feature']);
     });
 
@@ -49,7 +49,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
                     'archive'             => UploadedFile::fake()->image("e{$i}.jpg"),
                     'name'                => "Exame Store {$i}",
                 ],
-                $this->ctx['headers']
+                $this->ctx['headers'],
             )->assertCreated();
         }
 
@@ -78,7 +78,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
                 'archive'             => UploadedFile::fake()->image('new.jpg'),
                 'name'                => 'Exame Para Atualizar',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertForbidden();
     });
 
@@ -97,7 +97,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
                 'archive'             => UploadedFile::fake()->image('updated.jpg'),
                 'name'                => 'Exame Atualizado',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         $status = app(FeatureGateService::class)
@@ -116,7 +116,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
                 'archive'             => UploadedFile::fake()->image('e1.jpg'),
                 'name'                => 'Exame Compartilhado',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated();
 
         $exam = PatientExam::where('name', 'Exame Compartilhado')->first();
@@ -130,7 +130,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
                 'archive'             => UploadedFile::fake()->image('e1_v2.jpg'),
                 'name'                => 'Exame Compartilhado',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         // 3ª operação usa o último crédito
@@ -142,7 +142,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
                 'archive'             => UploadedFile::fake()->image('e2.jpg'),
                 'name'                => 'Exame 3',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated();
 
         // 4ª operação → limite esgotado
@@ -154,7 +154,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
                 'archive'             => UploadedFile::fake()->image('e3.jpg'),
                 'name'                => 'Exame 4',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertForbidden();
     });
 });

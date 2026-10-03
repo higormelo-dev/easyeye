@@ -10,11 +10,14 @@ import PageHeader from '@/Components/Panel/PageHeader.vue';
  * vivo — é o último retrato que o integrador sincronizou (ver aviso de
  * "sincronizado há Xmin" abaixo).
  */
+defineOptions({ name: 'EntityIntegratorQueueHealthIndex' });
+
 const props = defineProps({
     entity: { type: Object, required: true },
     userIntegrator: { type: Object, required: true },
     integrator: { type: Object, required: true },
     health: { type: Object, default: null },
+    equipmentNames: { type: Object, default: () => ({}) },
     // Últimos pontos do log de tendência (integrator_queue_health_history,
     // retido 7 dias no banco — aqui só os mais recentes, ver
     // HISTORY_LIMIT no controller). Mais recente primeiro.
@@ -60,6 +63,55 @@ const minutesSinceSync = computed(() => {
 });
 
 const isStale = computed(() => minutesSinceSync.value !== null && minutesSinceSync.value > STALE_AFTER_MINUTES);
+const operational = computed(() => props.health?.operational ?? null);
+const captureNeedsAttention = computed(
+    () =>
+        operational.value &&
+        (operational.value.ingest_pending > 0 ||
+            operational.value.quarantined > 0 ||
+            operational.value.acquisition_rejected > 0 ||
+            operational.value.unconfirmed_sent > 0 ||
+            operational.value.originals_pending_remote_archive > 0),
+);
+
+function issueLabel(issue) {
+    return (
+        {
+            dicom_invalid_or_unavailable: 'Verificar arquivo DICOM e disponibilidade do aparelho.',
+            source_or_spool_unavailable: 'Verificar pasta de origem, espaço e permissões de gravação.',
+            upload_size_exceeded: 'Original excede o limite de envio; revisão necessária.',
+            unsupported_file_type: 'Formato do arquivo requer revisão.',
+        }[issue] ?? 'Nenhuma recusa registrada.'
+    );
+}
+
+function observedLabel(value) {
+    if (!value) return 'Sem observação registrada';
+    const timestamp = value.replace(' ', 'T');
+    return new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(timestamp) ? timestamp : `${timestamp}Z`).toLocaleString();
+}
+
+function runtimeStateLabel(state) {
+    return (
+        { active: 'Ativo conforme última observação', inactive: 'Inativo conforme última observação' }[state] ??
+        'Desconhecido'
+    );
+}
+
+function deviceLabel(device) {
+    const remote = props.equipmentNames[device.remote_equipment_id];
+    return remote
+        ? `${remote.name} (${remote.code}) — aparelho local #${device.equipment_id}`
+        : `Aparelho local #${device.equipment_id}`;
+}
+
+const capabilityLabels = {
+    folder_capture: 'Captura de pastas',
+    dicom_storage: 'Recepção DICOM',
+    dicom_mwl: 'Worklist DICOM',
+    ocr: 'OCR',
+    rpa: 'Automação RPA',
+};
 
 function syncedLabel() {
     if (minutesSinceSync.value === null) return '';
@@ -165,15 +217,79 @@ function statusLabel(status) {
                     </div>
                 </div>
 
+                <div v-if="operational" class="card mb-3" data-testid="capture-health">
+                    <div class="card-header fw-medium">Captura e confirmação dos exames</div>
+                    <div class="card-body">
+                        <p class="small mb-2">
+                            Versão: {{ operational.version ?? 'não informada' }}. Último contato informado:
+                            {{ observedLabel(operational.heartbeat_at) }}.
+                        </p>
+                        <p class="small mb-2">
+                            Monitor de pastas: {{ runtimeStateLabel(operational.watcher_state) }}. Worklist:
+                            {{ runtimeStateLabel(operational.mwl_state) }}.
+                        </p>
+                        <p v-if="operational.capabilities" class="small mb-2">
+                            Recursos disponíveis nesta versão:
+                            <span v-for="(label, key) in capabilityLabels" :key="key" class="me-2">
+                                {{ label }}:
+                                {{ operational.capabilities[key] === true ? 'disponível' : 'indisponível' }}.
+                            </span>
+                            A disponibilidade e o contato não comprovam que os processos estão ativos.
+                        </p>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3">
+                                Aguardando gravação: <strong>{{ operational.ingest_pending }}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                Em quarentena: <strong>{{ operational.quarantined }}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                Recusas antes da fila: <strong>{{ operational.acquisition_rejected }}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                Sem recibo remoto: <strong>{{ operational.unconfirmed_sent ?? 0 }}</strong>
+                            </div>
+                            <div class="col-md-3">
+                                Originais locais sem arquivamento remoto:
+                                <strong>{{ operational.originals_pending_remote_archive ?? 0 }}</strong>
+                            </div>
+                        </div>
+                        <p v-if="captureNeedsAttention" class="alert alert-warning mb-2">
+                            Próxima ação: {{ operational.next_action }}.
+                        </p>
+                        <p class="text-muted small mb-2">
+                            Mais antigo pendente: {{ observedLabel(operational.oldest_pending_at) }}. Espaço livre:
+                            {{
+                                operational.disk_free_bytes === null
+                                    ? 'não informado'
+                                    : `${Math.floor(operational.disk_free_bytes / 1048576)} MiB`
+                            }}.
+                        </p>
+                        <div
+                            v-for="device in operational.devices"
+                            :key="device.equipment_id"
+                            class="small border-top py-2"
+                        >
+                            {{ deviceLabel(device) }} — observado {{ observedLabel(device.last_observed_at) }}; aceito
+                            {{ observedLabel(device.last_accepted_at) }}; recusas {{ device.rejected_count }}.
+                            <span v-if="device.issue" class="text-warning">{{ issueLabel(device.issue) }}</span>
+                        </div>
+                        <p class="text-muted small mb-0">
+                            Ausência de eventos não comprova que o aparelho deixou de produzir exames. Confira a última
+                            captura esperada.
+                        </p>
+                    </div>
+                </div>
+
                 <div
-                    v-if="health.blocked_count === 0 && health.failed_count === 0"
+                    v-if="health.blocked_count === 0 && health.failed_count === 0 && !captureNeedsAttention"
                     class="alert alert-success d-flex align-items-center"
                 >
                     <i class="ti ti-circle-check me-2 fs-5"></i>
-                    <span>Nada bloqueado ou com falha no último retrato — fila saudável.</span>
+                    <span>Fila de envios sem bloqueios ou falhas no último retrato.</span>
                 </div>
 
-                <div v-else class="card">
+                <div v-if="health.blocked_count > 0 || health.failed_count > 0" class="card">
                     <div class="card-header fw-medium">
                         Itens com problema
                         <span class="text-muted fw-normal small">

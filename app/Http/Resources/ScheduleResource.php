@@ -18,6 +18,13 @@ class ScheduleResource extends JsonResource
             'type'       => 'schedule',
             'id'         => $this->id,
             'attributes' => [
+                'clinic_resource_ids' => $this->resources->pluck('id')->all(),
+                'patient_birth_date'  => $this->patient?->person?->birth_date?->format('Y-m-d'),
+                'patient_sex'         => match ((string) ($this->patient?->person?->gender ?? '')) {
+                    '0' => 'F', '1' => 'M', default => null,
+                },
+                'local_date_time'    => $this->date_time?->copy()->setTimezone(config('app.timezone'))->toIso8601String(),
+                'fulfillment'        => 'unknown',
                 'entity_id'          => $this->entity_id,
                 'doctor_id'          => $this->doctor_id,
                 'patient_id'         => $this->patient_id,

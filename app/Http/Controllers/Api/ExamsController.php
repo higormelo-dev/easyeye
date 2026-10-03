@@ -10,7 +10,7 @@ use App\Models\PatientExam;
 use App\Services\Api\PatientExamService;
 use App\Services\FeatureGateService;
 use Illuminate\Http\JsonResponse;
-use Throwable;
+use Illuminate\Support\Facades\DB;
 
 class ExamsController extends Controller
 {
@@ -35,16 +35,11 @@ class ExamsController extends Controller
         $integrator = request()->attributes->get('integrator');
         $entityId   = $integrator->user->entity_id;
 
-        // Reserva atômica da cota ANTES de criar; reverte se a criação falhar.
-        $this->featureGate->consumeOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
+        $record = DB::transaction(function () use ($entityId, $request) {
+            $this->featureGate->consumeOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
-        try {
-            $record = $this->service->createFromScheduleIdentifier($request);
-        } catch (Throwable $e) {
-            $this->featureGate->decrement($entityId, FeatureKey::ApiMonthlyExamSends);
-
-            throw $e;
-        }
+            return $this->service->createFromScheduleIdentifier($request);
+        });
 
         return (new PatientExamResource($record))->response()->setStatusCode(201);
     }

@@ -4,7 +4,7 @@ use App\Enums\{DataAccessPurpose, FeatureKey};
 use App\Models\{DataAccessLog, ExamType, Patient, PatientExam};
 use App\Services\FeatureGateService;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\{Cache, Storage};
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\PersonalAccessToken;
 
 /**
@@ -44,9 +44,9 @@ function writeCtx(): array
         FeatureKey::ApiMonthlyExamSends->value => '50',
     ]);
 
-    $ctx['patient']  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+    $ctx['patient']  = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
     $ctx['examType'] = ExamType::factory()->create(['entity_id' => null]);
-    $ctx['schedule'] = createScheduleForEntity($ctx['entity'])['schedule'];
+    $ctx['schedule'] = createScheduleForEntity($ctx['entity'], ['patient_id' => $ctx['patient']->id])['schedule'];
 
     return $ctx;
 }
@@ -338,22 +338,20 @@ describe('idempotência', function () {
         $key  = 'concurrent-key-0001';
         $path = "api/integrators/v1/patients/{$ctx['patient']->id}/exams";
 
-        // Simula a 1ª requisição já ter adquirido o lock (ver ApiIdempotency::handle):
-        // uma 2ª chegando enquanto o lock está preso deve receber 409.
-        $cacheKey = 'idem:' . hash('sha256', $ctx['integrator']->id . '|POST|' . $path . '|' . $key);
-        $lock     = Cache::lock($cacheKey . ':lock', 30);
-        expect($lock->get())->toBeTrue();
+        $scope = hash('sha256', implode('|', [$ctx['entity']->id, $ctx['integrator']->id, 'POST', $path, $key]));
+        $parts = unpack('Nfirst/Nsecond', hex2bin(substr($scope, 0, 16)));
+        $a     = $parts['first'] > 0x7FFFFFFF ? $parts['first'] - 0x100000000 : $parts['first'];
+        $b     = $parts['second'] > 0x7FFFFFFF ? $parts['second'] - 0x100000000 : $parts['second'];
+        $pdo   = new PDO('pgsql:host=' . env('DB_HOST') . ';port=' . env('DB_PORT') . ';dbname=' . env('DB_DATABASE'), env('DB_USERNAME'), env('DB_PASSWORD'));
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('select pg_advisory_xact_lock(?, ?)');
+        $stmt->execute([$a, $b]);
 
         try {
-            $this->postJson(
-                '/' . $path,
-                examPayload($ctx, 'Exame Concorrente'),
-                $ctx['headers'] + ['Idempotency-Key' => $key],
-            )->assertStatus(409);
-
+            $this->postJson('/' . $path, examPayload($ctx, 'Exame Concorrente'), $ctx['headers'] + ['Idempotency-Key' => $key])->assertStatus(409)->assertJsonPath('code', 'idempotency_in_progress');
             expect(PatientExam::where('name', 'Exame Concorrente')->exists())->toBeFalse();
         } finally {
-            $lock->release();
+            $pdo->rollBack();
         }
     });
 });
@@ -364,7 +362,7 @@ describe('idempotência', function () {
 describe('log de acesso LGPD', function () {
     it('registra acesso ao listar exames do paciente', function () {
         $ctx     = setupIntegrator();
-        $patient = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
         PatientExam::factory(2)->create(['patient_id' => $patient->id]);
 
         $this->getJson("/api/integrators/v1/patients/{$patient->id}/exams", $ctx['headers'])
@@ -380,7 +378,7 @@ describe('log de acesso LGPD', function () {
 
     it('registra acesso ao consultar um paciente específico', function () {
         $ctx     = setupIntegrator();
-        $patient = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
 
         $this->getJson("/api/integrators/v1/patients/{$patient->id}", $ctx['headers'])
             ->assertOk();

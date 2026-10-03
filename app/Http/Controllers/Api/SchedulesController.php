@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ScheduleResource;
 use App\Models\Schedule;
+use App\Support\IntegratorClinicalIdentifier;
 use Carbon\Carbon;
 use Closure;
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
@@ -32,7 +33,7 @@ class SchedulesController extends Controller
         $search     = request()->string('search')->trim()->value();
 
         $schedules = $this->model->query()
-            ->with(['doctor', 'patient', 'covenant', 'visitType'])
+            ->with(['doctor', 'patient.person', 'resources', 'covenant', 'visitType'])
             ->where('entity_id', $integrator->user->entity_id);
 
         // Escopo opcional a um recurso de agenda específico (ex.: o
@@ -136,11 +137,14 @@ class SchedulesController extends Controller
         // Nunca devolve uma linha arbitrária: se o identificador casar com mais
         // de um agendamento (número = SDL-N de um e import_code de outro, ou
         // código duplicado), responde 409 e o desktop deve usar o UUID.
-        $matches = Schedule::identifierMatches(
+        $matches = IntegratorClinicalIdentifier::matches(
+            Schedule::class,
             (string) $integrator->user->entity_id,
             $idOrCode,
-            ['doctor', 'patient', 'covenant', 'visitType'],
+            'SDL',
+            request()->query('identifier_namespace'),
         );
+        $matches->load(['doctor', 'patient.person', 'resources', 'covenant', 'visitType']);
 
         if ($matches->isEmpty()) {
             throw (new ModelNotFoundException())->setModel(Schedule::class, [$idOrCode]);

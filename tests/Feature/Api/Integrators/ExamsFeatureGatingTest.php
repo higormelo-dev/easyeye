@@ -2,6 +2,7 @@
 
 use App\Enums\FeatureKey;
 use App\Models\{ExamType, Patient};
+use App\Services\FeatureGateService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -12,7 +13,7 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
 
     it('permite envio quando limite não está configurado no plano (ilimitado)', function () {
         $ctx      = setupIntegrator([FeatureKey::HasApiIntegrator->value => '1']);
-        $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+        $patient  = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
         $examType = ExamType::factory()->create(['entity_id' => null]);
         $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
 
@@ -29,7 +30,7 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '0',
         ]);
-        $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+        $patient  = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
         $examType = ExamType::factory()->create(['entity_id' => null]);
         $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
 
@@ -46,7 +47,7 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '2',
         ]);
-        $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+        $patient  = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
         $examType = ExamType::factory()->create(['entity_id' => null]);
         $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
 
@@ -74,7 +75,7 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '5',
         ]);
-        $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+        $patient  = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
         $examType = ExamType::factory()->create(['entity_id' => null]);
         $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
 
@@ -87,7 +88,7 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
             ], $ctx['headers'])->assertCreated();
         }
 
-        $gate   = app(\App\Services\FeatureGateService::class);
+        $gate   = app(FeatureGateService::class);
         $status = $gate->status($ctx['entity']->id, FeatureKey::ApiMonthlyExamSends);
 
         expect($status->used)->toBe(3);

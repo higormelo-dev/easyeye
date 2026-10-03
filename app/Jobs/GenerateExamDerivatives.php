@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\PatientExam;
+use GdImage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
 use Illuminate\Support\Facades\Storage;
+use Imagick;
+use Throwable;
 
 /**
  * Gera os derivados de visualização de um exame recém-enviado:
@@ -35,12 +37,16 @@ class GenerateExamDerivatives implements ShouldQueue
     use SerializesModels;
 
     private const DISPLAY_MAX_EDGE = 2560;
+
     private const DISPLAY_QUALITY = 85;
+
     private const THUMB_MAX_EDGE = 400;
+
     private const THUMB_QUALITY = 75;
+
     private const PDF_RENDER_DPI = 200;
 
-    public function __construct(public string $patientExamId)
+    public function __construct(public string $patientExamId, public ?string $expectedArchive = null)
     {
     }
 
@@ -48,7 +54,7 @@ class GenerateExamDerivatives implements ShouldQueue
     {
         try {
             $this->generate();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             report($e);
         }
     }
@@ -57,7 +63,7 @@ class GenerateExamDerivatives implements ShouldQueue
     {
         $exam = PatientExam::query()->find($this->patientExamId);
 
-        if ($exam === null || ! $exam->archive) {
+        if ($exam === null || ! $exam->archive || ($this->expectedArchive !== null && $exam->archive !== $this->expectedArchive)) {
             return;
         }
 
@@ -71,8 +77,8 @@ class GenerateExamDerivatives implements ShouldQueue
 
         $image = match (true) {
             in_array($extension, ['jpg', 'jpeg', 'png', 'bmp'], true) => $this->imageFromRaster($raw),
-            $extension === 'pdf' && extension_loaded('imagick') => $this->imageFromPdf($raw),
-            default => null,
+            $extension === 'pdf' && extension_loaded('imagick')       => $this->imageFromPdf($raw),
+            default                                                   => null,
         };
 
         if ($image === null) {
@@ -80,27 +86,27 @@ class GenerateExamDerivatives implements ShouldQueue
         }
 
         $display = $this->encodeJpeg($image, self::DISPLAY_MAX_EDGE, self::DISPLAY_QUALITY);
-        $thumb = $this->encodeJpeg($image, self::THUMB_MAX_EDGE, self::THUMB_QUALITY);
+        $thumb   = $this->encodeJpeg($image, self::THUMB_MAX_EDGE, self::THUMB_QUALITY);
 
         if ($display === null || $thumb === null) {
             return;
         }
 
-        $base = preg_replace('/\.[^.\/]+$/', '', $exam->archive);
+        $base        = preg_replace('/\.[^.\/]+$/', '', $exam->archive);
         $displayPath = "{$base}_display.jpg";
-        $thumbPath = "{$base}_thumb.jpg";
+        $thumbPath   = "{$base}_thumb.jpg";
 
         Storage::disk('s3')->put($displayPath, $display);
         Storage::disk('s3')->put($thumbPath, $thumb);
 
-        $exam->forceFill([
+        PatientExam::whereKey($exam->id)->where('archive', $exam->archive)->update([
             'display_archive' => $displayPath,
-            'thumb_archive' => $thumbPath,
-        ])->save();
+            'thumb_archive'   => $thumbPath,
+        ]);
     }
 
     /** Decodifica jpg/png/bmp via GD, achatando transparência sobre branco. */
-    private function imageFromRaster(string $raw): ?\GdImage
+    private function imageFromRaster(string $raw): ?GdImage
     {
         $image = @imagecreatefromstring($raw);
 
@@ -111,7 +117,7 @@ class GenerateExamDerivatives implements ShouldQueue
         // PNG com alfa sobre fundo branco (laudos/plots exportados com
         // transparência ficariam pretos no JPEG).
         $flattened = imagecreatetruecolor(imagesx($image), imagesy($image));
-        $white = imagecolorallocate($flattened, 255, 255, 255);
+        $white     = imagecolorallocate($flattened, 255, 255, 255);
         imagefill($flattened, 0, 0, $white);
         imagecopy($flattened, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
 
@@ -119,7 +125,7 @@ class GenerateExamDerivatives implements ShouldQueue
     }
 
     /** Rasteriza a 1ª página de um PDF via Imagick (requer Ghostscript). */
-    private function imageFromPdf(string $raw): ?\GdImage
+    private function imageFromPdf(string $raw): ?GdImage
     {
         $tmp = tempnam(sys_get_temp_dir(), 'exam-pdf-');
 
@@ -130,7 +136,7 @@ class GenerateExamDerivatives implements ShouldQueue
         try {
             file_put_contents($tmp, $raw);
 
-            $imagick = new \Imagick();
+            $imagick = new Imagick();
             $imagick->setResolution(self::PDF_RENDER_DPI, self::PDF_RENDER_DPI);
             $imagick->readImage($tmp . '[0]');
             $imagick->setImageBackgroundColor('white');
@@ -140,7 +146,7 @@ class GenerateExamDerivatives implements ShouldQueue
             $imagick->clear();
 
             return $this->imageFromRaster($jpeg);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         } finally {
             @unlink($tmp);
@@ -148,13 +154,14 @@ class GenerateExamDerivatives implements ShouldQueue
     }
 
     /** Reduz (nunca amplia) para o lado maior indicado e codifica JPEG. */
-    private function encodeJpeg(\GdImage $image, int $maxEdge, int $quality): ?string
+    private function encodeJpeg(GdImage $image, int $maxEdge, int $quality): ?string
     {
-        $width = imagesx($image);
+        $width  = imagesx($image);
         $height = imagesy($image);
-        $edge = max($width, $height);
+        $edge   = max($width, $height);
 
         $scaled = $image;
+
         if ($edge > $maxEdge) {
             $targetWidth = $width >= $height
                 ? $maxEdge
@@ -167,7 +174,7 @@ class GenerateExamDerivatives implements ShouldQueue
         }
 
         ob_start();
-        $ok = imagejpeg($scaled, null, $quality);
+        $ok   = imagejpeg($scaled, null, $quality);
         $jpeg = ob_get_clean();
 
         return $ok && $jpeg !== false ? $jpeg : null;

@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\{Builder, Collection};
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\{Carbon, Str};
 use Illuminate\Support\Facades\Storage;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -81,12 +81,13 @@ class EyeImagesController extends Controller
                 'id'   => (string) $d->id,
                 'name' => $d->person?->full_name,
             ]),
-            'patients'    => $this->serializePatients($paginator->getCollection()),
-            'meta'        => $this->paginatorMeta($paginator),
-            'total_exams' => $this->countFilteredExams($entityId, $filters),
-            'filters'     => $filters->toArray(),
-            'exam_types'  => $this->availableExamTypes($entityId),
-            'equipments'  => $this->availableEquipments($entityId),
+            'patients'     => $this->serializePatients($paginator->getCollection()),
+            'reviewTarget' => $this->reviewTarget($request, $entityId),
+            'meta'         => $this->paginatorMeta($paginator),
+            'total_exams'  => $this->countFilteredExams($entityId, $filters),
+            'filters'      => $filters->toArray(),
+            'exam_types'   => $this->availableExamTypes($entityId),
+            'equipments'   => $this->availableEquipments($entityId),
             // Laudo manual e diagnóstico de exame são atos clínicos exclusivos
             // do médico (CFM Res. 2.227/2018 — mesmo Gate IssueReport checado
             // no EyeImageReportController). A UI usa isso pra esconder os
@@ -338,6 +339,24 @@ class EyeImagesController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
+    private function reviewTarget(Request $request, string $entityId): ?array
+    {
+        if (! $request->hasAny(['patient_id', 'exam_id'])) {
+            return null;
+        }
+        $patientId = $request->query('patient_id');
+        $examId    = $request->query('exam_id');
+        abort_unless(is_string($patientId) && is_string($examId) && Str::isUuid($patientId) && Str::isUuid($examId), 404);
+        $patient = Patient::where('entity_id', $entityId)->whereKey($patientId)
+            ->whereHas('exams', fn ($q) => $q->whereKey($examId))
+            ->with(['person', 'exams' => fn ($q) => $q->whereKey($examId)->with([
+                'examType', 'doctor.person', 'equipment',
+                'aiRuns' => fn ($r) => $r->orderByDesc('ai_runs.created_at')->with('documentation:id,ai_run_id,medical_record_id'),
+            ])])->firstOrFail();
+
+        return ['patient' => $this->serializePatients(new Collection([$patient]))[0], 'exam_id' => $examId];
+    }
 
     private function serializePatients(Collection $patients): array
     {

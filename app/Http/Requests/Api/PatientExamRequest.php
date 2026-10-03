@@ -3,13 +3,16 @@
 namespace App\Http\Requests\Api;
 
 use App\Models\EntityIntegratorEquipment;
-use App\Models\{ExamType, PatientExam, Schedule};
+use App\Models\{ExamType, Schedule};
+use App\Support\IntegratorClinicalIdentifier;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 
 class PatientExamRequest extends FormRequest
 {
+    use ValidatesIntegratorCapture;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -29,6 +32,7 @@ class PatientExamRequest extends FormRequest
         $entityId   = $integrator->user->entity_id;
 
         return [
+            ...$this->captureRules(),
             // Defesa em profundidade: patient_id é sempre derivado do segmento
             // de rota, nunca do body. Rejeita explicitamente em vez de apenas
             // ignorar, para não mascarar um client tentando reatribuir o exame.
@@ -36,6 +40,13 @@ class PatientExamRequest extends FormRequest
             'exam_identifier' => [
                 'required',
                 function ($attribute, $value, $fail) use ($entityId) {
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
+
+                        return;
+                    }
+                    $value = (string) $value;
+
                     if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
                         $fail(trans('validation.uuid', ['attribute' => $attribute]));
 
@@ -85,7 +96,7 @@ class PatientExamRequest extends FormRequest
                     // UUID, SDL-N, número puro ou import_code. Identificador que casa com
                     // MAIS DE UM agendamento é recusado — o exame herdaria paciente e
                     // médico de um agendamento arbitrário.
-                    $matches = Schedule::identifierMatches((string) $entityId, (string) $value);
+                    $matches = IntegratorClinicalIdentifier::matches(Schedule::class, (string) $entityId, (string) $value, 'SDL', $this->input('schedule_identifier_namespace'));
 
                     if ($matches->isEmpty()) {
                         $fail(__('validation.custom.validation_invalid.not_schedule_identifier'));
@@ -94,45 +105,11 @@ class PatientExamRequest extends FormRequest
                     }
                 },
             ],
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                'min:3',
-                function ($attribute, $value, $fail) use ($entityId) {
-                    // Ignorar se name for vazio
-                    if ($value === null || $value === '') {
-                        return;
-                    }
-
-                    // name é único por entidade — mesma lógica da service (busca só por name)
-                    $existsQuery = PatientExam::query()
-                        ->whereHas('patient', function ($query) use ($entityId) {
-                            $query->where('entity_id', $entityId)
-                                ->whereNull('deleted_at');
-                        })
-                        ->whereRaw('LOWER(name) = LOWER(?)', [$value]);
-
-                    // Se estiver atualizando, ignorar o registro atual
-                    // O parâmetro de rota é {exam} (apiResource e rota POST customizada)
-                    $examParam = $this->route('exam');
-
-                    if ($examParam) {
-                        [$ignoreCol, $ignoreVal] = match (true) {
-                            Str::isUuid((string) $examParam) => ['id', $examParam],
-                            ctype_digit((string) $examParam) => ['code', sprintf('EXM-%010d', (int) $examParam)],
-                            default                          => ['code', $examParam],
-                        };
-                        $existsQuery->where($ignoreCol, '!=', $ignoreVal);
-                    }
-
-                    if ($existsQuery->exists()) {
-                        $fail(__('validation.custom.validation_unique.name_combination'));
-                    }
-                },
-            ],
+            'name'                 => ['required', 'string', 'max:255', 'min:3'],
             'archive'              => 'required|file|mimes:jpg,jpeg,png,emr|max:10240',
             'laterality'           => ['nullable', 'integer', 'in:0,1,2'],
+            'exam_performed_at'    => ['nullable', 'date'],
+            'observation'          => ['nullable', 'string', 'max:1000'],
             'equipment_identifier' => [
                 'nullable',
                 function ($attribute, $value, $fail) use ($integrator) {

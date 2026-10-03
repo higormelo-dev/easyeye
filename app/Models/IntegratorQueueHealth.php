@@ -25,14 +25,16 @@ class IntegratorQueueHealth extends Model
         'blocked_count',
         'sent_last_24h_count',
         'problems',
+        'operational',
         'synced_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'problems'  => 'array',
-            'synced_at' => 'datetime',
+            'problems'    => 'array',
+            'operational' => 'array',
+            'synced_at'   => 'datetime',
         ];
     }
 

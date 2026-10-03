@@ -53,7 +53,7 @@ describe('equipment_identifier no envio de exame', function () {
 
         $this->ctx      = setupIntegrator();
         $this->second   = eiqSecondIntegrator($this->ctx);
-        $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient  = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $this->examType = ExamType::factory()->create(['entity_id' => null]);
         $this->schedule = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $this->patient->id])['schedule'];
 

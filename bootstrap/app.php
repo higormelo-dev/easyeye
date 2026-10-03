@@ -156,6 +156,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (ValidationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
+                if ($e->response !== null) {
+                    return $e->response;
+                }
+
                 return response()->json([
                     'message' => __('validation.custom.validation_invalid.default_message'),
                     'errors'  => $e->errors(),

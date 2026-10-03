@@ -11,9 +11,9 @@ use App\Services\Api\PatientExamService;
 use App\Services\FeatureGateService;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
-use Throwable;
 
 class PatientExamsController extends Controller
 {
@@ -102,16 +102,11 @@ class PatientExamsController extends Controller
             404,
         );
 
-        // Reserva atômica da cota ANTES de criar; reverte se a criação falhar.
-        $this->featureGate->consumeOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
+        $record = DB::transaction(function () use ($entityId, $request, $patientId) {
+            $this->featureGate->consumeOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
-        try {
-            $record = $this->service->create($request, $patientId);
-        } catch (Throwable $e) {
-            $this->featureGate->decrement($entityId, FeatureKey::ApiMonthlyExamSends);
-
-            throw $e;
-        }
+            return $this->service->create($request, $patientId);
+        });
 
         return (new PatientExamResource($record))->response()->setStatusCode(201);
     }
@@ -152,16 +147,11 @@ class PatientExamsController extends Controller
 
         $record = $this->service->findByIdOrCode($patientId, $idOrCode);
 
-        // Reserva atômica da cota ANTES de atualizar; reverte se a atualização falhar.
-        $this->featureGate->consumeOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
+        $updatedRecord = DB::transaction(function () use ($entityId, $request, $record) {
+            $this->featureGate->consumeOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
-        try {
-            $updatedRecord = $this->service->update($record, $request);
-        } catch (Throwable $e) {
-            $this->featureGate->decrement($entityId, FeatureKey::ApiMonthlyExamSends);
-
-            throw $e;
-        }
+            return $this->service->update($record, $request);
+        });
 
         return new PatientExamResource($updatedRecord);
     }
@@ -182,26 +172,9 @@ class PatientExamsController extends Controller
 
     private function resolvePatient(string $idOrCode, string $entityId): Patient
     {
-        $query = Patient::where('entity_id', $entityId);
+        $patient = $this->service->patientFindByIdOrCode($idOrCode, $entityId);
+        abort_unless($patient !== null, 404);
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } elseif (ctype_digit($idOrCode)) {
-            // Número puro: pode ser o código interno (PAC-0000000042) OU o
-            // código do sistema anterior do integrador (import_code costuma
-            // ser só numérico em sistemas legados) — tenta os dois.
-            $formattedCode = sprintf('PAC-%010d', (int) $idOrCode);
-            $query->where(function ($q) use ($formattedCode, $idOrCode) {
-                $q->where('code', $formattedCode)
-                    ->orWhere('import_code', $idOrCode);
-            });
-        } else {
-            $query->where(function ($q) use ($idOrCode) {
-                $q->where('code', $idOrCode)
-                    ->orWhere('import_code', $idOrCode);
-            });
-        }
-
-        return $query->firstOrFail();
+        return $patient;
     }
 }

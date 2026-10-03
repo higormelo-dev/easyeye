@@ -121,3 +121,5 @@ Schedule::command('integrator-commands:prune')
     ->weeklyOn(1, '03:45')
     ->name('integrator-commands:prune')
     ->withoutOverlapping();
+
+Schedule::command('integrator-outbox:publish')->everyMinute()->withoutOverlapping();

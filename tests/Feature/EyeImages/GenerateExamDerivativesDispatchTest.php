@@ -14,19 +14,20 @@ use App\Jobs\GenerateExamDerivatives;
 use App\Models\{ExamType, Patient, PatientExam};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\{Bus, Storage};
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     Storage::fake('s3');
 
     $this->ctx      = setupIntegrator([FeatureKey::HasApiIntegrator->value => '1']);
-    $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+    $this->patient  = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
     $this->examType = ExamType::factory()->create(['entity_id' => null]);
 
     $schedCtx       = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $this->patient->id]);
     $this->schedule = $schedCtx['schedule'];
 });
 
-it('despacha GenerateExamDerivatives com afterCommit ao criar um exame novo', function () {
+it('persiste intenção de derivados com o exame e só publica pelo outbox', function () {
     Bus::fake();
 
     $this->postJson(
@@ -42,10 +43,13 @@ it('despacha GenerateExamDerivatives com afterCommit ao criar um exame novo', fu
 
     $exam = PatientExam::where('name', 'Exame Novo')->firstOrFail();
 
+    Bus::assertNotDispatched(GenerateExamDerivatives::class);
+    expect(DB::table('integrator_exam_outbox')->where('patient_exam_id', $exam->id)->where('archive', $exam->archive)->count())->toBe(1);
+    $this->artisan('integrator-outbox:publish')->assertSuccessful();
     Bus::assertDispatched(
         GenerateExamDerivatives::class,
         fn (GenerateExamDerivatives $job) => $job->patientExamId === $exam->id
-            && $job->afterCommit === true,
+            && $job->expectedArchive === $exam->archive,
     );
 });
 

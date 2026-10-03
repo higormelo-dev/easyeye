@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\Storage;
 /** Dois agendamentos de pacientes DIFERENTES da mesma clínica. */
 function ambiguityTwoSchedules(array $ctx): array
 {
-    $patientA = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
-    $patientB = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+    $patientA = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
+    $patientB = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
 
     $a = createScheduleForEntity($ctx['entity'], ['patient_id' => $patientA->id])['schedule'];
     $b = createScheduleForEntity($ctx['entity'], ['patient_id' => $patientB->id])['schedule'];

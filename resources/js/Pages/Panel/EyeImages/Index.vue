@@ -15,11 +15,14 @@ import EyeImageContextMenu from './EyeImageContextMenu.vue';
  * URLs S3 presigned (defesa contra IDOR). Visualizador split-panel
  * 1-4, lente, modo "All", impressão e flip vertical (Laser).
  */
+defineOptions({ name: 'EyeImagesIndex' });
+
 const props = defineProps({
     breadcrumbs: { type: Array, default: () => [] },
     entity: { type: Object, required: true },
     doctors: { type: Array, default: () => [] },
     patients: { type: Array, default: () => [] },
+    reviewTarget: { type: Object, default: null },
     exam_types: { type: Array, default: () => [] },
     equipments: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
@@ -103,33 +106,6 @@ const printCols = ref(2);
 const printOrientation = ref('portrait');
 
 // ── Computed ──────────────────────────────────────────────────────────────
-/**
- * Status derivado do exame — 'laudado' reflete o mesmo sinal do badge "IA"
- * (ai_report.approved), consistente com o filtro server-side de Status
- * (EyeImagesController::examFilterClosure — fonte de verdade é o AiRun
- * aprovado, não diagnosis_cids, que é metadado opcional do laudo).
- */
-function deriveStatus(exam) {
-    if (exam.active === false || exam.active === 0) return 'cancelado';
-    if (exam.ai_report?.approved) return 'laudado';
-    if (!exam.archive) return 'solicitado';
-    return 'realizado';
-}
-
-/**
- * Tradução do status derivado (paridade com Alpine original).
- * As strings vêm via prop `t` (lang/{locale}/eye_images.php).
- */
-function statusLabel(exam) {
-    const map = {
-        solicitado: props.t?.status_requested ?? 'Solicitado',
-        realizado: props.t?.status_done ?? 'Realizado',
-        laudado: props.t?.status_reported ?? 'Laudado',
-        cancelado: props.t?.status_cancelled ?? 'Cancelado',
-    };
-    return map[deriveStatus(exam)] ?? '—';
-}
-
 /**
  * Chave de agrupamento visual de um exame: data|equipamento|tipo, ou
  * exam_session_id quando mesclado (Mesclar/Dividir exame — ver
@@ -306,16 +282,6 @@ function truncateText(text, max = 16) {
     return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-/**
- * Formato curto dd/mm/aa — paridade com Alpine `formatDateShort`.
- * Útil em strips de thumbnails quando o espaço é apertado.
- */
-function formatDateShort(ymd) {
-    if (!ymd || ymd === 'unknown') return '—';
-    const [y, m, d] = String(ymd).split('-');
-    return `${d}/${m}/${y.slice(2)}`;
-}
-
 function formatDateFull(ymd) {
     if (!ymd || ymd === 'unknown') return '—';
     const [y, m, d] = String(ymd).split('-');
@@ -458,7 +424,7 @@ async function toggleExamShare(exam) {
             exam.shared_with_patient = true;
             exam.document_share_id = data.id;
         }
-    } catch (e) {
+    } catch {
         // Falha silenciosa na UI (badge mantém estado anterior) — erro já fica registrado no servidor.
     } finally {
         exam._sharing = false;
@@ -905,18 +871,6 @@ function toggleAllFlip() {
     ];
 }
 
-/**
- * Inverte verticalmente apenas o painel `pi` (sem afetar os outros).
- * Paridade com Alpine `togglePanelFlip` — útil para inverter um painel
- * isoladamente em casos clínicos específicos (ex.: laudos de retinografia
- * com orientação invertida em apenas um dos olhos).
- */
-function togglePanelFlip(pi) {
-    const flipped = [...viewerPanelFlipped.value];
-    flipped[pi] = !flipped[pi];
-    viewerPanelFlipped.value = flipped;
-}
-
 function toggleLens() {
     viewerLensActive.value = !viewerLensActive.value;
     viewerLensVisible.value = false;
@@ -1103,10 +1057,20 @@ function onDocumentClickClosePriorityPopover(event) {
     }
 }
 
-onMounted(() => {
+onMounted(async () => {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keydown', onPrintKey);
     document.addEventListener('click', onDocumentClickClosePriorityPopover);
+    const target = props.reviewTarget;
+    const exam = target?.patient?.exams?.find((item) => item.id === target.exam_id);
+    if (exam) {
+        if (!patients.value.some((patient) => patient.id === target.patient.id)) {
+            patients.value = [target.patient, ...patients.value];
+        }
+        await selectPatient(target.patient);
+        selectedExamIds.value = [exam.id];
+        openViewerModal([exam], 0, 1);
+    }
 });
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKeyDown);
@@ -1187,9 +1151,6 @@ const aiActioning = ref(false);
 const aiMaxImages = computed(() => Number(props.ai?.max_images ?? 4));
 const aiSelectedCount = computed(() => selectedExamIds.value.length);
 const aiHasSelection = computed(() => aiSelectedCount.value > 0);
-// Prompt clínico padrão para análise de imagem (atinge o mínimo de 12 chars).
-const aiDefaultEyePrompt =
-    'Analisar as imagens oculares selecionadas e descrever os achados por estrutura e lateralidade.';
 
 watch(
     () => [aiForm.workflow, aiForm.risk_level, aiForm.patient_id, aiForm.user_prompt, aiForm.max_output_tokens],
@@ -1382,10 +1343,7 @@ async function actAiRun(action) {
             await maybeOpenRecord(aiRunId.value);
         }
 
-        setAiAlert(
-            'success',
-            action === 'approve' ? aiLabel('eye_image_reported', 'Laudado (IA)') : aiLabel('reject', 'Rejeitar'),
-        );
+        setAiAlert('success', action === 'approve' ? 'Análise automática aprovada' : aiLabel('reject', 'Rejeitar'));
         resetAiRun();
         await fetchPatients(); // atualiza badges/laudos
         aiModalOpen.value = false;
@@ -1823,6 +1781,10 @@ const printEntity = computed(() => props.entity ?? {});
         </template>
 
         <PageHeader title="Imagens oftálmicas" :subtitle="`${examsTotal} exames`" />
+        <p class="text-muted small" data-testid="clinical-state-notice">
+            Arquivo disponível e análise automática aprovada não confirmam revisão clínica nem a conclusão dos exames
+            solicitados. Revisão clínica e completude: não informadas.
+        </p>
 
         <!-- ── Card de filtros ───────────────────────────────────────────────── -->
         <div class="card mb-3">
@@ -1990,7 +1952,7 @@ const printEntity = computed(() => props.entity ?? {});
                     <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect
                             v-model="examStatus"
-                            :options="[{ value: 'laudado', label: 'Laudado' }]"
+                            :options="[{ value: 'laudado', label: 'Análise automática aprovada' }]"
                             :value-key="'value'"
                             :label-key="'label'"
                             :placeholder="'Todos status'"
@@ -2651,7 +2613,7 @@ const printEntity = computed(() => props.entity ?? {});
                                                         <span
                                                             class="badge bg-info text-dark d-flex align-items-center"
                                                             style="font-size: 0.5rem; cursor: pointer"
-                                                            :title="aiLabel('eye_image_reported', 'Laudado (IA)')"
+                                                            :title="'Análise automática aprovada'"
                                                             @click.stop="openExistingReport(exam)"
                                                         >
                                                             <i class="ti ti-robot me-1"></i>IA
@@ -2730,6 +2692,7 @@ const printEntity = computed(() => props.entity ?? {});
         <Teleport to="body">
             <div
                 v-show="showViewerModal"
+                data-testid="review-viewer"
                 :style="{ right: viewerRightOffset }"
                 style="
                     position: fixed;
@@ -3350,7 +3313,7 @@ const printEntity = computed(() => props.entity ?? {});
             role="dialog"
             aria-modal="true"
             @click.self="closeAiModal"
-            @keydown.escape.window="closeAiModal"
+            @keydown.escape="closeAiModal"
         >
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
@@ -3521,9 +3484,7 @@ const printEntity = computed(() => props.entity ?? {});
                             <label class="form-label fw-semibold">
                                 <i class="ti ti-robot me-1 text-info"></i
                                 >{{ aiLabel('eye_image_report', 'Laudo da IA') }}
-                                <span class="badge bg-info text-dark ms-1">{{
-                                    aiLabel('eye_image_reported', 'Laudado (IA)')
-                                }}</span>
+                                <span class="badge bg-info text-dark ms-1">{{ 'Análise automática aprovada' }}</span>
                             </label>
                             <div class="border rounded p-2 bg-light" style="white-space: pre-wrap">
                                 {{ aiRunOutput }}

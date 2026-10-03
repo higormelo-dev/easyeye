@@ -3,8 +3,8 @@
 namespace App\Services\Api;
 
 use App\Http\Requests\Api\{ExamRequest, PatientExamRequest};
-use App\Jobs\GenerateExamDerivatives;
-use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
+use App\Models\{Doctor, EntityIntegrator, EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
+use App\Support\IntegratorClinicalIdentifier;
 use Closure;
 use Illuminate\Database\Eloquent\{Builder, Collection, Model, ModelNotFoundException};
 use Illuminate\Http\UploadedFile;
@@ -37,6 +37,7 @@ class PatientExamService
         $integrator = request()->attributes->get('integrator');
         $entityId   = $integrator->user->entity_id;
         $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
+        $this->assertSchedulePatient($schedule, $patientId);
 
         return $this->persistWithArchive(
             $request->file('archive'),
@@ -51,6 +52,9 @@ class PatientExamService
                 name: $request->name,
                 archivePath: $archivePath,
                 laterality: $request->laterality !== null ? (int) $request->laterality : null,
+                examPerformedAt: $request->filled('exam_performed_at')
+                    ? Carbon::parse($request->exam_performed_at)->setTimezone(config('app.timezone')) : null,
+                observation: $request->filled('observation') ? $request->observation : null,
             ),
         );
     }
@@ -72,6 +76,16 @@ class PatientExamService
             : null;
 
         if ($schedule) {
+            if ($schedule->patient_id === null) {
+                $this->clinicalError('schedule_patient_unresolved', 'schedule_identifier', 'O agendamento precisa de um paciente identificado antes do envio.');
+            }
+
+            if ($request->filled('patient_identifier')) {
+                $explicit = $this->patientFindByIdOrCode($request->patient_identifier, $entityId);
+                abort_unless($explicit !== null, 422);
+                $this->assertSchedulePatient($schedule, $explicit->id);
+            }
+            $this->assertSchedulePatient($schedule, $schedule->patient_id);
             // Fluxo original: schedule_identifier informado
             $patientId  = $schedule->patient_id;
             $doctorId   = $schedule->doctor_id;
@@ -83,19 +97,10 @@ class PatientExamService
 
             $patientId = $patient->id;
 
-            // Tenta vincular ao agendamento mais recente do DIA DO EXAME para
-            // esse paciente — não do dia do envio: um exame de ontem enviado
-            // hoje (integrador offline, backlog) não pode cair no agendamento
-            // de hoje. Sem data do equipamento, mantém o comportamento antigo.
-            $todaySchedule = Schedule::where('entity_id', $entityId)
-                ->where('patient_id', $patientId)
-                ->whereDate('date_time', ($examPerformedAt ?? now())->toDateString())
-                ->whereNull('deleted_at')
-                ->orderByDesc('date_time')
-                ->first();
-
-            $doctorId   = $todaySchedule?->doctor_id;
-            $scheduleId = $todaySchedule?->id;
+            // Patient-only means exactly that. An absent schedule is never
+            // inferred from the day of upload or appointment ordering.
+            $doctorId   = null;
+            $scheduleId = null;
         }
 
         return $this->persistWithArchive(
@@ -124,6 +129,11 @@ class PatientExamService
      */
     public function update(PatientExam $patientExam, PatientExamRequest $request): PatientExam
     {
+        if ($patientExam->capture_id !== null && $request->hasFile('archive')) {
+            $this->clinicalError('capture_immutable', 'archive', 'O original desta aquisição é imutável. Envie um novo identificador de captura para um novo original.');
+        }
+        $this->assertSchedulePatient($this->scheduleFindByIdOrCode($request->schedule_identifier), $patientExam->patient_id);
+
         // Sem arquivo novo: update simples, sem tocar no S3.
         if (! $request->hasFile('archive')) {
             return DB::transaction(function () use ($patientExam, $request) {
@@ -142,8 +152,19 @@ class PatientExamService
             $request->file('archive'),
             $directory,
             function (string $archivePath) use ($patientExam, $request): array {
+                $oldPath     = $patientExam->archive;
+                $patientExam = PatientExam::whereKey($patientExam->id)->lockForUpdate()->firstOrFail();
+
+                if ($patientExam->capture_id !== null) {
+                    $this->clinicalError('capture_immutable', 'archive', 'O original desta aquisição é imutável. Envie um novo identificador de captura para um novo original.');
+                }
                 $oldPath = $patientExam->archive;
-                $patientExam->update($this->buildUpdateData($request, $archivePath));
+                $patientExam->update([
+                    ...$this->buildUpdateData($request, $archivePath),
+                    'content_sha256' => hash_file('sha256', $request->file('archive')->getRealPath()),
+                    'content_bytes'  => $request->file('archive')->getSize(),
+                ]);
+                $this->outbox($patientExam->id, 'derivatives', $archivePath);
 
                 return [$patientExam->refresh(), $oldPath];
             },
@@ -179,16 +200,14 @@ class PatientExamService
     }
 
     /**
-     * Orquestra um upsert de exame com troca de arquivo de forma segura:
-     *
-     *   1. Faz upload do arquivo NOVO ANTES de abrir a transação.
-     *   2. Executa o persist (find-or-create/update) dentro da transação; o
-     *      callback devolve [PatientExam, ?caminho_do_arquivo_antigo].
-     *   3. Em rollback, apaga o arquivo recém-enviado (órfão).
-     *   4. Só após o COMMIT apaga o arquivo antigo.
-     *
-     * Garante a invariante: o registro nunca aponta para um arquivo inexistente.
-     * No pior caso sobra um órfão no S3 (limpável por GC), nunca o inverso.
+     * Envia um novo original privado antes de publicar o registro. Novas
+     * aquisições sempre criam linhas distintas; somente registros legados
+     * sem capture_id aceitam substituição explícita do original.
+     * O registro, a integridade e as intenções de derivados/limpeza entram
+     * na mesma transação. O publicador só remove o antigo após o commit.
+     * Falha síncrona tenta limpar o upload órfão sem apagar um original
+     * referenciado. Interrupção do processo ou falha do storage ainda pode
+     * deixar órfãos; o banco e o storage não compartilham uma transação.
      *
      * @param Closure(string): array{0: PatientExam, 1: ?string} $persist
      *
@@ -200,17 +219,21 @@ class PatientExamService
         $archivePath = $this->storeArchive($file, $directory, $fileName);
 
         try {
-            /** @var array{0: PatientExam, 1: ?string} $result */
-            $result             = DB::transaction(static fn () => $persist($archivePath));
-            [$record, $oldPath] = $result;
+            $record = DB::transaction(function () use ($persist, $archivePath) {
+                [$record, $oldPath] = $persist($archivePath);
+
+                if ($oldPath !== null && $oldPath !== $archivePath) {
+                    $this->outbox($record->id, 'delete_archive', $oldPath);
+                }
+
+                return $record;
+            });
         } catch (Throwable $e) {
-            Storage::disk('s3')->delete($archivePath);
+            if (! PatientExam::where('archive', $archivePath)->exists()) {
+                Storage::disk('s3')->delete($archivePath);
+            }
 
             throw $e;
-        }
-
-        if ($oldPath !== null && $oldPath !== $archivePath) {
-            Storage::disk('s3')->delete($oldPath);
         }
 
         return $record;
@@ -253,10 +276,8 @@ class PatientExamService
     }
 
     /**
-     * Núcleo do upsert: faz find-or-create do PatientExam usando um arquivo JÁ
-     * enviado ao S3 (caminho em $archivePath). NÃO sobe nem apaga arquivos — a
-     * orquestração de upload/cleanup fica em persistWithArchive, para manter a
-     * ordem segura S3↔DB (upload antes do commit, delete do antigo após o commit).
+     * Cria uma aquisição com original já enviado e intenção durável de
+     * derivados. Nome e hash não identificam uma aquisição clínica.
      *
      * @return array{0: PatientExam, 1: ?string} [registro, caminho_do_arquivo_antigo]
      */
@@ -273,46 +294,31 @@ class PatientExamService
         ?Carbon $examPerformedAt = null,
         ?string $observation = null,
     ): array {
-        // Escopo do upsert: o registro existente DEVE pertencer ao mesmo paciente.
-        // Sem o filtro por patient_id, um exame de outro paciente com o mesmo
-        // `name` seria reassociado e teria o arquivo apagado (corrupção cross-patient).
-        $existingRecord = PatientExam::query()
-            ->with('patient')
-            ->where('patient_id', $patientId)
-            ->whereHas('patient', function ($query) use ($entityId) {
-                $query->where('entity_id', $entityId)->whereNull('deleted_at');
-            })
-            ->where('name', $name)
-            ->first();
+        // Display names/content hashes do not identify clinical acquisitions.
+        // The receipt replays a capture; every fresh acquisition creates a row.
+        if (request()->filled('capture_id')) {
+            $integratorId = request()->attributes->get('integrator')->id;
+            EntityIntegrator::whereKey($integratorId)->lockForUpdate()->firstOrFail();
 
-        if ($existingRecord) {
-            $oldPath = $existingRecord->archive;
+            if (PatientExam::where('capture_integrator_id', $integratorId)->where('capture_id', request()->input('capture_id'))->exists()
+                || DB::table('integrator_api_receipts')->where('integrator_id', $integratorId)->where('capture_id', request()->input('capture_id'))->whereNotNull('status')->exists()) {
+                $this->clinicalError('capture_conflict', 'capture_id', 'Aquisição já registrada. Reutilize a chave e o endpoint originais.');
+            }
+        }
+        $patient = Patient::whereKey($patientId)->lockForUpdate()->first();
 
-            $existingRecord->update([
-                'patient_id'                     => $patientId,
-                'exam_id'                        => $examId,
-                'doctor_id'                      => $doctorId,
-                'schedule_id'                    => $scheduleId,
-                'entity_integrator_equipment_id' => $equipmentId,
-                'name'                           => $name,
-                'laterality'                     => $laterality,
-                'archive'                        => $archivePath,
-                // Reenvio sem esses campos não apaga o que já foi capturado.
-                'exam_performed_at' => $examPerformedAt ?? $existingRecord->exam_performed_at,
-                'observation'       => $observation ?? $existingRecord->observation,
-            ]);
-
-            // Arquivo substituído: regenera JPEG de exibição + miniatura.
-            // afterCommit(): este método roda dentro de DB::transaction()
-            // (ver persistWithArchive) e QUEUE_CONNECTION=redis não tem
-            // after_commit=true por padrão (config/queue.php) — sem isso, um
-            // worker pode pegar o job e não achar o registro ainda não
-            // commitado, falhando silenciosamente sem gerar a miniatura.
-            GenerateExamDerivatives::dispatch($existingRecord->id)->afterCommit();
-
-            return [$existingRecord->refresh(), $oldPath];
+        if ($patient === null || $patient->entity_id !== $entityId || ! $patient->active) {
+            $this->clinicalError('patient_unavailable', 'patient_identifier', 'O paciente está inativo ou indisponível na clínica autenticada.');
         }
 
+        if ($scheduleId !== null) {
+            $schedule = Schedule::whereKey($scheduleId)->lockForUpdate()->first();
+
+            if ($schedule === null || $schedule->entity_id !== $entityId) {
+                $this->clinicalError('schedule_unavailable', 'schedule_identifier', 'O agendamento está indisponível na clínica autenticada.');
+            }
+            $this->assertSchedulePatient($schedule, $patientId);
+        }
         $record = PatientExam::create([
             'patient_id'                     => $patientId,
             'exam_id'                        => $examId,
@@ -327,10 +333,14 @@ class PatientExamService
             // Exame capturado nasce habilitado (a coluna tinha default false e
             // o 'active' => true saiu num refactor de 02/02/2026): inativo é
             // "desabilitado/cancelado" — fica fora de laudo, IA e repasse.
-            'active' => true,
+            'active'                => true,
+            'capture_id'            => request()->input('capture_id'),
+            'capture_integrator_id' => request()->input('capture_id') ? request()->attributes->get('integrator')->id : null,
+            'content_sha256'        => hash_file('sha256', request()->file('archive')->getRealPath()),
+            'content_bytes'         => request()->file('archive')->getSize(),
         ]);
 
-        GenerateExamDerivatives::dispatch($record->id)->afterCommit();
+        $this->outbox($record->id, 'derivatives', $record->archive);
 
         return [$record, null];
     }
@@ -342,6 +352,39 @@ class PatientExamService
      *
      * @throws RuntimeException quando o upload falha
      */
+    private function assertSchedulePatient(?Schedule $schedule, string $patientId): void
+    {
+        if ($schedule !== null && $schedule->patient_id !== $patientId) {
+            $this->clinicalError('patient_schedule_mismatch', 'schedule_identifier', 'O agendamento pertence a outro paciente.');
+        }
+
+        if ($schedule !== null && (! $schedule->active || in_array($schedule->situation?->value, [8, 9], true))) {
+            $this->clinicalError('schedule_unavailable', 'schedule_identifier', 'O agendamento está cancelado ou indisponível.');
+        }
+        $equipment = $this->equipmentFindByIdOrCode(request()->input('equipment_identifier'));
+
+        if ($schedule !== null && $equipment?->clinic_resource_id !== null) {
+            $resource = $equipment->clinicResource;
+
+            if ($resource === null || $resource->entity_id !== $schedule->entity_id || ! $resource->active || ! $schedule->resources()->where('clinic_resources.id', $resource->id)->exists()) {
+                $this->clinicalError('schedule_equipment_mismatch', 'equipment_identifier', 'O agendamento não está reservado para este recurso de equipamento.');
+            }
+        }
+    }
+
+    private function clinicalError(string $code, string $field, string $message): never
+    {
+        $exception           = ValidationException::withMessages([$field => [$message]]);
+        $exception->response = response()->json(['code' => $code, 'message' => $message, 'errors' => $exception->errors()], 422);
+
+        throw $exception;
+    }
+
+    private function outbox(string $examId, string $operation, string $archive): void
+    {
+        DB::table('integrator_exam_outbox')->insert(['patient_exam_id' => $examId, 'operation' => $operation, 'archive' => $archive, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
     private function storeArchive(UploadedFile $file, string $directory, string $fileName): string
     {
         $path = Storage::disk('s3')->putFileAs($directory, $file, $fileName, 'private');
@@ -407,11 +450,16 @@ class PatientExamService
         }
 
         $integrator = request()->attributes->get('integrator');
-        $matches    = Schedule::identifierMatches((string) $integrator->user->entity_id, $idOrCode);
+        $matches    = IntegratorClinicalIdentifier::matches(Schedule::class, (string) $integrator->user->entity_id, $idOrCode, 'SDL', request()->input('schedule_identifier_namespace'));
 
         $this->rejectAmbiguous($matches, 'schedule_identifier', 'record_codes.ambiguous_identifier.schedule');
+        $schedule = $matches->first();
 
-        return $matches->first();
+        if ($schedule === null) {
+            $this->clinicalError('clinical_identifier_not_found', 'schedule_identifier', 'Agendamento não encontrado na clínica autenticada.');
+        }
+
+        return Schedule::whereKey($schedule->id)->lockForUpdate()->firstOrFail();
     }
 
     public function examFindByIdOrCode(string $idOrCode): ?ExamType
@@ -461,11 +509,9 @@ class PatientExamService
 
     /**
      * Paciente da clínica pelo identificador externo: UUID, PAC-N, número puro
-     * ou import_code. Mesma política de Schedule::identifierMatches(): código
-     * explícito tem precedência sobre import_code; número puro que é PAC-N de
-     * um paciente e import_code de OUTRO é ambíguo e é recusado (422 em
-     * patient_identifier) — antes o first() sem ordem gravava o exame em
-     * qualquer um dos dois pacientes.
+     * ou import_code. UUID e namespace explícito têm resolução exata; sem
+     * namespace, qualquer colisão entre códigos internos e de importação
+     * é recusada. Nunca escolhe arbitrariamente o primeiro paciente.
      *
      * @throws ValidationException identificador ambíguo
      */
@@ -475,30 +521,7 @@ class PatientExamService
             return null;
         }
 
-        $idOrCode = trim($idOrCode);
-        $scoped   = static fn (): Builder => Patient::query()->where('entity_id', $entityId);
-
-        if (Str::isUuid($idOrCode)) {
-            return $scoped()->whereKey($idOrCode)->first();
-        }
-
-        if (ctype_digit($idOrCode)) {
-            $code    = sprintf('%s-%010d', self::PATIENT_CODE_PREFIX, (int) $idOrCode);
-            $matches = $scoped()
-                ->where(fn (Builder $query) => $query->where('code', $code)->orWhere('import_code', $idOrCode))
-                ->limit(2)
-                ->get();
-        } else {
-            $code = preg_match('/^' . self::PATIENT_CODE_PREFIX . '-(\d{1,10})$/i', $idOrCode, $match) === 1
-                ? sprintf('%s-%010d', self::PATIENT_CODE_PREFIX, (int) $match[1])
-                : $idOrCode;
-
-            $matches = $scoped()->where('code', $code)->limit(2)->get();
-
-            if ($matches->isEmpty()) {
-                $matches = $scoped()->where('import_code', $idOrCode)->limit(2)->get();
-            }
-        }
+        $matches = IntegratorClinicalIdentifier::matches(Patient::class, $entityId, trim($idOrCode), 'PAC', request()->input('patient_identifier_namespace', request()->query('identifier_namespace')));
 
         $this->rejectAmbiguous($matches, 'patient_identifier', 'record_codes.ambiguous_identifier.patient');
 
@@ -518,7 +541,7 @@ class PatientExamService
     private function rejectAmbiguous(Collection $matches, string $field, string $messageKey): void
     {
         if ($matches->count() > 1) {
-            throw ValidationException::withMessages([$field => [__($messageKey)]]);
+            $this->clinicalError('clinical_identifier_ambiguous', $field, __($messageKey));
         }
     }
 }

@@ -27,8 +27,8 @@ describe('Fluxo de limite mensal de exames (end-to-end)', function () {
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '3',
         ]);
-        $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
-        $schedCtx = createScheduleForEntity($ctx['entity']);
+        $patient  = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
+        $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
         $url      = "/api/integrators/v1/patients/{$patient->id}/exams";
 
         // 3 envios bem-sucedidos
@@ -55,8 +55,8 @@ describe('Fluxo de limite mensal de exames (end-to-end)', function () {
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '1',
         ]);
-        $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
-        $schedCtx = createScheduleForEntity($ctx['entity']);
+        $patient  = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
+        $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
         $url      = "/api/integrators/v1/patients/{$patient->id}/exams";
 
         // Consome o limite do mês atual
@@ -94,8 +94,8 @@ describe('Fluxo de limite mensal de exames (end-to-end)', function () {
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '0',
         ]);
-        $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
-        $schedCtx = createScheduleForEntity($ctx['entity']);
+        $patient  = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
+        $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
         $url      = "/api/integrators/v1/patients/{$patient->id}/exams";
 
         foreach (range(1, 5) as $i) {
@@ -118,7 +118,7 @@ describe('Fluxo de limite mensal de exames (end-to-end)', function () {
             FeatureKey::HasApiIntegrator->value    => '0',
             FeatureKey::ApiMonthlyExamSends->value => '100',
         ]);
-        $patient = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $ctx['entity']->id]);
 
         $this->postJson(
             "/api/integrators/v1/patients/{$patient->id}/exams",
@@ -126,7 +126,7 @@ describe('Fluxo de limite mensal de exames (end-to-end)', function () {
                 'exam_identifier' => $this->examType->code,
                 'archive'         => UploadedFile::fake()->image('blocked.jpg'),
             ],
-            $ctx['headers']
+            $ctx['headers'],
         )->assertForbidden();
     });
 });

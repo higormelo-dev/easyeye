@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\{ClinicResourcesController,
     PatientExamsController,
     PatientsController,
     SchedulesController};
-use App\Http\Controllers\Api\WhatsAppWebhookController;
+use App\Http\Controllers\Api\{ReceiptReconciliationController, WhatsAppWebhookController};
 use App\Http\Controllers\Billing\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -46,6 +46,8 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
             Route::apiResource('examtypes', ExamTypesController::class)->only(['index', 'show']);
             Route::apiResource('schedules', SchedulesController::class)->only('index', 'show');
             Route::apiResource('exams', ExamsController::class)->only('store');
+            Route::post('exams/{exam}/receipt-reconciliation', [ReceiptReconciliationController::class, 'store'])
+                ->name('exams.receipt-reconciliation');
             // Auto-atualização do desktop: manifesto do último build publicado
             Route::get('updates', [IntegratorUpdatesController::class, 'index'])->name('updates.index');
             // Retrato do estado atual da fila local (pendentes/falhas/

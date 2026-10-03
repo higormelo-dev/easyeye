@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
     beforeEach(function () {
         $this->ctx     = setupIntegrator();
-        $this->patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
     });
 
     it('lists exams for a patient using UUID', function () {
@@ -40,7 +40,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
     });
 
     it('does not return exams from other patients in the same entity', function () {
-        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $otherPatient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         PatientExam::factory(2)->create(['patient_id' => $this->patient->id]);
         PatientExam::factory(3)->create(['patient_id' => $otherPatient->id]);
 
@@ -61,7 +61,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
     });
 
     it('searches exams by schedule code', function () {
-        $schedCtx = createScheduleForEntity($this->ctx['entity']);
+        $schedCtx = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $this->patient->id]);
         PatientExam::factory()->create([
             'patient_id'  => $this->patient->id,
             'schedule_id' => $schedCtx['schedule']->id,
@@ -77,7 +77,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
     });
 
     it('searches exams by doctor code', function () {
-        $schedCtx = createScheduleForEntity($this->ctx['entity']);
+        $schedCtx = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $this->patient->id]);
         PatientExam::factory()->create([
             'patient_id' => $this->patient->id,
             'doctor_id'  => $schedCtx['doctor']->id,
@@ -115,7 +115,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
 
     it('returns 404 for patient from another entity', function () {
         $other   = setupIntegrator();
-        $patient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         $this->getJson("/api/integrators/v1/patients/{$patient->id}/exams", $this->ctx['headers'])
             ->assertNotFound();
@@ -123,8 +123,8 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
 
     it('returns 404 when patient code belongs to another entity', function () {
         $other = setupIntegrator();
-        Patient::factory()->create(['entity_id' => $other['entity']->id]);
-        $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
+        $foreignPatient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         $this->getJson("/api/integrators/v1/patients/{$foreignPatient->code}/exams", $this->ctx['headers'])
             ->assertNotFound();
@@ -148,7 +148,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
 
     it('returns 404 when patient import_code belongs to another entity', function () {
         $other          = setupIntegrator();
-        $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        $foreignPatient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
         $foreignPatient->forceFill(['import_code' => 'SHARED-PAC-CODE'])->save();
 
         $this->getJson('/api/integrators/v1/patients/SHARED-PAC-CODE/exams', $this->ctx['headers'])
@@ -164,10 +164,10 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
         Storage::fake('s3');
 
         $this->ctx      = setupIntegrator();
-        $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient  = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $this->examType = ExamType::factory()->create(['entity_id' => null]);
 
-        $schedCtx       = createScheduleForEntity($this->ctx['entity']);
+        $schedCtx       = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $this->patient->id]);
         $this->schedule = $schedCtx['schedule'];
         $this->doctor   = $schedCtx['doctor'];
     });
@@ -278,7 +278,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
 
     it('returns 404 for patient UUID from another entity', function () {
         $other   = setupIntegrator();
-        $patient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         $this->postJson(
             "/api/integrators/v1/patients/{$patient->id}/exams",
@@ -292,7 +292,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
         )->assertNotFound();
     });
 
-    it('returns 422 when name already exists in the entity', function () {
+    it('preserves distinct captures with the same display name', function () {
         PatientExam::factory()->create([
             'patient_id' => $this->patient->id,
             'name'       => 'Exame Repetido',
@@ -308,12 +308,12 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'name'                => 'Exame Repetido',
             ],
             $this->ctx['headers'],
-        )->assertUnprocessable();
+        )->assertCreated();
     });
 
     it('allows same name in different entities', function () {
         $other        = setupIntegrator();
-        $otherPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        $otherPatient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         PatientExam::factory()->create([
             'patient_id' => $otherPatient->id,
@@ -535,7 +535,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
 describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () {
     beforeEach(function () {
         $this->ctx     = setupIntegrator();
-        $this->patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $this->exam    = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
     });
 
@@ -589,7 +589,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
     });
 
     it('returns 404 when exam belongs to another patient', function () {
-        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $otherPatient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $otherExam    = PatientExam::factory()->create(['patient_id' => $otherPatient->id]);
 
         $this->getJson(
@@ -600,8 +600,8 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
 
     it('returns 404 when patient code belongs to another entity', function () {
         $other = setupIntegrator();
-        Patient::factory()->create(['entity_id' => $other['entity']->id]);
-        $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
+        $foreignPatient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         $this->getJson(
             "/api/integrators/v1/patients/{$foreignPatient->code}/exams/{$this->exam->id}",
@@ -618,7 +618,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
         Storage::fake('s3');
 
         $this->ctx      = setupIntegrator();
-        $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient  = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $this->examType = ExamType::factory()->create(['entity_id' => null]);
         $this->exam     = PatientExam::factory()->create([
             'patient_id' => $this->patient->id,
@@ -626,7 +626,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
             'archive'    => 'old/path/exam.jpg',
         ]);
 
-        $schedCtx       = createScheduleForEntity($this->ctx['entity']);
+        $schedCtx       = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $this->patient->id]);
         $this->schedule = $schedCtx['schedule'];
         $this->doctor   = $schedCtx['doctor'];
     });
@@ -688,6 +688,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
             $this->ctx['headers'],
         )->assertOk();
 
+        $this->artisan('integrator-outbox:publish')->assertSuccessful();
         Storage::disk('s3')->assertMissing('old/path/exam.jpg');
         Storage::disk('s3')->assertExists(PatientExam::find($this->exam->id)->archive);
     });
@@ -705,7 +706,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
         )->assertNotFound();
     });
 
-    it('returns 422 when name conflicts with another exam in the entity', function () {
+    it('updates one acquisition without merging another with the same display name', function () {
         PatientExam::factory()->create([
             'patient_id' => $this->patient->id,
             'name'       => 'Nome Já Existente',
@@ -721,7 +722,8 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'name'                => 'Nome Já Existente',
             ],
             $this->ctx['headers'],
-        )->assertUnprocessable();
+        )->assertOk();
+        expect(PatientExam::where('patient_id', $this->patient->id)->where('name', 'Nome Já Existente')->count())->toBe(2);
     });
 
     it('allows updating name to the same value (no self-conflict)', function () {
@@ -769,8 +771,8 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
 
     it('returns 404 when patient from another entity', function () {
         $other = setupIntegrator();
-        Patient::factory()->create(['entity_id' => $other['entity']->id]);
-        $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
+        $foreignPatient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         $this->postJson(
             "/api/integrators/v1/patients/{$foreignPatient->id}/exams/{$this->exam->id}",
@@ -791,7 +793,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
     // patient_id no body. Fix: patient_id removido de FILLABLE_FIELDS + campo
     // marcado 'prohibited' no FormRequest (defesa em profundidade).
     it('rejects patient_id in the update body and does not reassign the exam', function () {
-        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $otherPatient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
 
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
@@ -850,7 +852,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
     });
 
     it('returns 404 when the exam belongs to another patient in the same entity', function () {
-        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $otherPatient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $otherExam    = PatientExam::factory()->create(['patient_id' => $otherPatient->id]);
 
         $this->postJson(
@@ -885,7 +887,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
 describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function () {
     beforeEach(function () {
         $this->ctx     = setupIntegrator();
-        $this->patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $this->exam    = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
     });
 
@@ -943,8 +945,8 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
 
     it('returns 404 when patient code belongs to another entity', function () {
         $other = setupIntegrator();
-        Patient::factory()->create(['entity_id' => $other['entity']->id]);
-        $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
+        $foreignPatient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         $this->deleteJson(
             "/api/integrators/v1/patients/{$foreignPatient->code}/exams/{$this->exam->id}",
@@ -962,7 +964,7 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
     });
 
     it('returns 404 when the exam belongs to another patient in the same entity', function () {
-        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $otherPatient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $otherExam    = PatientExam::factory()->create(['patient_id' => $otherPatient->id]);
 
         $this->deleteJson(

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Manager;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator, IntegratorQueueHealth, IntegratorQueueHealthHistory};
+use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator, IntegratorQueueHealth, IntegratorQueueHealthHistory};
 use Inertia\{Inertia, Response as InertiaResponse};
 
 /**
@@ -51,6 +51,10 @@ class EntityIntegratorQueueHealthController extends Controller
             ->limit(self::HISTORY_LIMIT)
             ->get();
 
+        $remoteIds      = collect($health?->operational['devices'] ?? [])->pluck('remote_equipment_id')->filter()->unique()->take(100);
+        $equipmentNames = EntityIntegratorEquipment::query()->where('integrator_id', $integratorModel->id)
+            ->whereIn('id', $remoteIds)->get(['id', 'code', 'name'])->keyBy('id');
+
         return Inertia::render('Panel/Manager/EntityIntegratorQueueHealth/Index', [
             'entity' => [
                 'id'   => $entity->id,
@@ -67,12 +71,14 @@ class EntityIntegratorQueueHealthController extends Controller
                 'code' => $integratorModel->code,
                 'name' => $integratorModel->name,
             ],
-            'health' => $health === null ? null : [
+            'equipmentNames' => $equipmentNames,
+            'health'         => $health === null ? null : [
                 'pending_count'       => $health->pending_count,
                 'failed_count'        => $health->failed_count,
                 'blocked_count'       => $health->blocked_count,
                 'sent_last_24h_count' => $health->sent_last_24h_count,
                 'problems'            => $health->problems,
+                'operational'         => $health->operational,
                 'synced_at'           => $health->synced_at->toIso8601String(),
             ],
             'history' => $history->map(fn (IntegratorQueueHealthHistory $point) => [

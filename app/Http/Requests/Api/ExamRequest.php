@@ -2,13 +2,16 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\{EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
+use App\Models\{EntityIntegratorEquipment, ExamType, Patient, Schedule};
+use App\Support\IntegratorClinicalIdentifier;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 
 class ExamRequest extends FormRequest
 {
+    use ValidatesIntegratorCapture;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -28,9 +31,17 @@ class ExamRequest extends FormRequest
         $entityId   = $integrator->user->entity_id;
 
         return [
+            ...$this->captureRules(),
             'exam_identifier' => [
                 'required',
                 function ($attribute, $value, $fail) use ($entityId) {
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
+
+                        return;
+                    }
+                    $value = (string) $value;
+
                     if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
                         $fail(trans('validation.uuid', ['attribute' => $attribute]));
 
@@ -63,36 +74,25 @@ class ExamRequest extends FormRequest
                         return;
                     }
 
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
+
+                        return;
+                    }
+                    $value = (string) $value;
+
                     if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
                         $fail(trans('validation.uuid', ['attribute' => $attribute]));
 
                         return;
                     }
 
-                    $query = Patient::query()
-                        ->where('entity_id', $entityId)
-                        ->whereNull('deleted_at');
+                    $matches = IntegratorClinicalIdentifier::matches(Patient::class, (string) $entityId, $value, 'PAC', $this->input('patient_identifier_namespace'));
 
-                    if (Str::isUuid($value)) {
-                        $query->where('id', $value);
-                    } elseif (ctype_digit($value)) {
-                        // Número puro: pode ser o código interno (PAC-0000000042) OU o
-                        // código do sistema anterior do integrador (import_code costuma
-                        // ser só numérico em sistemas legados) — tenta os dois.
-                        $formattedCode = sprintf('PAC-%010d', (int) $value);
-                        $query->where(function ($q) use ($formattedCode, $value) {
-                            $q->where('code', $formattedCode)
-                                ->orWhere('import_code', $value);
-                        });
-                    } else {
-                        $query->where(function ($q) use ($value) {
-                            $q->where('code', $value)
-                                ->orWhere('import_code', $value);
-                        });
-                    }
-
-                    if (! $query->exists()) {
+                    if ($matches->isEmpty()) {
                         $fail(__('validation.custom.validation_invalid.not_patient_identifier'));
+                    } elseif ($matches->count() > 1) {
+                        $fail(__('record_codes.ambiguous_identifier.patient'));
                     }
                 },
             ],
@@ -103,36 +103,25 @@ class ExamRequest extends FormRequest
                         return;
                     }
 
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
+
+                        return;
+                    }
+                    $value = (string) $value;
+
                     if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
                         $fail(trans('validation.uuid', ['attribute' => $attribute]));
 
                         return;
                     }
 
-                    $query = Schedule::query()
-                        ->where('entity_id', $entityId)
-                        ->whereNull('deleted_at');
+                    $matches = IntegratorClinicalIdentifier::matches(Schedule::class, (string) $entityId, $value, 'SDL', $this->input('schedule_identifier_namespace'));
 
-                    if (Str::isUuid($value)) {
-                        $query->where('id', $value);
-                    } elseif (ctype_digit($value)) {
-                        // Número puro: pode ser o código interno (SDL-0000000042) OU o
-                        // código do sistema anterior do integrador (import_code costuma
-                        // ser só numérico em sistemas legados) — tenta os dois.
-                        $formattedCode = sprintf('SDL-%010d', (int) $value);
-                        $query->where(function ($q) use ($formattedCode, $value) {
-                            $q->where('code', $formattedCode)
-                                ->orWhere('import_code', $value);
-                        });
-                    } else {
-                        $query->where(function ($q) use ($value) {
-                            $q->where('code', $value)
-                                ->orWhere('import_code', $value);
-                        });
-                    }
-
-                    if (! $query->exists()) {
+                    if ($matches->isEmpty()) {
                         $fail(__('validation.custom.validation_invalid.not_schedule_identifier'));
+                    } elseif ($matches->count() > 1) {
+                        $fail(__('record_codes.ambiguous_identifier.schedule'));
                     }
                 },
             ],
@@ -156,6 +145,13 @@ class ExamRequest extends FormRequest
                         return;
                     }
 
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
+
+                        return;
+                    }
+                    $value = (string) $value;
+
                     if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
                         $fail(trans('validation.uuid', ['attribute' => $attribute]));
 
@@ -178,34 +174,7 @@ class ExamRequest extends FormRequest
                     }
                 },
             ],
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                'min:3',
-                function ($attribute, $value, $fail) use ($entityId) {
-                    if ($value === null || $value === '') {
-                        return;
-                    }
-
-                    // name é único por entidade
-                    $exists = PatientExam::query()
-                        ->whereHas('patient', function ($query) use ($entityId) {
-                            $query->where('entity_id', $entityId)->whereNull('deleted_at');
-                        })
-                        ->whereRaw('LOWER(name) = LOWER(?)', [$value])
-                        ->exists();
-
-                    if ($exists) {
-                        $fail(__('validation.custom.validation_unique.name_combination'));
-                    }
-                },
-            ],
-            // Paridade com PatientExamRequest: equipamentos também exportam .emr.
-            // bmp: topógrafos (ex.: MediWorks DEA520) exportam BMP nativo.
-            // pdf: campímetros/biômetros/aberrômetros produzem LAUDO PDF — sem
-            // pdf aqui, essas modalidades não têm o que enviar (o import manual
-            // do Gerenciador de Imagens já aceita pdf desde sempre).
+            'name'    => ['required', 'string', 'max:255', 'min:3'],
             'archive' => 'required|file|mimes:jpg,jpeg,png,bmp,pdf,emr|max:10240',
         ];
     }

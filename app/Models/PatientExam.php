@@ -39,6 +39,7 @@ class PatientExam extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'capture_id', 'capture_integrator_id', 'content_sha256', 'content_bytes',
         'patient_id',
         'doctor_id',
         'schedule_id',
@@ -100,6 +101,7 @@ class PatientExam extends Model
     {
         return [
             'laterality'        => 'integer',
+            'content_bytes'     => 'integer',
             'quality_rating'    => 'integer',
             'active'            => 'boolean',
             'diagnosis_cids'    => 'array',

@@ -13,7 +13,7 @@ describe('POST /api/integrators/v1/exams', function () {
         Storage::fake('s3');
 
         $this->ctx      = setupIntegrator();
-        $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient  = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $this->examType = ExamType::factory()->create(['entity_id' => null]);
 
         // Schedule com patient_id: patient e doctor derivados aqui
@@ -143,7 +143,7 @@ describe('POST /api/integrators/v1/exams', function () {
         Storage::disk('s3')->assertExists($exam->archive);
     });
 
-    it('returns 422 when name already exists in the entity', function () {
+    it('preserves distinct captures with the same display name', function () {
         PatientExam::factory()->create([
             'patient_id' => $this->patient->id,
             'name'       => 'Exame Repetido',
@@ -159,12 +159,13 @@ describe('POST /api/integrators/v1/exams', function () {
                 'name'                => 'Exame Repetido',
             ],
             $this->ctx['headers'],
-        )->assertUnprocessable();
+        )->assertCreated();
+        expect(PatientExam::where('name', 'Exame Repetido')->count())->toBe(2);
     });
 
     it('allows same name in a different entity', function () {
         $other        = setupIntegrator();
-        $otherPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        $otherPatient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         PatientExam::factory()->create([
             'patient_id' => $otherPatient->id,
@@ -364,7 +365,7 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
     });
 
     it('creates exam via patient_identifier, resolving doctor/schedule from a schedule today', function () {
-        $patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $patient  = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $schedCtx = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $patient->id]);
 
         $this->postJson(
@@ -380,12 +381,12 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
 
         $exam = PatientExam::where('name', 'Exame Via Patient Identifier')->first();
         expect($exam->patient_id)->toBe($patient->id)
-            ->and($exam->doctor_id)->toBe($schedCtx['doctor']->id)
-            ->and($exam->schedule_id)->toBe($schedCtx['schedule']->id);
+            ->and($exam->doctor_id)->toBeNull()
+            ->and($exam->schedule_id)->toBeNull();
     });
 
     it('creates exam via patient_identifier with null doctor/schedule when patient has no schedule today', function () {
-        $patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
 
         $this->postJson(
             '/api/integrators/v1/exams',
@@ -405,7 +406,7 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
     });
 
     it('ignores a schedule that is not today when resolving via patient_identifier', function () {
-        $patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         createScheduleForEntity($this->ctx['entity'], [
             'patient_id' => $patient->id,
             'date_time'  => now()->subDay(),
@@ -431,7 +432,7 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
         // Relógio fixo no meio do dia: entre 00h e 03h, "agora − 3h" caía em ontem.
         $this->travelTo(today()->setTime(15, 0));
 
-        $patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         createScheduleForEntity($this->ctx['entity'], [
             'patient_id' => $patient->id,
             'date_time'  => now()->subHours(3),
@@ -453,13 +454,12 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
         )->assertCreated();
 
         $exam = PatientExam::where('name', 'Exame Agenda Mais Recente')->first();
-        expect($exam->schedule_id)->toBe($recent['schedule']->id)
-            ->and($exam->doctor_id)->toBe($recent['doctor']->id);
+        expect($exam->schedule_id)->toBeNull()->and($exam->doctor_id)->toBeNull();
     });
 
-    it('prioritizes schedule_identifier over patient_identifier when both are sent', function () {
-        $patientA = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
-        $patientB = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+    it('rejects contradictory patient and schedule before storing archive', function () {
+        $patientA = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
+        $patientB = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $schedCtx = createScheduleForEntity($this->ctx['entity'], ['patient_id' => $patientB->id]);
 
         $this->postJson(
@@ -472,15 +472,14 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
                 'name'                => 'Exame Prioridade Schedule',
             ],
             $this->ctx['headers'],
-        )->assertCreated();
+        )->assertUnprocessable()->assertJsonValidationErrors('schedule_identifier');
 
-        $exam = PatientExam::where('name', 'Exame Prioridade Schedule')->first();
-        expect($exam->patient_id)->toBe($patientB->id)
-            ->and($exam->patient_id)->not->toBe($patientA->id);
+        expect(PatientExam::where('name', 'Exame Prioridade Schedule')->exists())->toBeFalse();
+        expect(Storage::disk('s3')->allFiles())->toBeEmpty();
     });
 
     it('creates exam via patient_identifier as import_code (patient from legacy system)', function () {
-        $patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $patient = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
         $patient->forceFill(['import_code' => 'LEGACY-PAC-321'])->save();
 
         $this->postJson(
@@ -513,7 +512,7 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
 
     it('returns 422 when patient_identifier belongs to another entity', function () {
         $other        = setupIntegrator();
-        $otherPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        $otherPatient = Patient::factory()->create(['active' => true, 'entity_id' => $other['entity']->id]);
 
         $this->postJson(
             '/api/integrators/v1/exams',
@@ -565,7 +564,7 @@ describe('POST /api/integrators/v1/exams — exam_performed_at / observation', f
 
         $this->ctx      = setupIntegrator();
         $this->examType = ExamType::factory()->create(['entity_id' => null]);
-        $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $this->patient  = Patient::factory()->create(['active' => true, 'entity_id' => $this->ctx['entity']->id]);
     });
 
     it('stores exam_performed_at and observation sent by the integrator', function () {
@@ -628,8 +627,7 @@ describe('POST /api/integrators/v1/exams — exam_performed_at / observation', f
         ], $this->ctx['headers'])->assertCreated();
 
         $exam = PatientExam::where('name', 'Backlog Offline')->first();
-        expect($exam->schedule_id)->toBe($pastSched['schedule']->id)
-            ->and($exam->doctor_id)->toBe($pastSched['doctor']->id);
+        expect($exam->schedule_id)->toBeNull()->and($exam->doctor_id)->toBeNull();
     });
 
     it('rejects an invalid, far-future or pre-2000 exam_performed_at', function (string $value) {
@@ -660,14 +658,14 @@ describe('POST /api/integrators/v1/exams — exam_performed_at / observation', f
             ->assertJsonValidationErrors('observation');
     });
 
-    it('re-upload without the fields keeps the values already captured', function () {
+    it('a distinct acquisition without metadata does not replace the first acquisition metadata', function () {
         $payload = [
             'exam_identifier'    => $this->examType->code,
             'patient_identifier' => $this->patient->id,
             'name'               => 'Reenvio',
         ];
 
-        $this->postJson('/api/integrators/v1/exams', $payload + [
+        $first = $this->postJson('/api/integrators/v1/exams', $payload + [
             'archive'           => UploadedFile::fake()->image('a.jpg'),
             'exam_performed_at' => '2026-02-12T09:32:25-03:00',
             'observation'       => 'Display: Topo 4-Maps',
@@ -677,8 +675,9 @@ describe('POST /api/integrators/v1/exams — exam_performed_at / observation', f
             'archive' => UploadedFile::fake()->image('b.jpg'),
         ], $this->ctx['headers']);
 
-        $exam = PatientExam::where('name', 'Reenvio')->first();
+        $exam = PatientExam::findOrFail($first->json('data.id'));
         expect($exam->observation)->toBe('Display: Topo 4-Maps')
-            ->and($exam->exam_performed_at)->not->toBeNull();
+            ->and($exam->exam_performed_at)->not->toBeNull()
+            ->and(PatientExam::where('name', 'Reenvio')->count())->toBe(2);
     });
 });
