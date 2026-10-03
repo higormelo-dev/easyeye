@@ -130,6 +130,8 @@ return [
     'workflow_assistant_chat'               => 'Virtual assistant',
     'workflow_record_assist'                => 'Case analysis (record)',
     'workflow_medicine_posology'            => 'Suggested posology (catalog)',
+    'workflow_platform_finance_digest'      => 'Financial digest (platform)',
+    'workflow_platform_finance_chat'        => 'Financial chat (platform)',
 
     // Default suggested posology for a global medicine catalog item
     // (workflow=medicine_posology — Manager → Medicines). Only fills the

@@ -448,6 +448,38 @@ class PanelNavigation
         return (bool) Entity::query()->whereKey($entityId)->value('doctor_payouts_visible');
     }
 
+    /**
+     * Grupo "IA" do manager: uma entrada por tela, cada uma visível só pra
+     * quem passa no Gate da própria tela (link que cairia em 403 não aparece):
+     * Uso e custos (SaasOwnerFinancial — admin ou dono), Compras de créditos
+     * (SaasAccess — toda a equipe do SaaS), Provedores e modelos
+     * (SaasAdminPanel — admin; antes aparecia pra todos e dava 403).
+     *
+     * @return array<string, mixed>
+     */
+    private static function managerAiGroup(bool $isSaasAdmin, bool $isOwnerOrAdmin): array
+    {
+        $children = [];
+
+        if ($isOwnerOrAdmin) {
+            $children[] = ['route' => 'manager.ai-usage.index', 'icon' => 'ti ti-chart-dots-3', 'label' => __('actions.sidemenu.ai_menu_usage'), 'match' => ['manager.ai-usage.*']];
+        }
+
+        $children[] = ['route' => 'manager.ai-credit-purchases.index', 'icon' => 'ti ti-coin', 'label' => __('actions.sidemenu.ai_menu_credits'), 'match' => ['manager.ai-credit-purchases.*']];
+
+        if ($isSaasAdmin) {
+            $children[] = ['route' => 'manager.ai-providers.index', 'icon' => 'ti ti-plug-connected', 'label' => __('actions.sidemenu.ai_menu_providers'), 'match' => ['manager.ai-providers.*']];
+        }
+
+        return [
+            'key'      => 'ai',
+            'icon'     => 'ti ti-sparkles',
+            'label'    => __('actions.sidemenu.ai_group'),
+            'match'    => ['manager.ai-usage.*', 'manager.ai-credit-purchases.*', 'manager.ai-providers.*'],
+            'children' => $children,
+        ];
+    }
+
     private static function managerNav(): array
     {
         $nav = [
@@ -466,9 +498,11 @@ class PanelNavigation
         // checagem deste arquivo que consulta o banco (is_owner não é
         // cacheado em sessão como selected_entity_user_rule) — aceitável:
         // só roda pra staff do manager, não no hot path das clínicas.
-        $rule = session('selected_entity_user_rule');
+        $rule           = session('selected_entity_user_rule');
+        $isSaasAdmin    = $rule === SaasRule::Admin->value;
+        $isOwnerOrAdmin = $isSaasAdmin || self::currentUserOwnsSelectedEntity();
 
-        if ($rule === SaasRule::Admin->value || self::currentUserOwnsSelectedEntity()) {
+        if ($isOwnerOrAdmin) {
             $nav[] = [
                 'key'   => 'finance',
                 'route' => 'manager.finance.index',
@@ -528,20 +562,7 @@ class PanelNavigation
                 'label' => __('actions.sidemenu.partners'),
                 'match' => ['manager.partners.*'],
             ],
-            [
-                'key'   => 'ai-providers',
-                'route' => 'manager.ai-providers.index',
-                'icon'  => 'ti ti-sparkles',
-                'label' => __('actions.sidemenu.ai_providers'),
-                'match' => ['manager.ai-providers.*'],
-            ],
-            [
-                'key'   => 'ai-credit-purchases',
-                'route' => 'manager.ai-credit-purchases.index',
-                'icon'  => 'ti ti-coin',
-                'label' => __('actions.sidemenu.ai_credit_purchases'),
-                'match' => ['manager.ai-credit-purchases.*'],
-            ],
+            self::managerAiGroup($isSaasAdmin, $isOwnerOrAdmin),
             [
                 'key'   => 'whatsapp',
                 'route' => 'manager.whatsapp.index',

@@ -60,6 +60,7 @@ class LogAdminAccess
         'gateway'         => 'gateway',
         'credential'      => 'gateway_credential',
         'report_setting'  => 'report_setting',
+        'run'             => 'ai_run',
         'entity'          => 'entity',
     ];
 

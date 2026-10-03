@@ -54,6 +54,24 @@ final class SpreadsheetWriter
     {
         $stream = fopen('php://temp', 'r+');
 
+        $this->writeCsv($stream, $rows, $decimalSeparator);
+
+        rewind($stream);
+        $content = stream_get_contents($stream) ?: '';
+        fclose($stream);
+
+        return $content;
+    }
+
+    /**
+     * Mesmo CSV de csv(), escrito direto num stream (ex.: php://output) —
+     * download grande sem montar o arquivo inteiro na memória.
+     *
+     * @param resource                    $stream
+     * @param iterable<array<int, mixed>> $rows
+     */
+    public function writeCsv($stream, iterable $rows, string $decimalSeparator): void
+    {
         fwrite($stream, "\xEF\xBB\xBF");
 
         foreach ($rows as $row) {
@@ -61,12 +79,6 @@ final class SpreadsheetWriter
             // passar explícito o PHP 8.4 emite deprecation.
             fputcsv($stream, array_map(fn (mixed $cell): mixed => $this->csvCell($cell, $decimalSeparator), $row), ';', '"', '');
         }
-
-        rewind($stream);
-        $content = stream_get_contents($stream) ?: '';
-        fclose($stream);
-
-        return $content;
     }
 
     /** @param list<array<int, mixed>> $rows */

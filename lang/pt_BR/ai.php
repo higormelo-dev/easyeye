@@ -130,6 +130,8 @@ return [
     'workflow_record_assist'                => 'Análise do caso (prontuário)',
     'workflow_assistant_chat'               => 'Assistente virtual',
     'workflow_medicine_posology'            => 'Posologia sugerida (catálogo)',
+    'workflow_platform_finance_digest'      => 'Resumo financeiro (plataforma)',
+    'workflow_platform_finance_chat'        => 'Chat financeiro (plataforma)',
 
     // Posologia sugerida padrão de um item do catálogo global de medicamentos
     // (workflow=medicine_posology — Manager → Medicamentos). Só preenche o

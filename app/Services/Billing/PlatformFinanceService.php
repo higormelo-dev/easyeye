@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
-use App\Domains\AI\Models\AiProviderTopup;
+use App\Domains\AI\Services\AiUsdBrlRate;
 use App\Enums\Billing\{CancellationReason, PaymentStatus, PlatformExpenseCategory};
 use App\Enums\SubscriptionStatus;
 use App\Models\Billing\{Cancellation, Payment, PlatformExpense};
@@ -323,12 +323,7 @@ class PlatformFinanceService
      */
     private function latestUsdToBrlRate(): float
     {
-        $rate = AiProviderTopup::query()
-            ->whereNotNull('exchange_rate')
-            ->latest('topped_up_at')
-            ->value('exchange_rate');
-
-        return $rate !== null ? (float) $rate : 5.50;
+        return (new AiUsdBrlRate())->rate();
     }
 
     private function deltaPct(float $current, float $previous): ?float

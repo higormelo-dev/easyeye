@@ -4,6 +4,7 @@ use App\Http\Controllers\Manager\{
     AiCreditPurchasesController,
     AiModelPricesController,
     AiProvidersController,
+    AiUsageController,
     EntitiesController,
     EntityIntegratorCommandsController,
     EntityIntegratorEquipmentsController,
@@ -281,6 +282,17 @@ Route::group([
         ->name('finance.chat');
     Route::get('finance/ai/runs/{aiRun}', [FinanceController::class, 'showAiRun'])
         ->name('finance.ai-runs.show');
+
+    // ── Uso de IA (custo e uso por ação, clínica, usuário e provedor) ──────────
+    // Mesmo Gate SaasOwnerFinancial do P&L (AiUsageRequest/controller); leitura
+    // e exportação registradas pelo admin.audit do grupo. Só metadados de uso.
+    Route::get('ai-usage', [AiUsageController::class, 'index'])->name('ai-usage.index');
+    Route::get('ai-usage/runs/{run}', [AiUsageController::class, 'showRun'])
+        ->whereUuid('run')
+        ->name('ai-usage.runs.show');
+    Route::get('ai-usage/export', [AiUsageController::class, 'export'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-usage.export');
 
     // ── WhatsApp (Z-API) por clínica ───────────────────────────────────────────
     // Configuração EXCLUSIVA do dono/admin do SaaS (Gate SaasAdminPanel dentro

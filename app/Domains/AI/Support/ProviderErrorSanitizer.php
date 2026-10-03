@@ -66,6 +66,8 @@ final class ProviderErrorSanitizer
             '/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/u' => '[REDACTED:CNPJ]',
             // CNS com 15 dígitos
             '/\b\d{15}\b/u' => '[REDACTED:CNS]',
+            // Chave de API ecoada pelo provedor (OpenAI/Anthropic sk-…, Google AIza…).
+            '/\b(?:sk-(?:proj-|ant-)?[A-Za-z0-9_\-]{8,}|AIza[0-9A-Za-z_\-]{20,})/u' => '[REDACTED:KEY]',
             // E-mail
             '/\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b/iu' => '[REDACTED:EMAIL]',
             // Telefone BR (com DDD, opcional +55)
