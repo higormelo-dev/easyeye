@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\DoctorImport;
 use App\Services\DoctorImportService;
+use App\Traits\FailsUnfinishedImport;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -12,6 +13,7 @@ use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
 class ProcessDoctorImportJob implements ShouldQueue
 {
     use Dispatchable;
+    use FailsUnfinishedImport;
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
@@ -31,5 +33,11 @@ class ProcessDoctorImportJob implements ShouldQueue
     public function handle(DoctorImportService $service): void
     {
         $service->process($this->import);
+    }
+
+    /** @return array<string, mixed> */
+    protected function failureAttributes(): array
+    {
+        return ['abort_reason' => __('shared_identity.import.failed')];
     }
 }

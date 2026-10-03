@@ -6,12 +6,14 @@ namespace App\Services\Medicines;
 
 use App\Enums\{ImportStatus, MedicineSource};
 use App\Models\{Medicine, MedicineImport};
+use App\Support\Spreadsheet\XlsxStreamReader;
 use Generator;
 use Illuminate\Support\Facades\{DB, Log, Storage};
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\{IReadFilter, IReader};
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -332,21 +334,84 @@ class AnvisaMedicineImportService
             return [max(0, $lines - 1), $this->cmedCsvRows($path)];
         }
 
+        try {
+            $xlsx = new XlsxStreamReader($path);
+        } catch (RuntimeException) {
+            $xlsx = null; // não é XLSX (ex.: .xls binário antigo) → PhpSpreadsheet
+        }
+
+        if ($xlsx !== null) {
+            [$sheet, $headerRow, $columns, $lastRow] = $this->locateXlsxHeader($xlsx);
+
+            return [max(0, $lastRow - $headerRow), $this->xlsxRows($xlsx, $sheet, $headerRow, $columns)];
+        }
+
         $reader = IOFactory::createReaderForFile($path);
         $reader->setReadDataOnly(true);
         $reader->setReadEmptyCells(false);
 
-        [$sheet, $headerRow, $columns, $totalRows] = $this->locateXlsxHeader($reader, $path);
+        [$sheet, $headerRow, $columns, $totalRows] = $this->locateSpreadsheetHeader($reader, $path);
 
-        return [max(0, $totalRows - $headerRow), $this->xlsxRows($reader, $path, $sheet, $headerRow, $columns, $totalRows)];
+        return [max(0, $totalRows - $headerRow), $this->spreadsheetRows($reader, $path, $sheet, $headerRow, $columns, $totalRows)];
     }
 
     /**
+     * XLSX em streaming: memória constante mesmo com a lista CMED inteira
+     * (o PhpSpreadsheet passava de 1,4 GB de RSS nela — ver XlsxStreamReader).
+     *
      * @param array<string, string> $columns chave interna → letra da coluna
      *
      * @return Generator<int, array<string, string>>
      */
-    private function xlsxRows(IReader $reader, string $path, string $sheet, int $headerRow, array $columns, int $totalRows): Generator
+    private function xlsxRows(XlsxStreamReader $xlsx, string $sheetPath, int $headerRow, array $columns): Generator
+    {
+        foreach ($xlsx->rows($sheetPath, array_values($columns)) as $number => $cells) {
+            if ($number <= $headerRow) {
+                continue;
+            }
+
+            $row = [];
+
+            foreach ($columns as $key => $letter) {
+                $row[$key] = $this->cellString($cells[$letter] ?? '');
+            }
+
+            if (implode('', $row) !== '') {
+                yield $row;
+            }
+        }
+    }
+
+    /**
+     * @return array{0: string, 1: int, 2: array<string, string>, 3: int} aba, linha do cabeçalho, colunas, última linha
+     */
+    private function locateXlsxHeader(XlsxStreamReader $xlsx): array
+    {
+        foreach ($xlsx->sheets() as $sheet) {
+            foreach ($xlsx->rows($sheet['path']) as $number => $cells) {
+                if ($number > 80) {
+                    break;
+                }
+
+                $columns = $this->mapHeader(array_map(fn ($value) => $this->cellString($value), $cells));
+
+                if ($columns !== null) {
+                    return [$sheet['path'], $number, $columns, $xlsx->lastRow($sheet['path'])];
+                }
+            }
+        }
+
+        throw new MedicineImportException(__('manager_medicines.import_header_not_found'));
+    }
+
+    /**
+     * Demais formatos de planilha (.xls) via PhpSpreadsheet, em blocos.
+     *
+     * @param array<string, string> $columns chave interna → letra da coluna
+     *
+     * @return Generator<int, array<string, string>>
+     */
+    private function spreadsheetRows(IReader $reader, string $path, string $sheet, int $headerRow, array $columns, int $totalRows): Generator
     {
         $reader->setLoadSheetsOnly([$sheet]);
 
@@ -377,7 +442,7 @@ class AnvisaMedicineImportService
     /**
      * @return array{0: string, 1: int, 2: array<string, string>, 3: int}
      */
-    private function locateXlsxHeader(IReader $reader, string $path): array
+    private function locateSpreadsheetHeader(IReader $reader, string $path): array
     {
         foreach ($reader->listWorksheetInfo($path) as $info) {
             $reader->setLoadSheetsOnly([$info['worksheetName']]);

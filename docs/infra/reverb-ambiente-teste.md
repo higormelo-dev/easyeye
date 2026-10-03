@@ -156,6 +156,21 @@ preservada em redeploy pela Jelastic.
 
 A Jelastic exige uma **linha em branco depois da última entrada** da crontab.
 
+**Um worker só, de propósito.** Os jobs de importação têm `$timeout` de 600 s
+(pacientes, médicos, agenda) e 900 s (medicamentos), maior que o
+`retry_after` da conexão `redis` (90 s, `REDIS_QUEUE_RETRY_AFTER`). Com um
+worker isso não importa. Com dois ou mais, um job que passe de 90 s é
+entregue de novo a outro worker. Antes de subir mais workers, defina
+`REDIS_QUEUE_RETRY_AFTER=960` no `.env` (maior que o maior `$timeout`).
+
+**Memória do nó.** O OOM killer do kernel mata o worker se o processo
+estourar a RAM do nó. Isso acontece mesmo abaixo do `memory_limit` do PHP
+(384M aqui), porque bibliotecas como o libxml alocam fora dele. Conferir com
+`dmesg | grep -i oom`. Em 02/10/2026 a importação da lista CMED pelo
+PhpSpreadsheet chegou a 1,4 GB de RSS e o worker foi morto. A leitura de
+XLSX agora é em streaming (`App\Support\Spreadsheet\XlsxStreamReader`):
+a lista inteira importa em ~16 s com ~130 MB.
+
 > **Atenção — antes de 02/10/2026 este ambiente não tinha worker de fila nem
 > agendador rodando.** Ao ligar o worker, 12 jobs acumulados foram processados
 > (8 `NotifyScheduleChangeJob`, 2 `RunAiWorkflowJob`, 2
@@ -229,6 +244,7 @@ com 1 assinante no Redis, fila zerada e nenhum job com falha.
 | `/broadcasting/auth` responde 403 | Usuário sem permissão na tela, ou clínica da sessão ≠ clínica da importação (comportamento esperado) | Conferir papel do usuário; regra em `app/Broadcasting/ClinicImportChannel.php` |
 | Mudança em evento/canal não tem efeito | Reverb e config antigos em memória/cache | `php artisan config:cache && php artisan route:cache && php artisan reverb:restart` |
 | Links de paginação apontam para `https://_/...` (`ERR_NAME_NOT_RESOLVED`) | Navegador em HTTP/3 e nginx sem `fastcgi_param HTTP_HOST` | Reaplicar o ajuste de *Host repassado ao PHP sob HTTP/3* (seção 2.2) |
+| Importação fica em "Processando" para sempre; medicamentos recusam novo envio ("outra em andamento") | Worker morto no meio (OOM, deploy). Sentry mostra `MaxAttemptsExceededException` do job | Desde 02/10/2026 o `failed()` dos jobs de importação encerra o import sozinho. Registro antigo travado: `php artisan tinker` e marcar `status=failed`, `finished_at=now()` |
 | Depois de redeploy do nó, WebSocket parou | `default.conf` voltou ao padrão | Conferir se a linha continua em `/etc/jelastic/redeploy.conf`; reaplicar a seção 2.2 |
 
 ## 6. Como desfazer

@@ -6,7 +6,7 @@ use App\Services\Medicines\AnvisaMedicineImportService;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Writer\{Xls, Xlsx};
 
 /**
  * Importação do catálogo global de medicamentos a partir da lista de preços
@@ -61,8 +61,9 @@ function storeCmedXlsx(array $rows, string $name = 'cmed.xlsx'): string
         }
     }
 
-    $tmp = tempnam(sys_get_temp_dir(), 'cmed') . '.xlsx';
-    (new Xlsx($spreadsheet))->save($tmp);
+    $extension = pathinfo($name, PATHINFO_EXTENSION);
+    $tmp       = tempnam(sys_get_temp_dir(), 'cmed') . '.' . $extension;
+    ($extension === 'xls' ? new Xls($spreadsheet) : new Xlsx($spreadsheet))->save($tmp);
     Storage::disk()->put("imports/medicines/test/{$name}", file_get_contents($tmp));
     @unlink($tmp);
 
@@ -247,4 +248,12 @@ it('aceita a lista CMED em CSV (Latin-1, separador ;)', function () {
 
     expect($import->status)->toBe(ImportStatus::Done)
         ->and(cmedMedicine('500000000000001')->active_ingredient)->toBe('acetato de prednisolona');
+});
+
+it('aceita a lista CMED em .xls (formato binário antigo, lido pelo PhpSpreadsheet)', function () {
+    $import = runCmedImport(storeCmedXlsx([cmedRow(), cmedRow(['CÓDIGO GGREM' => '500000000000002'])], 'cmed.xls'));
+
+    expect($import->status)->toBe(ImportStatus::Done)
+        ->and($import->created_count)->toBe(2)
+        ->and(cmedMedicine('500000000000002')->name)->toBe('PREDOPTIC');
 });
