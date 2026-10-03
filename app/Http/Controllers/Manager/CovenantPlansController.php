@@ -26,8 +26,6 @@ use Illuminate\Validation\ValidationException;
  */
 class CovenantPlansController extends Controller
 {
-    private const STATUSES = ['active', 'inactive'];
-
     public function __construct(
         private readonly TenantContext $tenant,
         private readonly AuditLogger $audit,
@@ -38,7 +36,7 @@ class CovenantPlansController extends Controller
     {
         $model  = $this->globalCovenant($covenant);
         $search = $request->string('search')->trim()->value();
-        $status = in_array($request->input('status'), self::STATUSES, true) ? $request->input('status') : '';
+        $status = in_array($request->input('status'), CovenantPlan::SITUATIONS, true) ? $request->input('status') : '';
 
         $plans = $this->globalPlans()
             ->where('covenant_plans.covenant_id', $model->id)
@@ -48,21 +46,23 @@ class CovenantPlansController extends Controller
                 $q->where(fn (Builder $w) => $w->whereLikeUnaccent('covenant_plans.name', $term)
                     ->orWhere('covenant_plans.ans_code', 'like', $term . '%'));
             })
-            ->when($status === 'active', fn (Builder $q) => $q->where('covenant_plans.active', true))
-            ->when($status === 'inactive', fn (Builder $q) => $q->where('covenant_plans.active', false))
+            // Situação exibida no selo (ANS ou ativo/inativo do manual), não só a disponibilidade.
+            ->when($status !== '', fn (Builder $q) => $q->inSituation($status))
             ->orderByDesc('covenant_plans.active')
             ->orderBy('covenant_plans.name')
             ->orderBy('covenant_plans.id')
-            ->paginate(15)
-            ->through(fn (CovenantPlan $p) => $this->toRow($p));
+            ->paginate(15);
 
-        return response()->json([
-            ...$plans->toArray(),
-            'counts' => [
-                'active' => $this->globalPlans()->where('covenant_id', $model->id)->where('active', true)->count(),
-                'total'  => $this->globalPlans()->where('covenant_id', $model->id)->count(),
-            ],
+        $patients = $this->patientsByPlan($plans->getCollection()->pluck('id')->all());
+
+        $plans->through(fn (CovenantPlan $p) => [
+            ...$this->toRow($p),
+            'patients' => $patients[$p->id] ?? 0,
+            // Mesma regra do destroy(): qualquer vínculo, até de paciente excluído.
+            'in_use' => array_key_exists($p->id, $patients),
         ]);
+
+        return response()->json([...$plans->toArray(), 'counts' => $this->counts($model)]);
     }
 
     public function store(CovenantPlanRequest $request, string $covenant): JsonResponse
@@ -141,6 +141,60 @@ class CovenantPlansController extends Controller
     private function globalPlans(): Builder
     {
         return CovenantPlan::withoutGlobalScopes()->whereNull('covenant_plans.entity_id')->whereNull('covenant_plans.deleted_at');
+    }
+
+    /**
+     * Disponíveis (escolhíveis no cadastro do paciente), total e quantos há
+     * em cada situação do filtro — numa consulta só.
+     *
+     * @return array{active: int, total: int, situations: array<string, int>}
+     */
+    private function counts(Covenant $covenant): array
+    {
+        $counts = ['active' => 0, 'total' => 0, 'situations' => array_fill_keys(CovenantPlan::SITUATIONS, 0)];
+
+        $groups = $this->globalPlans()
+            ->where('covenant_plans.covenant_id', $covenant->id)
+            ->select('covenant_plans.ans_status', 'covenant_plans.active')
+            ->selectRaw('count(*) as plans')
+            ->groupBy('covenant_plans.ans_status', 'covenant_plans.active')
+            ->get();
+
+        foreach ($groups as $group) {
+            $plans = (int) $group->plans;
+            $counts['total'] += $plans;
+            $counts['active'] += $group->active ? $plans : 0;
+
+            if (isset($counts['situations'][$group->situation()])) {
+                $counts['situations'][$group->situation()] += $plans;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Pacientes com cada plano da página — só a contagem, sem dado pessoal
+     * (como o "Uso pelas clínicas" do convênio). Plano presente no resultado
+     * está em uso, mesmo que só por paciente excluído (0 ativos).
+     *
+     * @param list<string> $ids
+     *
+     * @return array<string, int>
+     */
+    private function patientsByPlan(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        return DB::table('patients')
+            ->whereIn('covenant_plan_id', $ids)
+            ->groupBy('covenant_plan_id')
+            ->selectRaw('covenant_plan_id, sum(case when deleted_at is null then 1 else 0 end) as active_patients')
+            ->pluck('active_patients', 'covenant_plan_id')
+            ->map(fn ($count) => (int) $count)
+            ->all();
     }
 
     /** @return array<string, mixed> */

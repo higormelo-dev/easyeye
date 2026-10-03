@@ -31,6 +31,12 @@ class CovenantPlan extends Model
     /** Situações da ANS em que o plano ainda atende beneficiários (Suspenso = comercialização suspensa). */
     public const SELECTABLE_STATUSES = ['active', 'suspended'];
 
+    /**
+     * Situação exibida (selo e filtro do manager): a da ANS ou, em plano sem
+     * dado oficial (manual), ativo/inativo. Chave de covenant_plans.status_*.
+     */
+    public const SITUATIONS = ['active', 'suspended', 'cancelled', 'transferred', 'inactive'];
+
     protected string $codePrefix = 'PL';
 
     protected string $codePrefixGlobal = 'PLP';
@@ -73,6 +79,26 @@ class CovenantPlan extends Model
             ->where('covenant_plans.active', true)
             ->where(fn (Builder $q) => $q->whereNull('covenant_plans.entity_id')
                 ->when($entityId, fn (Builder $q) => $q->orWhere('covenant_plans.entity_id', $entityId)));
+    }
+
+    /**
+     * Planos numa situação (ver SITUATIONS) — mesma regra de situation(),
+     * para o filtro bater com o selo.
+     */
+    public function scopeInSituation(Builder $query, string $situation): Builder
+    {
+        return match ($situation) {
+            'active' => $query->where(fn (Builder $q) => $q->where('covenant_plans.ans_status', 'active')
+                ->orWhere(fn (Builder $q) => $q->whereNull('covenant_plans.ans_status')->where('covenant_plans.active', true))),
+            'inactive' => $query->whereNull('covenant_plans.ans_status')->where('covenant_plans.active', false),
+            default    => $query->where('covenant_plans.ans_status', $situation),
+        };
+    }
+
+    /** Situação exibida: a da ANS ou, sem dado oficial, ativo/inativo. */
+    public function situation(): string
+    {
+        return $this->ans_status ?? ($this->active ? 'active' : 'inactive');
     }
 
     /** Situação na ANS para exibição (null em plano sem dado oficial). */

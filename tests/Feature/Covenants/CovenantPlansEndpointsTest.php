@@ -64,7 +64,11 @@ it('manager lista os planos globais do convênio com busca e contagem (sem plano
     $response = asPlansAdmin()->getJson(route('manager.covenants.plans.index', $this->operator->id))->assertOk();
 
     expect(array_column($response->json('data'), 'name'))->toBe(['AMIL ONE S6500', 'AMIL S380'])
-        ->and($response->json('counts'))->toBe(['active' => 1, 'total' => 2])
+        ->and($response->json('counts'))->toBe([
+            'active'     => 1,
+            'total'      => 2,
+            'situations' => ['active' => 1, 'suspended' => 0, 'cancelled' => 1, 'transferred' => 0, 'inactive' => 0],
+        ])
         ->and($response->json('data.0.label'))->toBe('AMIL ONE S6500 (Reg. ANS 471000001)')
         ->and($response->json('data.1.status_label'))->toBe(__('covenant_plans.status_cancelled'));
 
@@ -72,6 +76,83 @@ it('manager lista os planos globais do convênio com busca e contagem (sem plano
         ->toBe(['AMIL S380'])
         ->and(array_column(asPlansAdmin()->getJson(route('manager.covenants.plans.index', [$this->operator->id, 'status' => 'active']))->json('data'), 'name'))
         ->toBe(['AMIL ONE S6500']);
+});
+
+it('filtro de situação do manager = situação do selo (ANS ou ativo/inativo do manual), com contagem por situação', function () {
+    // Comercialização suspensa continua disponível (active=true): o filtro antigo
+    // (disponibilidade) não separava esses planos dos ativos.
+    globalPlan($this->operator, ['name' => 'A ANS ATIVO']);
+    globalPlan($this->operator, ['name' => 'B ANS SUSPENSO', 'ans_status' => 'suspended']);
+    globalPlan($this->operator, ['name' => 'C ANS CANCELADO', 'ans_status' => 'cancelled', 'active' => false]);
+    globalPlan($this->operator, ['name' => 'D ANS TRANSFERIDO', 'ans_status' => 'transferred', 'active' => false]);
+    globalPlan($this->operator, ['name' => 'E MANUAL ATIVO', 'source' => CovenantSource::Manual->value, 'ans_status' => null, 'ans_plan_id' => null]);
+    globalPlan($this->operator, ['name' => 'F MANUAL INATIVO', 'source' => CovenantSource::Manual->value, 'ans_status' => null, 'ans_plan_id' => null, 'active' => false]);
+    CovenantPlan::withoutGlobalScopes()->forceCreate([
+        'entity_id' => $this->clinic->id, 'covenant_id' => $this->operator->id, 'name' => 'G DA CLINICA', 'active' => false,
+    ]);
+
+    $list = fn (string $status) => asPlansAdmin()
+        ->getJson(route('manager.covenants.plans.index', [$this->operator->id, 'status' => $status]))
+        ->assertOk();
+
+    $expected = [
+        'active'      => ['A ANS ATIVO', 'E MANUAL ATIVO'],
+        'suspended'   => ['B ANS SUSPENSO'],
+        'cancelled'   => ['C ANS CANCELADO'],
+        'transferred' => ['D ANS TRANSFERIDO'],
+        'inactive'    => ['F MANUAL INATIVO'],
+    ];
+
+    foreach ($expected as $situation => $names) {
+        $rows = $list($situation)->json('data');
+
+        expect(array_column($rows, 'name'))->toBe($names);
+
+        // O selo de cada linha (texto do VUE: status_label ?? ativo/inativo) é o da opção escolhida.
+        foreach ($rows as $row) {
+            $badge = $row['status_label'] ?? __('covenant_plans.status_' . ($row['active'] ? 'active' : 'inactive'));
+            expect($badge)->toBe(__('covenant_plans.status_' . $situation));
+        }
+    }
+
+    // Valor fora da lista não filtra (nem quebra a consulta).
+    expect($list("active' OR 1=1 --")->json('total'))->toBe(6)
+        ->and($list('available')->json('total'))->toBe(6)
+        ->and($list('active')->json('counts'))->toBe([
+            'active'     => 3,
+            'total'      => 6,
+            'situations' => ['active' => 2, 'suspended' => 1, 'cancelled' => 1, 'transferred' => 1, 'inactive' => 1],
+        ]);
+});
+
+it('[LGPD] manager vê quantos pacientes usam cada plano (só a contagem) e se está em uso, como no destroy()', function () {
+    $used  = globalPlan($this->operator, ['name' => 'A COM PACIENTES']);
+    $trash = globalPlan($this->operator, ['name' => 'B SO EXCLUIDO', 'source' => CovenantSource::Manual->value, 'ans_status' => null, 'ans_plan_id' => null]);
+    globalPlan($this->operator, ['name' => 'C SEM USO']);
+
+    // Pacientes de duas clínicas somam (uso do catálogo global); excluído não conta, mas trava a exclusão.
+    $patient = Patient::factory()->create(['entity_id' => $this->clinic->id, 'covenant_id' => $this->operator->id, 'covenant_plan_id' => $used->id]);
+    Patient::factory()->create(['entity_id' => $this->other->id, 'covenant_id' => $this->operator->id, 'covenant_plan_id' => $used->id]);
+    Patient::factory()->create(['entity_id' => $this->clinic->id, 'covenant_id' => $this->operator->id, 'covenant_plan_id' => $trash->id])->delete();
+
+    $response = asPlansAdmin()->getJson(route('manager.covenants.plans.index', $this->operator->id))->assertOk();
+    $rows     = collect($response->json('data'))->keyBy('name');
+
+    expect($rows['A COM PACIENTES'])->toMatchArray(['patients' => 2, 'in_use' => true])
+        ->and($rows['B SO EXCLUIDO'])->toMatchArray(['patients' => 0, 'in_use' => true])
+        ->and($rows['C SEM USO'])->toMatchArray(['patients' => 0, 'in_use' => false])
+        ->and($rows['A COM PACIENTES'])->not->toHaveKeys(['patient_ids', 'patient_names']);
+
+    // Nenhum dado do paciente sai na resposta.
+    $name = (string) DB::table('people')->where('id', $patient->person_id)->value('full_name');
+    expect($name)->not->toBe('')
+        ->and($response->getContent())->not->toContain($name)
+        ->and($response->getContent())->not->toContain((string) $patient->id)
+        ->and($response->getContent())->not->toContain((string) $patient->person_id);
+
+    // O "em uso" da tela é a mesma regra do servidor.
+    asPlansAdmin()->deleteJson(route('manager.covenants.plans.destroy', $trash->id), ['reason' => 'Plano cadastrado em duplicidade.'])
+        ->assertJsonValidationErrors(['reason' => __('covenant_plans.in_use')]);
 });
 
 it('manager cadastra plano manual (global), edita e não mexe em plano da ANS', function () {
