@@ -168,7 +168,7 @@ Executar ao mexer em ACL/subscription/billing/TISS/compliance:
 5. Ajustes em templates clínicos afetam emissão de documentação e histórico de versões.
 6. PostgreSQL aceita conexões da subnet Docker `172.16.0.0/12` (`pg_hba.conf`). Mudanças na rede podem exigir liberação adicional.
 7. Redis em container (`easyeye_redis`) — `.env` deve apontar `REDIS_HOST=redis`.
-8. Reverb é processo longo: mudou evento/canal (`routes/channels.php`, `app/Broadcasting`) → `php artisan reverb:restart`. `VITE_REVERB_*` são lidas no build/start do Vite (reiniciar `npm run dev`). Canais privados repetem a regra de acesso da tela — mudou a rota, mude o canal.
+8. Reverb é processo longo: mudou evento/canal (`routes/channels.php`, `app/Broadcasting`) → `php artisan reverb:restart`. `VITE_REVERB_*` são lidas no build/start do Vite (reiniciar `npm run dev`). Canais privados repetem a regra de acesso da tela — mudou a rota, mude o canal. Configuração do servidor de teste (nginx, cron, `.env`, deploy): `docs/infra/reverb-ambiente-teste.md`.
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
