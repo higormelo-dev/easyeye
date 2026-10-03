@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Manager;
 
 use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiPayloadEnricher, AiProviderSettings};
+use App\Domains\AI\Support\AiJsonOutput;
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\Billing\PlatformExpenseCategory;
 use App\Enums\EntityGate;
@@ -43,6 +44,9 @@ class FinanceController extends Controller
 {
     private const PERIOD_PRESETS = ['this_month', '3m', '6m', '12m', 'custom'];
 
+    /** Tamanho máximo de uma pergunta do "Converse com os dados". */
+    private const CHAT_MAX_LENGTH = 4000;
+
     public function __construct(
         private readonly PlatformFinanceService $financeService,
         private readonly AiPayloadEnricher $enricher,
@@ -78,6 +82,9 @@ class FinanceController extends Controller
                     'chat'   => route('manager.finance.chat'),
                     'show'   => route('manager.finance.ai-runs.show', ['aiRun' => '__ID__']),
                 ],
+                // Última análise do mesmo período: reabrir a tela não paga de novo.
+                'last_digest'     => $this->lastDigest($period),
+                'chat_max_length' => self::CHAT_MAX_LENGTH,
             ],
             't' => trans('manager_finance'),
         ]);
@@ -179,7 +186,7 @@ class FinanceController extends Controller
         $this->authorizeSaasEntity();
 
         $validated = $request->validate([
-            'user_prompt'     => ['required', 'string', 'min:4', 'max:4000'],
+            'user_prompt'     => ['required', 'string', 'min:4', 'max:' . self::CHAT_MAX_LENGTH],
             'conversation_id' => ['nullable', 'uuid'],
         ]);
 
@@ -225,12 +232,69 @@ class FinanceController extends Controller
             'final_output'     => $aiRun->final_output,
             'error_message'    => $aiRun->error_message,
             'workflow'         => $aiRun->workflow,
+            // Análise já decodificada no servidor (tolera ```json e texto em volta).
+            'result'     => $this->digestResult($aiRun),
+            'created_at' => $aiRun->created_at?->toIso8601String(),
+            // Período que o servidor usou de fato (o da tela pode ter mudado).
+            'period' => [
+                'from' => data_get($aiRun->input_summary, 'context.periodo.de'),
+                'to'   => data_get($aiRun->input_summary, 'context.periodo.ate'),
+            ],
         ]);
     }
 
     // ──────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Última análise pronta do mesmo período (mesmo preset; no personalizado,
+     * as mesmas datas) — aprovada ou ainda aguardando a finalização do polling.
+     *
+     * @param array{from: Carbon, to: Carbon, preset: string} $period
+     *
+     * @return array{run_id: string, created_at: ?string, from: string, to: string, result: array<string, mixed>}|null
+     */
+    private function lastDigest(array $period): ?array
+    {
+        $run = AiRun::query()
+            ->where('entity_id', $this->currentSaasEntity()->id)
+            ->where('workflow', 'platform_finance_digest')
+            ->whereIn('status', [AiRunStatus::Approved->value, AiRunStatus::WaitingApproval->value])
+            ->whereNotNull('final_output')
+            ->where('input_summary->context->periodo->preset', $period['preset'])
+            ->when($period['preset'] === 'custom', fn ($q) => $q
+                ->where('input_summary->context->periodo->de', $period['from']->toDateString())
+                ->where('input_summary->context->periodo->ate', $period['to']->toDateString()))
+            ->latest()
+            // Duas no mesmo segundo (created_at sem fração): o id UUIDv7 segue a ordem de criação.
+            ->orderByDesc('id')
+            ->first();
+
+        $result = $run ? $this->digestResult($run) : null;
+
+        if ($run === null || $result === null) {
+            return null;
+        }
+
+        return [
+            'run_id'     => (string) $run->id,
+            'created_at' => $run->created_at?->toIso8601String(),
+            'from'       => (string) data_get($run->input_summary, 'context.periodo.de', ''),
+            'to'         => (string) data_get($run->input_summary, 'context.periodo.ate', ''),
+            'result'     => $result,
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function digestResult(AiRun $run): ?array
+    {
+        if ($run->workflow !== 'platform_finance_digest' || blank($run->final_output)) {
+            return null;
+        }
+
+        return AiJsonOutput::decode((string) $run->final_output);
+    }
 
     private function authorizeSaasEntity(): void
     {

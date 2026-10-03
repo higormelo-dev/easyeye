@@ -8,6 +8,28 @@ Formato: [Keep a Changelog](https://keepachangelog.com/), `## [Onda N] — categ
 
 ---
 
+## [2026-10-03] — Finanças: análise por IA e "Converse com os dados"
+
+### Corrigido
+- Análise e chat ignoravam o período selecionado (o POST não mandava preset/datas e o
+  servidor caía em "este mês").
+- Análise com JSON entre cercas (```json) dava erro: agora decodificada no servidor
+  (`AiJsonOutput`) e entregue pronta em `result`.
+- Finanças não tinha tradução em inglês (com `en` a página recebia a chave crua).
+- Última análise restaurada podia ser a mais antiga quando duas do mesmo período caíam no
+  mesmo segundo (created_at sem fração): desempate pelo id (UUIDv7).
+
+### Adicionado
+- Análise: período e data da geração, aviso quando a tela mudou de período, última
+  análise do mesmo período restaurada ao abrir (sem nova chamada paga), prévia/skeleton
+  com etapas, copiar e "Perguntar sobre isto" (leva a conclusão ao chat).
+- Chat: balões com markdown seguro (`Support/safeMarkdown.js` — escapa todo HTML),
+  "digitando", copiar/tentar de novo por mensagem, sugestão com um clique, textarea com
+  Enter/Shift+Enter, aviso de troca de período e conversa preservada na aba
+  (sessionStorage). Lado a lado em telas largas; polling para quando a tela sai.
+
+---
+
 ## [2026-10-03] — Minimização e auditoria do envio; correção da Anthropic
 
 ### Alterado

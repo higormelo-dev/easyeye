@@ -350,3 +350,95 @@ describe('showAiRun() — polling + auto-finalização', function () {
         expect(fn () => callShowAiRun($this, $run))->toThrow(AuthorizationException::class);
     });
 });
+
+describe('Análise por IA — período da tela e análise salva', function () {
+    function financeDigestRun($test, array $periodo, array $overrides = []): AiRun
+    {
+        // forceCreate: created_at não é fillable — create() ignoraria a data e empataria as análises.
+        return AiRun::query()->forceCreate([
+            'entity_id'     => $test->saas->id,
+            'requested_by'  => $test->admin->id,
+            'workflow'      => 'platform_finance_digest',
+            'mode'          => 'economy',
+            'risk_level'    => 'medium',
+            'status'        => AiRunStatus::Approved->value,
+            'final_output'  => '{"resumo":"Receita subiu","ganhando":[],"perdendo":[],"oportunidades":[],"acoes_sugeridas":[]}',
+            'input_summary' => ['context' => ['periodo' => $periodo]],
+            ...$overrides,
+        ]);
+    }
+
+    it('digest() usa o período enviado pela tela (antes ia sempre "este mês")', function () {
+        Queue::fake();
+        actingAsManager($this, $this->admin);
+
+        $request = Request::create('/panel/manager/finance/ai/digest', 'POST', ['preset' => '12m']);
+        $request->setLaravelSession(app('session.store'));
+        $request->setUserResolver(fn () => auth()->user());
+
+        app(FinanceController::class)->digest($request);
+
+        expect(AiRun::query()->sole()->input_summary['context']['periodo']['preset'])->toBe('12m');
+    });
+
+    it('a última análise do mesmo período vem pronta ao abrir a tela — não paga de novo', function () {
+        actingAsManager($this, $this->admin);
+        $month = ['de' => now()->startOfMonth()->toDateString(), 'ate' => now()->toDateString(), 'preset' => 'this_month'];
+
+        financeDigestRun($this, $month, ['created_at' => now()->subDays(2), 'final_output' => '{"resumo":"Antiga"}']);
+        $latest = financeDigestRun($this, $month, ['final_output' => "```json\n{\"resumo\":\"Mais recente\",\"ganhando\":[]}\n```"]);
+
+        $last = financeIndexProps($this)['ai']['last_digest'];
+
+        expect($last['run_id'])->toBe((string) $latest->id)
+            ->and($last['result']['resumo'])->toBe('Mais recente') // tolera a cerca ```json
+            ->and($last['from'])->toBe($month['de'])
+            ->and($last['to'])->toBe($month['ate'])
+            ->and(financeIndexProps($this)['ai']['chat_max_length'])->toBe(4000);
+    });
+
+    it('duas análises no mesmo segundo: vale a criada por último (antes a escolha era aleatória)', function () {
+        actingAsManager($this, $this->admin);
+        $this->freezeSecond();
+        $month = ['de' => now()->startOfMonth()->toDateString(), 'ate' => now()->toDateString(), 'preset' => 'this_month'];
+
+        $first = financeDigestRun($this, $month, ['final_output' => '{"resumo":"Primeira"}', 'status' => AiRunStatus::WaitingApproval->value]);
+        usleep(2000); // outro milissegundo no UUIDv7; o created_at continua igual
+        $second = financeDigestRun($this, $month, ['final_output' => '{"resumo":"Segunda"}']);
+        // Como no uso real: a primeira é aprovada depois e a linha muda de lugar na tabela.
+        $first->update(['status' => AiRunStatus::Approved->value]);
+
+        expect(AiRun::query()->pluck('created_at')->unique())->toHaveCount(1)
+            ->and(financeIndexProps($this)['ai']['last_digest']['run_id'])->toBe((string) $second->id);
+    });
+
+    it('não reaproveita análise de outro período, que falhou, de outra entidade ou com JSON inválido', function () {
+        actingAsManager($this, $this->admin);
+        $month = ['de' => now()->startOfMonth()->toDateString(), 'ate' => now()->toDateString(), 'preset' => 'this_month'];
+        $other = Entity::factory()->create(['is_client' => false]);
+
+        financeDigestRun($this, [...$month, 'preset' => '12m']);
+        financeDigestRun($this, $month, ['status' => AiRunStatus::Failed->value]);
+        financeDigestRun($this, $month, ['entity_id' => $other->id]);
+        financeDigestRun($this, $month, ['final_output' => 'resposta sem JSON']);
+
+        expect(financeIndexProps($this)['ai']['last_digest'])->toBeNull();
+    });
+
+    it('showAiRun devolve a análise já decodificada e o período que o servidor usou', function () {
+        actingAsManager($this, $this->admin);
+
+        $run = financeDigestRun($this, ['de' => '2026-07-01', 'ate' => '2026-09-30', 'preset' => 'custom'], [
+            'status'       => AiRunStatus::WaitingApproval->value,
+            'final_output' => "Segue a análise:\n```json\n{\"resumo\":\"ok\",\"ganhando\":[]}\n```",
+        ]);
+
+        $request = Request::create("/panel/manager/finance/ai/runs/{$run->id}", 'GET');
+        $request->setLaravelSession(app('session.store'));
+        $data = app(FinanceController::class)->showAiRun($run)->getData(true);
+
+        expect($data['status'])->toBe('approved')
+            ->and($data['result'])->toBe(['resumo' => 'ok', 'ganhando' => []])
+            ->and($data['period'])->toBe(['from' => '2026-07-01', 'to' => '2026-09-30']);
+    });
+});

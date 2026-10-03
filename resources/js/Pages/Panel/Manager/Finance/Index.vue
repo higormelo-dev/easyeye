@@ -1,8 +1,10 @@
 <script setup>
-import { ref, reactive, computed, nextTick } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import axios from 'axios';
+import AiChatCard from './AiChatCard.vue';
+import AiDigestCard from './AiDigestCard.vue';
 
 const props = defineProps({
     summary: { type: Object, required: true },
@@ -142,121 +144,13 @@ async function deleteExpense(expense) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// IA — Digest estruturado
+// IA — análise e conversa (AiDigestCard / AiChatCard)
 // ─────────────────────────────────────────────────────────────────────────
-const digestBusy = ref(false);
-const digestResult = ref(null);
-const digestError = ref('');
+const chatCard = ref(null);
 
-function aiUrl(key, id) {
-    const raw = props.ai.urls[key];
-    return id ? raw.replace('__ID__', id) : raw;
-}
-
-const BACKOFF_MS = [1500, 2000, 3000, 4500, 6000, 8000];
-
-async function pollRun(runId, onDone) {
-    let attempt = 0;
-    const deadline = Date.now() + 120000;
-
-    const tick = async () => {
-        if (Date.now() > deadline) {
-            onDone(null, 'timeout');
-            return;
-        }
-        try {
-            const { data } = await axios.get(aiUrl('show', runId));
-            if (['approved', 'rejected', 'failed', 'cancelled'].includes(data.status)) {
-                onDone(data, data.status === 'approved' ? null : data.error_message || data.status);
-                return;
-            }
-            const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
-            attempt += 1;
-            setTimeout(tick, delay);
-        } catch (e) {
-            onDone(null, e.response?.data?.message ?? 'error');
-        }
-    };
-    await tick();
-}
-
-async function generateDigest() {
-    if (digestBusy.value) return;
-    digestBusy.value = true;
-    digestError.value = '';
-    digestResult.value = null;
-    try {
-        const { data } = await axios.post(aiUrl('digest'));
-        await pollRun(data.run_id, (result, error) => {
-            digestBusy.value = false;
-            if (error) {
-                digestError.value = props.t.ai.error;
-                return;
-            }
-            try {
-                digestResult.value = JSON.parse(result.final_output);
-            } catch {
-                digestError.value = props.t.ai.error;
-            }
-        });
-    } catch (e) {
-        digestBusy.value = false;
-        digestError.value = e.response?.data?.message ?? props.t.ai.error;
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// IA — Chat
-// ─────────────────────────────────────────────────────────────────────────
-function newUuid() {
-    return window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-const chatMessages = ref([]);
-const chatPrompt = ref('');
-const chatBusy = ref(false);
-const chatConversationId = ref(newUuid());
-const chatScroll = ref(null);
-
-function newChatConversation() {
-    chatConversationId.value = newUuid();
-    chatMessages.value = [];
-}
-
-function applyChatSuggestion(text) {
-    chatPrompt.value = text;
-}
-
-async function sendChat() {
-    const prompt = chatPrompt.value.trim();
-    if (!prompt || chatBusy.value) return;
-    chatBusy.value = true;
-    chatMessages.value.push({ role: 'user', content: prompt });
-    chatPrompt.value = '';
-    const assistantMsg = reactive({ role: 'assistant', content: '', pending: true });
-    chatMessages.value.push(assistantMsg);
-    nextTick(() => {
-        if (chatScroll.value) chatScroll.value.scrollTop = chatScroll.value.scrollHeight;
-    });
-
-    try {
-        const { data } = await axios.post(aiUrl('chat'), {
-            user_prompt: prompt,
-            conversation_id: chatConversationId.value,
-        });
-        await pollRun(data.run_id, (result, error) => {
-            assistantMsg.pending = false;
-            assistantMsg.content = error ? props.t.ai.error : (result?.final_output ?? '');
-            chatBusy.value = false;
-            nextTick(() => {
-                if (chatScroll.value) chatScroll.value.scrollTop = chatScroll.value.scrollHeight;
-            });
-        });
-    } catch (e) {
-        assistantMsg.pending = false;
-        assistantMsg.content = e.response?.data?.message ?? props.t.ai.error;
-        chatBusy.value = false;
-    }
+// "Perguntar sobre isto" na análise → pergunta pronta no chat (o admin revisa e envia).
+function askChat(text) {
+    chatCard.value?.ask(text);
 }
 </script>
 
@@ -513,144 +407,19 @@ async function sendChat() {
                 </div>
             </div>
 
-            <!-- ═══════════════ IA — Digest ═══════════════ -->
-            <div class="pf-card mb-3">
-                <div class="pf-card-header d-flex align-items-center justify-content-between">
-                    <div>
-                        <div>{{ t.ai.title }}</div>
-                        <div class="text-muted fw-normal" style="font-size: 0.78rem">{{ t.ai.subtitle }}</div>
-                    </div>
-                    <button
-                        type="button"
-                        class="btn btn-sm"
-                        :class="digestResult ? 'btn-outline-primary' : 'btn-primary'"
-                        :disabled="digestBusy"
-                        @click="generateDigest"
-                    >
-                        <span v-if="digestBusy" class="spinner-border spinner-border-sm me-1"></span>
-                        <i v-else class="ti ti-sparkles me-1"></i>
-                        {{ digestResult ? t.ai.regenerate : t.ai.generate }}
-                    </button>
+            <!-- ═══════════════ IA — análise + conversa (lado a lado em telas largas) ═══════════════ -->
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-xxl-7">
+                    <AiDigestCard :t="t.ai" :period="period" :urls="ai.urls" :initial="ai.last_digest" @ask="askChat" />
                 </div>
-                <div class="pf-card-body">
-                    <div v-if="digestError" class="alert alert-danger py-2 small mb-0">{{ digestError }}</div>
-                    <div v-else-if="digestBusy && !digestResult" class="text-muted small py-3 text-center">
-                        <span class="spinner-border spinner-border-sm me-2"></span>{{ t.ai.thinking }}
-                    </div>
-                    <div v-else-if="!digestResult" class="text-muted small py-3 text-center">{{ t.ai.empty }}</div>
-                    <div v-else>
-                        <p class="fw-semibold mb-3">{{ digestResult.resumo }}</p>
-                        <div class="row g-3">
-                            <div
-                                class="col-md-6"
-                                v-for="section in [
-                                    {
-                                        key: 'ganhando',
-                                        label: t.ai.section_winning,
-                                        icon: 'ti-arrow-up-circle',
-                                        cls: 'pf-digest--good',
-                                    },
-                                    {
-                                        key: 'perdendo',
-                                        label: t.ai.section_losing,
-                                        icon: 'ti-arrow-down-circle',
-                                        cls: 'pf-digest--bad',
-                                    },
-                                    {
-                                        key: 'oportunidades',
-                                        label: t.ai.section_opportunities,
-                                        icon: 'ti-bulb',
-                                        cls: 'pf-digest--opp',
-                                    },
-                                    {
-                                        key: 'acoes_sugeridas',
-                                        label: t.ai.section_actions,
-                                        icon: 'ti-checklist',
-                                        cls: 'pf-digest--action',
-                                    },
-                                ]"
-                                :key="section.key"
-                            >
-                                <div :class="['pf-digest-section', section.cls]">
-                                    <div class="pf-digest-section-title">
-                                        <i :class="'ti ' + section.icon"></i>{{ section.label }}
-                                    </div>
-                                    <div v-if="!digestResult[section.key]?.length" class="text-muted small">—</div>
-                                    <div v-for="(item, i) in digestResult[section.key]" :key="i" class="pf-digest-item">
-                                        <div class="pf-digest-item-title">{{ item.titulo }}</div>
-                                        <div class="pf-digest-item-detail">{{ item.detalhe }}</div>
-                                        <div v-if="item.evidencia" class="pf-digest-item-evidence">
-                                            <i class="ti ti-database me-1"></i>{{ t.ai.evidence_label }}:
-                                            {{ item.evidencia }}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ═══════════════ IA — Chat ═══════════════ -->
-            <div class="pf-card mb-3">
-                <div class="pf-card-header d-flex align-items-center justify-content-between">
-                    <div>
-                        <div>{{ t.ai.chat_title }}</div>
-                        <div class="text-muted fw-normal" style="font-size: 0.78rem">{{ t.ai.chat_subtitle }}</div>
-                    </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="newChatConversation">
-                        <i class="ti ti-rotate me-1"></i>{{ t.ai.chat_new }}
-                    </button>
-                </div>
-                <div class="pf-card-body">
-                    <div ref="chatScroll" class="pf-chat-messages mb-2">
-                        <div v-if="!chatMessages.length" class="text-muted small text-center py-3">
-                            {{ t.ai.chat_empty }}
-                        </div>
-                        <div
-                            v-for="(msg, i) in chatMessages"
-                            :key="i"
-                            class="pf-chat-msg"
-                            :class="`pf-chat-msg--${msg.role}`"
-                        >
-                            <span v-if="msg.pending" class="text-muted small"
-                                ><span class="spinner-border spinner-border-sm me-1"></span>{{ t.ai.thinking }}</span
-                            >
-                            <span v-else style="white-space: pre-wrap">{{ msg.content }}</span>
-                        </div>
-                    </div>
-
-                    <div v-if="!chatMessages.length" class="d-flex flex-wrap gap-1 mb-2">
-                        <button
-                            v-for="s in t.ai.chat_suggestions"
-                            :key="s"
-                            type="button"
-                            class="btn btn-sm btn-outline-secondary"
-                            style="font-size: 0.75rem"
-                            @click="applyChatSuggestion(s)"
-                        >
-                            {{ s }}
-                        </button>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        <input
-                            v-model="chatPrompt"
-                            type="text"
-                            class="form-control form-control-sm"
-                            :placeholder="t.ai.chat_placeholder"
-                            :disabled="chatBusy"
-                            @keydown.enter="sendChat"
-                        />
-                        <button
-                            type="button"
-                            class="btn btn-primary btn-sm"
-                            :disabled="chatBusy || !chatPrompt.trim()"
-                            @click="sendChat"
-                        >
-                            <i class="ti ti-send"></i>
-                        </button>
-                    </div>
+                <div class="col-12 col-xxl-5">
+                    <AiChatCard
+                        ref="chatCard"
+                        :t="t.ai"
+                        :period="period"
+                        :urls="ai.urls"
+                        :max-length="ai.chat_max_length ?? 4000"
+                    />
                 </div>
             </div>
         </div>
@@ -901,84 +670,6 @@ async function sendChat() {
     margin-left: 3px;
 }
 
-.pf-digest-section {
-    border: 1px solid #e2e8f0;
-    border-radius: 0.6rem;
-    padding: 0.8rem;
-    height: 100%;
-}
-.pf-digest--good {
-    border-left: 3px solid #16a34a;
-}
-.pf-digest--bad {
-    border-left: 3px solid #dc2626;
-}
-.pf-digest--opp {
-    border-left: 3px solid #7c3aed;
-}
-.pf-digest--action {
-    border-left: 3px solid #0891b2;
-}
-.pf-digest-section-title {
-    font-weight: 700;
-    font-size: 0.82rem;
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.pf-digest-item {
-    margin-bottom: 0.6rem;
-}
-.pf-digest-item:last-child {
-    margin-bottom: 0;
-}
-.pf-digest-item-title {
-    font-weight: 600;
-    font-size: 0.82rem;
-    color: #1e293b;
-}
-.pf-digest-item-detail {
-    font-size: 0.78rem;
-    color: #475569;
-}
-.pf-digest-item-evidence {
-    font-size: 0.7rem;
-    color: #7c3aed;
-    background: #f5f3ff;
-    border-radius: 4px;
-    padding: 2px 6px;
-    display: inline-block;
-    margin-top: 3px;
-}
-
-.pf-chat-messages {
-    max-height: 320px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background: #f8fafc;
-    border-radius: 0.5rem;
-}
-.pf-chat-msg {
-    max-width: 85%;
-    padding: 0.5rem 0.7rem;
-    border-radius: 0.5rem;
-    font-size: 0.84rem;
-}
-.pf-chat-msg--user {
-    align-self: flex-end;
-    background: #7c3aed;
-    color: #fff;
-}
-.pf-chat-msg--assistant {
-    align-self: flex-start;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-}
-
 /* ── Dark mode ────────────────────────────────────────────────────────────
    Página inteira é CSS custom (pf-*) com cor fixa, zero reação a tema —
    mesma paleta já usada em .pmr-form/inputs globais/SearchSelect (ver
@@ -1033,28 +724,5 @@ async function sendChat() {
 
 :root[data-bs-theme='dark'] .pf-bar-track {
     background: #18212f;
-}
-
-:root[data-bs-theme='dark'] .pf-digest-section {
-    border-color: #384559;
-}
-:root[data-bs-theme='dark'] .pf-digest-item-title {
-    color: #dbe4ef;
-}
-:root[data-bs-theme='dark'] .pf-digest-item-detail {
-    color: #9fb0c7;
-}
-:root[data-bs-theme='dark'] .pf-digest-item-evidence {
-    color: #c4b5fd;
-    background: rgba(124, 58, 237, 0.18);
-}
-
-:root[data-bs-theme='dark'] .pf-chat-messages {
-    background: #0d1219;
-}
-:root[data-bs-theme='dark'] .pf-chat-msg--assistant {
-    background: #18212f;
-    border-color: #384559;
-    color: #dbe4ef;
 }
 </style>
