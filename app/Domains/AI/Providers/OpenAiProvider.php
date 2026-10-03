@@ -40,14 +40,20 @@ class OpenAiProvider implements AiProviderInterface
         $content      = $this->extractTextContent($json);
         $responseHash = hash('sha256', $content);
 
+        // output_tokens da OpenAI JÁ inclui o raciocínio (total = entrada +
+        // saída). A cobrança soma saída + raciocínio, então a saída fica só
+        // com o texto visível — antes o raciocínio era cobrado duas vezes.
+        $reasoningTokens = (int) data_get($json, 'usage.output_tokens_details.reasoning_tokens', 0);
+        $outputTokens    = max(0, (int) data_get($json, 'usage.output_tokens', 0) - $reasoningTokens);
+
         return new AiProviderResponseData(
             provider: $this->provider(),
             model: (string) data_get($json, 'model', $this->model()),
             content: $content,
             usage: new AiUsageData(
                 inputTokens: (int) data_get($json, 'usage.input_tokens', 0),
-                outputTokens: (int) data_get($json, 'usage.output_tokens', 0),
-                reasoningTokens: (int) data_get($json, 'usage.output_tokens_details.reasoning_tokens', 0),
+                outputTokens: $outputTokens,
+                reasoningTokens: $reasoningTokens,
                 toolCallsCount: $this->countToolCalls($json),
                 rawCostUsd: null,
             ),

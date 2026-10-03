@@ -14,6 +14,7 @@ import ConsumptionByProviderChart from './ConsumptionByProviderChart.vue';
 import InternalWalletCard from './InternalWalletCard.vue';
 import ProviderCostsCard from './ProviderCostsCard.vue';
 import ProviderTopupModal from './ProviderTopupModal.vue';
+import { providerMeta } from './aiProviderMeta';
 
 /**
  * Manager: dois trabalhos do dono do SaaS, separados em abas claras —
@@ -375,21 +376,14 @@ function providerBadgeClass(provider) {
         case 'gemini':
             return 'badge bg-primary-subtle text-primary border border-primary border-opacity-25';
         default:
-            return 'badge bg-light text-muted';
+            return provider
+                ? 'badge bg-secondary-subtle text-secondary border border-secondary border-opacity-25'
+                : 'badge bg-light text-muted';
     }
 }
 
 function providerIcon(provider) {
-    switch (provider) {
-        case 'openai':
-            return 'ti ti-brand-openai';
-        case 'anthropic':
-            return 'ti ti-message-chatbot';
-        case 'gemini':
-            return 'ti ti-brand-google';
-        default:
-            return 'ti ti-minus';
-    }
+    return provider ? providerMeta(provider).icon : 'ti ti-minus';
 }
 </script>
 
@@ -915,6 +909,7 @@ function providerIcon(provider) {
             ref="topupModalRef"
             :open="topupModalOpen"
             :preset-provider="presetTopupProvider"
+            :providers="providerOptions"
             :t="t"
             @close="closeTopupModal"
             @submit="submitTopup"

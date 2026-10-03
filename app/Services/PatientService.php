@@ -56,6 +56,18 @@ class PatientService
                     $request->card_number : null;
             }
 
+            // Plano acompanha o convênio (o validador já garantiu que o plano
+            // enviado é dele). Quem não manda o plano (ex.: integração antiga)
+            // não o apaga — a não ser que troque de convênio.
+            if ($request->has('covenant_plan_id')) {
+                $data['covenant_plan_id'] = $this->planFor(
+                    $request->has('covenant_id') ? $request->covenant_id : $patient->covenant_id,
+                    $request->covenant_plan_id,
+                );
+            } elseif ($request->has('covenant_id') && (string) $request->covenant_id !== (string) $patient->covenant_id) {
+                $data['covenant_plan_id'] = null;
+            }
+
             $patient->update($data);
 
             if (! $request->has('type_method')) {
@@ -209,10 +221,11 @@ class PatientService
             ->first();
 
         $patientData = [
-            'covenant_id' => $request->covenant_id,
-            'skin_id'     => $request->skin_id,
-            'iris_id'     => $request->iris_id,
-            'card_number' => ($covenant !== null && ! $this->isParticular($covenant)) ? $request->card_number : null,
+            'covenant_id'      => $request->covenant_id,
+            'skin_id'          => $request->skin_id,
+            'iris_id'          => $request->iris_id,
+            'card_number'      => ($covenant !== null && ! $this->isParticular($covenant)) ? $request->card_number : null,
+            'covenant_plan_id' => $this->planFor($request->covenant_id, $request->covenant_plan_id),
         ];
 
         if ($existingPatientEntity) {
@@ -391,6 +404,18 @@ class PatientService
             ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
             ->where('entity_users.entity_id', $entityId)
             ->select('doctors.person_id');
+    }
+
+    /** Plano só existe para convênio que não é Particular. */
+    private function planFor(?string $covenantId, ?string $planId): ?string
+    {
+        if (blank($planId) || blank($covenantId)) {
+            return null;
+        }
+
+        $covenant = Covenant::query()->find($covenantId);
+
+        return $covenant !== null && ! $this->isParticular($covenant) ? $planId : null;
     }
 
     /** Covenant grava `name` em maiúsculas (HasUppercaseFields) — comparar sem caixa. */

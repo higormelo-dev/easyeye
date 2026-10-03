@@ -19,8 +19,8 @@ class EloquentAiModelPriceRepository implements AiModelPriceRepositoryInterface
             return $exact;
         }
 
-        // Provedores devolvem o id do snapshot datado (ex.: gpt-4o-2024-08-06).
-        // Cai para o modelo-base (gpt-4o) cadastrado no price table.
+        // Provedores devolvem o id do snapshot datado (ex.: gpt-4o-2024-08-06,
+        // claude-sonnet-4-5-20250929). Cai para o modelo-base cadastrado.
         $base = $this->baseModel($model);
 
         return $base !== $model ? $this->queryActive($provider, $base) : null;
@@ -45,6 +45,12 @@ class EloquentAiModelPriceRepository implements AiModelPriceRepositoryInterface
 
     private function baseModel(string $model): string
     {
-        return preg_replace('/-\d{4}-\d{2}-\d{2}$/', '', $model) ?? $model;
+        return self::stripSnapshotDate($model);
+    }
+
+    /** Remove o sufixo de data do snapshot: -AAAA-MM-DD (OpenAI) ou -AAAAMMDD (Anthropic). */
+    public static function stripSnapshotDate(string $model): string
+    {
+        return preg_replace('/-(?:\d{4}-\d{2}-\d{2}|20\d{6})$/', '', $model) ?? $model;
     }
 }

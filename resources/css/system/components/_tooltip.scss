@@ -30,9 +30,28 @@ $value in $theme-colors {
     }
 }
 
+.tooltip {
+    // Dicas do sistema (title) podem ter uma frase inteira.
+    --bs-tooltip-max-width: 320px;
+}
+
+// Controle desabilitado com title explica o motivo (ex.: prontuário assinado).
+// O Bootstrap (.btn:disabled) e o ActionIconButton tiram o ponteiro do
+// desabilitado — o mouse "atravessava" o botão e nem o title nativo aparecia.
+// Só nos desabilitados NATIVOS: o navegador continua bloqueando o clique.
+button:disabled[title],
+input:disabled[title],
+select:disabled[title],
+textarea:disabled[title] {
+    pointer-events: auto;
+    cursor: not-allowed;
+}
+
 .tooltip-inner {
     padding: 0.3125rem 0.625rem;
     background-color: var(--dark);
+    // Respeita quebras de linha do title (ex.: listas em dicas).
+    white-space: pre-line;
   }
   
   $tooltip-placements: top, bottom, left, right;

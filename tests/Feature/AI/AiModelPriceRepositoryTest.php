@@ -16,7 +16,7 @@ test('findActive ignora preço com effective_until vencido', function () {
         'active'          => true,
     ]);
 
-    $repo = new EloquentAiModelPriceRepository();
+    $repo  = new EloquentAiModelPriceRepository();
     $price = $repo->findActive(AiProvider::OpenAI, 'gpt-archived');
 
     expect($price)->toBeNull();
@@ -31,7 +31,7 @@ test('findActive ignora preço com active=false mesmo na janela', function () {
         'active'          => false,
     ]);
 
-    $repo = new EloquentAiModelPriceRepository();
+    $repo  = new EloquentAiModelPriceRepository();
     $price = $repo->findActive(AiProvider::Anthropic, 'claude-disabled');
 
     expect($price)->toBeNull();
@@ -40,24 +40,24 @@ test('findActive ignora preço com active=false mesmo na janela', function () {
 test('findActive retorna o preço mais recente quando há histórico', function () {
     // Antigo: vigência fechada
     AiModelPrice::factory()->create([
-        'provider'              => AiProvider::Gemini->value,
-        'model'                 => 'gemini-pro',
-        'input_usd_per_million' => 0.50,
+        'provider'               => AiProvider::Gemini->value,
+        'model'                  => 'gemini-pro',
+        'input_usd_per_million'  => 0.50,
         'output_usd_per_million' => 1.50,
-        'effective_from'        => now()->subYear(),
-        'effective_until'       => now()->subMonth(),
-        'active'                => true,
+        'effective_from'         => now()->subYear(),
+        'effective_until'        => now()->subMonth(),
+        'active'                 => true,
     ]);
 
     // Atual: vigência aberta com preço novo
     AiModelPrice::factory()->create([
-        'provider'              => AiProvider::Gemini->value,
-        'model'                 => 'gemini-pro',
-        'input_usd_per_million' => 1.25,
+        'provider'               => AiProvider::Gemini->value,
+        'model'                  => 'gemini-pro',
+        'input_usd_per_million'  => 1.25,
         'output_usd_per_million' => 5.00,
-        'effective_from'        => now()->subDay(),
-        'effective_until'       => null,
-        'active'                => true,
+        'effective_from'         => now()->subDay(),
+        'effective_until'        => null,
+        'active'                 => true,
     ]);
 
     $repo  = new EloquentAiModelPriceRepository();
@@ -80,4 +80,21 @@ test('findActive ignora preço cujo effective_from ainda não chegou', function 
     $price = $repo->findActive(AiProvider::OpenAI, 'gpt-future');
 
     expect($price)->toBeNull();
+});
+
+test('findActive cai no modelo-base para snapshot datado da Anthropic (-AAAAMMDD)', function () {
+    AiModelPrice::factory()->create([
+        'provider'        => AiProvider::Anthropic->value,
+        'model'           => 'claude-sonnet-4-5',
+        'effective_from'  => now()->subDay(),
+        'effective_until' => null,
+        'active'          => true,
+    ]);
+
+    $price = (new EloquentAiModelPriceRepository())->findActive(AiProvider::Anthropic, 'claude-sonnet-4-5-20250929');
+
+    expect($price?->model)->toBe('claude-sonnet-4-5')
+        ->and(EloquentAiModelPriceRepository::stripSnapshotDate('gpt-4o-2024-08-06'))->toBe('gpt-4o')
+        // Versão no nome não é data de snapshot.
+        ->and(EloquentAiModelPriceRepository::stripSnapshotDate('gemini-3.6-flash'))->toBe('gemini-3.6-flash');
 });

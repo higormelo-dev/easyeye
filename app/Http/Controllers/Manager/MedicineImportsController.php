@@ -12,15 +12,18 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Upload da lista CMED/Anvisa pro catálogo global de medicamentos — o
- * processamento (~1 min pra lista completa) roda em fila
- * (ProcessMedicineImportJob); o progresso chega à tela por WebSocket
- * (ImportProgressUpdated).
+ * Carga do catálogo global de medicamentos: download direto da CMED/Anvisa
+ * ("Atualizar agora") ou envio dos arquivos — o processamento (~1 min pra
+ * lista completa) roda em fila (ProcessMedicineImportJob); o progresso chega
+ * à tela por WebSocket (ImportProgressUpdated).
  */
 class MedicineImportsController extends Controller
 {
     public function store(MedicineImportRequest $request): RedirectResponse
     {
+        $data   = $request->validated();
+        $upload = $data['source'] === 'upload';
+
         // Uma carga por vez: duas importações simultâneas disputariam a
         // varredura que desativa as apresentações que saíram da lista.
         $running = MedicineImport::query()
@@ -28,7 +31,20 @@ class MedicineImportsController extends Controller
             ->exists();
 
         if ($running) {
-            throw ValidationException::withMessages(['cmed_file' => __('manager_medicines.import_in_progress')]);
+            throw ValidationException::withMessages([($upload ? 'cmed_file' : 'source') => __('manager_medicines.import_in_progress')]);
+        }
+
+        if (! $upload) {
+            $import = MedicineImport::query()->create([
+                'user_id' => $request->user()->id,
+                'source'  => MedicineImport::SOURCE_CMED,
+                'force'   => (bool) ($data['force'] ?? false),
+                'status'  => ImportStatus::Pending,
+            ]);
+
+            ProcessMedicineImportJob::dispatch($import);
+
+            return back()->with('success', __('manager_medicines.sync_queued'));
         }
 
         $folder = 'imports/medicines/' . Str::uuid7();
@@ -37,6 +53,7 @@ class MedicineImportsController extends Controller
 
         $import = MedicineImport::query()->create([
             'user_id'                 => $request->user()->id,
+            'source'                  => MedicineImport::SOURCE_UPLOAD,
             'status'                  => ImportStatus::Pending,
             'cmed_file_path'          => $cmed->storeAs($folder, 'cmed.' . $this->extension($cmed)),
             'cmed_original_name'      => mb_substr($cmed->getClientOriginalName(), 0, 255),
@@ -47,6 +64,29 @@ class MedicineImportsController extends Controller
         ProcessMedicineImportJob::dispatch($import);
 
         return back()->with('success', __('manager_medicines.import_queued'));
+    }
+
+    /**
+     * Cancela uma carga PARADA (na fila sem começar — worker fora do ar — ou
+     * sem progresso além do timeout do job). Sem isto ela bloqueava novas
+     * cargas para sempre. Em andamento normal: recusa.
+     */
+    public function cancel(string $import): RedirectResponse
+    {
+        $model = MedicineImport::query()->findOrFail($import);
+
+        if (! $model->isStalled()) {
+            throw ValidationException::withMessages(['import' => __('manager_medicines.import_not_stalled')]);
+        }
+
+        $model->update([
+            'status'      => ImportStatus::Cancelled,
+            'phase'       => null,
+            'error'       => __('manager_medicines.import_cancelled_reason'),
+            'finished_at' => now(),
+        ]);
+
+        return back()->with('success', __('manager_medicines.import_cancelled'));
     }
 
     /** Extensão do nome enviado, só letras (já validada por mimes). */

@@ -243,7 +243,7 @@ class PanelNavigation
 
             // Atendimento: catálogos ligados ao fluxo de agendamento/atendimento.
             $attendanceChildren = [
-                ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants'), 'match' => ['panel.setting.covenants.*']],
+                ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants'), 'match' => ['panel.setting.covenants.*', 'panel.setting.covenant-plans.*']],
                 ['route' => 'panel.setting.visittypes.index', 'label' => __('actions.sidemenu.visittypes'), 'match' => ['panel.setting.visittypes.*']],
                 // 'Tipos de cirurgia' MOVIDO pra virar 9ª aba dentro de
                 // "Parâmetros oftalmológicos" (era item solto aqui) — pedido
@@ -480,6 +480,36 @@ class PanelNavigation
         ];
     }
 
+    /**
+     * Catálogos globais (medicamentos, convênios) — rotas saas.role:admin
+     * (admin ou dono); para o resto da equipe o link só daria 403.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function managerCatalogItems(bool $isOwnerOrAdmin): array
+    {
+        if (! $isOwnerOrAdmin) {
+            return [];
+        }
+
+        return [
+            [
+                'key'   => 'medicines',
+                'route' => 'manager.medicines.index',
+                'icon'  => 'ti ti-pill',
+                'label' => __('manager_medicines.menu'),
+                'match' => ['manager.medicines.*'],
+            ],
+            [
+                'key'   => 'covenants',
+                'route' => 'manager.covenants.index',
+                'icon'  => 'ti ti-building-hospital',
+                'label' => __('manager_covenants.menu'),
+                'match' => ['manager.covenants.*'],
+            ],
+        ];
+    }
+
     private static function managerNav(): array
     {
         $nav = [
@@ -548,13 +578,7 @@ class PanelNavigation
                 'label' => __('actions.report_settings.title'),
                 'match' => ['manager.report-settings.*'],
             ],
-            [
-                'key'   => 'medicines',
-                'route' => 'manager.medicines.index',
-                'icon'  => 'ti ti-pill',
-                'label' => __('manager_medicines.menu'),
-                'match' => ['manager.medicines.*'],
-            ],
+            ...self::managerCatalogItems($isOwnerOrAdmin),
             [
                 'key'   => 'partners',
                 'route' => 'manager.partners.index',

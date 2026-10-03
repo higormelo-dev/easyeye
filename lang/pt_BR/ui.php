@@ -35,5 +35,15 @@ return [
     'patient_form' => [
         'occupation'             => 'Profissão',
         'occupation_placeholder' => 'Ex.: professora, motorista, aposentado(a)',
+        // Plano do convênio (produto da ANS ou plano da clínica)
+        'plan'                 => 'Plano',
+        'plan_placeholder'     => 'Buscar pelo nome ou registro na ANS',
+        'plan_select_covenant' => 'Escolha o convênio primeiro',
+        'plan_particular'      => 'Não se aplica a Particular',
+        'plan_empty'           => 'Nenhum plano para este convênio',
+        'plan_no_results'      => 'Nenhum plano encontrado',
+        'plan_none'            => 'Nenhum plano cadastrado para este convênio. A clínica pode cadastrar em Configurações › Convênios › Planos.',
+        'plan_unavailable'     => 'Este plano não está mais disponível (cancelado na ANS ou desativado). Escolha outro ao atualizar o cadastro.',
+        'plan_hint'            => 'Opcional. O registro do produto na ANS vem impresso na carteirinha.',
     ],
 ];

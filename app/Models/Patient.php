@@ -37,6 +37,7 @@ class Patient extends Model
         'entity_id',
         'person_id',
         'covenant_id',
+        'covenant_plan_id',
         'skin_id',
         'iris_id',
         'code',
@@ -213,6 +214,15 @@ class Patient extends Model
     public function covenant(): BelongsTo
     {
         return $this->belongsTo(Covenant::class, 'covenant_id');
+    }
+
+    /**
+     * Plano do convênio (ANS ou próprio da clínica). Inclui plano excluído:
+     * o cadastro continua mostrando o que foi registrado.
+     */
+    public function covenantPlan(): BelongsTo
+    {
+        return $this->belongsTo(CovenantPlan::class, 'covenant_plan_id')->withTrashed();
     }
 
     public function skinType(): BelongsTo

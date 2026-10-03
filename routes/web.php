@@ -64,12 +64,13 @@ use App\Http\Controllers\{
     SubscriptionExpiredController,
 };
 use App\Http\Controllers\{CallPanelDisplayController, MedicationPresetsController};
-use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
+use App\Http\Controllers\{Cid10SearchController, CovenantPlanSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
 use App\Http\Controllers\{PanelDashboardController, PreferencesController};
 use App\Http\Controllers\Security\TwoFactorController;
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
+    CovenantPlansController,
     CovenantsController,
     CoverTestTypesController,
     IrisTypesController,
@@ -343,6 +344,8 @@ Route::group(
         Route::middleware('permission:patients.manage,admin,financial,doctor,secretary')->group(function () {
             Route::get('patients/cards', [PatientsController::class, 'cards'])->name('patients.cards');
             Route::get('patients/search', [PatientsController::class, 'search'])->name('patients.search');
+            // Planos do convênio escolhido no cadastro do paciente (ANS + próprios da clínica).
+            Route::get('covenant-plans/search', CovenantPlanSearchController::class)->name('covenant-plans.search');
             Route::post('patients/quick', [PatientsController::class, 'quickStore'])->name('patients.quick');
             // Importação em lote — rotas específicas antes do resource para não conflitar com {patient}
             Route::get('patients/import', [PatientImportsController::class, 'index'])->name('patients.import.index');
@@ -874,6 +877,11 @@ Route::group(
                 Route::get('covenants/cards', [CovenantsController::class, 'cards'])->name('covenants.cards');
                 Route::resource('covenants', CovenantsController::class);
                 Route::get('covenants/{covenant}/restore', [CovenantsController::class, 'restore'])->name('covenants.restore');
+
+                // Planos próprios da clínica (os da ANS vêm do catálogo global).
+                Route::get('covenant-plans/cards', [CovenantPlansController::class, 'cards'])->name('covenant-plans.cards');
+                Route::resource('covenant-plans', CovenantPlansController::class);
+                Route::get('covenant-plans/{covenant_plan}/restore', [CovenantPlansController::class, 'restore'])->name('covenant-plans.restore');
 
                 Route::get('skintypes/cards', [SkinTypesController::class, 'cards'])->name('skintypes.cards');
                 Route::resource('skintypes', SkinTypesController::class);

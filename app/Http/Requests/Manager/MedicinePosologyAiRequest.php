@@ -2,12 +2,14 @@
 
 namespace App\Http\Requests\Manager;
 
+use App\Enums\AI\AiProvider;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Pedido de sugestão de posologia por IA (Manager → Medicamentos).
  * Item já salvo: só o id — os dados vêm do banco. Cadastro novo: os campos
- * digitados no formulário.
+ * digitados no formulário. `provider`: a IA escolhida pelo admin.
  */
 class MedicinePosologyAiRequest extends FormRequest
 {
@@ -26,6 +28,9 @@ class MedicinePosologyAiRequest extends FormRequest
             'concentration'            => ['nullable', 'string', 'max:100'],
             'medicine_presentation_id' => ['nullable', 'string', 'max:64'],
             'is_ophthalmic'            => ['nullable', 'boolean'],
+            // IA escolhida (obrigatória quando há mais de uma configurada —
+            // o serviço confere contra as disponíveis).
+            'provider' => ['nullable', 'string', Rule::in(array_column(AiProvider::cases(), 'value'))],
         ];
     }
 }

@@ -1,6 +1,7 @@
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
@@ -23,6 +24,8 @@ const props = defineProps({
     stateOptions: { type: Array, default: () => [] },
     isEdit: { type: Boolean, default: false },
     lookupCep: { type: Function, default: () => {} },
+    // Plano já salvo (opção completa vinda do editData) — rótulo do seletor.
+    planOption: { type: Object, default: null },
 });
 
 // Particular não tem carteirinha — o backend já descarta o valor
@@ -33,13 +36,93 @@ const isParticular = computed(() => {
 });
 
 watch(isParticular, (particular) => {
-    if (particular) props.form.card_number = '';
+    if (particular) {
+        props.form.card_number = '';
+        props.form.covenant_plan_id = '';
+    }
 });
 
 // Textos compartilhados (lang/<locale>/ui.php → patient_form) — o mesmo
 // componente serve Pacientes e Agenda, cada um com o seu `t` de página.
 const page = usePage();
 const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
+
+// ── Plano do convênio ─────────────────────────────────────────────────────
+// Lista inicial (primeiros planos do convênio) + busca no servidor ao
+// digitar: a maior operadora tem ~4,5 mil planos.
+const planSeed = ref([]);
+const planLoading = ref(false);
+const pickedPlan = ref(null); // opção escolhida agora (detalhes abaixo do campo)
+let planRequest = 0;
+
+async function loadPlans(covenantId) {
+    const request = ++planRequest;
+    planSeed.value = [];
+
+    if (!covenantId || isParticular.value) {
+        planLoading.value = false;
+        return;
+    }
+
+    planLoading.value = true;
+    try {
+        const { data } = await axios.get(route('panel.covenant-plans.search'), { params: { covenant_id: covenantId } });
+        if (request === planRequest) planSeed.value = data?.data ?? [];
+    } catch {
+        // sem lista inicial: a busca ao digitar continua funcionando
+    } finally {
+        if (request === planRequest) planLoading.value = false;
+    }
+}
+
+watch(() => props.form.covenant_id, loadPlans, { immediate: true });
+
+// Trocar o convênio na tela invalida o plano (cada plano é de um convênio).
+// Só na ação do usuário: carregar um cadastro também muda o convênio.
+function onCovenantChange() {
+    props.form.covenant_plan_id = '';
+    pickedPlan.value = null;
+}
+
+const planOptions = computed(() => {
+    const saved = props.planOption;
+
+    if (!saved || saved.id !== props.form.covenant_plan_id || planSeed.value.some((p) => p.id === saved.id)) {
+        return planSeed.value;
+    }
+
+    return [saved, ...planSeed.value];
+});
+
+const currentPlan = computed(() => {
+    const id = props.form.covenant_plan_id;
+    if (!id) return null;
+    if (pickedPlan.value?.id === id) return pickedPlan.value;
+
+    return planOptions.value.find((p) => p.id === id) ?? null;
+});
+
+const planSearchUrl = computed(() =>
+    props.form.covenant_id && !isParticular.value
+        ? route('panel.covenant-plans.search', { covenant_id: props.form.covenant_id, q: '__Q__' })
+        : '',
+);
+
+const planPlaceholder = computed(() => {
+    if (isParticular.value) return ui.value.plan_particular;
+    if (!props.form.covenant_id) return ui.value.plan_select_covenant;
+
+    return ui.value.plan_placeholder;
+});
+
+const showNoPlans = computed(
+    () =>
+        !planLoading.value &&
+        !!props.form.covenant_id &&
+        !isParticular.value &&
+        !props.form.covenant_plan_id &&
+        planSeed.value.length === 0,
+);
 </script>
 
 <template>
@@ -173,8 +256,45 @@ const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
                 :options="covenants"
                 :placeholder="'Selecione'"
                 :invalid="!!form.errors.covenant_id"
+                @change="onCovenantChange"
             />
             <div v-if="form.errors.covenant_id" class="invalid-feedback d-block">{{ form.errors.covenant_id }}</div>
+        </div>
+
+        <div class="mb-3 patient-plan-field">
+            <label class="form-label">{{ ui.plan }}</label>
+            <SearchSelect
+                v-model="form.covenant_plan_id"
+                :options="planOptions"
+                value-key="id"
+                label-key="label"
+                :remote-search-url="planSearchUrl"
+                :remote-min-chars="2"
+                show-sub-label
+                :disabled="!form.covenant_id || isParticular"
+                :placeholder="planPlaceholder"
+                :no-options-text="ui.plan_empty"
+                :no-results-text="ui.plan_no_results"
+                :invalid="!!form.errors.covenant_plan_id"
+                @option-selected="pickedPlan = $event"
+            />
+            <div v-if="form.errors.covenant_plan_id" class="invalid-feedback d-block">
+                {{ form.errors.covenant_plan_id }}
+            </div>
+            <div aria-live="polite">
+                <small v-if="currentPlan?.sub_label" class="d-block text-muted mt-1 patient-plan-details">
+                    {{ currentPlan.sub_label }}
+                </small>
+                <small v-if="currentPlan && currentPlan.active === false" class="d-block text-warning-emphasis mt-1">
+                    <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ ui.plan_unavailable }}
+                </small>
+                <small v-else-if="showNoPlans" class="d-block text-muted mt-1 patient-plan-none">{{
+                    ui.plan_none
+                }}</small>
+                <small v-else-if="!form.covenant_plan_id && !isParticular" class="d-block text-muted mt-1">
+                    {{ ui.plan_hint }}
+                </small>
+            </div>
         </div>
 
         <div class="mb-3">

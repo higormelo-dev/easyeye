@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
+import { providerMeta, providerOrder } from './aiProviderMeta';
 
 /**
  * Painel de CUSTOS REAIS do EasyEye nos provedores (lado supplier).
@@ -18,28 +19,18 @@ const props = defineProps({
 
 const emit = defineEmits(['add-topup']);
 
-const PROVIDER_META = {
-    openai: {
-        label: 'ChatGPT',
-        icon: 'ti ti-brand-openai',
-        color: '#10a37f',
-        billingUrl: 'https://platform.openai.com/settings/organization/limits',
-    },
-    anthropic: {
-        label: 'Claude',
-        icon: 'ti ti-message-chatbot',
-        color: '#cc785c',
-        billingUrl: 'https://console.anthropic.com/settings/limits',
-    },
-    gemini: {
-        label: 'Gemini',
-        icon: 'ti ti-brand-google',
-        color: '#4285f4',
-        billingUrl: 'https://console.cloud.google.com/billing/budgets',
-    },
-};
-
-const PROVIDER_ORDER = ['openai', 'anthropic', 'gemini'];
+// Os três de sempre + provedores da lista pronta com movimento (gasto, chamadas ou recarga).
+const providerKeys = computed(() =>
+    providerOrder(Object.keys(props.costs?.by_provider ?? {}), (c) => {
+        const p = props.costs?.by_provider?.[c] ?? {};
+        return (
+            (p.calls_mtd ?? 0) > 0 ||
+            (p.last_7d_usd ?? 0) > 0 ||
+            (p.month_to_date_usd ?? 0) > 0 ||
+            (p.recent_topups?.length ?? 0) > 0
+        );
+    }),
+);
 
 const showChecklist = ref(false);
 
@@ -157,7 +148,7 @@ function fmtDateOnly(iso) {
 
             <!-- ─── Por provedor ───────────────────────────────────────── -->
             <div class="row g-2 mb-3">
-                <div v-for="key in PROVIDER_ORDER" :key="key" class="col-12 col-md-4">
+                <div v-for="key in providerKeys" :key="key" class="col-12 col-md-4">
                     <div
                         class="provider-cost-tile p-3 rounded h-100"
                         :class="
@@ -166,12 +157,15 @@ function fmtDateOnly(iso) {
                                 ? 'provider-cost-tile--danger'
                                 : ''
                         "
-                        :style="{ borderLeft: `4px solid ${PROVIDER_META[key].color}` }"
+                        :style="{ borderLeft: `4px solid ${providerMeta(key, byProvider[key]?.label).color}` }"
                     >
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <div class="fw-semibold" :style="{ color: PROVIDER_META[key].color }">
-                                <i :class="PROVIDER_META[key].icon" class="me-1"></i>
-                                {{ PROVIDER_META[key].label }}
+                            <div
+                                class="fw-semibold"
+                                :style="{ color: providerMeta(key, byProvider[key]?.label).color }"
+                            >
+                                <i :class="providerMeta(key, byProvider[key]?.label).icon" class="me-1"></i>
+                                {{ providerMeta(key, byProvider[key]?.label).label }}
                             </div>
                             <div class="d-flex align-items-center gap-1">
                                 <button
@@ -184,7 +178,8 @@ function fmtDateOnly(iso) {
                                     <i class="ti ti-plus" style="font-size: 0.85rem"></i>
                                 </button>
                                 <a
-                                    :href="PROVIDER_META[key].billingUrl"
+                                    v-if="providerMeta(key).billingUrl"
+                                    :href="providerMeta(key, byProvider[key]?.label).billingUrl"
                                     target="_blank"
                                     rel="noopener"
                                     class="text-muted small text-decoration-none"
@@ -369,21 +364,21 @@ function fmtDateOnly(iso) {
                     </div>
                 </div>
                 <ul class="mb-0" style="list-style: none; padding-left: 0">
-                    <li v-for="key in PROVIDER_ORDER" :key="key" class="mb-2">
+                    <li v-for="key in providerKeys.filter((k) => providerMeta(k).billingUrl)" :key="key" class="mb-2">
                         <i
-                            :class="PROVIDER_META[key].icon"
+                            :class="providerMeta(key, byProvider[key]?.label).icon"
                             class="me-1"
-                            :style="{ color: PROVIDER_META[key].color }"
+                            :style="{ color: providerMeta(key, byProvider[key]?.label).color }"
                         ></i>
-                        <strong>{{ PROVIDER_META[key].label }}:</strong>
+                        <strong>{{ providerMeta(key, byProvider[key]?.label).label }}:</strong>
                         configure limite mensal em
                         <a
-                            :href="PROVIDER_META[key].billingUrl"
+                            :href="providerMeta(key, byProvider[key]?.label).billingUrl"
                             target="_blank"
                             rel="noopener"
                             class="text-decoration-underline"
                         >
-                            {{ PROVIDER_META[key].billingUrl.replace('https://', '') }}
+                            {{ providerMeta(key, byProvider[key]?.label).billingUrl.replace('https://', '') }}
                         </a>
                     </li>
                 </ul>

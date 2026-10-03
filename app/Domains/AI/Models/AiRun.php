@@ -51,6 +51,7 @@ class AiRun extends Model
         'cancelled_at',
         'notified_pending_at',
         'error_message',
+        'dispatch_audit',
     ];
 
     protected function casts(): array
@@ -63,6 +64,7 @@ class AiRun extends Model
             'reserved_credits'    => 'integer',
             'consumed_credits'    => 'integer',
             'input_summary'       => 'array',
+            'dispatch_audit'      => 'array',
             'safety_notes'        => 'array',
             'started_at'          => 'datetime',
             'approved_at'         => 'datetime',

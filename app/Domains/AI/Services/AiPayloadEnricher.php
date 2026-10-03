@@ -70,7 +70,10 @@ class AiPayloadEnricher
 
         $payload['context'] = $this->buildContext($payload, $entityId);
 
-        $guarded                           = $this->promptGuardrails->sanitizePayload($payload);
+        // Nome do paciente digitado no pedido/texto livre sai como iniciais.
+        $patient = ! empty($payload['patient_id']) ? Patient::query()->find((string) $payload['patient_id']) : null;
+
+        $guarded                           = $this->promptGuardrails->sanitizePayload($payload, $this->contextBuilder->protectedNames($patient));
         $guarded['payload']['_guardrails'] = $guarded['guardrails'];
 
         return $guarded['payload'];

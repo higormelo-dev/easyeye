@@ -260,13 +260,13 @@ class ScheduleImportService
         }
 
         $indexFieldMap = $this->buildIndexFieldMap($rawHeaders);
+        $hasCovenant   = $this->hasCovenantColumn($rawHeaders);
 
         $mappedColumns   = [];
         $unmappedColumns = [];
 
         foreach ($rawHeaders as $header) {
-            $normalized = $this->normalizeKey($header);
-            $field      = self::COLUMN_MAP[$normalized] ?? null;
+            $field = $this->fieldFor($this->normalizeKey($header), $hasCovenant);
 
             if ($field !== null) {
                 $mappedColumns[] = [
@@ -785,11 +785,11 @@ class ScheduleImportService
 
     private function buildIndexFieldMap(array $headers): array
     {
-        $map = [];
+        $map         = [];
+        $hasCovenant = $this->hasCovenantColumn($headers);
 
         foreach ($headers as $i => $header) {
-            $normalized = $this->normalizeKey($header);
-            $field      = self::COLUMN_MAP[$normalized] ?? null;
+            $field = $this->fieldFor($this->normalizeKey($header), $hasCovenant);
 
             if ($field !== null) {
                 $map[$i] = $field;
@@ -797,6 +797,27 @@ class ScheduleImportService
         }
 
         return $map;
+    }
+
+    /**
+     * "plano" só vale como convênio quando a planilha não tem coluna de
+     * convênio. Com as duas, "plano" é o plano do paciente (o agendamento não
+     * tem plano) e não pode sobrescrever o convênio da linha.
+     */
+    private function fieldFor(string $normalized, bool $hasCovenantColumn): ?string
+    {
+        if ($hasCovenantColumn && $normalized === 'plano') {
+            return null;
+        }
+
+        return self::COLUMN_MAP[$normalized] ?? null;
+    }
+
+    private function hasCovenantColumn(array $headers): bool
+    {
+        $keys = array_map(fn ($header) => $this->normalizeKey((string) $header), $headers);
+
+        return array_intersect($keys, ['convenio', 'convenio_nome']) !== [];
     }
 
     private function mapRow(array $row, array $indexFieldMap): array

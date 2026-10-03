@@ -132,6 +132,28 @@ test('calculateActualCredits usa tabela de preços quando rawCostUsd não vier d
     expect($estimate->normalizedCredits)->toBe(369);
 });
 
+test('raciocínio sem preço próprio é cobrado como saída (0 explícito = gratuito)', function () {
+    $semPreco = new AiModelPrice([
+        'provider'                  => AiProvider::OpenAI->value,
+        'model'                     => 'gpt-reasoner',
+        'input_usd_per_million'     => 1.0,
+        'output_usd_per_million'    => 10.0,
+        'reasoning_usd_per_million' => null,
+        'effective_from'            => now()->subDay(),
+        'active'                    => true,
+    ]);
+
+    $usage = new AiUsageData(inputTokens: 0, outputTokens: 1_000_000, reasoningTokens: 1_000_000, rawCostUsd: null);
+    $call  = fn (string $model) => new AiProviderResponseData(provider: AiProvider::OpenAI, model: $model, content: 'ok', usage: $usage, latencyMs: 1);
+
+    // Saída visível (10) + raciocínio ao preço da saída (10).
+    expect((new AiPricingService(fakePriceRepository([$semPreco])))->resolveCostUsdForResponse($call('gpt-reasoner')))->toBe(20.0);
+
+    $gratis = buildPrice(AiProvider::OpenAI, 'gpt-free-thinking', 1.0, 10.0, 0.0, 0.0);
+
+    expect((new AiPricingService(fakePriceRepository([$gratis])))->resolveCostUsdForResponse($call('gpt-free-thinking')))->toBe(10.0);
+});
+
 test('lança exceção quando não encontra preço de model', function () {
     $pricing = new AiPricingService(fakePriceRepository([]));
 

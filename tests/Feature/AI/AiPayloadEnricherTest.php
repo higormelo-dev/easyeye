@@ -311,3 +311,26 @@ describe('laudo conjunto de vários exames', function () {
             ->and(collect($out['context']['selected_exams'])->pluck('eye')->all())->toBe(['OD', 'OS']);
     });
 });
+
+it('[LGPD] o provedor não recebe nome, iniciais nem os códigos internos do paciente', function () {
+    $this->patient->person->update(['full_name' => 'Maria Aparecida Lopes']);
+    $this->record->update(['main_complaint' => 'Maria Aparecida refere visão turva']);
+
+    $out = $this->enricher->enrich([
+        'workflow'          => 'record_assist',
+        'mode'              => 'validated',
+        'risk_level'        => 'medium',
+        'medical_record_id' => $this->record->id,
+        'patient_id'        => $this->patient->id,
+        'user_prompt'       => 'Resuma o caso da paciente MARIA LOPES.',
+    ], $this->entity->id, false);
+
+    $sent = json_encode([$out['user_prompt'], $out['context']], JSON_UNESCAPED_UNICODE);
+
+    expect($sent)->not->toContain('Maria')->not->toContain('MARIA')->not->toContain('Lopes')->not->toContain('M. A.')
+        ->and($out['user_prompt'])->toBe('Resuma o caso da paciente <PATIENT_NAME_REDACTED>.')
+        ->and($out['context']['main_complaint'])->toBe('<PATIENT_NAME_REDACTED> refere visão turva')
+        ->and($out['context'])->not->toHaveKey('patient_initials')
+        ->and($out['context'])->not->toHaveKey('patient_code')->not->toHaveKey('medical_record_code')
+        ->and($out['_guardrails']['pii_types'])->toContain('patient_name');
+});

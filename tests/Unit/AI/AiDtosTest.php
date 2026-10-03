@@ -1,11 +1,7 @@
 <?php
 
-use App\DTOs\AI\AiProviderResponseData;
-use App\DTOs\AI\AiRequestData;
-use App\DTOs\AI\AiUsageData;
-use App\DTOs\AI\AiWorkflowResultData;
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiRunMode;
+use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData, AiWorkflowResultData};
+use App\Enums\AI\{AiProvider, AiRunMode};
 
 test('AiRequestData::fullPrompt concatena system + user com duas quebras', function () {
     $req = new AiRequestData(

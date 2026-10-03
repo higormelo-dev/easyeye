@@ -10,6 +10,7 @@
  */
 
 use App\Enums\{ClientRule, ImportStatus, ScheduleSituation};
+use App\Models\Covenant;
 use App\Models\{Doctor, Entity, Patient, People, Schedule, ScheduleImport, User, VisitType};
 use App\Services\ScheduleImportService;
 use Illuminate\Support\Facades\Storage;
@@ -363,4 +364,28 @@ it('tipo_visita explicito prevalece sobre tipo_atendimento', function () {
     app(ScheduleImportService::class)->process($import);
 
     expect(Schedule::first()->visit_id)->toBe($consulta);
+});
+
+it('com colunas "convenio" e "plano", o convênio do agendamento vem de "convenio" (plano não sobrescreve)', function () {
+    $doctor   = createImportableDoctor($this->entity, record: '222222', importCode: 'DOC-P');
+    $covenant = Covenant::factory()->create(['entity_id' => $this->entity->id, 'name' => 'UNIMED']);
+
+    $csv = "codigo_importacao_medico;nome_paciente;data_hora;situacao;convenio;plano\n"
+        . "DOC-P;Plano Teste;16/06/2026 10:00;Agendado;Unimed;Unimed Nacional Enfermaria\n";
+
+    app(ScheduleImportService::class)->process(makeScheduleImport($this->entity, $csv));
+
+    expect(Schedule::withoutGlobalScopes()->where('entity_id', $this->entity->id)->sole()->covenant_id)->toBe($covenant->id);
+});
+
+it('só com a coluna "plano" ela continua sendo o convênio (planilhas antigas)', function () {
+    $doctor   = createImportableDoctor($this->entity, record: '333333', importCode: 'DOC-Q');
+    $covenant = Covenant::factory()->create(['entity_id' => $this->entity->id, 'name' => 'UNIMED']);
+
+    $csv = "codigo_importacao_medico;nome_paciente;data_hora;situacao;plano\n"
+        . "DOC-Q;Plano Antigo;17/06/2026 10:00;Agendado;Unimed\n";
+
+    app(ScheduleImportService::class)->process(makeScheduleImport($this->entity, $csv));
+
+    expect(Schedule::withoutGlobalScopes()->where('entity_id', $this->entity->id)->sole()->covenant_id)->toBe($covenant->id);
 });

@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Domains\AI\Providers\AnthropicProvider;
-use App\Domains\AI\Providers\GeminiProvider;
-use App\Domains\AI\Providers\OpenAiProvider;
+use App\Domains\AI\Providers\{AnthropicProvider, GeminiProvider, OpenAiProvider};
 use App\DTOs\AI\AiRequestData;
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiRiskLevel;
-use App\Enums\AI\AiRunMode;
+use App\Enums\AI\{AiProvider, AiRiskLevel, AiRunMode};
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -22,17 +18,17 @@ test('openai provider real faz parse de conteúdo e uso', function () {
 
     Http::fake([
         'https://api.openai.com/v1/responses' => Http::response([
-            'id' => 'resp_123',
+            'id'     => 'resp_123',
             'status' => 'completed',
-            'model' => 'gpt-5-mini',
-            'usage' => [
-                'input_tokens' => 120,
-                'output_tokens' => 90,
+            'model'  => 'gpt-5-mini',
+            'usage'  => [
+                'input_tokens'          => 120,
+                'output_tokens'         => 90,
                 'output_tokens_details' => ['reasoning_tokens' => 25],
             ],
             'output' => [
                 [
-                    'type' => 'message',
+                    'type'    => 'message',
                     'content' => [
                         ['type' => 'output_text', 'text' => 'Rascunho de apoio clínico.'],
                     ],
@@ -58,7 +54,9 @@ test('openai provider real faz parse de conteúdo e uso', function () {
     expect($result->model)->toBe('gpt-5-mini');
     expect($result->content)->toContain('Rascunho de apoio clínico');
     expect($result->usage->inputTokens)->toBe(120);
-    expect($result->usage->outputTokens)->toBe(90);
+    // output_tokens (90) inclui o raciocínio (25): a saída fica só com o
+    // texto visível para o raciocínio não ser cobrado duas vezes.
+    expect($result->usage->outputTokens)->toBe(65);
     expect($result->usage->reasoningTokens)->toBe(25);
     expect($result->requestHash)->not->toBeNull();
     expect($result->responseHash)->not->toBeNull();
@@ -79,15 +77,15 @@ test('anthropic provider real faz parse de conteúdo e uso', function () {
 
     Http::fake([
         'https://api.anthropic.com/v1/messages' => Http::response([
-            'id' => 'msg_123',
-            'type' => 'message',
-            'model' => 'claude-sonnet-4-5',
+            'id'      => 'msg_123',
+            'type'    => 'message',
+            'model'   => 'claude-sonnet-4-5',
             'content' => [
                 ['type' => 'text', 'text' => 'Sugestão revisada para o médico.'],
             ],
             'stop_reason' => 'end_turn',
-            'usage' => [
-                'input_tokens' => 80,
+            'usage'       => [
+                'input_tokens'  => 80,
                 'output_tokens' => 60,
             ],
         ], 200),
@@ -126,12 +124,12 @@ test('gemini provider real faz parse de conteúdo e uso', function () {
 
     Http::fake([
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent' => Http::response([
-            'responseId' => 'gem_123',
+            'responseId'   => 'gem_123',
             'modelVersion' => 'gemini-2.0-flash',
-            'candidates' => [
+            'candidates'   => [
                 [
                     'finishReason' => 'STOP',
-                    'content' => [
+                    'content'      => [
                         'parts' => [
                             ['text' => 'Consolidação final segura para revisão médica.'],
                         ],
@@ -139,9 +137,9 @@ test('gemini provider real faz parse de conteúdo e uso', function () {
                 ],
             ],
             'usageMetadata' => [
-                'promptTokenCount' => 70,
+                'promptTokenCount'     => 70,
                 'candidatesTokenCount' => 55,
-                'thoughtsTokenCount' => 12,
+                'thoughtsTokenCount'   => 12,
             ],
         ], 200),
     ]);
@@ -182,7 +180,7 @@ test('openai provider real lança exceção sanitizada em erro HTTP', function (
     Http::fake([
         'https://api.openai.com/v1/responses' => Http::response([
             'error' => [
-                'code' => 'invalid_api_key',
+                'code'    => 'invalid_api_key',
                 'message' => 'API key inválida.',
             ],
         ], 401),
@@ -194,5 +192,29 @@ test('openai provider real lança exceção sanitizada em erro HTTP', function (
         workflow: 'report_drafting',
         mode: AiRunMode::Economy,
         userPrompt: 'Conteúdo sensível de prontuário não deve vazar em erro.',
-    )))->toThrow(\RuntimeException::class, 'OpenAI request failed [401/invalid_api_key]: API key inválida.');
+    )))->toThrow(RuntimeException::class, 'OpenAI request failed [401/invalid_api_key]: API key inválida.');
+});
+
+test('anthropic: pedido de JSON vai no texto — sem campo metadata fora do contrato da API (só user_id)', function () {
+    config()->set('services.anthropic.api_key', 'anthropic-key-test');
+    config()->set('ai.providers.anthropic.model', 'claude-sonnet-4-5');
+    config()->set('ai.providers.anthropic.base_url', 'https://api.anthropic.com');
+
+    Http::fake(['https://api.anthropic.com/v1/messages' => Http::response([
+        'id'      => 'msg_1', 'type' => 'message', 'model' => 'claude-sonnet-4-5',
+        'content' => [['type' => 'text', 'text' => '{"ok":true}']], 'stop_reason' => 'end_turn',
+        'usage'   => ['input_tokens' => 10, 'output_tokens' => 5],
+    ])]);
+
+    (new AnthropicProvider())->generate(new AiRequestData(
+        workflow: 'record_assist',
+        mode: AiRunMode::Economy,
+        userPrompt: 'Sugira os campos.',
+        systemPrompt: 'Apoio ao médico.',
+        riskLevel: AiRiskLevel::Medium,
+        expectsJson: true,
+    ));
+
+    Http::assertSent(fn (Request $request): bool => ! array_key_exists('metadata', $request->data())
+        && str_contains((string) data_get($request->data(), 'messages.0.content.0.text'), 'Responda em JSON válido.'));
 });

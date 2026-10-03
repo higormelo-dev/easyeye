@@ -1,10 +1,7 @@
 <?php
 
 use App\Domains\AI\Services\AiMedicalContextBuilder;
-use App\Models\Entity;
-use App\Models\MedicalRecord;
-use App\Models\Patient;
-use App\Models\People;
+use App\Models\{Entity, MedicalRecord, Patient, People};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -25,14 +22,15 @@ function makePatientWithPerson(array $personAttrs = [], array $patientAttrs = []
     ], $patientAttrs));
 }
 
-test('build retorna iniciais do nome do paciente (não nome completo)', function () {
+test('[LGPD] build não envia nome nem iniciais do paciente — só idade e sexo', function () {
     $patient = makePatientWithPerson([
         'full_name' => 'Maria das Dores Cardoso Oliveira',
     ]);
 
     $context = (new AiMedicalContextBuilder())->build($patient, null);
 
-    expect($context['patient_initials'])->toBe('M. D. D. C. O.');
+    expect($context)->toBe(['age_years' => 58, 'gender' => 1]);
+    expect($context)->not->toHaveKey('patient_initials');
     expect($context)->not->toHaveKey('full_name');
     expect($context)->not->toHaveKey('cpf');
     expect($context)->not->toHaveKey('email');
@@ -49,19 +47,36 @@ test('build inclui idade calculada a partir de birth_date', function () {
     expect($context['age_years'])->toBe(45);
 });
 
-test('build inclui code do paciente como identificador opaco', function () {
-    $patient = makePatientWithPerson(patientAttrs: ['code' => 'PAC-XYZ-42']);
+test('[LGPD] build não envia os códigos internos de paciente e prontuário ao provedor', function () {
+    $patient = makePatientWithPerson([], ['code' => 'PAC-XYZ-42']);
+    $record  = MedicalRecord::create([
+        'doctor_id'      => createDoctorForEntity(Entity::find($patient->entity_id))->id,
+        'patient_id'     => $patient->id,
+        'entity_id'      => $patient->entity_id,
+        'code'           => 'PRT-001',
+        'main_complaint' => 'Baixa visual',
+    ]);
 
-    $context = (new AiMedicalContextBuilder())->build($patient, null);
+    $context = (new AiMedicalContextBuilder())->build($patient, $record);
 
-    expect($context['patient_code'])->toBe('PAC-XYZ-42');
+    // Repetidos a cada chamada, permitiriam ao provedor ligar as consultas do mesmo paciente.
+    expect($context)->not->toHaveKey('patient_code')
+        ->and($context)->not->toHaveKey('medical_record_code')
+        ->and(json_encode($context))->not->toContain('PAC-XYZ-42')->not->toContain('PRT-001');
+});
+
+test('protectedNames devolve nome completo e apelido para a redação', function () {
+    $patient = makePatientWithPerson(['full_name' => 'João da Silva Santos', 'nickname' => 'Joãozinho']);
+
+    expect((new AiMedicalContextBuilder())->protectedNames($patient))->toBe(['JOÃO DA SILVA SANTOS', 'JOÃOZINHO'])
+        ->and((new AiMedicalContextBuilder())->protectedNames(null))->toBe([]);
 });
 
 test('build sem patient retorna apenas contexto do medical record', function () {
     $patient = makePatientWithPerson();
     $doctor  = createDoctorForEntity(Entity::find($patient->entity_id));
     $record  = MedicalRecord::create([
-        'doctor_id'  => $doctor->id,
+        'doctor_id'      => $doctor->id,
         'patient_id'     => $patient->id,
         'entity_id'      => $patient->entity_id,
         'code'           => 'PRT-001',
@@ -72,7 +87,7 @@ test('build sem patient retorna apenas contexto do medical record', function () 
 
     $context = (new AiMedicalContextBuilder())->build(null, $record);
 
-    expect($context['medical_record_code'])->toBe('PRT-001');
+    expect($context)->not->toHaveKey('medical_record_code');
     expect($context['main_complaint'])->toBe('Visão embaçada bilateral há 3 meses.');
     expect($context['comorbidities'])->toContain('diabetes_mellitus');
     expect($context['comorbidities'])->not->toContain('hipertensao_arterial');
@@ -80,11 +95,11 @@ test('build sem patient retorna apenas contexto do medical record', function () 
 });
 
 test('build trunca campos longos para evitar payload gigante', function () {
-    $patient = makePatientWithPerson();
+    $patient  = makePatientWithPerson();
     $longText = str_repeat('Detalhe clínico longo. ', 100);
-    $doctor  = createDoctorForEntity(Entity::find($patient->entity_id));
-    $record  = MedicalRecord::create([
-        'doctor_id'  => $doctor->id,
+    $doctor   = createDoctorForEntity(Entity::find($patient->entity_id));
+    $record   = MedicalRecord::create([
+        'doctor_id'      => $doctor->id,
         'patient_id'     => $patient->id,
         'entity_id'      => $patient->entity_id,
         'code'           => 'PRT-LONG',
@@ -110,8 +125,8 @@ test('build remove chaves vazias do contexto final', function () {
 
     $context = (new AiMedicalContextBuilder())->build($patient, $record);
 
-    expect($context)->toHaveKey('patient_initials');
-    expect($context)->toHaveKey('medical_record_code');
+    expect($context)->toHaveKey('age_years');
+    expect($context)->not->toHaveKey('medical_record_code');
     expect($context)->not->toHaveKey('main_complaint');
     expect($context)->not->toHaveKey('comorbidities');
 });
@@ -124,7 +139,7 @@ test('build agrega comorbidades quando flags estão presentes', function () {
     $patient = makePatientWithPerson();
     $doctor  = createDoctorForEntity(Entity::find($patient->entity_id));
     $record  = MedicalRecord::create([
-        'doctor_id'  => $doctor->id,
+        'doctor_id'    => $doctor->id,
         'patient_id'   => $patient->id,
         'entity_id'    => $patient->entity_id,
         'code'         => 'PRT-COMOR',
@@ -138,4 +153,19 @@ test('build agrega comorbidades quando flags estão presentes', function () {
     expect($context['comorbidities'])->toContain('diabetes_mellitus');
     expect($context['comorbidities'])->toContain('hipertensao_arterial');
     expect($context['comorbidities'])->toContain('glaucoma');
+});
+
+test('toda chave que o build() envia tem categoria na auditoria do envio (demografia ou prontuário)', function () {
+    $patient = makePatientWithPerson();
+    $doctor  = createDoctorForEntity(Entity::find($patient->entity_id));
+    $record  = MedicalRecord::create([
+        'doctor_id'           => $doctor->id, 'patient_id' => $patient->id, 'entity_id' => $patient->entity_id, 'code' => 'PRT-KEYS',
+        'main_complaint'      => 'a', 'hda' => 'b', 'others_history' => 'c', 'medications_in_use' => 'd', 'ocular_surgical_history' => 'e',
+        'biomicroscopy_right' => 'f', 'fundoscopy_left' => 'g', 'tonometer_right' => '14',
+    ]);
+
+    $keys = array_keys((new AiMedicalContextBuilder())->build($patient, $record));
+
+    expect(array_diff($keys, [...AiMedicalContextBuilder::DEMOGRAPHIC_KEYS, ...AiMedicalContextBuilder::CLINICAL_KEYS]))->toBe([])
+        ->and($keys)->toContain('age_years')->toContain('main_complaint');
 });

@@ -13,6 +13,13 @@ interface AiRunRepositoryInterface
     public function markRunning(AiRun $run): void;
 
     /**
+     * Registra o resumo auditável do que foi enviado ao provedor (sem conteúdo).
+     *
+     * @param array<string, mixed> $dispatch AiDispatchAudit::summarize()
+     */
+    public function recordDispatch(AiRun $run, array $dispatch): void;
+
+    /**
      * @param list<string> $safetyNotes
      */
     public function markWaitingApproval(

@@ -2,8 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Enums\ImportStatus;
 use App\Models\MedicineImport;
-use App\Services\Medicines\AnvisaMedicineImportService;
+use App\Services\Medicines\MedicineCatalogSyncService;
 use App\Traits\FailsUnfinishedImport;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,7 +23,8 @@ class ProcessMedicineImportJob implements ShouldQueue
      *  admin reenvia — reimportar é idempotente (chave = código GGREM). */
     public int $tries = 1;
 
-    /** A lista CMED completa (~26 mil apresentações) leva ~1 min pra ler. */
+    /** Download das fontes oficiais (~21 MB) + a lista completa (~26 mil
+     *  apresentações) em ~1 min. */
     public int $timeout = 900;
 
     public function __construct(
@@ -30,9 +32,17 @@ class ProcessMedicineImportJob implements ShouldQueue
     ) {
     }
 
-    public function handle(AnvisaMedicineImportService $service): void
+    public function handle(MedicineCatalogSyncService $service): void
     {
-        $service->process($this->import);
+        // Cancelada pelo admin enquanto esperava na fila (worker parado) ou já
+        // processada: não roda de novo.
+        $import = $this->import->fresh();
+
+        if ($import === null || $import->status !== ImportStatus::Pending) {
+            return;
+        }
+
+        $service->run($import);
     }
 
     /** @return array<string, mixed> */

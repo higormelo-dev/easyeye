@@ -29,7 +29,16 @@ class MedicinesController extends Controller
     private const POSOLOGY_FIELDS = ['dosage', 'frequency', 'duration', 'instructions'];
 
     /** Ordenação aceita pela tabela (whitelist — vai direto pro ORDER BY). */
-    private const SORTS = ['name', 'laboratory', 'source', 'active'];
+    private const SORTS = ['name', 'laboratory', 'source', 'cmed_situation', 'active'];
+
+    /** Situação do item na lista de preços da CMED (coluna "Situação na CMED"). */
+    private const CMED_SITUATIONS = ['marketed', 'not_marketed', 'left_list'];
+
+    /**
+     * Ordem da situação na CMED: comercializado, não comercializado, fora da
+     * lista atual e, por último, os curados (não se aplica).
+     */
+    private const CMED_SITUATION_ORDER = "CASE WHEN medicines.source <> 'cmed' THEN 3 WHEN medicines.active = false THEN 2 WHEN medicines.is_marketed THEN 0 ELSE 1 END";
 
     public function __construct(
         private readonly MedicineCatalogSearch $catalogSearch,
@@ -42,12 +51,13 @@ class MedicinesController extends Controller
     public function index(Request $request): Response
     {
         $filters = [
-            'search'     => $request->string('search')->trim()->value(),
-            'source'     => in_array($request->input('source'), ['manual', 'cmed'], true) ? $request->input('source') : '',
-            'status'     => in_array($request->input('status'), ['active', 'inactive'], true) ? $request->input('status') : '',
-            'ophthalmic' => $request->boolean('ophthalmic'),
-            'sort'       => in_array($request->input('sort'), self::SORTS, true) ? $request->input('sort') : 'name',
-            'direction'  => $request->input('direction') === 'desc' ? 'desc' : 'asc',
+            'search'         => $request->string('search')->trim()->value(),
+            'source'         => in_array($request->input('source'), ['manual', 'cmed'], true) ? $request->input('source') : '',
+            'status'         => in_array($request->input('status'), ['active', 'inactive'], true) ? $request->input('status') : '',
+            'cmed_situation' => in_array($request->input('cmed_situation'), self::CMED_SITUATIONS, true) ? $request->input('cmed_situation') : '',
+            'ophthalmic'     => $request->boolean('ophthalmic'),
+            'sort'           => in_array($request->input('sort'), self::SORTS, true) ? $request->input('sort') : 'name',
+            'direction'      => $request->input('direction') === 'desc' ? 'desc' : 'asc',
         ];
 
         $query = $this->globalCatalog()->with('presentation:id,name');
@@ -60,8 +70,14 @@ class MedicinesController extends Controller
             ->when($filters['status'] === 'active', fn (Builder $q) => $q->where('active', true))
             ->when($filters['status'] === 'inactive', fn (Builder $q) => $q->where('active', false))
             ->when($filters['ophthalmic'], fn (Builder $q) => $q->where('is_ophthalmic', true))
-            ->orderBy('medicines.' . $filters['sort'], $filters['direction'])
-            ->orderBy('medicines.name')
+            ->when($filters['cmed_situation'], fn (Builder $q, string $situation) => $this->whereCmedSituation($q, $situation));
+
+        // Coluna derivada: ordena pela expressão; as demais, pela coluna (whitelist).
+        $filters['sort'] === 'cmed_situation'
+            ? $query->orderByRaw(self::CMED_SITUATION_ORDER . ' ' . $filters['direction'])
+            : $query->orderBy('medicines.' . $filters['sort'], $filters['direction']);
+
+        $query->orderBy('medicines.name')
             ->orderBy('medicines.concentration')
             ->orderBy('medicines.id');
 
@@ -86,8 +102,11 @@ class MedicinesController extends Controller
                 // gravaram a mesma apresentação com caixa diferente.
                 ->unique(fn ($p) => mb_strtolower($p->name, 'UTF-8'))
                 ->values(),
-            // Botão "Gerar com IA" só aparece com provedor configurado.
-            'aiAvailable' => fn () => $this->posologyAi->available(),
+            // Aviso da verificação semanal (routes/console.php).
+            'autoSync' => (bool) config('medicines.cmed.sync_enabled'),
+            // Botão "Gerar com IA": IAs "Configuradas" no painel de provedores
+            // (chave + modelo), Principal primeiro — com mais de uma, o admin escolhe.
+            'aiProviders' => fn () => $this->posologyAi->providers(),
             't'           => trans('manager_medicines'),
         ]);
     }
@@ -189,12 +208,47 @@ class MedicinesController extends Controller
         }
 
         try {
-            $suggestion = $this->posologyAi->suggest($medicine, (string) session('selected_entity_id'), (string) auth()->id());
+            $suggestion = $this->posologyAi->suggest(
+                $medicine,
+                (string) session('selected_entity_id'),
+                (string) auth()->id(),
+                $data['provider'] ?? null,
+            );
         } catch (MedicinePosologyAiException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            return response()->json(['message' => $e->getMessage(), 'reason' => $e->reason], 422);
         }
 
         return response()->json(['suggestion' => $suggestion]);
+    }
+
+    /**
+     * Situação na lista de preços da CMED. Item da CMED inativo = fora da
+     * lista atual (a importação desativa o que saiu da lista ou teve o
+     * registro cancelado — o admin não desativa item da CMED). Curado: null.
+     */
+    private function cmedSituation(Medicine $m): ?string
+    {
+        if ($m->source !== MedicineSource::Cmed) {
+            return null;
+        }
+
+        if (! $m->active) {
+            return 'left_list';
+        }
+
+        return $m->is_marketed ? 'marketed' : 'not_marketed';
+    }
+
+    /** Mesmo critério de cmedSituation(), como filtro SQL. */
+    private function whereCmedSituation(Builder $query, string $situation): void
+    {
+        $query->where('medicines.source', MedicineSource::Cmed->value);
+
+        match ($situation) {
+            'marketed'     => $query->where('medicines.active', true)->where('medicines.is_marketed', true),
+            'not_marketed' => $query->where('medicines.active', true)->where('medicines.is_marketed', false),
+            default        => $query->where('medicines.active', false),
+        };
     }
 
     /** @return Builder<Medicine> */
@@ -224,6 +278,7 @@ class MedicinesController extends Controller
             'source_label'             => $m->source->label(),
             'is_ophthalmic'            => (bool) $m->is_ophthalmic,
             'is_marketed'              => (bool) $m->is_marketed,
+            'cmed_situation'           => $this->cmedSituation($m),
             'active'                   => (bool) $m->active,
             'dosage'                   => $m->dosage,
             'frequency'                => $m->frequency,

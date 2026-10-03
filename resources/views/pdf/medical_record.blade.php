@@ -183,7 +183,12 @@
     </div>
     <div class="col col-4">
         <span class="field-label">{{ __('pdf.covenant') }}</span>
-        <span class="field-value">{{ $patient->covenant?->name ?? __('pdf.private_payment') }}</span>
+        <span class="field-value">
+            {{ $patient->covenant?->name ?? __('pdf.private_payment') }}
+            @if($patient->covenantPlan)
+            &nbsp;· {{ __('pdf.plan') }}: {{ $patient->covenantPlan->displayName() }}
+            @endif
+        </span>
     </div>
 </div>
 </div>

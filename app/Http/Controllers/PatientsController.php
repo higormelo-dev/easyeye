@@ -126,7 +126,7 @@ class PatientsController extends Controller
 
         $patients = Patient::query()
             ->withTrashed()
-            ->with(['person', 'covenant', 'skinType', 'irisType'])
+            ->with(['person', 'covenant', 'covenantPlan', 'skinType', 'irisType'])
             ->join('people', 'patients.person_id', '=', 'people.id')
             ->where(function ($query) {
                 $query->where('patients.entity_id', session()->get('selected_entity_id'))
@@ -160,6 +160,7 @@ class PatientsController extends Controller
             'skin'                => $p->skinType?->name,
             'iris'                => $p->irisType?->name,
             'covenant'            => $p->covenant?->name,
+            'covenant_plan'       => $p->covenantPlan?->name,
             'medical_records_url' => route('panel.patients.medicalrecords.index', $p->id),
             ...ActionPolicy::from($p, $entityId)->toArray(),
         ]);
@@ -218,6 +219,7 @@ class PatientsController extends Controller
                 'code'                => $record->code,
                 'import_code'         => $record->import_code,
                 'covenant'            => $record->covenant?->name,
+                'covenant_plan'       => $this->planDetails($record),
                 'card_number'         => $record->card_number,
                 'skin_type'           => $record->skinType?->name,
                 'iris_type'           => $record->irisType?->name,
@@ -383,12 +385,15 @@ class PatientsController extends Controller
             404,
         );
 
-        $patient->load('person');
+        $patient->load(['person', 'covenantPlan']);
         $person = $patient->person;
 
         return response()->json([
             'data' => [
-                'covenant_id'            => $patient->covenant_id,
+                'covenant_id'      => $patient->covenant_id,
+                'covenant_plan_id' => $patient->covenant_plan_id,
+                // Opção já escolhida (o seletor de plano busca no servidor).
+                'covenant_plan'          => $patient->covenantPlan?->toOption(),
                 'card_number'            => $patient->card_number,
                 'skin_id'                => $patient->skin_id,
                 'iris_id'                => $patient->iris_id,
@@ -479,5 +484,25 @@ class PatientsController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $this->getDeleteMessage());
         });
+    }
+
+    /**
+     * Plano para a gaveta de detalhes: nome, registro, características e
+     * aviso quando deixou de estar disponível (cancelado na ANS etc.).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function planDetails(Patient $patient): ?array
+    {
+        $plan = $patient->covenantPlan;
+
+        if (! $plan) {
+            return null;
+        }
+
+        return [
+            ...$plan->toOption(),
+            'unavailable' => ! $plan->active || $plan->trashed(),
+        ];
     }
 }

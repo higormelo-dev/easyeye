@@ -1,12 +1,8 @@
 <?php
 
-use App\Domains\AI\Providers\Fakes\AnthropicFakeProvider;
-use App\Domains\AI\Providers\Fakes\GeminiFakeProvider;
-use App\Domains\AI\Providers\Fakes\OpenAiFakeProvider;
+use App\Domains\AI\Providers\Fakes\{AnthropicFakeProvider, GeminiFakeProvider, OpenAiFakeProvider};
 use App\DTOs\AI\AiRequestData;
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiRiskLevel;
-use App\Enums\AI\AiRunMode;
+use App\Enums\AI\{AiProvider, AiRiskLevel, AiRunMode};
 
 test('openai fake provider retorna provider, tokens e custo', function () {
     $provider = new OpenAiFakeProvider();
@@ -43,7 +39,7 @@ test('anthropic e gemini fake providers retornam dados coerentes', function () {
     );
 
     $anthropic = (new AnthropicFakeProvider())->generate($request);
-    $gemini = (new GeminiFakeProvider())->generate($request);
+    $gemini    = (new GeminiFakeProvider())->generate($request);
 
     expect($anthropic->provider)->toBe(AiProvider::Anthropic);
     expect($gemini->provider)->toBe(AiProvider::Gemini);

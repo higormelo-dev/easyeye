@@ -5,10 +5,8 @@ declare(strict_types=1);
 use App\Domains\AI\Contracts\AiRunRepositoryInterface;
 use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\AiRunExecutionService;
+use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Jobs\AI\RunAiWorkflowJob;
-use App\Enums\AI\AiRiskLevel;
-use App\Enums\AI\AiRunMode;
-use App\Enums\AI\AiRunStatus;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -16,17 +14,17 @@ uses(TestCase::class)->in(__FILE__);
 
 test('job executa workflow quando run existe', function () {
     $run = new AiRun([
-        'entity_id' => (string) Str::uuid(),
-        'workflow' => 'report_drafting',
-        'mode' => AiRunMode::Validated->value,
-        'risk_level' => AiRiskLevel::Low->value,
-        'status' => AiRunStatus::Reserved->value,
+        'entity_id'        => (string) Str::uuid(),
+        'workflow'         => 'report_drafting',
+        'mode'             => AiRunMode::Validated->value,
+        'risk_level'       => AiRiskLevel::Low->value,
+        'status'           => AiRunStatus::Reserved->value,
         'reserved_credits' => 50,
     ]);
     $run->id = (string) Str::uuid();
 
-    $repository = \Mockery::mock(AiRunRepositoryInterface::class);
-    $executor = \Mockery::mock(AiRunExecutionService::class);
+    $repository = Mockery::mock(AiRunRepositoryInterface::class);
+    $executor   = Mockery::mock(AiRunExecutionService::class);
 
     $repository->shouldReceive('find')
         ->once()
@@ -42,8 +40,8 @@ test('job executa workflow quando run existe', function () {
 });
 
 test('job não executa quando run não existe', function () {
-    $repository = \Mockery::mock(AiRunRepositoryInterface::class);
-    $executor = \Mockery::mock(AiRunExecutionService::class);
+    $repository = Mockery::mock(AiRunRepositoryInterface::class);
+    $executor   = Mockery::mock(AiRunExecutionService::class);
 
     $repository->shouldReceive('find')
         ->once()
@@ -58,17 +56,17 @@ test('job não executa quando run não existe', function () {
 
 test('failed() libera reserva e marca run como Failed', function () {
     $run = new AiRun([
-        'entity_id' => (string) Str::uuid(),
-        'workflow' => 'report_drafting',
-        'mode' => AiRunMode::Validated->value,
-        'risk_level' => AiRiskLevel::Low->value,
-        'status' => AiRunStatus::Running->value,
+        'entity_id'        => (string) Str::uuid(),
+        'workflow'         => 'report_drafting',
+        'mode'             => AiRunMode::Validated->value,
+        'risk_level'       => AiRiskLevel::Low->value,
+        'status'           => AiRunStatus::Running->value,
         'reserved_credits' => 90,
     ]);
     $run->id = (string) Str::uuid();
 
-    $repository = \Mockery::mock(AiRunRepositoryInterface::class);
-    $executor = \Mockery::mock(AiRunExecutionService::class);
+    $repository = Mockery::mock(AiRunRepositoryInterface::class);
+    $executor   = Mockery::mock(AiRunExecutionService::class);
 
     $repository->shouldReceive('find')
         ->once()
@@ -88,8 +86,8 @@ test('failed() libera reserva e marca run como Failed', function () {
 });
 
 test('failed() é silencioso quando run não existe', function () {
-    $repository = \Mockery::mock(AiRunRepositoryInterface::class);
-    $executor = \Mockery::mock(AiRunExecutionService::class);
+    $repository = Mockery::mock(AiRunRepositoryInterface::class);
+    $executor   = Mockery::mock(AiRunExecutionService::class);
 
     $repository->shouldReceive('find')
         ->once()

@@ -1,6 +1,6 @@
 <?php
 
-use App\Broadcasting\{ClinicImportChannel, ManagerMedicineImportChannel};
+use App\Broadcasting\{ClinicImportChannel, ManagerAiCatalogSyncChannel, ManagerCovenantImportChannel, ManagerMedicineImportChannel};
 use Illuminate\Support\Facades\Broadcast;
 
 /*
@@ -13,3 +13,9 @@ Broadcast::channel('imports.{type}.{importId}', ClinicImportChannel::class);
 
 // Progresso da importação do catálogo global de medicamentos (manager).
 Broadcast::channel('manager.imports.medicines.{importId}', ManagerMedicineImportChannel::class);
+
+// Progresso da sincronização do catálogo global de convênios com a ANS (manager).
+Broadcast::channel('manager.imports.covenants.{importId}', ManagerCovenantImportChannel::class);
+
+// Progresso da sincronização do catálogo de modelos/preços de IA (manager).
+Broadcast::channel('manager.ai-catalog-syncs.{syncId}', ManagerAiCatalogSyncChannel::class);

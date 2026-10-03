@@ -3,6 +3,7 @@ import { createSSRApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import mask from './directives/mask.js';
+import { installTooltips } from './Support/tooltips.js';
 
 // BUG — ícones invisíveis no /register (e demais telas de auth servidas pelo
 // rootView 'app'): as páginas Auth/* usam <i class="ti ti-*"> (Tabler Icons),
@@ -21,6 +22,10 @@ if (csrfMeta) {
     axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfMeta.getAttribute('content');
 }
 window.axios = axios;
+
+// Tooltips do template (2FA, Portal de Parceiros); sem o CSS do Bootstrap
+// (site de marketing) não liga e fica o title nativo.
+installTooltips();
 
 const appName = document.documentElement.dataset.app ?? 'EasyEye';
 

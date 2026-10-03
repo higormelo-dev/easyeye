@@ -6,6 +6,7 @@ import TablePagination from '@/Components/Panel/TablePagination.vue';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import { cmedSituation } from './cmedSituation.js';
 
 /**
  * Catálogo de medicamentos em tabela — mesmo layout de Manager → Planos
@@ -60,10 +61,20 @@ function posology(m) {
                         {{ t.col_source }}
                     </SortableTh>
                     <SortableTh
+                        col-key="cmed_situation"
+                        :current-sort="currentSort"
+                        :current-dir="currentDir"
+                        class="d-none d-sm-table-cell"
+                        @sort="$emit('sort', $event)"
+                    >
+                        {{ t.col_cmed_situation }}
+                    </SortableTh>
+                    <SortableTh
                         col-key="active"
                         :current-sort="currentSort"
                         :current-dir="currentDir"
                         class="text-center"
+                        :title="t.status_hint"
                         @sort="$emit('sort', $event)"
                     >
                         {{ t.col_status }}
@@ -74,7 +85,7 @@ function posology(m) {
             <tbody>
                 <!-- Empty state -->
                 <tr v-if="medicines.data.length === 0">
-                    <td colspan="6" class="text-center text-muted py-5">
+                    <td colspan="7" class="text-center text-muted py-5">
                         <i class="ti ti-pill fs-1 d-block mb-2"></i>
                         {{ t.empty }}
                     </td>
@@ -128,21 +139,27 @@ function posology(m) {
                             >{{ m.source_label }}</span
                         >
                     </td>
+                    <td class="d-none d-sm-table-cell">
+                        <!-- Situação na lista de preços da CMED (curado: não se aplica). -->
+                        <span
+                            v-if="cmedSituation(m, t)"
+                            class="badge rounded fs-12 fw-medium"
+                            :class="cmedSituation(m, t).cls"
+                            :title="cmedSituation(m, t).hint"
+                            ><i :class="`ti ${cmedSituation(m, t).icon} me-1`" aria-hidden="true"></i
+                            >{{ cmedSituation(m, t).label }}</span
+                        >
+                        <template v-else>
+                            <span class="text-muted" aria-hidden="true">—</span>
+                            <span class="visually-hidden">{{ t.cmed_not_applicable }}</span>
+                        </template>
+                    </td>
                     <td class="text-center">
-                        <!-- Aviso na mesma linha do status (antes: frase solta embaixo). -->
-                        <div class="d-inline-flex flex-wrap align-items-center justify-content-center gap-1">
-                            <StatusBadge
-                                :active="m.active"
-                                :label-active="t.status_active"
-                                :label-inactive="t.status_inactive"
-                            />
-                            <span
-                                v-if="m.source === 'cmed' && m.active && !m.is_marketed"
-                                class="badge badge-soft-warning border border-warning rounded fs-13 fw-medium"
-                                :title="t.not_marketed_hint"
-                                ><i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ t.not_marketed }}</span
-                            >
-                        </div>
+                        <StatusBadge
+                            :active="m.active"
+                            :label-active="t.status_active"
+                            :label-inactive="t.status_inactive"
+                        />
                     </td>
                     <td class="text-end">
                         <ActionIconGroup align="end" gap="tight">

@@ -157,7 +157,8 @@ preservada em redeploy pela Jelastic.
 A Jelastic exige uma **linha em branco depois da última entrada** da crontab.
 
 **Um worker só, de propósito.** Os jobs de importação têm `$timeout` de 600 s
-(pacientes, médicos, agenda) e 900 s (medicamentos), maior que o
+(pacientes, médicos, agenda) e 900 s (medicamentos — envio ou download da CMED — e
+sincronização de convênios/planos com a ANS), maior que o
 `retry_after` da conexão `redis` (90 s, `REDIS_QUEUE_RETRY_AFTER`). Com um
 worker isso não importa. Com dois ou mais, um job que passe de 90 s é
 entregue de novo a outro worker. Antes de subir mais workers, defina
@@ -181,6 +182,87 @@ a lista inteira importa em ~16 s com ~130 MB.
 > IA e `integrator-outbox:publish` (a cada minuto). Lista completa:
 > `php artisan schedule:list`. Mantenha gateways e WhatsApp do ambiente de
 > teste em modo sandbox / com dados de teste.
+
+### 2.4 Sincronização de convênios e planos com a ANS
+
+Manager → Convênios → **Atualizar agora** (ou o agendador, toda segunda às 04:30) baixa da
+ANS a lista de operadoras (~1,5 MB) e a de planos (~75 MB, ~166 mil produtos). O arquivo de
+planos vai direto para o disco e é lido em linhas — a 1ª carga (~66 mil planos) leva ~15 s e
+usa ~25 MB de memória; as seguintes só regravam o que mudou.
+
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `ANS_OPERATORS_SYNC_ENABLED` | `false` | Liga a sincronização semanal automática (operadoras + planos). |
+| `ANS_PLANS_SYNC_ENABLED` | `true` | `false` pula a etapa de planos (só operadoras). |
+| `ANS_PLANS_TIMEOUT` | `600` | Tempo máximo do download dos planos (s). |
+
+Depois de mudar no `.env`: `php artisan config:cache`. O servidor precisa de saída HTTPS para
+`dadosabertos.ans.gov.br`; se a ANS estiver fora do ar, a sincronização termina com aviso e
+as operadoras podem ser atualizadas por envio manual do CSV (os planos ficam para a próxima).
+
+### 2.5 Sincronização do catálogo de medicamentos (CMED/Anvisa)
+
+Manager → Medicamentos → **Atualizar agora** (ou o agendador, toda terça às 05:00) lê na
+página oficial da CMED o link da lista de preços (PMC) mais recente
+(`lista_pmc_AAAAMMDD_*.xlsx`, ~13 MB) e baixa também a situação dos registros
+(`DADOS_ABERTOS_MEDICAMENTOS.csv`, ~8 MB, diário). A carga completa (~21 mil apresentações)
+leva ~11 s e usa ~35 MB de memória; se a lista e os dados abertos não mudaram desde a última
+carga, termina em menos de 1 s sem reprocessar (o admin pode marcar "Reprocessar").
+
+- Página da CMED fora do ar ou com layout novo: usa a mesma lista em CSV do portal de dados
+  abertos (`TA_PRECO_MEDICAMENTO.csv`, endereço fixo, mas atualizado com atraso) e avisa a
+  data da lista na tela.
+- Só baixa de `www.gov.br` e `dados.anvisa.gov.br` (HTTPS, também em redirecionamento), com
+  teto de 80 MB por arquivo. Os arquivos baixados não ficam no disco (a versão e o link ficam
+  no histórico).
+
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `CMED_SYNC_ENABLED` | `false` | Liga a verificação semanal automática. |
+| `CMED_DOWNLOAD_TIMEOUT` | `300` | Tempo máximo de cada download (s). |
+
+Depois de mudar no `.env`: `php artisan config:cache` (o arquivo `config/medicines.php` é novo).
+
+### 2.6 Provedores de IA e catálogo de modelos/preços
+
+Manager → **Provedores de IA**. As chaves de API ficam **só no `.env`** (nunca no banco nem
+na tela — a página mostra se a chave está definida, a variável e os 4 últimos caracteres,
+para conferir uma troca). Além de OpenAI, Anthropic e Gemini, a lista pronta tem Mistral,
+Groq, xAI (Grok), Azure OpenAI e Maritaca (Sabiá) (driver "compatível com OpenAI"): basta a
+chave — o Azure também precisa do endereço do recurso.
+
+**LGPD** (detalhes e fontes em `docs/legal/ai-providers-lgpd.md`): a Gemini API fica **fora
+dos papéis do assistente** (não recebe dado de paciente; em execução real, se tiver sobrado
+num papel salvo, é ignorada). Provedor que leva dado de
+paciente para fora do Brasil sem adequação (OpenAI, Anthropic, Groq, xAI, Azure global,
+Sabiá sem `-br-sp`) só entra num papel depois de registrado o mecanismo de transferência
+(drawer do provedor → Proteção de dados); quem já estava em uso segue, com aviso na tela.
+**Ambiente de teste:** se o Gemini estiver num papel, ele deixa de ser chamado após o deploy
+(o modo Validado some com um só provedor) — ponha como revisor Azure (Suécia), Mistral,
+Sabiá `-br-sp` ou Anthropic (com o registro).
+
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` | — | Integrações próprias. |
+| `MISTRAL_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `MARITACA_API_KEY` | — | Provedores compatíveis. Opcionais: `AI_<PROVEDOR>_MODEL`, `AI_<PROVEDOR>_BASE_URL`, `AI_<PROVEDOR>_TIMEOUT_SECONDS`. |
+| `AI_AZURE_OPENAI_BASE_URL` | — (obrigatória com a chave) | `https://{recurso}.openai.azure.com/openai/v1`. O modelo (`AI_AZURE_OPENAI_MODEL`) é o **nome do deployment** — use o nome do modelo (ex.: `gpt-4o-mini`) para a sincronização achar o preço; a API do Azure não lista deployments, então cadastre o modelo em "Novo modelo". |
+| `AI_AZURE_OPENAI_DATA_REGION` | `eu` | Região do deployment, para a LGPD: `eu` (Standard regional na UE, ex.: swedencentral), `br` (Provisioned em brazilsouth) ou `global` (Global/Data Zone — exige registro). |
+| `AI_MARITACA_MODEL` | `sabia-4-br-sp` | Sufixo `-br-sp` = processamento 100% no Brasil (+30% no preço). Preço oficial em R$ convertido para US$ pela cotação da última recarga de provedor. |
+| `AI_CATALOG_SYNC_ENABLED` | `false` | Liga a verificação diária (03:40) do catálogo de modelos/preços. |
+| `AI_PRICES_CATALOG_URL` | catálogo LiteLLM (GitHub) | Fonte dos preços (só HTTPS). |
+| `AI_CATALOG_MAX_PRICE_CHANGE_FACTOR` | `10` | Variação de preço acima disso (pra cima ou pra baixo) não é aplicada sozinha — vai para revisão. |
+
+**Sincronizar agora** (ou o agendador) lista os modelos pela API de cada provedor com chave
+(só leitura, nenhuma chamada gasta tokens) e confere os preços no catálogo público LiteLLM
+(~3 MB; ~1,5 s e ~70 MB de memória). Modelos novos entram **inativos** (o admin ativa os que
+quiser usar); preço editado à mão no painel fica **travado**; modelo que o provedor deixou de
+oferecer é marcado na tela, nunca desativado sozinho. Provedor sem chave: só confere os
+preços dos modelos já cadastrados.
+
+Depois de mudar o `.env`: `php artisan config:cache` **e** `php artisan queue:restart` (o
+worker carrega a config uma vez — sem reiniciar, os jobs de IA seguem com a chave antiga). O
+servidor precisa de saída HTTPS para `raw.githubusercontent.com` e para a API de cada
+provedor configurado.
 
 ## 3. Checklist de deploy
 

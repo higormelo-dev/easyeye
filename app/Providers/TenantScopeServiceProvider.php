@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Domains\AI\Models\{AiCircuitBreaker, AiCreditLedgerEntry, AiCreditPurchase, AiCreditWallet, AiDoctorPrompt, AiRunFeedback};
-use App\Models\{AdditionType, AuditLog, BillingBatch, BillingClaim, CashClose, ClinicResource, ColorVisionType, Covenant, CoverTestType, DataAccessLog, EntityActivation, ExamType, FeatureUsage, FinancialCashEntry, FinancialCategory, Indication, IrisType, Lense, LgpdRequest, Medicine, MedicinePresentation, NearPointConvergence, Notice, PartnerCommission, PartnerLead, PatientConsent, PatientImport, Procedure, ProcedurePrice, RecordVersion, ReferralCode, ReportSetting, ScheduleEvent, SkinType, Subscription, SurgeryType, VisitType, VisualAcuityType, WaitingList};
+use App\Models\{AdditionType, AuditLog, BillingBatch, BillingClaim, CashClose, ClinicResource, ColorVisionType, Covenant, CovenantPlan, CoverTestType, DataAccessLog, EntityActivation, ExamType, FeatureUsage, FinancialCashEntry, FinancialCategory, Indication, IrisType, Lense, LgpdRequest, Medicine, MedicinePresentation, NearPointConvergence, Notice, PartnerCommission, PartnerLead, PatientConsent, PatientImport, Procedure, ProcedurePrice, RecordVersion, ReferralCode, ReportSetting, ScheduleEvent, SkinType, Subscription, SurgeryType, VisitType, VisualAcuityType, WaitingList};
 use App\Models\Billing\{BillingLog, BillingRetrySchedule, Cancellation, EntityGatewayAccess, FinancialEvent, GatewayCircuitBreaker, GatewayCredential, GatewayFallbackRule, Invoice, Payment, PaymentAttempt, SubscriptionChange, TenantGatewaySetting, WebhookEvent};
 use App\Models\Scopes\EntityScope;
 use App\Support\TenantContext;
@@ -76,6 +76,7 @@ class TenantScopeServiceProvider extends ServiceProvider
         // Clínico auxiliar / catálogos
         ClinicResource::class,
         Covenant::class,
+        CovenantPlan::class,
         ExamType::class,
         ScheduleEvent::class,
         WaitingList::class,

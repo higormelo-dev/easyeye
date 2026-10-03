@@ -18,6 +18,20 @@ class CovenantsController extends BaseSettingController
         $this->routePrefix     = 'panel.setting.covenants';
         $this->viewSlot        = 'covenants';
         $this->crudFields      = ['name' => '', 'color' => '#3699ff', 'table' => false, 'active' => true];
+        $this->tabsGroup       = self::tabs();
+    }
+
+    /**
+     * Abas Convênios | Planos (Configurações).
+     *
+     * @return list<array{route: string, label: string}>
+     */
+    public static function tabs(): array
+    {
+        return [
+            ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants')],
+            ['route' => 'panel.setting.covenant-plans.index', 'label' => __('covenant_plans.settings_tab')],
+        ];
     }
 
     protected function getColumns(): array

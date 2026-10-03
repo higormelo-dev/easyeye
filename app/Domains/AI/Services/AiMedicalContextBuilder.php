@@ -13,10 +13,15 @@ use Throwable;
  * Constrói o contexto clínico mínimo enviado ao provedor LLM a partir de
  * um Patient/MedicalRecord do banco — em vez de aceitar contexto bruto do frontend.
  *
- * Estratégia de minimização (LGPD art. 6º, V — necessidade):
+ * Estratégia de minimização (LGPD art. 6º, III — necessidade):
  *   - Inclui apenas campos com utilidade clínica direta.
  *   - Remove identificadores diretos: CPF, RG, email, telefone, endereço.
- *   - Aplica anonimização de nome para iniciais ("João Silva Santos" → "J. S. S.").
+ *   - Não envia nome nem iniciais do paciente: só idade e sexo.
+ *   - Não envia os códigos internos (paciente/prontuário): o modelo não precisa
+ *     deles e, repetidos a cada chamada, permitiriam ao provedor ligar as
+ *     consultas de um mesmo paciente. O vínculo fica só no EasyEye (ai_runs).
+ *   - O nome digitado em texto livre vira o marcador <PATIENT_NAME_REDACTED>
+ *     na redação de dados pessoais (AiPromptGuardrailService, com protectedNames()).
  *
  * O médico vê o paciente real na sua tela; o LLM vê só o conjunto mínimo.
  * Se a clínica precisar enviar mais contexto, deve passar via campo `extra`
@@ -24,6 +29,15 @@ use Throwable;
  */
 final class AiMedicalContextBuilder
 {
+    /** Chaves demográficas que build() envia (categorias da auditoria do envio). */
+    public const DEMOGRAPHIC_KEYS = ['age_years', 'gender'];
+
+    /** Chaves clínicas do prontuário que build() envia. */
+    public const CLINICAL_KEYS = [
+        'main_complaint', 'history_present_illness', 'others_history', 'medications_in_use',
+        'ocular_surgical_history', 'comorbidities', 'tonometry', 'visual_acuity', 'biomicroscopy', 'fundoscopy',
+    ];
+
     /**
      * @return array<string, mixed>
      */
@@ -54,16 +68,14 @@ final class AiMedicalContextBuilder
         $person = $patient->person;
 
         if (! $person) {
-            return ['patient_code' => $patient->code];
+            return [];
         }
 
         $age = $this->ageFromBirthDate($person->birth_date);
 
         return [
-            'patient_code'     => $patient->code,
-            'patient_initials' => $this->initialsOf((string) $person->full_name),
-            'age_years'        => $age,
-            'gender'           => $person->gender,
+            'age_years' => $age,
+            'gender'    => $person->gender,
         ];
     }
 
@@ -73,7 +85,6 @@ final class AiMedicalContextBuilder
     private function medicalRecordContext(MedicalRecord $record): array
     {
         return [
-            'medical_record_code'     => $record->code,
             'main_complaint'          => $this->truncate($record->main_complaint),
             'history_present_illness' => $this->truncate($record->hda),
             'others_history'          => $this->truncate($record->others_history),
@@ -93,22 +104,24 @@ final class AiMedicalContextBuilder
         ];
     }
 
-    private function initialsOf(string $fullName): string
+    /**
+     * Nomes do paciente (completo e apelido) para a redação de dados pessoais
+     * trocar pelo marcador quando aparecerem em texto livre.
+     *
+     * @return list<string>
+     */
+    public function protectedNames(?Patient $patient): array
     {
-        $fullName = trim($fullName);
+        $person = $patient?->loadMissing('person')->person;
 
-        if ($fullName === '') {
-            return '';
+        if (! $person) {
+            return [];
         }
 
-        $parts = preg_split('/\s+/', $fullName) ?: [];
-
-        $initials = array_map(
-            static fn (string $part) => mb_strtoupper(mb_substr($part, 0, 1)) . '.',
-            array_filter($parts, static fn (string $p) => $p !== ''),
-        );
-
-        return implode(' ', $initials);
+        return array_values(array_filter(
+            [(string) $person->full_name, (string) ($person->nickname ?? '')],
+            static fn (string $name) => trim($name) !== '',
+        ));
     }
 
     private function ageFromBirthDate(mixed $birthDate): ?int

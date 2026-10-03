@@ -1,6 +1,6 @@
 <?php
 
-use App\Domains\AI\Models\{AiRun};
+use App\Domains\AI\Models\AiRun;
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
 use App\Models\{Entity, Plan, PlanFeature, Subscription, User};

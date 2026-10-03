@@ -137,6 +137,7 @@ Estado atual: ~367 rotas registradas.
 8. Rich text: usar `<TinyMceEditor v-model="content" />` — wrapper Vue do TinyMCE 8.
 9. SCSS modular em `resources/css/system/_*.scss` e `system.scss` como entry.
 10. **Não usar Alpine.js, Yajra DataTables ou Blade fora de PDFs/entry-points** — removidos do projeto.
+11. Tooltip: basta o atributo `title` (ou `data-bs-title`) — vira o tooltip do template automaticamente, sob demanda (`resources/js/Support/tooltips.js`, ligado em `panel.js`/`site.js`). Não criar `new bootstrap.Tooltip` em componente. `data-bs-placement` muda a posição; `data-tooltip="off"` mantém o nativo. Botão/campo `disabled` com `title` também mostra (o CSS reativa o ponteiro só neles — use `title` para explicar o bloqueio).
 
 ## Convenções de Implementação
 

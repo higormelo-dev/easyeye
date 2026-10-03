@@ -23,6 +23,7 @@ return [
     'code'       => 'Code',
     'doctor'     => 'Attending physician',
     'covenant'   => 'Insurance',
+    'plan'       => 'Plan',
     'date'       => 'Date',
     'address'    => 'Address',
 

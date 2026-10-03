@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
@@ -12,6 +12,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['edit', 'view', 'delete', 'toggleActive', 'restore']);
+
+// Textos compartilhados do cadastro (lang/<locale>/ui.php → patient_form).
+const inertiaPage = usePage();
+const ui = computed(() => inertiaPage?.props?.t_ui?.patient_form ?? {});
 
 const fallbackPhoto = '/img/system/team.png';
 const patients = ref([]);
@@ -91,6 +95,9 @@ onUnmounted(() => removeSuccessListener?.());
                     <address class="small text-muted mt-2 mb-1">
                         <strong>Código:</strong> {{ formatPatientCode(p.code) }}<br />
                         <strong>Convênio:</strong> {{ p.covenant ?? 'Não informado' }}<br />
+                        <template v-if="p.covenant_plan"
+                            ><strong>{{ ui.plan }}:</strong> {{ p.covenant_plan }}<br
+                        /></template>
                         <strong>Pele:</strong> {{ p.skin ?? 'Não informado' }}<br />
                         <strong>Íris:</strong> {{ p.iris ?? 'Não informado' }}
                     </address>

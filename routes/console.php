@@ -88,6 +88,35 @@ Schedule::command('whatsapp:send-confirmations')
     ->name('whatsapp:send-confirmations')
     ->withoutOverlapping();
 
+// Catálogo global de convênios ← Cadastro de Operadoras da ANS (dados
+// abertos, atualizados diariamente). Só lê dados públicos: seguro em
+// qualquer ambiente; ANS_OPERATORS_SYNC_ENABLED=false desliga.
+Schedule::command('covenants:sync-ans')
+    ->weeklyOn(1, '04:30')
+    ->when(fn () => (bool) config('covenants.ans.sync_enabled'))
+    ->name('covenants:sync-ans')
+    ->withoutOverlapping();
+
+// Catálogo global de medicamentos ← lista de preços CMED + dados abertos da
+// Anvisa (só lê dados públicos; sem mudança desde a última carga, não
+// reprocessa). Terça, longe da sincronização da ANS (segunda 04:30).
+// CMED_SYNC_ENABLED=false desliga.
+Schedule::command('medicines:sync-cmed')
+    ->weeklyOn(2, '05:00')
+    ->when(fn () => (bool) config('medicines.cmed.sync_enabled'))
+    ->name('medicines:sync-cmed')
+    ->withoutOverlapping();
+
+// Catálogo de modelos/preços de IA ← API de cada provedor com chave no .env +
+// catálogo público de preços LiteLLM (só leitura; nenhuma chamada gasta
+// tokens). Preço editado à mão no painel fica travado.
+// AI_CATALOG_SYNC_ENABLED=false desliga.
+Schedule::command('ai:sync-model-catalog')
+    ->dailyAt('03:40')
+    ->when(fn () => (bool) config('ai.catalog_sync.enabled'))
+    ->name('ai:sync-model-catalog')
+    ->withoutOverlapping();
+
 // WhatsApp (Z-API) — pesquisa de satisfação pós-atendimento (delay por
 // clínica; max_age_days evita spam retroativo ao ativar a feature).
 Schedule::command('whatsapp:send-surveys')

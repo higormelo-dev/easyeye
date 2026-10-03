@@ -34,6 +34,7 @@ const activeTab = ref('personal');
 const {
     form,
     loading,
+    planOption,
     resetForm,
     loadEditData,
     savePatient,
@@ -133,6 +134,7 @@ const tabs = [
                 :state-options="stateOptions"
                 :is-edit="isEdit"
                 :lookup-cep="lookupCep"
+                :plan-option="planOption"
             />
         </form>
 

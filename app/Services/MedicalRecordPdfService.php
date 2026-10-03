@@ -28,6 +28,7 @@ class MedicalRecordPdfService
         $record->loadMissing([
             'patient.person',
             'patient.covenant',
+            'patient.covenantPlan',
             'doctor.person',
             'schedule',
             'visualAcuityType',

@@ -26,6 +26,12 @@ class InMemoryRunRepository implements AiRunRepositoryInterface
         ]);
     }
 
+    /** @param array<string, mixed> $dispatch */
+    public function recordDispatch(AiRun $run, array $dispatch): void
+    {
+        $run->forceFill(['dispatch_audit' => $dispatch]);
+    }
+
     public function markWaitingApproval(
         AiRun $run,
         string $finalOutput,

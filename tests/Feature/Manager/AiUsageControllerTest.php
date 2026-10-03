@@ -187,7 +187,7 @@ describe('filtros', function () {
         'mais de 2 anos'        => [['preset' => 'custom', 'from' => '2023-01-01', 'to' => '2026-01-01'], 'to'],
         'preset desconhecido'   => [['preset' => 'forever'], 'preset'],
         'clínica não-uuid'      => [['entity_id' => "1' OR '1'='1"], 'entity_id'],
-        'provedor desconhecido' => [['provider' => 'deepseek'], 'provider'],
+        'provedor desconhecido' => [['provider' => 'skynet'], 'provider'],
         'situação desconhecida' => [['status' => 'hacked'], 'status'],
         'ordenação fora'        => [['sort' => 'raw_cost_usd; DROP TABLE ai_runs'], 'sort'],
     ]);

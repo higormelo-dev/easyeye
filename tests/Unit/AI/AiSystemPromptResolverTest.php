@@ -80,3 +80,16 @@ test('harden re-deriva quando o run não tem system_prompt gravado', function ()
         ->and($resolver->harden('assistant_chat', '   '))->toBe($resolver->resolve('assistant_chat'))
         ->and($resolver->harden('record_assist', '', 'hda'))->toBe($resolver->resolve('record_assist', 'hda'));
 });
+
+test('harden reconhece o texto anterior do preâmbulo (run gravado antes da mudança) e não duplica as regras', function () {
+    $stored = __('ai.security_preamble_previous') . __('ai.record_assist_system_prompt');
+
+    $prompt = (new AiSystemPromptResolver())->harden('record_assist', $stored);
+
+    expect($prompt)->toBe(__('ai.security_preamble') . __('ai.record_assist_system_prompt'))
+        ->and(substr_count($prompt, '(1) '))->toBe(1);
+});
+
+test('[LGPD] o preâmbulo manda não reproduzir os marcadores de dados mascarados', function () {
+    expect((new AiSystemPromptResolver())->resolve('record_assist'))->toContain('<PATIENT_NAME_REDACTED>');
+});

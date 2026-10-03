@@ -7,8 +7,9 @@ namespace App\Domains\AI\Services;
 use App\Domains\AI\Contracts\{AiCircuitBreakerInterface, AiProviderInterface, AiRunProviderCallStoreInterface};
 use App\Domains\AI\Exceptions\AiRunCancelledException;
 use App\Domains\AI\Models\AiRun;
+use App\Domains\AI\Support\ProviderDataPolicy;
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData, AiWorkflowResultData};
-use App\Enums\AI\{AiProviderCallRole, AiRunMode};
+use App\Enums\AI\{AiProvider, AiProviderCallRole, AiRunMode};
 use RuntimeException;
 use Throwable;
 
@@ -39,7 +40,13 @@ class AiOrchestrator
      */
     public function execute(AiRun $run, AiRequestData $request): AiWorkflowResultData
     {
-        $steps           = $this->providerManager->providersForMode($request->mode);
+        // Provedor fixado pelo fluxo que criou o run (metadata.pinned_provider,
+        // gravado só no servidor): 1 chamada, sem fallback para outra IA.
+        $pinned = $this->pinnedProvider($request);
+
+        $steps = $pinned !== null
+            ? [['role' => AiProviderCallRole::Generator, 'provider' => $pinned]]
+            : $this->providerManager->providersForMode($request->mode);
         $responses       = [];
         $previousOutputs = [];
         $entityId        = (string) $run->entity_id;
@@ -63,7 +70,7 @@ class AiOrchestrator
             ]);
 
             $stepRequest = $this->stepRequest($request, $role, $previousOutputs);
-            $chain       = $this->providerManager->fallbackChainForRole($role);
+            $chain       = $pinned !== null ? [$pinned] : $this->providerManager->fallbackChainForRole($role);
             $response    = $this->runWithFallback(
                 run: $run,
                 request: $request,
@@ -182,7 +189,8 @@ class AiOrchestrator
                     status: 'failed',
                     response: new AiProviderResponseData(
                         provider: $providerEnum,
-                        model: 'unknown',
+                        // Modelo configurado: o painel de uso mostra QUAL modelo falhou.
+                        model: $this->providerManager->modelFor($providerCode) ?? 'unknown',
                         content: '',
                         usage: new AiUsageData(),
                         latencyMs: 0,
@@ -204,6 +212,28 @@ class AiOrchestrator
         throw $lastException ?? new RuntimeException(
             "Todos os providers da chain falharam para o papel [{$role->value}].",
         );
+    }
+
+    private function pinnedProvider(AiRequestData $request): ?AiProviderInterface
+    {
+        $code = $request->metadata['pinned_provider'] ?? null;
+
+        if (! is_string($code) || $code === '') {
+            return null;
+        }
+
+        // LGPD: provedor bloqueado para dados de pacientes só atende fluxo que
+        // declara (no servidor) não levar dado de paciente — ex.: posologia do
+        // catálogo global de medicamentos.
+        $provider = AiProvider::tryFrom($code);
+
+        if ($provider !== null
+            && ! ProviderDataPolicy::allowsPatientData($provider)
+            && ($request->metadata['patient_data'] ?? true) !== false) {
+            throw new RuntimeException("Provider IA [{$code}] não pode receber dados de pacientes (LGPD).");
+        }
+
+        return $this->providerManager->pinned($code);
     }
 
     private function classifyFailure(Throwable $e): string

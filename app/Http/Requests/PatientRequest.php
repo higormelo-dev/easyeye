@@ -2,15 +2,20 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Patient;
+use App\Models\{CovenantPlan, Patient};
 use App\Support\BrazilianFormat;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 
 class PatientRequest extends FormRequest
 {
+    /** Cache do paciente em edição (várias regras consultam). */
+    private ?Patient $currentPatient = null;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -57,8 +62,9 @@ class PatientRequest extends FormRequest
                     })->whereNull('deleted_at');
                 }),
             ],
-            'card_number' => 'nullable|string|max:255',
-            'name'        => [
+            'card_number'      => 'nullable|string|max:255',
+            'covenant_plan_id' => ['nullable', 'uuid', $this->covenantPlanRule()],
+            'name'             => [
                 'required_without:type_method',
                 'string',
                 'max:255',
@@ -241,17 +247,59 @@ class PatientRequest extends FormRequest
 
     private function getIgnoredPersonId()
     {
-        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $patientId = $this->route('patient');
+        return $this->currentPatient()?->person_id;
+    }
 
-            $patient = Patient::query()
-                ->where('id', $patientId)
-                ->first();
-
-            return $patient->person_id ?? null;
+    /** Paciente em edição (PUT/PATCH); null no cadastro. */
+    private function currentPatient(): ?Patient
+    {
+        if (! $this->isMethod('PUT') && ! $this->isMethod('PATCH')) {
+            return null;
         }
 
-        return null;
+        return $this->currentPatient ??= Patient::query()->where('id', $this->route('patient'))->first();
+    }
+
+    /**
+     * Plano: visível para a clínica (global ou dela), do MESMO convênio e
+     * disponível. O plano que o paciente já tem passa mesmo que tenha sido
+     * cancelado na ANS/desativado — reabrir e salvar o cadastro não pode
+     * travar por causa dele.
+     */
+    private function covenantPlanRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if (blank($value) || ! Str::isUuid((string) $value)) {
+                return; // vazio = sem plano; formato inválido já cai na regra uuid
+            }
+
+            $current  = $this->currentPatient();
+            $entityId = (string) session()->get('selected_entity_id');
+            $covenant = $this->input('covenant_id') ?: $current?->covenant_id;
+
+            $plan = CovenantPlan::withoutGlobalScopes()
+                ->whereKey($value)
+                ->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId))
+                ->first();
+
+            if (! $plan) {
+                $fail(__('covenant_plans.invalid'));
+
+                return;
+            }
+
+            if ((string) $plan->covenant_id !== (string) $covenant) {
+                $fail(__('covenant_plans.wrong_covenant'));
+
+                return;
+            }
+
+            $unchanged = $current !== null && (string) $current->covenant_plan_id === (string) $value;
+
+            if (! $unchanged && ($plan->deleted_at !== null || ! $plan->active)) {
+                $fail(__('covenant_plans.unavailable'));
+            }
+        };
     }
 
     /**

@@ -39,3 +39,31 @@ test('redactText mascara cartão apenas quando passa no luhn', function () {
     expect($service->redactText('Cartão teste 4111 1111 1111 1111.'))->toContain('<CREDIT_CARD_REDACTED>');
     expect($service->redactText('Sequência clínica 1234 5678 9012 3456.'))->toContain('1234 5678 9012 3456');
 });
+
+test('[LGPD] nome do paciente digitado no pedido ou em texto livre vira um marcador (nem as iniciais saem)', function () {
+    $result = (new AiPromptGuardrailService())->sanitizePayload([
+        'user_prompt' => 'Paciente João da Silva refere dor. JOÃO SILVA retorna; Joao também.',
+        'context'     => ['history_present_illness' => 'Sr. Silva relata halos', 'conversation_history' => [['role' => 'user', 'content' => 'E o João?']]],
+    ], ['João da Silva Santos']);
+
+    // Nome composto ("João da Silva", "JOÃO SILVA") vira UM marcador; a pontuação fica.
+    expect($result['payload']['user_prompt'])->toBe('Paciente <PATIENT_NAME_REDACTED> refere dor. <PATIENT_NAME_REDACTED> retorna; <PATIENT_NAME_REDACTED> também.')
+        ->and($result['payload']['context']['history_present_illness'])->toBe('Sr. <PATIENT_NAME_REDACTED> relata halos')
+        ->and($result['payload']['context']['conversation_history'][0]['content'])->toBe('E o <PATIENT_NAME_REDACTED>?')
+        ->and($result['guardrails']['pii_types'])->toContain('patient_name');
+});
+
+test('[LGPD] só nome próprio: palavra comum igual a parte do nome (minúscula) fica intacta', function () {
+    $result = (new AiPromptGuardrailService())->sanitizePayload([
+        'user_prompt' => 'Fotofobia: sensibilidade à luz intensa.',
+    ], ['Maria da Luz Rosa']);
+
+    expect($result['payload']['user_prompt'])->toBe('Fotofobia: sensibilidade à luz intensa.')
+        ->and($result['guardrails']['pii_redacted'])->toBeFalse();
+});
+
+test('sem nomes protegidos o comportamento é o de sempre', function () {
+    $result = (new AiPromptGuardrailService())->sanitizePayload(['user_prompt' => 'João Silva, CPF 123.456.789-09']);
+
+    expect($result['payload']['user_prompt'])->toBe('João Silva, CPF <CPF_REDACTED>');
+});

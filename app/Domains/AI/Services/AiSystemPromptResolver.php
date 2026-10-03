@@ -107,10 +107,14 @@ final class AiSystemPromptResolver
 
     private function stripPreamble(string $prompt): string
     {
-        $preamble = $this->preamble();
+        // Atual ou o texto anterior (run gravado antes da última mudança das
+        // regras) — senão o harden() mandaria as duas versões juntas.
+        foreach ([$this->preamble(), (string) __('ai.security_preamble_previous')] as $preamble) {
+            if ($preamble !== '' && str_starts_with($prompt, $preamble)) {
+                return substr($prompt, strlen($preamble));
+            }
+        }
 
-        return str_starts_with($prompt, $preamble)
-            ? substr($prompt, strlen($preamble))
-            : $prompt;
+        return $prompt;
     }
 }

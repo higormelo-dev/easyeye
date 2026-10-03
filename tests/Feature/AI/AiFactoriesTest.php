@@ -1,15 +1,7 @@
 <?php
 
-use App\Domains\AI\Models\AiCreditLedgerEntry;
-use App\Domains\AI\Models\AiCreditWallet;
-use App\Domains\AI\Models\AiModelPrice;
-use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Models\AiRunProviderCall;
-use App\Enums\AI\AiLedgerEntryType;
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiProviderCallRole;
-use App\Enums\AI\AiRunMode;
-use App\Enums\AI\AiRunStatus;
+use App\Domains\AI\Models\{AiCreditLedgerEntry, AiCreditWallet, AiModelPrice, AiRun, AiRunProviderCall};
+use App\Enums\AI\{AiLedgerEntryType, AiProvider, AiProviderCallRole, AiRunMode, AiRunStatus};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

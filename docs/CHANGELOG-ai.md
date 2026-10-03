@@ -8,6 +8,109 @@ Formato: [Keep a Changelog](https://keepachangelog.com/), `## [Onda N] — categ
 
 ---
 
+## [2026-10-03] — Minimização e auditoria do envio; correção da Anthropic
+
+### Alterado
+- **Sem iniciais**: o contexto enviado à IA não tem mais `patient_initials` (só idade e
+  sexo); nome/apelido digitados viram `<PATIENT_NAME_REDACTED>` (nome composto vira um
+  marcador só). Regra (5) no preâmbulo: não deduzir nem reproduzir marcadores. O texto
+  anterior do preâmbulo fica em `ai.security_preamble_previous` para runs antigos não
+  receberem as regras em dobro.
+
+### Adicionado
+- **Auditoria do envio** (`ai_runs.dispatch_audit`, migration): SHA-256 das instruções
+  enviadas, categorias de dados, chaves do contexto e nº de imagens — gravado antes da
+  chamada, sem conteúdo (a trilha `audit_logs` só registra essa coluna).
+
+### Corrigido
+- **Anthropic**: o payload mandava `metadata.expects_json`, fora do contrato da API (só
+  `metadata.user_id`) — chamadas com JSON podiam ser recusadas. O pedido de JSON já vai no
+  texto (PromptComposer).
+
+---
+
+## [2026-10-03] — Tarja dos dados do paciente nas imagens de exame
+
+### Adicionado
+- **Tarja antes da IA** (`ExamImageDeidentifier` + `ExamImageLayouts`): os equipamentos
+  exportam o relatório com nome, nascimento e ID do paciente no próprio pixel. O layout é
+  reconhecido pela impressão digital de regiões fixas da tela (título, rótulos, logotipo)
+  e os campos do paciente são pintados de preto só na cópia enviada. Layouts: Pentacam
+  (PT; ficha à esquerda e Belin), Keratograph (Overview, 4-Maps), Pachycam, Tomey EM-3000.
+- **Layout não reconhecido: a imagem não sai** (decisão de produto). Aviso nas
+  verificações de segurança do resultado; sem nenhuma imagem, a análise falha antes do
+  provedor, com o motivo para o médico, sem cobrança e sem nova tentativa
+  (`AiImageNotDeidentifiedException`).
+- Auditoria por imagem em `ai_run_patient_exam.image_deidentification` (migration).
+- Comando `ai:exam-image-layout` para conferir amostras e cadastrar layouts novos.
+
+### Corrigido
+- `context.selected_exams` passa a listar só as imagens enviadas (antes, imagem
+  ignorada — arquivo ausente ou acima do limite — deslocava "imagem N = exame N").
+
+---
+
+## [2026-10-03] — LGPD dos provedores de IA, Azure OpenAI e Maritaca
+
+### Adicionado
+- **Azure OpenAI** (API v1, header `api-key`, deployment como modelo; região declarada
+  em `AI_AZURE_OPENAI_DATA_REGION`) e **Maritaca** (Sabiá; `-br-sp` processa 100% no
+  Brasil; preço oficial em R$ convertido pela cotação da última recarga). Sem listagem
+  de deployments no Azure: modelos cadastrados à mão.
+- **Política LGPD por provedor** (`ProviderDataPolicy`): onde processa, base da
+  transferência internacional e bloqueio para pacientes. Gemini API fora dos papéis do
+  assistente (validação no painel, filtro em execução real e trava no orquestrador para
+  provedor fixado sem `patient_data: false`). DeepSeek (dados na China) e OpenRouter
+  (repassa a terceiros) avaliados e não incluídos.
+- **Registro do mecanismo de transferência** (LGPD art. 33) por provedor
+  (`PATCH/DELETE ai-providers/{provider}/transfer`, auditado): exigido antes de pôr num
+  papel quem leva dado de paciente para fora do Brasil sem adequação; quem já estava em
+  uso segue com aviso. Coluna LGPD, seção "Proteção de dados" no drawer e avisos na tela.
+- Documento `docs/legal/ai-providers-lgpd.md` (suboperadores, fontes, checklist).
+
+### Alterado
+- Contexto clínico enviado à IA sem código do paciente/prontuário; nome e apelido do
+  paciente digitados no pedido viram iniciais.
+- Driver compatível recusa imagem em provedor sem visão (Maritaca) antes de enviar e
+  exige endereço configurado (Azure).
+
+---
+
+## [2026-10-03] — Provedores de IA: lista pronta e catálogo sincronizado
+
+### Adicionado
+- **Novos provedores** (driver `OpenAiCompatibleProvider`, POST `/chat/completions`):
+  Mistral, Groq e xAI (Grok). Chave só no `.env`
+  (`<PROVEDOR>_API_KEY`); a tela mostra origem, variável e os 4 últimos caracteres.
+- **Sincronização do catálogo de modelos/preços** (Manager → Provedores de IA →
+  "Sincronizar agora" ou `ai:sync-model-catalog` diário com `AI_CATALOG_SYNC_ENABLED`):
+  modelos pela API de cada provedor + preços do catálogo LiteLLM. Novos entram
+  inativos; preço manual fica travado; variação > 10x vai para revisão; modelo não
+  oferecido é marcado. Progresso em tempo real (Reverb), histórico e "o que mudou".
+- Tela reorganizada no padrão do manager (Empresas/Medicamentos): números no topo,
+  abas Provedores | Modelos e preços | Sincronização, ações em ícone + menu, detalhes
+  em drawer (provedor: chave, modelo, endereço, como configurar, teste) e cadastro de
+  preço em modal. Catálogo paginado, filtrado (provedor, status, origem, situação,
+  busca) e ordenado no servidor; modelo de cada provedor salvo pelo drawer
+  (`PATCH ai-providers/{provider}/model`).
+
+### Corrigido
+- **Raciocínio da OpenAI cobrado duas vezes**: `output_tokens` da OpenAI já inclui o
+  raciocínio e o custo somava `reasoning_tokens` de novo. Agora a saída registrada é só
+  o texto visível; raciocínio sem preço próprio é cobrado como saída.
+- Snapshot datado da Anthropic (`claude-…-AAAAMMDD`) cai no preço do modelo-base.
+- Sanitizador de erros reconhece chaves Groq (`gsk_`) e xAI (`xai-`); o driver
+  compatível remove a chave exata ecoada pelo provedor.
+- Cards de custo/consumo (Manager → Créditos IA) mostram provedores além dos três
+  originais quando há movimento.
+
+### Schema
+- `ai_model_prices`: `source`, `price_locked`, `synced_at`, `unlisted_at` (linhas já
+  editadas pelo painel entram travadas).
+- Nova tabela `ai_catalog_syncs` (histórico das sincronizações).
+
+---
+
 ## [Onda 4] — Consolidação de dívidas · 2026-06-12
 
 ### Adicionado

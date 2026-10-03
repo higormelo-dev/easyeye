@@ -220,6 +220,13 @@ na agenda) e a opção **Cobrança** (entra no faturamento TISS):
 
 ![Convênios](img/15-convenios.png)
 
+**Configurações → Convênios → aba Planos** — os planos dos convênios da ANS já vêm prontos
+(o EasyEye os mantém atualizados com os dados abertos da ANS) e aparecem direto no cadastro do
+paciente. Aqui você cadastra só o que **não** está nesse catálogo: plano de um convênio próprio
+da clínica (ex.: convênio de empresa) ou plano que ainda não aparece na lista. Informe o
+convênio, o nome e, se tiver, o **registro do produto na ANS** (impresso na carteirinha). O
+convênio do plano não muda depois de criado; Particular não tem planos.
+
 **Configurações → Unidades / salas** — salas e equipamentos agendáveis (tipo **Sala** ou
 **Equipamento**):
 

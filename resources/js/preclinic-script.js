@@ -981,13 +981,9 @@ Template Name: Preclinic - Bootstrap Admin Template
 		});
 	});
 
-	// Tooltip
-	if($('[data-bs-toggle="tooltip"]').length > 0) {
-		var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-		var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-			return new bootstrap.Tooltip(tooltipTriggerEl)
-		})
-	}
+	// Tooltip: a inicialização do template (uma vez, no carregamento) não
+	// alcançava as telas Vue/Inertia, desenhadas depois e trocadas a cada
+	// navegação. Agora é global e sob demanda — resources/js/Support/tooltips.js.
 
 	/* Invoice Template */
 	$('.invoice-template').on('click', function(){

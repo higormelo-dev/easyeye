@@ -49,7 +49,7 @@ use Illuminate\Support\Collection;
  */
 final class PatientDataExporter
 {
-    public const FORMAT_VERSION = 2;
+    public const FORMAT_VERSION = 3; // 3: plano do convênio no bloco da clínica
 
     /** @var array<class-string, array<string, ?string>> nomes de catálogo por id */
     private array $names = [];
@@ -59,7 +59,7 @@ final class PatientDataExporter
 
     public function export(Patient $patient): array
     {
-        $patient->load(['person.patientAccount', 'entity', 'covenant', 'skinType', 'irisType']);
+        $patient->load(['person.patientAccount', 'entity', 'covenant', 'covenantPlan', 'skinType', 'irisType']);
         $scheduleIds = Schedule::withTrashed()->where(fn ($q) => $q->where('entity_id', $patient->entity_id)->orWhereNull('entity_id'))
             ->where('patient_id', $patient->id)->pluck('id');
 
@@ -89,10 +89,14 @@ final class PatientDataExporter
     private function clinic(Patient $patient): array
     {
         return [
-            'name'            => $patient->entity?->name,
-            'patient_code'    => $patient->code,
-            'card_number'     => $patient->card_number,
-            'covenant'        => $patient->covenant?->name,
+            'name'          => $patient->entity?->name,
+            'patient_code'  => $patient->code,
+            'card_number'   => $patient->card_number,
+            'covenant'      => $patient->covenant?->name,
+            'covenant_plan' => $patient->covenantPlan ? [
+                'name'             => $patient->covenantPlan->name,
+                'ans_registration' => $patient->covenantPlan->ans_code,
+            ] : null,
             'active'          => $patient->active,
             'patient_since'   => $this->iso($patient->created_at),
             'skin_type'       => $patient->skinType?->name,

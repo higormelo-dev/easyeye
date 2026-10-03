@@ -12,8 +12,11 @@ return [
     ],
 
     'patients' => [
-        'title'    => 'Import Patients',
-        'subtitle' => 'Import patients in bulk from a CSV spreadsheet.',
+        'plan_not_found' => 'Warning: plan ":plan" not found for the insurer — patient imported without a plan. Fix it in the patient record or register the plan in Settings › Insurers › Plans.',
+        'plan_ambiguous' => 'Warning: more than one plan ":plan" for the insurer — patient imported without a plan. Use the ANS product registry (printed on the card) or pick it in the patient record.',
+        'col_warnings'   => 'Warnings',
+        'title'          => 'Import Patients',
+        'subtitle'       => 'Import patients in bulk from a CSV spreadsheet.',
 
         'upload_title'      => 'Upload CSV file',
         'upload_hint'       => 'Supports files exported from Feegow, Doctoralia, ProDoctor and any standard CSV spreadsheet.',

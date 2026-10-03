@@ -1,23 +1,19 @@
 <?php
 
 use App\Domains\AI\Exceptions\InsufficientAiCreditsException;
-use App\Domains\AI\Models\AiCreditLedgerEntry;
-use App\Domains\AI\Models\AiCreditWallet;
+use App\Domains\AI\Models\{AiCreditLedgerEntry, AiCreditWallet};
 use App\Domains\AI\Services\AiCreditWalletService;
-use App\Enums\AI\AiLedgerEntryType;
-use App\Enums\AI\AiProvider;
+use App\Enums\AI\{AiLedgerEntryType, AiProvider};
 use App\Enums\SubscriptionStatus;
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\Subscription;
+use App\Models\{Entity, Plan, Subscription};
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->entity = Entity::factory()->create(['is_client' => false]);
-    $this->plan = Plan::factory()->create(['active' => true]);
+    $this->entity       = Entity::factory()->create(['is_client' => false]);
+    $this->plan         = Plan::factory()->create(['active' => true]);
     $this->subscription = Subscription::factory()->create([
         'entity_id' => $this->entity->id,
         'plan_id'   => $this->plan->id,
@@ -193,7 +189,7 @@ test('refund estorna créditos para o balance comprado', function () {
 test('refund é idempotente com mesma idempotencyKey', function () {
     $this->service->purchaseCredits(entityId: $this->entity->id, amount: 100);
 
-    $key = 'refund-key-001';
+    $key    = 'refund-key-001';
     $first  = $this->service->refund(entityId: $this->entity->id, amount: 40, idempotencyKey: $key);
     $second = $this->service->refund(entityId: $this->entity->id, amount: 40, idempotencyKey: $key);
 

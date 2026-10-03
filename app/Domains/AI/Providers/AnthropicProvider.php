@@ -113,9 +113,8 @@ class AnthropicProvider implements AiProviderInterface
             $payload['system'] = $request->systemPrompt;
         }
 
-        if ($request->expectsJson) {
-            $payload['metadata'] = ['expects_json' => true];
-        }
+        // JSON é pedido no próprio texto (PromptComposer). Não usar `metadata`
+        // para isso: a API só aceita metadata.user_id (docs: Create a Message).
 
         return $payload;
     }

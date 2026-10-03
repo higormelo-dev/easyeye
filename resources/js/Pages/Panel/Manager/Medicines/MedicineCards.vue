@@ -4,6 +4,7 @@ import TablePagination from '@/Components/Panel/TablePagination.vue';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import { cmedSituation } from './cmedSituation.js';
 
 /**
  * Catálogo de medicamentos em cards — mesmo layout de Manager → Planos.
@@ -47,10 +48,12 @@ defineEmits(['view', 'edit', 'delete', 'toggleActive']);
                                 :label-inactive="t.status_inactive"
                             />
                             <span
-                                v-if="m.source === 'cmed' && m.active && !m.is_marketed"
-                                class="badge badge-soft-warning border border-warning rounded fs-13 fw-medium"
-                                :title="t.not_marketed_hint"
-                                ><i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ t.not_marketed }}</span
+                                v-if="cmedSituation(m, t)"
+                                class="badge rounded fs-12 fw-medium"
+                                :class="cmedSituation(m, t).cls"
+                                :title="cmedSituation(m, t).hint"
+                                ><i :class="`ti ${cmedSituation(m, t).icon} me-1`" aria-hidden="true"></i
+                                >{{ cmedSituation(m, t).label }}</span
                             >
                         </div>
                         <div class="text-muted small mb-2">

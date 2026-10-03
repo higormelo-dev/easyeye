@@ -69,6 +69,8 @@ test('execution service consome e libera reserva no sucesso', function () {
     $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService(), new EyeImageAttachmentService());
     $service->execute($run);
 
+    expect($run->dispatch_audit['data_categories'] ?? null)->toContain('request_text');
+
     expect($run->status)->toBe(AiRunStatus::WaitingApproval);
     expect($run->consumed_credits)->toBe(60);
     expect($run->final_output)->toBe('resultado final');

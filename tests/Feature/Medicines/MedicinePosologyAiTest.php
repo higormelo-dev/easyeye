@@ -3,10 +3,12 @@
 use App\Domains\AI\Contracts\AiProviderInterface;
 use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiProviderManager, AiProviderSettings};
+use App\Domains\AI\Services\AiRunExecutionService;
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
 use App\Enums\AI\{AiProvider, AiRunStatus};
 use App\Enums\{MedicineSource, SaasRule};
 use App\Models\{Entity, Medicine, User};
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
 
 /**
@@ -82,6 +84,10 @@ function posologyJson(array $overrides = []): string
 }
 
 beforeEach(function () {
+    // Padrão: UMA IA configurada (o botão gera direto). Os cenários com
+    // várias IAs configuram a lista no próprio teste.
+    app(AiProviderSettings::class)->setEnabledCodes([AiProvider::OpenAI->value]);
+
     $this->saas  = Entity::factory()->create(['is_client' => false, 'active' => true]);
     $this->admin = User::factory()->create();
     createEntityUser($this->saas, $this->admin, SaasRule::Admin->value);
@@ -202,7 +208,7 @@ it('falha do provedor: 422 com mensagem genérica (sem detalhe técnico) e run m
     $response = asPosologyAdmin()
         ->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
         ->assertStatus(422)
-        ->assertJsonPath('message', __('manager_medicines.ai_failed'));
+        ->assertJsonPath('message', __('manager_medicines.ai_failed_busy', ['provider' => AiProvider::OpenAI->label()]) . ' ' . __('manager_medicines.ai_try_again'));
 
     expect($response->getContent())->not->toContain('segredo-interno')
         ->and(AiRun::withoutGlobalScopes()->sole()->status)->toBe(AiRunStatus::Failed);
@@ -213,7 +219,7 @@ it('sem provedor configurado no servidor: botão some e o endpoint recusa', func
     $provider = fakePosologyAi(posologyJson());
 
     asPosologyAdmin()->get(route('manager.medicines.index'))
-        ->assertInertia(fn (AssertableInertia $page) => $page->where('aiAvailable', false));
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('aiProviders', []));
 
     asPosologyAdmin()
         ->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
@@ -261,4 +267,204 @@ it('limite de 10 sugestões por minuto (chamada paga)', function () {
     }
 
     asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])->assertStatus(429);
+});
+
+describe('escolha da IA', function () {
+    /** @return array<string, PosologyFakeProvider> fakes por provedor (cada um com a sua resposta) */
+    function fakePosologyAiByProvider(array $replies): array
+    {
+        $providers = [];
+
+        foreach (AiProvider::cases() as $case) {
+            $providers[$case->value] = new PosologyFakeProvider($case, $replies[$case->value] ?? posologyJson());
+        }
+
+        app()->instance(AiProviderManager::class, new AiProviderManager($providers, app(AiProviderSettings::class)));
+
+        return $providers;
+    }
+
+    it('uma IA configurada: gera direto com ela, em UMA chamada', function () {
+        app(AiProviderSettings::class)->setEnabledCodes([AiProvider::Gemini->value]);
+        $fakes = fakePosologyAiByProvider([]);
+
+        asPosologyAdmin()->get(route('manager.medicines.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('aiProviders', 1)
+                ->where('aiProviders.0.code', 'gemini')
+                ->where('aiProviders.0.label', AiProvider::Gemini->label()));
+
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
+            ->assertOk()
+            ->assertJsonPath('suggestion.provider', 'gemini')
+            ->assertJsonPath('suggestion.provider_label', AiProvider::Gemini->label());
+
+        expect($fakes['gemini']->requests)->toHaveCount(1)
+            ->and($fakes['openai']->requests)->toBe([])
+            ->and(AiRun::withoutGlobalScopes()->sole()->mode->value)->toBe('economy');
+    });
+
+    it('várias IAs: sem escolha o servidor pede a escolha e não chama nenhuma', function () {
+        app(AiProviderSettings::class)->setEnabledCodes(['openai', 'anthropic', 'gemini']);
+        $fakes = fakePosologyAiByProvider([]);
+
+        asPosologyAdmin()->get(route('manager.medicines.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('aiProviders', 3));
+
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('manager_medicines.ai_choose_provider'));
+
+        expect(AiRun::withoutGlobalScopes()->count())->toBe(0)
+            ->and(collect($fakes)->sum(fn ($f) => count($f->requests)))->toBe(0);
+    });
+
+    it('várias IAs: usa SÓ a escolhida (uma chamada, sem revisor), com o registro da execução', function () {
+        app(AiProviderSettings::class)->setEnabledCodes(['openai', 'anthropic', 'gemini']);
+        $fakes = fakePosologyAiByProvider(['anthropic' => posologyJson(['dosage' => '2 gotas'])]);
+
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id, 'provider' => 'anthropic'])
+            ->assertOk()
+            ->assertJsonPath('suggestion.dosage', '2 gotas')
+            ->assertJsonPath('suggestion.provider_label', AiProvider::Anthropic->label());
+
+        $run = AiRun::withoutGlobalScopes()->sole();
+        expect($fakes['anthropic']->requests)->toHaveCount(1)
+            ->and($fakes['openai']->requests)->toBe([])
+            ->and($fakes['gemini']->requests)->toBe([])
+            ->and($run->mode->value)->toBe('economy')
+            ->and($run->input_summary['metadata']['pinned_provider'])->toBe('anthropic')
+            ->and(DB::table('ai_run_provider_calls')->where('ai_run_id', $run->id)->pluck('provider')->all())
+            ->toBe(['anthropic']);
+    });
+
+    it('IA escolhida falha: diz qual IA e o motivo (demora/sobrecarga), não troca por outra', function (string $error, string $cause) {
+        app(AiProviderSettings::class)->setEnabledCodes(['openai', 'gemini']);
+        $fakes = fakePosologyAiByProvider(['gemini' => new RuntimeException($error)]);
+
+        $response = asPosologyAdmin()
+            ->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id, 'provider' => 'gemini'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('manager_medicines.' . $cause, ['provider' => AiProvider::Gemini->label()]) . ' ' . __('manager_medicines.ai_try_other'));
+
+        expect($response->getContent())->not->toContain('segredo')
+            ->and($fakes['openai']->requests)->toBe([]);
+
+        // Painel de uso mostra o modelo que falhou (antes: "unknown").
+        expect(DB::table('ai_run_provider_calls')->value('model'))
+            ->toBe(app(AiProviderSettings::class)->model('gemini'));
+    })->with([
+        'tempo esgotado' => ['cURL error 28: Operation timed out after 20002 milliseconds with 0 bytes received segredo', 'ai_failed_timeout'],
+        'sobrecarga'     => ['Gemini request failed [503]: This model is currently experiencing high demand segredo', 'ai_failed_busy'],
+        'outro erro'     => ['Gemini request failed [400]: segredo', 'ai_failed_provider'],
+    ]);
+
+    it('IA "Configurada" no painel entra na escolha mesmo SEM papel no assistente (Principal primeiro)', function () {
+        config(['ai.provider_runtime' => 'real', 'services.openai.api_key' => 'sk-test', 'services.gemini.api_key' => 'g-test', 'services.anthropic.api_key' => null]);
+        // Assistente clínico só com o Principal (OpenAI): o Gemini fica sem papel.
+        app(AiProviderSettings::class)->setRoleAssignments(['primary' => 'openai']);
+        $fakes = fakePosologyAiByProvider(['gemini' => posologyJson(['dosage' => 'gemini dose'])]);
+
+        asPosologyAdmin()->get(route('manager.medicines.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('aiProviders', fn ($providers) => collect($providers)->pluck('code')->all() === ['openai', 'gemini']));
+
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id, 'provider' => 'gemini'])
+            ->assertOk()
+            ->assertJsonPath('suggestion.dosage', 'gemini dose');
+
+        expect($fakes['gemini']->requests)->toHaveCount(1)
+            ->and($fakes['openai']->requests)->toBe([])
+            // O assistente clínico continua só com o Principal (nada mudou para as clínicas).
+            ->and(app(AiProviderSettings::class)->enabledCodes())->toBe(['openai']);
+    });
+
+    it('lista mudou com a página aberta: servidor sinaliza para a tela recarregar as IAs', function () {
+        app(AiProviderSettings::class)->setEnabledCodes(['openai', 'gemini']);
+        fakePosologyAiByProvider([]);
+
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
+            ->assertStatus(422)->assertJsonPath('reason', 'stale_providers');
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id, 'provider' => 'anthropic'])
+            ->assertStatus(422)->assertJsonPath('reason', 'stale_providers');
+    });
+
+    it('IA não habilitada ou desconhecida é recusada', function () {
+        app(AiProviderSettings::class)->setEnabledCodes(['openai', 'gemini']);
+        $fakes = fakePosologyAiByProvider([]);
+
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id, 'provider' => 'anthropic'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('manager_medicines.ai_provider_invalid'));
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id, 'provider' => 'xpto'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('provider');
+
+        expect($fakes['anthropic']->requests)->toBe([]);
+    });
+
+    it('[SEGURANÇA] provedor fixado SEM chave nunca é chamado (nem trocado por outro)', function () {
+        config(['ai.provider_runtime' => 'real', 'services.openai.api_key' => 'sk-test', 'services.anthropic.api_key' => null]);
+        app(AiProviderSettings::class)->setEnabledCodes(['openai']);
+        $fakes = fakePosologyAiByProvider([]);
+
+        $run = AiRun::query()->create([
+            'entity_id'         => $this->saas->id,
+            'requested_by'      => $this->admin->id,
+            'workflow'          => 'medicine_posology',
+            'mode'              => 'economy',
+            'risk_level'        => 'medium',
+            'status'            => AiRunStatus::Pending->value,
+            'estimated_credits' => 0,
+            'reserved_credits'  => 0,
+            'consumed_credits'  => 0,
+            'input_summary'     => ['user_prompt' => 'x', 'metadata' => ['pinned_provider' => 'anthropic']],
+        ]);
+
+        try {
+            app(AiRunExecutionService::class)->execute($run);
+        } catch (Throwable) {
+            // falha esperada: provedor fixado sem credencial
+        }
+
+        expect($fakes['anthropic']->requests)->toBe([])
+            ->and($fakes['openai']->requests)->toBe([])
+            ->and($run->fresh()->status)->toBe(AiRunStatus::Failed);
+    });
+
+    it('[LGPD] provedor bloqueado para pacientes só atende fluxo que declara não levar dado de paciente', function () {
+        app(AiProviderSettings::class)->setEnabledCodes(['openai', 'gemini']);
+        $fakes = fakePosologyAiByProvider([]);
+
+        $run = AiRun::query()->create([
+            'entity_id'         => $this->saas->id,
+            'requested_by'      => $this->admin->id,
+            'workflow'          => 'report_drafting',
+            'mode'              => 'economy',
+            'risk_level'        => 'medium',
+            'status'            => AiRunStatus::Pending->value,
+            'estimated_credits' => 0,
+            'reserved_credits'  => 0,
+            'consumed_credits'  => 0,
+            // Sem "patient_data" => false: o padrão é tratar como dado de paciente.
+            'input_summary' => ['user_prompt' => 'x', 'metadata' => ['pinned_provider' => 'gemini']],
+        ]);
+
+        try {
+            app(AiRunExecutionService::class)->execute($run);
+        } catch (Throwable) {
+            // falha esperada: Gemini API bloqueada para pacientes (termos)
+        }
+
+        expect($fakes['gemini']->requests)->toBe([])
+            ->and($fakes['openai']->requests)->toBe([])
+            ->and($run->fresh()->status)->toBe(AiRunStatus::Failed);
+
+        // A posologia (só catálogo) declara patient_data=false e segue podendo usar o Gemini.
+        asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id, 'provider' => 'gemini'])
+            ->assertOk();
+
+        expect($fakes['gemini']->requests)->toHaveCount(1)
+            ->and(AiRun::withoutGlobalScopes()->where('workflow', 'medicine_posology')->sole()->input_summary['metadata']['patient_data'])->toBeFalse();
+    });
 });

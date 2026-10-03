@@ -18,28 +18,30 @@ class PatientResource extends JsonResource
             'type'       => 'patient',
             'id'         => $this->id,
             'attributes' => [
-                'entity_id'   => $this->entity_id,
-                'person_id'   => $this->person_id,
-                'covenant_id' => $this->covenant_id,
-                'skin_id'     => $this->skin_id,
-                'iris_id'     => $this->iris_id,
-                'code'        => $this->code,
-                'import_code' => $this->import_code,
-                'full_name'   => $this->person?->full_name,
-                'card_number' => $this->card_number,
-                'active'      => (bool) $this->active,
-                'created_at'  => $this->created_at,
-                'updated_at'  => $this->updated_at,
+                'entity_id'        => $this->entity_id,
+                'person_id'        => $this->person_id,
+                'covenant_id'      => $this->covenant_id,
+                'covenant_plan_id' => $this->covenant_plan_id,
+                'skin_id'          => $this->skin_id,
+                'iris_id'          => $this->iris_id,
+                'code'             => $this->code,
+                'import_code'      => $this->import_code,
+                'full_name'        => $this->person?->full_name,
+                'card_number'      => $this->card_number,
+                'active'           => (bool) $this->active,
+                'created_at'       => $this->created_at,
+                'updated_at'       => $this->updated_at,
             ],
         ];
 
         if (! $request->routeIs('*.index')) {
             $resource['relationships'] = [
-                'entity'    => $this->entity->toArray(),
-                'person'    => $this->person->toArray(),
-                'covenant'  => $this->covenant->toArray(),
-                'skin_type' => $this->skinType?->toArray() ?? (object) [],
-                'iris_type' => $this->irisType?->toArray() ?? (object) [],
+                'entity'        => $this->entity->toArray(),
+                'person'        => $this->person->toArray(),
+                'covenant'      => $this->covenant->toArray(),
+                'covenant_plan' => $this->covenantPlan?->toOption() ?? (object) [],
+                'skin_type'     => $this->skinType?->toArray() ?? (object) [],
+                'iris_type'     => $this->irisType?->toArray() ?? (object) [],
             ];
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Services;
 
+use App\Domains\AI\Support\ProviderDataPolicy;
 use App\Enums\AI\{AiProvider, AiProviderCallRole, AiRunMode};
 use App\Models\SubscriptionSetting;
 
@@ -34,6 +35,15 @@ class AiProviderSettings
      * editável pelo admin do SaaS sem deploy. Fallback: config/ai.php (env).
      */
     public const MODELS_SETTING_KEY = 'ai.provider_models';
+
+    /**
+     * Mecanismo de transferência internacional (LGPD art. 33) registrado pelo
+     * dono do SaaS por provedor ({openai: {mechanism, reference, signed_at,
+     * registered_by, registered_at}}) — exigido antes de pôr no assistente um
+     * provedor que leva dado de paciente para fora do Brasil sem adequação
+     * (ProviderDataPolicy::requiresTransferRecord()).
+     */
+    public const TRANSFER_RECORDS_SETTING_KEY = 'ai.provider_transfer_records';
 
     /**
      * Códigos de provedores habilitados, na ordem de prioridade, já filtrados
@@ -67,21 +77,32 @@ class AiProviderSettings
                 continue;
             }
 
+            // LGPD: provedor bloqueado para dados de pacientes (ProviderDataPolicy)
+            // nunca recebe chamada real do assistente — nem se sobrou num papel
+            // salvo antes da trava (o painel avisa para trocar).
+            if ($requireKey && ! ProviderDataPolicy::allowsPatientData(AiProvider::from($code))) {
+                continue;
+            }
+
             $seen[$code] = true;
             $result[]    = $code;
         }
 
-        // Salvaguarda: nunca deixar o sistema sem nenhum provedor. Aplica o
-        // mesmo filtro de credencial ao fallback; se nem o fallback tem chave,
-        // devolve a lista crua (o painel continua de pé e o erro de chave
-        // aparece na execução — cenário de ambiente sem nenhuma credencial).
+        // Salvaguarda: nunca deixar o sistema sem nenhum provedor. Aplica os
+        // mesmos filtros (LGPD e credencial) ao fallback; se nem o fallback tem
+        // chave, devolve a lista sem os bloqueados (o painel continua de pé e o
+        // erro de chave aparece na execução — ambiente sem nenhuma credencial).
         if ($result === []) {
             $fallback = $this->configFallbackOrder();
 
             if ($requireKey) {
+                $fallback = array_values(array_filter(
+                    $fallback,
+                    static fn (string $c) => ($p = AiProvider::tryFrom($c)) !== null && ProviderDataPolicy::allowsPatientData($p),
+                ));
                 $configured = array_values(array_filter($fallback, fn (string $c) => $this->isConfigured($c)));
 
-                return $configured !== [] ? $configured : $fallback;
+                return $configured !== [] ? $configured : ($fallback !== [] ? $fallback : [AiProvider::OpenAI->value]);
             }
 
             return $fallback;
@@ -206,7 +227,9 @@ class AiProviderSettings
      */
     public function isConfigured(string $code): bool
     {
+        // Endereço: os provedores têm padrão, exceto o Azure (um por recurso).
         return filled(config("services.{$code}.api_key"))
+            && filled(config("ai.providers.{$code}.base_url"))
             && $this->model($code) !== null;
     }
 
@@ -283,6 +306,65 @@ class AiProviderSettings
         }
 
         SubscriptionSetting::setValue(self::MODELS_SETTING_KEY, json_encode($current));
+    }
+
+    /**
+     * Mecanismos de transferência internacional registrados, por provedor.
+     *
+     * @return array<string, array{mechanism: string, reference: string, signed_at: string, registered_by: ?string, registered_at: ?string}>
+     */
+    public function transferRecords(): array
+    {
+        $raw     = SubscriptionSetting::getValue(self::TRANSFER_RECORDS_SETTING_KEY);
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach ($decoded as $code => $record) {
+            if (! is_string($code) || AiProvider::tryFrom($code) === null || ! is_array($record)) {
+                continue;
+            }
+
+            $mechanism = $record['mechanism'] ?? null;
+            $reference = $record['reference'] ?? null;
+            $signedAt  = $record['signed_at'] ?? null;
+
+            if (! in_array($mechanism, ProviderDataPolicy::MECHANISMS, true) || ! is_string($reference) || ! is_string($signedAt)) {
+                continue;
+            }
+
+            $out[$code] = [
+                'mechanism'     => $mechanism,
+                'reference'     => $reference,
+                'signed_at'     => $signedAt,
+                'registered_by' => is_string($record['registered_by'] ?? null) ? $record['registered_by'] : null,
+                'registered_at' => is_string($record['registered_at'] ?? null) ? $record['registered_at'] : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Grava (ou remove, com null) o mecanismo registrado de um provedor.
+     *
+     * @param array{mechanism: string, reference: string, signed_at: string, registered_by: ?string, registered_at: ?string}|null $record
+     */
+    public function setTransferRecord(string $code, ?array $record): void
+    {
+        $records = $this->transferRecords();
+
+        if ($record === null) {
+            unset($records[$code]);
+        } else {
+            $records[$code] = $record;
+        }
+
+        SubscriptionSetting::setValue(self::TRANSFER_RECORDS_SETTING_KEY, json_encode($records, JSON_UNESCAPED_UNICODE));
     }
 
     /**

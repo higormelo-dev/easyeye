@@ -120,6 +120,34 @@ it('ordena pela coluna escolhida; coluna fora da lista é ignorada', function ()
         ->assertInertia(fn (AssertableInertia $page) => $page->where('filters.sort', 'name')->where('filters.direction', 'asc'));
 });
 
+it('situação na CMED separada do status: código na linha, filtro e ordenação próprios', function () {
+    $mk = fn (string $name, array $a) => Medicine::withoutGlobalScopes()->create(['name' => $name, 'active' => true, ...$a]);
+    $mk('A COMERCIALIZADO', ['source' => MedicineSource::Cmed, 'source_code' => '1', 'is_marketed' => true]);
+    $mk('B SEM VENDA', ['source' => MedicineSource::Cmed, 'source_code' => '2', 'is_marketed' => false]);
+    $mk('C FORA DA LISTA', ['source' => MedicineSource::Cmed, 'source_code' => '3', 'is_marketed' => true, 'active' => false]);
+    $mk('D CURADO', []);
+
+    $rows = fn (array $query) => collect(asMedicinesAdmin()->get(route('manager.medicines.index', $query))
+        ->assertOk()->viewData('page')['props']['medicines']['data']);
+
+    expect($rows([])->pluck('cmed_situation', 'name')->all())->toBe([
+        'A COMERCIALIZADO' => 'marketed', 'B SEM VENDA' => 'not_marketed', 'C FORA DA LISTA' => 'left_list', 'D CURADO' => null,
+    ]);
+
+    expect($rows(['cmed_situation' => 'not_marketed'])->pluck('name')->all())->toBe(['B SEM VENDA'])
+        ->and($rows(['cmed_situation' => 'left_list'])->pluck('name')->all())->toBe(['C FORA DA LISTA'])
+        ->and($rows(['cmed_situation' => 'marketed'])->pluck('name')->all())->toBe(['A COMERCIALIZADO'])
+        ->and($rows(['cmed_situation' => 'qualquer'])->count())->toBe(4);
+
+    expect($rows(['sort' => 'cmed_situation'])->pluck('name')->all())
+        ->toBe(['A COMERCIALIZADO', 'B SEM VENDA', 'C FORA DA LISTA', 'D CURADO'])
+        ->and($rows(['sort' => 'cmed_situation', 'direction' => 'desc'])->pluck('name')->all())
+        ->toBe(['D CURADO', 'C FORA DA LISTA', 'B SEM VENDA', 'A COMERCIALIZADO']);
+
+    // Status (Ativo/Inativo) continua filtrando à parte.
+    expect($rows(['status' => 'inactive'])->pluck('name')->all())->toBe(['C FORA DA LISTA']);
+});
+
 it('busca mantém a ordenação escolhida', function () {
     Medicine::withoutGlobalScopes()->create(['name' => 'TIMOLOL GENÉRICO', 'source' => MedicineSource::Cmed, 'source_code' => '9', 'active' => true]);
     Medicine::withoutGlobalScopes()->create(['name' => 'TIMOLOL CURADO', 'active' => true]);

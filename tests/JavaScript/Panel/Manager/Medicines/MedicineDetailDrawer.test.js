@@ -30,6 +30,7 @@ const cmed = {
     source_label: 'CMED/Anvisa',
     is_ophthalmic: true,
     is_marketed: false,
+    cmed_situation: 'not_marketed',
     active: true,
     synced_at: '02/10/2026 22:00',
 };
@@ -39,15 +40,18 @@ function mountDrawer(medicine) {
 }
 
 describe('Manager → Medicamentos: drawer de detalhes', () => {
-    it('mostra cadastro da CMED (registro, EAN, comercialização, última importação)', () => {
+    it('mostra cadastro da CMED (registro, EAN, situação na CMED, última importação)', () => {
         const text = mountDrawer(cmed).text();
 
         expect(text).toContain('PREDOPTIC');
         expect(text).toContain('acetato de prednisolona');
         expect(text).toContain('1000000010011');
         expect(text).toContain('7890000000011');
-        expect(text).toContain('detail_marketed');
-        expect(text).toContain('no');
+        // Situação na CMED (rótulo + explicação), separada do status Ativo/Inativo.
+        expect(text).toContain('col_cmed_situation');
+        expect(text).toContain('not_marketed');
+        expect(text).toContain('not_marketed_hint');
+        expect(text).toContain('status_active');
         expect(text).toContain('02/10/2026 22:00');
         expect(text).toContain('edit_posology');
     });

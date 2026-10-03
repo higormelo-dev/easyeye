@@ -7,7 +7,7 @@ return [
     'menu'            => 'Medicines',
     'page_title'      => 'Medicine catalog',
     'breadcrumb_home' => 'Dashboard',
-    'btn_import'      => 'Import CMED list',
+    'btn_import'      => 'Update from CMED',
     'btn_new'         => 'New medicine',
 
     'stat_active'     => 'Active in prescriptions',
@@ -115,7 +115,7 @@ return [
     'cmed_only_posology' => 'For CMED/Anvisa items only the suggested dosage can be changed.',
     'cmed_cannot_delete' => 'CMED/Anvisa items are not deleted: they leave the prescription search when they drop off the list on the next import.',
 
-    'import_title'             => 'Import CMED/Anvisa price list',
+    'import_title'             => 'Update the catalog from CMED/Anvisa',
     'import_help'              => 'Download the latest "PMC" spreadsheet from the Anvisa website (Medicines → CMED → Price lists) and upload it here. Each presentation becomes a prescription item with brand name, generic, strength and laboratory. Hospital-only presentations are skipped; the ones that leave the list are deactivated (never deleted). Suggested dosages you edited are kept.',
     'import_cmed_file'         => 'CMED price list (PMC)',
     'import_cmed_hint'         => 'XLSX published by Anvisa (or a CSV exported from it).',
@@ -142,4 +142,60 @@ return [
     'result_skipped_hospital'  => 'Hospital-only skipped',
     'result_skipped_inactive'  => 'Inactive registration',
     'result_skipped_invalid'   => 'Invalid rows',
+
+    // Sync with official sources (CMED/Anvisa)
+    'import_help_sync'           => 'Downloads from the official sources the latest CMED price list (published a few times a month) and the Anvisa registration status (daily). If nothing changed since the last load, the catalog is not reprocessed.',
+    'import_auto_hint'           => 'Automatic check every Tuesday at 05:00.',
+    'import_mode'                => 'Data source',
+    'import_mode_cmed'           => 'Download from CMED/Anvisa (recommended)',
+    'import_mode_upload'         => 'Upload the files',
+    'import_force'               => 'Reprocess even if the list has not changed',
+    'import_submit_cmed'         => 'Update now',
+    'import_source_upload'       => 'Uploaded files',
+    'import_source_cmed'         => 'CMED/Anvisa download',
+    'import_source_scheduled'    => 'Automatic (weekly)',
+    'list_published'             => 'CMED list published on :date',
+    'col_origin'                 => 'Source',
+    'phase_downloading'          => 'Downloading the official sources',
+    'sync_queued'                => 'Sync with CMED/Anvisa queued.',
+    'sync_unchanged'             => 'Nothing changed since the last load (CMED list of :date and registration status unchanged): the catalog is up to date.',
+    'sync_fallback_used'         => 'The CMED page did not respond or changed: the list from the Anvisa open data portal was used, published on :date (it may be outdated).',
+    'sync_open_data_unavailable' => 'Anvisa open data unavailable: registration status was not checked in this load.',
+    'sync_list_unavailable'      => 'Could not reach the CMED price list right now (official page and open data portal not responding). Try again later or upload the spreadsheet.',
+    'sync_download_failed'       => 'Could not download the official files right now. Try again later or upload the spreadsheet.',
+
+    // Stalled load / no realtime
+    'import_waiting_worker'     => 'Queued — waiting for background processing to start.',
+    'import_refresh_status'     => 'Refresh status',
+    'import_stalled_pending'    => 'The load has not started: background processing (queue) seems to be stopped. Cancel and try again; if it persists, contact technical support.',
+    'import_stalled_processing' => 'The load stopped responding. Cancel and try again; if it persists, contact technical support.',
+    'import_cancel'             => 'Cancel load',
+    'import_cancelled'          => 'Load cancelled. You can start another one.',
+    'import_cancelled_reason'   => 'Cancelled by the administrator: background processing did not respond.',
+    'import_not_stalled'        => 'This load is still running. Wait for it to finish.',
+
+    // Situation in the CMED price list (own column) × catalog status
+    'col_cmed_situation'        => 'CMED situation',
+    'filter_cmed_situation'     => 'CMED situation',
+    'filter_cmed_situation_all' => 'All CMED situations',
+    'cmed_marketed'             => 'Marketed',
+    'cmed_marketed_hint'        => 'Sales declared to CMED in the last year.',
+    'cmed_left_list'            => 'Not in current list',
+    'cmed_left_list_hint'       => 'Not in the latest imported CMED price list (removed from the list or registration cancelled at Anvisa). Not shown in prescriptions.',
+    'cmed_not_applicable'       => 'Not applicable (curated item)',
+    'status_hint'               => 'Active = shown in the clinics\' prescription search.',
+
+    // AI chosen for the posology suggestion
+    'ai_menu_title'       => 'Generate with which AI?',
+    'ai_last_used'        => 'last used',
+    'ai_filled_by'        => 'Suggestion generated by :provider — review before saving.',
+    'ai_choose_provider'  => 'There is now more than one configured AI: the list was refreshed. Choose which AI will generate the suggestion.',
+    'ai_provider_invalid' => 'This AI is no longer available: the list was refreshed. Choose one of the configured AIs.',
+
+    // Failure of the chosen AI (no technical provider detail)
+    'ai_failed_timeout'  => ':provider took too long to respond (it may be overloaded).',
+    'ai_failed_busy'     => ':provider is overloaded right now (high demand at the provider).',
+    'ai_failed_provider' => ':provider could not generate the suggestion right now.',
+    'ai_try_again'       => 'Try again in a moment.',
+    'ai_try_other'       => 'Try again or choose another AI.',
 ];

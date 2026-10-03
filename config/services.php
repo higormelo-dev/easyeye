@@ -47,6 +47,29 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
     ],
 
+    // Provedores "compatíveis com OpenAI" (lista pronta — App\Enums\AI\AiProvider).
+    // Chave só no .env: a tela Manager → Provedores de IA mostra se está
+    // definida (e os 4 últimos caracteres), nunca o valor.
+    'mistral' => [
+        'api_key' => env('MISTRAL_API_KEY'),
+    ],
+
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+    ],
+
+    'xai' => [
+        'api_key' => env('XAI_API_KEY'),
+    ],
+
+    'azure_openai' => [
+        'api_key' => env('AZURE_OPENAI_API_KEY'),
+    ],
+
+    'maritaca' => [
+        'api_key' => env('MARITACA_API_KEY'),
+    ],
+
     'integrator_updates' => [
         // Chave pública ed25519 (hex, 32 bytes) que assina os builds do
         // EasyEye Integrator — mesmo valor de UPDATE_PUBLIC_KEY_HEX em

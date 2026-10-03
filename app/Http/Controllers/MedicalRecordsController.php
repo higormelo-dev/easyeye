@@ -45,7 +45,7 @@ class MedicalRecordsController extends Controller
         // MedicalRecord ainda pra passar pelo helper, então a checagem vem direto.
         abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
 
-        $patient->load(['person', 'covenant', 'skinType', 'irisType']);
+        $patient->load(['person', 'covenant', 'covenantPlan', 'skinType', 'irisType']);
 
         return Inertia::render('Panel/MedicalRecords/Index', [
             'breadcrumbs' => [
@@ -55,18 +55,19 @@ class MedicalRecordsController extends Controller
                 ['label' => __('actions.medical_records.title'), 'url' => '#', 'active' => true],
             ],
             'patient' => [
-                'id'            => (string) $patient->id,
-                'code'          => $patient->code,
-                'full_name'     => $patient->person?->full_name,
-                'birth_date'    => $patient->person?->birth_date?->format('d/m/Y'),
-                'age'           => $patient->person?->birth_date?->age,
-                'gender'        => $patient->person?->gender,
-                'cpf'           => $patient->person?->cpf,
-                'phone'         => BrazilianFormat::phone($patient->person?->cellphone ?: $patient->person?->telephone),
-                'email'         => $patient->person?->email,
-                'covenant_name' => $patient->covenant?->name,
-                'skin_type'     => $patient->skinType?->name,
-                'iris_type'     => $patient->irisType?->name,
+                'id'                 => (string) $patient->id,
+                'code'               => $patient->code,
+                'full_name'          => $patient->person?->full_name,
+                'birth_date'         => $patient->person?->birth_date?->format('d/m/Y'),
+                'age'                => $patient->person?->birth_date?->age,
+                'gender'             => $patient->person?->gender,
+                'cpf'                => $patient->person?->cpf,
+                'phone'              => BrazilianFormat::phone($patient->person?->cellphone ?: $patient->person?->telephone),
+                'email'              => $patient->person?->email,
+                'covenant_name'      => $patient->covenant?->name,
+                'covenant_plan_name' => $patient->covenantPlan?->displayName(),
+                'skin_type'          => $patient->skinType?->name,
+                'iris_type'          => $patient->irisType?->name,
             ],
             'urls' => [
                 'ajax_list' => route('panel.patients.medicalrecords.ajaxlist', $patient),
@@ -142,7 +143,7 @@ class MedicalRecordsController extends Controller
         // com o próprio Patient como recurso, o log não infere o paciente.
         $this->logAccess($patient, DataAccessPurpose::PatientCare, patientId: (string) $patient->id);
 
-        $patient->load(['person', 'covenant', 'skinType', 'irisType']);
+        $patient->load(['person', 'covenant', 'covenantPlan', 'skinType', 'irisType']);
         $props                  = $this->buildFormProps($patient, null);
         $props['breadcrumbs'][] = [
             'label'  => __('actions.medical_records.create'),
@@ -311,7 +312,7 @@ class MedicalRecordsController extends Controller
         $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
-        $patient->load(['person', 'covenant', 'skinType', 'irisType']);
+        $patient->load(['person', 'covenant', 'covenantPlan', 'skinType', 'irisType']);
         $medicalrecord->load([
             'doctor.person',
             'documentations.doctor.person',
@@ -977,18 +978,19 @@ class MedicalRecordsController extends Controller
     private function serializePatient(Patient $patient): array
     {
         return [
-            'id'            => (string) $patient->id,
-            'code'          => $patient->code,
-            'full_name'     => $patient->person?->full_name,
-            'birth_date'    => $patient->person?->birth_date?->format('d/m/Y'),
-            'age'           => $patient->person?->birth_date?->age,
-            'gender'        => $patient->person?->gender,
-            'cpf'           => $patient->person?->cpf,
-            'phone'         => BrazilianFormat::phone($patient->person?->cellphone ?: $patient->person?->telephone),
-            'email'         => $patient->person?->email,
-            'covenant_name' => $patient->covenant?->name,
-            'skin_type'     => $patient->skinType?->name,
-            'iris_type'     => $patient->irisType?->name,
+            'id'                 => (string) $patient->id,
+            'code'               => $patient->code,
+            'full_name'          => $patient->person?->full_name,
+            'birth_date'         => $patient->person?->birth_date?->format('d/m/Y'),
+            'age'                => $patient->person?->birth_date?->age,
+            'gender'             => $patient->person?->gender,
+            'cpf'                => $patient->person?->cpf,
+            'phone'              => BrazilianFormat::phone($patient->person?->cellphone ?: $patient->person?->telephone),
+            'email'              => $patient->person?->email,
+            'covenant_name'      => $patient->covenant?->name,
+            'covenant_plan_name' => $patient->covenantPlan?->displayName(),
+            'skin_type'          => $patient->skinType?->name,
+            'iris_type'          => $patient->irisType?->name,
         ];
     }
 

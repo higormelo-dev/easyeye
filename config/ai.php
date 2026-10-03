@@ -50,6 +50,91 @@ return [
             'retry_times'             => (int) env('AI_GEMINI_RETRY_TIMES', 1),
             'retry_sleep_ms'          => (int) env('AI_GEMINI_RETRY_SLEEP_MS', 250),
         ],
+
+        // ── Provedores "compatíveis com OpenAI" (OpenAiCompatibleProvider) ──
+        // Ficam disponíveis no painel quando a chave (MISTRAL_API_KEY etc.)
+        // está no .env. O modelo do .env é só o padrão: o painel escolhe entre
+        // os modelos do catálogo sincronizado. Conexão/retry: mesmos padrões
+        // dos demais (AI_<PROVEDOR>_CONNECT_TIMEOUT_SECONDS etc., opcionais).
+
+        'mistral' => [
+            'base_url'        => env('AI_MISTRAL_BASE_URL', 'https://api.mistral.ai/v1'),
+            'model'           => env('AI_MISTRAL_MODEL', 'mistral-small-latest'),
+            'timeout_seconds' => (int) env('AI_MISTRAL_TIMEOUT_SECONDS', 30),
+        ],
+
+        'groq' => [
+            'base_url'        => env('AI_GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+            'model'           => env('AI_GROQ_MODEL', 'openai/gpt-oss-120b'),
+            'timeout_seconds' => (int) env('AI_GROQ_TIMEOUT_SECONDS', 30),
+        ],
+
+        'xai' => [
+            'base_url'        => env('AI_XAI_BASE_URL', 'https://api.x.ai/v1'),
+            'model'           => env('AI_XAI_MODEL', 'grok-4.5'),
+            'timeout_seconds' => (int) env('AI_XAI_TIMEOUT_SECONDS', 30),
+        ],
+
+        // Azure OpenAI (API v1, sem api-version). Sem endereço padrão: cada
+        // recurso tem o seu — https://{recurso}.openai.azure.com/openai/v1.
+        // "model" = NOME DO DEPLOYMENT criado no Azure (use o nome do modelo,
+        // ex.: gpt-4o-mini, para a sincronização achar o preço).
+        'azure_openai' => [
+            'base_url'        => env('AI_AZURE_OPENAI_BASE_URL'),
+            'model'           => env('AI_AZURE_OPENAI_MODEL', 'gpt-4o-mini'),
+            'timeout_seconds' => (int) env('AI_AZURE_OPENAI_TIMEOUT_SECONDS', 30),
+            'auth'            => 'api-key',
+            // A API lista modelos-base, não os deployments: os deployments
+            // entram no catálogo à mão (a sincronização confere os preços).
+            'catalog_listing' => false,
+            // Onde o deployment processa os dados — declarado pelo dono do
+            // SaaS conforme o que criou no Azure (o painel mostra e a LGPD
+            // depende disto): eu = Standard regional em país da UE (ex.:
+            // swedencentral — recomendado, coberto pela adequação da UE);
+            // br = Provisioned (PTU) em brazilsouth; global = Global Standard
+            // ou Data Zone (inferência em qualquer região).
+            'data_region' => env('AI_AZURE_OPENAI_DATA_REGION', 'eu'),
+        ],
+
+        // Maritaca AI (Brasil). Modelos com sufixo "-br-sp": inferência e
+        // logs 100% no Brasil (+30% no preço); sem sufixo podem processar nos
+        // EUA/UE. Só texto: o EasyEye não envia imagem a ela (a Maritaca faria
+        // OCR, possivelmente com terceiros fora do Brasil).
+        'maritaca' => [
+            'base_url'        => env('AI_MARITACA_BASE_URL', 'https://chat.maritaca.ai/api'),
+            'model'           => env('AI_MARITACA_MODEL', 'sabia-4-br-sp'),
+            'timeout_seconds' => (int) env('AI_MARITACA_TIMEOUT_SECONDS', 60),
+            // GET /models usa "Authorization: Key ..." (docs.maritaca.ai/api/pt/list-models).
+            'list_auth' => 'key',
+            // Preço oficial em R$ por 1M tokens [entrada, saída] — fora do
+            // catálogo LiteLLM; a sincronização converte para US$ pela cotação
+            // do sistema (AiUsdBrlRate). Fonte: docs.maritaca.ai/pt/precos (03/10/2026).
+            'prices_brl' => [
+                'sabia-4'                => [5.00, 20.00],
+                'sabia-4-thinking'       => [5.00, 40.00],
+                'sabiazinho-4'           => [1.00, 4.00],
+                'sabia-4-br-sp'          => [6.50, 26.00],
+                'sabia-4-thinking-br-sp' => [6.50, 52.00],
+                'sabiazinho-4-br-sp'     => [1.30, 5.20],
+            ],
+        ],
+    ],
+
+    // Sincronização do catálogo de modelos e preços (Manager → Provedores de IA):
+    // modelos pela API oficial de cada provedor com chave + preços do catálogo
+    // público LiteLLM (USD por token → USD por 1M). Preço editado à mão fica
+    // travado. Só leitura (nenhuma chamada gasta tokens). AI_CATALOG_SYNC_ENABLED
+    // liga a verificação diária automática; o botão "Sincronizar agora" funciona
+    // sempre.
+    'catalog_sync' => [
+        'enabled'         => filter_var(env('AI_CATALOG_SYNC_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'prices_url'      => env('AI_PRICES_CATALOG_URL', 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json'),
+        'timeout_seconds' => (int) env('AI_CATALOG_SYNC_TIMEOUT_SECONDS', 60),
+        // Teto do JSON de preços (~3 MB hoje): acima disso, recusa.
+        'prices_max_bytes' => (int) env('AI_PRICES_CATALOG_MAX_BYTES', 30 * 1024 * 1024),
+        // Mudança de preço maior que isso (vezes, pra cima ou pra baixo) não é
+        // aplicada sozinha — vai para revisão (protege a cobrança de erro no catálogo).
+        'max_price_change_factor' => (float) env('AI_CATALOG_MAX_PRICE_CHANGE_FACTOR', 10),
     ],
 
     'circuit_breaker' => [

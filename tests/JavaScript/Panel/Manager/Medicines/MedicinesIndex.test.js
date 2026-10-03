@@ -8,18 +8,22 @@ import MedicinesIndex from '@/Pages/Panel/Manager/Medicines/Index.vue';
  * catálogo, regras de ação por origem (CMED só edita posologia), filtros
  * server-side e acompanhamento automático de importação em andamento.
  */
-const form = vi.hoisted(() => ({ current: null }));
+const form = vi.hoisted(() => ({ current: null, transformed: null }));
 vi.mock('@inertiajs/vue3', async () => {
     const { reactive } = await import('vue');
     return {
         usePage: () => ({ props: { locale: 'pt_BR' } }),
-        router: { get: vi.fn(), put: vi.fn(), delete: vi.fn(), reload: vi.fn() },
+        router: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), reload: vi.fn() },
         useForm: (data) => {
             form.current = reactive({
                 ...data,
                 errors: {},
                 processing: false,
                 progress: null,
+                transform(callback) {
+                    form.transformed = callback;
+                    return this;
+                },
                 post: vi.fn(),
                 reset: vi.fn(),
             });
@@ -28,14 +32,15 @@ vi.mock('@inertiajs/vue3', async () => {
         Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
     };
 });
-const live = vi.hoisted(() => ({ options: null, connected: true }));
+const live = vi.hoisted(() => ({ options: null, connected: true, resync: null }));
 vi.mock('@/composables/useImportProgress', async () => {
     const { computed } = await import('vue');
     return {
         useImportProgress: (importRef, options) => {
             live.options = options;
             live.importRef = importRef;
-            return { realtimeConnected: computed(() => live.connected) };
+            live.resync = vi.fn();
+            return { realtimeConnected: computed(() => live.connected), resync: live.resync };
         },
     };
 });
@@ -193,30 +198,84 @@ describe('Manager → Medicamentos', () => {
         );
     });
 
-    it('item da CMED ativo e não comercializado mostra aviso curto ao lado do status, com explicação no tooltip', async () => {
+    it('"Situação na CMED" e "Status" em colunas separadas (situação com explicação no tooltip)', async () => {
         const base = { source: 'cmed', source_label: 'CMED/Anvisa', is_ophthalmic: false };
         const medicines = {
             data: [
-                { ...base, id: 'a', name: 'SEM VENDA', active: true, is_marketed: false },
-                { ...base, id: 'b', name: 'COM VENDA', active: true, is_marketed: true },
-                { ...base, id: 'c', name: 'INATIVO', active: false, is_marketed: false },
-                { id: 'd', name: 'CURADO', source: 'manual', source_label: 'Curado', active: true, is_marketed: false },
+                {
+                    ...base,
+                    id: 'a',
+                    name: 'SEM VENDA',
+                    active: true,
+                    is_marketed: false,
+                    cmed_situation: 'not_marketed',
+                },
+                { ...base, id: 'b', name: 'COM VENDA', active: true, is_marketed: true, cmed_situation: 'marketed' },
+                {
+                    ...base,
+                    id: 'c',
+                    name: 'SAIU DA LISTA',
+                    active: false,
+                    is_marketed: true,
+                    cmed_situation: 'left_list',
+                },
+                {
+                    id: 'd',
+                    name: 'CURADO',
+                    source: 'manual',
+                    source_label: 'Curado',
+                    active: true,
+                    cmed_situation: null,
+                },
             ],
             links: [],
             total: 4,
         };
         const wrapper = mountPage({ medicines });
-        const warnings = () => wrapper.findAll('.badge-soft-warning');
+        const headers = wrapper.findAll('thead th').map((th) => th.text());
+        const cells = (i) => wrapper.findAll('tbody tr')[i].findAll('td');
+        const situationIdx = headers.findIndex((h) => h.includes('col_cmed_situation'));
+        const statusIdx = headers.findIndex((h) => h.includes('col_status'));
 
-        expect(warnings()).toHaveLength(1);
-        expect(warnings()[0].text()).toBe('not_marketed');
-        expect(warnings()[0].attributes('title')).toBe('not_marketed_hint');
-        expect(warnings()[0].element.closest('tr').textContent).toContain('SEM VENDA');
+        expect(situationIdx).toBeGreaterThan(-1);
+        expect(statusIdx).toBe(situationIdx + 1);
 
-        // Mesmo aviso nos cards.
+        expect(cells(0)[situationIdx].text()).toBe('not_marketed');
+        expect(cells(0)[situationIdx].find('.badge').attributes('title')).toBe('not_marketed_hint');
+        expect(cells(0)[statusIdx].text()).toBe('status_active');
+        expect(cells(1)[situationIdx].text()).toBe('cmed_marketed');
+        expect(cells(2)[situationIdx].text()).toBe('cmed_left_list');
+        expect(cells(2)[situationIdx].find('.badge').attributes('title')).toBe('cmed_left_list_hint');
+        expect(cells(2)[statusIdx].text()).toBe('status_inactive');
+        // Curado: não se aplica (texto só para leitor de tela).
+        expect(cells(3)[situationIdx].find('.badge').exists()).toBe(false);
+        expect(cells(3)[situationIdx].find('.visually-hidden').text()).toBe('cmed_not_applicable');
+
+        // Mesma situação nos cards (só onde se aplica).
         await wrapper.find('.to-cards').trigger('click');
-        expect(warnings()).toHaveLength(1);
+        expect(wrapper.findAll('.card.card-body .badge-soft-warning')).toHaveLength(1);
+        expect(wrapper.text()).toContain('cmed_left_list');
         localStorage.removeItem('mgr_medicines_view');
+    });
+
+    it('filtro e ordenação pela situação na CMED vão para o servidor', async () => {
+        const wrapper = mountPage();
+
+        await wrapper.find('select[aria-label="filter_cmed_situation"]').setValue('not_marketed');
+        await flushPromises();
+        expect(router.get).toHaveBeenLastCalledWith(
+            expect.any(String),
+            expect.objectContaining({ cmed_situation: 'not_marketed' }),
+            expect.objectContaining({ only: ['medicines', 'filters'] }),
+        );
+
+        const header = wrapper.findAll('th').find((th) => th.text().includes('col_cmed_situation'));
+        await header.find('button').trigger('click');
+        expect(router.get).toHaveBeenLastCalledWith(
+            expect.any(String),
+            expect.objectContaining({ sort: 'cmed_situation', direction: 'asc' }),
+            expect.any(Object),
+        );
     });
 
     it('clicar na coluna ordena no servidor, mantendo os filtros', async () => {
@@ -278,9 +337,15 @@ describe('Manager → Medicamentos', () => {
         channel: 'manager.imports.medicines.imp-1',
     };
 
-    it('importação: botão só habilita com o arquivo CMED e fica bloqueado com outra em andamento', async () => {
+    it('importação: padrão é baixar da CMED (sem arquivo); no envio exige a planilha; bloqueia com outra em andamento', async () => {
         const wrapper = mountPage();
         const submit = () => wrapper.find('form button[type="submit"]');
+
+        expect(form.current.source).toBe('cmed');
+        expect(submit().attributes('disabled')).toBeUndefined();
+        expect(submit().text()).toContain('import_submit_cmed');
+
+        await wrapper.find('#imp-mode-upload').setValue(true);
         expect(submit().attributes('disabled')).toBeDefined();
 
         form.current.cmed_file = new File(['x'], 'lista.xlsx');
@@ -289,6 +354,36 @@ describe('Manager → Medicamentos', () => {
 
         await wrapper.setProps({ runningImport: running });
         expect(submit().attributes('disabled')).toBeDefined();
+    });
+
+    it('"Atualizar agora" envia só a origem e o "forçar" (sem arquivos)', async () => {
+        const wrapper = mountPage();
+        form.current.cmed_file = new File(['x'], 'sobrou.xlsx'); // escolhido antes de voltar pro download
+        await wrapper.find('#imp-force').setValue(true);
+
+        await wrapper.find('form').trigger('submit');
+
+        expect(form.current.post).toHaveBeenCalledWith(
+            expect.stringContaining('medicines.imports.store'),
+            expect.any(Object),
+        );
+        expect(form.transformed({ ...form.current })).toEqual({ source: 'cmed', force: true });
+    });
+
+    it('envio manual manda os arquivos com a origem "upload"', async () => {
+        const wrapper = mountPage();
+        await wrapper.find('#imp-mode-upload').setValue(true);
+        const file = new File(['x'], 'lista.xlsx');
+        form.current.cmed_file = file;
+        await flushPromises();
+
+        await wrapper.find('form').trigger('submit');
+
+        expect(form.transformed({ ...form.current })).toEqual({
+            source: 'upload',
+            cmed_file: file,
+            open_data_file: null,
+        });
     });
 
     it('mostra a barra de progresso com fase, linhas e contadores', () => {
@@ -331,5 +426,83 @@ describe('Manager → Medicamentos', () => {
         const wrapper = mountPage({ runningImport: running });
         expect(wrapper.find('.ti-plug-connected-x').exists()).toBe(true);
         live.connected = true;
+    });
+
+    describe('carga na fila / parada / sem tempo real / resultado da sincronização', () => {
+        const queued = {
+            ...running,
+            source: 'cmed',
+            source_label: 'Download da CMED/Anvisa',
+            status: 'pending',
+            status_label: 'Aguardando',
+            status_color: 'secondary',
+            phase: null,
+            phase_label: null,
+            processed_rows: 0,
+            total_rows: 0,
+            progress: 0,
+            idle_seconds: 5,
+            stall_after_seconds: 90,
+        };
+
+        it('na fila mostra "aguardando o processamento" em vez de contadores zerados', () => {
+            const wrapper = mountPage({ runningImport: queued });
+
+            expect(wrapper.text()).toContain('import_waiting_worker');
+            expect(wrapper.text()).toContain('Download da CMED/Anvisa');
+            expect(wrapper.text()).not.toContain('result_skipped_hospital');
+        });
+
+        it('parada além do limite: avisa e cancela pela rota própria', async () => {
+            const wrapper = mountPage({ runningImport: { ...queued, idle_seconds: 300 } });
+
+            expect(wrapper.find('.alert').classes()).toContain('alert-warning');
+            await wrapper
+                .findAll('button')
+                .find((b) => b.text().includes('import_cancel'))
+                .trigger('click');
+
+            expect(router.post).toHaveBeenCalledWith(
+                expect.stringContaining('medicines.imports.cancel'),
+                {},
+                expect.objectContaining({ preserveScroll: true }),
+            );
+        });
+
+        it('sem tempo real: "Atualizar status" relê o estado', async () => {
+            live.connected = false;
+            const wrapper = mountPage({ runningImport: queued });
+
+            await wrapper
+                .findAll('button')
+                .find((b) => b.text().includes('import_refresh_status'))
+                .trigger('click');
+
+            expect(live.resync).toHaveBeenCalledOnce();
+            live.connected = true;
+        });
+
+        it('mostra a data da lista CMED e o aviso da sincronização (ex.: nada mudou)', () => {
+            const wrapper = mountPage({
+                imports: [
+                    {
+                        ...queued,
+                        id: 'imp-9',
+                        status: 'done',
+                        status_label: 'Concluída',
+                        status_color: 'success',
+                        is_done: true,
+                        list_published_at: '23/09/2026',
+                        notice: 'Nada mudou desde a última carga.',
+                        created_at: '03/10/2026 05:00',
+                    },
+                ],
+            });
+            const history = wrapper.findAll('tbody').at(-1).text();
+
+            expect(history).toContain('list_published');
+            expect(history).toContain('Nada mudou desde a última carga.');
+            expect(history).toContain('Download da CMED/Anvisa');
+        });
     });
 });

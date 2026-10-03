@@ -33,7 +33,7 @@ class AiModelPricesController extends Controller
     {
         $this->authorizeSaas();
 
-        return response()->json(['prices' => $this->catalog()]);
+        return response()->json(['prices' => self::catalog()]);
     }
 
     public function store(Request $request): JsonResponse
@@ -51,17 +51,21 @@ class AiModelPricesController extends Controller
             return response()->json(['message' => __('manager_ai.price_duplicate')], 422);
         }
 
+        // Preço digitado à mão nasce travado (a sincronização não sobrescreve),
+        // a não ser que o admin peça para o catálogo mantê-lo atualizado.
         $price = AiModelPrice::query()->create([
-            ...$validated,
+            ...collect($validated)->except('price_locked')->all(),
             'effective_from' => now(),
             'active'         => true,
+            'source'         => AiModelPrice::SOURCE_MANUAL,
+            'price_locked'   => (bool) ($validated['price_locked'] ?? true),
         ]);
 
         $this->auditChange($request, 'store', $price, null);
 
         return response()->json([
             'message' => __('manager_ai.price_saved'),
-            'prices'  => $this->catalog(),
+            'prices'  => self::catalog(),
         ]);
     }
 
@@ -77,12 +81,19 @@ class AiModelPricesController extends Controller
             'reasoning_usd_per_million' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'tool_call_usd'             => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'active'                    => ['required', 'boolean'],
+            'price_locked'              => ['sometimes', 'boolean'],
         ]);
 
         $old = $aiModelPrice->only([
             'input_usd_per_million', 'output_usd_per_million',
-            'reasoning_usd_per_million', 'tool_call_usd', 'active',
+            'reasoning_usd_per_million', 'tool_call_usd', 'active', 'price_locked',
         ]);
+
+        // Trava: o admin decide no modal; sem a opção (ex.: só ativar/desativar),
+        // mudar o preço à mão trava, e não mexer no preço mantém como estava.
+        $validated['price_locked'] = array_key_exists('price_locked', $validated)
+            ? (bool) $validated['price_locked']
+            : ($aiModelPrice->price_locked || $this->priceChanged($aiModelPrice, $validated));
 
         $aiModelPrice->update($validated);
 
@@ -90,7 +101,7 @@ class AiModelPricesController extends Controller
 
         return response()->json([
             'message' => __('manager_ai.price_saved'),
-            'prices'  => $this->catalog(),
+            'prices'  => self::catalog(),
         ]);
     }
 
@@ -100,34 +111,41 @@ class AiModelPricesController extends Controller
         $allCodes = array_map(static fn (AiProvider $p) => $p->value, AiProvider::cases());
 
         return [
-            'provider'                  => ['required', 'string', Rule::in($allCodes)],
-            'model'                     => ['required', 'string', 'max:120', 'regex:/^[a-z0-9][a-z0-9._-]*$/i'],
+            'provider' => ['required', 'string', Rule::in($allCodes)],
+            // Ids da Groq têm "/" (openai/gpt-oss-120b); outros usam ":" (modelo:versão).
+            'model'                     => ['required', 'string', 'max:120', 'regex:#^[a-z0-9][a-z0-9._:/@+-]*$#i'],
             'input_usd_per_million'     => ['required', 'numeric', 'min:0', 'max:100000'],
             'output_usd_per_million'    => ['required', 'numeric', 'min:0', 'max:100000'],
             'reasoning_usd_per_million' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'tool_call_usd'             => ['nullable', 'numeric', 'min:0', 'max:1000'],
+            'price_locked'              => ['sometimes', 'boolean'],
         ];
     }
 
+    /** @param array<string, mixed> $validated */
+    private function priceChanged(AiModelPrice $price, array $validated): bool
+    {
+        foreach (['input_usd_per_million', 'output_usd_per_million', 'reasoning_usd_per_million', 'tool_call_usd'] as $field) {
+            $old = $price->{$field};
+            $new = $validated[$field] ?? null;
+
+            if (($old === null) !== ($new === null) || abs((float) $old - (float) $new) > 0.000001) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @return list<array<string, mixed>> */
-    private function catalog(): array
+    public static function catalog(): array
     {
         return AiModelPrice::query()
             ->orderBy('provider')
             ->orderBy('model')
             ->get()
-            ->map(fn (AiModelPrice $p) => [
-                'id'                        => (string) $p->id,
-                'provider'                  => $p->provider->value,
-                'provider_label'            => $p->provider->label(),
-                'model'                     => $p->model,
-                'input_usd_per_million'     => (float) $p->input_usd_per_million,
-                'output_usd_per_million'    => (float) $p->output_usd_per_million,
-                'reasoning_usd_per_million' => $p->reasoning_usd_per_million !== null ? (float) $p->reasoning_usd_per_million : null,
-                'tool_call_usd'             => $p->tool_call_usd !== null ? (float) $p->tool_call_usd : null,
-                'active'                    => (bool) $p->active,
-                'effective_from'            => $p->effective_from?->format('d/m/Y'),
-            ])->all();
+            ->map(fn (AiModelPrice $p) => $p->toCatalogRow())
+            ->all();
     }
 
     private function auditChange(Request $request, string $action, AiModelPrice $price, ?array $old): void
@@ -141,7 +159,7 @@ class AiModelPricesController extends Controller
             reason: __('manager_ai.price_audit_reason'),
             newValues: $price->only([
                 'provider', 'model', 'input_usd_per_million', 'output_usd_per_million',
-                'reasoning_usd_per_million', 'tool_call_usd', 'active',
+                'reasoning_usd_per_million', 'tool_call_usd', 'active', 'price_locked',
             ]),
             request: $request,
             oldValues: $old,

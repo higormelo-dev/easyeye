@@ -2,13 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Domains\AI\Providers\AnthropicProvider;
-use App\Domains\AI\Providers\GeminiProvider;
-use App\Domains\AI\Providers\OpenAiProvider;
+use App\Domains\AI\Providers\{AnthropicProvider, GeminiProvider, OpenAiProvider};
 use App\Domains\AI\Support\ProviderErrorSanitizer;
 use App\DTOs\AI\AiRequestData;
-use App\Enums\AI\AiRiskLevel;
-use App\Enums\AI\AiRunMode;
+use App\Enums\AI\{AiRiskLevel, AiRunMode};
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -105,7 +102,7 @@ test('Gemini: erro HTTP é sanitizado', function () {
 test('erro do provider que ecoa payload PHI é truncado (segurança LGPD)', function () {
     // Simula um provider que ecoa o prompt no erro — cenário real em APIs imaturas
     // ou quando o provider devolve "Bad request: prompt contains ... <PHI>".
-    $phiPrompt = 'Paciente João Silva, CPF 123.456.789-00. Achado: descolamento de retina à OD.';
+    $phiPrompt           = 'Paciente João Silva, CPF 123.456.789-00. Achado: descolamento de retina à OD.';
     $providerEchoMessage = "Bad request: prompt rejected. Content snippet: \"{$phiPrompt}\". " . str_repeat('extra data ', 80);
 
     Http::fake([
@@ -125,7 +122,7 @@ test('erro do provider que ecoa payload PHI é truncado (segurança LGPD)', func
         expect($e->getMessage())->not->toContain('123.456.789-00');
         expect(
             str_contains($e->getMessage(), '[REDACTED:CPF]')
-            || str_contains($e->getMessage(), '[REDACTED:PAYLOAD]')
+            || str_contains($e->getMessage(), '[REDACTED:PAYLOAD]'),
         )->toBeTrue();
         expect(mb_strlen($e->getMessage()))->toBeLessThan(700);
     }
@@ -139,7 +136,7 @@ test('ProviderErrorSanitizer: sanitize aplica fallback para null e string vazia'
 });
 
 test('ProviderErrorSanitizer: trunca mensagens longas a 500 chars com elipse', function () {
-    $long = str_repeat('a', 1000);
+    $long   = str_repeat('a', 1000);
     $result = ProviderErrorSanitizer::sanitize($long);
 
     expect(mb_strlen($result))->toBe(500);
@@ -147,7 +144,7 @@ test('ProviderErrorSanitizer: trunca mensagens longas a 500 chars com elipse', f
 });
 
 test('ProviderErrorSanitizer: redige CNPJ, email, telefone e CNS', function () {
-    $raw = 'CPF 123.456.789-00; CNPJ 12.345.678/0001-90; e-mail joao.silva@clinicax.com.br; telefone +55 (11) 98888-7777; CNS 123456789012345';
+    $raw    = 'CPF 123.456.789-00; CNPJ 12.345.678/0001-90; e-mail joao.silva@clinicax.com.br; telefone +55 (11) 98888-7777; CNS 123456789012345';
     $result = ProviderErrorSanitizer::sanitize($raw);
 
     expect($result)->toContain('[REDACTED:CPF]');
@@ -170,7 +167,7 @@ test('OpenAI lança exceção explícita quando API key não configurada', funct
     $provider = new OpenAiProvider();
 
     expect(fn () => $provider->generate(basicRequest()))
-        ->toThrow(\RuntimeException::class, 'OpenAI API key não configurada.');
+        ->toThrow(RuntimeException::class, 'OpenAI API key não configurada.');
 });
 
 test('Anthropic lança exceção explícita quando API key não configurada', function () {
@@ -179,7 +176,7 @@ test('Anthropic lança exceção explícita quando API key não configurada', fu
     $provider = new AnthropicProvider();
 
     expect(fn () => $provider->generate(basicRequest()))
-        ->toThrow(\RuntimeException::class, 'Anthropic API key não configurada.');
+        ->toThrow(RuntimeException::class, 'Anthropic API key não configurada.');
 });
 
 test('Gemini lança exceção explícita quando API key não configurada', function () {
@@ -188,7 +185,7 @@ test('Gemini lança exceção explícita quando API key não configurada', funct
     $provider = new GeminiProvider();
 
     expect(fn () => $provider->generate(basicRequest()))
-        ->toThrow(\RuntimeException::class, 'Gemini API key não configurada.');
+        ->toThrow(RuntimeException::class, 'Gemini API key não configurada.');
 });
 
 // ── Hashes determinísticos ───────────────────────────────────────────────────
@@ -196,10 +193,10 @@ test('Gemini lança exceção explícita quando API key não configurada', funct
 test('OpenAI: requestHash é determinístico para o mesmo payload', function () {
     Http::fake([
         'https://api.openai.com/v1/responses' => Http::response([
-            'id' => 'resp_xxx',
-            'model' => 'gpt-5-mini',
+            'id'     => 'resp_xxx',
+            'model'  => 'gpt-5-mini',
             'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => 'ok']]]],
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+            'usage'  => ['input_tokens' => 10, 'output_tokens' => 5],
         ], 200),
     ]);
 
@@ -212,7 +209,7 @@ test('OpenAI: requestHash é determinístico para o mesmo payload', function () 
         riskLevel: AiRiskLevel::Low,
     );
 
-    $first = $provider->generate($request);
+    $first  = $provider->generate($request);
     $second = $provider->generate($request);
 
     expect($first->requestHash)->toBe($second->requestHash);
@@ -224,9 +221,9 @@ test('OpenAI: requestHash é determinístico para o mesmo payload', function () 
 test('OpenAI: anexos de imagem viram input_image no payload', function () {
     Http::fake([
         'https://api.openai.com/v1/responses' => Http::response([
-            'id' => 'r1', 'model' => 'gpt-5-mini',
+            'id'     => 'r1', 'model' => 'gpt-5-mini',
             'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => 'ok']]]],
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+            'usage'  => ['input_tokens' => 10, 'output_tokens' => 5],
         ], 200),
     ]);
 
@@ -241,8 +238,8 @@ test('OpenAI: anexos de imagem viram input_image no payload', function () {
 
     Http::assertSent(function (Request $request): bool {
         $content = data_get($request->data(), 'input.0.content', []);
-        $images = array_filter($content, fn ($c) => ($c['type'] ?? null) === 'input_image');
-        $first = array_values($images)[0] ?? null;
+        $images  = array_filter($content, fn ($c) => ($c['type'] ?? null) === 'input_image');
+        $first   = array_values($images)[0] ?? null;
 
         return count($images) === 1
             && $first['image_url'] === 'https://files.example/r1.jpg'
@@ -253,10 +250,10 @@ test('OpenAI: anexos de imagem viram input_image no payload', function () {
 test('Anthropic: anexos de imagem viram type=image com source url', function () {
     Http::fake([
         'https://api.anthropic.com/v1/messages' => Http::response([
-            'id' => 'm1', 'model' => 'claude-sonnet-4-5',
-            'content' => [['type' => 'text', 'text' => 'ok']],
+            'id'          => 'm1', 'model' => 'claude-sonnet-4-5',
+            'content'     => [['type' => 'text', 'text' => 'ok']],
             'stop_reason' => 'end_turn',
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+            'usage'       => ['input_tokens' => 10, 'output_tokens' => 5],
         ], 200),
     ]);
 
@@ -269,8 +266,8 @@ test('Anthropic: anexos de imagem viram type=image com source url', function () 
 
     Http::assertSent(function (Request $request): bool {
         $content = data_get($request->data(), 'messages.0.content', []);
-        $images = array_filter($content, fn ($c) => ($c['type'] ?? null) === 'image');
-        $first = array_values($images)[0] ?? null;
+        $images  = array_filter($content, fn ($c) => ($c['type'] ?? null) === 'image');
+        $first   = array_values($images)[0] ?? null;
 
         return count($images) === 1
             && data_get($first, 'source.type') === 'url'
@@ -281,8 +278,8 @@ test('Anthropic: anexos de imagem viram type=image com source url', function () 
 test('Gemini: anexos viram parts.file_data com mime_type', function () {
     Http::fake([
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent' => Http::response([
-            'responseId' => 'g1', 'modelVersion' => 'gemini-2.0-flash',
-            'candidates' => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => 'ok']]]]],
+            'responseId'    => 'g1', 'modelVersion' => 'gemini-2.0-flash',
+            'candidates'    => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => 'ok']]]]],
             'usageMetadata' => ['promptTokenCount' => 10, 'candidatesTokenCount' => 5],
         ], 200),
     ]);
@@ -295,9 +292,9 @@ test('Gemini: anexos viram parts.file_data com mime_type', function () {
     ));
 
     Http::assertSent(function (Request $request): bool {
-        $parts = data_get($request->data(), 'contents.0.parts', []);
+        $parts     = data_get($request->data(), 'contents.0.parts', []);
         $fileParts = array_filter($parts, fn ($p) => isset($p['file_data']));
-        $first = array_values($fileParts)[0] ?? null;
+        $first     = array_values($fileParts)[0] ?? null;
 
         return count($fileParts) === 1
             && data_get($first, 'file_data.file_uri') === 'https://files.example/r1.jpg'
@@ -310,7 +307,7 @@ test('Gemini: anexos viram parts.file_data com mime_type', function () {
 test('OpenAI: countToolCalls reconhece function_call e tool_call no output', function () {
     Http::fake([
         'https://api.openai.com/v1/responses' => Http::response([
-            'id' => 'r1', 'model' => 'gpt-5-mini',
+            'id'     => 'r1', 'model' => 'gpt-5-mini',
             'output' => [
                 ['type' => 'function_call', 'name' => 'lookup'],
                 ['type' => 'reasoning_tool_call'],
@@ -328,13 +325,13 @@ test('OpenAI: countToolCalls reconhece function_call e tool_call no output', fun
 test('Anthropic: countToolCalls reconhece tool_use no content', function () {
     Http::fake([
         'https://api.anthropic.com/v1/messages' => Http::response([
-            'id' => 'm1', 'model' => 'claude-sonnet-4-5',
+            'id'      => 'm1', 'model' => 'claude-sonnet-4-5',
             'content' => [
                 ['type' => 'tool_use', 'id' => 'tu1', 'name' => 'lookup'],
                 ['type' => 'text', 'text' => 'final'],
             ],
             'stop_reason' => 'tool_use',
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+            'usage'       => ['input_tokens' => 10, 'output_tokens' => 5],
         ], 200),
     ]);
 
@@ -350,16 +347,16 @@ test('OpenAI envia User-Agent configurado no header', function () {
 
     Http::fake([
         'https://api.openai.com/v1/responses' => Http::response([
-            'id' => 'r1', 'model' => 'gpt-5-mini',
+            'id'     => 'r1', 'model' => 'gpt-5-mini',
             'output' => [['type' => 'message', 'content' => [['type' => 'output_text', 'text' => 'ok']]]],
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+            'usage'  => ['input_tokens' => 10, 'output_tokens' => 5],
         ], 200),
     ]);
 
     (new OpenAiProvider())->generate(basicRequest());
 
-    Http::assertSent(fn (Request $request): bool =>
-        $request->hasHeader('User-Agent', 'EasyEye/1.0 (+https://easyeye.com.br)')
+    Http::assertSent(
+        fn (Request $request): bool => $request->hasHeader('User-Agent', 'EasyEye/1.0 (+https://easyeye.com.br)'),
     );
 });
 
@@ -368,17 +365,17 @@ test('Anthropic envia User-Agent configurado no header', function () {
 
     Http::fake([
         'https://api.anthropic.com/v1/messages' => Http::response([
-            'id' => 'm1', 'model' => 'claude-sonnet-4-5',
-            'content' => [['type' => 'text', 'text' => 'ok']],
+            'id'          => 'm1', 'model' => 'claude-sonnet-4-5',
+            'content'     => [['type' => 'text', 'text' => 'ok']],
             'stop_reason' => 'end_turn',
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+            'usage'       => ['input_tokens' => 10, 'output_tokens' => 5],
         ], 200),
     ]);
 
     (new AnthropicProvider())->generate(basicRequest());
 
-    Http::assertSent(fn (Request $request): bool =>
-        $request->hasHeader('User-Agent', 'EasyEye/1.0 (+https://easyeye.com.br)')
+    Http::assertSent(
+        fn (Request $request): bool => $request->hasHeader('User-Agent', 'EasyEye/1.0 (+https://easyeye.com.br)'),
     );
 });
 
@@ -387,15 +384,15 @@ test('Gemini envia User-Agent configurado no header', function () {
 
     Http::fake([
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent' => Http::response([
-            'responseId' => 'g1', 'modelVersion' => 'gemini-2.0-flash',
-            'candidates' => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => 'ok']]]]],
+            'responseId'    => 'g1', 'modelVersion' => 'gemini-2.0-flash',
+            'candidates'    => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => 'ok']]]]],
             'usageMetadata' => ['promptTokenCount' => 10, 'candidatesTokenCount' => 5],
         ], 200),
     ]);
 
     (new GeminiProvider())->generate(basicRequest());
 
-    Http::assertSent(fn (Request $request): bool =>
-        $request->hasHeader('User-Agent', 'EasyEye/1.0 (+https://easyeye.com.br)')
+    Http::assertSent(
+        fn (Request $request): bool => $request->hasHeader('User-Agent', 'EasyEye/1.0 (+https://easyeye.com.br)'),
     );
 });

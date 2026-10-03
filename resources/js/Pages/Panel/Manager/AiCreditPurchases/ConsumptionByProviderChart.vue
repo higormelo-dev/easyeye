@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { Chart, DoughnutController, ArcElement, Legend, Tooltip } from 'chart.js';
+import { providerMeta } from './aiProviderMeta';
 
 Chart.register(DoughnutController, ArcElement, Legend, Tooltip);
 
@@ -8,12 +9,6 @@ const props = defineProps({
     consumption: { type: Object, default: () => ({}) },
     t: { type: Object, default: () => ({}) },
 });
-
-const PROVIDER_COLORS = {
-    openai: '#10a37f',
-    anthropic: '#cc785c',
-    gemini: '#4285f4',
-};
 
 const canvas = ref(null);
 let chartInst = null;
@@ -39,7 +34,7 @@ function buildChart() {
         if (!info || (info.credits ?? 0) <= 0) continue;
         labels.push(info.label || providerValue);
         data.push(info.credits);
-        colors.push(PROVIDER_COLORS[providerValue] ?? '#94a3b8');
+        colors.push(providerMeta(providerValue).color);
     }
 
     chartInst = new Chart(canvas.value, {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\AI;
 
 use App\Domains\AI\Contracts\AiRunRepositoryInterface;
-use App\Domains\AI\Exceptions\AiModelPriceNotFoundException;
+use App\Domains\AI\Exceptions\{AiImageNotDeidentifiedException, AiModelPriceNotFoundException};
 use App\Domains\AI\Services\AiRunExecutionService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\{ShouldBeUnique, ShouldQueue};
@@ -53,11 +53,12 @@ class RunAiWorkflowJob implements ShouldQueue, ShouldBeUnique
 
         try {
             $executionService->execute($run);
-        } catch (AiModelPriceNotFoundException $e) {
-            // Erro de CONFIGURAÇÃO (modelo sem preço cadastrado): retry
-            // re-executaria as chamadas pagas de provider até 3x sem chance
-            // de sucesso. Falha imediata, sem novas tentativas — a reserva
-            // já foi liberada pelo compensateFailedRun no execute().
+        } catch (AiModelPriceNotFoundException|AiImageNotDeidentifiedException $e) {
+            // Erro de CONFIGURAÇÃO (modelo sem preço cadastrado; imagem de
+            // layout não reconhecido para tarjar os dados do paciente): retry
+            // repetiria sem chance de sucesso. Falha imediata, sem novas
+            // tentativas — a reserva já foi liberada pelo compensateFailedRun
+            // no execute().
             $this->fail($e);
         }
     }

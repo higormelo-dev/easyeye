@@ -12,8 +12,11 @@ return [
     ],
 
     'patients' => [
-        'title'    => 'Importar Pacientes',
-        'subtitle' => 'Importe pacientes em lote a partir de uma planilha CSV.',
+        'plan_not_found' => 'Aviso: plano ":plan" não encontrado no convênio — paciente importado sem plano. Ajuste no cadastro ou cadastre o plano em Configurações › Convênios › Planos.',
+        'plan_ambiguous' => 'Aviso: mais de um plano ":plan" no convênio — paciente importado sem plano. Informe o registro do produto na ANS (impresso na carteirinha) ou escolha no cadastro.',
+        'col_warnings'   => 'Avisos',
+        'title'          => 'Importar Pacientes',
+        'subtitle'       => 'Importe pacientes em lote a partir de uma planilha CSV.',
 
         'upload_title'      => 'Enviar arquivo CSV',
         'upload_hint'       => 'Suporta arquivos exportados do Feegow, Doctoralia, ProDoctor e qualquer planilha CSV padrão.',

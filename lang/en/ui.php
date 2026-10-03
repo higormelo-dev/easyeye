@@ -35,5 +35,15 @@ return [
     'patient_form' => [
         'occupation'             => 'Occupation',
         'occupation_placeholder' => 'E.g.: teacher, driver, retired',
+        // Insurer plan (ANS product or clinic plan)
+        'plan'                 => 'Plan',
+        'plan_placeholder'     => 'Search by name or ANS registry',
+        'plan_select_covenant' => 'Choose the insurer first',
+        'plan_particular'      => 'Not applicable to self-pay',
+        'plan_empty'           => 'No plans for this insurer',
+        'plan_no_results'      => 'No plans found',
+        'plan_none'            => 'No plans registered for this insurer. The clinic can add them in Settings › Insurers › Plans.',
+        'plan_unavailable'     => 'This plan is no longer available (cancelled at ANS or deactivated). Choose another one when updating the record.',
+        'plan_hint'            => 'Optional. The ANS product registry is printed on the member card.',
     ],
 ];

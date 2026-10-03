@@ -1,10 +1,15 @@
 <?php
 
+use App\Enums\AI\AiProvider;
 use App\Http\Controllers\Manager\{
+    AiCatalogSyncsController,
     AiCreditPurchasesController,
     AiModelPricesController,
     AiProvidersController,
     AiUsageController,
+    CovenantImportsController,
+    CovenantPlansController,
+    CovenantsController,
     EntitiesController,
     EntityIntegratorCommandsController,
     EntityIntegratorEquipmentsController,
@@ -206,11 +211,33 @@ Route::group([
     Route::patch('ai-providers', [AiProvidersController::class, 'update'])
         ->middleware('throttle:manager-destructive')
         ->name('ai-providers.update');
+    // Modelo de um provedor (drawer do provedor).
+    Route::patch('ai-providers/{provider}/model', [AiProvidersController::class, 'updateModel'])
+        ->whereIn('provider', array_map(static fn (AiProvider $p) => $p->value, AiProvider::cases()))
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-providers.model');
+    // LGPD: mecanismo de transferência internacional registrado por provedor.
+    Route::patch('ai-providers/{provider}/transfer', [AiProvidersController::class, 'updateTransfer'])
+        ->whereIn('provider', array_map(static fn (AiProvider $p) => $p->value, AiProvider::cases()))
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-providers.transfer.update');
+    Route::delete('ai-providers/{provider}/transfer', [AiProvidersController::class, 'destroyTransfer'])
+        ->whereIn('provider', array_map(static fn (AiProvider $p) => $p->value, AiProvider::cases()))
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-providers.transfer.destroy');
     // Teste de conexão real (chamada mínima ao provedor) — throttle apertado:
     // cada clique custa alguns centavos de API.
     Route::post('ai-providers/test', [AiProvidersController::class, 'test'])
         ->middleware('throttle:6,1')
         ->name('ai-providers.test');
+    // Sincronização do catálogo de modelos/preços (fila + progresso por WebSocket).
+    Route::post('ai-providers/catalog-syncs', [AiCatalogSyncsController::class, 'store'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-catalog-syncs.store');
+    Route::post('ai-providers/catalog-syncs/{sync}/cancel', [AiCatalogSyncsController::class, 'cancel'])
+        ->whereUuid('sync')
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-catalog-syncs.cancel');
 
     // ── Catálogo de modelos e preços (habilita modelos no select acima) ──
     Route::get('ai-model-prices', [AiModelPricesController::class, 'index'])
@@ -339,10 +366,53 @@ Route::group([
         Route::post('medicines/imports', [MedicineImportsController::class, 'store'])
             ->middleware('throttle:manager-destructive')
             ->name('medicines.imports.store');
+        Route::post('medicines/imports/{import}/cancel', [MedicineImportsController::class, 'cancel'])
+            ->whereUuid('import')
+            ->middleware('throttle:manager-destructive')
+            ->name('medicines.imports.cancel');
         // Sugestão de posologia por IA (chamada paga ao provedor): limite próprio.
         Route::post('medicines/ai-posology', [MedicinesController::class, 'aiPosology'])
             ->middleware('throttle:10,1')
             ->name('medicines.ai-posology');
+    });
+
+    // ── Catálogo global de convênios (operadoras da ANS + manuais) — admin only
+    // Sincronização com o Cadastro de Operadoras da ANS (dados abertos).
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('covenants', [CovenantsController::class, 'index'])->name('covenants.index');
+        Route::post('covenants', [CovenantsController::class, 'store'])->name('covenants.store');
+        Route::post('covenants/imports', [CovenantImportsController::class, 'store'])
+            ->middleware('throttle:manager-destructive')
+            ->name('covenants.imports.store');
+        Route::post('covenants/imports/{import}/cancel', [CovenantImportsController::class, 'cancel'])
+            ->whereUuid('import')
+            ->middleware('throttle:manager-destructive')
+            ->name('covenants.imports.cancel');
+        Route::put('covenants/{covenant}', [CovenantsController::class, 'update'])
+            ->whereUuid('covenant')
+            ->name('covenants.update');
+        Route::get('covenants/{covenant}/usage', [CovenantsController::class, 'usage'])
+            ->whereUuid('covenant')
+            ->name('covenants.usage');
+        Route::delete('covenants/{covenant}', [CovenantsController::class, 'destroy'])
+            ->whereUuid('covenant')
+            ->middleware('throttle:manager-destructive')
+            ->name('covenants.destroy');
+
+        // Planos do convênio (ANS só leitura; manuais com cadastro).
+        Route::get('covenants/{covenant}/plans', [CovenantPlansController::class, 'index'])
+            ->whereUuid('covenant')
+            ->name('covenants.plans.index');
+        Route::post('covenants/{covenant}/plans', [CovenantPlansController::class, 'store'])
+            ->whereUuid('covenant')
+            ->name('covenants.plans.store');
+        Route::put('covenant-plans/{plan}', [CovenantPlansController::class, 'update'])
+            ->whereUuid('plan')
+            ->name('covenants.plans.update');
+        Route::delete('covenant-plans/{plan}', [CovenantPlansController::class, 'destroy'])
+            ->whereUuid('plan')
+            ->middleware('throttle:manager-destructive')
+            ->name('covenants.plans.destroy');
     });
 });
 

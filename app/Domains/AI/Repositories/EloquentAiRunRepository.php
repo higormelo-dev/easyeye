@@ -31,6 +31,13 @@ class EloquentAiRunRepository implements AiRunRepositoryInterface
         $run->update($payload);
     }
 
+    /** @param array<string, mixed> $dispatch */
+    public function recordDispatch(AiRun $run, array $dispatch): void
+    {
+        // Só esta coluna muda: a trilha (Auditable) não copia o conteúdo clínico.
+        $run->update(['dispatch_audit' => $dispatch]);
+    }
+
     public function markWaitingApproval(
         AiRun $run,
         string $finalOutput,

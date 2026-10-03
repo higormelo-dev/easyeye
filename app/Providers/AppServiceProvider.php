@@ -3,10 +3,11 @@
 namespace App\Providers;
 
 use App\Domains\AI\Contracts\{AiCircuitBreakerInterface, AiModelPriceRepositoryInterface, AiRunProviderCallStoreInterface, AiRunRepositoryInterface};
-use App\Domains\AI\Providers\{AnthropicProvider, GeminiProvider, OpenAiProvider};
-use App\Domains\AI\Providers\Fakes\{AnthropicFakeProvider, GeminiFakeProvider, OpenAiFakeProvider};
+use App\Domains\AI\Providers\{AnthropicProvider, GeminiProvider, OpenAiCompatibleProvider, OpenAiProvider};
+use App\Domains\AI\Providers\Fakes\{AnthropicFakeProvider, CompatibleFakeProvider, GeminiFakeProvider, OpenAiFakeProvider};
 use App\Domains\AI\Repositories\{EloquentAiModelPriceRepository, EloquentAiRunProviderCallStore, EloquentAiRunRepository};
 use App\Domains\AI\Services\{AiCircuitBreakerService, AiProviderManager, AiProviderSettings};
+use App\Enums\AI\AiProvider;
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
@@ -46,22 +47,30 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(AiProviderManager::class, function ($app): AiProviderManager {
-            $runtime  = (string) config('ai.provider_runtime', 'fake');
-            $settings = $app->make(AiProviderSettings::class);
-
-            if ($runtime === 'real') {
-                return new AiProviderManager([
+            $real      = (string) config('ai.provider_runtime', 'fake') === 'real';
+            $providers = $real
+                ? [
                     'openai'    => $app->make(OpenAiProvider::class),
                     'anthropic' => $app->make(AnthropicProvider::class),
                     'gemini'    => $app->make(GeminiProvider::class),
-                ], $settings);
+                ]
+                : [
+                    'openai'    => $app->make(OpenAiFakeProvider::class),
+                    'anthropic' => $app->make(AnthropicFakeProvider::class),
+                    'gemini'    => $app->make(GeminiFakeProvider::class),
+                ];
+
+            // Lista pronta "compatível com OpenAI" (Mistral, Groq, xAI, Azure
+            // OpenAI, Maritaca): um driver genérico por provedor.
+            foreach (AiProvider::cases() as $provider) {
+                if ($provider->isOpenAiCompatible()) {
+                    $providers[$provider->value] = $real
+                        ? new OpenAiCompatibleProvider($provider)
+                        : new CompatibleFakeProvider($provider);
+                }
             }
 
-            return new AiProviderManager([
-                'openai'    => $app->make(OpenAiFakeProvider::class),
-                'anthropic' => $app->make(AnthropicFakeProvider::class),
-                'gemini'    => $app->make(GeminiFakeProvider::class),
-            ], $settings);
+            return new AiProviderManager($providers, $app->make(AiProviderSettings::class));
         });
 
         // CAC: singletons dos serviços de aquisição

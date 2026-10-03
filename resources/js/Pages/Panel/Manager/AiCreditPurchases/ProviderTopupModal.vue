@@ -1,25 +1,30 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
+import { BASE_PROVIDERS, providerMeta } from './aiProviderMeta';
 
 /**
  * Modal para registrar uma recarga (topup) que o time fez no painel
- * de um provedor de IA (OpenAI/Claude/Gemini).
+ * de um provedor de IA (lista pronta: OpenAI, Claude, Gemini, Mistral...).
  *
  * NÃO faz cobrança real — apenas registra para cálculo do saldo estimado.
  */
 const props = defineProps({
     open: { type: Boolean, required: true },
     presetProvider: { type: String, default: '' },
+    // [{value, label}] — lista pronta de provedores (App\Enums\AI\AiProvider).
+    providers: { type: Array, default: () => [] },
     t: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'submit']);
 
-const PROVIDERS = [
-    { value: 'openai', label: 'ChatGPT', icon: 'ti ti-brand-openai' },
-    { value: 'anthropic', label: 'Claude', icon: 'ti ti-message-chatbot' },
-    { value: 'gemini', label: 'Gemini', icon: 'ti ti-brand-google' },
-];
+const PROVIDERS = computed(() =>
+    (props.providers.length ? props.providers : BASE_PROVIDERS.map((value) => ({ value }))).map((p) => ({
+        value: p.value,
+        label: providerMeta(p.value, p.label ?? null).label,
+        icon: providerMeta(p.value).icon,
+    })),
+);
 
 const form = ref({
     provider: 'openai',

@@ -74,6 +74,28 @@ class AiProviderManager
         ];
     }
 
+    /** Modelo configurado de um provedor (registro de chamadas que falharam). */
+    public function modelFor(string $code): ?string
+    {
+        return $this->settings->model($code);
+    }
+
+    /**
+     * Provedor ESCOLHIDO para uma execução (ex.: Manager → Medicamentos, onde
+     * o admin escolhe entre as IAs "Configuradas" no painel). Exige chave +
+     * modelo (runtime real) — nunca troca silenciosamente por outro.
+     */
+    public function pinned(string $code): AiProviderInterface
+    {
+        $configured = config('ai.provider_runtime') !== 'real' || $this->settings->isConfigured($code);
+
+        if (AiProvider::tryFrom($code) === null || ! $configured) {
+            throw new RuntimeException("Provider IA [{$code}] não está configurado.");
+        }
+
+        return $this->get($code);
+    }
+
     /**
      * Cadeia de fallback para um papel. Cada papel começa pelo seu provider preferido
      * e cai para os demais providers registrados se o preferido falhar ou seu circuit

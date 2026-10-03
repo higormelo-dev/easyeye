@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Concerns\OpensImportFile;
 use App\Enums\{FeatureKey, ImportStatus};
-use App\Models\{Covenant, Patient, PatientImport, People};
+use App\Models\{Covenant, CovenantPlan, Patient, PatientImport, People};
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\{DB, Log, Storage};
@@ -123,11 +123,21 @@ class PatientImportService
         // people.country
         'pais'    => 'country',
         'country' => 'country',
-        // patients.covenant (lookup por nome)
+        // patients.covenant (lookup por nome). "plano" sozinho é o convênio
+        // em planilhas antigas; com coluna de convênio, vira o plano (headerFields).
         'convenio'      => '_covenant',
         'convenio_nome' => '_covenant',
         'plano'         => '_covenant',
         'plano_saude'   => '_covenant',
+        // patients.covenant_plan_id (registro do produto na ANS ou nome do plano)
+        'nome_plano'         => '_plan',
+        'plano_nome'         => '_plan',
+        'nome_do_plano'      => '_plan',
+        'produto'            => '_plan',
+        'registro_plano'     => '_plan',
+        'registro_ans_plano' => '_plan',
+        'plano_registro_ans' => '_plan',
+        'codigo_plano'       => '_plan',
         // patients.card_number
         'carteirinha'        => '_card_number',
         'num_carteira'       => '_card_number',
@@ -144,6 +154,12 @@ class PatientImportService
 
     /** Chave normalizada (normalizeKey) do convênio usado quando a coluna vem vazia. */
     private const PARTICULAR_KEY = 'particular';
+
+    /** Cabeçalhos que nomeiam o convênio de fato. */
+    private const COVENANT_HEADERS = ['convenio', 'convenio_nome'];
+
+    /** "Plano": convênio quando é a única coluna; plano quando há coluna de convênio. */
+    private const AMBIGUOUS_PLAN_HEADERS = ['plano', 'plano_saude'];
 
     public function __construct(
         private readonly FeatureGateService $featureGate,
@@ -174,6 +190,7 @@ class PatientImportService
         'zipcode'           => 'CEP',
         'country'           => 'País',
         '_covenant'         => 'Convênio',
+        '_plan'             => 'Plano',
         '_card_number'      => 'Carteirinha',
         '_import_code'      => 'Código de importação',
     ];
@@ -212,9 +229,10 @@ class PatientImportService
         $mappedColumns   = [];
         $unmappedColumns = [];
 
+        $headerFields = $this->headerFields($rawHeaders);
+
         foreach ($rawHeaders as $i => $header) {
-            $normalized = $this->normalizeKey($header);
-            $field      = self::COLUMN_MAP[$normalized] ?? null;
+            $field = $headerFields[$i] ?? null;
 
             if ($field !== null) {
                 $mappedColumns[] = [
@@ -354,11 +372,14 @@ class PatientImportService
         // entre linhas do arquivo e contra pacientes já importados antes).
         $usedImportCodes = $this->loadUsedImportCodes($import->entity_id);
 
-        $errors     = [];
-        $imported   = 0;
-        $skipped    = 0;
-        $errorCount = 0;
-        $processed  = 0;
+        $errors       = [];
+        $imported     = 0;
+        $skipped      = 0;
+        $errorCount   = 0;
+        $warningCount = 0;
+        $processed    = 0;
+        // Planos por convênio, carregados sob demanda (a maior operadora tem ~4,5 mil).
+        $plansCache = [];
 
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
             // Cancelamento solicitado em outra request enquanto este job
@@ -372,6 +393,7 @@ class PatientImportService
                     'imported_rows'  => $imported,
                     'skipped_rows'   => $skipped,
                     'error_rows'     => $errorCount,
+                    'warning_rows'   => $warningCount,
                     'finished_at'    => now(),
                 ]);
 
@@ -391,6 +413,7 @@ class PatientImportService
                     'imported_rows'  => $imported,
                     'skipped_rows'   => $skipped,
                     'error_rows'     => $errorCount,
+                    'warning_rows'   => $warningCount,
                     'abort_reason'   => "Limite do plano atingido ({$planLimit} pacientes). Importe interrompido na linha {$rowNum}.",
                     'finished_at'    => now(),
                 ]);
@@ -423,13 +446,21 @@ class PatientImportService
             }
 
             try {
-                $result = DB::transaction(
-                    function () use ($data, $import, $covenantsMap, &$usedImportCodes) {
-                        return $this->importRow($data, $import->entity_id, $covenantsMap, $usedImportCodes);
+                $warning = null;
+                $result  = DB::transaction(
+                    function () use ($data, $import, $covenantsMap, &$usedImportCodes, &$plansCache, &$warning) {
+                        return $this->importRow($data, $import->entity_id, $covenantsMap, $usedImportCodes, $plansCache, $warning);
                     },
                 );
 
                 $result === 'imported' ? $imported++ : $skipped++;
+
+                // Importado, mas com ressalva (ex.: plano não encontrado): vai
+                // para o mesmo CSV baixável, marcado como aviso.
+                if ($warning !== null) {
+                    $errors[] = $this->errorRow($rowNum, $warning, $data);
+                    $warningCount++;
+                }
             } catch (Throwable $e) {
                 $errors[] = $this->errorRow($rowNum, $this->safeFailureReason($e, $import, $rowNum, 'shared_identity.import.row_failed'), $data);
                 $errorCount++;
@@ -450,14 +481,21 @@ class PatientImportService
             'imported_rows'  => $imported,
             'skipped_rows'   => $skipped,
             'error_rows'     => $errorCount,
+            'warning_rows'   => $warningCount,
             'finished_at'    => now(),
         ]);
     }
 
     // ── Criação de People + Patient ───────────────────────────────────────────
 
-    private function importRow(array $data, string $entityId, array $covenantsMap, array &$usedImportCodes): string
-    {
+    private function importRow(
+        array $data,
+        string $entityId,
+        array $covenantsMap,
+        array &$usedImportCodes,
+        array &$plansCache = [],
+        ?string &$warning = null,
+    ): string {
         $cpf  = $this->onlyNumbers((string) ($data['national_registry'] ?? ''));
         $name = mb_strtoupper(trim((string) ($data['full_name'] ?? '')), 'UTF-8');
 
@@ -515,11 +553,10 @@ class PatientImportService
 
             // Pessoa existe, cria apenas o Patient
             $patient = Patient::create([
-                'entity_id'   => $entityId,
-                'person_id'   => $person->id,
-                'covenant_id' => $this->resolveCovenantId($data['_covenant'] ?? null, $covenantsMap),
-                'card_number' => $data['_card_number'] ?? null,
-                'active'      => true,
+                'entity_id' => $entityId,
+                'person_id' => $person->id,
+                ...$this->covenantData($data, $entityId, $covenantsMap, $plansCache, $warning),
+                'active' => true,
             ]);
             $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
 
@@ -556,11 +593,10 @@ class PatientImportService
         $person = People::create($personData);
 
         $patient = Patient::create([
-            'entity_id'   => $entityId,
-            'person_id'   => $person->id,
-            'covenant_id' => $this->resolveCovenantId($data['_covenant'] ?? null, $covenantsMap),
-            'card_number' => $data['_card_number'] ?? null,
-            'active'      => true,
+            'entity_id' => $entityId,
+            'person_id' => $person->id,
+            ...$this->covenantData($data, $entityId, $covenantsMap, $plansCache, $warning),
+            'active' => true,
         ]);
         $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
 
@@ -606,18 +642,27 @@ class PatientImportService
     /** Constrói índice → campo a partir dos cabeçalhos do CSV. */
     private function buildIndexFieldMap(array $headers): array
     {
-        $map = [];
+        return array_filter($this->headerFields($headers), fn (?string $field) => $field !== null);
+    }
 
-        foreach ($headers as $i => $header) {
-            $normalized = $this->normalizeKey($header);
-            $field      = self::COLUMN_MAP[$normalized] ?? null;
+    /**
+     * Campo de cada cabeçalho (null = coluna ignorada). Planilha com coluna
+     * de convênio E coluna "plano": "plano" é o plano do convênio; sem coluna
+     * de convênio, "plano" continua sendo o convênio (planilhas antigas).
+     *
+     * @return array<int, ?string>
+     */
+    private function headerFields(array $headers): array
+    {
+        $keys        = array_map(fn ($header) => $this->normalizeKey((string) $header), $headers);
+        $hasCovenant = array_intersect($keys, self::COVENANT_HEADERS) !== [];
 
-            if ($field !== null) {
-                $map[$i] = $field;
-            }
-        }
-
-        return $map;
+        return array_map(
+            fn (string $key) => $hasCovenant && in_array($key, self::AMBIGUOUS_PLAN_HEADERS, true)
+                ? '_plan'
+                : (self::COLUMN_MAP[$key] ?? null),
+            $keys,
+        );
     }
 
     /** Converte uma linha do CSV em array campo → valor com parsing de tipos. */
@@ -751,6 +796,78 @@ class PatientImportService
 
         return $covenantsMap[$key]
             ?? throw new RuntimeException("Convênio \"{$name}\" não encontrado. Cadastre-o em Configurações › Convênios ou corrija a planilha.");
+    }
+
+    /**
+     * Convênio, carteirinha e plano da linha. Particular não tem carteirinha
+     * nem plano (mesma regra do cadastro manual, PatientService).
+     *
+     * @return array{covenant_id: string, card_number: ?string, covenant_plan_id: ?string}
+     */
+    private function covenantData(array $data, string $entityId, array $covenantsMap, array &$plansCache, ?string &$warning): array
+    {
+        $covenantId   = $this->resolveCovenantId($data['_covenant'] ?? null, $covenantsMap);
+        $isParticular = $covenantId === ($covenantsMap[self::PARTICULAR_KEY] ?? null);
+
+        return [
+            'covenant_id'      => $covenantId,
+            'card_number'      => $isParticular ? null : ($data['_card_number'] ?? null),
+            'covenant_plan_id' => $isParticular ? null : $this->resolvePlanId($data['_plan'] ?? null, $covenantId, $entityId, $plansCache, $warning),
+        ];
+    }
+
+    /**
+     * Plano da linha dentro do convênio já resolvido: registro do produto na
+     * ANS (só dígitos) ou nome (sem acento/caixa). Não encontrado ou ambíguo
+     * (a ANS tem planos homônimos na mesma operadora): o paciente entra sem
+     * plano e a linha volta como aviso — nunca derruba o cadastro.
+     */
+    private function resolvePlanId(?string $value, string $covenantId, string $entityId, array &$plansCache, ?string &$warning): ?string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $plans = $plansCache[$covenantId] ??= $this->loadPlansIndex($covenantId, $entityId);
+        $code  = $this->onlyNumbers($value);
+        $ids   = $code !== '' && $code === preg_replace('/[\s.\-\/]/', '', $value)
+            ? ($plans['codes'][$code] ?? [])
+            : ($plans['names'][$this->normalizeKey($value)] ?? []);
+
+        if (count($ids) === 1) {
+            return $ids[0];
+        }
+
+        $warning = __($ids === [] ? 'imports.patients.plan_not_found' : 'imports.patients.plan_ambiguous', ['plan' => $value]);
+
+        return null;
+    }
+
+    /**
+     * Planos escolhíveis de um convênio (globais + da clínica) indexados por
+     * registro e por nome normalizado.
+     *
+     * @return array{codes: array<string, list<string>>, names: array<string, list<string>>}
+     */
+    private function loadPlansIndex(string $covenantId, string $entityId): array
+    {
+        $index = ['codes' => [], 'names' => []];
+
+        CovenantPlan::query()
+            ->selectableFor($covenantId, $entityId)
+            ->get(['covenant_plans.id', 'covenant_plans.name', 'covenant_plans.ans_code'])
+            ->each(function (CovenantPlan $plan) use (&$index) {
+                // Só registro numérico (plano antigo tem código com texto, ex.: "04 - juridico").
+                if (ctype_digit((string) $plan->ans_code)) {
+                    $index['codes'][(string) $plan->ans_code][] = (string) $plan->id;
+                }
+
+                $index['names'][$this->normalizeKey((string) $plan->name)][] = (string) $plan->id;
+            });
+
+        return $index;
     }
 
     private function onlyNumbers(string $value): string

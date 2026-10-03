@@ -26,8 +26,10 @@ const props = defineProps({
     // Importação na fila/processando (progressPayload do servidor) ou null.
     runningImport: { type: Object, default: null },
     presentations: { type: Array, default: () => [] },
-    // Há provedor de IA configurado (botão "Gerar com IA" no formulário).
-    aiAvailable: { type: Boolean, default: false },
+    // Verificação semanal automática ligada (CMED_SYNC_ENABLED).
+    autoSync: { type: Boolean, default: false },
+    // IAs configuradas (botão "Gerar com IA" no formulário; com 2+, o admin escolhe).
+    aiProviders: { type: Array, default: () => [] },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -61,6 +63,7 @@ function setView(value) {
 const search = ref(props.filters.search ?? '');
 const source = ref(props.filters.source ?? '');
 const status = ref(props.filters.status ?? '');
+const cmedSituation = ref(props.filters.cmed_situation ?? '');
 const ophthalmic = ref(!!props.filters.ophthalmic);
 const sort = ref(props.filters.sort ?? 'name');
 const direction = ref(props.filters.direction ?? 'asc');
@@ -72,6 +75,7 @@ function applyFilters() {
             search: search.value || undefined,
             source: source.value || undefined,
             status: status.value || undefined,
+            cmed_situation: cmedSituation.value || undefined,
             ophthalmic: ophthalmic.value ? 1 : undefined,
             // Ordem padrão (nome A→Z) fica fora da URL.
             sort: sort.value !== 'name' || direction.value !== 'asc' ? sort.value : undefined,
@@ -92,7 +96,7 @@ watch(search, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(applyFilters, 350);
 });
-watch([source, status, ophthalmic], applyFilters);
+watch([source, status, cmedSituation, ophthalmic], applyFilters);
 
 // ── Cadastro / edição ────────────────────────────────────────────────────
 const formOpen = ref(false);
@@ -173,30 +177,17 @@ function confirmDelete(reason) {
     return handleReasonConfirm(reason).catch(() => {});
 }
 
-// ── Importação CMED/Anvisa ───────────────────────────────────────────────
-const importForm = useForm({ cmed_file: null, open_data_file: null });
-
-function submitImport() {
-    importForm.post(route('manager.medicines.imports.store'), {
-        forceFormData: true,
-        preserveScroll: true,
-        onSuccess: () => {
-            importForm.reset();
-            tab.value = 'imports';
-        },
-    });
-}
-
+// ── Carga do catálogo: download da CMED/Anvisa ou envio dos arquivos ─────
 // Barra de progresso em tempo real (WebSocket/Reverb — sem polling HTTP),
-// mesmo padrão das importações de pacientes/médicos/agenda. Ao terminar,
-// mantém o cartão com o resultado e recarrega histórico, números e catálogo.
+// mesmo padrão das demais importações. Ao terminar, mantém o cartão com o
+// resultado e recarrega histórico, números e catálogo.
 const progressImport = ref(props.runningImport);
 const importRunning = computed(() => !!progressImport.value && !progressImport.value.is_done);
 
-const { realtimeConnected } = useImportProgress(progressImport, {
+const { realtimeConnected, resync } = useImportProgress(progressImport, {
     onDone: () => router.reload({ only: ['imports', 'stats', 'medicines'] }),
-    // Assinou/reconectou: relê o estado uma vez (eventos anteriores à conexão).
-    onResync: () => router.reload({ only: ['runningImport', 'imports', 'stats'] }),
+    // Assinou/reconectou (ou "Atualizar status"): relê o estado uma vez.
+    onResync: () => router.reload({ only: ['runningImport', 'imports', 'stats', 'medicines'] }),
 });
 
 watch(
@@ -214,12 +205,109 @@ watch(
     },
 );
 
-onBeforeUnmount(() => clearTimeout(searchTimer));
+const importForm = useForm({ source: 'cmed', force: false, cmed_file: null, open_data_file: null });
+const isUpload = computed(() => importForm.source === 'upload');
+const fileInputs = ref(0); // troca a key dos inputs de arquivo pra limpá-los
+
+const canSubmitImport = computed(
+    () => (!isUpload.value || !!importForm.cmed_file) && !importForm.processing && !importRunning.value,
+);
+
+function submitImport() {
+    if (!canSubmitImport.value) return;
+
+    importForm
+        // Download: arquivos não vão (mesmo que tenham sido escolhidos antes).
+        .transform((data) =>
+            data.source === 'upload'
+                ? { source: 'upload', cmed_file: data.cmed_file, open_data_file: data.open_data_file }
+                : { source: 'cmed', force: !!data.force },
+        )
+        .post(route('manager.medicines.imports.store'), {
+            forceFormData: isUpload.value,
+            preserveScroll: true,
+            onSuccess: () => {
+                importForm.reset('cmed_file', 'open_data_file', 'force');
+                fileInputs.value++;
+                tab.value = 'imports';
+            },
+        });
+}
+
+function pickFile(field, event) {
+    importForm[field] = event.target.files?.[0] ?? null;
+}
+
+// Parada há quanto tempo (sem polling): o servidor manda idle_seconds; aqui
+// só soma o tempo desde que o estado chegou (relógio local, sem requisição).
+const idleSeconds = ref(0);
+let idleBase = { at: Date.now(), seconds: 0 };
+
+watch(
+    progressImport,
+    (imp) => {
+        idleBase = { at: Date.now(), seconds: imp?.idle_seconds ?? 0 };
+        idleSeconds.value = idleBase.seconds;
+    },
+    { immediate: true },
+);
+
+const idleTimer = setInterval(() => {
+    if (importRunning.value) idleSeconds.value = idleBase.seconds + Math.floor((Date.now() - idleBase.at) / 1000);
+}, 5000);
+
+onBeforeUnmount(() => {
+    clearTimeout(searchTimer);
+    clearInterval(idleTimer);
+});
+
+// Na fila (worker ainda não pegou) e parada além do esperado (worker fora do ar).
+const importQueued = computed(() => importRunning.value && progressImport.value?.status === 'pending');
+const importStalled = computed(
+    () =>
+        importRunning.value &&
+        progressImport.value?.stall_after_seconds != null &&
+        idleSeconds.value >= progressImport.value.stall_after_seconds,
+);
+
+const cancelling = ref(false);
+const cancelError = ref('');
+
+function cancelImport() {
+    if (!progressImport.value || cancelling.value) return;
+
+    cancelling.value = true;
+    cancelError.value = '';
+    router.post(
+        route('manager.medicines.imports.cancel', progressImport.value.id),
+        {},
+        {
+            preserveScroll: true,
+            onError: (errors) => {
+                cancelError.value = errors.import ?? Object.values(errors)[0] ?? '';
+            },
+            onFinish: () => {
+                cancelling.value = false;
+            },
+        },
+    );
+}
+
+function alertClass(imp) {
+    if (importRunning.value) return importStalled.value ? 'alert-warning' : 'alert-info';
+    if (imp.status === 'done') return 'alert-success';
+
+    return imp.status === 'cancelled' ? 'alert-secondary' : 'alert-danger';
+}
 
 function fmtProgress(text, imp) {
     return (text ?? '')
         .replace(':processed', number(imp.processed_rows ?? 0))
         .replace(':total', number(imp.total_rows ?? 0));
+}
+
+function listLabel(imp) {
+    return imp.list_published_at ? (props.t.list_published ?? '').replace(':date', imp.list_published_at) : null;
 }
 
 const breadcrumbs = [
@@ -248,7 +336,7 @@ const breadcrumbs = [
                     :aria-label="t.btn_import"
                     @click="tab = 'imports'"
                 >
-                    <i class="ti ti-file-import"></i><span class="d-none d-md-inline ms-1">{{ t.btn_import }}</span>
+                    <i class="ti ti-refresh"></i><span class="d-none d-md-inline ms-1">{{ t.btn_import }}</span>
                 </button>
                 <button
                     type="button"
@@ -316,6 +404,12 @@ const breadcrumbs = [
                     <option value="manual">{{ t.source_manual }}</option>
                     <option value="cmed">{{ t.source_cmed }}</option>
                 </select>
+                <select v-model="cmedSituation" class="form-select w-auto" :aria-label="t.filter_cmed_situation">
+                    <option value="">{{ t.filter_cmed_situation_all }}</option>
+                    <option value="marketed">{{ t.cmed_marketed }}</option>
+                    <option value="not_marketed">{{ t.not_marketed }}</option>
+                    <option value="left_list">{{ t.cmed_left_list }}</option>
+                </select>
                 <select v-model="status" class="form-select w-auto" :aria-label="t.filter_status">
                     <option value="">{{ t.filter_status_all }}</option>
                     <option value="active">{{ t.status_active }}</option>
@@ -354,24 +448,26 @@ const breadcrumbs = [
             <div class="card">
                 <div class="card-body">
                     <h6 class="fw-semibold">{{ t.import_title }}</h6>
-                    <p class="text-muted small mb-3">{{ t.import_help }}</p>
+                    <p class="text-muted small mb-2">{{ t.import_help_sync }}</p>
+                    <p v-if="autoSync" class="small mb-3">
+                        <i class="ti ti-calendar-repeat me-1 text-primary" aria-hidden="true"></i
+                        >{{ t.import_auto_hint }}
+                    </p>
 
-                    <!-- Progresso da importação (consulta a cada 2 s) -->
+                    <!-- Progresso em tempo real (WebSocket) -->
                     <div
                         v-if="progressImport"
                         class="alert mb-3"
-                        :class="
-                            importRunning
-                                ? 'alert-info'
-                                : progressImport.status === 'done'
-                                  ? 'alert-success'
-                                  : 'alert-danger'
-                        "
+                        :class="alertClass(progressImport)"
                         role="status"
                         aria-live="polite"
                     >
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <strong class="text-truncate">{{ progressImport.cmed_original_name }}</strong>
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            <strong class="text-truncate">{{
+                                progressImport.source === 'upload'
+                                    ? progressImport.cmed_original_name
+                                    : progressImport.source_label
+                            }}</strong>
                             <span :class="`badge bg-${progressImport.status_color}`">{{
                                 progressImport.status_label
                             }}</span>
@@ -385,6 +481,9 @@ const breadcrumbs = [
                                 :aria-label="t.close"
                                 @click="progressImport = null"
                             ></button>
+                        </div>
+                        <div v-if="listLabel(progressImport)" class="small mb-2">
+                            <i class="ti ti-calendar me-1" aria-hidden="true"></i>{{ listLabel(progressImport) }}
                         </div>
                         <div
                             class="progress mb-2"
@@ -402,12 +501,18 @@ const breadcrumbs = [
                                         ? 'bg-info progress-bar-striped progress-bar-animated'
                                         : progressImport.status === 'done'
                                           ? 'bg-success'
-                                          : 'bg-danger'
+                                          : progressImport.status === 'cancelled'
+                                            ? 'bg-secondary'
+                                            : 'bg-danger'
                                 "
                                 :style="`width: ${importRunning ? Math.max(progressImport.progress, 3) : 100}%`"
                             ></div>
                         </div>
-                        <div class="small">
+                        <div v-if="importQueued" class="small">
+                            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span
+                            >{{ t.import_waiting_worker }}
+                        </div>
+                        <div v-else class="small">
                             <template v-if="progressImport.total_rows">
                                 {{ fmtProgress(t.import_progress_rows, progressImport) }}
                                 ({{ progressImport.progress }}%) —
@@ -436,49 +541,134 @@ const breadcrumbs = [
                                 <strong>{{ number(progressImport.deactivated_count) }}</strong>
                             </template>
                         </div>
+                        <div v-if="progressImport.notice" class="small mt-1">
+                            <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ progressImport.notice }}
+                        </div>
                         <div v-if="progressImport.error" class="small text-danger mt-1">{{ progressImport.error }}</div>
-                        <small v-if="importRunning && !realtimeConnected" class="d-block text-muted mt-1">
-                            <i class="ti ti-plug-connected-x me-1"></i>{{ page.props.t_ui?.realtime_offline }}
-                        </small>
+                        <div v-if="importStalled" class="small mt-2" role="alert">
+                            <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                            >{{ importQueued ? t.import_stalled_pending : t.import_stalled_processing }}
+                            <div class="mt-2">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    :disabled="cancelling"
+                                    @click="cancelImport"
+                                >
+                                    <span
+                                        v-if="cancelling"
+                                        class="spinner-border spinner-border-sm me-1"
+                                        aria-hidden="true"
+                                    ></span>
+                                    <i v-else class="ti ti-player-stop me-1" aria-hidden="true"></i
+                                    >{{ t.import_cancel }}
+                                </button>
+                            </div>
+                            <div v-if="cancelError" class="text-danger mt-1">{{ cancelError }}</div>
+                        </div>
+                        <div
+                            v-if="importRunning && !realtimeConnected"
+                            class="d-flex flex-wrap align-items-center gap-2 mt-2 small text-muted"
+                        >
+                            <span
+                                ><i class="ti ti-plug-connected-x me-1" aria-hidden="true"></i
+                                >{{ page.props.t_ui?.realtime_offline }}</span
+                            >
+                            <button type="button" class="btn btn-sm btn-light" @click="resync">
+                                <i class="ti ti-refresh me-1" aria-hidden="true"></i>{{ t.import_refresh_status }}
+                            </button>
+                        </div>
                     </div>
 
                     <form class="row g-3" @submit.prevent="submitImport">
-                        <div class="col-12 col-lg-6">
-                            <label class="form-label fw-semibold" for="imp-cmed">
-                                {{ t.import_cmed_file }} <span class="text-danger">*</span>
-                            </label>
-                            <input
-                                id="imp-cmed"
-                                type="file"
-                                class="form-control"
-                                :class="{ 'is-invalid': importForm.errors.cmed_file }"
-                                accept=".xlsx,.xls,.csv"
-                                @input="importForm.cmed_file = $event.target.files[0] ?? null"
-                            />
-                            <div class="form-text">{{ t.import_cmed_hint }}</div>
-                            <div class="invalid-feedback">{{ importForm.errors.cmed_file }}</div>
+                        <fieldset class="col-12">
+                            <legend class="form-label fw-semibold fs-14 mb-1">{{ t.import_mode }}</legend>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div class="form-check mb-0">
+                                    <input
+                                        id="imp-mode-cmed"
+                                        v-model="importForm.source"
+                                        type="radio"
+                                        value="cmed"
+                                        class="form-check-input"
+                                    />
+                                    <label for="imp-mode-cmed" class="form-check-label">{{ t.import_mode_cmed }}</label>
+                                </div>
+                                <div class="form-check mb-0">
+                                    <input
+                                        id="imp-mode-upload"
+                                        v-model="importForm.source"
+                                        type="radio"
+                                        value="upload"
+                                        class="form-check-input"
+                                    />
+                                    <label for="imp-mode-upload" class="form-check-label">{{
+                                        t.import_mode_upload
+                                    }}</label>
+                                </div>
+                            </div>
+                            <div v-if="importForm.errors.source" class="text-danger small mt-1">
+                                {{ importForm.errors.source }}
+                            </div>
+                        </fieldset>
+
+                        <div v-if="!isUpload" class="col-12">
+                            <div class="form-check mb-0">
+                                <input
+                                    id="imp-force"
+                                    v-model="importForm.force"
+                                    type="checkbox"
+                                    class="form-check-input"
+                                />
+                                <label for="imp-force" class="form-check-label">{{ t.import_force }}</label>
+                            </div>
                         </div>
-                        <div class="col-12 col-lg-6">
-                            <label class="form-label fw-semibold" for="imp-open">{{ t.import_open_data_file }}</label>
-                            <input
-                                id="imp-open"
-                                type="file"
-                                class="form-control"
-                                :class="{ 'is-invalid': importForm.errors.open_data_file }"
-                                accept=".csv"
-                                @input="importForm.open_data_file = $event.target.files[0] ?? null"
-                            />
-                            <div class="form-text">{{ t.import_open_data_hint }}</div>
-                            <div class="invalid-feedback">{{ importForm.errors.open_data_file }}</div>
-                        </div>
+
+                        <template v-else>
+                            <div class="col-12">
+                                <div class="alert alert-light border small mb-0">
+                                    <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ t.import_help }}
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label fw-semibold" for="imp-cmed">
+                                    {{ t.import_cmed_file }} <span class="text-danger">*</span>
+                                </label>
+                                <input
+                                    id="imp-cmed"
+                                    :key="`cmed-${fileInputs}`"
+                                    type="file"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': importForm.errors.cmed_file }"
+                                    accept=".xlsx,.xls,.csv"
+                                    @input="pickFile('cmed_file', $event)"
+                                />
+                                <div class="form-text">{{ t.import_cmed_hint }}</div>
+                                <div class="invalid-feedback">{{ importForm.errors.cmed_file }}</div>
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label fw-semibold" for="imp-open">{{
+                                    t.import_open_data_file
+                                }}</label>
+                                <input
+                                    id="imp-open"
+                                    :key="`open-${fileInputs}`"
+                                    type="file"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': importForm.errors.open_data_file }"
+                                    accept=".csv"
+                                    @input="pickFile('open_data_file', $event)"
+                                />
+                                <div class="form-text">{{ t.import_open_data_hint }}</div>
+                                <div class="invalid-feedback">{{ importForm.errors.open_data_file }}</div>
+                            </div>
+                        </template>
+
                         <div class="col-12">
-                            <button
-                                type="submit"
-                                class="btn btn-primary"
-                                :disabled="!importForm.cmed_file || importForm.processing || importRunning"
-                            >
+                            <button type="submit" class="btn btn-primary" :disabled="!canSubmitImport">
                                 <span v-if="importForm.processing" class="spinner-border spinner-border-sm me-1"></span>
-                                <i v-else class="ti ti-upload me-1"></i>{{ t.import_submit }}
+                                <i v-else :class="`ti ${isUpload ? 'ti-upload' : 'ti-cloud-download'} me-1`"></i>
+                                {{ isUpload ? t.import_submit : t.import_submit_cmed }}
                             </button>
                             <div
                                 v-if="importForm.progress"
@@ -507,7 +697,7 @@ const breadcrumbs = [
                             <tr>
                                 <th>{{ t.col_date }}</th>
                                 <th>{{ t.col_status }}</th>
-                                <th class="d-none d-md-table-cell">{{ t.col_files }}</th>
+                                <th class="d-none d-md-table-cell">{{ t.col_origin }}</th>
                                 <th>{{ t.col_result }}</th>
                             </tr>
                         </thead>
@@ -524,8 +714,12 @@ const breadcrumbs = [
                                     <span class="badge" :class="`bg-${imp.status_color}`">{{ imp.status_label }}</span>
                                 </td>
                                 <td class="d-none d-md-table-cell">
-                                    <div>{{ imp.cmed_original_name }}</div>
-                                    <div v-if="imp.open_data_original_name" class="text-muted">
+                                    <div>{{ imp.source_label }}</div>
+                                    <div v-if="listLabel(imp)" class="text-muted">{{ listLabel(imp) }}</div>
+                                    <div v-if="imp.cmed_original_name" class="text-muted text-break">
+                                        {{ imp.cmed_original_name }}
+                                    </div>
+                                    <div v-if="imp.open_data_original_name" class="text-muted text-break">
                                         {{ imp.open_data_original_name }}
                                     </div>
                                 </td>
@@ -552,6 +746,9 @@ const breadcrumbs = [
                                         </div>
                                     </div>
                                     <span v-else class="text-muted">—</span>
+                                    <div v-if="imp.notice" class="text-muted mt-1">
+                                        <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ imp.notice }}
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -564,9 +761,10 @@ const breadcrumbs = [
             :open="formOpen"
             :medicine="editing"
             :presentations="presentations"
-            :ai-available="aiAvailable"
+            :ai-providers="aiProviders"
             :t="t"
             @close="formOpen = false"
+            @providers-stale="router.reload({ only: ['aiProviders'] })"
         />
 
         <MedicineDetailDrawer

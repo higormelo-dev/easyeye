@@ -219,9 +219,20 @@ Clique em **Pacientes** no menu:
 
 ![Novo paciente — aba Pessoal](img/14-paciente-novo-pessoal.png)
 
-3. Na aba **Clínico**, informe o **convênio** do paciente:
+3. Na aba **Clínico**, informe o **convênio** do paciente e, se quiser, o **plano**:
 
 ![Novo paciente — aba Clínico](img/15-paciente-novo-clinico.png)
+
+   - O campo **Plano** só abre depois do convênio. Ele já lista os primeiros planos do convênio;
+     para achar um plano específico, digite parte do **nome** ou o **registro do produto na ANS**
+     (número impresso na carteirinha). Abaixo do plano escolhido aparecem a contratação, a
+     segmentação e se tem **coparticipação**.
+   - Ao trocar o convênio, o plano é apagado (cada plano é de um convênio). **Particular** não
+     tem plano nem carteirinha.
+   - Se o plano do paciente foi cancelado na ANS, o cadastro avisa — escolha o plano novo da
+     carteirinha quando o paciente trouxer.
+   - Não achou o plano? Peça ao administrador para cadastrar em **Configurações → Convênios →
+     Planos**.
 
 4. Preencha o contato (celular, e-mail, endereço — o **CEP preenche o endereço sozinho**).
 5. Clique em **Salvar**.

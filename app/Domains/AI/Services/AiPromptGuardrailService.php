@@ -8,6 +8,17 @@ use Illuminate\Validation\ValidationException;
 
 final class AiPromptGuardrailService
 {
+    /** Partículas de nome que nunca são trocadas sozinhas ("da", "de"...). */
+    private const NAME_PARTICLES = ['da', 'das', 'de', 'do', 'dos', 'e', 'di', 'du', 'del', 'della', 'van', 'von'];
+
+    /** Marcador do nome do paciente — nem as iniciais saem para o provedor. */
+    public const PATIENT_NAME_TOKEN = '<PATIENT_NAME_REDACTED>';
+
+    /** Letras com acento aceitas no nome digitado (João = Joao = JOÃO). */
+    private const LETTER_VARIANTS = [
+        'a' => 'aáàâãä', 'e' => 'eéèêë', 'i' => 'iíìîï', 'o' => 'oóòôõö', 'u' => 'uúùûü', 'c' => 'cç', 'n' => 'nñ',
+    ];
+
     /**
      * @var array<string, string>
      */
@@ -61,7 +72,7 @@ final class AiPromptGuardrailService
      *
      * @return array{payload:array<string, mixed>, guardrails:array<string, mixed>}
      */
-    public function sanitizePayload(array $payload): array
+    public function sanitizePayload(array $payload, array $protectedNames = []): array
     {
         // system_prompt NÃO entra no scan de injection: desde
         // AiPayloadEnricher::withSecurityPreamble() ele é SEMPRE definido
@@ -86,19 +97,22 @@ final class AiPromptGuardrailService
 
         $piiTypes  = [];
         $sanitized = $payload;
+        // Nome do paciente digitado no pedido ou em texto livre do prontuário:
+        // vira as iniciais (que já vão no contexto) — o provedor não recebe o nome.
+        $names = $this->namePatterns($protectedNames);
 
         foreach (['user_prompt', 'system_prompt'] as $field) {
             if (isset($sanitized[$field]) && is_string($sanitized[$field])) {
-                $sanitized[$field] = $this->redactPii($sanitized[$field], $piiTypes);
+                $sanitized[$field] = $this->redactPii($sanitized[$field], $piiTypes, $names);
             }
         }
 
         if (isset($sanitized['context'])) {
-            $sanitized['context'] = $this->sanitizeValue($sanitized['context'], $piiTypes);
+            $sanitized['context'] = $this->sanitizeValue($sanitized['context'], $piiTypes, $names);
         }
 
         if (isset($sanitized['attachments'])) {
-            $sanitized['attachments'] = $this->sanitizeValue($sanitized['attachments'], $piiTypes);
+            $sanitized['attachments'] = $this->sanitizeValue($sanitized['attachments'], $piiTypes, $names);
         }
 
         $piiTypes = array_values(array_unique($piiTypes));
@@ -135,8 +149,30 @@ final class AiPromptGuardrailService
     /**
      * @param array<int, string> $piiTypes
      */
-    private function redactPii(string $text, array &$piiTypes): string
+    private function redactPii(string $text, array &$piiTypes, array $names = []): string
     {
+        foreach ($names as $pattern) {
+            $text = preg_replace_callback(
+                $pattern,
+                function () use (&$piiTypes): string {
+                    $piiTypes[] = 'patient_name';
+
+                    return self::PATIENT_NAME_TOKEN;
+                },
+                $text,
+            ) ?? $text;
+        }
+
+        // "Maria da Silva" vira um marcador só (não um por nome/sobrenome).
+        if ($names !== []) {
+            $token = preg_quote(self::PATIENT_NAME_TOKEN, '/');
+            $text  = preg_replace(
+                '/' . $token . '(?:(?:\s*-\s*|\s+(?:(?:' . implode('|', self::NAME_PARTICLES) . ')\s+)?)' . $token . ')+/iu',
+                self::PATIENT_NAME_TOKEN,
+                $text,
+            ) ?? $text;
+        }
+
         $text = preg_replace_callback(
             '/\b(?:\d[ -]*?){13,19}\b/u',
             function (array $matches) use (&$piiTypes): string {
@@ -171,10 +207,10 @@ final class AiPromptGuardrailService
     /**
      * @param array<int, string> $piiTypes
      */
-    private function sanitizeValue(mixed $value, array &$piiTypes): mixed
+    private function sanitizeValue(mixed $value, array &$piiTypes, array $names = []): mixed
     {
         if (is_string($value)) {
-            return $this->redactPii($value, $piiTypes);
+            return $this->redactPii($value, $piiTypes, $names);
         }
 
         if (! is_array($value)) {
@@ -184,10 +220,55 @@ final class AiPromptGuardrailService
         $sanitized = [];
 
         foreach ($value as $key => $child) {
-            $sanitized[$key] = $this->sanitizeValue($child, $piiTypes);
+            $sanitized[$key] = $this->sanitizeValue($child, $piiTypes, $names);
         }
 
         return $sanitized;
+    }
+
+    /**
+     * Um padrão por parte do nome (3+ letras, sem partículas), com ou sem
+     * acento e só com inicial maiúscula — nome próprio no texto. "Luz" do
+     * paciente não troca "sensibilidade à luz".
+     *
+     * @param list<string> $names
+     *
+     * @return list<string>
+     */
+    private function namePatterns(array $names): array
+    {
+        $base = [];
+
+        foreach (self::LETTER_VARIANTS as $letter => $variants) {
+            foreach (mb_str_split($variants) as $variant) {
+                $base[$variant] = $letter;
+            }
+        }
+
+        $patterns = [];
+
+        foreach ($names as $name) {
+            foreach (preg_split('/[\s\-]+/u', mb_strtolower(trim((string) $name))) ?: [] as $part) {
+                $token = implode('', array_map(static fn ($ch) => $base[$ch] ?? $ch, mb_str_split($part)));
+
+                if (mb_strlen($token) < 3 || in_array($token, self::NAME_PARTICLES, true) || preg_match('/^[a-z]+$/', $token) !== 1) {
+                    continue;
+                }
+
+                $chars = str_split($token);
+                $first = array_shift($chars);
+                $regex = '[' . mb_strtoupper(self::LETTER_VARIANTS[$first] ?? $first) . ']';
+
+                foreach ($chars as $ch) {
+                    $variants = self::LETTER_VARIANTS[$ch] ?? $ch;
+                    $regex .= '[' . $variants . mb_strtoupper($variants) . ']';
+                }
+
+                $patterns[$token] = '/(?<![\p{L}\p{N}])' . $regex . '(?![\p{L}\p{N}])/u';
+            }
+        }
+
+        return array_values($patterns);
     }
 
     private function flattenStrings(mixed $value): string

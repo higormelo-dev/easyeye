@@ -36,6 +36,13 @@ const props = defineProps({
     // isso o select sai no tamanho "regular" da lib (~47px) enquanto o
     // input de busca ao lado é "sm" (~31px), destoando de altura.
     sm: { type: Boolean, default: false },
+    // Mostra o `sub_label` das opções (linha menor abaixo do nome) — ex.:
+    // planos homônimos da mesma operadora, diferenciados por contratação e
+    // segmentação. Opt-in: os consumidores atuais não mudam.
+    showSubLabel: { type: Boolean, default: false },
+    // Textos da lista vazia (i18n); padrão mantém o comportamento atual.
+    noOptionsText: { type: String, default: 'Nenhuma opção' },
+    noResultsText: { type: String, default: 'Nada encontrado' },
 });
 
 // `option-selected` — Onda IOL Lenses: emite o OBJETO completo da opção
@@ -175,10 +182,16 @@ const selectedTitle = computed(() => {
         :close-on-select="!multiple"
         :placeholder="placeholder"
         :disabled="disabled"
-        no-options-text="Nenhuma opção"
-        no-results-text="Nada encontrado"
+        :no-options-text="noOptionsText"
+        :no-results-text="noResultsText"
         @search-change="onSearchChange"
     >
+        <template v-if="showSubLabel" #option="{ option }">
+            <span class="search-select__option">
+                <span class="search-select__option-label">{{ option[labelKey] }}</span>
+                <small v-if="option.sub_label" class="search-select__option-sub">{{ option.sub_label }}</small>
+            </span>
+        </template>
         <template v-if="multiple" #multiplelabel="{ values }">
             <div class="multiselect-multiple-label search-select__summary">
                 <span class="search-select__summary-text">{{ multipleLabel(values) }}</span>
@@ -228,6 +241,21 @@ const selectedTitle = computed(() => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Opção com linha de detalhe (prop `showSubLabel`). */
+.search-select__option {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.search-select__option-label {
+    overflow-wrap: anywhere;
+}
+.search-select__option-sub {
+    color: var(--bs-secondary-color);
+    font-size: 0.8em;
+    line-height: 1.3;
 }
 
 /* Variante compacta (prop `sm`) — mesma altura/fonte do .input-group-sm

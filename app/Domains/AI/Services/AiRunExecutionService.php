@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Contracts\AiRunRepositoryInterface;
-use App\Domains\AI\Exceptions\AiRunCancelledException;
+use App\Domains\AI\Exceptions\{AiImageNotDeidentifiedException, AiRunCancelledException};
 use App\Domains\AI\Models\{AiCreditLedgerEntry, AiRun};
+use App\Domains\AI\Support\AiDispatchAudit;
 use App\DTOs\AI\AiRequestData;
 use App\Enums\AI\{AiRiskLevel, AiRunStatus};
 use App\Models\PatientExam;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\{DB, Log};
 use Throwable;
 
 class AiRunExecutionService
@@ -41,7 +42,12 @@ class AiRunExecutionService
         $this->runRepository->markRunning($run);
 
         try {
-            $request  = $this->buildRequestFromRun($run);
+            [$request, $imageNotes] = $this->buildRequestFromRun($run);
+
+            // Auditoria do envio (LGPD): versão das instruções e categorias de
+            // dados — gravada antes da chamada, sem o conteúdo.
+            $this->runRepository->recordDispatch($run, AiDispatchAudit::summarize($request));
+
             $result   = $this->orchestrator->execute($run, $request);
             $estimate = $this->pricingService->calculateActualCredits(
                 workflow: $run->workflow,
@@ -75,6 +81,7 @@ class AiRunExecutionService
 
             $safetyNotes = array_values(array_filter(array_merge(
                 (array) ($run->safety_notes ?? []),
+                $imageNotes,
                 $result->safetyNotes,
             )));
 
@@ -105,7 +112,8 @@ class AiRunExecutionService
             // que ainda não foi consumido. Não relança para o job não marcar failed.
             $this->compensateCancelledRun($run);
         } catch (Throwable $e) {
-            $this->compensateFailedRun($run, $e->getMessage());
+            // Imagem sem tarja possível: a mensagem já é a do médico (sem provedor).
+            $this->compensateFailedRun($run, $e->getMessage(), doctorFacing: $e instanceof AiImageNotDeidentifiedException);
 
             throw $e;
         }
@@ -121,8 +129,11 @@ class AiRunExecutionService
      *
      * Sem este método, a reserva ficaria órfã em falha catastrófica — o que viola
      * o critério de aceite "Nenhum crédito pode ser perdido em falha".
+     *
+     * $doctorFacing: o motivo já foi escrito para o médico (sem provedor/modelo)
+     * e é gravado como está; os demais viram a mensagem genérica.
      */
-    public function compensateFailedRun(AiRun $run, string $reason): void
+    public function compensateFailedRun(AiRun $run, string $reason, bool $doctorFacing = false): void
     {
         $this->releaseReservationOnFailure($run);
 
@@ -131,7 +142,7 @@ class AiRunExecutionService
             : AiRunStatus::tryFrom((string) $run->status);
 
         if ($status !== AiRunStatus::Failed) {
-            $this->runRepository->markFailed($run, $this->doctorSafeReason($reason));
+            $this->runRepository->markFailed($run, $doctorFacing ? $reason : $this->doctorSafeReason($reason));
         }
     }
 
@@ -209,9 +220,16 @@ class AiRunExecutionService
         ], true);
     }
 
-    private function buildRequestFromRun(AiRun $run): AiRequestData
+    /**
+     * @return array{0: AiRequestData, 1: list<string>} requisição + avisos ao médico (imagens que não saíram)
+     *
+     * @throws AiImageNotDeidentifiedException
+     */
+    private function buildRequestFromRun(AiRun $run): array
     {
         $summary = is_array($run->input_summary) ? $run->input_summary : [];
+
+        [$attachments, $context, $notes] = $this->resolveImages($run, $summary, (array) ($summary['context'] ?? []));
 
         // SEGURANÇA — última linha de defesa: qualquer que seja o caminho
         // que criou o run (UI, API, escalate, fila antiga), o system prompt
@@ -221,7 +239,7 @@ class AiRunExecutionService
         $workflow = (string) $run->workflow;
         $field    = isset($summary['field']) ? (string) $summary['field'] : null;
 
-        return new AiRequestData(
+        return [new AiRequestData(
             workflow: $workflow,
             mode: $run->mode,
             userPrompt: (string) ($summary['user_prompt'] ?? 'Gerar apoio clínico estruturado para revisão médica.'),
@@ -231,40 +249,79 @@ class AiRunExecutionService
                 $field,
             ),
             riskLevel: $run->risk_level instanceof AiRiskLevel ? $run->risk_level : AiRiskLevel::Low,
-            context: (array) ($summary['context'] ?? []),
-            attachments: $this->resolveAttachments($run, $summary),
+            context: $context,
+            attachments: $attachments,
             expectsJson: (bool) ($summary['expects_json'] ?? false),
             maxOutputTokens: isset($summary['max_output_tokens']) ? (int) $summary['max_output_tokens'] : null,
             metadata: (array) ($summary['metadata'] ?? []),
-        );
+        ), $notes];
     }
 
     /**
      * Resolve os anexos de imagem em tempo de execução. Para o módulo Eye Image,
      * o run guarda apenas `exam_ids` (não o base64): aqui buscamos os exames e
-     * geramos os anexos inline. Para outros fluxos, usa os anexos já presentes.
+     * geramos os anexos inline, já com os dados do paciente tarjados (LGPD).
+     * Para outros fluxos, usa os anexos já presentes.
+     *
+     * Imagem que não sai (layout não reconhecido para tarjar) fica registrada
+     * no vínculo run↔exame, vira aviso ao médico e sai de
+     * context.selected_exams (imagem N = exame N). Se nenhuma imagem pôde
+     * sair, falha antes de chamar o provedor — nada é cobrado.
      *
      * @param array<string, mixed> $summary
+     * @param array<string, mixed> $context
      *
-     * @return list<array<string, mixed>>
+     * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>, 2: list<string>}
+     *
+     * @throws AiImageNotDeidentifiedException
      */
-    private function resolveAttachments(AiRun $run, array $summary): array
+    private function resolveImages(AiRun $run, array $summary, array $context): array
     {
         $examIds = array_values(array_filter((array) ($summary['exam_ids'] ?? [])));
 
-        if ($examIds !== []) {
-            // Ordem da seleção do médico — a mesma de context.selected_exams
-            // (AiPayloadEnricher), pra imagem N bater com o exame N.
-            $exams = PatientExam::query()
-                ->whereIn('id', $examIds)
-                ->get()
-                ->sortBy(fn (PatientExam $exam) => array_search((string) $exam->id, $examIds, true))
-                ->values();
-
-            return $this->eyeImageAttachments->build($exams);
+        if ($examIds === []) {
+            return [(array) ($summary['attachments'] ?? []), $context, []];
         }
 
-        return (array) ($summary['attachments'] ?? []);
+        // Ordem da seleção do médico — a mesma de context.selected_exams
+        // (AiPayloadEnricher), pra imagem N bater com o exame N.
+        $exams = PatientExam::query()
+            ->whereIn('id', $examIds)
+            ->get()
+            ->sortBy(fn (PatientExam $exam) => array_search((string) $exam->id, $examIds, true))
+            ->values();
+
+        $prepared = $this->eyeImageAttachments->prepare($exams);
+
+        foreach ($prepared['outcomes'] as $examId => $outcome) {
+            DB::table('ai_run_patient_exam')
+                ->where('ai_run_id', $run->id)
+                ->where('patient_exam_id', $examId)
+                ->update(['image_deidentification' => $outcome]);
+        }
+
+        $sent    = array_column($prepared['attachments'], 'exam_id');
+        $blocked = count(array_keys($prepared['outcomes'], EyeImageAttachmentService::SKIPPED_UNRECOGNIZED_LAYOUT, true));
+
+        if ($sent === [] && $blocked > 0) {
+            throw new AiImageNotDeidentifiedException(trans_choice('ai.eye_image_none_sent', $blocked, ['count' => $blocked]));
+        }
+
+        if (isset($context['selected_exams']) && is_array($context['selected_exams'])) {
+            $kept = [];
+
+            foreach (array_values($context['selected_exams']) as $i => $exam) {
+                if (in_array((string) ($examIds[$i] ?? ''), $sent, true) && is_array($exam)) {
+                    $kept[] = [...$exam, 'image' => count($kept) + 1];
+                }
+            }
+
+            $context['selected_exams'] = $kept;
+        }
+
+        $notes = $blocked > 0 ? [trans_choice('ai.eye_image_some_not_sent', $blocked, ['count' => $blocked])] : [];
+
+        return [$prepared['attachments'], $context, $notes];
     }
 
     private function releaseReservationOnFailure(AiRun $run): void

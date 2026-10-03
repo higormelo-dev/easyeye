@@ -106,6 +106,38 @@ describe('useImportProgress', () => {
         expect(api().realtimeConnected.value).toBe(true);
     });
 
+    it('sem tempo real: ao voltar para a aba relê o estado uma vez; conectado ou terminada, não', async () => {
+        const onResync = vi.fn();
+        const { state } = mountWith({ ...running }, { onResync });
+        const setVisibility = (value) => {
+            Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => value });
+            document.dispatchEvent(new Event('visibilitychange'));
+        };
+
+        setVisibility('visible'); // conectado: não precisa
+        expect(onResync).not.toHaveBeenCalled();
+
+        echoState.status.value = 'disconnected';
+        await nextTick();
+        setVisibility('hidden');
+        expect(onResync).not.toHaveBeenCalled();
+        setVisibility('visible');
+        expect(onResync).toHaveBeenCalledOnce();
+
+        state.value = { ...running, is_done: true };
+        setVisibility('visible');
+        expect(onResync).toHaveBeenCalledOnce();
+    });
+
+    it('resync() relê o estado sob demanda (botão "Atualizar status")', () => {
+        const onResync = vi.fn();
+        const { api } = mountWith({ ...running }, { onResync });
+
+        api().resync();
+
+        expect(onResync).toHaveBeenCalledOnce();
+    });
+
     it('importação já terminada não assina nada; desmontar sai do canal', () => {
         mountWith({ ...running, is_done: true });
         expect(echoState.channels).toEqual({});

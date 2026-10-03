@@ -222,6 +222,9 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                     <strong class="text-success">{{ liveImport.imported_rows }}</strong> importados,
                     <strong class="text-warning">{{ liveImport.skipped_rows }}</strong> ignorados,
                     <strong class="text-danger">{{ liveImport.error_rows }}</strong> erros
+                    <template v-if="liveImport.warning_rows">
+                        · <strong class="text-warning">{{ liveImport.warning_rows }}</strong> {{ t.col_warnings }}
+                    </template>
                 </div>
                 <small v-if="!realtimeConnected" class="d-block text-muted mt-1">
                     <i class="ti ti-plug-connected-x me-1"></i>{{ page.props.t_ui?.realtime_offline }}
@@ -377,7 +380,12 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                                 </td>
                                 <td class="text-end">{{ item.total_rows }}</td>
                                 <td class="text-end text-success">{{ item.imported_rows }}</td>
-                                <td class="text-end text-danger">{{ item.error_rows }}</td>
+                                <td class="text-end text-danger">
+                                    {{ item.error_rows }}
+                                    <div v-if="item.warning_rows" class="small text-warning">
+                                        {{ item.warning_rows }} {{ t.col_warnings }}
+                                    </div>
+                                </td>
                                 <td class="text-end">
                                     <a
                                         v-if="item.has_errors_file && item.urls.errors"

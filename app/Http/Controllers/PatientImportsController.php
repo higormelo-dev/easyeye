@@ -80,6 +80,7 @@ class PatientImportsController extends Controller
             'imported_rows'   => (int) $i->imported_rows,
             'skipped_rows'    => (int) $i->skipped_rows,
             'error_rows'      => (int) $i->error_rows,
+            'warning_rows'    => (int) $i->warning_rows,
             'progress'        => $i->progressPercent(),
             'abort_reason'    => $i->abort_reason,
             'user_name'       => $i->user?->name,
@@ -228,7 +229,7 @@ class PatientImportsController extends Controller
             'data_nascimento', 'sexo', 'estado_civil',
             'nome_mae', 'nome_pai',
             'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'pais',
-            'convenio', 'carteirinha', 'codigo_importacao',
+            'convenio', 'plano', 'carteirinha', 'codigo_importacao',
         ];
 
         $example = [
@@ -236,7 +237,8 @@ class PatientImportsController extends Controller
             '15/06/1980', 'M', '1',
             'Maria da Silva', 'José da Silva',
             '01310100', 'Av. Paulista', '1000', 'Apto 1', 'Bela Vista', 'São Paulo', 'SP', 'Brasil',
-            'Unimed', '123456789', '00042',
+            // "plano": nome do plano ou registro do produto na ANS (carteirinha).
+            'Unimed', '', '123456789', '00042',
         ];
 
         return response()->streamDownload(function () use ($headers, $example) {

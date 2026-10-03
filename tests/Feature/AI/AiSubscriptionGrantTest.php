@@ -1,15 +1,10 @@
 <?php
 
-use App\Domains\AI\Models\AiCreditLedgerEntry;
-use App\Domains\AI\Models\AiCreditWallet;
+use App\Domains\AI\Models\{AiCreditLedgerEntry, AiCreditWallet};
 use App\Domains\AI\Services\AiCreditWalletService;
 use App\Enums\AI\AiLedgerEntryType;
-use App\Enums\FeatureKey;
-use App\Enums\SubscriptionStatus;
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\PlanFeature;
-use App\Models\Subscription;
+use App\Enums\{FeatureKey, SubscriptionStatus};
+use App\Models\{Entity, Plan, PlanFeature, Subscription};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

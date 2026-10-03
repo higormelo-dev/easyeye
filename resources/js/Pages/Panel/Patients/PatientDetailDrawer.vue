@@ -132,6 +132,18 @@ function invitePortal() {
                         <span class="detail-label">Convênio</span
                         ><span class="detail-value">{{ patient.covenant ?? '—' }}</span>
                     </div>
+                    <div v-if="patient.covenant_plan" class="detail-row">
+                        <span class="detail-label">{{ ui.plan }}</span
+                        ><span class="detail-value">
+                            {{ patient.covenant_plan.label }}
+                            <small v-if="patient.covenant_plan.sub_label" class="d-block text-muted">{{
+                                patient.covenant_plan.sub_label
+                            }}</small>
+                            <small v-if="patient.covenant_plan.unavailable" class="d-block text-warning-emphasis">
+                                <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ ui.plan_unavailable }}
+                            </small>
+                        </span>
+                    </div>
                     <div v-if="patient.card_number" class="detail-row">
                         <span class="detail-label">Nº Cartão</span
                         ><span class="detail-value">{{ patient.card_number }}</span>

@@ -196,9 +196,11 @@ class AiPricingService
         int $toolCallsCount,
         AiModelPrice $price,
     ): float {
-        $inputCost     = ($inputTokens / 1_000_000) * (float) $price->input_usd_per_million;
-        $outputCost    = ($outputTokens / 1_000_000) * (float) $price->output_usd_per_million;
-        $reasoningCost = ($reasoningTokens / 1_000_000) * (float) ($price->reasoning_usd_per_million ?? 0);
+        $inputCost  = ($inputTokens / 1_000_000) * (float) $price->input_usd_per_million;
+        $outputCost = ($outputTokens / 1_000_000) * (float) $price->output_usd_per_million;
+        // Sem preço próprio de raciocínio, vale o de saída — todo provedor
+        // cobra o raciocínio como saída (0 explícito = raciocínio gratuito).
+        $reasoningCost = ($reasoningTokens / 1_000_000) * (float) ($price->reasoning_usd_per_million ?? $price->output_usd_per_million);
         $toolCost      = $toolCallsCount * (float) ($price->tool_call_usd ?? 0);
 
         return round($inputCost + $outputCost + $reasoningCost + $toolCost, 8);

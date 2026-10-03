@@ -76,6 +76,7 @@ const patientTabs = [
 const {
     form: patientForm,
     loading: patientLoading,
+    planOption,
     resetForm: resetPatientForm,
     loadEditData,
     savePatient,
@@ -681,6 +682,7 @@ async function onSubmit() {
                         :state-options="stateOptions"
                         :is-edit="!!form.patient_id"
                         :lookup-cep="lookupCep"
+                        :plan-option="planOption"
                     />
                 </div>
             </div>

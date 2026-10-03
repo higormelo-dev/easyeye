@@ -11,10 +11,14 @@ import { useForm } from '@inertiajs/vue3';
  */
 export function usePatientForm(catalogs) {
     const loading = ref(false);
+    // Plano já salvo (nome/registro) — o seletor busca no servidor e precisa
+    // do rótulo da opção escolhida antes de qualquer busca.
+    const planOption = ref(null);
 
     const form = useForm({
         // Clínico
         covenant_id: '',
+        covenant_plan_id: '',
         card_number: '',
         skin_id: '',
         iris_id: '',
@@ -55,6 +59,7 @@ export function usePatientForm(catalogs) {
         // template vazio antes do reset pra não "resetar" pro último paciente.
         form.defaults({
             covenant_id: '',
+            covenant_plan_id: '',
             card_number: '',
             skin_id: '',
             iris_id: '',
@@ -87,6 +92,7 @@ export function usePatientForm(catalogs) {
         });
         form.reset();
         form.clearErrors();
+        planOption.value = null;
     }
 
     async function loadEditData(id) {
@@ -98,6 +104,7 @@ export function usePatientForm(catalogs) {
             Object.keys(form.data()).forEach((key) => {
                 if (key in d) form[key] = d[key] ?? form[key];
             });
+            planOption.value = d.covenant_plan ?? null;
             // Baseline = dado carregado: isDirty passa a refletir só edição
             // REAL do usuário (decide se o save do agendamento faz PUT).
             form.defaults(form.data());
@@ -203,7 +210,7 @@ export function usePatientForm(catalogs) {
             ].includes(k),
         ),
         clinical: Object.keys(form.errors).some((k) =>
-            ['covenant_id', 'card_number', 'skin_id', 'iris_id'].includes(k),
+            ['covenant_id', 'covenant_plan_id', 'card_number', 'skin_id', 'iris_id'].includes(k),
         ),
         contact: Object.keys(form.errors).some((k) => ['telephone', 'cellphone', 'whatsapp'].includes(k)),
         address: Object.keys(form.errors).some((k) =>
@@ -227,6 +234,7 @@ export function usePatientForm(catalogs) {
     return {
         form,
         loading,
+        planOption,
         resetForm,
         loadEditData,
         savePatient,

@@ -6,10 +6,15 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from 'ziggy-js';
 import mask from './directives/mask.js';
 import { installPopstateGuard } from './Support/popstateGuard.js';
+import { installTooltips } from './Support/tooltips.js';
 
 // Antes do createInertiaApp: o listener do Voltar/Avançar precisa rodar antes
 // do Inertia (aviso de alterações não salvas — ver Support/popstateGuard.js).
 installPopstateGuard();
+
+// Tooltips do template em todo elemento com `title` (sob demanda — a
+// inicialização do template rodava antes de o Vue desenhar a tela).
+installTooltips();
 
 createInertiaApp({
     resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),

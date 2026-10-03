@@ -164,7 +164,7 @@ class BillingService
             // cinto-e-suspensório caso o lock seja contornado (job, artisan).
             $schedule = $this->lockScheduleRows(
                 Schedule::query()
-                    ->with(['patient.person', 'doctor', 'covenant'])
+                    ->with(['patient.person', 'patient.covenantPlan', 'doctor', 'covenant'])
                     ->where('entity_id', $entityId)
                     ->where('id', $data['schedule_id'])
                     ->where('situation', ScheduleSituation::Attended->value)
@@ -252,6 +252,7 @@ class BillingService
             'guide_type'              => 'consultation',
             'attendance_date'         => $schedule->date_time->toDateString(),
             'beneficiary_card_number' => $schedule->patient?->card_number ?? null,
+            'beneficiary_plan'        => $this->beneficiaryPlan($schedule),
             // People só tem full_name (antes lia ->name: nulo em TODA guia TISS
             // criada pelo faturamento — XML sem nomeBeneficiario).
             'beneficiary_name'    => $schedule->patient?->person?->full_name ?? null,
@@ -265,6 +266,22 @@ class BillingService
                 'metadata'             => filled($eyeSide) ? ['eye_side' => $eyeSide] : null,
             ]],
         ]);
+    }
+
+    /**
+     * Plano do paciente na guia — só quando é do convênio faturado (o do
+     * agendamento pode ser outro). Coluna de 64 posições; a XML TISS não tem
+     * campo de plano (é informativo na guia e na exportação LGPD).
+     */
+    private function beneficiaryPlan(Schedule $schedule): ?string
+    {
+        $plan = $schedule->patient?->covenantPlan;
+
+        if (! $plan || (string) $plan->covenant_id !== (string) $schedule->covenant_id) {
+            return null;
+        }
+
+        return mb_substr((string) $plan->name, 0, 64);
     }
 
     public function createBatch(array $data): BillingBatch
@@ -1232,7 +1249,7 @@ class BillingService
 
         // Releitura sem lock; paciente/pessoa já carregados para o nome do
         // beneficiário de cada guia TISS do lote (sem 1 consulta por guia).
-        return $eligible()->with(['patient.person'])->get()
+        return $eligible()->with(['patient.person', 'patient.covenantPlan'])->get()
             ->filter(fn (Schedule $schedule): bool => isset($locked[(string) $schedule->id]))
             ->values()
             ->toBase();

@@ -1,9 +1,13 @@
 <script setup>
 import { computed } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
     patient: { type: Object, required: true },
 });
+
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
 
 const initials = computed(() => {
     const name = props.patient.full_name ?? '';
@@ -84,6 +88,12 @@ const genderLabel = computed(() => {
                 <span class="text-muted"><i class="fas fa-handshake me-1"></i>Convênio</span>
                 <span class="fw-medium" :title="patient.covenant_name">
                     {{ patient.covenant_name }}
+                </span>
+            </li>
+            <li v-if="patient.covenant_plan_name" class="list-group-item d-flex flex-column">
+                <span class="text-muted"><i class="fas fa-id-card me-1"></i>{{ ui.plan }}</span>
+                <span class="fw-medium" :title="patient.covenant_plan_name">
+                    {{ patient.covenant_plan_name }}
                 </span>
             </li>
             <li v-if="patient.skin_type" class="list-group-item d-flex justify-content-between">

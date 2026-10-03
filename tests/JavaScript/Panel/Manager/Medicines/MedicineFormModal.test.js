@@ -42,9 +42,15 @@ const suggestion = {
     note: 'Dose varia conforme a indicação.',
 };
 
+const ONE_AI = [{ code: 'openai', label: 'OpenAI', model: 'gpt-4o' }];
+const MANY_AI = [
+    { code: 'openai', label: 'OpenAI', model: 'gpt-4o' },
+    { code: 'gemini', label: 'Google (Gemini)', model: 'gemini-2.5-pro' },
+];
+
 async function mountForm(props = {}) {
     const wrapper = mount(MedicineFormModal, {
-        props: { open: false, medicine: cmed, aiAvailable: true, t, ...props },
+        props: { open: false, medicine: cmed, aiProviders: ONE_AI, t, ...props },
     });
     await wrapper.setProps({ open: true }); // o watch de "open" carrega o item
     return wrapper;
@@ -57,7 +63,7 @@ describe('Manager → Medicamentos: posologia sugerida por IA', () => {
     beforeEach(() => vi.clearAllMocks());
 
     it('sem provedor de IA configurado o botão não aparece', async () => {
-        expect(aiButton(await mountForm({ aiAvailable: false }))).toBeUndefined();
+        expect(aiButton(await mountForm({ aiProviders: [] }))).toBeUndefined();
     });
 
     it('cadastro novo só habilita com o nome preenchido', async () => {
@@ -75,7 +81,8 @@ describe('Manager → Medicamentos: posologia sugerida por IA', () => {
         await aiButton(wrapper).trigger('click');
         await flushPromises();
 
-        expect(axios.post).toHaveBeenCalledWith(expect.any(String), { medicine_id: 'cmed-1' });
+        // Uma IA configurada: gera direto com ela (sem perguntar).
+        expect(axios.post).toHaveBeenCalledWith(expect.any(String), { provider: 'openai', medicine_id: 'cmed-1' });
         expect(value(wrapper, 'med-dosage')).toBe('1 gota no olho afetado');
         expect(value(wrapper, 'med-frequency')).toBe('de 6/6h');
         expect(value(wrapper, 'med-duration')).toBe('7 dias');
@@ -139,5 +146,84 @@ describe('Manager → Medicamentos: posologia sugerida por IA', () => {
         expect(wrapper.find('#med-dosage').attributes('disabled')).toBeDefined();
         expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined();
         expect(wrapper.text()).toContain('ai_generating');
+    });
+
+    describe('com mais de uma IA configurada', () => {
+        beforeEach(() => localStorage.removeItem('mgr_medicines_ai_provider'));
+
+        it('o botão pergunta qual IA usar e só gera depois da escolha', async () => {
+            axios.post.mockResolvedValue({
+                data: { suggestion: { ...suggestion, provider_label: 'Google (Gemini)' } },
+            });
+            const wrapper = await mountForm({ aiProviders: MANY_AI });
+
+            await aiButton(wrapper).trigger('click');
+            expect(axios.post).not.toHaveBeenCalled();
+
+            const menu = wrapper.find('[role="menu"]');
+            expect(menu.exists()).toBe(true);
+            expect(aiButton(wrapper).attributes('aria-expanded')).toBe('true');
+            expect(menu.findAll('[role="menuitem"]').map((i) => i.text())).toEqual([
+                'OpenAI · gpt-4o',
+                'Google (Gemini) · gemini-2.5-pro',
+            ]);
+
+            await menu.find('[data-provider="gemini"]').trigger('click');
+            await flushPromises();
+
+            expect(axios.post).toHaveBeenCalledWith(expect.any(String), { provider: 'gemini', medicine_id: 'cmed-1' });
+            expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+            // Aviso diz qual IA gerou.
+            expect(wrapper.text()).toContain('ai_filled_by');
+        });
+
+        it('lembra a última IA escolhida (marcada no menu)', async () => {
+            axios.post.mockResolvedValue({ data: { suggestion } });
+            const first = await mountForm({ aiProviders: MANY_AI });
+            await aiButton(first).trigger('click');
+            await first.find('[data-provider="gemini"]').trigger('click');
+            await flushPromises();
+
+            const second = await mountForm({ aiProviders: MANY_AI });
+            await aiButton(second).trigger('click');
+
+            expect(second.find('[data-provider="gemini"]').text()).toContain('ai_last_used');
+            expect(second.find('[data-provider="openai"]').text()).not.toContain('ai_last_used');
+        });
+
+        it('Esc fecha o menu sem gerar', async () => {
+            const wrapper = await mountForm({ aiProviders: MANY_AI });
+            await aiButton(wrapper).trigger('click');
+
+            await wrapper.find('[role="menu"]').trigger('keydown', { key: 'Escape' });
+
+            expect(wrapper.find('[role="menu"]').exists()).toBe(false);
+            expect(axios.post).not.toHaveBeenCalled();
+        });
+
+        it('erro da IA escolhida aparece (ex.: escolha outra)', async () => {
+            axios.post.mockRejectedValue({
+                response: { status: 422, data: { message: 'Google (Gemini) não respondeu agora.' } },
+            });
+            const wrapper = await mountForm({ aiProviders: MANY_AI });
+            await aiButton(wrapper).trigger('click');
+            await wrapper.find('[data-provider="gemini"]').trigger('click');
+            await flushPromises();
+
+            expect(wrapper.text()).toContain('Google (Gemini) não respondeu agora.');
+        });
+    });
+
+    it('lista de IAs desatualizada (provedores mudaram com a página aberta): pede para a tela recarregar', async () => {
+        axios.post.mockRejectedValue({
+            response: { status: 422, data: { message: 'A lista foi atualizada.', reason: 'stale_providers' } },
+        });
+        const wrapper = await mountForm();
+
+        await aiButton(wrapper).trigger('click');
+        await flushPromises();
+
+        expect(wrapper.emitted('providersStale')).toHaveLength(1);
+        expect(wrapper.text()).toContain('A lista foi atualizada.');
     });
 });

@@ -63,10 +63,27 @@ export function useImportProgress(importRef, { onDone, onResync } = {}) {
         }
     });
 
-    onBeforeUnmount(leave);
+    const realtimeConnected = computed(() => configured && status.value === 'connected');
+    const running = () => !!importRef.value && !importRef.value.is_done;
+
+    // Sem tempo real (Reverb fora do ar/reconectando) a tela ficaria parada:
+    // ao voltar para a aba relê o estado UMA vez. Sem polling — só reage ao
+    // usuário (aqui e no botão "Atualizar status" da tela, via resync()).
+    function onVisible() {
+        if (document.visibilityState === 'visible' && running() && !realtimeConnected.value) onResync?.();
+    }
+
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
+
+    onBeforeUnmount(() => {
+        leave();
+        if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
+    });
 
     return {
         /** false = sem tempo real no momento (servidor fora / reconectando). */
-        realtimeConnected: computed(() => configured && status.value === 'connected'),
+        realtimeConnected,
+        /** Relê o estado da importação sob demanda (ação do usuário). */
+        resync: () => onResync?.(),
     };
 }

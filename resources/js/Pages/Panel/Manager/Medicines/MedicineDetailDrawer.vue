@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import { cmedSituation } from './cmedSituation.js';
 
 /**
  * Detalhes do medicamento — mesmo drawer de Manager → Planos. Os dados já
@@ -15,6 +16,7 @@ const props = defineProps({
 defineEmits(['close', 'edit']);
 
 const m = computed(() => props.medicine);
+const situation = computed(() => (m.value ? cmedSituation(m.value, props.t) : null));
 
 const registry = computed(() => {
     if (!m.value) return [];
@@ -30,7 +32,7 @@ const registry = computed(() => {
         [props.t.detail_therapeutic, m.value.therapeutic_class],
         [props.t.detail_registration, m.value.anvisa_registration],
         [props.t.detail_ean, m.value.ean],
-        [props.t.detail_marketed, isCmed ? (m.value.is_marketed ? props.t.yes : props.t.no) : null],
+        [props.t.col_cmed_situation, situation.value?.label],
         [props.t.detail_synced_at, isCmed ? m.value.synced_at : null],
     ].filter(([, value]) => value);
 });
@@ -66,6 +68,9 @@ const posology = computed(() =>
                         >{{ m.source_label }}</span
                     >
                     <span v-if="m.is_ophthalmic" class="badge badge-soft-info rounded fs-12">{{ t.ophthalmic }}</span>
+                    <span v-if="situation" class="badge rounded fs-12" :class="situation.cls" :title="situation.hint"
+                        ><i :class="`ti ${situation.icon} me-1`" aria-hidden="true"></i>{{ situation.label }}</span
+                    >
                 </div>
             </div>
         </template>
@@ -81,6 +86,9 @@ const posology = computed(() =>
 
         <!-- Body -->
         <template v-if="m">
+            <p v-if="situation && situation.code !== 'marketed'" class="small text-muted mb-3">
+                <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ situation.hint }}
+            </p>
             <div class="mdd-section">
                 <div class="mdd-section__title">
                     <i class="ti ti-file-description me-1"></i> {{ t.section_registry }}

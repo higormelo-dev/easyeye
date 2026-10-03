@@ -23,6 +23,7 @@ return [
     'code'       => 'Código',
     'doctor'     => 'Médico responsável',
     'covenant'   => 'Convênio',
+    'plan'       => 'Plano',
     'date'       => 'Data',
     'address'    => 'Endereço',
 

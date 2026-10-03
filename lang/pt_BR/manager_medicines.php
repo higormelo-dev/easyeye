@@ -7,7 +7,7 @@ return [
     'menu'            => 'Medicamentos',
     'page_title'      => 'Catálogo de medicamentos',
     'breadcrumb_home' => 'Dashboard',
-    'btn_import'      => 'Importar lista CMED',
+    'btn_import'      => 'Atualizar pela CMED',
     'btn_new'         => 'Novo medicamento',
 
     'stat_active'     => 'Ativos no receituário',
@@ -23,8 +23,8 @@ return [
     'filter_source_all'  => 'Todas as origens',
     'source_manual'      => 'Curado',
     'source_cmed'        => 'CMED/Anvisa',
-    'filter_status'      => 'Situação',
-    'filter_status_all'  => 'Todas as situações',
+    'filter_status'      => 'Status',
+    'filter_status_all'  => 'Todos os status',
     'status_active'      => 'Ativo',
     'status_inactive'    => 'Inativo',
     'filter_ophthalmic'  => 'Só oftálmicos',
@@ -33,7 +33,7 @@ return [
     'col_presentation'  => 'Apresentação',
     'col_laboratory'    => 'Laboratório / tipo',
     'col_source'        => 'Origem',
-    'col_status'        => 'Situação',
+    'col_status'        => 'Status',
     'col_actions'       => 'Ações',
     'col_date'          => 'Data',
     'col_files'         => 'Arquivos',
@@ -117,7 +117,7 @@ return [
     'cmed_cannot_delete' => 'Itens da CMED/Anvisa não são excluídos: saem do receituário quando deixam a lista na próxima importação.',
 
     // Importação
-    'import_title'             => 'Importar lista de preços CMED/Anvisa',
+    'import_title'             => 'Atualizar o catálogo com a CMED/Anvisa',
     'import_help'              => 'Baixe a planilha "PMC" mais recente no site da Anvisa (Medicamentos → CMED → Listas de preços) e envie aqui. Cada apresentação vira um item do receituário, com nome comercial, genérico, concentração e laboratório. Apresentações de uso hospitalar ficam de fora; as que saírem da lista são desativadas (nunca apagadas). A posologia sugerida que você editou é mantida.',
     'import_cmed_file'         => 'Lista de preços CMED (PMC)',
     'import_cmed_hint'         => 'XLSX publicado pela Anvisa (ou CSV exportado dele).',
@@ -144,4 +144,60 @@ return [
     'result_skipped_hospital'  => 'Hospitalares ignorados',
     'result_skipped_inactive'  => 'Registro inativo',
     'result_skipped_invalid'   => 'Linhas inválidas',
+
+    // Sincronização com as fontes oficiais (CMED/Anvisa)
+    'import_help_sync'           => 'Baixa direto das fontes oficiais a lista de preços mais recente da CMED (publicada algumas vezes por mês) e a situação dos registros na Anvisa (diária). Se nada mudou desde a última carga, o catálogo não é reprocessado.',
+    'import_auto_hint'           => 'Verificação automática toda terça-feira às 05:00.',
+    'import_mode'                => 'Origem dos dados',
+    'import_mode_cmed'           => 'Baixar da CMED/Anvisa (recomendado)',
+    'import_mode_upload'         => 'Enviar os arquivos',
+    'import_force'               => 'Reprocessar mesmo que a lista não tenha mudado',
+    'import_submit_cmed'         => 'Atualizar agora',
+    'import_source_upload'       => 'Arquivos enviados',
+    'import_source_cmed'         => 'Download da CMED/Anvisa',
+    'import_source_scheduled'    => 'Automática (semanal)',
+    'list_published'             => 'Lista CMED publicada em :date',
+    'col_origin'                 => 'Origem',
+    'phase_downloading'          => 'Baixando as fontes oficiais',
+    'sync_queued'                => 'Sincronização com a CMED/Anvisa colocada na fila.',
+    'sync_unchanged'             => 'Nada mudou desde a última carga (lista CMED de :date e situação dos registros iguais): o catálogo já está atualizado.',
+    'sync_fallback_used'         => 'A página da CMED não respondeu ou mudou: foi usada a lista do portal de dados abertos da Anvisa, publicada em :date (pode estar desatualizada).',
+    'sync_open_data_unavailable' => 'Dados abertos da Anvisa indisponíveis: a situação dos registros não foi conferida nesta carga.',
+    'sync_list_unavailable'      => 'Não foi possível acessar a lista de preços da CMED agora (página oficial e portal de dados abertos sem resposta). Tente mais tarde ou envie a planilha.',
+    'sync_download_failed'       => 'Não foi possível baixar os arquivos oficiais agora. Tente mais tarde ou envie a planilha.',
+
+    // Carga parada / sem tempo real
+    'import_waiting_worker'     => 'Na fila — aguardando o processamento em segundo plano começar.',
+    'import_refresh_status'     => 'Atualizar status',
+    'import_stalled_pending'    => 'A carga ainda não começou: o processamento em segundo plano (fila) parece parado. Cancele e tente de novo; se continuar, avise o suporte técnico.',
+    'import_stalled_processing' => 'A carga parou de responder. Cancele e tente de novo; se continuar, avise o suporte técnico.',
+    'import_cancel'             => 'Cancelar carga',
+    'import_cancelled'          => 'Carga cancelada. Você já pode iniciar outra.',
+    'import_cancelled_reason'   => 'Cancelada pelo administrador: o processamento em segundo plano não respondeu.',
+    'import_not_stalled'        => 'Esta carga ainda está em andamento. Aguarde terminar.',
+
+    // Situação na lista de preços da CMED (coluna própria) × status no catálogo
+    'col_cmed_situation'        => 'Situação na CMED',
+    'filter_cmed_situation'     => 'Situação na CMED',
+    'filter_cmed_situation_all' => 'Todas as situações na CMED',
+    'cmed_marketed'             => 'Comercializado',
+    'cmed_marketed_hint'        => 'Com comercialização declarada à CMED no último ano.',
+    'cmed_left_list'            => 'Fora da lista atual',
+    'cmed_left_list_hint'       => 'Não está na última lista de preços da CMED importada (saiu da lista ou teve o registro cancelado na Anvisa). Não aparece no receituário.',
+    'cmed_not_applicable'       => 'Não se aplica (item curado)',
+    'status_hint'               => 'Ativo = aparece na busca do receituário das clínicas.',
+
+    // IA escolhida para a sugestão de posologia
+    'ai_menu_title'       => 'Gerar com qual IA?',
+    'ai_last_used'        => 'última usada',
+    'ai_filled_by'        => 'Sugestão gerada por :provider — revise antes de salvar.',
+    'ai_choose_provider'  => 'Agora há mais de uma IA configurada: a lista foi atualizada. Escolha qual IA vai gerar a sugestão.',
+    'ai_provider_invalid' => 'Esta IA não está mais disponível: a lista foi atualizada. Escolha uma das IAs configuradas.',
+
+    // Falha da IA escolhida (sem detalhe técnico do provedor)
+    'ai_failed_timeout'  => ':provider demorou demais para responder (pode estar sobrecarregada).',
+    'ai_failed_busy'     => ':provider está sobrecarregada agora (alta demanda do provedor).',
+    'ai_failed_provider' => ':provider não conseguiu gerar a sugestão agora.',
+    'ai_try_again'       => 'Tente novamente em instantes.',
+    'ai_try_other'       => 'Tente novamente ou escolha outra IA.',
 ];
