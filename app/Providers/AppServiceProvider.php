@@ -85,6 +85,12 @@ class AppServiceProvider extends ServiceProvider
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
             URL::forceRootUrl(config('app.url'));
+
+            // Links de paginação seguem o mesmo APP_URL que route()/redirect()
+            // já usam. O resolver padrão lê o host da requisição, que depende do
+            // protocolo/proxy: sob HTTP/3 o Nginx não repassa o Host ao PHP-FPM
+            // e os links viravam https://_/... (server_name catch-all).
+            Paginator::currentPathResolver(fn () => url()->current());
         }
 
         Paginator::useBootstrapFive();

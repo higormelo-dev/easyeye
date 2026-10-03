@@ -107,6 +107,37 @@ O arquivo foi adicionado à seção *CUSTOM FILES AND FOLDERS* de
 `/etc/jelastic/redeploy.conf`, para **não ser perdido em um redeploy** da
 imagem do nó.
 
+#### Host repassado ao PHP sob HTTP/3
+
+O `ssl.conf` do nó anuncia HTTP/3 (`listen 443 quic` + `alt-svc: h3`), e os
+navegadores passam a usá-lo depois da primeira visita. Em HTTP/3 o host chega
+só no pseudo-cabeçalho `:authority`, não como cabeçalho `Host`. O
+`fastcgi_params` padrão não repassa `HTTP_HOST`, então o PHP-FPM recebia só
+`SERVER_NAME` = `_` (o `server_name` catch-all). O Laravel montava os links de
+paginação como `https://_/panel/...?page=2` (`ERR_NAME_NOT_RESOLVED`).
+`route()` e `redirect()` não quebravam porque usam o `APP_URL`
+(`URL::forceRootUrl`).
+
+Correção: nos **dois** blocos `location ~ \.php$` do `default.conf`
+(backup: `default.conf.bak-http3host-20261002`):
+
+```nginx
+fastcgi_param HTTP_HOST $host;
+```
+
+Desde o mesmo ajuste, a aplicação também gera os links de paginação a partir
+do `APP_URL` quando ele é https (`AppServiceProvider`), sem depender do host da
+requisição.
+
+Teste rápido (o `location` tem que mostrar `teste.easyeye.app` nos dois
+protocolos):
+
+```bash
+for v in --http2 --http3-only; do
+  curl -s $v https://teste.easyeye.app/login | grep -o '"location":"[^"]*"'
+done
+```
+
 ### 2.3 Processos (crontab do usuário `nginx`)
 
 Não há supervisor nem systemd disponível para o usuário; os processos longos
@@ -197,6 +228,7 @@ com 1 assinante no Redis, fila zerada e nenhum job com falha.
 | Navegador tenta conectar em host/porta errados | Build feito antes de ajustar `VITE_REVERB_*` | Corrigir `.env` e rodar `npm run build` |
 | `/broadcasting/auth` responde 403 | Usuário sem permissão na tela, ou clínica da sessão ≠ clínica da importação (comportamento esperado) | Conferir papel do usuário; regra em `app/Broadcasting/ClinicImportChannel.php` |
 | Mudança em evento/canal não tem efeito | Reverb e config antigos em memória/cache | `php artisan config:cache && php artisan route:cache && php artisan reverb:restart` |
+| Links de paginação apontam para `https://_/...` (`ERR_NAME_NOT_RESOLVED`) | Navegador em HTTP/3 e nginx sem `fastcgi_param HTTP_HOST` | Reaplicar o ajuste de *Host repassado ao PHP sob HTTP/3* (seção 2.2) |
 | Depois de redeploy do nó, WebSocket parou | `default.conf` voltou ao padrão | Conferir se a linha continua em `/etc/jelastic/redeploy.conf`; reaplicar a seção 2.2 |
 
 ## 6. Como desfazer
@@ -227,6 +259,22 @@ limpo em reinício do nó — os da seção acima ficam junto dos originais.)
    `teste.easyeye.app` neste ambiente.
 4. Arquivos soltos não rastreados na raiz do app (`11.12.0` e `build`) —
    provavelmente resto de comando digitado errado; avaliar e remover.
+5. **Allowlist de hosts desligada neste ambiente.** O middleware
+   `TrustHosts` do Laravel não age quando `APP_ENV=testing` (o framework
+   trata esse nome como "rodando testes"). Com `trustProxies(at: '*')` e o
+   nó recebendo o tráfego direto, um cliente que envia
+   `X-Forwarded-Host: outro-dominio` faz a aplicação usar esse host nas URLs
+   montadas a partir da requisição. Verificado em 02/10/2026: o `location`
+   da tela de login refletiu o host forjado. URLs de `route()`/`redirect()`
+   e os links de paginação usam o `APP_URL` e não são afetados. Pelo mesmo
+   motivo, `X-Forwarded-For` enviado pelo cliente é aceito como IP de origem
+   (afeta *rate limit* por IP e o IP gravado na auditoria). Em produção
+   (`APP_ENV=production`) a allowlist de hosts age, mas o `X-Forwarded-For`
+   continua confiável para qualquer origem se o nó também recebe tráfego
+   direto. Sugestão: restringir `trustProxies` aos IPs do balanceador (ou
+   `127.0.0.1` quando não há balanceador) e usar um nome de ambiente próprio
+   (ex.: `staging`) no servidor de teste, depois de revisar os pontos que
+   checam `environment('testing')` (ex.: Sentry).
 
 ## 8. Produção
 

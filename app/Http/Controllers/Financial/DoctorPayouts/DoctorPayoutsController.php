@@ -14,7 +14,7 @@ use App\Services\Financial\DoctorPayouts\{DoctorPayoutCalculator, DoctorPayoutEx
 use App\Support\{Money, ReportPeriod};
 use Carbon\CarbonImmutable;
 use Illuminate\Http\{RedirectResponse, Request, Response};
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\{LengthAwarePaginator, Paginator};
 use Illuminate\Support\{Collection, Str};
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -439,7 +439,7 @@ class DoctorPayoutsController extends Controller
             count($rows),
             self::PER_PAGE,
             $page,
-            ['path' => $request->url(), 'query' => $request->query()],
+            ['path' => Paginator::resolveCurrentPath(), 'query' => $request->query()],
         );
     }
 
