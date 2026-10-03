@@ -27,7 +27,7 @@ class IntegratorExamArchive implements ValidationRule
                 $fail($e->getMessage());
             }
 
-return;
+            return;
         }
         $mime = $value->getMimeType();
         $map  = ['jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'], 'png' => ['image/png'], 'bmp' => ['image/bmp', 'image/x-ms-bmp'], 'pdf' => ['application/pdf']];

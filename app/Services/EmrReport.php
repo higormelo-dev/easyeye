@@ -32,7 +32,7 @@ class EmrReport
                 continue;
             }
 
-if (! str_contains($line, ':')) {
+            if (! str_contains($line, ':')) {
                 throw new InvalidArgumentException('emr_structure_invalid');
             }[$label,$value] = explode(':', $line, 2);
             $label           = trim($label);
@@ -42,7 +42,7 @@ if (! str_contains($line, ':')) {
                 throw new InvalidArgumentException('emr_label_or_duplicate_invalid');
             }
 
-if (preg_match('/<\/?[A-Za-z][^>]*>/u', $value)) {
+            if (preg_match('/<\/?[A-Za-z][^>]*>/u', $value)) {
                 throw new InvalidArgumentException('emr_html_invalid');
             }$fields[$label] = $value;
         }

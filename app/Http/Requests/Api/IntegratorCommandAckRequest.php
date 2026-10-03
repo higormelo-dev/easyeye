@@ -21,7 +21,7 @@ class IntegratorCommandAckRequest extends FormRequest
             return ['status' => ['required', Rule::in(['completed', 'failed'])]];
         }
         $keys = match($command->type) {
-            'resync_now' => ['scanned_folders', 'queued_files', 'sent', 'failed_or_blocked'],'reload_config' => ['reloaded', 'semantics'],'run_diagnostics' => ['schema_version', 'app_version', 'pending', 'failed', 'blocked', 'capabilities', 'watcher_state', 'mwl_state', 'disk_free_bytes', 'ingest_pending', 'quarantined', 'rejected', 'devices', 'configuration_generation', 'total_devices', 'devices_truncated'],default => []
+            'resync_now' => ['scanned_folders', 'queued_files', 'sent', 'failed_or_blocked'],'reload_config' => ['reloaded', 'semantics'],'run_diagnostics' => ['schema_version', 'app_version', 'pending', 'failed', 'blocked', 'capabilities', 'watcher_state', 'mwl_state', 'disk_free_bytes', 'ingest_pending', 'quarantined', 'rejected', 'devices', 'configuration_generation', 'total_devices', 'devices_truncated'],default => [],
         };
 
         if ($this->input('status') === 'failed') {

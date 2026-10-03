@@ -53,7 +53,7 @@ function p2ValidateSchema(mixed $value, array $schema, array $spec, string $path
     }
     $type  = $schema['type'] ?? null;
     $valid = match($type) {
-        'string' => is_string($value),'integer' => is_int($value),'number' => is_int($value) || is_float($value),'boolean' => is_bool($value),'array' => is_array($value) && array_is_list($value),'object' => is_array($value),default => true
+        'string' => is_string($value),'integer' => is_int($value),'number' => is_int($value) || is_float($value),'boolean' => is_bool($value),'array' => is_array($value) && array_is_list($value),'object' => is_array($value),default => true,
     };
 
     if (! $valid) {
@@ -121,7 +121,7 @@ foreach (['snapshot-contract.json' => 'Snapshot', 'update-v2-fixture.json' => 'U
 }
 
 if ($failures) {
-    fwrite(STDERR,implode("\n",$failures) . "\n");
+    fwrite(STDERR, implode("\n", $failures) . "\n");
 
     exit(1);
 }

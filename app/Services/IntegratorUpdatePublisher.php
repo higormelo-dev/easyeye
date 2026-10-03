@@ -158,7 +158,7 @@ class IntegratorUpdatePublisher
                     throw new InvalidArgumentException('release_storage_read_stalled');
                 }
 
-if ($chunk === false) {
+                if ($chunk === false) {
                     throw new InvalidArgumentException('release_storage_read_failed');
                 }$count += strlen($chunk);
 
@@ -167,7 +167,7 @@ if ($chunk === false) {
                 }hash_update($ctx, $chunk);
             }
 
-if ($count !== $size || ! hash_equals($hash, hash_final($ctx))) {
+            if ($count !== $size || ! hash_equals($hash, hash_final($ctx))) {
                 throw new InvalidArgumentException('release_storage_hash_mismatch');
             }
         } finally {
