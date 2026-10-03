@@ -83,4 +83,24 @@ class AuditContext
 
         return ($account instanceof PatientAccount) ? $account->getKey() : null;
     }
+
+    /**
+     * Coluna do ator paciente pra INSERT em audit_logs/data_access_logs — só
+     * quando há paciente logado (o null já é o default da coluna).
+     *
+     * A coluna nasceu em 2026_09_06; migrations de dados mais antigas que
+     * gravam por model auditado (ex.: 2026_08_31 refresh_ai_model_price_catalog
+     * → AiModelPriceSeeder) rodam ANTES dela num `migrate` que aplica as duas
+     * no mesmo lote (banco novo, ambiente atrasado). Mandar a chave com null
+     * quebrava o INSERT ("column patient_account_id does not exist") e a
+     * trilha daqueles registros se perdia (Sentry EASY-EYE-TESTING-12).
+     *
+     * @return array{patient_account_id?: string}
+     */
+    public static function patientAccountActor(): array
+    {
+        $patientAccountId = self::patientAccountId();
+
+        return $patientAccountId !== null ? ['patient_account_id' => $patientAccountId] : [];
+    }
 }
