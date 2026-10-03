@@ -431,6 +431,7 @@ return [
     ],
 
     'medical_records' => [
+        'med_search_ph'        => 'Brand or generic name (2+ letters)…',
         'imaging_error'        => 'Could not load the exams. Try again.',
         'imaging_empty'        => 'No imaging exams registered for this patient.',
         'imaging_exam'         => 'Exam',

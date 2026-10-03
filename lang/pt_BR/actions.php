@@ -434,6 +434,7 @@ return [
     ],
 
     'medical_records' => [
+        'med_search_ph'        => 'Nome comercial ou genérico (2+ letras)…',
         'imaging_error'        => 'Não foi possível carregar os exames. Tente novamente.',
         'imaging_empty'        => 'Nenhum exame de imagem cadastrado para este paciente.',
         'imaging_exam'         => 'Exame',

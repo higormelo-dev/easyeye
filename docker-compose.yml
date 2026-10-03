@@ -75,6 +75,29 @@ services:
       start_period: 20s
       timeout: 5s
 
+  # Servidor WebSocket (Laravel Reverb) — progresso das importações em tempo
+  # real. O nginx expõe /app (WebSocket) e /apps (API de broadcast) na mesma
+  # porta do app. Escala horizontal: REVERB_SCALING_ENABLED=true + Redis.
+  reverb:
+    build: *app-build
+    container_name: easyeye_reverb
+    restart: unless-stopped
+    working_dir: /var/www/html/app
+    volumes:
+      - ./:/var/www/html/app
+      - ./.env.docker:/var/www/html/app/.env:ro
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - easyeye-network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z -w1 127.0.0.1 8080 || exit 1"]
+      interval: 10s
+      retries: 5
+      start_period: 15s
+      timeout: 5s
+
   nginx:
     image: nginx:1.27-alpine
     container_name: easyeye_nginx

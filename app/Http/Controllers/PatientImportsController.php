@@ -6,7 +6,7 @@ use App\Enums\{FeatureKey, ImportStatus};
 use App\Jobs\ProcessPatientImportJob;
 use App\Models\PatientImport;
 use App\Services\{FeatureGateService, PatientImportService};
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -85,8 +85,9 @@ class PatientImportsController extends Controller
             'user_name'       => $i->user?->name,
             'preview'         => $i->preview,
             'has_errors_file' => $i->errors_file_path !== null,
-            'urls'            => [
-                'status'  => route('panel.patients.import.status', $i->id),
+            // Progresso chega por WebSocket (canal privado), sem polling HTTP.
+            'channel' => $i->broadcastChannelName(),
+            'urls'    => [
                 'confirm' => route('panel.patients.import.confirm', $i->id),
                 'cancel'  => route('panel.patients.import.cancel', $i->id),
                 'errors'  => $i->errors_file_path
@@ -194,33 +195,6 @@ class PatientImportsController extends Controller
         return redirect()
             ->route('panel.patients.import.index')
             ->with('message', __('imports.patients.cancel_requested'));
-    }
-
-    /**
-     * Retorna o estado atual de um import como JSON (polling pelo Alpine.js).
-     */
-    public function status(PatientImport $patientImport): JsonResponse
-    {
-        abort_if((string) $patientImport->entity_id !== session('selected_entity_id'), 404);
-
-        return response()->json([
-            'id'              => $patientImport->id,
-            'status'          => $patientImport->status->value,
-            'status_label'    => $patientImport->status->label(),
-            'status_color'    => $patientImport->status->color(),
-            'total_rows'      => $patientImport->total_rows,
-            'processed_rows'  => $patientImport->processed_rows,
-            'imported_rows'   => $patientImport->imported_rows,
-            'skipped_rows'    => $patientImport->skipped_rows,
-            'error_rows'      => $patientImport->error_rows,
-            'progress'        => $patientImport->progressPercent(),
-            'is_done'         => $patientImport->status->isDone(),
-            'abort_reason'    => $patientImport->abort_reason,
-            'has_errors_file' => $patientImport->errors_file_path !== null,
-            'errors_url'      => $patientImport->errors_file_path
-                ? route('panel.patients.import.errors', $patientImport)
-                : null,
-        ]);
     }
 
     /**

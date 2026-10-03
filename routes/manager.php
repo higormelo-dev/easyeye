@@ -16,6 +16,8 @@ use App\Http\Controllers\Manager\{
     ImpersonateController,
     IntegratorUpdatesController,
     ManagerDashboardController,
+    MedicineImportsController,
+    MedicinesController,
     PartnersController,
     PlansController,
     ReportSettingsController,
@@ -310,6 +312,20 @@ Route::group([
             ->middleware('throttle:manager-destructive')
             ->name('report-settings.destroy');
         Route::resource('report-settings', ReportSettingsController::class)->except('show', 'destroy');
+    });
+
+    // ── Catálogo global de medicamentos (receituário das clínicas) — admin only
+    // Manuais (com posologia sugerida) + importação da lista CMED/Anvisa.
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('medicines', [MedicinesController::class, 'index'])->name('medicines.index');
+        Route::post('medicines', [MedicinesController::class, 'store'])->name('medicines.store');
+        Route::put('medicines/{medicine}', [MedicinesController::class, 'update'])->name('medicines.update');
+        Route::delete('medicines/{medicine}', [MedicinesController::class, 'destroy'])
+            ->middleware('throttle:manager-destructive')
+            ->name('medicines.destroy');
+        Route::post('medicines/imports', [MedicineImportsController::class, 'store'])
+            ->middleware('throttle:manager-destructive')
+            ->name('medicines.imports.store');
     });
 });
 

@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { useImportProgress } from '@/composables/useImportProgress';
+import { ref, computed, watch } from 'vue';
 import { useForm, router, Link, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
@@ -129,7 +130,6 @@ async function cancelProcessingImport(item) {
     });
     if (!ok) return;
 
-    stopPolling();
     await fetch(item.urls.cancel, {
         method: 'DELETE',
         headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
@@ -137,52 +137,24 @@ async function cancelProcessingImport(item) {
     router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
 }
 
-// ── Polling (2s) enquanto houver import processando ─────────────────────────
-const pollingImport = ref(props.pending_import);
-let pollTimer = null;
+// ── Progresso em tempo real (WebSocket/Reverb — sem polling HTTP) ────────────
+// Eventos import.progress do canal privado da importação (ver
+// composables/useImportProgress.js). Ao assinar/reconectar, relê as props uma
+// vez pra não perder o que aconteceu antes da conexão.
+const liveImport = ref(props.pending_import);
+const { realtimeConnected } = useImportProgress(liveImport, {
+    onDone: () => router.reload({ only: ['imports', 'pending_import'] }),
+    onResync: () => router.reload({ only: ['pending_import'] }),
+});
 
-async function pollStatus() {
-    if (!pollingImport.value || pollingImport.value.is_done) return;
-    try {
-        const res = await fetch(pollingImport.value.urls.status, { headers: { Accept: 'application/json' } });
-        const json = await res.json();
-
-        pollingImport.value = { ...pollingImport.value, ...json };
-
-        if (json.is_done) {
-            router.reload({ only: ['imports', 'pending_import'] });
-        }
-    } catch {
-        /* silent */
-    }
-}
-
-function startPolling() {
-    if (pollTimer || !pollingImport.value || pollingImport.value.is_done) return;
-    pollTimer = setInterval(pollStatus, 2000);
-}
-
-function stopPolling() {
-    if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-    }
-}
-
-// `pollingImport` era um snapshot único de props.pending_import — depois de
-// enviar/confirmar/cancelar um import, o Inertia atualiza a prop (router.reload
-// parcial), mas o componente não remonta, então esse ref nunca refletia a
-// mudança sem F5 manual. Este watch mantém os dois sincronizados sempre.
+// Mantém o estado vivo em sincronia com a prop (enviar/confirmar/cancelar
+// atualizam pending_import via reload parcial — o componente não remonta).
 watch(
     () => props.pending_import,
     (value) => {
-        pollingImport.value = value;
-        value && !value.is_done ? startPolling() : stopPolling();
+        liveImport.value = value;
     },
 );
-
-onMounted(startPolling);
-onBeforeUnmount(stopPolling);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const statusBadgeClass = (color) => `badge bg-${color} fs-11 fw-medium`;
@@ -225,15 +197,15 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
             </div>
 
             <!-- Polling do import em processamento -->
-            <div v-if="pollingImport && !pollingImport.is_done" class="alert alert-info">
+            <div v-if="liveImport && !liveImport.is_done" class="alert alert-info">
                 <div class="d-flex align-items-center mb-2">
                     <span class="spinner-border spinner-border-sm me-2"></span>
-                    <strong>Importação em andamento — {{ pollingImport.original_name }}</strong>
-                    <span :class="`badge bg-${pollingImport.status_color} ms-2`">{{ pollingImport.status_label }}</span>
+                    <strong>Importação em andamento — {{ liveImport.original_name }}</strong>
+                    <span :class="`badge bg-${liveImport.status_color} ms-2`">{{ liveImport.status_label }}</span>
                     <button
                         type="button"
                         class="btn btn-outline-danger btn-sm ms-auto"
-                        @click="cancelProcessingImport(pollingImport)"
+                        @click="cancelProcessingImport(liveImport)"
                     >
                         <i class="ti ti-ban me-1"></i>Cancelar importação
                     </button>
@@ -242,16 +214,19 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                 <div class="progress mb-2" style="height: 8px">
                     <div
                         class="progress-bar bg-info progress-bar-striped progress-bar-animated"
-                        :style="`width: ${pollingImport.progress}%`"
+                        :style="`width: ${liveImport.progress}%`"
                     ></div>
                 </div>
 
                 <div class="small text-muted">
-                    {{ pollingImport.processed_rows }} de {{ pollingImport.total_rows }} processados —
-                    <strong class="text-success">{{ pollingImport.imported_rows }}</strong> importados,
-                    <strong class="text-warning">{{ pollingImport.skipped_rows }}</strong> ignorados,
-                    <strong class="text-danger">{{ pollingImport.error_rows }}</strong> erros
+                    {{ liveImport.processed_rows }} de {{ liveImport.total_rows }} processados —
+                    <strong class="text-success">{{ liveImport.imported_rows }}</strong> importados,
+                    <strong class="text-warning">{{ liveImport.skipped_rows }}</strong> ignorados,
+                    <strong class="text-danger">{{ liveImport.error_rows }}</strong> erros
                 </div>
+                <small v-if="!realtimeConnected" class="d-block text-muted mt-1">
+                    <i class="ti ti-plug-connected-x me-1"></i>{{ page.props.t_ui?.realtime_offline }}
+                </small>
             </div>
 
             <!-- Preview pendente (antes de confirmar) -->
@@ -332,7 +307,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
             </div>
 
             <!-- Upload novo -->
-            <div v-if="!pollingImport || pollingImport.is_done" class="card mb-3">
+            <div v-if="!liveImport || liveImport.is_done" class="card mb-3">
                 <div class="card-body">
                     <h6 class="fw-semibold mb-3"><i class="ti ti-upload me-1"></i>Novo arquivo CSV</h6>
                     <form @submit.prevent="submitUpload">

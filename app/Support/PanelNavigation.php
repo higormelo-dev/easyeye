@@ -515,6 +515,13 @@ class PanelNavigation
                 'match' => ['manager.report-settings.*'],
             ],
             [
+                'key'   => 'medicines',
+                'route' => 'manager.medicines.index',
+                'icon'  => 'ti ti-pill',
+                'label' => __('manager_medicines.menu'),
+                'match' => ['manager.medicines.*'],
+            ],
+            [
                 'key'   => 'partners',
                 'route' => 'manager.partners.index',
                 'icon'  => 'ti ti-affiliate',

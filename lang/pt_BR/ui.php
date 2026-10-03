@@ -10,6 +10,9 @@ return [
     'close'   => 'Fechar',
     'loading' => 'Carregando...',
 
+    // Progresso em tempo real (WebSocket/Reverb) — composables/useImportProgress.js
+    'realtime_offline' => 'Conexão em tempo real indisponível — tentando reconectar…',
+
     // Busca de diagnóstico CID-10 (Components/Panel/Cid10Picker.vue)
     'cid10' => [
         'placeholder'    => 'Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\MedicineSource;
 use App\Models\Medicine;
 
 /**
@@ -32,18 +33,7 @@ class MedicationPrescriptionService
      */
     public function formatLine(Medicine $medicine, ?string $posologyOverride = null): string
     {
-        $medicine->loadMissing('presentation');
-
-        $name         = trim((string) $medicine->name);
-        $presentation = trim((string) $medicine->presentation?->name);
-
-        $head = '- ' . $name;
-
-        if ($presentation !== '') {
-            $head .= ' (' . $presentation . ')';
-        }
-
-        $line = $head;
+        $line = $this->headLine($medicine);
 
         $override = trim((string) $posologyOverride);
 
@@ -79,6 +69,33 @@ class MedicationPrescriptionService
         }
 
         return $line . "\n\n";
+    }
+
+    /**
+     * Cabeçalho do item na receita. Curado/da clínica: "- NOME (Apresentação)".
+     * Importado da CMED: "- PRED 1,2 MG/ML suspensão oftálmica (acetato de
+     * prednisolona)" — concentração e forma vêm da apresentação da Anvisa e
+     * o genérico entra entre parênteses quando o nome é comercial.
+     */
+    private function headLine(Medicine $medicine): string
+    {
+        $name = trim((string) $medicine->name);
+
+        if ($medicine->source === MedicineSource::Cmed) {
+            $head       = trim('- ' . $name . ' ' . $medicine->concentration . ' ' . $medicine->formLabel());
+            $ingredient = trim((string) $medicine->active_ingredient);
+
+            if ($ingredient !== '' && Medicine::normalizeSearch($ingredient) !== Medicine::normalizeSearch($name)) {
+                $head .= ' (' . $ingredient . ')';
+            }
+
+            return (string) preg_replace('/\s+/', ' ', $head);
+        }
+
+        $medicine->loadMissing('presentation');
+        $presentation = trim((string) $medicine->presentation?->name);
+
+        return '- ' . $name . ($presentation !== '' ? ' (' . $presentation . ')' : '');
     }
 
     /**

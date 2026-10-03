@@ -330,7 +330,6 @@ Route::group(
             Route::get('doctors/import/template', [DoctorImportsController::class, 'template'])->name('doctors.import.template');
             Route::post('doctors/import/{doctorImport}/confirm', [DoctorImportsController::class, 'confirm'])->name('doctors.import.confirm');
             Route::delete('doctors/import/{doctorImport}/cancel', [DoctorImportsController::class, 'cancel'])->name('doctors.import.cancel');
-            Route::get('doctors/import/{doctorImport}/status', [DoctorImportsController::class, 'status'])->name('doctors.import.status');
             Route::get('doctors/import/{doctorImport}/errors', [DoctorImportsController::class, 'errors'])->name('doctors.import.errors');
             // store com limite próprio: a validação diz se o e-mail/CPF já tem
             // login de médico no EasyEye — sem limite, viraria varredura.
@@ -351,7 +350,6 @@ Route::group(
             Route::get('patients/import/template', [PatientImportsController::class, 'template'])->name('patients.import.template');
             Route::post('patients/import/{patientImport}/confirm', [PatientImportsController::class, 'confirm'])->name('patients.import.confirm');
             Route::delete('patients/import/{patientImport}/cancel', [PatientImportsController::class, 'cancel'])->name('patients.import.cancel');
-            Route::get('patients/import/{patientImport}/status', [PatientImportsController::class, 'status'])->name('patients.import.status');
             Route::get('patients/import/{patientImport}/errors', [PatientImportsController::class, 'errors'])->name('patients.import.errors');
             Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
             // Estrela de prioridade/triagem (benchmark 18/09/2026) — mesmo
@@ -598,7 +596,6 @@ Route::group(
             Route::get('schedules/import/template', [ScheduleImportsController::class, 'template'])->name('schedules.import.template');
             Route::post('schedules/import/{scheduleImport}/confirm', [ScheduleImportsController::class, 'confirm'])->name('schedules.import.confirm');
             Route::delete('schedules/import/{scheduleImport}/cancel', [ScheduleImportsController::class, 'cancel'])->name('schedules.import.cancel');
-            Route::get('schedules/import/{scheduleImport}/status', [ScheduleImportsController::class, 'status'])->name('schedules.import.status');
             Route::get('schedules/import/{scheduleImport}/errors', [ScheduleImportsController::class, 'errors'])->name('schedules.import.errors');
 
             Route::post('schedules/ajaxlist', [SchedulesController::class, 'ajaxList'])->name('schedules.ajaxlist');

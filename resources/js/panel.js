@@ -1,4 +1,5 @@
 import './bootstrap'; // define window.axios (+ X-Requested-With) — usado pelo Assistente de IA, SearchSelect, EyeImages
+import './echo'; // WebSocket (Reverb) — progresso das importações em tempo real
 import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';

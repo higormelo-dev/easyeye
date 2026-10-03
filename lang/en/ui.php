@@ -10,6 +10,9 @@ return [
     'close'   => 'Close',
     'loading' => 'Loading...',
 
+    // Progresso em tempo real (WebSocket/Reverb) — composables/useImportProgress.js
+    'realtime_offline' => 'Real-time connection unavailable — trying to reconnect…',
+
     // ICD-10 diagnosis search (Components/Panel/Cid10Picker.vue)
     'cid10' => [
         'placeholder'    => 'Search by code or diagnosis (e.g. H40.1, glaucoma)…',

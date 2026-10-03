@@ -1466,17 +1466,33 @@ async function toggleMedFavorite(item) {
     }
 }
 
-async function searchMedicines() {
+// Catálogo global (~20 mil apresentações CMED/Anvisa): espera o médico
+// parar de digitar e cancela a busca anterior — resposta atrasada de "pr"
+// nunca sobrescreve a de "pred".
+let medSearchTimer = null;
+let medSearchAbort = null;
+
+function searchMedicines() {
+    clearTimeout(medSearchTimer);
+    medSearchTimer = setTimeout(runMedicineSearch, 250);
+}
+
+async function runMedicineSearch() {
     const q = (medSearchQuery.value || '').trim();
+    medSearchAbort?.abort();
     if (q.length < 2 || !props.urls.medicine_search) {
         medSearchResults.value = [];
         medSearchOpen.value = false;
+        medSearchLoading.value = false;
         return;
     }
     medSearchLoading.value = true;
+    const controller = new AbortController();
+    medSearchAbort = controller;
     try {
         const res = await fetch(`${props.urls.medicine_search}?q=${encodeURIComponent(q)}`, {
             headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+            signal: controller.signal,
         });
         if (!res.ok) {
             medSearchResults.value = [];
@@ -1486,12 +1502,26 @@ async function searchMedicines() {
         medSearchResults.value = await res.json();
         medSearchOpen.value = medSearchResults.value.length > 0;
     } catch (e) {
+        if (e?.name === 'AbortError') return;
         console.error('Medicine search error:', e);
         medSearchResults.value = [];
         medSearchOpen.value = false;
     } finally {
-        medSearchLoading.value = false;
+        if (medSearchAbort === controller) medSearchLoading.value = false;
     }
+}
+
+onBeforeUnmount(() => {
+    clearTimeout(medSearchTimer);
+    medSearchAbort?.abort();
+});
+
+// Linha secundária do resultado: genérico · apresentação · laboratório ·
+// tipo (genérico/similar/novo) — diferencia apresentações do mesmo nome.
+function medicineDetail(item) {
+    return [item.active_ingredient, item.presentation_detail, item.laboratory, item.category]
+        .filter(Boolean)
+        .join(' · ');
 }
 
 function removeMedicine(idx) {
@@ -3759,7 +3789,9 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                     v-model="medSearchQuery"
                                     type="text"
                                     class="form-control form-control-sm"
-                                    placeholder="Digite ao menos 2 letras…"
+                                    :placeholder="
+                                        t.med_search_ph ?? 'Nome comercial ou genérico (2+ letras)…'
+                                    "
                                     :disabled="prescription.length >= maxMedicines"
                                     @input="searchMedicines"
                                 />
@@ -3788,6 +3820,9 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         style="font-size: 0.7rem"
                                     ></i>
                                     <span class="fw-semibold">{{ item.name }}</span>
+                                    <span v-if="item.concentration" class="fw-semibold ms-1">{{
+                                        item.concentration
+                                    }}</span>
                                     <span v-if="item.presentation" class="text-muted ms-1"
                                         >({{ item.presentation }})</span
                                     >
@@ -3797,6 +3832,14 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         style="font-size: 0.6rem"
                                         >minha posologia</span
                                     >
+                                    <div
+                                        v-if="medicineDetail(item)"
+                                        class="text-muted text-truncate"
+                                        style="font-size: 0.72rem"
+                                        :title="medicineDetail(item)"
+                                    >
+                                        {{ medicineDetail(item) }}
+                                    </div>
                                 </li>
                             </ul>
                         </div>
@@ -3856,8 +3899,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             <div class="d-flex align-items-center gap-2 mb-1">
                                 <span class="fw-semibold" style="font-size: 0.85rem">
                                     {{ selectedMed.name }}
+                                    <span v-if="selectedMed.concentration">{{ selectedMed.concentration }}</span>
                                     <span v-if="selectedMed.presentation" class="text-muted"
                                         >({{ selectedMed.presentation }})</span
+                                    >
+                                    <span
+                                        v-if="selectedMed.active_ingredient"
+                                        class="d-block text-muted fw-normal"
+                                        style="font-size: 0.72rem"
+                                        >{{ selectedMed.active_ingredient }}</span
                                     >
                                 </span>
                                 <button

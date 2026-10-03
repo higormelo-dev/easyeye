@@ -6,7 +6,7 @@ use App\Enums\{FeatureKey, ImportStatus};
 use App\Jobs\ProcessDoctorImportJob;
 use App\Models\DoctorImport;
 use App\Services\{DoctorImportService, FeatureGateService};
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -78,8 +78,9 @@ class DoctorImportsController extends Controller
             'user_name'       => $i->user?->name,
             'preview'         => $i->preview,
             'has_errors_file' => $i->errors_file_path !== null,
-            'urls'            => [
-                'status'  => route('panel.doctors.import.status', $i->id),
+            // Progresso chega por WebSocket (canal privado), sem polling HTTP.
+            'channel' => $i->broadcastChannelName(),
+            'urls'    => [
                 'confirm' => route('panel.doctors.import.confirm', $i->id),
                 'cancel'  => route('panel.doctors.import.cancel', $i->id),
                 'errors'  => $i->errors_file_path
@@ -185,33 +186,6 @@ class DoctorImportsController extends Controller
         return redirect()
             ->route('panel.doctors.import.index')
             ->with('message', __('imports.doctors.cancel_requested'));
-    }
-
-    /**
-     * Retorna o estado atual de um import como JSON (polling pelo front-end).
-     */
-    public function status(DoctorImport $doctorImport): JsonResponse
-    {
-        abort_if((string) $doctorImport->entity_id !== session('selected_entity_id'), 404);
-
-        return response()->json([
-            'id'              => $doctorImport->id,
-            'status'          => $doctorImport->status->value,
-            'status_label'    => $doctorImport->status->label(),
-            'status_color'    => $doctorImport->status->color(),
-            'total_rows'      => $doctorImport->total_rows,
-            'processed_rows'  => $doctorImport->processed_rows,
-            'imported_rows'   => $doctorImport->imported_rows,
-            'skipped_rows'    => $doctorImport->skipped_rows,
-            'error_rows'      => $doctorImport->error_rows,
-            'progress'        => $doctorImport->progressPercent(),
-            'is_done'         => $doctorImport->status->isDone(),
-            'abort_reason'    => $doctorImport->abort_reason,
-            'has_errors_file' => $doctorImport->errors_file_path !== null,
-            'errors_url'      => $doctorImport->errors_file_path
-                ? route('panel.doctors.import.errors', $doctorImport)
-                : null,
-        ]);
     }
 
     /**

@@ -5,17 +5,22 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\{DoctorMedicationPreset, Medicine};
+use App\Services\Medicines\MedicineCatalogSearch;
 use Illuminate\Http\{JsonResponse, Request};
 
 /**
- * Autocomplete de medicamentos da entidade ativa.
- *
- * Consumido pelo modal "Receituário de Medicamentos" (F5) — Alpine
- * dispara a busca enquanto o médico digita. Resultados ordenados por nome,
- * limitados a 20 itens p/ não estourar o dropdown.
+ * Autocomplete de medicamentos do receituário (F5): catálogo global
+ * (manager → Medicamentos) + itens da clínica, por nome comercial ou
+ * genérico. Ordem e regra de busca em MedicineCatalogSearch; até 20 itens
+ * p/ não estourar o dropdown.
  */
 class MedicineSearchController extends Controller
 {
+    public function __construct(
+        private readonly MedicineCatalogSearch $catalogSearch,
+    ) {
+    }
+
     public function __invoke(Request $request): JsonResponse
     {
         $q = $request->string('q')->trim()->value();
@@ -26,19 +31,24 @@ class MedicineSearchController extends Controller
 
         $entityId = session('selected_entity_id');
 
-        $results = Medicine::query()
+        // Catálogo global (manager → Medicamentos: curados + CMED/Anvisa) +
+        // itens da própria clínica. Busca por nome comercial OU genérico,
+        // palavra a palavra (MedicineCatalogSearch).
+        $query = Medicine::query()
             ->with('presentation:id,name')
             ->where(function ($q2) use ($entityId) {
                 $q2->where('entity_id', $entityId)->orWhereNull('entity_id');
             })
-            ->where('active', true)
-            ->where(function ($q2) use ($q) {
-                $q2->whereLikeUnaccent('name', $q)
-                    ->orWhereLikeUnaccent('dosage', $q);
-            })
-            ->orderBy('name')
-            ->limit(20)
-            ->get(['id', 'name', 'dosage', 'frequency', 'duration', 'instructions', 'medicine_presentation_id']);
+            ->where('active', true);
+
+        $this->catalogSearch->apply($query, $q);
+        $this->catalogSearch->rank($query, $q);
+
+        $results = $query->limit(20)->get([
+            'id', 'name', 'dosage', 'frequency', 'duration', 'instructions', 'medicine_presentation_id',
+            'active_ingredient', 'concentration', 'pharmaceutical_form', 'presentation_detail',
+            'laboratory', 'regulatory_category', 'source', 'is_ophthalmic',
+        ]);
 
         // Preset do médico logado (minha posologia/favorito) por medicamento —
         // prefill da sugestão de posologia no modal do receituário.
@@ -56,9 +66,17 @@ class MedicineSearchController extends Controller
                 'frequency'    => $m->frequency,
                 'duration'     => $m->duration,
                 'instructions' => $m->instructions,
-                'presentation' => $m->presentation?->name,
+                'presentation' => $m->presentation?->name ?? $m->formLabel(),
                 'my_posology'  => $presets->get($m->id)?->posology,
                 'is_favorite'  => (bool) ($presets->get($m->id)?->is_favorite ?? false),
+                // Diferenciar apresentações na lista (genérico, concentração,
+                // embalagem, laboratório, genérico/similar/novo).
+                'active_ingredient'   => $m->active_ingredient,
+                'concentration'       => $m->concentration,
+                'presentation_detail' => $m->presentation_detail,
+                'laboratory'          => $m->laboratory,
+                'category'            => $m->regulatory_category,
+                'is_ophthalmic'       => (bool) $m->is_ophthalmic,
             ]),
         );
     }

@@ -21,12 +21,13 @@ Foco atual sistema:
 5. Filas/cache: queue default `database`; Redis em container `easyeye_redis`.
 6. Observabilidade: Sentry habilitado em `production` e `testing`.
 7. Rich-text editor: TinyMCE 8 via wrapper Vue `Components/Panel/TinyMceEditor.vue`.
+8. Tempo real: Laravel Reverb (WebSocket) + `@laravel/echo-vue`, escala horizontal via Redis (`REVERB_SCALING_ENABLED`). Progresso de importações (pacientes, médicos, agenda, medicamentos) só por broadcast — `ImportProgressUpdated` + `composables/useImportProgress.js`; não existe endpoint HTTP de status.
 
 ## Comandos Comuns
 
 ```bash
 # Desenvolvimento
-composer dev          # server + queue + logs(pail) + vite
+composer dev          # server + queue + logs(pail) + vite + reverb (WebSocket)
 npm run dev
 npm run build
 
@@ -167,6 +168,7 @@ Executar ao mexer em ACL/subscription/billing/TISS/compliance:
 5. Ajustes em templates clínicos afetam emissão de documentação e histórico de versões.
 6. PostgreSQL aceita conexões da subnet Docker `172.16.0.0/12` (`pg_hba.conf`). Mudanças na rede podem exigir liberação adicional.
 7. Redis em container (`easyeye_redis`) — `.env` deve apontar `REDIS_HOST=redis`.
+8. Reverb é processo longo: mudou evento/canal (`routes/channels.php`, `app/Broadcasting`) → `php artisan reverb:restart`. `VITE_REVERB_*` são lidas no build/start do Vite (reiniciar `npm run dev`). Canais privados repetem a regra de acesso da tela — mudou a rota, mude o canal.
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands

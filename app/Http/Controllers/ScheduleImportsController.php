@@ -6,7 +6,7 @@ use App\Enums\ImportStatus;
 use App\Jobs\ProcessScheduleImportJob;
 use App\Models\ScheduleImport;
 use App\Services\ScheduleImportService;
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -71,8 +71,9 @@ class ScheduleImportsController extends Controller
             'user_name'       => $i->user?->name,
             'preview'         => $i->preview,
             'has_errors_file' => $i->errors_file_path !== null,
-            'urls'            => [
-                'status'  => route('panel.schedules.import.status', $i->id),
+            // Progresso chega por WebSocket (canal privado), sem polling HTTP.
+            'channel' => $i->broadcastChannelName(),
+            'urls'    => [
                 'confirm' => route('panel.schedules.import.confirm', $i->id),
                 'cancel'  => route('panel.schedules.import.cancel', $i->id),
                 'errors'  => $i->errors_file_path
@@ -178,33 +179,6 @@ class ScheduleImportsController extends Controller
         return redirect()
             ->route('panel.schedules.import.index')
             ->with('message', __('imports.schedules.cancel_requested'));
-    }
-
-    /**
-     * Retorna o estado atual de um import como JSON (polling pelo front-end).
-     */
-    public function status(ScheduleImport $scheduleImport): JsonResponse
-    {
-        abort_if((string) $scheduleImport->entity_id !== session('selected_entity_id'), 404);
-
-        return response()->json([
-            'id'              => $scheduleImport->id,
-            'status'          => $scheduleImport->status->value,
-            'status_label'    => $scheduleImport->status->label(),
-            'status_color'    => $scheduleImport->status->color(),
-            'total_rows'      => $scheduleImport->total_rows,
-            'processed_rows'  => $scheduleImport->processed_rows,
-            'imported_rows'   => $scheduleImport->imported_rows,
-            'skipped_rows'    => $scheduleImport->skipped_rows,
-            'error_rows'      => $scheduleImport->error_rows,
-            'progress'        => $scheduleImport->progressPercent(),
-            'is_done'         => $scheduleImport->status->isDone(),
-            'abort_reason'    => $scheduleImport->abort_reason,
-            'has_errors_file' => $scheduleImport->errors_file_path !== null,
-            'errors_url'      => $scheduleImport->errors_file_path
-                ? route('panel.schedules.import.errors', $scheduleImport)
-                : null,
-        ]);
     }
 
     /**
