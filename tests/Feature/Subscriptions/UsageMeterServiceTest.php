@@ -2,6 +2,7 @@
 
 use App\Enums\{BillingCycle, FeatureKey};
 use App\Models\{Entity, FeatureUsage, Plan, SubscriptionSetting};
+use App\Models\Subscription;
 use App\Services\{SubscriptionService, UsageMeterService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -44,9 +45,9 @@ test('getCurrentUsage retorna 0 sem registros', function () {
 });
 
 test('subscription factory states funcionam corretamente', function () {
-    $trial    = \App\Models\Subscription::factory()->trial(14)->make();
-    $expired  = \App\Models\Subscription::factory()->expired()->make();
-    $lifetime = \App\Models\Subscription::factory()->lifetime()->make();
+    $trial    = Subscription::factory()->trial(14)->make();
+    $expired  = Subscription::factory()->expired()->make();
+    $lifetime = Subscription::factory()->lifetime()->make();
 
     expect($trial->isOnTrial())->toBeTrue();
     expect($expired->isActive())->toBeFalse();

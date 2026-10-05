@@ -10,7 +10,9 @@ pre-push:
       # pré-existente (não relacionada ao que você está enviando agora) que
       # travaria todo mundo se rodasse `pint --test` sem escopo.
       glob: "*.php"
-      files: git diff --name-only HEAD @{push}
+      # --diff-filter=d: arquivo apagado no push não existe para o Pint
+      # ("path is not readable") e travava o push.
+      files: git diff --name-only --diff-filter=d HEAD @{push}
       run: vendor/bin/pint --test {files}
 
     js-tests:

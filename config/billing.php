@@ -124,7 +124,7 @@ return [
 
     'retry' => [
         'payment_attempts' => [
-            'max_attempts' => (int) env('BILLING_PAYMENT_RETRY_MAX_ATTEMPTS', 3),
+            'max_attempts'    => (int) env('BILLING_PAYMENT_RETRY_MAX_ATTEMPTS', 3),
             'backoff_seconds' => (int) env('BILLING_PAYMENT_RETRY_BACKOFF_SECONDS', 120),
         ],
     ],
@@ -165,10 +165,10 @@ return [
             ],
         ],
         'mercadopago' => [
-            'base_url'       => env('MERCADOPAGO_BASE_URL', 'https://api.mercadopago.com'),
-            'secret'         => env('MERCADOPAGO_SECRET'),
+            'base_url' => env('MERCADOPAGO_BASE_URL', 'https://api.mercadopago.com'),
+            'secret'   => env('MERCADOPAGO_SECRET'),
             // Public key (APP_USR-… / TEST-…) do MercadoPago.js — pode ir ao navegador.
-            'public_key' => env('MERCADOPAGO_PUBLIC_KEY'),
+            'public_key'     => env('MERCADOPAGO_PUBLIC_KEY'),
             'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET'),
             'endpoints'      => [
                 'customers'           => '/v1/customers',
@@ -181,8 +181,8 @@ return [
             ],
         ],
         'pagarme' => [
-            'base_url'       => env('PAGARME_BASE_URL', 'https://api.pagar.me/core/v5'),
-            'secret'         => env('PAGARME_SECRET'),
+            'base_url' => env('PAGARME_BASE_URL', 'https://api.pagar.me/core/v5'),
+            'secret'   => env('PAGARME_SECRET'),
             // Chave pública (pk_…) do tokenizecard.js — pode ir ao navegador.
             'public_key' => env('PAGARME_PUBLIC_KEY'),
             // Pagar.me autentica o webhook com Basic Auth: "usuario:senha".
@@ -197,10 +197,10 @@ return [
             ],
         ],
         'stripe_br' => [
-            'base_url'       => env('STRIPE_BR_BASE_URL', 'https://api.stripe.com'),
-            'secret'         => env('STRIPE_BR_SECRET'),
+            'base_url' => env('STRIPE_BR_BASE_URL', 'https://api.stripe.com'),
+            'secret'   => env('STRIPE_BR_SECRET'),
             // Publishable key (pk_…) do Stripe.js — pode ir ao navegador.
-            'public_key' => env('STRIPE_BR_PUBLISHABLE_KEY'),
+            'public_key'     => env('STRIPE_BR_PUBLISHABLE_KEY'),
             'webhook_secret' => env('STRIPE_BR_WEBHOOK_SECRET'),
             'api_version'    => env('STRIPE_BR_API_VERSION', '2025-03-31.basil'),
             'endpoints'      => [
@@ -216,11 +216,11 @@ return [
             ],
         ],
         'pagbank' => [
-            'base_url'       => env('PAGBANK_BASE_URL', 'https://api.pagseguro.com'),
-            'secret'         => env('PAGBANK_SECRET'),
+            'base_url' => env('PAGBANK_BASE_URL', 'https://api.pagseguro.com'),
+            'secret'   => env('PAGBANK_SECRET'),
             // Chave pública do PagSeguro.encryptCard. Vazia = obtida pela API
             // (POST /public-keys, type card) e guardada em cache.
-            'public_key' => env('PAGBANK_PUBLIC_KEY'),
+            'public_key'     => env('PAGBANK_PUBLIC_KEY'),
             'webhook_secret' => env('PAGBANK_WEBHOOK_SECRET'),
             // Vazio = rota billing.webhooks; só https (o PagBank exige SSL).
             'notification_url' => env('PAGBANK_NOTIFICATION_URL'),

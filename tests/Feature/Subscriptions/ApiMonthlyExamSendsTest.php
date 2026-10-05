@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\{FeatureKey};
+use App\Enums\FeatureKey;
 use App\Exceptions\FeatureDeniedException;
 use App\Models\{Entity, FeatureUsage, Plan, PlanFeature, SubscriptionSetting};
 use App\Services\{FeatureGateService, SubscriptionService};

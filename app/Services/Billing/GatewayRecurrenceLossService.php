@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Billing;
 
 use App\DTOs\Billing\NormalizedWebhookEventDTO;
-use App\Enums\{SaasRule};
+use App\Enums\SaasRule;
 use App\Models\Billing\SubscriptionChange;
 use App\Models\{Subscription, User};
 use App\Notifications\GatewayRecurrenceLostNotification;
