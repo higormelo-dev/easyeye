@@ -1,6 +1,6 @@
 <?php
 
-use App\Broadcasting\{ClinicImportChannel, ManagerAiCatalogSyncChannel, ManagerCovenantImportChannel, ManagerMedicineImportChannel};
+use App\Broadcasting\{ClinicBillingChannel, ClinicImportChannel, ManagerAiCatalogSyncChannel, ManagerCovenantImportChannel, ManagerMedicineImportChannel};
 use Illuminate\Support\Facades\Broadcast;
 
 /*
@@ -19,3 +19,7 @@ Broadcast::channel('manager.imports.covenants.{importId}', ManagerCovenantImport
 
 // Progresso da sincronização do catálogo de modelos/preços de IA (manager).
 Broadcast::channel('manager.ai-catalog-syncs.{syncId}', ManagerAiCatalogSyncChannel::class);
+
+// Pagamento da assinatura confirmado (checkout transparente): billing.{entityId}
+// — só contatos de cobrança (admin, financeiro, dono) da clínica da sessão.
+Broadcast::channel('billing.{entityId}', ClinicBillingChannel::class);

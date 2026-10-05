@@ -148,6 +148,10 @@ Route::group([
     // ── Planos — admin only ────────────────────────────────────────────────────
     Route::middleware('saas.role:admin')->group(function () {
         Route::get('plans/cards', [PlansController::class, 'cards'])->name('plans.cards');
+        // Dias de trial (antes do resource: não pode cair em plans/{plan}).
+        Route::put('plans/trial-settings', [PlansController::class, 'updateTrialSettings'])->name('plans.trial-settings');
+        // Máximo de parcelas sem juros do checkout (cartão, ciclo anual).
+        Route::put('plans/checkout-settings', [PlansController::class, 'updateCheckoutSettings'])->name('plans.checkout-settings');
         Route::delete('plans/{plan}', [PlansController::class, 'destroy'])
             ->middleware('throttle:manager-destructive')
             ->name('plans.destroy');
@@ -269,18 +273,42 @@ Route::group([
     // ── Assinaturas — admin ou financial (operação de cobrança) ────────────────
     Route::middleware('saas.role:admin,financial')->group(function () {
         Route::get('subscriptions/cards', [SubscriptionsController::class, 'cards'])->name('subscriptions.cards');
-        Route::post('subscriptions/activate', [SubscriptionsController::class, 'activate'])->name('subscriptions.activate');
-        Route::post('subscriptions/trial', [SubscriptionsController::class, 'startTrial'])->name('subscriptions.trial');
+        // Busca de empresas para "Nova assinatura" (com a situação atual de cada uma).
+        Route::get('subscriptions/entities', [SubscriptionsController::class, 'entities'])->name('subscriptions.entities');
+        // Prévia da troca de plano (upgrade proporcional / downgrade agendado) antes de confirmar.
+        Route::get('subscriptions/change-preview', [SubscriptionsController::class, 'changePreview'])->name('subscriptions.change-preview');
+        // Nova assinatura (trial, cobrança automática ou cortesia) — substitui
+        // a vigente da empresa.
+        Route::post('subscriptions', [SubscriptionsController::class, 'store'])
+            ->middleware('throttle:manager-destructive')
+            ->name('subscriptions.store');
         Route::post('subscriptions/cancel', [SubscriptionsController::class, 'cancel'])
             ->middleware('throttle:manager-destructive')
             ->name('subscriptions.cancel');
-        Route::post('subscriptions/settings', [SubscriptionsController::class, 'updateSettings'])->name('subscriptions.settings');
         Route::patch('subscriptions/block-access', [SubscriptionsController::class, 'blockAccess'])
             ->middleware('throttle:manager-destructive')
             ->name('subscriptions.block-access');
+        Route::post('subscriptions/{subscription}/extend', [SubscriptionsController::class, 'extend'])->name('subscriptions.extend');
+        // Desfazer a mudança de plano agendada (downgrade) antes da data.
+        Route::post('subscriptions/{subscription}/scheduled-change/cancel', [SubscriptionsController::class, 'cancelScheduledChange'])
+            ->middleware('throttle:manager-destructive')
+            ->name('subscriptions.scheduled-change.cancel');
+        Route::get('subscriptions/{subscription}/history', [SubscriptionsController::class, 'history'])->name('subscriptions.history');
         Route::get('subscriptions/{subscription}/invoices', [SubscriptionsController::class, 'invoices'])->name('subscriptions.invoices');
+        // "Enviar cobrança à clínica": e-mail + WhatsApp com o link para pagar
+        // a fatura em Minha assinatura (um envio por fatura a cada 10 min).
+        Route::post('subscriptions/{subscription}/invoices/{invoice}/send-charge', [SubscriptionsController::class, 'sendCharge'])
+            ->middleware('throttle:manager-destructive')
+            ->name('subscriptions.invoices.send-charge');
+        // Aviso "o gateway desativou a recorrência" visto pelo time.
+        Route::post('subscriptions/{subscription}/recurrence-alert/acknowledge', [SubscriptionsController::class, 'acknowledgeRecurrenceAlert'])
+            ->name('subscriptions.recurrence-alert.acknowledge');
         Route::get('subscriptions/{subscription}/retries', [SubscriptionsController::class, 'retries'])->name('subscriptions.retries');
-        Route::resource('subscriptions', SubscriptionsController::class)->only('index', 'show', 'update');
+        // Alterar plano, modalidade e período (com justificativa).
+        Route::put('subscriptions/{subscription}', [SubscriptionsController::class, 'update'])
+            ->middleware('throttle:manager-destructive')
+            ->name('subscriptions.update');
+        Route::resource('subscriptions', SubscriptionsController::class)->only('index', 'show');
     });
 
     // ── Finanças internas do EasyEye (P&L do próprio SaaS + IA) ────────────────

@@ -2,6 +2,7 @@
 
 namespace App\Models\Billing;
 
+use App\Casts\SanitizedGatewayPayload;
 use App\Enums\Billing\PaymentStatus;
 use App\Models\{Entity, Subscription};
 use App\Traits\{Auditable, HasAuditColumns};
@@ -29,6 +30,8 @@ class Payment extends Model
         'currency',
         'paid_at',
         'failed_at',
+        'refunded_at',
+        'chargeback_at',
         'payment_method',
         'gateway_fee',
         'net_amount',
@@ -47,8 +50,10 @@ class Payment extends Model
             'net_amount'          => 'decimal:2',
             'paid_at'             => 'datetime',
             'failed_at'           => 'datetime',
+            'refunded_at'         => 'datetime',
+            'chargeback_at'       => 'datetime',
             'metadata'            => 'array',
-            'raw_gateway_payload' => 'array',
+            'raw_gateway_payload' => SanitizedGatewayPayload::class,
             'created_at'          => 'datetime',
             'updated_at'          => 'datetime',
             'deleted_at'          => 'datetime',

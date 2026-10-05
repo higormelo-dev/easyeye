@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\AI\Models\AiRun;
+use App\Domains\AI\Services\AiCreditWalletService;
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
 use App\Models\{Entity, Plan, PlanFeature, Subscription, User};
@@ -52,15 +53,33 @@ test('dashboard responde Inertia para membro autorizado', function () {
     $response->assertJsonPath('component', 'Panel/AI/Index');
 });
 
-test('dashboard expõe plan_quota lida da feature do plano', function () {
+test('dashboard expõe a franquia da carteira (concedida pelo plano)', function () {
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
         ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
     $response->assertJsonPath('props.analytics.plan_quota', 100);
+    $response->assertJsonPath('props.analytics.quota.monthly_quota', 100);
+    $response->assertJsonPath('props.analytics.quota.renews_on', today()->addMonthNoOverflow()->toDateString());
+    $response->assertJsonPath('props.paywall.code', 'ai_insufficient_credits');
 });
 
-test('dashboard agrega consumo mensal por runs decididos do período (AiQuotaService)', function () {
+test('medidor do dashboard segue a carteira, não a soma de runs do mês', function () {
+    app(AiCreditWalletService::class)->reserve($this->entity->id, 30);
+
+    // Run decidido no mês que não passou pela carteira (ex.: importado): só relatório.
+    aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 45);
+
+    $response = $this->actingAs($this->admin)
+        ->withSession(panelSession($this->adminEU))
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
+
+    $response->assertJsonPath('props.analytics.quota.consumed_credits', 30);
+    expect($response->json('props.analytics.quota.usage_percent'))->toEqual(30.0);
+    $response->assertJsonPath('props.analytics.consumed.credits', 45);
+});
+
+test('dashboard agrega consumo mensal por runs decididos do período (relatório)', function () {
     // Run fora do mês corrente não entra no consumo do período.
     $old = aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 20);
     AiRun::query()->whereKey($old->id)->update([
@@ -77,7 +96,6 @@ test('dashboard agrega consumo mensal por runs decididos do período (AiQuotaSer
         ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
     $response->assertJsonPath('props.analytics.consumed.credits', 45);
-    expect($response->json('props.analytics.consumed.usage_percent'))->toEqual(45.0);
 });
 
 test('dashboard distribui consumo por workflow', function () {

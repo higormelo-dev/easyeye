@@ -2,6 +2,7 @@
 
 namespace App\Actions\Register;
 
+use App\Enums\BillingCycle;
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
 use App\Services\TrialService;
 use RuntimeException;
@@ -14,9 +15,10 @@ class StartTrialAction
     }
 
     /**
-     * Inicia o trial com o plano escolhido pelo usuário (ou o menor tier disponível).
+     * Inicia o trial com o plano e o ciclo de cobrança escolhidos pelo usuário
+     * (ou o menor tier disponível / ciclo padrão do plano).
      */
-    public function execute(Entity $entity, ?string $planId = null): Subscription
+    public function execute(Entity $entity, ?string $planId = null, ?string $billingCycle = null): Subscription
     {
         $plan = $planId
             ? Plan::active()->find($planId)
@@ -32,6 +34,6 @@ class StartTrialAction
             throw new RuntimeException('Período de trial está desabilitado (trial_days = 0).');
         }
 
-        return $this->trialService->startManualTrial($entity, $plan, $days);
+        return $this->trialService->startManualTrial($entity, $plan, $days, BillingCycle::tryFrom((string) $billingCycle));
     }
 }

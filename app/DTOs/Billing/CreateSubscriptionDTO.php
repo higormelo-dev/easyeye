@@ -15,6 +15,9 @@ readonly class CreateSubscriptionDTO
         public int $intervalCount = 1,
         public ?string $description = null,
         public array $metadata = [],
+        // Vencimento da 1ª cobrança (Y-m-d) em gateways cuja assinatura já
+        // emite essa cobrança (ver subscriptionIssuesFirstCharge()).
+        public ?string $firstDueDate = null,
     ) {
     }
 

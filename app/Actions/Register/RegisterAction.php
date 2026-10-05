@@ -24,7 +24,7 @@ class RegisterAction
      *  1. Cria User
      *  2. Cria Entity (observer suprimido para evitar trial duplicado)
      *  3. Cria EntityUser (user = admin da empresa)
-     *  4. Inicia trial com o plano escolhido
+     *  4. Inicia trial com o plano escolhido (start_mode=checkout: sem trial)
      *
      * Jobs de e-mail são disparados FORA da transação para não bloqueá-la.
      *
@@ -33,10 +33,14 @@ class RegisterAction
     public function execute(array $data): array
     {
         $result = DB::transaction(function () use ($data) {
-            $user         = $this->createUser->execute($data);
-            $entity       = $this->createEntity->execute($data);
-            $entityUser   = $this->createEntityUser->execute($user, $entity);
-            $subscription = $this->startTrial->execute($entity, $data['plan_id'] ?? null);
+            $user       = $this->createUser->execute($data);
+            $entity     = $this->createEntity->execute($data);
+            $entityUser = $this->createEntityUser->execute($user, $entity);
+            // "Contratar já pagando": sem trial — a assinatura nasce no
+            // checkout (/signup-checkout/contract) com a 1ª cobrança.
+            $subscription = ($data['start_mode'] ?? 'trial') === 'checkout'
+                ? null
+                : $this->startTrial->execute($entity, $data['plan_id'] ?? null, $data['billing_cycle'] ?? null);
 
             return compact('user', 'entity', 'entityUser', 'subscription');
         });

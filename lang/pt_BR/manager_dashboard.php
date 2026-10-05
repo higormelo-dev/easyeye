@@ -44,6 +44,15 @@ return [
 
     // Funil de assinaturas
     'subscription_funnel' => 'Funil de Assinaturas',
+    'subscription_status' => [
+        'active'           => 'Ativo',
+        'trial'            => 'Trial',
+        'past_due'         => 'Em atraso',
+        'awaiting_payment' => 'Aguardando 1º pagamento',
+        'needs_review'     => 'Revisar cobrança',
+        'expired'          => 'Expirado',
+        'cancelled'        => 'Cancelado',
+    ],
 
     // Funil de conversão
     'conversion_funnel_title' => 'Funil de Conversão',

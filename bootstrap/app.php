@@ -1,6 +1,7 @@
 <?php
 
-use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
+use App\Http\Middleware\{
+    ApiAuthenticateWithIntegrator,
     ApiCheckPlanAccess,
     ApiCheckTokenExpiration,
     ApiIdempotency,
@@ -8,7 +9,9 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     CheckFeature,
     CheckJsonResponse,
     CheckSubscription,
+    CheckoutContentSecurityPolicy,
     EnsureApiDocsAccess,
+    EnsureBillingContact,
     EnsureEntityPermission,
     EnsureEntityRole,
     EnsureEntitySelected,
@@ -24,14 +27,17 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     HandleInertiaRequests,
     LogAdminAccess,
     ParseMultipartFormData,
+    PatientPortalReadOnly,
     RequireTermsAcceptance,
-    SetLocale};
+    SetLocale
+};
 use App\Http\Middleware\BindTenantContext;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -104,12 +110,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'terms.accepted'       => RequireTermsAcceptance::class,
             'partner'              => EnsureIsPartner::class,
             'patient.auth'         => EnsurePatientAuthenticated::class,
+            'patient.read-only'    => PatientPortalReadOnly::class,
             'saas.admin'           => EnsureSaasAdmin::class,
             'saas.role'            => EnsureSaasRole::class,
             'phone.verified'       => EnsurePhoneVerified::class,
             'admin.audit'          => LogAdminAccess::class,
             '2fa'                  => EnsureTwoFactor::class,
             'docs.access'          => EnsureApiDocsAccess::class,
+            'billing.contact'      => EnsureBillingContact::class,
+            'checkout.csp'         => CheckoutContentSecurityPolicy::class,
         ]);
 
         // Adiciona o SetLocale, HandleImpersonation e HandleInertiaRequests ao grupo web
@@ -132,6 +141,9 @@ return Application::configure(basePath: dirname(__DIR__))
         if (app()->environment('testing') || app()->environment('production')) {
             Integration::handles($exceptions);
         }
+
+        // Token/cartão criptografado do checkout nunca volta para a sessão.
+        $exceptions->dontFlash(['card_token']);
 
         $exceptions->render(function (AuthenticationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
@@ -218,6 +230,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
             if (
                 ! in_array($status, [401, 403, 404, 419, 429, 500, 503], true)
+                || $response->headers->has('X-Error-Page')
                 || $request->is('api/*')
                 || $request->expectsJson()
                 || $request->hasHeader('X-Inertia')
@@ -240,6 +253,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 return $response; // nunca piorar um erro
             }
         });
+
+        // Resposta pronta (ex.: limite do cadastro com mensagem própria —
+        // RateLimiter ->response()): devolve como veio, sem virar 500 abaixo.
+        $exceptions->render(fn (HttpResponseException $e) => $e->getResponse());
 
         $exceptions->render(function (Throwable $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {

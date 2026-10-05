@@ -6,6 +6,14 @@
  * aceitando o convite de cada uma (logado e confirmando a senha).
  */
 return [
+    // Clínica com o serviço suspenso: o portal fica só para consulta (sem
+    // expor ao paciente o motivo — nunca falar de pagamento/assinatura).
+    'read_only' => [
+        'badge'          => 'Somente consulta',
+        'notice'         => 'Agendamento online e outras solicitações estão indisponíveis no momento; entre em contato com a clínica. Seus documentos continuam disponíveis para ver e baixar.',
+        'action_blocked' => 'Esta ação está indisponível no momento. Entre em contato com a clínica.',
+    ],
+
     'invitation' => [
         'already_used'     => 'Este convite já foi utilizado. Faça login com sua senha.',
         'login_to_link'    => 'Você já tem conta no Portal do Paciente. Entre com sua senha para adicionar :clinic à sua conta.',

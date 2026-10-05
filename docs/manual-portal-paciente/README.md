@@ -13,6 +13,10 @@ próprio. Nenhuma equipe da clínica acessa por aqui — este manual é para o *
 > copie as imagens de `e2e/cypress/screenshots/patient-portal-manual.cy.js/` para
 > `docs/manual-portal-paciente/img/` e finalize com
 > `php artisan tinker --execute="require 'e2e/scripts/clean-docs-doctor.php';"`.
+> As telas de "Somente consulta" (imagens 14 e 15) vêm de
+> `e2e/cypress/e2e/docs/billing-manual.cy.js` (cria e remove sozinho uma clínica e um
+> paciente de demonstração): copie `e2e/cypress/screenshots/billing-manual.cy.js/portal/`
+> para `docs/manual-portal-paciente/img/`.
 
 ---
 
@@ -26,8 +30,9 @@ próprio. Nenhuma equipe da clínica acessa por aqui — este manual é para o *
 6. [Visualizar e baixar um documento](#6-visualizar-e-baixar-um-documento)
 7. [Baixar meus dados (LGPD)](#7-baixar-meus-dados-lgpd)
 8. [Sair (logout)](#8-sair-logout)
-9. [Perguntas frequentes / limitações atuais](#9-perguntas-frequentes--limitações-atuais)
-10. [Para a equipe da clínica: como liberar o Portal para um paciente](#10-para-a-equipe-da-clínica-como-liberar-o-portal-para-um-paciente)
+9. [Clínica em modo "Somente consulta"](#9-clínica-em-modo-somente-consulta)
+10. [Perguntas frequentes / limitações atuais](#10-perguntas-frequentes--limitações-atuais)
+11. [Para a equipe da clínica: como liberar o Portal para um paciente](#11-para-a-equipe-da-clínica-como-liberar-o-portal-para-um-paciente)
 
 ---
 
@@ -203,7 +208,33 @@ Clique em **Sair**. A sessão é encerrada imediatamente e o Portal volta para a
 
 ---
 
-## 9. Perguntas frequentes / limitações atuais
+## 9. Clínica em modo "Somente consulta"
+
+Às vezes uma clínica fica temporariamente indisponível no Portal. Quando isso acontece, o
+card dela em **Minhas Clínicas** mostra o selo **Somente consulta** e um aviso:
+
+![Clínica em modo somente consulta](img/14-somente-consulta.png)
+
+- Você **continua vendo e baixando** todos os documentos que a clínica já liberou, e o
+  **Baixar meus dados** continua disponível.
+- **Agendamento online e outras solicitações** ficam indisponíveis por enquanto — para
+  isso, entre em contato direto com a clínica.
+
+Dentro da clínica, o mesmo aviso aparece no topo da lista de documentos:
+
+![Documentos com o aviso de somente consulta](img/15-clinica-somente-consulta.png)
+
+Quando a clínica volta ao normal, o aviso some sozinho — não é preciso fazer nada na sua
+conta.
+
+> **Para a equipe da clínica:** o modo "Somente consulta" é ligado automaticamente quando o
+> acesso da clínica ao EasyEye está suspenso por falta de pagamento da assinatura. O
+> paciente nunca vê o motivo — o texto é neutro. Veja o
+> [Manual do Administrador](../manual-administrador/README.md#17-avisos-de-cobrança-o-que-acontece-em-cada-etapa).
+
+---
+
+## 10. Perguntas frequentes / limitações atuais
 
 - **"Não recebi o e-mail de convite/redefinição de senha."** Confira a caixa de spam. Peça à
   clínica para reenviar o convite (não invalida um link anterior ainda válido) ou solicite um
@@ -220,7 +251,7 @@ Clique em **Sair**. A sessão é encerrada imediatamente e o Portal volta para a
 
 ---
 
-## 10. Para a equipe da clínica: como liberar o Portal para um paciente
+## 11. Para a equipe da clínica: como liberar o Portal para um paciente
 
 Duas ações, feitas de dentro do `/panel` (perfis Administrador, Médico e Secretária):
 

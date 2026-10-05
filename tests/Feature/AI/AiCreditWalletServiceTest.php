@@ -117,7 +117,7 @@ test('consumeReservation grava provider e incrementa lifetime_consumed_<provider
     expect($wallet->lifetime_consumed_openai)->toBe(0);
 });
 
-test('releaseReservation devolve primeiro à cota, depois ao balance', function () {
+test('releaseReservation sem run devolve primeiro ao saldo comprado, depois à cota', function () {
     $this->service->grantMonthlyQuota(
         entityId: $this->entity->id,
         amount: 40,
@@ -128,17 +128,17 @@ test('releaseReservation devolve primeiro à cota, depois ao balance', function 
     // Reserva 60: 40 da cota + 20 do balance
     $this->service->reserve(entityId: $this->entity->id, amount: 60);
 
-    // Libera 50: 40 volta para cota + 10 volta para balance
+    // Libera 50 (10 consumidos, que saem da cota): 20 voltam ao comprado, 30 à cota.
     $release = $this->service->releaseReservation(entityId: $this->entity->id, amount: 50);
 
     expect($release->type)->toBe(AiLedgerEntryType::Release);
-    expect($release->metadata['to_quota'])->toBe(40);
-    expect($release->metadata['to_balance'])->toBe(10);
+    expect($release->metadata['to_balance'])->toBe(20);
+    expect($release->metadata['to_quota'])->toBe(30);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect($wallet->monthly_quota_used)->toBe(0);
-    expect($wallet->balance)->toBe(90);                 // 80 + 10
-    expect($wallet->reserved_balance)->toBe(10);
+    expect($wallet->monthly_quota_used)->toBe(10);
+    expect($wallet->balance)->toBe(100);                // comprado intacto
+    expect($wallet->reserved_balance)->toBe(0);
 });
 
 test('idempotency key evita duplicidade de grant da cota', function () {

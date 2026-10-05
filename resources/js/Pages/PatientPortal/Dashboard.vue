@@ -5,10 +5,13 @@ import PatientPortalLayout from '@/Layouts/PatientPortalLayout.vue';
 
 // Aviso vindo do servidor (ex.: "Clínica adicionada à sua conta"), já traduzido.
 const statusMessage = computed(() => usePage().props.flash?.status ?? null);
+const errorMessage = computed(() => usePage().props.flash?.error ?? null);
 
 defineProps({
     patientName: { type: String, default: '' },
     clinics: { type: Array, default: () => [] },
+    // Textos do "só consulta" (clínica com o serviço suspenso) — aviso neutro.
+    readOnly: { type: Object, default: () => ({}) },
 });
 </script>
 
@@ -20,6 +23,9 @@ defineProps({
 
         <div v-if="statusMessage" class="alert alert-success py-2" role="status">
             <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ statusMessage }}
+        </div>
+        <div v-if="errorMessage" class="alert alert-warning text-warning-emphasis py-2" role="alert">
+            <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ errorMessage }}
         </div>
 
         <div v-if="clinics.length === 0" class="card shadow-sm border-0">
@@ -48,6 +54,16 @@ defineProps({
                                 <small v-if="clinic.city" class="text-muted">{{ clinic.city }}</small>
                             </div>
                         </div>
+                        <p
+                            v-if="clinic.read_only"
+                            class="small text-body-secondary mt-3 mb-0"
+                            data-test="portal-read-only"
+                        >
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">{{
+                                readOnly.badge
+                            }}</span
+                            >{{ readOnly.notice }}
+                        </p>
                         <div class="d-flex align-items-center justify-content-between mt-3 pt-2 border-top">
                             <small class="text-primary fw-semibold">Ver documentos</small>
                             <i class="ti ti-chevron-right text-primary"></i>

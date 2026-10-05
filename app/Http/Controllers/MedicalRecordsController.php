@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings, AiQuotaService};
+use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService};
 use App\Enums\AI\AiRunMode;
 use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey, ScheduleSituation};
 use App\Exceptions\{AttendanceRequiresCashEntryException, LockedMedicalRecordException};
@@ -32,6 +32,7 @@ class MedicalRecordsController extends Controller
         private readonly AiProviderSettings $aiProviderSettings,
         private readonly AiQuotaService $aiQuotaService,
         private readonly ScheduleService $scheduleService,
+        private readonly AiPaywallService $aiPaywall,
     ) {
     }
 
@@ -813,7 +814,8 @@ class MedicalRecordsController extends Controller
             'workflows'        => $workflows,
             'modes'            => $modes,
             'balance'          => $this->aiWallet->balance($entityId),
-            'quota'            => $this->aiQuotaService->currentMonthSnapshot($entityId),
+            'quota'            => $this->aiQuotaService->snapshot($entityId),
+            'paywall'          => $this->aiPaywall->describe($entityId),
             'urls'             => [
                 'estimate'   => route('panel.ai-runs.estimate'),
                 'store'      => route('panel.ai-runs.store'),

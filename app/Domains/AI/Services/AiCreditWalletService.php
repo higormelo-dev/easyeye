@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Exceptions\InsufficientAiCreditsException;
-use App\Domains\AI\Models\{AiCreditLedgerEntry, AiCreditWallet};
-use App\Enums\AI\{AiLedgerEntryType, AiProvider};
+use App\Domains\AI\Models\{AiCreditLedgerEntry, AiCreditWallet, AiRun};
+use App\Domains\AI\Support\AiQuotaWindow;
+use App\Enums\AI\{AiLedgerEntryType, AiProvider, AiRunStatus};
 use App\Enums\FeatureKey;
-use App\Models\Subscription;
-use Carbon\CarbonImmutable;
+use App\Models\{Plan, Subscription};
+use Carbon\{CarbonImmutable, CarbonInterface};
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 /**
  * Carteira de créditos IA — modelo unificado.
@@ -63,6 +65,12 @@ class AiCreditWalletService
 
             $wallet = $this->lockWallet($entityId);
 
+            // Concessão concorrente (agendador × leitura sob demanda): quem
+            // esperou o lock vê a concessão já gravada e não zera o consumo.
+            if ($existing = $this->findIdempotentEntry($idempotencyKey, $entityId, AiLedgerEntryType::Grant)) {
+                return $existing;
+            }
+
             // Reset do ciclo mensal: nova cota substitui qualquer resíduo do ciclo anterior.
             $wallet->monthly_quota                  = $amount;
             $wallet->monthly_quota_used             = 0;
@@ -88,43 +96,274 @@ class AiCreditWalletService
     }
 
     /**
-     * Concede a franquia mensal da subscription. Idempotente por ciclo (ends_at).
+     * Concede a franquia mensal da janela atual da assinatura — só cobrança
+     * automática paga com acesso total (Subscription::earnsMonthlyAiQuota):
+     * trial e cortesia não recebem.
+     *
+     * Janelas de 1 mês ancoradas na 1ª concessão desta assinatura (a
+     * ativação paga) — ver AiQuotaWindow. Idempotente por assinatura + início
+     * da janela: renovação paga, webhook repetido e "Adicionar período" não
+     * reiniciam o consumo. A janela seguinte vem da leitura da carteira
+     * (grantDueQuotaWindow) ou do ai:grant-monthly-quotas, o que vier antes.
+     * Sem acúmulo: a cota da nova janela substitui a da anterior.
      */
     public function grantMonthlyCreditsForSubscription(Subscription $subscription): ?AiCreditLedgerEntry
     {
-        $plan = $subscription->plan;
-
-        if (! $plan) {
+        if (! $subscription->earnsMonthlyAiQuota()) {
             return null;
         }
 
-        $plan->loadMissing('features');
-
-        $amount = (int) $plan->featureValue(FeatureKey::AiMonthlyCredits);
+        $plan   = $this->currentPlan($subscription);
+        $amount = $plan ? $this->planMonthlyQuota($plan) : 0;
 
         if ($amount <= 0) {
             return null;
         }
 
-        $endsAt = $subscription->ends_at
-            ? CarbonImmutable::parse($subscription->ends_at)
-            : CarbonImmutable::now()->addMonth();
-        $periodKey = $endsAt->toDateString();
+        $window = $this->currentQuotaWindow($subscription);
+
+        if ($this->quotaWindowGranted($subscription, $window)) {
+            return null;
+        }
 
         return $this->grantMonthlyQuota(
             entityId: $subscription->entity_id,
             amount: $amount,
-            periodEndsAt: $endsAt,
+            periodEndsAt: $window->end,
             subscriptionId: $subscription->id,
             description: "Cota mensal do plano {$plan->name}.",
-            idempotencyKey: "ai-monthly-grant-{$subscription->id}-{$periodKey}",
+            idempotencyKey: $window->grantKey($subscription->id),
             metadata: [
-                'plan_id'    => $plan->id,
-                'plan_slug'  => $plan->slug,
-                'period_key' => $periodKey,
-                'source'     => 'subscription_cycle',
+                'plan_id'       => $plan->id,
+                'plan_slug'     => $plan->slug,
+                'window_anchor' => $window->anchor->toDateString(),
+                'window_start'  => $window->start->toDateString(),
+                'window_end'    => $window->end->toDateString(),
+                'window_index'  => $window->index,
+                'source'        => 'subscription_window',
             ],
         );
+    }
+
+    /**
+     * Concessão sob demanda: a carteira lida para reservar ou medir com a
+     * janela da franquia vencida recebe a janela vigente na hora, sem esperar
+     * o ai:grant-monthly-quotas das 00:20 (que segue como garantia, inclusive
+     * para quem não abre a IA). Só para a assinatura vigente da empresa que
+     * ganha franquia (earnsMonthlyAiQuota) — cortesia, trial e acesso
+     * limitado não recebem. Idempotente pela chave da janela.
+     *
+     * @return bool true quando a janela vigente está concedida (agora ou por
+     *              uma leitura concorrente) — a carteira deve ser relida
+     */
+    public function grantDueQuotaWindow(string $entityId): bool
+    {
+        $wallet = AiCreditWallet::query()
+            ->where('entity_id', $entityId)
+            ->first(['id', 'monthly_quota', 'quota_period_ends_at']);
+
+        // Só quem já teve franquia e viu a janela vencer (cota zerada por
+        // cortesia/trial fica com monthly_quota = 0 e não consulta nada).
+        if ($wallet === null || (int) $wallet->monthly_quota <= 0 || ! $wallet->quotaExpired()) {
+            return false;
+        }
+
+        $subscription = Subscription::bestAccessibleFor($entityId);
+
+        if ($subscription === null || ! $subscription->earnsMonthlyAiQuota()) {
+            return false;
+        }
+
+        try {
+            return $this->grantMonthlyCreditsForSubscription($subscription) !== null;
+        } catch (Throwable $e) {
+            // A leitura (medidor/reserva) não pode quebrar por isso: o
+            // agendador concede depois.
+            report($e);
+
+            return false;
+        }
+    }
+
+    /**
+     * Troca de plano na mesma assinatura, no meio da janela: a cota passa a
+     * ser a do novo plano e o consumido da janela é mantido (trocar de plano
+     * não zera o uso). Sem janela concedida ainda, concede a do novo plano.
+     */
+    public function applyPlanChangeForSubscription(Subscription $subscription): ?AiCreditLedgerEntry
+    {
+        $plan = $this->currentPlan($subscription);
+
+        if (! $plan || ! $subscription->earnsMonthlyAiQuota()) {
+            return null;
+        }
+
+        $window = $this->currentQuotaWindow($subscription);
+
+        if (! $this->quotaWindowGranted($subscription, $window)) {
+            return $this->grantMonthlyCreditsForSubscription($subscription);
+        }
+
+        $amount = $this->planMonthlyQuota($plan);
+
+        return DB::transaction(function () use ($subscription, $plan, $amount, $window): ?AiCreditLedgerEntry {
+            $key = "ai-quota-plan:{$subscription->id}:{$window->start->toDateString()}:{$plan->id}";
+
+            if ($existing = $this->findIdempotentEntry($key, $subscription->entity_id, AiLedgerEntryType::Adjustment)) {
+                return $existing;
+            }
+
+            $wallet = $this->lockWallet($subscription->entity_id);
+
+            // A carteira precisa estar na janela desta assinatura (outra
+            // assinatura da empresa pode ter assumido a cota depois).
+            if ($wallet->quotaExpired()
+                || $wallet->quota_period_ends_at === null
+                || ! $wallet->quota_period_ends_at->equalTo($window->end)) {
+                return null;
+            }
+
+            $previous = (int) $wallet->monthly_quota;
+
+            if ($previous === $amount) {
+                return null;
+            }
+
+            $wallet->monthly_quota                  = $amount;
+            $wallet->monthly_quota_lifetime_granted = (int) $wallet->monthly_quota_lifetime_granted + max(0, $amount - $previous);
+            $wallet->save();
+
+            return $this->createLedgerEntry(
+                wallet: $wallet,
+                type: AiLedgerEntryType::Adjustment,
+                provider: null,
+                amount: $amount - $previous,
+                subscriptionId: $subscription->id,
+                description: "Cota mensal ajustada ao plano {$plan->name}.",
+                idempotencyKey: $key,
+                metadata: [
+                    'adjustment_reason' => 'quota_plan_change',
+                    'kind'              => 'monthly_quota',
+                    'plan_id'           => $plan->id,
+                    'previous_quota'    => $previous,
+                    'new_quota'         => $amount,
+                    'quota_used'        => (int) $wallet->monthly_quota_used,
+                    'window_start'      => $window->start->toDateString(),
+                    'window_end'        => $window->end->toDateString(),
+                ],
+            );
+        });
+    }
+
+    /**
+     * Zera a cota mensal que ainda resta (a assinatura virou cortesia ou foi
+     * trocada por trial/cortesia — sem franquia de IA). Saldo comprado e
+     * créditos de cortesia do manager ficam. Registra no ledger (expire).
+     */
+    public function forfeitMonthlyQuota(
+        string $entityId,
+        ?string $subscriptionId,
+        string $reason,
+        ?string $createdBy = null,
+    ): ?AiCreditLedgerEntry {
+        if (! AiCreditWallet::query()->where('entity_id', $entityId)->exists()) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($entityId, $subscriptionId, $reason, $createdBy): ?AiCreditLedgerEntry {
+            $wallet = $this->lockWallet($entityId);
+
+            if ((int) $wallet->monthly_quota === 0 && (int) $wallet->monthly_quota_used === 0) {
+                return null;
+            }
+
+            $remaining = $wallet->quotaRemaining();
+            $quota     = (int) $wallet->monthly_quota;
+            $used      = (int) $wallet->monthly_quota_used;
+
+            $wallet->monthly_quota        = 0;
+            $wallet->monthly_quota_used   = 0;
+            $wallet->quota_period_ends_at = now();
+            $wallet->save();
+
+            return $this->createLedgerEntry(
+                wallet: $wallet,
+                type: AiLedgerEntryType::Expire,
+                provider: null,
+                amount: -$remaining,
+                subscriptionId: $subscriptionId,
+                description: 'Cota mensal de IA encerrada: a assinatura não inclui franquia de IA.',
+                createdBy: $createdBy,
+                metadata: [
+                    'kind'           => 'monthly_quota',
+                    'reason'         => $reason,
+                    'forfeited'      => $remaining,
+                    'previous_quota' => $quota,
+                    'previous_used'  => $used,
+                ],
+            );
+        });
+    }
+
+    /**
+     * Janela atual da franquia da assinatura. A âncora é o dia da 1ª
+     * concessão desta assinatura (a ativação paga); sem concessão ainda, hoje.
+     */
+    public function currentQuotaWindow(Subscription $subscription, ?CarbonInterface $at = null): AiQuotaWindow
+    {
+        return AiQuotaWindow::containing($this->quotaAnchor($subscription), $at ?? now());
+    }
+
+    private function quotaAnchor(Subscription $subscription): CarbonImmutable
+    {
+        $first = AiCreditLedgerEntry::query()
+            ->where('entity_id', $subscription->entity_id)
+            ->where('subscription_id', $subscription->id)
+            ->where('type', AiLedgerEntryType::Grant->value)
+            ->orderBy('created_at')
+            ->first(['created_at', 'metadata']);
+
+        $anchor = data_get($first?->metadata, 'window_anchor');
+
+        if (is_string($anchor) && $anchor !== '') {
+            return CarbonImmutable::parse($anchor)->startOfDay();
+        }
+
+        // Concessões anteriores às janelas (período = ends_at): a 1ª foi na ativação.
+        return CarbonImmutable::instance($first?->created_at ?? now())->startOfDay();
+    }
+
+    /**
+     * A janela já teve a franquia concedida: pela chave da janela ou, nas
+     * concessões anteriores às janelas, por uma concessão feita dentro dela.
+     */
+    private function quotaWindowGranted(Subscription $subscription, AiQuotaWindow $window): bool
+    {
+        return AiCreditLedgerEntry::query()
+            ->where('entity_id', $subscription->entity_id)
+            ->where('subscription_id', $subscription->id)
+            ->where('type', AiLedgerEntryType::Grant->value)
+            ->where(fn ($q) => $q->where('idempotency_key', $window->grantKey($subscription->id))
+                ->orWhere(fn ($range) => $range->where('created_at', '>=', $window->start)
+                    ->where('created_at', '<', $window->end)))
+            ->exists();
+    }
+
+    /** Plano atual da assinatura (a relação carregada pode ser a do plano anterior à troca). */
+    private function currentPlan(Subscription $subscription): ?Plan
+    {
+        if ($subscription->relationLoaded('plan') && $subscription->plan?->id !== $subscription->plan_id) {
+            $subscription->unsetRelation('plan');
+        }
+
+        return $subscription->plan;
+    }
+
+    private function planMonthlyQuota(Plan $plan): int
+    {
+        $plan->loadMissing('features');
+
+        return max(0, (int) $plan->featureValue(FeatureKey::AiMonthlyCredits));
     }
 
     /**
@@ -281,6 +520,9 @@ class AiCreditWalletService
     ): AiCreditLedgerEntry {
         $this->assertPositiveAmount($amount);
 
+        // Janela da franquia virou e o agendador ainda não rodou: concede antes de reservar.
+        $this->grantDueQuotaWindow($entityId);
+
         return DB::transaction(function () use (
             $entityId,
             $amount,
@@ -334,6 +576,9 @@ class AiCreditWalletService
                     'reserved_amount' => $amount,
                     'from_quota'      => $fromQuota,
                     'from_balance'    => $fromBalance,
+                    // Janela da cota usada: devolução depois da virada não
+                    // volta para a janela nova (cota é use-or-lose).
+                    'quota_window_ends_at' => $wallet->quota_period_ends_at?->toAtomString(),
                 ]),
             );
         });
@@ -341,6 +586,12 @@ class AiCreditWalletService
 
     /**
      * Confirma o consumo definitivo de uma reserva.
+     *
+     * Liquida pela origem gravada na reserva do run (`ai_run_id`): o consumo
+     * sai primeiro da parte da cota (que expira) e só depois da parte do
+     * saldo comprado — só essa baixa o reserved_balance, e nunca o de outras
+     * execuções. Sem reserva registrada para o run, baixa do reservado do
+     * saldo comprado até o que existe.
      *
      * Recebe `provider` opcionalmente — quando informado, grava no ledger
      * (analytics) e incrementa o contador lifetime_consumed_<provider>.
@@ -374,23 +625,18 @@ class AiCreditWalletService
             }
 
             $wallet = $this->lockWallet($entityId);
+            $open   = $this->openReservation($wallet, $aiRunId);
 
-            if ($wallet->reserved_balance < $amount) {
-                // Pode ter sido reservado parcialmente da cota — nesse caso
-                // o consume só precisa baixar o reserved_balance até o limite.
-                // Se ainda exceder, lança erro (algo desincronizado).
-                if ($wallet->reserved_balance < $amount && $amount > $wallet->reserved_balance) {
-                    $reservedDelta            = $wallet->reserved_balance;
-                    $wallet->reserved_balance = 0;
-                } else {
-                    $reservedDelta = $amount;
-                    $wallet->reserved_balance -= $amount;
-                }
+            if ($open !== null) {
+                $fromQuota   = min($amount, $open['quota']);
+                $fromBalance = min($amount - $fromQuota, $open['balance']);
             } else {
-                $reservedDelta = $amount;
-                $wallet->reserved_balance -= $amount;
+                $fromBalance = min($amount, (int) $wallet->reserved_balance);
+                $fromQuota   = $amount - $fromBalance;
             }
 
+            // A parte da cota já foi contada em monthly_quota_used na reserva.
+            $wallet->reserved_balance = max(0, (int) $wallet->reserved_balance - $fromBalance);
             $wallet->lifetime_consumed += $amount;
 
             if ($provider !== null) {
@@ -412,15 +658,20 @@ class AiCreditWalletService
                 createdBy: $createdBy,
                 metadata: array_merge($metadata ?? [], [
                     'consumed_from_reservation' => $amount,
-                    'reserved_delta'            => $reservedDelta,
+                    'reserved_delta'            => $fromBalance,
+                    'from_quota'                => $fromQuota,
+                    'from_balance'              => $fromBalance,
                 ]),
             );
         });
     }
 
     /**
-     * Libera uma reserva de volta ao saldo disponível. Devolve preferencialmente
-     * à cota (se a cota teve uso recente) e depois ao balance comprado.
+     * Libera uma reserva de volta ao saldo disponível, pela origem gravada
+     * na reserva do run: como o consumo sai primeiro da cota, a sobra volta
+     * primeiro ao saldo comprado (crédito comprado nunca vira cota que
+     * expira) e só depois à cota — e só se a janela da cota ainda for a da
+     * reserva; virada a janela, essa parte se perde (use-or-lose).
      */
     public function releaseReservation(
         string $entityId,
@@ -449,27 +700,31 @@ class AiCreditWalletService
             }
 
             $wallet = $this->lockWallet($entityId);
+            $open   = $this->openReservation($wallet, $aiRunId);
 
-            // Devolve primeiro à cota se houve consumo dela neste ciclo (e não expirou).
-            $toQuota = 0;
-
-            if (! $wallet->quotaExpired() && $wallet->monthly_quota_used > 0) {
-                $toQuota = min($amount, $wallet->monthly_quota_used);
-                $wallet->monthly_quota_used -= $toQuota;
+            if ($open !== null) {
+                $toBalance  = min($amount, $open['balance']);
+                $quotaPart  = min($amount - $toBalance, $open['quota']);
+                $sameWindow = ! $wallet->quotaExpired()
+                    && ($open['window'] === null || $open['window'] === $wallet->quota_period_ends_at?->toAtomString());
+            } else {
+                $toBalance  = min($amount, (int) $wallet->reserved_balance);
+                $quotaPart  = min($amount - $toBalance, $wallet->quotaExpired() ? 0 : (int) $wallet->monthly_quota_used);
+                $sameWindow = true;
             }
 
-            $toBalance = $amount - $toQuota;
-
-            if ($toBalance > 0) {
-                if ($wallet->reserved_balance < $toBalance) {
-                    throw new InvalidArgumentException(
-                        "Tentativa de liberação maior que o reservado. Reservado: {$wallet->reserved_balance}; solicitado adicional: {$toBalance}.",
-                    );
-                }
-                $wallet->reserved_balance -= $toBalance;
-                $wallet->balance += $toBalance;
+            if ($toBalance + $quotaPart < $amount) {
+                throw new InvalidArgumentException(
+                    'Tentativa de liberação maior que o reservado. Reservado em aberto: ' . ($toBalance + $quotaPart) . "; solicitado: {$amount}.",
+                );
             }
 
+            $toQuota   = $sameWindow ? min($quotaPart, (int) $wallet->monthly_quota_used) : 0;
+            $forfeited = $quotaPart - $toQuota;
+
+            $wallet->monthly_quota_used -= $toQuota;
+            $wallet->reserved_balance = max(0, (int) $wallet->reserved_balance - $toBalance);
+            $wallet->balance += $toBalance;
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -486,6 +741,7 @@ class AiCreditWalletService
                     'released_amount' => $amount,
                     'to_quota'        => $toQuota,
                     'to_balance'      => $toBalance,
+                    'quota_forfeited' => $forfeited,
                 ]),
             );
         });
@@ -560,6 +816,9 @@ class AiCreditWalletService
      */
     public function balance(string $entityId): array
     {
+        // Mesmo saldo que a reserva veria: janela vencida recebe a vigente antes.
+        $this->grantDueQuotaWindow($entityId);
+
         $wallet = AiCreditWallet::query()->firstOrCreate(
             ['entity_id' => $entityId],
             $this->emptyWalletColumns(),
@@ -593,7 +852,132 @@ class AiCreditWalletService
         ];
     }
 
+    /**
+     * Saneia o reserved_balance: ele deve ser a soma das partes do saldo
+     * comprado reservadas por execuções ainda em andamento. A sobra
+     * ("Reservados" sem execução — liquidações antigas devolviam à cota o que
+     * tinha saído do saldo comprado) volta ao saldo comprado, com registro no
+     * ledger. Sem `$apply`, só calcula.
+     *
+     * @return array{entity_id:string, reserved:int, expected:int, phantom:int, applied:bool}
+     */
+    public function reconcileReservedBalance(string $entityId, bool $apply = false): array
+    {
+        return DB::transaction(function () use ($entityId, $apply): array {
+            $wallet = AiCreditWallet::query()->where('entity_id', $entityId)->lockForUpdate()->first();
+
+            if (! $wallet) {
+                return ['entity_id' => $entityId, 'reserved' => 0, 'expected' => 0, 'phantom' => 0, 'applied' => false];
+            }
+
+            $openRunIds = AiRun::query()
+                ->withoutGlobalScopes()
+                ->where('entity_id', $entityId)
+                ->whereIn('status', [
+                    AiRunStatus::Pending->value,
+                    AiRunStatus::Reserved->value,
+                    AiRunStatus::Running->value,
+                ])
+                ->pluck('id');
+
+            $expected = 0;
+
+            foreach ($openRunIds as $runId) {
+                $expected += $this->openReservation($wallet, (string) $runId)['balance'] ?? 0;
+            }
+
+            $reserved = (int) $wallet->reserved_balance;
+            $phantom  = max(0, $reserved - $expected);
+            $applied  = false;
+
+            if ($apply && $phantom > 0) {
+                $wallet->reserved_balance = $reserved - $phantom;
+                $wallet->balance += $phantom;
+                $wallet->save();
+
+                $this->createLedgerEntry(
+                    wallet: $wallet,
+                    type: AiLedgerEntryType::Adjustment,
+                    provider: null,
+                    amount: $phantom,
+                    description: 'Créditos reservados sem execução em andamento devolvidos ao saldo comprado.',
+                    metadata: [
+                        'adjustment_reason' => 'reserved_balance_reconcile',
+                        'reserved_before'   => $reserved,
+                        'expected_reserved' => $expected,
+                    ],
+                );
+
+                $applied = true;
+            }
+
+            return [
+                'entity_id' => $entityId,
+                'reserved'  => $reserved,
+                'expected'  => $expected,
+                'phantom'   => $phantom,
+                'applied'   => $applied,
+            ];
+        });
+    }
+
     // ─── Internals ────────────────────────────────────────────────────────────
+
+    /**
+     * Quanto da reserva de um run ainda está em aberto, por origem (cota ×
+     * saldo comprado), lido do ledger do próprio run: reserva menos consumos
+     * e liberações já feitos. Null sem reserva registrada para o run.
+     *
+     * @return array{quota:int, balance:int, window:?string}|null
+     */
+    private function openReservation(AiCreditWallet $wallet, ?string $aiRunId): ?array
+    {
+        if (blank($aiRunId)) {
+            return null;
+        }
+
+        $entries = AiCreditLedgerEntry::query()
+            ->where('entity_id', $wallet->entity_id)
+            ->where('ai_run_id', $aiRunId)
+            ->whereIn('type', [
+                AiLedgerEntryType::Reserve->value,
+                AiLedgerEntryType::Consume->value,
+                AiLedgerEntryType::Release->value,
+            ])
+            ->get(['type', 'amount', 'metadata']);
+
+        $reserve = $entries->first(fn (AiCreditLedgerEntry $entry) => $entry->type === AiLedgerEntryType::Reserve);
+
+        if (! $reserve) {
+            return null;
+        }
+
+        $quota   = (int) data_get($reserve->metadata, 'from_quota', 0);
+        $balance = (int) data_get($reserve->metadata, 'from_balance', abs((int) $reserve->amount) - $quota);
+
+        foreach ($entries as $entry) {
+            $meta = (array) $entry->metadata;
+
+            if ($entry->type === AiLedgerEntryType::Consume) {
+                // Consumos antigos só registravam reserved_delta (parte do saldo comprado).
+                $consumed    = (int) ($meta['consumed_from_reservation'] ?? 0);
+                $fromBalance = (int) ($meta['from_balance'] ?? $meta['reserved_delta'] ?? 0);
+                $quota -= (int) ($meta['from_quota'] ?? max(0, $consumed - $fromBalance));
+                $balance -= $fromBalance;
+            } elseif ($entry->type === AiLedgerEntryType::Release) {
+                $quota -= (int) ($meta['to_quota'] ?? 0) + (int) ($meta['quota_forfeited'] ?? 0);
+                $balance -= (int) ($meta['to_balance'] ?? 0);
+            }
+        }
+
+        $window = data_get($reserve->metadata, 'quota_window_ends_at');
+
+        return [
+            'quota'   => max(0, $quota),
+            'balance' => max(0, $balance),
+            'window'  => is_string($window) ? $window : null,
+        ];
+    }
 
     private function lockWallet(string $entityId): AiCreditWallet
     {

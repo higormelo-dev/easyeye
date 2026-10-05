@@ -12,9 +12,13 @@ const STATUS_COLORS = {
     expired: '#dc3545',
     cancelled: '#6c757d',
     past_due: '#ffc107',
+    awaiting_payment: '#0dcaf0',
+    needs_review: '#6f42c1',
 };
 
-const STATUS_ORDER = ['active', 'trial', 'past_due', 'expired', 'cancelled'];
+// Contratação aguardando o 1º pagamento não entra em "Em atraso"; a cobrança
+// do código anterior aguardando conciliação fica só em "Revisar cobrança".
+const STATUS_ORDER = ['active', 'trial', 'past_due', 'awaiting_payment', 'needs_review', 'expired', 'cancelled'];
 
 const STATUS_BADGE = {
     trial: 'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
@@ -22,14 +26,8 @@ const STATUS_BADGE = {
     expired: 'badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium',
     cancelled: 'badge-soft-secondary rounded fs-13 fw-medium',
     past_due: 'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
-};
-
-const STATUS_LABEL = {
-    trial: 'Trial',
-    active: 'Ativo',
-    expired: 'Expirado',
-    cancelled: 'Cancelado',
-    past_due: 'Em atraso',
+    awaiting_payment: 'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
+    needs_review: 'badge-soft-secondary rounded border fs-13 fw-medium',
 };
 
 const counts = computed(() => props.subscriptionKpis.subscriptionCounts ?? {});
@@ -54,7 +52,9 @@ function barWidth(status) {
         <div class="card-body">
             <div v-for="status in STATUS_ORDER" :key="status" class="funnel-row">
                 <span class="funnel-label">
-                    <span :class="['badge', STATUS_BADGE[status]]">{{ STATUS_LABEL[status] }}</span>
+                    <span :class="['badge', STATUS_BADGE[status]]">{{
+                        t.subscription_status?.[status] ?? status
+                    }}</span>
                 </span>
                 <div class="funnel-bar-wrapper">
                     <div

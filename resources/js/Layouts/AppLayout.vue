@@ -5,6 +5,7 @@ import logoSvg from '@img/system/logo.svg';
 import logoSmallSvg from '@img/system/logo-small.svg';
 import logoWhiteSvg from '@img/system/logo-white.svg';
 import AiFloatingAssistant from '@/Components/Panel/AiFloatingAssistant.vue';
+import SubscriptionBanner from '@/Components/Panel/SubscriptionBanner.vue';
 import { usePanelTour } from '@/composables/usePanelTour.js';
 
 const props = defineProps({
@@ -21,6 +22,9 @@ const locales = computed(() => page.props.locales ?? []);
 const flash = computed(() => page.props.flash ?? {});
 const entities = computed(() => auth.value.entities ?? []);
 const aiAssistant = computed(() => page.props.aiAssistant ?? { enabled: false });
+// Situação da assinatura (pagamento pendente/em atraso, acesso limitado,
+// trial terminando) — só empresa cliente no painel; null no resto.
+const subscriptionBanner = computed(() => page.props.subscriptionBanner ?? null);
 
 // ── Dark mode ──────────────────────────────────────────────────────────────
 const isDark = ref(false);
@@ -646,6 +650,9 @@ onUnmounted(() => panelTour.stop());
                     <i class="ti ti-user-x me-1"></i> Sair
                 </button>
             </div>
+
+            <!-- Situação da assinatura -->
+            <SubscriptionBanner v-if="subscriptionBanner" :banner="subscriptionBanner" />
 
             <!-- Flash messages (Vue-controlled — auto-dismiss 6s + botão X funcional) -->
             <transition name="flash">

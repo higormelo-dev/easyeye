@@ -12,7 +12,10 @@
  *   F3 — diff visual (rascunho IA vs edição médica) antes de aprovar
  *   F4 — histórico dos últimos 5 runs do paciente (re-abre laudo em view)
  *   F5 — safety flags visíveis no review (alerta amarelo/vermelho)
- *   F6 — progress ring da cota mensal (cor por threshold)
+ *   F6 — progress ring da franquia mensal (cor por threshold) — lê a
+ *        carteira (mesma fonte que bloqueia), com a data de renovação
+ *   Paywall — sem créditos (422 ai_insufficient_credits) ou acesso limitado
+ *        pela régua de cobrança (402): AiPaywallNotice com o próximo passo
  *   F7 — autofocus no textarea de resultado + Ctrl/Cmd+Enter aprova
  */
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
@@ -20,6 +23,8 @@ import { diffWords } from 'diff';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
 import Cid10Picker from '@/Components/Panel/Cid10Picker.vue';
+import AiPaywallNotice from '@/Components/Panel/AiPaywallNotice.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
 
 const props = defineProps({
     open: { type: Boolean, required: true },
@@ -94,8 +99,20 @@ const mode = computed(() => {
 const ETA_BY_MODE = { economy: 10, validated: 25, consensus: 45 };
 const etaSeconds = computed(() => ETA_BY_MODE[mode.value] ?? 25);
 
-// ── F6 — Cota mensal ────────────────────────────────────────────────────────
+// ── F6 — Franquia mensal (carteira) ─────────────────────────────────────────
+const { date: formatDate, number: formatNumber } = useLocaleFormat();
 const quota = computed(() => props.ai?.quota ?? {});
+// Renovação só para quem ganha franquia (em atraso, condicionada ao
+// pagamento); cota que sobrou (ex.: virou cortesia) mostra até quando vale,
+// sem prometer renovação.
+const quotaRenewsText = computed(() => {
+    if (quota.value?.renews_on) return lbl('quota_renews_on', '').replace(':date', formatDate(quota.value.renews_on));
+    if (quota.value?.renews_if_paid_on)
+        return lbl('quota_renews_if_paid', '').replace(':date', formatDate(quota.value.renews_if_paid_on));
+    if (quota.value?.expires_on)
+        return lbl('quota_expires_on', '').replace(':date', formatDate(quota.value.expires_on));
+    return '';
+});
 const quotaPercent = computed(() => {
     const p = quota.value?.usage_percent;
     return typeof p === 'number' ? Math.min(100, Math.max(0, p)) : null;
@@ -112,9 +129,14 @@ const quotaAlertText = computed(() => {
     const tpl = quotaPercent.value >= 90 ? lbl('quota_critical', '') : lbl('quota_warning', '');
     return tpl.replace(':percent', quotaPercent.value);
 });
-// Saldo de créditos avulsos (comprados/cortesia) — separado da cota mensal.
-// balance.balance = avulso; balance.available = quota_remaining + avulso.
-const purchasedCredits = computed(() => Number(props.ai?.balance?.balance ?? 0));
+// Saldo de créditos avulsos (comprados/cortesia) — separado da franquia.
+// balance.balance = avulso; balance.available = franquia restante + avulso.
+const purchasedCredits = computed(() => Number(quota.value?.purchased_balance ?? props.ai?.balance?.balance ?? 0));
+// Créditos que a carteira ainda libera (mesma conta da reserva no backend).
+const availableCredits = computed(() => {
+    const value = props.ai?.balance?.available ?? quota.value?.available;
+    return value === undefined || value === null ? null : Number(value);
+});
 
 // Cota mensal totalmente consumida (consumed >= quota), independente de avulso.
 const quotaFullyUsed = computed(() => {
@@ -123,30 +145,28 @@ const quotaFullyUsed = computed(() => {
     return q > 0 && c >= q;
 });
 
-// Onda 4, C4 — bloqueio do botão Analisar quando a cota mensal estoura.
-// MAS: créditos avulsos (cortesia/comprados) continuam permitindo análise — o
-// backend consome a cota primeiro e depois o saldo avulso. Só trava de fato
-// quando a cota está ≥95% E não há avulso para cobrir.
-const quotaExhausted = computed(
-    () => quotaPercent.value !== null && quotaPercent.value >= 95 && purchasedCredits.value <= 0,
-);
+// Bloqueio do botão Analisar: a carteira não libera mais nenhum crédito
+// (franquia da janela esgotada e sem avulso). Com avulso, segue analisando —
+// o backend consome a franquia primeiro e depois o saldo avulso.
+const quotaExhausted = computed(() => availableCredits.value !== null && availableCredits.value <= 0);
 
 // Cota esgotada mas há avulso → segue funcionando consumindo avulso (aviso, não bloqueio).
 const usingPurchasedCredits = computed(() => quotaFullyUsed.value && purchasedCredits.value > 0);
 
+// Números no idioma do usuário (1.500, não 1500).
 const quotaExhaustedText = computed(() => {
     const tpl = lbl('quota_exhausted', '');
     return tpl
-        .replace(':consumed', quota.value?.consumed_credits ?? 0)
-        .replace(':quota', quota.value?.monthly_quota ?? 0);
+        .replace(':consumed', formatNumber(quota.value?.consumed_credits ?? 0))
+        .replace(':quota', formatNumber(quota.value?.monthly_quota ?? 0));
 });
 
 const usingPurchasedText = computed(() => {
     const tpl = lbl('quota_spillover', '');
     return tpl
-        .replace(':consumed', quota.value?.consumed_credits ?? 0)
-        .replace(':quota', quota.value?.monthly_quota ?? 0)
-        .replace(':available', purchasedCredits.value);
+        .replace(':consumed', formatNumber(quota.value?.consumed_credits ?? 0))
+        .replace(':quota', formatNumber(quota.value?.monthly_quota ?? 0))
+        .replace(':available', formatNumber(purchasedCredits.value));
 });
 
 // ── Estado do run ───────────────────────────────────────────────────────────
@@ -160,6 +180,45 @@ const submitting = ref(false);
 const acting = ref(false);
 const cancelling = ref(false);
 const escalating = ref(false);
+
+// Paywall vindo de uma resposta (422 sem créditos / 402 acesso limitado).
+const paywallError = ref(null);
+const paywallNotice = computed(() => {
+    if (paywallError.value) return paywallError.value;
+    if (step.value === 'idle' && quotaExhausted.value && props.ai?.paywall) {
+        return { paywall: props.ai.paywall, limited: props.ai.paywall.reason === 'limited', message: '' };
+    }
+    return null;
+});
+
+function paywallFromError(error) {
+    const status = error?.response?.status;
+    const data = error?.response?.data ?? {};
+    // Resposta da ação (422/402): anunciada como alerta.
+    if (status === 422 && data.code === 'ai_insufficient_credits') {
+        return {
+            paywall: data.paywall ?? props.ai?.paywall ?? null,
+            limited: false,
+            message: data.message ?? '',
+            urgent: true,
+        };
+    }
+    if (status === 402 && data.access_level === 'limited') {
+        return { paywall: props.ai?.paywall ?? null, limited: true, message: data.message ?? '', urgent: true };
+    }
+    return null;
+}
+
+// Erro de crédito/acesso: volta ao pedido e mostra o paywall (não é falha da análise).
+function showPaywallFrom(error) {
+    const notice = paywallFromError(error);
+    if (!notice) return false;
+    stopTimers();
+    step.value = 'idle';
+    clearAlert();
+    paywallError.value = notice;
+    return true;
+}
 
 // ── Onda 3, P1 — Meus prompts ──────────────────────────────────────────────
 const myPrompts = ref([]);
@@ -273,6 +332,7 @@ watch(
     (v) => {
         if (v) {
             clearAlert();
+            paywallError.value = null;
             resetRun();
             if (props.viewReport?.content) {
                 reviewText.value = mdToHtml(props.viewReport.content);
@@ -390,6 +450,7 @@ function validate() {
 
 async function analyze() {
     clearAlert();
+    paywallError.value = null;
     if (!validate()) return;
     submitting.value = true;
     resetRun();
@@ -404,6 +465,7 @@ async function analyze() {
         }
         await poll();
     } catch (error) {
+        if (showPaywallFrom(error)) return;
         const m = error?.response?.data?.message;
         const details = error?.response?.data?.details;
         fail(
@@ -888,6 +950,7 @@ async function escalate() {
         startElapsed();
         poll();
     } catch (error) {
+        if (showPaywallFrom(error)) return;
         setAlert('danger', error?.response?.data?.message ?? lbl('failed', 'Falha ao reanalisar.'));
     } finally {
         escalating.value = false;
@@ -1019,7 +1082,7 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                 <!-- F6 — Saldo + progress ring de cota -->
                 <div class="d-flex flex-wrap align-items-center gap-3 small text-muted">
                     <span
-                        ><strong>{{ balance.available ?? '—' }}</strong>
+                        ><strong>{{ formatNumber(balance.available) }}</strong>
                         {{ lbl('credits_available', 'Créditos disponíveis') }}</span
                     >
                     <div
@@ -1027,8 +1090,8 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                         class="d-flex align-items-center gap-2"
                         :title="
                             lbl('quota_used', '')
-                                .replace(':consumed', quota.consumed_credits)
-                                .replace(':quota', quota.monthly_quota)
+                                .replace(':consumed', formatNumber(quota.consumed_credits))
+                                .replace(':quota', formatNumber(quota.monthly_quota))
                                 .replace(':percent', quotaPercent ?? 0)
                         "
                     >
@@ -1049,6 +1112,7 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                         <span
                             >{{ lbl('quota_label', 'Cota mensal') }}: <strong>{{ quotaPercent ?? 0 }}%</strong></span
                         >
+                        <span v-if="quotaRenewsText" data-test="ai-quota-renews">· {{ quotaRenewsText }}</span>
                     </div>
                 </div>
 
@@ -1056,7 +1120,14 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                     {{ alertMsg }}
                 </div>
 
-                <div v-if="step === 'idle' && quotaExhausted" class="alert alert-danger py-2 small mb-0">
+                <AiPaywallNotice
+                    v-if="paywallNotice"
+                    :paywall="paywallNotice.paywall"
+                    :limited="paywallNotice.limited"
+                    :fallback-message="paywallNotice.message || quotaExhaustedText"
+                    :urgent="paywallNotice.urgent === true"
+                />
+                <div v-else-if="step === 'idle' && quotaExhausted" class="alert alert-danger py-2 small mb-0">
                     <i class="ti ti-circle-off me-1" aria-hidden="true"></i>{{ quotaExhaustedText }}
                 </div>
                 <div v-else-if="step === 'idle' && usingPurchasedCredits" class="alert alert-info py-2 small mb-0">

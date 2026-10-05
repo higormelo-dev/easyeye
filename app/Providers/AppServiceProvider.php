@@ -227,6 +227,39 @@ class AppServiceProvider extends ServiceProvider
         );
 
         // -------------------------------------------------------------------------
+        // Checkout transparente da assinatura: pagamento (cartão, contratação,
+        // troca de cartão) com teto baixo — teste de cartões roubados (card
+        // testing) é o abuso típico; leitura (instruções Pix/boleto, opções)
+        // mais folgada. Chave por usuário + clínica (e IP sem login).
+        // -------------------------------------------------------------------------
+        $checkoutKey = static fn (Request $r): string => 'checkout:' . ($r->user()?->id ?? $r->ip()) . ':' . $r->session()->get('selected_entity_id', 'none');
+
+        RateLimiter::for(
+            'billing-checkout-pay',
+            static fn (Request $r) => [
+                Limit::perMinute(5)->by($checkoutKey($r)),
+                Limit::perHour(20)->by($checkoutKey($r)),
+            ],
+        );
+        RateLimiter::for(
+            'billing-checkout-read',
+            static fn (Request $r) => Limit::perMinute(30)->by($checkoutKey($r)),
+        );
+
+        // Cadastro no site (POST /register): cada cadastro é uma conta nova com
+        // o próprio limite de pagamento — o teto por IP impede abrir contas em
+        // série para testar cartões (card testing) pelo checkout do cadastro.
+        $signupTooMany = static fn () => response()->json(['message' => __('auth.register.too_many_signups')], 429);
+
+        RateLimiter::for(
+            'register',
+            static fn (Request $r) => [
+                Limit::perHour(max(1, (int) config('billing.checkout.fraud.register_per_ip_hour', 10)))->by('register:hour:' . $r->ip())->response($signupTooMany),
+                Limit::perDay(max(1, (int) config('billing.checkout.fraud.register_per_ip_day', 30)))->by('register:day:' . $r->ip())->response($signupTooMany),
+            ],
+        );
+
+        // -------------------------------------------------------------------------
         // Painel financeiro da clínica: mutações (faturar, marcar paga/negada,
         // fechar caixa, importar retorno TISS) e as exportações pesadas
         // (XML/CSV com drill-down) não tinham nenhum teto — sessão comprometida

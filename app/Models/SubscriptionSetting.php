@@ -57,12 +57,4 @@ class SubscriptionSetting extends Model
     {
         return (int) static::getValue('trial_days', 7);
     }
-
-    /**
-     * Dias de período de graça após expiração.
-     */
-    public static function gracePeriodDays(): int
-    {
-        return (int) static::getValue('grace_period_days', 3);
-    }
 }

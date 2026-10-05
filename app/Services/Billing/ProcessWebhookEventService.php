@@ -2,24 +2,49 @@
 
 namespace App\Services\Billing;
 
-use App\DTOs\Billing\GatewayWebhookInputDTO;
-use App\Enums\Billing\{BillingEventType, CancellationReason, InvoiceStatus, PaymentStatus};
-use App\Models\Billing\{Cancellation, Invoice, Payment, WebhookEvent};
-use App\Models\Subscription;
+use App\Contracts\Billing\PaymentGatewayInterface;
+use App\DTOs\Billing\{GatewayWebhookInputDTO, NormalizedWebhookEventDTO};
+use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentStatus, WebhookEventStatus};
+use App\Enums\{SubscriptionBillingMode, SubscriptionStatus};
+use App\Models\Billing\{Invoice, Payment, WebhookEvent};
+use App\Models\{Entity, Subscription};
+use App\Support\Billing\PaymentUrl;
+use Carbon\{CarbonImmutable, CarbonInterface};
+use Illuminate\Support\{Collection, Str};
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Throwable;
 
+/**
+ * Aplica o evento normalizado do gateway à cobrança e à assinatura.
+ *
+ * Resolução: a assinatura vem do id dela no gateway, do Payment já gravado
+ * (pelo id externo da cobrança) ou da referência que enviamos (metadata
+ * subscription_id/invoice_id); a fatura, do Payment, do id externo, da
+ * referência ou do período que contém o vencimento da cobrança.
+ *
+ * Tudo roda numa transação que trava a empresa e a assinatura: o mesmo
+ * pagamento nunca estende o período duas vezes, e evento velho (falha depois
+ * do pagamento) não volta o estado. Assinatura que não é mais cobrada pelo
+ * gateway (cortesia, trial, cancelada, expirada, substituída) nunca muda por
+ * webhook: o pagamento é registrado com alerta.
+ */
 class ProcessWebhookEventService
 {
     /** Normalized event types that indicate a successful payment */
     private const PAID_TYPES = ['paid', 'authorized'];
 
-    /** Normalized event types that indicate a payment failure */
-    private const FAILED_TYPES = ['failed'];
+    /** Cobrança recusada ou vencida sem pagamento */
+    private const UNPAID_TYPES = ['failed', 'overdue'];
 
-    /** Normalized event types that indicate cancellation */
-    private const CANCELLED_TYPES = ['cancelled'];
+    /**
+     * A recorrência foi encerrada no gateway: nunca bloqueia nem cancela a
+     * assinatura — a cobrança passa para a renovação local, com alerta ao
+     * manager (GatewayRecurrenceLossService).
+     */
+    private const SUBSCRIPTION_CANCELLED_TYPES = ['cancelled'];
+
+    /** Só a cobrança foi cancelada/apagada — a assinatura segue */
+    private const PAYMENT_CANCELLED_TYPES = ['payment_cancelled'];
 
     /** Normalized event types that indicate a refund */
     private const REFUNDED_TYPES = ['refunded'];
@@ -27,16 +52,22 @@ class ProcessWebhookEventService
     /** Normalized event types that indicate a chargeback */
     private const CHARGEBACK_TYPES = ['chargeback'];
 
+    /** Cobrança emitida/alterada: guarda link e vencimento */
+    private const CHARGE_CREATED_TYPES = ['created'];
+
     public function __construct(
         private readonly GatewayRegistry $gatewayRegistry,
         private readonly BillingLogService $billingLogService,
         private readonly FinancialEventService $financialEventService,
+        private readonly SubscriptionCycleService $cycles,
+        private readonly AiCreditPackCheckoutService $aiPacks,
+        private readonly GatewayRecurrenceLossService $recurrenceLoss,
     ) {
     }
 
     public function process(WebhookEvent $webhookEvent): void
     {
-        if ($webhookEvent->status->value === 'processed') {
+        if ($webhookEvent->status === WebhookEventStatus::Processed) {
             return;
         }
 
@@ -61,48 +92,22 @@ class ProcessWebhookEventService
                 receivedAt: $webhookEvent->received_at?->toIso8601String(),
             ));
 
-            // Resolve all models inside a transaction with pessimistic locking
-            // to prevent race conditions when two webhooks arrive concurrently
-            [$subscription, $invoice, $payment] = DB::transaction(function () use ($normalized, $webhookEvent) {
-                $subscription = $this->resolveSubscription($normalized->externalSubscriptionId, $normalized->metadata);
-                $invoice      = $this->resolveInvoice($normalized->externalInvoiceId, $normalized->gatewayCode, $subscription);
-                $payment      = $this->resolvePayment($normalized->externalPaymentId, $normalized->gatewayCode, $subscription, $invoice, $normalized->amount, $normalized->currency);
-
-                // Lock subscription row to prevent concurrent state mutations
-                if ($subscription) {
-                    $subscription = Subscription::query()
-                        ->where('id', $subscription->id)
-                        ->lockForUpdate()
-                        ->first();
-                }
-
-                if ($subscription && ! $webhookEvent->entity_id) {
-                    $webhookEvent->entity_id = $subscription->entity_id;
-                }
-
-                if ($payment && $invoice && ! $payment->invoice_id) {
-                    $payment->invoice_id = $invoice->id;
-                    $payment->save();
-                }
-
-                return [$subscription, $invoice, $payment];
-            });
-
-            // Apply state changes based on normalized event type (explicit match, not str_contains)
             $eventType = strtolower($normalized->eventType);
 
-            if (in_array($eventType, self::PAID_TYPES, true)) {
-                $this->applyPaidState($subscription, $invoice, $payment, $correlationId);
-            } elseif (in_array($eventType, self::FAILED_TYPES, true)) {
-                $this->applyFailedState($subscription, $invoice, $payment, $correlationId);
-            } elseif (in_array($eventType, self::CANCELLED_TYPES, true)) {
-                $this->applyCancelledState($subscription, $normalized->gatewayCode, $correlationId);
-            } elseif (in_array($eventType, self::REFUNDED_TYPES, true)) {
-                $this->applyRefundedState($subscription, $invoice, $payment, $correlationId);
-            } elseif (in_array($eventType, self::CHARGEBACK_TYPES, true)) {
-                $this->applyChargebackState($subscription, $invoice, $payment, $correlationId);
+            [$subscription, $invoice, $payment, $outcome, $replaced, $staleCharges] = DB::transaction(
+                fn (): array => $this->apply($normalized, $eventType, $correlationId),
+            );
+
+            if (! $webhookEvent->entity_id && ($subscription || $invoice)) {
+                $webhookEvent->entity_id = $subscription?->entity_id ?? $invoice->entity_id;
             }
-            // 'unknown' and unrecognized types: log without state change
+
+            // Cobrança recorrente das assinaturas substituídas: fora da transação (HTTP).
+            $this->cycles->stopRecurrences($replaced, $correlationId);
+
+            // Paga por uma das cobranças da fatura: as outras (a vigente que o
+            // checkout desligou, o boleto/Pix da outra forma) deixam de valer.
+            $this->cancelStaleCharges($gateway, $invoice, $staleCharges, $correlationId);
 
             $webhookEvent->update([
                 'event_type'         => $normalized->eventType,
@@ -114,6 +119,8 @@ class ProcessWebhookEventService
                     'external_invoice_id'      => $normalized->externalInvoiceId,
                     'amount'                   => $normalized->amount,
                     'currency'                 => $normalized->currency,
+                    'due_date'                 => $normalized->dueDate,
+                    'outcome'                  => $outcome,
                 ],
                 'status'       => 'processed',
                 'processed_at' => now(),
@@ -121,11 +128,12 @@ class ProcessWebhookEventService
             ]);
 
             $this->billingLogService->log(
-                level: 'info',
-                message: 'Webhook processado com sucesso.',
+                level: str_starts_with($outcome, 'alert_') ? 'warning' : 'info',
+                message: 'Webhook processado.',
                 context: [
                     'event_type' => $normalized->eventType,
                     'status'     => $normalized->status,
+                    'outcome'    => $outcome,
                 ],
                 entityId: $subscription?->entity_id ?? $webhookEvent->entity_id,
                 subscription: $subscription,
@@ -155,11 +163,279 @@ class ProcessWebhookEventService
         }
     }
 
-    private function resolveSubscription(?string $externalSubscriptionId, array $metadata): ?Subscription
+    /**
+     * Resolve e aplica o evento com a empresa e a assinatura travadas.
+     *
+     * @return array{0: ?Subscription, 1: ?Invoice, 2: ?Payment, 3: string, 4: Collection<int, Subscription>, 5: list<string>}
+     */
+    private function apply(NormalizedWebhookEventDTO $n, string $eventType, string $correlationId): array
     {
-        if ($externalSubscriptionId) {
+        $knownPayment = $this->findPayment($n);
+
+        // Cobrança de pacote de créditos de IA (fatura sem assinatura): o
+        // serviço do pacote aplica — credita, estorna — sem tocar assinatura.
+        if (($pack = $this->aiCreditPackInvoice($n, $knownPayment)) !== null) {
+            [$invoice, $payment, $outcome, $stale] = $this->aiPacks->applyWebhook($n, $eventType, $pack, $correlationId);
+
+            return [null, $invoice, $payment, $outcome, collect(), $stale];
+        }
+
+        $subscription = $this->resolveSubscription($n, $knownPayment);
+
+        if ($subscription) {
+            Entity::query()->whereKey($subscription->entity_id)->lockForUpdate()->first();
+            $subscription = Subscription::query()->with('plan')->whereKey($subscription->id)->lockForUpdate()->first();
+        }
+
+        $governed = $subscription !== null && $this->isGovernedBy($subscription, $n->gatewayCode);
+        // Relido depois da trava: outro processamento do mesmo pagamento já terminou.
+        $payment = $this->findPayment($n);
+        $invoice = $this->resolveInvoice($n, $subscription, $payment);
+
+        // Cobrança gerada pela recorrência do gateway (ex.: 2ª parcela do
+        // Asaas) ainda sem fatura: cria a do período que começa no vencimento.
+        // Nunca para cobrança de outra recorrência (duplicada/órfã).
+        if (! $invoice && $governed && $n->dueDate !== null && $subscription->hasGatewayRecurrence()
+            && ! $this->isForeignRecurrence($n, $subscription)
+            && in_array($eventType, [...self::PAID_TYPES, ...self::UNPAID_TYPES, ...self::CHARGE_CREATED_TYPES], true)) {
+            $invoice = $this->cycles->periodInvoice($subscription, $this->dueDateOf($n), $correlationId);
+        }
+
+        $isPaidEvent = in_array($eventType, self::PAID_TYPES, true);
+        $isReversal  = in_array($eventType, [...self::REFUNDED_TYPES, ...self::CHARGEBACK_TYPES], true);
+
+        // Estorno/chargeback já aplicado a este pagamento (reentrega depois
+        // da retenção de webhook_events): sem novo evento financeiro, log ou
+        // atraso.
+        if ($isReversal && $payment !== null
+            && $payment->status === (in_array($eventType, self::REFUNDED_TYPES, true) ? PaymentStatus::Refunded : PaymentStatus::Chargeback)) {
+            return [$subscription, $invoice, $payment, 'duplicate', collect(), []];
+        }
+
+        // Estorno da cobrança que QUITOU a fatura: segue o estorno normal da
+        // assinatura, mesmo que ela esteja entre as desligadas pelo checkout.
+        $settledByThis = $isReversal && $invoice && $invoice->isSettledByCharge($n->externalPaymentId, $payment);
+
+        // Estorno do pagamento em DUPLICIDADE (a fatura foi quitada por outra
+        // cobrança, que segue paga): só esse pagamento — fatura e assinatura
+        // ficam como estão (nada de reembolsada nem de atraso).
+        if ($isReversal && $invoice && ! $settledByThis && $invoice->isSettledByAnotherCharge($n->externalPaymentId)) {
+            return [$subscription, $invoice, $this->reverseDuplicatePayment($subscription, $invoice, $payment, $n, $eventType, $correlationId), in_array($eventType, self::REFUNDED_TYPES, true) ? 'duplicate_payment_refunded' : 'duplicate_payment_chargeback', collect(), []];
+        }
+
+        // Cobrança que o checkout substituiu (outra forma de pagamento) ou
+        // tentativa de cartão recusada: falha, cancelamento ou emissão dela
+        // não mexem na fatura, que já tem outra cobrança vigente. Pagamento
+        // dela (o cliente pagou o Pix antigo) vale normalmente.
+        if (! $isPaidEvent && ! $settledByThis && $invoice && $this->isDetachedCharge($invoice, $n)) {
+            $dead = in_array($eventType, [...self::UNPAID_TYPES, ...self::PAYMENT_CANCELLED_TYPES], true);
+
+            $payment?->update(array_filter([
+                'status' => $dead && $payment->status !== PaymentStatus::Paid
+                    ? PaymentStatus::Cancelled->value
+                    : null,
+            ]));
+
+            // Cobrança mantida pelo checkout (outra forma) que expirou/foi
+            // cancelada: as instruções dela saem da fatura.
+            if ($dead) {
+                $this->forgetCharges($invoice, [(string) $n->externalPaymentId]);
+            }
+
+            return [$subscription, $invoice, $payment, 'ignored_replaced_charge', collect(), []];
+        }
+
+        // Pagamento de assinatura que este gateway não cobra mais (substituída,
+        // cancelada, expirada, cortesia com a recorrência antiga) sem fatura
+        // identificável: fatura de registro para o dinheiro entrar na trilha —
+        // Payment, evento de alerta e estorno. Nunca muda a assinatura (ver
+        // applyPaid). Na assinatura vigente, a cobrança sem fatura segue só no
+        // alerta: um reenvio, já com a fatura ligada, ainda pode aplicá-la.
+        if (! $invoice && ! $payment && $subscription && ! $governed && $isPaidEvent && filled($n->externalPaymentId)) {
+            $invoice = $this->unappliedPaymentInvoice($subscription, $n, $correlationId);
+        }
+
+        if (! $payment && $subscription && $invoice && $this->isChargeEvent($eventType)
+            && ! ($isPaidEvent && $invoice->status === InvoiceStatus::Paid)) {
+            $payment = $this->createPayment($n, $subscription, $invoice);
+        }
+
+        if ($invoice && $this->isChargeEvent($eventType)) {
+            $this->syncInvoiceWithCharge($invoice, $n, $subscription);
+        }
+
+        // Cobrança apagada e restaurada no gateway (PAYMENT_RESTORED do
+        // Asaas): volta a ser cobrança em aberto.
+        if (in_array($eventType, self::CHARGE_CREATED_TYPES, true) && ($n->metadata['restored'] ?? false) === true) {
+            $this->restoreCancelledCharge($invoice, $payment, $governed);
+        }
+
+        $replaced = collect();
+        $outcome  = 'ignored';
+        $stale    = [];
+
+        if ($isPaidEvent) {
+            [$outcome, $replaced] = $this->applyPaid($subscription, $invoice, $payment, $n, $governed, $correlationId);
+
+            if ($invoice && in_array($outcome, ['activated', 'renewed'], true)) {
+                $stale = $this->retireOtherCharges($invoice->refresh(), (string) $n->externalPaymentId);
+            }
+        } elseif (in_array($eventType, self::UNPAID_TYPES, true)) {
+            $outcome = $this->applyUnpaid($subscription, $invoice, $payment, $n, $eventType, $governed, $correlationId);
+        } elseif (in_array($eventType, self::SUBSCRIPTION_CANCELLED_TYPES, true)) {
+            $outcome = $this->recurrenceLoss->handle($subscription, $n, $governed, $correlationId);
+        } elseif (in_array($eventType, self::PAYMENT_CANCELLED_TYPES, true)) {
+            $outcome = $this->applyPaymentCancelled($invoice, $payment);
+        } elseif (in_array($eventType, self::REFUNDED_TYPES, true)) {
+            $outcome = $this->applyRefunded($subscription, $invoice, $payment, $correlationId);
+        } elseif (in_array($eventType, self::CHARGEBACK_TYPES, true)) {
+            $outcome = $this->applyChargeback($subscription, $invoice, $payment, $governed, $correlationId);
+        } elseif (in_array($eventType, self::CHARGE_CREATED_TYPES, true)) {
+            $outcome = $invoice ? 'charge_synced' : 'ignored';
+        }
+        // 'unknown' e tipos não reconhecidos: só registro, sem mudança de estado
+
+        return [$subscription, $invoice, $payment, $outcome, $replaced, $stale];
+    }
+
+    /**
+     * A fatura foi paga por esta cobrança: ela passa a ser a da fatura (a
+     * vigente, se era outra, fica desligada) e as demais que ainda valiam —
+     * a vigente de outra forma, o boleto/Pix mantido ao alternar — são
+     * marcadas canceladas e devolvidas para cancelar no gateway depois do
+     * commit (senão o cliente pode pagar duas vezes).
+     *
+     * @return list<string>
+     */
+    private function retireOtherCharges(Invoice $invoice, string $paidChargeId): array
+    {
+        if ($paidChargeId === '') {
+            return [];
+        }
+
+        $stale    = $invoice->liveChargeIds($paidChargeId);
+        $metadata = (array) ($invoice->metadata ?? []);
+        $previous = $invoice->external_invoice_id;
+
+        if ($stale === [] && $previous === $paidChargeId) {
+            return [];
+        }
+
+        if (filled($previous) && $previous !== $paidChargeId) {
+            $metadata['detached_charges'] = array_values(array_unique([...(array) ($metadata['detached_charges'] ?? []), (string) $previous]));
+        }
+
+        $metadata['cancelled_charges'] = array_values(array_unique([...(array) ($metadata['cancelled_charges'] ?? []), ...$stale]));
+        $metadata['paid_by_charge']    = $paidChargeId;
+
+        $invoice->forceFill([
+            'external_invoice_id' => Invoice::query()->where('gateway_code', $invoice->gateway_code)->where('external_invoice_id', $paidChargeId)->whereKeyNot($invoice->id)->exists()
+                ? $invoice->external_invoice_id
+                : $paidChargeId,
+            'payment_instructions' => null,
+            'metadata'             => $metadata,
+        ])->save();
+
+        if ($stale !== []) {
+            Payment::query()
+                ->where('invoice_id', $invoice->id)
+                ->whereIn('external_payment_id', $stale)
+                ->where('status', PaymentStatus::Pending->value)
+                ->update(['status' => PaymentStatus::Cancelled->value]);
+        }
+
+        return $stale;
+    }
+
+    /** Tira da fatura as instruções das cobranças que não valem mais. */
+    private function forgetCharges(Invoice $invoice, array $chargeIds): void
+    {
+        $entries = array_filter(
+            (array) ($invoice->payment_instructions ?? []),
+            fn ($entry) => ! in_array((string) data_get($entry, 'charge_id', ''), $chargeIds, true),
+        );
+        $metadata                      = (array) ($invoice->metadata ?? []);
+        $metadata['cancelled_charges'] = array_values(array_unique([...(array) ($metadata['cancelled_charges'] ?? []), ...$chargeIds]));
+
+        $invoice->forceFill(['payment_instructions' => $entries !== [] ? $entries : null, 'metadata' => $metadata])->save();
+    }
+
+    /** @param list<string> $chargeIds */
+    private function cancelStaleCharges(PaymentGatewayInterface $gateway, ?Invoice $invoice, array $chargeIds, string $correlationId): void
+    {
+        foreach ($chargeIds as $chargeId) {
+            try {
+                $cancelled = $gateway->cancelCharge($chargeId);
+            } catch (Throwable) {
+                $cancelled = false;
+            }
+
+            if (! $cancelled) {
+                $this->billingLogService->log(
+                    level: 'critical',
+                    message: 'Fatura paga por uma das cobranças; outra cobrança dela segue aberta no gateway e não pôde ser cancelada — cancelar manualmente (se paga, estornar).',
+                    context: ['external_charge_id' => $chargeId],
+                    entityId: $invoice?->entity_id,
+                    invoice: $invoice,
+                    gatewayCode: $gateway->code(),
+                    correlationId: $correlationId,
+                );
+            }
+        }
+    }
+
+    // ── Resolução ────────────────────────────────────────────────────────────
+
+    private function findPayment(NormalizedWebhookEventDTO $n): ?Payment
+    {
+        if (blank($n->externalPaymentId)) {
+            return null;
+        }
+
+        return Payment::query()
+            ->where('gateway_code', $n->gatewayCode)
+            ->where('external_payment_id', $n->externalPaymentId)
+            ->first();
+    }
+
+    /**
+     * Fatura de pacote de créditos de IA desta cobrança: pelo Payment já
+     * gravado, pelo id externo ligado à fatura ou pela referência que
+     * enviamos (metadata invoice_id).
+     */
+    private function aiCreditPackInvoice(NormalizedWebhookEventDTO $n, ?Payment $payment): ?Invoice
+    {
+        $candidates = [];
+
+        if ($payment?->invoice_id) {
+            $candidates[] = fn () => Invoice::query()->find($payment->invoice_id);
+        }
+
+        foreach (array_filter([$n->externalInvoiceId, $n->externalPaymentId]) as $externalId) {
+            $candidates[] = fn () => Invoice::query()->where('gateway_code', $n->gatewayCode)->where('external_invoice_id', $externalId)->first();
+        }
+
+        if (($invoiceId = $this->uuidFrom($n->metadata['invoice_id'] ?? null)) !== null) {
+            $candidates[] = fn () => Invoice::query()->find($invoiceId);
+        }
+
+        foreach ($candidates as $find) {
+            $invoice = $find();
+
+            if ($invoice !== null) {
+                return $invoice->isAiCreditPack() ? $invoice : null;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveSubscription(NormalizedWebhookEventDTO $n, ?Payment $payment): ?Subscription
+    {
+        if (filled($n->externalSubscriptionId)) {
             $subscription = Subscription::query()
-                ->where('gateway_subscription_id', $externalSubscriptionId)
+                ->where('gateway', $n->gatewayCode)
+                ->where('gateway_subscription_id', $n->externalSubscriptionId)
                 ->first();
 
             if ($subscription) {
@@ -167,21 +443,71 @@ class ProcessWebhookEventService
             }
         }
 
-        $subscriptionId = $metadata['subscription_id'] ?? null;
+        if ($payment?->subscription_id) {
+            return Subscription::query()->find($payment->subscription_id);
+        }
 
-        if (is_string($subscriptionId) && $subscriptionId !== '') {
-            return Subscription::query()->find($subscriptionId);
+        $subscriptionId = $this->uuidFrom($n->metadata['subscription_id'] ?? null);
+
+        if ($subscriptionId && ($subscription = Subscription::query()->find($subscriptionId))) {
+            return $subscription;
+        }
+
+        $invoiceId = $this->uuidFrom($n->metadata['invoice_id'] ?? null);
+
+        if ($invoiceId && ($invoice = Invoice::query()->find($invoiceId))) {
+            return Subscription::query()->find($invoice->subscription_id);
         }
 
         return null;
     }
 
-    private function resolveInvoice(?string $externalInvoiceId, string $gatewayCode, ?Subscription $subscription): ?Invoice
+    private function resolveInvoice(NormalizedWebhookEventDTO $n, ?Subscription $subscription, ?Payment $payment): ?Invoice
     {
-        if ($externalInvoiceId) {
+        $belongs = fn (?Invoice $invoice): bool => $invoice !== null
+            && ($subscription === null || $invoice->subscription_id === $subscription->id);
+
+        if ($payment && $belongs($invoice = Invoice::query()->find($payment->invoice_id))) {
+            return $invoice;
+        }
+
+        foreach (array_filter([$n->externalInvoiceId, $n->externalPaymentId]) as $externalId) {
             $invoice = Invoice::query()
-                ->where('gateway_code', $gatewayCode)
-                ->where('external_invoice_id', $externalInvoiceId)
+                ->where('gateway_code', $n->gatewayCode)
+                ->where('external_invoice_id', $externalId)
+                ->first();
+
+            if ($belongs($invoice)) {
+                return $invoice;
+            }
+        }
+
+        $invoiceId = $this->uuidFrom($n->metadata['invoice_id'] ?? null);
+
+        if ($invoiceId && $belongs($invoice = Invoice::query()->find($invoiceId))) {
+            return $invoice;
+        }
+
+        if (! $subscription) {
+            return null;
+        }
+
+        // Evento de outra recorrência (duplicada ou órfã — mesma referência,
+        // outro id no gateway): só a cobrança já ligada a uma fatura (acima)
+        // vale. Pelo vencimento ou pela 1ª fatura, cancelaria/venceria a
+        // fatura da assinatura vigente.
+        if ($this->isForeignRecurrence($n, $subscription)) {
+            return null;
+        }
+
+        // Cobrança da recorrência: a fatura do período que contém o vencimento.
+        if ($n->dueDate !== null) {
+            $due     = $this->dueDateOf($n)->toDateString();
+            $invoice = $subscription->invoices()
+                ->forBillingPeriod()
+                ->whereDate('period_start', '<=', $due)
+                ->whereDate('period_end', '>', $due)
+                ->orderByDesc('period_start')
                 ->first();
 
             if ($invoice) {
@@ -189,193 +515,294 @@ class ProcessWebhookEventService
             }
         }
 
-        if ($subscription?->current_invoice_id) {
-            return Invoice::query()->find($subscription->current_invoice_id);
-        }
-
-        return null;
-    }
-
-    private function resolvePayment(
-        ?string $externalPaymentId,
-        string $gatewayCode,
-        ?Subscription $subscription,
-        ?Invoice $invoice,
-        ?float $amount,
-        ?string $currency,
-    ): ?Payment {
-        if ($externalPaymentId) {
-            $payment = Payment::query()
-                ->where('gateway_code', $gatewayCode)
-                ->where('external_payment_id', $externalPaymentId)
-                ->first();
-
-            if ($payment) {
-                return $payment;
-            }
-        }
-
-        if (! $subscription || ! $invoice) {
+        // Contratação que nunca pagou: a cobrança ainda não ligada (ou a mesma)
+        // que vence antes do fim do 1º período é a da fatura do 1º período.
+        // Quem já pagou nunca cai aqui — o pagamento da renovação não pode ir
+        // para a fatura do ciclo anterior.
+        if ($subscription->hasBeenPaid() || ! $subscription->current_invoice_id) {
             return null;
         }
 
-        // Idempotency key prevents duplicate payment records on webhook retry
-        $idempotencyKey = 'webhook:' . $gatewayCode . ':' . ($externalPaymentId ?? $invoice->id);
+        $first = Invoice::query()->find($subscription->current_invoice_id);
 
-        return Payment::query()->firstOrCreate(
-            [
-                'invoice_id'      => $invoice->id,
-                'idempotency_key' => $idempotencyKey,
-            ],
-            [
-                'entity_id'           => $subscription->entity_id,
-                'subscription_id'     => $subscription->id,
-                'gateway_code'        => $gatewayCode,
-                'external_payment_id' => $externalPaymentId,
-                'status'              => PaymentStatus::Pending->value,
-                'amount'              => $amount ?? (float) $invoice->amount,
-                'currency'            => $currency ?? $invoice->currency,
-                'idempotency_key'     => $idempotencyKey,
-            ],
-        );
+        $sameCharge = $first !== null
+            && (blank($first->external_invoice_id) || $first->external_invoice_id === $n->externalPaymentId);
+        $withinFirstPeriod = $n->dueDate === null
+            || $first?->period_end === null
+            || $this->dueDateOf($n)->lessThan($first->period_end);
+
+        return $sameCharge && $withinFirstPeriod ? $first : null;
     }
 
-    private function applyPaidState(?Subscription $subscription, ?Invoice $invoice, ?Payment $payment, string $correlationId): void
+    /** Cobrança desligada da fatura pelo checkout (invoices.metadata.detached_charges). */
+    private function isDetachedCharge(Invoice $invoice, NormalizedWebhookEventDTO $n): bool
     {
-        if ($payment) {
-            $payment->update([
-                'status'  => PaymentStatus::Paid->value,
-                'paid_at' => now(),
-            ]);
-        }
+        $detached = (array) data_get($invoice->metadata, 'detached_charges', []);
 
-        if ($invoice) {
-            $invoice->update([
-                'status'  => InvoiceStatus::Paid->value,
-                'paid_at' => now(),
-            ]);
-        }
-
-        if ($subscription) {
-            $subscription->update([
-                'status'             => 'active',
-                'billing_state'      => 'paid',
-                'last_payment_at'    => now(),
-                'last_billing_error' => null,
-            ]);
-
-            $this->financialEventService->record(
-                eventType: BillingEventType::SubscriptionActivated,
-                entityId: (string) $subscription->entity_id,
-                subscription: $subscription,
-                invoice: $invoice,
-                payment: $payment,
-                amount: $payment ? (float) $payment->amount : null,
-                currency: $payment?->currency,
-                correlationId: $correlationId,
-                source: 'webhook',
-            );
-        }
-
-        if ($subscription && $invoice) {
-            $this->financialEventService->record(
-                eventType: BillingEventType::InvoicePaid,
-                entityId: (string) $subscription->entity_id,
-                subscription: $subscription,
-                invoice: $invoice,
-                payment: $payment,
-                amount: $payment ? (float) $payment->amount : (float) $invoice->amount,
-                currency: $payment?->currency ?? $invoice->currency,
-                correlationId: $correlationId,
-                source: 'webhook',
-            );
-        }
+        return filled($n->externalPaymentId)
+            && $n->externalPaymentId !== $invoice->external_invoice_id
+            && in_array($n->externalPaymentId, $detached, true);
     }
 
-    private function applyFailedState(?Subscription $subscription, ?Invoice $invoice, ?Payment $payment, string $correlationId): void
+    private function createPayment(NormalizedWebhookEventDTO $n, Subscription $subscription, Invoice $invoice): ?Payment
     {
-        if ($payment) {
-            $payment->update([
-                'status'    => PaymentStatus::Failed->value,
-                'failed_at' => now(),
-            ]);
+        if (blank($n->externalPaymentId)) {
+            return null;
         }
 
-        if ($invoice) {
-            $invoice->update([
-                'status' => InvoiceStatus::Failed->value,
-            ]);
-        }
-
-        if ($subscription) {
-            $subscription->update([
-                'status'             => 'past_due',
-                'billing_state'      => 'past_due',
-                'last_billing_error' => 'Falha no pagamento recebida via webhook.',
-            ]);
-
-            $this->financialEventService->record(
-                eventType: BillingEventType::PaymentFailed,
-                entityId: (string) $subscription->entity_id,
-                subscription: $subscription,
-                invoice: $invoice,
-                payment: $payment,
-                amount: $payment ? (float) $payment->amount : null,
-                currency: $payment?->currency,
-                correlationId: $correlationId,
-                source: 'webhook',
-            );
-        }
-    }
-
-    private function applyCancelledState(?Subscription $subscription, string $gatewayCode, string $correlationId): void
-    {
-        if (! $subscription) {
-            return;
-        }
-
-        $subscription->update([
-            'status'        => 'cancelled',
-            'cancelled_at'  => now(),
-            'billing_state' => 'cancelled',
+        return Payment::query()->create([
+            'entity_id'           => $subscription->entity_id,
+            'invoice_id'          => $invoice->id,
+            'subscription_id'     => $subscription->id,
+            'gateway_code'        => $n->gatewayCode,
+            'external_payment_id' => $n->externalPaymentId,
+            'status'              => PaymentStatus::Pending->value,
+            'amount'              => $n->amount ?? (float) $invoice->amount,
+            'currency'            => $n->currency ?? $invoice->currency,
+            'idempotency_key'     => 'webhook:' . $n->gatewayCode . ':' . $n->externalPaymentId,
+            'metadata'            => ['source' => 'webhook'],
         ]);
+    }
 
-        Cancellation::query()->create([
-            'entity_id'       => $subscription->entity_id,
-            'subscription_id' => $subscription->id,
-            'gateway_code'    => $gatewayCode,
-            'reason'          => CancellationReason::System->value,
-            'source'          => 'webhook',
-            'effective_at'    => now(),
-            'metadata'        => ['origin' => 'gateway'],
-            'correlation_id'  => $correlationId,
-        ]);
+    /** Liga a fatura à cobrança do gateway e guarda link e vencimento. */
+    private function syncInvoiceWithCharge(Invoice $invoice, NormalizedWebhookEventDTO $n, ?Subscription $subscription): void
+    {
+        $updates = [];
 
-        $this->financialEventService->record(
-            eventType: BillingEventType::SubscriptionCancelled,
-            entityId: (string) $subscription->entity_id,
+        if (blank($invoice->gateway_code)) {
+            $updates['gateway_code'] = $n->gatewayCode;
+        }
+
+        if (filled($n->externalPaymentId) && blank($invoice->external_invoice_id)
+            && ! Invoice::query()->where('gateway_code', $n->gatewayCode)->where('external_invoice_id', $n->externalPaymentId)->exists()) {
+            $updates['external_invoice_id'] = $n->externalPaymentId;
+        }
+
+        // Só link http(s) (vira href no painel e no e-mail); fora disso, descartado.
+        if (($paymentUrl = PaymentUrl::safe($n->paymentUrl)) !== null) {
+            $updates['payment_url'] = $paymentUrl;
+        }
+
+        $unpaid = ! in_array($invoice->status, [InvoiceStatus::Paid, InvoiceStatus::Refunded], true);
+
+        if ($unpaid && $n->dueDate !== null) {
+            $updates['due_at'] = $this->dueDateOf($n)->endOfDay();
+        }
+
+        if ($invoice->status === InvoiceStatus::Draft) {
+            $updates['status'] = InvoiceStatus::Pending->value;
+        }
+
+        if ($updates !== []) {
+            $invoice->update($updates);
+        }
+
+        // Contratação: o acesso vale até o vencimento real da 1ª cobrança —
+        // nunca o da cobrança reemitida pelo checkout (pagar depois do
+        // vencimento não devolve acesso antes do pagamento).
+        if ($subscription && $unpaid && $n->dueDate !== null && $subscription->isAwaitingFirstPayment()
+            && $invoice->id === $subscription->current_invoice_id
+            && ! data_get($invoice->metadata, 'checkout.reissued')) {
+            $dueAt = $this->dueDateOf($n)->endOfDay();
+
+            $subscription->update(['next_billing_at' => $dueAt, 'ends_at' => $dueAt]);
+        }
+    }
+
+    // ── Estados ──────────────────────────────────────────────────────────────
+
+    /**
+     * @return array{0: string, 1: Collection<int, Subscription>}
+     */
+    private function applyPaid(
+        ?Subscription $subscription,
+        ?Invoice $invoice,
+        ?Payment $payment,
+        NormalizedWebhookEventDTO $n,
+        bool $governed,
+        string $correlationId,
+    ): array {
+        // Idempotência por pagamento: confirmado de novo (ex.: CONFIRMED e
+        // depois RECEIVED no Asaas) não estende de novo.
+        if ($payment?->status === PaymentStatus::Paid) {
+            return ['duplicate', collect()];
+        }
+
+        if ($invoice?->status === InvoiceStatus::Paid) {
+            $this->alert($subscription, $invoice, $payment, 'Pagamento para fatura já paga — conferir duplicidade no gateway.', $n, $correlationId);
+
+            return ['alert_invoice_already_paid', collect()];
+        }
+
+        if (! $governed || ! $invoice || $this->isUnappliedRecord($invoice)) {
+            // Cancelada, expirada, substituída, cortesia ou sem fatura: o
+            // dinheiro entrou (registrado na fatura de registro quando não há
+            // outra), mas a assinatura não muda — alerta para o time.
+            $this->markPaymentPaid($payment, $invoice);
+
+            if ($subscription && $payment) {
+                $this->financialEventService->record(
+                    eventType: BillingEventType::PaymentSucceeded,
+                    entityId: (string) $subscription->entity_id,
+                    subscription: $subscription,
+                    invoice: $invoice,
+                    payment: $payment,
+                    amount: (float) $payment->amount,
+                    currency: $payment->currency,
+                    metadata: ['alert' => 'subscription_not_billed_by_gateway', 'subscription_status' => $subscription->status->value],
+                    correlationId: $correlationId,
+                    source: 'webhook',
+                );
+            }
+
+            // Sem Payment (sem assinatura, sem id da cobrança ou cobrança da
+            // assinatura vigente sem fatura): o log crítico guarda valor,
+            // gateway e ids para o time conferir e registrar ou estornar à mão.
+            $payment
+                ? $this->alert($subscription, $invoice, $payment, 'Pagamento recebido para assinatura que não está sendo cobrada por este gateway — nenhuma mudança de acesso.', $n, $correlationId)
+                : $this->alert($subscription, $invoice, null, 'Pagamento recebido sem assinatura ou cobrança identificável — não registrado; conferir no gateway e registrar ou estornar manualmente.', $n, $correlationId, 'critical');
+
+            return ['alert_payment_not_applied', collect()];
+        }
+
+        $wasAwaitingFirst = $subscription->isAwaitingFirstPayment();
+        $replaced         = $this->cycles->confirmPayment(
             subscription: $subscription,
-            amount: null,
-            currency: null,
+            invoice: $invoice,
+            payment: $payment,
+            dueDate: $this->paidDueDate($n, $invoice, $subscription),
             correlationId: $correlationId,
             source: 'webhook',
         );
+
+        return [$wasAwaitingFirst ? 'activated' : 'renewed', $replaced];
     }
 
-    private function applyRefundedState(?Subscription $subscription, ?Invoice $invoice, ?Payment $payment, string $correlationId): void
-    {
-        if ($payment) {
-            $payment->update([
-                'status'      => PaymentStatus::Refunded->value,
-                'refunded_at' => now(),
-            ]);
+    private function applyUnpaid(
+        ?Subscription $subscription,
+        ?Invoice $invoice,
+        ?Payment $payment,
+        NormalizedWebhookEventDTO $n,
+        string $eventType,
+        bool $governed,
+        string $correlationId,
+    ): string {
+        // Evento velho depois do pagamento não volta o estado.
+        if ($payment?->status === PaymentStatus::Paid || $invoice?->status === InvoiceStatus::Paid) {
+            return 'stale';
         }
 
-        if ($invoice) {
-            $invoice->update([
-                'status' => InvoiceStatus::Refunded->value,
-            ]);
+        $overdue = $eventType === 'overdue';
+
+        $payment?->update([
+            'status'    => PaymentStatus::Failed->value,
+            'failed_at' => now(),
+        ]);
+
+        // Só a fatura desta cobrança — nunca a paga do ciclo anterior.
+        $invoice?->update([
+            'status' => $overdue ? InvoiceStatus::Overdue->value : InvoiceStatus::Failed->value,
+        ]);
+
+        if (! $governed) {
+            return 'ignored_not_billed_by_gateway';
         }
+
+        // Diferença do upgrade não paga: a assinatura paga segue como está
+        // (sem atraso nem régua) — só a fatura do upgrade fica em aberto.
+        if ($invoice?->isPlanChange()) {
+            return 'plan_change_unpaid';
+        }
+
+        // Cobrança que não conseguimos identificar não muda a assinatura.
+        if (! $invoice) {
+            return 'ignored_unknown_charge';
+        }
+
+        $error = __($overdue ? 'manager_subscriptions.billing_errors.payment_overdue' : 'manager_subscriptions.billing_errors.payment_failed');
+
+        $this->financialEventService->record(
+            eventType: $overdue ? BillingEventType::InvoiceOverdue : BillingEventType::PaymentFailed,
+            entityId: (string) $subscription->entity_id,
+            subscription: $subscription,
+            invoice: $invoice,
+            payment: $payment,
+            amount: $payment ? (float) $payment->amount : (float) $invoice->amount,
+            currency: $payment?->currency ?? $invoice->currency,
+            correlationId: $correlationId,
+            source: 'webhook',
+        );
+
+        // Contratação: segue pendente, sem régua — o acesso acaba no fim do
+        // dia do vencimento da 1ª cobrança.
+        if (! $subscription->hasBeenPaid()) {
+            $subscription->update([
+                'billing_state'      => 'payment_failed',
+                'last_billing_error' => $error,
+            ]);
+
+            return 'first_payment_unpaid';
+        }
+
+        $due = $this->chargeDueDate($n, $invoice);
+
+        // Período desta cobrança já está pago (ex.: outra cobrança do mesmo ciclo).
+        $periodEnd = $due ? $subscription->periodEndFrom($due) : null;
+
+        if ($periodEnd && $subscription->ends_at && $subscription->ends_at->greaterThanOrEqualTo($periodEnd)) {
+            return 'period_already_paid';
+        }
+
+        $dueEnd = $due ? CarbonImmutable::instance($due)->endOfDay() : null;
+
+        // Recusada antes do vencimento (ex.: cartão): ainda não está em atraso
+        // e o período pago segue; vencido sem pagamento, a expiração diária
+        // põe em atraso desde o fim do período.
+        if ($dueEnd && $dueEnd->isFuture()) {
+            $subscription->update([
+                'billing_state'      => 'payment_failed',
+                'last_billing_error' => $error,
+            ]);
+
+            return 'payment_failed_before_due';
+        }
+
+        // Em atraso desde o vencimento da cobrança (fim do dia), ou agora.
+        $this->cycles->markPastDue(
+            subscription: $subscription,
+            since: $dueEnd ?? now(),
+            billingState: 'past_due',
+            error: $error,
+            correlationId: $correlationId,
+            source: 'webhook',
+            invoice: $invoice,
+        );
+
+        return 'past_due';
+    }
+
+    private function applyPaymentCancelled(?Invoice $invoice, ?Payment $payment): string
+    {
+        if ($payment?->status === PaymentStatus::Paid || $invoice?->status === InvoiceStatus::Paid) {
+            return 'stale';
+        }
+
+        $payment?->update(['status' => PaymentStatus::Cancelled->value]);
+        $invoice?->update(['status' => InvoiceStatus::Cancelled->value]);
+
+        return $invoice || $payment ? 'payment_cancelled' : 'ignored';
+    }
+
+    private function applyRefunded(?Subscription $subscription, ?Invoice $invoice, ?Payment $payment, string $correlationId): string
+    {
+        $payment?->update([
+            'status'      => PaymentStatus::Refunded->value,
+            'refunded_at' => now(),
+        ]);
+
+        $invoice?->update([
+            'status' => InvoiceStatus::Refunded->value,
+        ]);
 
         if ($subscription) {
             $this->financialEventService->record(
@@ -390,42 +817,268 @@ class ProcessWebhookEventService
                 source: 'webhook',
             );
         }
+
+        return $invoice || $payment ? 'refunded' : 'ignored';
     }
 
-    private function applyChargebackState(?Subscription $subscription, ?Invoice $invoice, ?Payment $payment, string $correlationId): void
+    /**
+     * Estorno/chargeback do pagamento em duplicidade (a fatura foi quitada
+     * por outra cobrança, que segue paga): só esse pagamento, o evento
+     * financeiro e o alerta. A fatura segue paga e a assinatura não muda.
+     */
+    private function reverseDuplicatePayment(?Subscription $subscription, Invoice $invoice, ?Payment $payment, NormalizedWebhookEventDTO $n, string $eventType, string $correlationId): ?Payment
     {
-        if ($payment) {
-            $payment->update([
-                'status'        => PaymentStatus::Chargeback->value,
-                'chargeback_at' => now(),
-            ]);
+        $refund = in_array($eventType, self::REFUNDED_TYPES, true);
+
+        $payment ??= filled($n->externalPaymentId) ? Payment::query()->create([
+            'entity_id'           => $invoice->entity_id,
+            'invoice_id'          => $invoice->id,
+            'subscription_id'     => $invoice->subscription_id,
+            'gateway_code'        => $n->gatewayCode,
+            'external_payment_id' => $n->externalPaymentId,
+            'status'              => PaymentStatus::Pending->value,
+            'amount'              => $n->amount ?? (float) $invoice->amount,
+            'currency'            => $n->currency ?? $invoice->currency,
+            'idempotency_key'     => 'webhook:' . $n->gatewayCode . ':' . $n->externalPaymentId,
+            'metadata'            => ['source' => 'webhook', 'duplicate_payment' => true],
+        ]) : null;
+
+        $payment?->update($refund
+            ? ['status' => PaymentStatus::Refunded->value, 'refunded_at' => now()]
+            : ['status' => PaymentStatus::Chargeback->value, 'chargeback_at' => now()]);
+
+        $this->financialEventService->record(
+            eventType: $refund ? BillingEventType::PaymentRefunded : BillingEventType::ChargebackReceived,
+            entityId: (string) $invoice->entity_id,
+            subscription: $subscription,
+            invoice: $invoice,
+            payment: $payment,
+            amount: $payment ? (float) $payment->amount : $n->amount,
+            currency: $payment?->currency ?? $n->currency,
+            metadata: ['duplicate_payment' => true, 'paid_by_charge' => data_get($invoice->metadata, 'paid_by_charge')],
+            correlationId: $correlationId,
+            source: 'webhook',
+        );
+
+        $this->alert(
+            $subscription,
+            $invoice,
+            $payment,
+            $refund
+                ? 'Estorno de pagamento em duplicidade — a fatura segue paga pela outra cobrança; assinatura sem mudança.'
+                : 'Chargeback de pagamento em duplicidade — a fatura segue paga pela outra cobrança; assinatura sem mudança.',
+            $n,
+            $correlationId,
+        );
+
+        return $payment;
+    }
+
+    private function applyChargeback(?Subscription $subscription, ?Invoice $invoice, ?Payment $payment, bool $governed, string $correlationId): string
+    {
+        $payment?->update([
+            'status'        => PaymentStatus::Chargeback->value,
+            'chargeback_at' => now(),
+        ]);
+
+        $invoice?->update([
+            'status' => InvoiceStatus::Failed->value,
+        ]);
+
+        if (! $subscription) {
+            return 'ignored';
         }
 
-        if ($invoice) {
+        $this->financialEventService->record(
+            eventType: BillingEventType::ChargebackReceived,
+            entityId: (string) $subscription->entity_id,
+            subscription: $subscription,
+            invoice: $invoice,
+            payment: $payment,
+            amount: $payment ? (float) $payment->amount : null,
+            currency: $payment?->currency,
+            correlationId: $correlationId,
+            source: 'webhook',
+        );
+
+        if (! $governed) {
+            return 'alert_payment_not_applied';
+        }
+
+        // Em disputa: atraso desde agora (a régua decide o acesso).
+        $this->cycles->markPastDue(
+            subscription: $subscription,
+            since: now(),
+            billingState: 'chargeback',
+            error: __('manager_subscriptions.billing_errors.chargeback'),
+            correlationId: $correlationId,
+            source: 'webhook',
+            invoice: $invoice,
+        );
+
+        return 'chargeback';
+    }
+
+    // ── Apoio ────────────────────────────────────────────────────────────────
+
+    /**
+     * Só a assinatura cobrada por este gateway e ainda vigente (ativa ou em
+     * atraso) muda por webhook. Cortesia, trial, cancelada, expirada ou
+     * substituída: nunca reativa nem bloqueia.
+     */
+    private function isGovernedBy(Subscription $subscription, string $gatewayCode): bool
+    {
+        return $subscription->billing_mode === SubscriptionBillingMode::Gateway
+            && in_array($subscription->status, [SubscriptionStatus::Active, SubscriptionStatus::PastDue], true)
+            && (blank($subscription->gateway) || $subscription->gateway === $gatewayCode);
+    }
+
+    /**
+     * O evento vem de uma recorrência do gateway diferente da que a assinatura
+     * acompanha (gateway_subscription_id preenchido e outro id no evento).
+     */
+    private function isForeignRecurrence(NormalizedWebhookEventDTO $n, Subscription $subscription): bool
+    {
+        return filled($n->externalSubscriptionId)
+            && filled($subscription->gateway_subscription_id)
+            && $n->externalSubscriptionId !== $subscription->gateway_subscription_id;
+    }
+
+    /**
+     * Cobrança cancelada que o gateway restaurou: pagamento e fatura
+     * cancelados voltam a pendente (a fatura só na assinatura que o gateway
+     * ainda cobra — a encerrada não reabre).
+     */
+    private function restoreCancelledCharge(?Invoice $invoice, ?Payment $payment, bool $governed): void
+    {
+        if ($payment?->status === PaymentStatus::Cancelled) {
+            $payment->update(['status' => PaymentStatus::Pending->value]);
+        }
+
+        if ($governed && $invoice?->status === InvoiceStatus::Cancelled) {
+            $invoice->update(['status' => InvoiceStatus::Pending->value]);
+        }
+    }
+
+    private function isChargeEvent(string $eventType): bool
+    {
+        return in_array($eventType, [
+            ...self::PAID_TYPES,
+            ...self::UNPAID_TYPES,
+            ...self::PAYMENT_CANCELLED_TYPES,
+            ...self::REFUNDED_TYPES,
+            ...self::CHARGEBACK_TYPES,
+            ...self::CHARGE_CREATED_TYPES,
+        ], true);
+    }
+
+    private function markPaymentPaid(?Payment $payment, ?Invoice $invoice): void
+    {
+        $payment?->update([
+            'status'  => PaymentStatus::Paid->value,
+            'paid_at' => now(),
+        ]);
+
+        if ($invoice && $invoice->status !== InvoiceStatus::Paid) {
             $invoice->update([
-                'status' => InvoiceStatus::Failed->value,
+                'status'  => InvoiceStatus::Paid->value,
+                'paid_at' => now(),
             ]);
         }
+    }
 
-        if ($subscription) {
-            // Mark subscription as past_due pending dispute resolution
-            $subscription->update([
-                'status'             => 'past_due',
-                'billing_state'      => 'chargeback',
-                'last_billing_error' => 'Chargeback recebido via webhook.',
-            ]);
-
-            $this->financialEventService->record(
-                eventType: BillingEventType::ChargebackReceived,
-                entityId: (string) $subscription->entity_id,
-                subscription: $subscription,
-                invoice: $invoice,
-                payment: $payment,
-                amount: $payment ? (float) $payment->amount : null,
-                currency: $payment?->currency,
-                correlationId: $correlationId,
-                source: 'webhook',
-            );
+    /**
+     * Vencimento que conta para o ciclo: o início do período da fatura (1º
+     * período ou ciclo). O período não anda quando a cobrança é reemitida com
+     * outro vencimento (nova tentativa depois do vencimento, vencimento
+     * alterado no gateway) — senão quem paga atrasado ganha os dias de
+     * atraso e o atraso recomeçaria a cada reemissão. Sem período (fatura
+     * antiga), o vencimento informado pelo gateway ou o da fatura. O
+     * vencimento do gateway segue valendo para due_at e para o acesso da
+     * contratação ainda não paga (syncInvoiceWithCharge).
+     */
+    private function chargeDueDate(NormalizedWebhookEventDTO $n, ?Invoice $invoice): ?CarbonInterface
+    {
+        if ($invoice?->period_start !== null) {
+            return CarbonImmutable::instance($invoice->period_start)->startOfDay();
         }
+
+        if ($n->dueDate !== null) {
+            return $this->dueDateOf($n);
+        }
+
+        return $invoice?->due_at;
+    }
+
+    /** Vencimento da cobrança paga — a nova vigência conta dele (sem ganhar nem perder dias). */
+    private function paidDueDate(NormalizedWebhookEventDTO $n, ?Invoice $invoice, Subscription $subscription): CarbonInterface
+    {
+        return $this->chargeDueDate($n, $invoice)
+            ?? $subscription->next_billing_at
+            ?? now();
+    }
+
+    private function dueDateOf(NormalizedWebhookEventDTO $n): CarbonImmutable
+    {
+        return CarbonImmutable::parse((string) $n->dueDate)->startOfDay();
+    }
+
+    private function uuidFrom(mixed $value): ?string
+    {
+        return is_string($value) && Str::isUuid($value) ? $value : null;
+    }
+
+    /**
+     * Fatura de registro de um pagamento que não se liga a nenhuma fatura da
+     * assinatura: só guarda o dinheiro recebido (Payment) — sem período, não
+     * entra no ciclo, na régua nem na renovação.
+     */
+    private function unappliedPaymentInvoice(Subscription $subscription, NormalizedWebhookEventDTO $n, string $correlationId): Invoice
+    {
+        $date = $n->dueDate !== null ? $this->dueDateOf($n) : CarbonImmutable::today();
+
+        return Invoice::query()->create([
+            'entity_id'       => $subscription->entity_id,
+            'subscription_id' => $subscription->id,
+            'plan_id'         => $subscription->plan_id,
+            'gateway_code'    => $n->gatewayCode,
+            'reference'       => 'INV-' . $date->format('Ymd') . '-' . strtoupper(Str::random(8)),
+            'due_at'          => $date->endOfDay(),
+            'amount'          => $n->amount ?? $subscription->recurringAmount() ?? 0,
+            'currency'        => $n->currency ?? 'BRL',
+            'status'          => InvoiceStatus::Pending->value,
+            'billing_reason'  => SubscriptionCycleService::BILLING_REASON_UNAPPLIED,
+            'metadata'        => ['alert' => 'subscription_not_billed_by_gateway', 'subscription_status' => $subscription->status->value],
+            'correlation_id'  => $correlationId,
+            'idempotency_key' => "unapplied:{$n->gatewayCode}:{$n->externalPaymentId}",
+        ]);
+    }
+
+    private function isUnappliedRecord(Invoice $invoice): bool
+    {
+        return $invoice->billing_reason === SubscriptionCycleService::BILLING_REASON_UNAPPLIED;
+    }
+
+    private function alert(?Subscription $subscription, ?Invoice $invoice, ?Payment $payment, string $message, NormalizedWebhookEventDTO $n, string $correlationId, string $level = 'warning'): void
+    {
+        $this->billingLogService->log(
+            level: $level,
+            message: $message,
+            context: [
+                'external_payment_id'      => $n->externalPaymentId,
+                'external_subscription_id' => $n->externalSubscriptionId,
+                'amount'                   => $n->amount,
+                'currency'                 => $n->currency,
+                'due_date'                 => $n->dueDate,
+                'subscription_status'      => $subscription?->status?->value,
+                'billing_mode'             => $subscription?->billing_mode?->value,
+            ],
+            entityId: $subscription?->entity_id ?? $invoice?->entity_id ?? $payment?->entity_id,
+            subscription: $subscription,
+            invoice: $invoice,
+            payment: $payment,
+            gatewayCode: $n->gatewayCode,
+            correlationId: $correlationId,
+        );
     }
 }

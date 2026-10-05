@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\{
     AccessControl\RolesController,
-    AiCreditPurchasesController,
     AiRunPromptsController,
     AiRunsController,
     ComplianceController,
@@ -63,6 +62,7 @@ use App\Http\Controllers\{
     SiteLegalController,
     SubscriptionExpiredController,
 };
+use App\Http\Controllers\Billing\CheckoutController;
 use App\Http\Controllers\{CallPanelDisplayController, MedicationPresetsController};
 use App\Http\Controllers\{Cid10SearchController, CovenantPlanSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
@@ -162,8 +162,12 @@ Route::get('/go', function () {
 Route::get('/call-panel/{token}', [CallPanelDisplayController::class, 'show'])->name('call-panel.show');
 Route::get('/call-panel/{token}/feed', [CallPanelDisplayController::class, 'feed'])->name('call-panel.feed');
 
+// Mesmos controles de segurança do painel (WhatsApp confirmado e 2FA quando
+// a empresa exige): a tela mostra valor e link da fatura. Sem loop — as telas
+// de confirmação/2FA ficam fora desses gates, e depois delas o dashboard
+// passa pelo check.subscription e volta para cá.
 Route::get('/subscription/expired', SubscriptionExpiredController::class)
-    ->middleware(['auth', 'verified', 'entity.selected'])
+    ->middleware(['auth', 'verified', 'phone.verified', 'entity.selected', '2fa', 'checkout.csp'])
     ->name('subscription.expired');
 
 Route::post('/session/ping', function () {
@@ -175,7 +179,9 @@ Route::group(
     // decidir se exige 2FA via Entity.requires_two_factor).
     // phone.verified logo após verified: onboarding = confirma e-mail →
     // confirma WhatsApp → painel (ver EnsurePhoneVerified para os bypasses).
-    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'phone.verified', 'entity.selected', 'tenant.bind', '2fa'], 'as' => 'panel.'],
+    // check.subscription por último: clínica sem assinatura com acesso (trial
+    // vencido, período encerrado) vai para /subscription/expired.
+    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'phone.verified', 'entity.selected', 'tenant.bind', '2fa', 'check.subscription'], 'as' => 'panel.'],
     function () {
         Route::get('/', function () {
             return redirect()->route('panel.dashboard');
@@ -192,6 +198,29 @@ Route::group(
         // Preferências pessoais (item MELHORIA "mais humano") — endpoint único,
         // ver PreferencesController.
         Route::patch('/preferences', [PreferencesController::class, 'update'])->name('preferences.update');
+
+        // Minha assinatura — checkout transparente (Pix, boleto e cartão
+        // tokenizado no navegador). Só admin, financeiro e dono
+        // (billing.contact); liberado mesmo com o acesso bloqueado ou limitado
+        // (CheckSubscription::ALWAYS_ALLOWED) — é por aqui que se paga.
+        Route::prefix('my-subscription')
+            ->name('my-subscription.')
+            ->middleware('billing.contact')
+            ->group(function () {
+                Route::get('/', [CheckoutController::class, 'page'])->middleware('checkout.csp')->name('index');
+                Route::get('summary', [CheckoutController::class, 'summary'])->middleware('throttle:billing-checkout-read')->name('summary');
+                Route::get('options', [CheckoutController::class, 'options'])->middleware('throttle:billing-checkout-read')->name('options');
+                Route::get('invoices/{invoice}/instructions', [CheckoutController::class, 'instructions'])->middleware('throttle:billing-checkout-read')->name('instructions');
+                Route::post('invoices/{invoice}/charge', [CheckoutController::class, 'issueCharge'])->middleware('throttle:billing-checkout-pay')->name('charge');
+                Route::post('invoices/{invoice}/card', [CheckoutController::class, 'payWithCard'])->middleware('throttle:billing-checkout-pay')->name('card');
+                Route::put('card', [CheckoutController::class, 'replaceCard'])->middleware('throttle:billing-checkout-pay')->name('replace-card');
+                Route::post('contract', [CheckoutController::class, 'contract'])->middleware('throttle:billing-checkout-pay')->name('contract');
+                // Pacote de créditos de IA no mesmo checkout (só com acesso total — AiCreditPackCheckoutService).
+                Route::get('ai-credits', [CheckoutController::class, 'aiCreditOptions'])->middleware('throttle:billing-checkout-read')->name('ai-credits.options');
+                Route::post('ai-credits', [CheckoutController::class, 'aiCreditPurchase'])->middleware('throttle:billing-checkout-pay')->name('ai-credits.purchase');
+                // Descartar o pedido de pacote ainda não pago (cancela a cobrança no gateway quando possível).
+                Route::delete('ai-credits/{invoice}', [CheckoutController::class, 'aiCreditDiscard'])->middleware('throttle:billing-checkout-pay')->name('ai-credits.discard');
+            });
 
         Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');
         Route::get('/eye-images/search', [EyeImagesController::class, 'search'])->name('eye-images.search');
@@ -515,10 +544,12 @@ Route::group(
                 // Tela única de consumo + compra de créditos + monitor de execuções.
                 // URL canônica: /panel/ai/usage. Sem rota raiz /panel/ai — dashboard
                 // analítico antigo descontinuado.
-                Route::get('usage', [AiRunsController::class, 'index'])->name('ai-runs.index');
-                Route::post('credit-purchases', [AiCreditPurchasesController::class, 'store'])
-                    ->middleware('throttle:ai-store')
-                    ->name('ai-credit-purchases.store');
+                // CSP do checkout: a tela compra pacotes de créditos com o SDK de cartão do gateway.
+                Route::get('usage', [AiRunsController::class, 'index'])->middleware('checkout.csp')->name('ai-runs.index');
+                // Compra de créditos: só pelo checkout de Minha assinatura
+                // (panel.my-subscription.ai-credits.*). O antigo POST
+                // /panel/ai/credit-purchases foi removido (criava pedido fora do
+                // checkout, sem a regra de acesso total).
 
                 Route::as('ai-runs.')->group(function () {
                     Route::post('runs/estimate', [AiRunsController::class, 'estimate'])

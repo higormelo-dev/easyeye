@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Enums\{ClientRule, FeatureKey, Permission, SaasRule};
 use App\Models\Entity;
+use App\Services\Billing\SubscriptionNoticeService;
 use App\Services\FeatureGateService;
 
 class PanelNavigation
@@ -217,6 +218,19 @@ class PanelNavigation
                     ['route' => 'panel.financial.reports.cash-flow', 'icon' => 'ti ti-chart-arcs', 'label' => __('actions.sidemenu.report_cash_flow'), 'match' => ['panel.financial.reports.cash-flow*']],
                     ['route' => 'panel.financial.reports.covenants', 'icon' => 'ti ti-report-money', 'label' => __('actions.sidemenu.report_billing'), 'match' => ['panel.financial.reports.covenants*']],
                 ],
+            ];
+        }
+
+        // Minha assinatura (checkout transparente): só quem paga a assinatura
+        // do EasyEye — admin, financeiro ou dono (mesma regra do middleware
+        // billing.contact da rota; sem ela o item levaria a um 403).
+        if (self::isBillingContact($isFinancial)) {
+            $nav[] = [
+                'key'   => 'my-subscription',
+                'route' => 'panel.my-subscription.index',
+                'icon'  => 'ti ti-receipt',
+                'label' => __('actions.sidemenu.my_subscription'),
+                'match' => ['panel.my-subscription.*'],
             ];
         }
 
@@ -436,6 +450,22 @@ class PanelNavigation
         return app(FeatureGateService::class)->can((string) $entityId, FeatureKey::HasInventoryModule);
     }
 
+    /**
+     * Contato de cobrança da clínica da sessão (admin, financeiro ou dono,
+     * vínculo ativo). Admin/financeiro pela sessão; o dono (is_owner, não
+     * guardado em sessão) consulta o vínculo.
+     */
+    private static function isBillingContact(bool $isAdminOrFinancial): bool
+    {
+        $entityId = (string) session('selected_entity_id', '');
+
+        if ($entityId === '') {
+            return false;
+        }
+
+        return $isAdminOrFinancial || app(SubscriptionNoticeService::class)->canSeeBilling(auth()->user(), $entityId);
+    }
+
     /** A clínica da sessão deixa os médicos verem os próprios repasses? */
     private static function doctorPayoutsVisible(): bool
     {
@@ -550,19 +580,15 @@ class PanelNavigation
                 'label' => __('actions.sidemenu.entities'),
                 'match' => ['manager.entities.*'],
             ],
-            [
-                'key'   => 'plans',
-                'route' => 'manager.plans.index',
-                'icon'  => 'ti ti-package',
-                'label' => __('actions.sidemenu.plans'),
-                'match' => ['manager.plans.*'],
-            ],
+            // Planos e Assinaturas são um fluxo só (abas no topo das duas telas):
+            // um item abre Assinaturas — liberada também para o financeiro — e
+            // fica ativo nas duas. Planos é só admin; a aba some para o resto.
             [
                 'key'   => 'subscriptions',
                 'route' => 'manager.subscriptions.index',
                 'icon'  => 'ti ti-file-invoice',
-                'label' => __('actions.sidemenu.subscriptions'),
-                'match' => ['manager.subscriptions.*'],
+                'label' => __('actions.sidemenu.plans_subscriptions'),
+                'match' => ['manager.subscriptions.*', 'manager.plans.*'],
             ],
             [
                 'key'   => 'gateways',

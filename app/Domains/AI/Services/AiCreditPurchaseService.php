@@ -53,6 +53,7 @@ class AiCreditPurchaseService
         ?string $requestedBy = null,
         ?string $idempotencyKey = null,
         ?array $metadata = null,
+        string $source = 'panel_ai_ui',
     ): AiCreditPurchase {
         $package = $this->resolvePackage($packageCode);
         $idempotencyKey ??= 'ai-credit-purchase:' . (string) Str::uuid();
@@ -65,6 +66,7 @@ class AiCreditPurchaseService
             $requestedBy,
             $idempotencyKey,
             $metadata,
+            $source,
         ): AiCreditPurchase {
             $existing = AiCreditPurchase::query()
                 ->where('idempotency_key', $idempotencyKey)
@@ -92,7 +94,7 @@ class AiCreditPurchaseService
                     'credits' => (int) $package['credits'],
                 ]),
                 'metadata' => array_merge($metadata ?? [], [
-                    'source'  => 'panel_ai_ui',
+                    'source'  => $source,
                     'package' => $this->presentPackage($package),
                 ]),
                 'idempotency_key' => $idempotencyKey,
@@ -334,6 +336,63 @@ class AiCreditPurchaseService
 
             return $locked->fresh();
         });
+    }
+
+    /**
+     * Pagamento confirmado pelo gateway (checkout): credita uma vez só. O
+     * dinheiro entrou, então vale mesmo para o pedido que o manager tinha
+     * cancelado ou marcado como falha enquanto o Pix/boleto seguia aberto —
+     * reaberto e creditado, com o registro em metadata.reopened_by_payment.
+     * Já creditado (ou estornado): nada muda.
+     */
+    public function creditFromGatewayPayment(AiCreditPurchase $purchase, array $paymentContext = []): AiCreditPurchase
+    {
+        return DB::transaction(function () use ($purchase, $paymentContext): AiCreditPurchase {
+            $locked = AiCreditPurchase::query()
+                ->whereKey($purchase->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (in_array($locked->status, [AiCreditPurchaseStatus::Credited, AiCreditPurchaseStatus::Refunded], true)) {
+                return $locked;
+            }
+
+            if (in_array($locked->status, [AiCreditPurchaseStatus::Cancelled, AiCreditPurchaseStatus::Failed], true)) {
+                $locked->update([
+                    'status'       => AiCreditPurchaseStatus::PendingPayment->value,
+                    'cancelled_at' => null,
+                    'failed_at'    => null,
+                    'metadata'     => array_merge((array) $locked->metadata, [
+                        'reopened_by_payment' => [
+                            'previous_status' => $locked->status->value,
+                            'at'              => now()->toIso8601String(),
+                        ],
+                    ]),
+                ]);
+            }
+
+            $locked->update([
+                'metadata' => array_merge((array) $locked->metadata, ['payment' => $paymentContext]),
+            ]);
+
+            return $this->creditPaidPurchase($locked, null);
+        });
+    }
+
+    /**
+     * Estorno ou chargeback confirmado pelo gateway: mesma regra do estorno
+     * do manager (refundPurchase — o saldo pode ficar negativo). Ainda não
+     * creditado: o pedido é só cancelado (nada a tirar da carteira).
+     */
+    public function reverseFromGateway(AiCreditPurchase $purchase, string $reason): AiCreditPurchase
+    {
+        $status = $purchase->fresh()?->status;
+
+        return match ($status) {
+            AiCreditPurchaseStatus::Credited       => $this->refundPurchase($purchase, $reason),
+            AiCreditPurchaseStatus::PendingPayment => $this->cancelPurchase($purchase, $reason),
+            default                                => $purchase->fresh() ?? $purchase,
+        };
     }
 
     /**

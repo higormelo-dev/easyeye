@@ -10,7 +10,6 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     // Garante configurações de trial no DB
     SubscriptionSetting::setValue('trial_days', 7);
-    SubscriptionSetting::setValue('grace_period_days', 3);
 
     // Cria um plano básico para os testes
     $this->plan = Plan::factory()->create(['slug' => 'basico', 'active' => true, 'sort_order' => 1]);
@@ -63,13 +62,19 @@ test('trials vencidos são expirados pelo scheduler', function () {
     expect(Subscription::forEntity($entity->id)->first()->status)->toBe(SubscriptionStatus::Expired);
 });
 
-test('trial expirado ganha período de graça', function () {
+test('trial vencido perde o acesso na hora, sem período de graça', function () {
     $entity = Entity::factory()->create(['is_client' => true]);
 
-    Subscription::forEntity($entity->id)->update(['trial_ends_at' => now()->subDay()]);
+    Subscription::forEntity($entity->id)->update(['trial_ends_at' => now()->subMinute()]);
+
+    // Antes do job da madrugada: o acesso já acabou em trial_ends_at.
+    expect(Subscription::forEntity($entity->id)->first()->hasAccess())->toBeFalse()
+        ->and(Subscription::forEntity($entity->id)->accessible()->exists())->toBeFalse();
+
     app(TrialService::class)->expireOverdueTrials();
 
     $sub = Subscription::forEntity($entity->id)->first();
-    expect($sub->grace_period_ends_at)->not->toBeNull();
-    expect($sub->grace_period_ends_at->isFuture())->toBeTrue();
+    expect($sub->status)->toBe(SubscriptionStatus::Expired)
+        ->and($sub->getRawOriginal('grace_period_ends_at'))->toBeNull()
+        ->and($sub->hasAccess())->toBeFalse();
 });

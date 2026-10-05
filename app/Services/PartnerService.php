@@ -105,8 +105,15 @@ class PartnerService
             return null;
         }
 
-        $plan   = $subscription->plan;
-        $amount = round(($plan->price * $partner->commission_rate) / 100, 2);
+        // Valor do ciclo contratado (anual = valor anual); linhas antigas sem
+        // valor gravado caem no preço do plano. Cortesia não gera comissão.
+        $base = $subscription->recurringAmount();
+
+        if ($base === null || $base <= 0) {
+            return null;
+        }
+
+        $amount = round(($base * $partner->commission_rate) / 100, 2);
         $period = now()->format('Y-m');
 
         // BUGFIX (revisao de seguranca): SubscriptionObserver::updated() chama generateCommission()

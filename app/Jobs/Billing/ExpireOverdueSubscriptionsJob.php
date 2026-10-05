@@ -10,8 +10,9 @@ use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
 use Illuminate\Support\Facades\Log;
 
 /**
- * Expires all active subscriptions whose ends_at has passed.
- * Called daily by the scheduler.
+ * Fim de período sem renovação (diário): cortesia e liberações antigas
+ * expiram; cobrança automática sem o pagamento da renovação entra em atraso
+ * desde o fim do período (a régua de cobrança cuida do resto).
  */
 class ExpireOverdueSubscriptionsJob implements ShouldQueue
 {
@@ -31,8 +32,12 @@ class ExpireOverdueSubscriptionsJob implements ShouldQueue
 
     public function handle(SubscriptionService $subscriptionService): void
     {
-        $count = $subscriptionService->expireOverdue();
+        $expired = $subscriptionService->expireOverdue();
+        $pastDue = $subscriptionService->markLapsedAsPastDue();
 
-        Log::info('[ExpireOverdueSubscriptionsJob] Assinaturas expiradas.', ['count' => $count]);
+        Log::info('[ExpireOverdueSubscriptionsJob] Assinaturas expiradas e em atraso.', [
+            'count'    => $expired,
+            'past_due' => $pastDue,
+        ]);
     }
 }

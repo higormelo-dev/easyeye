@@ -16,11 +16,6 @@ class SubscriptionSettingSeeder extends Seeder
                 'description' => 'Duração do período de trial em dias',
             ],
             [
-                'key'         => 'grace_period_days',
-                'value'       => '3',
-                'description' => 'Dias de acesso após expiração da assinatura (período de graça)',
-            ],
-            [
                 'key'         => 'ai.enabled_providers',
                 'value'       => json_encode(['gemini']),
                 'type'        => 'json',

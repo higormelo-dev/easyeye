@@ -7,6 +7,7 @@ namespace App\Http\Controllers\PatientPortal;
 use App\Enums\ShareableDocumentType;
 use App\Http\Controllers\Controller;
 use App\Models\{Patient, PatientAccount, PatientDocumentShare};
+use App\Services\Billing\ClinicServiceGate;
 use Illuminate\Support\Facades\Auth;
 use Inertia\{Inertia, Response};
 
@@ -16,7 +17,7 @@ use Inertia\{Inertia, Response};
  */
 class ClinicController extends Controller
 {
-    public function show(Patient $patient): Response
+    public function show(Patient $patient, ClinicServiceGate $gate): Response
     {
         /** @var PatientAccount $account */
         $account = Auth::guard('patient')->user();
@@ -38,6 +39,10 @@ class ClinicController extends Controller
             'documents'  => $shares->map(fn (PatientDocumentShare $s) => $this->serializeShare($s))->values(),
             // Fase 4 — autoatendimento LGPD (Art. 18, II/V).
             'lgpdExportUrl' => route('patient-portal.clinics.export', $patient),
+            // Serviço da clínica suspenso: só consulta — documentos e o
+            // "Baixar meus dados" seguem; aviso neutro.
+            'readOnly'       => $gate->portalReadOnly($patient->entity),
+            'readOnlyNotice' => __('patient_portal.read_only.notice'),
         ]);
     }
 

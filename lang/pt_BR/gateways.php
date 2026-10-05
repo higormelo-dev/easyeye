@@ -84,6 +84,13 @@ return [
     'modal_cred_hidden'      => 'chave oculta',
     'modal_cred_revoke'      => 'Revogar',
 
+    // Chave pública do checkout transparente (SDK do cartão no navegador)
+    'modal_cred_public_key'         => 'Chave pública (checkout no navegador)',
+    'modal_cred_public_key_ph'      => 'pk_… / APP_USR-… / chave pública',
+    'modal_cred_public_key_hint'    => 'Usada pelo formulário seguro do cartão (Mercado Pago, Stripe, Pagar.me; no PagBank é opcional). É pública por definição — nunca cole aqui a chave secreta (sk_/rk_).',
+    'modal_cred_public_key_current' => 'Chave pública: :key',
+    'js_error_public_key_secret'    => 'Esta parece ser a chave secreta (sk_/rk_). Informe a chave pública.',
+
     // Modal: Entity access
     'modal_ea_title'     => 'Acesso por Clínica',
     'modal_ea_alert'     => 'Habilite este gateway para as clínicas que poderão configurar suas próprias credenciais e receber pagamentos de pacientes. A clínica só verá o gateway no painel dela após ser habilitada aqui.',
@@ -118,11 +125,38 @@ return [
     // Secret field labels per gateway (used in JS gatewaySecretLabels)
     'secret_label' => [
         'asaas'       => ['label' => 'API Key (access_token)', 'hint' => 'Chave de acesso da conta Asaas (começa com $aact_…)'],
-        'infinitepay' => ['label' => 'Bearer Token', 'hint' => 'Token OAuth da InfinitePay'],
+        'infinitepay' => ['label' => 'Token (opcional)', 'hint' => 'O Checkout Integrado da InfinitePay não usa token — deixe vazio.'],
         'mercadopago' => ['label' => 'Access Token', 'hint' => 'Começa com APP_USR-…'],
         'pagarme'     => ['label' => 'Secret Key', 'hint' => 'Chave secreta da conta Pagar.me'],
         'stripe_br'   => ['label' => 'Secret Key', 'hint' => 'Começa com sk_live_… ou sk_test_…'],
         'pagbank'     => ['label' => 'Token de Acesso', 'hint' => 'Token Bearer do PagBank'],
+    ],
+
+    // InfinitePay: a credencial é a InfiniteTag (handle)
+    'modal_cred_handle'      => 'InfiniteTag (handle)',
+    'modal_cred_handle_ph'   => 'ex.: minhaloja',
+    'modal_cred_handle_hint' => 'Sua InfiniteTag, sem o "$" — a mesma do app InfinitePay. O webhook não tem segredo: o pagamento é confirmado na própria InfinitePay.',
+    'handle_required'        => 'Informe a InfiniteTag (handle) da conta InfinitePay.',
+    'handle_invalid'         => 'InfiniteTag inválida: use só letras, números, ponto, hífen ou sublinhado (sem espaços).',
+    'public_key_invalid'     => 'Chave pública em formato inválido. Esperado: :format.',
+    'public_key_secret'      => 'Isto parece a chave secreta (ou é igual ao token). Informe a chave PÚBLICA do SDK JS — ela vai para o navegador.',
+    'public_key_unsupported' => 'Este gateway não usa chave pública (sem cartão transparente).',
+    'public_key_formats'     => [
+        'mercadopago' => 'Public key "APP_USR-" ou "TEST-" seguida de um UUID',
+        'pagarme'     => 'chave pública "pk_…" ou "pk_test_…"',
+        'stripe_br'   => 'publishable key "pk_live_…" ou "pk_test_…"',
+        'pagbank'     => 'chave pública RSA (PEM ou o texto "MII…")',
+    ],
+    'js_error_handle_required' => 'Informe a InfiniteTag (handle).',
+
+    // Dica do segredo do webhook por gateway
+    'webhook_hint' => [
+        'asaas'       => 'Token de autenticação cadastrado no webhook do Asaas (32 a 255 caracteres), enviado no header asaas-access-token.',
+        'infinitepay' => 'Não usado: a InfinitePay não assina o webhook.',
+        'mercadopago' => 'Assinatura secreta das notificações Webhooks (Suas integrações → Webhooks).',
+        'pagarme'     => 'Usuário e senha da autenticação do webhook no formato usuario:senha.',
+        'stripe_br'   => 'Signing secret do endpoint de webhook (começa com whsec_).',
+        'pagbank'     => 'Token da conta PagBank (o mesmo da chave de API) — valida o x-authenticity-token.',
     ],
 
     // Controller messages

@@ -9,7 +9,6 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     SubscriptionSetting::setValue('trial_days', 7);
-    SubscriptionSetting::setValue('grace_period_days', 3);
 
     $this->plan    = Plan::factory()->create(['slug' => 'pro', 'active' => true]);
     $this->entity  = Entity::factory()->create(['is_client' => false]); // sem auto-trial
@@ -46,15 +45,38 @@ test('ativar nova assinatura cancela a anterior', function () {
     expect(Subscription::forEntity($this->entity->id)->accessible()->count())->toBe(1);
 });
 
-test('cancelamento adiciona período de graça', function () {
+test('cancelamento tira o acesso na hora, sem período de graça', function () {
     $this->service->activate($this->entity, $this->plan);
     $sub = $this->service->cancel($this->entity);
 
-    expect($sub->status)->toBe(SubscriptionStatus::Cancelled);
-    expect($sub->grace_period_ends_at)->not->toBeNull();
-    expect($sub->grace_period_ends_at->isFuture())->toBeTrue();
-    expect($sub->inGracePeriod())->toBeTrue();
-    expect($sub->hasAccess())->toBeTrue();
+    expect($sub->status)->toBe(SubscriptionStatus::Cancelled)
+        ->and($sub->getRawOriginal('grace_period_ends_at'))->toBeNull()
+        ->and($sub->hasAccess())->toBeFalse()
+        ->and($this->service->hasAccess($this->entity))->toBeFalse();
+});
+
+test('assinatura vencida expira sem período de graça', function () {
+    $sub = $this->service->activate($this->entity, $this->plan);
+    $sub->update(['ends_at' => now()->subMinute()]);
+
+    expect($this->service->hasAccess($this->entity))->toBeFalse();
+    expect($this->service->expireOverdue())->toBe(1);
+
+    $sub->refresh();
+    expect($sub->status)->toBe(SubscriptionStatus::Expired)
+        ->and($sub->getRawOriginal('grace_period_ends_at'))->toBeNull();
+});
+
+test('período de graça antigo gravado no banco não libera mais acesso', function () {
+    $sub = $this->service->activate($this->entity, $this->plan);
+    $sub->forceFill([
+        'status'               => SubscriptionStatus::Expired,
+        'ends_at'              => now()->subDay(),
+        'grace_period_ends_at' => now()->addDays(2),
+    ])->save();
+
+    expect($sub->fresh()->hasAccess())->toBeFalse()
+        ->and($this->service->hasAccess($this->entity))->toBeFalse();
 });
 
 test('hasAccess retorna false sem assinatura', function () {

@@ -5,6 +5,7 @@ namespace App\Services\Billing;
 use App\DTOs\Billing\GatewayWebhookInputDTO;
 use App\Exceptions\Billing\GatewayUnauthorizedException;
 use App\Models\Billing\WebhookEvent;
+use App\Support\Billing\PayloadSanitizer;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,9 @@ class WebhookIngestionService
             headers: $headers,
             body: $body,
             payload: $payload,
-            externalEventId: $this->extractExternalEventId($payload),
+            // Chave de idempotência de cada gateway (mesma notificação = mesma
+            // chave; pago, estorno e chargeback do mesmo recurso, chaves diferentes).
+            externalEventId: $gateway->webhookEventKey($payload),
             signature: $this->extractSignature($headers),
             receivedAt: now()->toIso8601String(),
         );
@@ -49,11 +52,15 @@ class WebhookIngestionService
                 'event_type'        => Arr::get($payload, 'event') ?? Arr::get($payload, 'type'),
                 'event_hash'        => $eventHash,
                 'signature'         => $dto->signature,
-                'headers'           => $headers,
-                'payload'           => $payload,
-                'status'            => 'received',
-                'received_at'       => now(),
-                'correlation_id'    => $correlationId,
+                // Sem os headers com segredo (Basic Auth, token do Asaas…).
+                'headers' => PayloadSanitizer::storableHeaders($headers),
+                // Sem dado pessoal do pagador (nome, documento, e-mail,
+                // telefone, endereço, cartão): só o que o reprocessamento usa.
+                // A assinatura já foi conferida acima no corpo bruto.
+                'payload'        => PayloadSanitizer::cleanPersonal($payload),
+                'status'         => 'received',
+                'received_at'    => now(),
+                'correlation_id' => $correlationId,
             ]));
         } catch (QueryException $e) {
             if ($this->isUniqueViolation($e)) {
@@ -86,21 +93,6 @@ class WebhookIngestionService
         );
 
         return $event;
-    }
-
-    private function extractExternalEventId(array $payload): ?string
-    {
-        $paths = ['id', 'event_id', 'data.id', 'resource.id'];
-
-        foreach ($paths as $path) {
-            $value = Arr::get($payload, $path);
-
-            if (is_scalar($value) && (string) $value !== '') {
-                return (string) $value;
-            }
-        }
-
-        return null;
     }
 
     private function extractSignature(array $headers): ?string

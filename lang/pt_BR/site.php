@@ -220,6 +220,12 @@ return [
     ],
 
     'pricing' => [
+        // Ciclo de cobrança escolhido pelo visitante
+        'cycle_selector_label'   => 'Ciclo de cobrança',
+        'cycle_save_up_to'       => 'até :percent% off',
+        'monthly_equivalent'     => 'equivale a :price/mês',
+        'savings_badge'          => 'Economize :percent%',
+        'cycle_unavailable'      => 'Disponível no ciclo :cycle',
         'label'                  => 'Planos',
         'title'                  => 'Planos para cada tamanho de clínica',
         'subtitle'               => 'Sem taxas de implantação. Cancele quando quiser.',

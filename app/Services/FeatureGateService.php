@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\DTOs\FeatureStatus;
-use App\Enums\FeatureKey;
+use App\Enums\{FeatureKey, SubscriptionAccessLevel};
 use App\Exceptions\FeatureDeniedException;
 use App\Models\Subscription;
 
@@ -104,6 +104,22 @@ class FeatureGateService
                 limit:       0,
                 used:        0,
                 remaining:   0,
+            );
+        }
+
+        // Cliente pagante em atraso com acesso limitado pela régua de
+        // cobrança: IA fica indisponível (o menu e o assistente somem) até o
+        // pagamento; agenda, pacientes e prontuário seguem.
+        if ($feature->isAi() && $subscription->accessLevel() === SubscriptionAccessLevel::Limited) {
+            return new FeatureStatus(
+                feature:      $feature,
+                allowed:      false,
+                isBoolean:    $feature->isBoolean(),
+                isUnlimited:  false,
+                limit:        0,
+                used:         0,
+                remaining:    0,
+                deniedByAccessLevel: SubscriptionAccessLevel::Limited,
             );
         }
 
@@ -328,6 +344,15 @@ class FeatureGateService
     }
 
     /**
+     * Usa a assinatura já consultada neste request (SubscriptionService::currentAccessFor,
+     * com plan.features carregado) — evita repetir a mesma consulta.
+     */
+    public function rememberSubscription(string $entityId, ?Subscription $subscription): void
+    {
+        $this->subscriptionCache[$entityId] = $subscription;
+    }
+
+    /**
      * Invalida o cache da assinatura para a empresa.
      * Chamar após mudança de plano, renovação ou activação.
      */
@@ -341,11 +366,9 @@ class FeatureGateService
     private function getSubscription(string $entityId): ?Subscription
     {
         if (! array_key_exists($entityId, $this->subscriptionCache)) {
-            $this->subscriptionCache[$entityId] = Subscription::forEntity($entityId)
-                ->accessible()
-                ->currentFirst()
-                ->with('plan.features')
-                ->first();
+            // Mesma escolha do SubscriptionService::currentAccess: a que dá o
+            // melhor acesso (total antes de limitado), depois a mais recente.
+            $this->subscriptionCache[$entityId] = Subscription::bestAccessibleFor($entityId, ['plan.features']);
         }
 
         return $this->subscriptionCache[$entityId];

@@ -3,7 +3,8 @@
 Guia completo de utilização do sistema para o perfil **Administrador da clínica**, passo a
 passo com telas reais. O administrador tem acesso total à clínica: além de tudo que os
 perfis de secretária e financeiro fazem, ele gerencia o **corpo clínico**, os **usuários e
-permissões**, todas as **configurações**, o **compliance** e os **créditos de IA**.
+permissões**, todas as **configurações**, o **compliance**, os **créditos de IA** e a
+**assinatura do EasyEye** (plano, faturas e pagamento).
 
 Este manual foca no que é **exclusivo do administrador**. Para a operação do dia a dia,
 consulte também:
@@ -18,6 +19,10 @@ consulte também:
 > `cd e2e && npx cypress run --browser chrome --config excludeSpecPattern=__none__ --spec cypress/e2e/docs/admin-manual.cy.js`
 > e copie as imagens de `e2e/cypress/screenshots/admin-manual.cy.js/` para
 > `docs/manual-administrador/img/`. Nenhum dado é criado durante as capturas.
+> As telas de assinatura e cobrança (imagens 34 a 48) vêm de
+> `e2e/cypress/e2e/docs/billing-manual.cy.js`, que cria e remove sozinho clínicas de
+> demonstração (`CY-BILL …`): rode-o com o mesmo comando trocando o `--spec` e copie
+> `e2e/cypress/screenshots/billing-manual.cy.js/adm/` para `docs/manual-administrador/img/`.
 
 ---
 
@@ -38,6 +43,8 @@ consulte também:
 13. [Operação: agenda e pacientes](#13-operação-agenda-e-pacientes)
 14. [Imagens oftálmicas e Portal do Paciente](#14-imagens-oftálmicas-e-portal-do-paciente)
 15. [Minha conta e limites do perfil](#15-minha-conta-e-limites-do-perfil)
+16. [Minha assinatura: plano, faturas e pagamento](#16-minha-assinatura-plano-faturas-e-pagamento)
+17. [Avisos de cobrança: o que acontece em cada etapa](#17-avisos-de-cobrança-o-que-acontece-em-cada-etapa)
 
 ---
 
@@ -56,6 +63,7 @@ O menu do administrador é o mais completo do sistema:
 |---|---|
 | Operação | Painel, Agendas, Pacientes, Médicos, Imagens oftálmicas |
 | Assistente de IA | Consumo e compra de créditos |
+| Minha assinatura | Plano do EasyEye, faturas, pagamento e troca de plano |
 | Financeiro | BI, Fluxo de Caixa, Faturamento TISS, Glosas, 2 relatórios |
 | Relatórios | Produção, Absenteísmo e **Compliance** |
 | Configurações | Unidades/salas, Segurança (2FA), Painel de chamadas, Convênios, catálogos clínicos, Lentes IOL, Modelos de documento, Parâmetros oftalmológicos |
@@ -265,6 +273,11 @@ registrada em auditoria:
 > Antes de ativar, configure o **seu** 2FA (Meu perfil) — a exigência vale para todos,
 > inclusive você.
 
+> Se o acesso da clínica ao EasyEye for **suspenso** por falta de pagamento, a TV passa a
+> mostrar **"Serviço indisponível no momento"** e não exibe chamadas. Ela volta sozinha
+> quando o pagamento é confirmado — não é preciso mexer no aparelho
+> ([detalhes na seção 17](#17-avisos-de-cobrança-o-que-acontece-em-cada-etapa)).
+
 ---
 
 ## 10. Relatórios e Compliance (LGPD/CFM)
@@ -311,6 +324,41 @@ O passo a passo completo está no [Manual do Financeiro](../manual-financeiro/RE
 
 > A geração e aprovação de conteúdo de IA é dos **médicos**; o administrador acompanha e
 > abastece os créditos.
+
+### Comprar créditos de IA
+
+Em **Pacotes de créditos IA**, clique em **Comprar** no pacote desejado. O pagamento é
+feito **dentro do EasyEye**, sem sair do sistema, por **Pix**, **boleto** ou **cartão de
+crédito** (no cartão, à vista):
+
+![Escolha da forma de pagamento do pacote](img/41-ia-comprar-checkout.png)
+
+- Os créditos entram na carteira **assim que o pagamento é confirmado** (no Pix, em
+  segundos; no boleto, em até 3 dias úteis) e a tela se atualiza sozinha.
+- Créditos comprados **não expiram**.
+- A compra só fica disponível com a assinatura **em dia** — com o pagamento atrasado, a IA
+  fica bloqueada (veja a [seção 17](#17-avisos-de-cobrança-o-que-acontece-em-cada-etapa)).
+
+### Pedido de créditos aguardando pagamento
+
+Se você começou uma compra e não concluiu o pagamento, o pedido aparece no topo do
+quadro, com duas opções:
+
+![Pedido de créditos aguardando pagamento](img/40-ia-creditos-pendente.png)
+
+- **Continuar pagamento** — reabre o pagamento do mesmo pedido, de onde parou.
+- **Descartar** — cancela o pedido (pede confirmação; o Pix/boleto gerado é cancelado).
+
+Pedidos não pagos são descartados sozinhos depois de alguns dias. O pedido **não é uma
+dívida**: só vira créditos se for pago.
+
+### Sem créditos (paywall)
+
+Quando a clínica fica sem créditos, a tela de IA mostra o motivo (franquia do mês acabou,
+teste grátis ou cortesia sem franquia mensal) e o botão **Comprar créditos**. Os médicos
+veem a mesma mensagem com a orientação de pedir ao administrador — **médico não compra
+créditos**; quem compra é o administrador, o financeiro (em Minha assinatura) ou o dono
+da clínica.
 
 ---
 
@@ -392,6 +440,169 @@ Mesmo sendo administrador da clínica, duas fronteiras permanecem:
 
 - **Atos médicos** — criação/edição de prontuário, diagnóstico e prompts de IA são
   exclusivos do perfil Médico (exigência CFM).
+
+---
+
+## 16. Minha assinatura: plano, faturas e pagamento
+
+**Minha assinatura** (menu lateral) reúne tudo sobre a assinatura da clínica no EasyEye.
+Só o **administrador**, o **financeiro** e o **dono** da clínica veem esta tela — os demais
+perfis não têm o item no menu.
+
+![Minha assinatura](img/34-minha-assinatura.png)
+
+| Quadro | O que mostra |
+|---|---|
+| Assinatura | Plano, ciclo (mensal, anual…), valor, situação, próxima cobrança, forma de pagamento e o cartão usado nas renovações |
+| Faturas em aberto | Cobranças a pagar, com vencimento e o botão **Pagar** |
+| Mudar de plano ou ciclo | Planos disponíveis e o botão **Contratar e pagar** |
+| Créditos de IA | Os mesmos pacotes da tela de IA (veja a [seção 12](#12-assistente-de-ia-consumo-e-créditos)) |
+| Histórico de faturas | Todas as faturas, com período, vencimento, valor, situação e data do pagamento |
+
+### Pagar uma fatura
+
+Em **Faturas em aberto**, clique em **Pagar**. O pagamento abre numa janela **dentro do
+EasyEye** — escolha a forma:
+
+![Formas de pagamento](img/35-pagar-formas.png)
+
+- **Pix** — mostra o **QR Code** e o código **copia e cola** (botão **Copiar**), com a
+  validade do código. Pague pelo app do banco; a confirmação chega em segundos e a tela
+  atualiza sozinha. Código vencido? Clique em **Gerar novo código Pix**.
+
+  ![Pagar com Pix](img/36-pagar-pix.png)
+
+- **Boleto** — mostra a **linha digitável** (com **Copiar**), o botão para **baixar o
+  boleto em PDF** e o vencimento. O banco leva até 3 dias úteis para confirmar.
+
+  ![Pagar com boleto](img/37-pagar-boleto.png)
+
+- **Cartão de crédito** — você digita os dados do cartão no formulário seguro do próprio
+  meio de pagamento (o EasyEye não vê nem guarda o número do cartão). Em alguns meios de
+  pagamento o cartão é concluído no **site do meio de pagamento**, que abre em uma nova
+  aba — a opção avisa antes ("Concluído no site de …").
+
+Enquanto espera a confirmação, a janela mostra "Aguardando a confirmação do pagamento". Se
+a atualização automática estiver indisponível, use **Já paguei — atualizar**. Confirmado o
+pagamento, aparece **Pagamento confirmado. Obrigado!** e a fatura sai da lista.
+
+> Os avisos de cobrança (no topo do painel, por e-mail e por WhatsApp) trazem o link
+> **Pagar agora**, que abre exatamente esta tela já na fatura certa.
+
+### Trocar o cartão da renovação
+
+Quando a assinatura é renovada no cartão, o quadro **Assinatura** mostra o cartão atual
+(bandeira e final) e o botão **Trocar cartão**. O novo cartão vale para as próximas
+cobranças — **nada é cobrado na troca**. Alguns meios de pagamento não permitem trocar o
+cartão separadamente; nesse caso o botão não aparece e o cartão novo é informado no
+próximo pagamento.
+
+### Mudar de plano ou de ciclo
+
+Em **Mudar de plano ou ciclo**, escolha o plano e o ciclo e clique em **Contratar e pagar**.
+Antes de qualquer cobrança, o sistema mostra o que vai acontecer:
+
+- **Upgrade** (plano de valor maior) — vale **na hora**: você paga só a **diferença
+  proporcional** aos dias que faltam do período já pago. O novo plano começa assim que esse
+  pagamento é confirmado; se não pagar, a assinatura atual continua como está.
+
+  ![Upgrade com valor proporcional](img/38-trocar-plano-upgrade.png)
+
+- **Downgrade** (plano menor ou ciclo mais curto) — vale **no fim do período já pago**,
+  sem cobrança agora. Clique em **Confirmar a mudança**; a assinatura passa a mostrar
+  "Mudança agendada" com a data e o novo valor.
+
+  ![Downgrade agendado para o fim do período](img/39-trocar-plano-downgrade.png)
+
+> **Plano anual no cartão:** pode ser parcelado **sem juros** na contratação (o número de
+> parcelas aparece na escolha do ciclo). A **renovação** no cartão é cobrada **à vista**.
+
+### Teste grátis: contratar
+
+Durante o teste grátis, o aviso no topo do painel mostra quantos dias faltam e o botão
+**Contratar agora**, que leva a Minha assinatura:
+
+![Aviso de teste grátis terminando](img/46-aviso-teste-gratis.png)
+
+O teste grátis **não tem dias extras**: no fim do último dia o painel é bloqueado. Na tela
+de bloqueio, cada plano tem o botão **Contratar**, que abre a contratação já com o
+pagamento dentro do sistema — confirmado o pagamento, o acesso volta na hora:
+
+![Teste grátis encerrado](img/47-teste-gratis-encerrado.png)
+
+Você também recebe lembretes por **e-mail e WhatsApp** 3 dias antes, 1 dia antes e no dia
+em que o teste termina.
+
+---
+
+## 17. Avisos de cobrança: o que acontece em cada etapa
+
+Quando uma fatura da assinatura vence sem pagamento, o EasyEye avisa e vai restringindo o
+acesso aos poucos. Os avisos vão por **e-mail** e por **WhatsApp** para o administrador, o
+financeiro e o dono da clínica (WhatsApp só para quem tem o número confirmado no cadastro)
+e sempre trazem o link para pagar dentro do sistema.
+
+| Quando | O que acontece |
+|---|---|
+| 5 dias antes do vencimento | Lembrete da cobrança |
+| 1 dia depois do vencimento | Aviso de pagamento em atraso — **tudo continua funcionando** |
+| 3 dias depois do vencimento | **Acesso limitado**: IA e módulo financeiro bloqueados |
+| 7 dias depois do vencimento | **Acesso suspenso**: o painel fica bloqueado até o pagamento |
+
+Pagou? O acesso volta **sozinho**, assim que o pagamento é confirmado (Pix em segundos,
+boleto em até 3 dias úteis).
+
+### Pagamento em atraso (aviso)
+
+Um aviso amarelo aparece no topo de todas as telas, com as datas em que a IA/financeiro
+serão bloqueados e em que o painel será suspenso. Ele não pode ser fechado. **Pagar
+agora** abre a fatura em Minha assinatura:
+
+![Aviso de pagamento em atraso](img/42-aviso-atraso.png)
+
+### Acesso limitado
+
+O aviso fica vermelho e passa a dizer o que está bloqueado:
+
+![Aviso de acesso limitado](img/43-aviso-acesso-limitado.png)
+
+- **Bloqueados:** inteligência artificial (análises, assistente, chat e compra de
+  créditos) e o módulo financeiro (caixa, faturamento TISS, glosas, repasses, tabela de
+  preços e relatórios financeiros). Ao abrir uma dessas telas, o sistema explica o motivo
+  e oferece o pagamento:
+
+  ![Tela de acesso limitado](img/44-tela-acesso-limitado.png)
+
+- **Continuam funcionando:** agenda, pacientes, prontuário, imagens e o restante do
+  painel — inclusive o **Lançar no caixa** do atendimento, feito pela agenda.
+- **Minha assinatura** continua aberta para pagar.
+
+Secretárias e médicos veem o mesmo aviso, **sem valor nem link**, com a orientação de
+procurar o administrador da clínica.
+
+### Acesso suspenso
+
+Ao entrar no painel, qualquer tela leva à página de bloqueio, com a cobrança em aberto e o
+botão **Pagar agora** — o pagamento abre dentro do sistema (Minha assinatura continua
+liberada, assim como o seu perfil):
+
+![Tela de acesso suspenso](img/45-tela-bloqueio.png)
+
+Enquanto o acesso estiver suspenso:
+
+- as **mensagens automáticas de WhatsApp aos pacientes** (confirmação de consulta,
+  pesquisa de satisfação e respostas automáticas) **param** — e voltam sozinhas com o
+  pagamento;
+- a **TV do painel de chamadas** mostra "Serviço indisponível no momento":
+
+  ![TV de chamada com o serviço indisponível](img/48-tv-servico-indisponivel.png)
+
+- o **Portal do Paciente** continua no ar, mas **só para consulta**: o paciente vê e baixa
+  os documentos já liberados e não consegue fazer solicitações. O aviso para o paciente é
+  neutro — não fala em pagamento.
+
+> **Cortesia:** clínicas em cortesia não têm franquia mensal de IA; para usar a IA,
+> compram créditos avulsos (seção 12).
 
 ---
 

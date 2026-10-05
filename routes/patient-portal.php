@@ -12,7 +12,10 @@ use Illuminate\Support\Facades\Route;
 // clínicas onde já foi atendido de uma vez só (sem "entidade ativa"). O
 // EntityScope global de Patient fica inerte (TenantContext sem vínculo) e
 // DashboardController::index() já filtra por person_id explicitamente.
-Route::prefix('meus-documentos')->middleware('patient.auth')->name('patient-portal.')->group(function () {
+//
+// patient.read-only: clínica com o acesso bloqueado fica em só leitura no
+// portal (documentos e resultados seguem; escrita recusada — ClinicServiceGate).
+Route::prefix('meus-documentos')->middleware(['patient.auth', 'patient.read-only'])->name('patient-portal.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Fase 2 — grant de documento + leitura (laudo/exame/anexo liberados pelo staff).

@@ -193,12 +193,11 @@ return [
     'credit_purchases' => [
         'currency' => env('AI_CREDIT_PURCHASE_CURRENCY', 'BRL'),
 
-        // Em produção, créditos comprados só devem entrar na carteira após
-        // confirmação financeira via gateway/webhook. Útil ativar em local/testes.
-        'auto_credit_without_gateway' => filter_var(
-            env('AI_CREDIT_PURCHASES_AUTO_CREDIT', false),
-            FILTER_VALIDATE_BOOL,
-        ),
+        // Pedido de pacote (checkout) pendente sem pagamento há mais de N dias:
+        // descartado por ai:expire-credit-pack-orders (pedido e fatura
+        // cancelados, cobranças canceladas no gateway quando possível).
+        // Pagamento que chegar depois ainda credita (o cliente pagou).
+        'pending_expiry_days' => (int) env('AI_CREDIT_PACK_PENDING_EXPIRY_DAYS', 7),
 
         'packages' => [
             [

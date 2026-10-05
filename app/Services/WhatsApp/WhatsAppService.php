@@ -115,7 +115,18 @@ class WhatsAppService
             ]));
         } catch (QueryException $e) {
             if ($this->isUniqueViolation($e)) {
-                return null; // já enviada/enfileirada pra esta consulta
+                // Pulada antes (acesso da clínica bloqueado): a mesma linha
+                // volta para a fila. Senão já foi enviada/enfileirada.
+                $revived = WhatsAppMessage::query()
+                    ->where('schedule_id', $schedule->id)
+                    ->where('direction', 'out')
+                    ->where('kind', $kind)
+                    ->where('status', WhatsAppMessage::STATUS_SKIPPED)
+                    ->update(['status' => WhatsAppMessage::STATUS_PENDING, 'phone' => $phone, 'body' => $body, 'error' => null]);
+
+                return $revived > 0
+                    ? WhatsAppMessage::query()->where('schedule_id', $schedule->id)->where('direction', 'out')->where('kind', $kind)->first()
+                    : null;
             }
 
             throw $e;

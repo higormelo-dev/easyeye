@@ -15,6 +15,9 @@ use InvalidArgumentException;
 
 class GatewaysController extends Controller
 {
+    /** Gateway cuja credencial é a InfiniteTag (handle), não um token. */
+    private const HANDLE_GATEWAY = 'infinitepay';
+
     public function __construct(
         private readonly GatewayDefaultService $defaultService,
         private readonly AuditLogger $audit,
@@ -75,6 +78,8 @@ class GatewaysController extends Controller
                 'valid_to'   => $c->valid_to?->format('d/m/Y'),
                 'created_at' => $c->created_at->format('d/m/Y H:i'),
                 'has_secret' => ! empty($c->credentials),
+                // Pública por definição (vai ao navegador no checkout).
+                'public_key' => is_array($c->credentials) ? ($c->credentials['public_key'] ?? null) : null,
                 'revoke_url' => route('manager.gateways.credentials.revoke', [$gateway, $c]),
             ]);
 
@@ -108,23 +113,65 @@ class GatewaysController extends Controller
         return response()->json(['message' => __('gateways.priority_updated')]);
     }
 
+    /**
+     * Formato da chave PÚBLICA do SDK JS por gateway (vai ao navegador):
+     *  - Mercado Pago: APP_USR-/TEST- + UUID ("Credenciais" → Public key;
+     *    https://www.mercadopago.com.br/developers/pt/docs/your-integrations/credentials).
+     *    O access token também começa com APP_USR-, mas não é um UUID;
+     *  - Pagar.me: pk_… / pk_test_… (https://docs.pagar.me/docs/chaves-de-acesso);
+     *  - Stripe: pk_live_… / pk_test_… (https://docs.stripe.com/keys);
+     *  - PagBank: chave pública RSA (PEM ou só o corpo base64 "MII…")
+     *    (https://developer.pagbank.com.br/reference/criar-chave-publica).
+     * Asaas e InfinitePay não têm cartão transparente: chave pública recusada.
+     */
+    private const PUBLIC_KEY_FORMATS = [
+        'mercadopago' => '/^(APP_USR|TEST)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+        'pagarme'     => '/^pk_(test_)?[A-Za-z0-9]{8,}$/',
+        'stripe_br'   => '/^pk_(live|test)_[A-Za-z0-9]{10,}$/',
+        'pagbank'     => '/^(-----BEGIN PUBLIC KEY-----[A-Za-z0-9+\/=\s]+-----END PUBLIC KEY-----|MII[A-Za-z0-9+\/=]{100,})$/',
+    ];
+
     public function storeCredential(Request $request, Gateway $gateway): JsonResponse
     {
+        // InfinitePay (Checkout Integrado): sem token nem segredo de webhook —
+        // a credencial é a InfiniteTag (handle) e o webhook é conferido no
+        // payment_check da própria InfinitePay.
+        $usesHandle = $gateway->code === self::HANDLE_GATEWAY;
+
         $request->validate([
             'label'  => ['nullable', 'string', 'max:120'],
-            'secret' => ['required', 'string', 'min:8'],
+            'secret' => $usesHandle ? ['nullable', 'string', 'max:255'] : ['required', 'string', 'min:8'],
+            'handle' => $usesHandle ? ['required', 'string', 'regex:/^\$?[A-Za-z0-9._-]{1,64}$/'] : ['prohibited'],
+            // Chave PÚBLICA do SDK JS do checkout transparente (Mercado Pago,
+            // Stripe, Pagar.me; PagBank opcional — sem ela, vem da API). Vai
+            // ao navegador; a secreta nunca.
+            // Formato por gateway (self::PUBLIC_KEY_FORMATS); nunca igual ao
+            // secret nem uma chave secreta (sk_/rk_/access token).
+            'public_key' => isset(self::PUBLIC_KEY_FORMATS[$gateway->code])
+                ? ['nullable', 'string', 'max:4096', 'not_regex:/^(sk_|rk_)/', 'regex:' . self::PUBLIC_KEY_FORMATS[$gateway->code], 'different:secret']
+                : ['prohibited'],
             // BUGFIX (revisao de seguranca): gateway com supports_webhooks=true não pode
             // ser salvo sem webhook_secret — isso deixava validateWebhookSignature() sem
             // segredo para validar, forçando fail-open (webhook aceito sem autenticação).
-            'webhook_secret' => $gateway->supports_webhooks ? ['required', 'string'] : ['nullable', 'string'],
+            'webhook_secret' => $gateway->supports_webhooks && ! $usesHandle ? ['required', 'string'] : ['nullable', 'string'],
             'valid_from'     => ['nullable', 'date'],
             'valid_to'       => ['nullable', 'date', 'after:valid_from'],
             'reason'         => ['required', 'string', 'min:20', 'max:1000'],
         ], [
-            'reason.required' => __('manager_hardening.reason_required'),
-            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
-            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+            'reason.required'       => __('manager_hardening.reason_required'),
+            'reason.min'            => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'            => __('manager_hardening.reason_max', ['max' => 1000]),
+            'handle.required'       => __('gateways.handle_required'),
+            'handle.regex'          => __('gateways.handle_invalid'),
+            'public_key.regex'      => __('gateways.public_key_invalid', ['format' => __("gateways.public_key_formats.{$gateway->code}")]),
+            'public_key.not_regex'  => __('gateways.public_key_secret'),
+            'public_key.different'  => __('gateways.public_key_secret'),
+            'public_key.prohibited' => __('gateways.public_key_unsupported'),
         ]);
+
+        $credentials = $usesHandle
+            ? array_filter(['handle' => ltrim(trim((string) $request->input('handle')), '$'), 'secret' => $request->input('secret')], fn ($value) => filled($value))
+            : array_filter(['secret' => $request->secret, 'public_key' => trim((string) $request->input('public_key')) ?: null], fn ($value) => filled($value));
 
         // Revoga credenciais globais anteriores (rotação automática).
         $oldCount = GatewayCredential::query()
@@ -138,7 +185,7 @@ class GatewaysController extends Controller
             'entity_id'      => null,
             'scope'          => CredentialScope::Global->value,
             'label'          => $request->label ?? 'Credencial ' . now()->format('d/m/Y H:i'),
-            'credentials'    => ['secret' => $request->secret],
+            'credentials'    => $credentials,
             'webhook_secret' => $request->webhook_secret,
             'active'         => true,
             'valid_from'     => $request->valid_from,
@@ -165,6 +212,8 @@ class GatewaysController extends Controller
                 'scope'                => CredentialScope::Global->value,
                 'cascaded_revocations' => $oldCount,
                 'has_webhook_secret'   => $request->filled('webhook_secret'),
+                'has_handle'           => isset($credentials['handle']),
+                'has_public_key'       => isset($credentials['public_key']),
                 'valid_from'           => $request->valid_from,
                 'valid_to'             => $request->valid_to,
             ],

@@ -19,9 +19,9 @@ use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
  * Conceitos:
  *   - balance              : créditos COMPRADOS que NUNCA expiram (acumulam).
  *   - reserved_balance     : porção de balance reservada em execuções em curso.
- *   - monthly_quota        : cota dada pelo plano da subscription, expira no fim do ciclo (use-or-lose).
- *   - monthly_quota_used   : quanto da cota foi consumido neste ciclo.
- *   - quota_period_ends_at : quando a cota reseta (geralmente subscription.ends_at).
+ *   - monthly_quota        : franquia mensal do plano (só cobrança automática paga), expira no fim da janela (use-or-lose).
+ *   - monthly_quota_used   : quanto da cota foi consumido nesta janela.
+ *   - quota_period_ends_at : fim da janela mensal (ver AiQuotaWindow) — a próxima vem da leitura da carteira (reserva/medidor) ou do ai:grant-monthly-quotas.
  *
  * Política de consumo: consome COTA primeiro (que vai expirar), só depois desconta do balance.
  *
@@ -103,6 +103,19 @@ class AiCreditWallet extends Model
     {
         return $this->quota_period_ends_at !== null
             && $this->quota_period_ends_at->isPast();
+    }
+
+    /**
+     * Último dia (Y-m-d) em que a cota em vigor ainda vale — a janela termina
+     * às 00:00 do dia seguinte. Null sem cota em vigor.
+     */
+    public function quotaLastDay(): ?string
+    {
+        if ($this->quota_period_ends_at === null || $this->quotaExpired() || (int) $this->monthly_quota <= 0) {
+            return null;
+        }
+
+        return $this->quota_period_ends_at->copy()->subSecond()->toDateString();
     }
 
     /**

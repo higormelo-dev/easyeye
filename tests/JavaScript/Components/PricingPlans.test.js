@@ -297,3 +297,99 @@ describe('PricingPlans', () => {
         expect(wrapper.get('.pricing-desc').text()).toBe('Descrição cadastrada do plano.');
     });
 });
+
+describe('PricingPlans — ciclo de cobrança', () => {
+    const cycleT = {
+        ...t,
+        cycle_selector_label: 'Ciclo de cobrança',
+        cycle_save_up_to: 'até :percent% off',
+        monthly_equivalent: 'equivale a :price/mês',
+        savings_badge: 'Economize :percent%',
+        cycle_unavailable: 'Disponível no ciclo :cycle',
+    };
+    const price = (cycle, label, months, value, savings = 0, periodLabel = '/mês') => ({
+        cycle,
+        label,
+        months,
+        price: value,
+        period_label: periodLabel,
+        monthly_equivalent: Math.round((value / months) * 100) / 100,
+        savings_percent: savings,
+    });
+    const withCycles = () => [
+        plan('Básico', { default_cycle: 'monthly', prices: [price('monthly', 'Mensal', 1, 299.9)] }),
+        plan('Pro', {
+            is_featured: true,
+            default_cycle: 'monthly',
+            prices: [price('monthly', 'Mensal', 1, 899.9), price('yearly', 'Anual', 12, 8639.04, 20, '/ano')],
+        }),
+    ];
+
+    it('mostra os ciclos oferecidos com a maior economia e começa no mensal', () => {
+        render({ t: cycleT, plans: withCycles() });
+
+        const options = wrapper.findAll('[role="radio"]');
+        expect(options.map((o) => o.attributes('aria-label'))).toEqual(['Mensal', 'Anual, até 20% off']);
+        expect(options[0].attributes('aria-checked')).toBe('true');
+        expect(wrapper.get('[role="radiogroup"]').attributes('aria-label')).toBe('Ciclo de cobrança');
+        expect(wrapper.findAll('.price-value').map((p) => p.text())).toEqual(['299,90', '899,90']);
+    });
+
+    it('anual troca preço, período, equivalente mensal, economia e o link do cadastro', async () => {
+        render({ t: cycleT, plans: withCycles() });
+
+        await wrapper.get('[data-cycle="yearly"]').trigger('click');
+
+        const [basic, pro] = wrapper.findAll('.pricing-card');
+        expect(pro.get('.price-value').text()).toBe('8.639,04');
+        expect(pro.get('.price-period').text()).toBe('/ano');
+        expect(pro.get('[data-test="price-equivalent"]').text().replace(/\s+/g, ' ')).toBe(
+            'equivale a R$ 719,92/mês Economize 20%',
+        );
+        expect(pro.get('.pricing-cta a').attributes('href')).toBe('/register?plan=Pro&cycle=yearly');
+
+        // Plano sem anual continua vendável no ciclo dele, avisando.
+        expect(basic.get('.price-value').text()).toBe('299,90');
+        expect(basic.get('[data-test="cycle-unavailable"]').text()).toBe('Disponível no ciclo Mensal');
+        expect(basic.get('.pricing-cta a').attributes('href')).toBe('/register?plan=Básico&cycle=monthly');
+    });
+
+    it('setas do teclado trocam o ciclo (radiogroup)', async () => {
+        render({ t: cycleT, plans: withCycles() });
+
+        await wrapper.get('[data-cycle="monthly"]').trigger('keydown', { key: 'ArrowRight' });
+
+        expect(wrapper.get('[data-cycle="yearly"]').attributes('aria-checked')).toBe('true');
+        expect(wrapper.get('[data-cycle="monthly"]').attributes('tabindex')).toBe('-1');
+    });
+
+    it('seletor lista os ciclos do mais curto ao mais longo', () => {
+        const plans = [
+            plan('Pro', {
+                default_cycle: 'monthly',
+                prices: [
+                    price('yearly', 'Anual', 12, 8639.04, 20, '/ano'),
+                    price('monthly', 'Mensal', 1, 899.9),
+                    price('semiannual', 'Semestral', 6, 4859.46, 10, '/semestre'),
+                ],
+            }),
+        ];
+        render({ t: cycleT, plans });
+
+        expect(wrapper.findAll('[role="radio"]').map((o) => o.attributes('data-cycle'))).toEqual([
+            'monthly',
+            'semiannual',
+            'yearly',
+        ]);
+    });
+
+    it('catálogo com um só ciclo não mostra seletor', () => {
+        render({
+            t: cycleT,
+            plans: [plan('Básico', { default_cycle: 'monthly', prices: [price('monthly', 'Mensal', 1, 299.9)] })],
+        });
+
+        expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="price-equivalent"]').exists()).toBe(false);
+    });
+});

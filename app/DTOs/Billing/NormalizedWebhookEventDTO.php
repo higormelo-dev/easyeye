@@ -17,6 +17,10 @@ readonly class NormalizedWebhookEventDTO
         public array $metadata,
         public array $rawPayload,
         public string $occurredAt,
+        // Vencimento da cobrança (Y-m-d) e link de pagamento (página da
+        // fatura, boleto ou Pix), quando o gateway informa.
+        public ?string $dueDate = null,
+        public ?string $paymentUrl = null,
     ) {
     }
 }

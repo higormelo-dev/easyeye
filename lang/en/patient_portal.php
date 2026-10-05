@@ -6,6 +6,14 @@
  * by accepting each clinic's invitation (signed in and confirming the password).
  */
 return [
+    // Clinic with suspended service: the portal is view-only (never tell the
+    // patient why — no payment/subscription talk).
+    'read_only' => [
+        'badge'          => 'View only',
+        'notice'         => 'Online booking and other requests are unavailable right now; please contact the clinic. Your documents remain available to view and download.',
+        'action_blocked' => 'This action is unavailable right now. Please contact the clinic.',
+    ],
+
     'invitation' => [
         'already_used'     => 'This invitation has already been used. Sign in with your password.',
         'login_to_link'    => 'You already have a Patient Portal account. Sign in with your password to add :clinic to your account.',

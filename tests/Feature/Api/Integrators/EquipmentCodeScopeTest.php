@@ -195,8 +195,9 @@ it('[CONCORRENCIA] serializa a numeracao EIQ do mesmo integrador ate o commit de
     try {
         DB::statement("SET LOCAL lock_timeout = '300ms'");
 
+        // 55P03 = lock_timeout (SQLSTATE; o texto muda com o lc_messages do servidor).
         expect(fn () => EntityIntegratorEquipment::factory()->create(['integrator_id' => $ctx['integrator']->id]))
-            ->toThrow(QueryException::class, 'lock timeout');
+            ->toThrow(fn (QueryException $e) => expect($e->getCode())->toBe('55P03'));
 
         // Outro integrador (mesma clínica) não é bloqueado.
         expect(EntityIntegratorEquipment::factory()->create(['integrator_id' => $second['integrator']->id])->code)

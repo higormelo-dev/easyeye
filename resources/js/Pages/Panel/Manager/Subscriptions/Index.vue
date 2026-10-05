@@ -1,61 +1,167 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchInput from '@/Components/Panel/SearchInput.vue';
+import ManagerBillingNav from '@/Components/Panel/ManagerBillingNav.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import SubscriptionTable from './SubscriptionTable.vue';
 import SubscriptionCards from './SubscriptionCards.vue';
 import SubscriptionDetailDrawer from './SubscriptionDetailDrawer.vue';
-import SubscriptionFormModal from './SubscriptionFormModal.vue';
-import SubscriptionActivateModal from './SubscriptionActivateModal.vue';
-import SubscriptionTrialModal from './SubscriptionTrialModal.vue';
-import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import SubscriptionCreateModal from './SubscriptionCreateModal.vue';
+import SubscriptionExtendModal from './SubscriptionExtendModal.vue';
+import SubscriptionTermsModal from './SubscriptionTermsModal.vue';
 
 const props = defineProps({
     subscriptions: { type: Object, required: true },
     total: { type: Number, default: 0 },
+    summary: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({}) },
     plans: { type: Array, default: () => [] },
     billingCycles: { type: Array, default: () => [] },
     statuses: { type: Array, default: () => [] },
     gateways: { type: Array, default: () => [] },
-    trialDays: { type: Number, default: 14 },
-    graceDays: { type: Number, default: 3 },
+    trialDays: { type: Number, default: 7 },
+    canManagePlans: { type: Boolean, default: false },
     t: { type: Object, default: () => ({}) },
 });
 
 // ── View toggle ──────────────────────────────────────────────────────────────
-const view = ref(localStorage.getItem('mgr_subscriptions_view') ?? 'table');
+function readView() {
+    try {
+        return localStorage.getItem('mgr_subscriptions_view') ?? 'table';
+    } catch {
+        return 'table';
+    }
+}
+
+const view = ref(readView());
 function setView(v) {
     view.value = v;
-    localStorage.setItem('mgr_subscriptions_view', v);
+    try {
+        localStorage.setItem('mgr_subscriptions_view', v);
+    } catch {
+        // armazenamento indisponível (modo privado): só não lembra a escolha
+    }
 }
 
-// ── Search / sort ─────────────────────────────────────────────────────────────
+// ── Filtros (na URL: dá para compartilhar e voltar) ─────────────────────────
 const search = ref(props.filters.search ?? '');
-let searchTimer = null;
-
-watch(search, (val) => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-        router.get(
-            route('manager.subscriptions.index'),
-            { search: val, sort: props.filters.sort, direction: props.filters.direction },
-            { preserveState: true, preserveScroll: true, replace: true },
-        );
-    }, 400);
+const filterForm = ref({
+    status: props.filters.status ?? '',
+    plan: props.filters.plan ?? '',
+    mode: props.filters.mode ?? '',
+    scope: props.filters.scope ?? 'current',
 });
 
-function onSort({ sort, direction }) {
-    router.get(
-        route('manager.subscriptions.index'),
-        { search: search.value, sort, direction },
-        { preserveState: true, preserveScroll: true },
+const activeFilters = computed(() => ({
+    search: search.value,
+    ...filterForm.value,
+    sort: props.filters.sort,
+    direction: props.filters.direction,
+}));
+
+const hasFilters = computed(
+    () => !!(search.value || filterForm.value.status || filterForm.value.plan || filterForm.value.mode),
+);
+
+function applyFilters(extra = {}) {
+    const query = Object.fromEntries(
+        Object.entries({ ...activeFilters.value, ...extra }).filter(
+            ([key, value]) =>
+                value !== '' && value !== null && value !== undefined && !(key === 'scope' && value === 'current'),
+        ),
     );
+
+    router.get(route('manager.subscriptions.index'), query, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
 }
 
-// ── Detail drawer ─────────────────────────────────────────────────────────────
+let searchTimer = null;
+watch(search, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => applyFilters(), 400);
+});
+
+watch(filterForm, () => applyFilters(), { deep: true });
+
+function clearFilters() {
+    search.value = '';
+    filterForm.value = { status: '', plan: '', mode: '', scope: 'current' };
+}
+
+function onSort({ sort, direction }) {
+    applyFilters({ sort, direction });
+}
+
+// Atalhos do resumo: filtram a lista pela situação/modalidade.
+const summaryCards = computed(() => [
+    { key: 'trial', mode: 'trial', icon: 'ti-clock-play', label: props.t.summary_trial },
+    { key: 'gateway', mode: 'gateway', icon: 'ti-credit-card', label: props.t.summary_gateway },
+    { key: 'complimentary', mode: 'complimentary', icon: 'ti-gift', label: props.t.summary_complimentary },
+    { key: 'past_due', status: 'past_due', icon: 'ti-alert-triangle', label: props.t.summary_past_due },
+    {
+        key: 'awaiting_payment',
+        status: 'awaiting_payment',
+        icon: 'ti-hourglass',
+        label: props.t.summary_awaiting_payment,
+    },
+    { key: 'without_access', status: 'no_access', icon: 'ti-lock', label: props.t.summary_without_access },
+    // Cobrança automática do código anterior aguardando conciliação: só aparece quando há.
+    ...(props.summary?.needs_review
+        ? [{ key: 'needs_review', status: 'needs_review', icon: 'ti-file-search', label: props.t.summary_needs_review }]
+        : []),
+    // O gateway desativou a recorrência (cobrança passou para o sistema): só aparece quando há.
+    ...(props.summary?.recurrence_alert
+        ? [
+              {
+                  key: 'recurrence_alert',
+                  status: 'recurrence_alert',
+                  icon: 'ti-repeat-off',
+                  label: props.t.summary_recurrence_alert,
+              },
+          ]
+        : []),
+]);
+
+function applySummary(card) {
+    filterForm.value = {
+        ...filterForm.value,
+        scope: 'current',
+        status: card.status ?? (card.mode ? 'accessible' : ''),
+        mode: card.mode ?? '',
+    };
+}
+
+function isSummaryActive(card) {
+    return card.mode
+        ? filterForm.value.mode === card.mode && filterForm.value.status === 'accessible'
+        : filterForm.value.status === card.status && !filterForm.value.mode;
+}
+
+const planFilterOptions = computed(() => props.plans.map((p) => ({ id: p.id, name: p.name })));
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg, type = 'success') {
+    if (!msg) return;
+    if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
+}
+
+// Depois de salvar: recarrega a lista/resumo e o drawer aberto.
+const refreshKey = ref(0);
+
+function afterSave(message) {
+    showToast(message, 'success');
+    refreshKey.value++;
+    router.reload({ only: ['subscriptions', 'total', 'summary'] });
+}
+
+// ── Drawer ───────────────────────────────────────────────────────────────────
 const detailOpen = ref(false);
 const detailId = ref(null);
 
@@ -63,120 +169,101 @@ function openDetail(id) {
     detailId.value = id;
     detailOpen.value = true;
 }
-function closeDetail() {
-    detailOpen.value = false;
-    detailId.value = null;
+
+// ── Nova assinatura ──────────────────────────────────────────────────────────
+const createOpen = ref(false);
+const createPreset = ref({});
+
+function openCreate(preset = {}) {
+    createPreset.value = preset;
+    createOpen.value = true;
 }
 
-// ── Edit form ─────────────────────────────────────────────────────────────────
-const formOpen = ref(false);
-const formId = ref(null);
-
-function openEdit(id) {
-    formId.value = id;
-    formOpen.value = true;
-}
-function closeForm() {
-    formOpen.value = false;
-    formId.value = null;
+function openCreateFor(s) {
+    openCreate({ entity_id: s.entity_id, plan_id: s.plan_id });
 }
 
-// ── Activate modal ────────────────────────────────────────────────────────────
-const activateOpen = ref(false);
-const activateSubscription = ref(null);
+// Vindo de Planos ("Nova assinatura neste plano"): ?new=1&new_plan=<id>.
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') !== '1') return;
 
-function openActivate(s) {
-    activateSubscription.value = s;
-    activateOpen.value = true;
-}
-function closeActivate() {
-    activateOpen.value = false;
-    activateSubscription.value = null;
-}
+    openCreate({ plan_id: params.get('new_plan') || undefined, entity_id: params.get('new_entity') || undefined });
 
-// ── Trial modal ───────────────────────────────────────────────────────────────
-const trialOpen = ref(false);
-const trialSubscription = ref(null);
+    params.delete('new');
+    params.delete('new_plan');
+    params.delete('new_entity');
+    const qs = params.toString();
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+});
 
-function openTrial(s) {
-    trialSubscription.value = s;
-    trialOpen.value = true;
-}
-function closeTrial() {
-    trialOpen.value = false;
-    trialSubscription.value = null;
+// ── Adicionar período / Alterar ─────────────────────────────────────────────
+const extendOpen = ref(false);
+const termsOpen = ref(false);
+const target = ref(null);
+
+function openExtend(s) {
+    target.value = s;
+    extendOpen.value = true;
 }
 
-// ── Reason confirmation modal ──────────────────────────────────────────────────
-// Pattern: ações destrutivas abrem este modal genérico (com textarea para reason);
-// no @confirm enviamos o body com reason incluída.
+function openTerms(s) {
+    target.value = s;
+    termsOpen.value = true;
+}
+
+function termsToCreate() {
+    termsOpen.value = false;
+    if (target.value) openCreateFor(target.value);
+}
+
+// ── Cancelar / bloquear (justificativa obrigatória) ─────────────────────────
 const reasonModal = ref({
     open: false,
     saving: false,
     title: '',
     message: '',
-    confirmLabel: '',
     confirmVariant: 'danger',
-    onConfirm: null, // (reason: string) => Promise<void>
+    error: '',
+    onConfirm: null,
 });
 
 function openReasonModal(config) {
-    reasonModal.value = {
-        open: true,
-        saving: false,
-        title: config.title ?? '',
-        message: config.message ?? '',
-        confirmLabel: config.confirmLabel ?? '',
-        confirmVariant: config.confirmVariant ?? 'danger',
-        onConfirm: config.onConfirm,
-    };
+    reasonModal.value = { open: true, saving: false, error: '', confirmVariant: 'danger', ...config };
 }
 
 function closeReasonModal() {
-    if (reasonModal.value.saving) return;
-    reasonModal.value.open = false;
+    if (!reasonModal.value.saving) reasonModal.value.open = false;
 }
 
 async function handleReasonConfirm(reason) {
     if (!reasonModal.value.onConfirm) return;
     reasonModal.value.saving = true;
+    reasonModal.value.error = '';
     try {
         await reasonModal.value.onConfirm(reason);
         reasonModal.value.open = false;
+    } catch (err) {
+        reasonModal.value.error = err?.response?.data?.message ?? props.t.request_failed;
     } finally {
         reasonModal.value.saving = false;
     }
 }
 
-// ── Cancel ────────────────────────────────────────────────────────────────────
 function onCancel(s) {
     openReasonModal({
         title: props.t.confirm_cancel_title,
         message: props.t.confirm_cancel_text,
-        confirmVariant: 'danger',
         async onConfirm(reason) {
-            const res = await fetch(route('manager.subscriptions.cancel'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify({ entity_id: s.entity_id, reason }),
+            const { data } = await window.axios.post(route('manager.subscriptions.cancel'), {
+                entity_id: s.entity_id,
+                reason,
             });
-
-            const json = await res.json();
-            if (res.ok) {
-                showToast(json.message, 'success');
-                router.reload({ only: ['subscriptions', 'total'] });
-            } else {
-                showToast(json.message ?? 'Erro', 'error');
-            }
+            afterSave(data.message);
         },
     });
 }
 
-// ── Block / Unblock ───────────────────────────────────────────────────────────
 function onBlock(s) {
     const blocking = s.entity_active;
     openReasonModal({
@@ -184,59 +271,17 @@ function onBlock(s) {
         message: blocking ? props.t.confirm_block_text : props.t.confirm_unblock_text,
         confirmVariant: blocking ? 'danger' : 'warning',
         async onConfirm(reason) {
-            const res = await fetch(route('manager.subscriptions.block-access'), {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify({ entity_id: s.entity_id, active: !blocking, reason }),
+            const { data } = await window.axios.patch(route('manager.subscriptions.block-access'), {
+                entity_id: s.entity_id,
+                active: !blocking,
+                reason,
             });
-
-            const json = await res.json();
-            if (res.ok) {
-                showToast(json.message, 'success');
-                router.reload({ only: ['subscriptions', 'total'] });
-            } else {
-                showToast(json.message ?? 'Erro', 'error');
-            }
+            afterSave(data.message);
         },
     });
 }
 
-// ── Settings ──────────────────────────────────────────────────────────────────
-const settingsForm = ref({ trial_days: props.trialDays, grace_period_days: props.graceDays });
-const settingsSaving = ref(false);
-
-async function saveSettings() {
-    settingsSaving.value = true;
-    try {
-        const res = await fetch(route('manager.subscriptions.settings'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                Accept: 'application/json',
-            },
-            body: JSON.stringify(settingsForm.value),
-        });
-        const json = await res.json();
-        showToast(json.message ?? props.t.settings_saved, res.ok ? 'success' : 'error');
-        if (res.ok) router.reload({ only: ['trialDays', 'graceDays'] });
-    } finally {
-        settingsSaving.value = false;
-    }
-}
-
-// ── Toast helper ──────────────────────────────────────────────────────────────
-function showToast(msg, type = 'success') {
-    if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
-    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
-    alert(msg);
-}
-
-// ── Breadcrumbs ───────────────────────────────────────────────────────────────
+// ── Breadcrumbs ──────────────────────────────────────────────────────────────
 const breadcrumbs = [
     { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
     { label: props.t.breadcrumb_current ?? 'Assinaturas', url: '#', active: true },
@@ -246,7 +291,6 @@ const breadcrumbs = [
 <template>
     <AppLayout :title="t.page_title" :breadcrumbs="breadcrumbs">
         <div>
-            <!-- ── Page Header ─────────────────────────────────────────────── -->
             <PageHeader
                 :title="t.page_title"
                 :total="total"
@@ -255,134 +299,228 @@ const breadcrumbs = [
                 :view-cards-title="t.view_cards"
                 :show-view-toggle="true"
                 @set-view="setView"
-            />
+            >
+                <template #actions>
+                    <button type="button" class="btn btn-primary fs-13" @click="openCreate()">
+                        <i class="ti ti-plus me-1" aria-hidden="true"></i> {{ t.btn_new }}
+                    </button>
+                </template>
+            </PageHeader>
 
-            <!-- ── Search ──────────────────────────────────────────────────── -->
-            <SearchInput v-model="search" :placeholder="t.search_placeholder" max-width="380px" />
+            <!-- ── Planos ↔ Assinaturas ─────────────────────────────────── -->
+            <ManagerBillingNav active="subscriptions" :can-manage-plans="canManagePlans" :labels="t" />
 
-            <!-- ── Settings card ────────────────────────────────────────────── -->
-            <div class="card mb-3">
-                <div class="card-header fw-semibold py-2">
-                    <i class="ti ti-settings me-1 text-muted"></i>{{ t.settings_title }}
-                </div>
-                <div class="card-body py-3">
-                    <form class="row g-3 align-items-end" @submit.prevent="saveSettings">
-                        <div class="col-md-3 col-sm-6">
-                            <label class="form-label small">{{ t.settings_trial_days }}</label>
-                            <input
-                                v-model.number="settingsForm.trial_days"
-                                type="number"
-                                min="1"
-                                max="365"
-                                class="form-control form-control-sm"
-                            />
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <label class="form-label small">{{ t.settings_grace_days }}</label>
-                            <input
-                                v-model.number="settingsForm.grace_period_days"
-                                type="number"
-                                min="0"
-                                max="30"
-                                class="form-control form-control-sm"
-                            />
-                        </div>
-                        <div class="col-auto">
-                            <button type="submit" class="btn btn-primary btn-sm" :disabled="settingsSaving">
-                                <span v-if="settingsSaving" class="spinner-border spinner-border-sm me-1"></span>
-                                {{ t.settings_save }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+            <!-- ── Resumo (assinatura vigente de cada empresa) ──────────── -->
+            <section class="sub-summary mb-3" :aria-label="t.summary_label">
+                <button
+                    v-for="card in summaryCards"
+                    :key="card.key"
+                    type="button"
+                    class="sub-summary__item"
+                    :class="{ 'sub-summary__item--active': isSummaryActive(card) }"
+                    :aria-pressed="isSummaryActive(card)"
+                    :data-summary="card.key"
+                    @click="applySummary(card)"
+                >
+                    <i :class="['ti', card.icon]" aria-hidden="true"></i>
+                    <span class="sub-summary__value">{{ summary[card.key] ?? 0 }}</span>
+                    <span class="sub-summary__label">{{ card.label }}</span>
+                </button>
+                <button
+                    type="button"
+                    class="sub-summary__item"
+                    :title="t.summary_no_sub_hint"
+                    data-summary="no_subscription"
+                    @click="openCreate()"
+                >
+                    <i class="ti ti-building-plus" aria-hidden="true"></i>
+                    <span class="sub-summary__value">{{ summary.no_subscription ?? 0 }}</span>
+                    <span class="sub-summary__label">{{ t.summary_no_subscription }}</span>
+                </button>
+            </section>
+
+            <!-- ── Busca e filtros ─────────────────────────────────────── -->
+            <div class="sub-filters mb-3" role="search">
+                <SearchInput v-model="search" :placeholder="t.search_placeholder" max-width="320px" />
+                <label class="visually-hidden" for="sub-filter-status">{{ t.filter_status }}</label>
+                <select id="sub-filter-status" v-model="filterForm.status" class="form-select form-select-sm">
+                    <option value="">{{ t.filter_status_all }}</option>
+                    <option value="accessible">{{ t.filter_status_accessible }}</option>
+                    <option value="no_access">{{ t.summary_without_access }}</option>
+                    <option value="awaiting_payment">{{ t.summary_awaiting_payment }}</option>
+                    <option value="needs_review">{{ t.summary_needs_review }}</option>
+                    <option value="recurrence_alert">{{ t.summary_recurrence_alert }}</option>
+                    <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+                </select>
+                <label class="visually-hidden" for="sub-filter-plan">{{ t.filter_plan }}</label>
+                <select id="sub-filter-plan" v-model="filterForm.plan" class="form-select form-select-sm">
+                    <option value="">{{ t.filter_plan_all }}</option>
+                    <option v-for="p in planFilterOptions" :key="p.id" :value="p.id">{{ p.name }}</option>
+                </select>
+                <label class="visually-hidden" for="sub-filter-mode">{{ t.filter_mode }}</label>
+                <select id="sub-filter-mode" v-model="filterForm.mode" class="form-select form-select-sm">
+                    <option value="">{{ t.filter_mode_all }}</option>
+                    <option v-for="(label, key) in t.modality" :key="key" :value="key">{{ label }}</option>
+                </select>
+                <label class="visually-hidden" for="sub-filter-scope">{{ t.filter_scope }}</label>
+                <select id="sub-filter-scope" v-model="filterForm.scope" class="form-select form-select-sm">
+                    <option value="current">{{ t.filter_scope_current }}</option>
+                    <option value="all">{{ t.filter_scope_all }}</option>
+                </select>
+                <button v-if="hasFilters" type="button" class="btn btn-sm btn-link text-nowrap" @click="clearFilters">
+                    <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear }}
+                </button>
             </div>
 
-            <!-- ── Table / Cards ─────────────────────────────────────────────── -->
+            <!-- ── Tabela / Cards ──────────────────────────────────────── -->
             <SubscriptionTable
                 v-if="view === 'table'"
                 :subscriptions="subscriptions"
                 :filters="filters"
+                :billing-cycles="billingCycles"
+                :can-manage-plans="canManagePlans"
+                :has-filters="hasFilters"
                 :t="t"
                 @sort="onSort"
                 @view="openDetail"
-                @edit="openEdit"
-                @activate="openActivate"
-                @trial="openTrial"
+                @extend="openExtend"
+                @change="openTerms"
+                @new-for="openCreateFor"
                 @cancel="onCancel"
                 @block="onBlock"
             />
             <SubscriptionCards
                 v-else
                 :cards-url="route('manager.subscriptions.cards')"
-                :initial-search="search"
+                :filters="activeFilters"
+                :billing-cycles="billingCycles"
+                :has-filters="hasFilters"
                 :t="t"
                 @view="openDetail"
-                @edit="openEdit"
-                @activate="openActivate"
-                @trial="openTrial"
+                @extend="openExtend"
+                @change="openTerms"
+                @new-for="openCreateFor"
                 @cancel="onCancel"
                 @block="onBlock"
             />
         </div>
 
-        <!-- Detail drawer -->
         <SubscriptionDetailDrawer
             :open="detailOpen"
             :subscription-id="detailId"
-            :t="t"
-            @close="closeDetail"
-            @edit="
-                (id) => {
-                    closeDetail();
-                    openEdit(id);
-                }
-            "
-        />
-
-        <!-- Edit form -->
-        <SubscriptionFormModal
-            :open="formOpen"
-            :subscription-id="formId"
-            :plans="plans"
+            :billing-cycles="billingCycles"
             :statuses="statuses"
+            :can-manage-plans="canManagePlans"
+            :refresh-key="refreshKey"
             :t="t"
-            @close="closeForm"
-            @saved="closeForm"
+            @close="detailOpen = false"
+            @updated="router.reload({ only: ['subscriptions', 'total', 'summary'] })"
+            @extend="openExtend"
+            @change="openTerms"
+            @new-for="openCreateFor"
+            @cancel="onCancel"
+            @block="onBlock"
         />
 
-        <!-- Activate modal -->
-        <SubscriptionActivateModal
-            :open="activateOpen"
-            :subscription="activateSubscription"
+        <SubscriptionCreateModal
+            :open="createOpen"
             :plans="plans"
             :billing-cycles="billingCycles"
             :gateways="gateways"
-            :t="t"
-            @close="closeActivate"
-            @saved="closeActivate"
-        />
-
-        <!-- Trial modal -->
-        <SubscriptionTrialModal
-            :open="trialOpen"
-            :subscription="trialSubscription"
-            :plans="plans"
             :trial-days="trialDays"
+            :preset="createPreset"
             :t="t"
-            @close="closeTrial"
-            @saved="closeTrial"
+            @close="createOpen = false"
+            @saved="afterSave"
         />
 
-        <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
+        <SubscriptionExtendModal
+            :open="extendOpen"
+            :subscription="target"
+            :t="t"
+            @close="extendOpen = false"
+            @saved="afterSave"
+        />
+
+        <SubscriptionTermsModal
+            :open="termsOpen"
+            :subscription="target"
+            :plans="plans"
+            :t="t"
+            @close="termsOpen = false"
+            @saved="afterSave"
+            @create-new="termsToCreate"
+        />
+
         <ConfirmationWithReasonModal
             :open="reasonModal.open"
             :title="reasonModal.title"
             :message="reasonModal.message"
-            :confirm-label="reasonModal.confirmLabel"
             :confirm-variant="reasonModal.confirmVariant"
             :saving="reasonModal.saving"
+            :error="reasonModal.error"
             @close="closeReasonModal"
             @confirm="handleReasonConfirm"
         />
     </AppLayout>
 </template>
+
+<style scoped>
+.sub-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
+}
+.sub-summary__item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    text-align: left;
+}
+.sub-summary__item:hover,
+.sub-summary__item--active {
+    border-color: var(--bs-primary);
+}
+.sub-summary__item--active {
+    background: var(--bs-primary-bg-subtle);
+}
+.sub-summary__item .ti {
+    grid-row: 1 / span 2;
+    font-size: 1.25rem;
+    color: var(--bs-secondary-color);
+}
+.sub-summary__value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+.sub-summary__label {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    line-height: 1.2;
+}
+.sub-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+.sub-filters .form-select {
+    width: auto;
+    min-width: 160px;
+    max-width: 100%;
+}
+@media (max-width: 575.98px) {
+    .sub-filters .form-select {
+        flex: 1 1 100%;
+    }
+}
+</style>

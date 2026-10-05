@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Enums\SubscriptionStatus;
+use App\Enums\{BillingCycle, SubscriptionStatus};
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
 use RuntimeException;
 
@@ -32,20 +32,26 @@ class TrialService
     }
 
     /**
-     * Inicia um trial manual (admin), opcionalmente em um plano específico.
+     * Inicia um trial manual (admin/cadastro), opcionalmente em um plano
+     * específico. O ciclo escolhido no site (ex.: anual) e o valor dele hoje
+     * ficam guardados para a contratação seguir a mesma modalidade; ciclo que
+     * o plano não oferece cai no ciclo padrão do plano.
      */
-    public function startManualTrial(Entity $entity, ?Plan $plan = null, ?int $days = null): Subscription
+    public function startManualTrial(Entity $entity, ?Plan $plan = null, ?int $days = null, ?BillingCycle $cycle = null): Subscription
     {
         $plan ??= Plan::active()->orderBy('sort_order')->first()
             ?? throw new RuntimeException('Nenhum plano ativo encontrado.');
 
         $days ??= SubscriptionSetting::trialDays();
+        $cycle = $cycle && $plan->offersCycle($cycle) ? $cycle : $plan->defaultCycle();
 
         $this->cancelCurrent($entity);
 
         return Subscription::create([
             'entity_id'     => $entity->id,
             'plan_id'       => $plan->id,
+            'billing_cycle' => $cycle,
+            'amount'        => $cycle ? $plan->priceFor($cycle) : null,
             'status'        => SubscriptionStatus::Trial,
             'trial_ends_at' => now()->addDays($days),
             'starts_at'     => now(),
@@ -53,19 +59,15 @@ class TrialService
     }
 
     /**
-     * Expira trials vencidos. Deve ser rodado via scheduler (diário).
-     * Retorna o número de trials expirados.
+     * Marca como expirados os trials vencidos (scheduler, diário). O acesso
+     * já terminou em `trial_ends_at` — não há período de graça; aqui só o
+     * status acompanha. Retorna o número de trials expirados.
      */
     public function expireOverdueTrials(): int
     {
-        $graceDays = SubscriptionSetting::gracePeriodDays();
-
         return Subscription::where('status', SubscriptionStatus::Trial)
             ->where('trial_ends_at', '<', now())
-            ->update([
-                'status'               => SubscriptionStatus::Expired,
-                'grace_period_ends_at' => now()->addDays($graceDays),
-            ]);
+            ->update(['status' => SubscriptionStatus::Expired]);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

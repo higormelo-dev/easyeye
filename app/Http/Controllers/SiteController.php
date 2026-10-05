@@ -7,6 +7,7 @@ use App\Http\Middleware\SetLocale;
 use App\Http\Requests\SiteContactRequest;
 use App\Mail\SiteContactMessage;
 use App\Models\{Plan, SubscriptionSetting};
+use App\Support\Billing\PlanPricing;
 use App\Support\Site\{SiteContent, SiteLinks};
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\{Log, Mail};
@@ -20,9 +21,12 @@ class SiteController extends Controller
     {
         $trialDays = SubscriptionSetting::trialDays();
         $plans     = Plan::active()
-            ->with(['features' => fn ($q) => $q->orderBy('feature')])
+            ->with(['features' => fn ($q) => $q->orderBy('feature'), 'prices'])
             ->orderBy('sort_order')
             ->get()
+            // Sem ciclo à venda (ex.: plano antigo só vitalício) não há o que contratar.
+            ->filter(fn (Plan $plan) => $plan->isSellable())
+            ->values()
             ->map(fn (Plan $plan) => [
                 'id'                 => $plan->id,
                 'slug'               => $plan->slug,
@@ -30,11 +34,14 @@ class SiteController extends Controller
                 'description'        => $plan->description,
                 'price'              => $plan->price,
                 'price_period_label' => $plan->pricePeriodLabel(),
-                'trial_days'         => $trialDays,
-                'register_url'       => route('register', ['plan' => $plan->id]),
-                'is_featured'        => (bool) $plan->is_featured,
-                'is_free'            => (float) $plan->price === 0.0,
-                'features'           => $plan->features->map(fn ($f) => [
+                // Ciclos que o cliente pode escolher (mensal, anual...).
+                'default_cycle' => $plan->defaultCycle()?->value,
+                'prices'        => PlanPricing::cycles($plan),
+                'trial_days'    => $trialDays,
+                'register_url'  => route('register', ['plan' => $plan->id]),
+                'is_featured'   => (bool) $plan->is_featured,
+                'is_free'       => (float) $plan->price === 0.0,
+                'features'      => $plan->features->map(fn ($f) => [
                     'id' => $f->id,
                     // Chave estável para o comparador e a disponibilidade por plano.
                     'key'           => $f->feature->value,

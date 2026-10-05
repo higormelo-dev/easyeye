@@ -1,8 +1,7 @@
 <?php
 
-use App\Jobs\Billing\{ExpireOverdueSubscriptionsJob, RenewSubscriptionJob, RetryFailedPaymentJob};
-use App\Models\Billing\BillingRetrySchedule;
-use App\Models\Subscription;
+use App\Jobs\Billing\ExpireOverdueSubscriptionsJob;
+use App\Services\Billing\SubscriptionCycleService;
 use App\Services\{ReportSettingService, TrialService};
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\{Artisan, Schedule};
@@ -29,28 +28,58 @@ Schedule::call(function () {
     app(TrialService::class)->expireOverdueTrials();
 })->dailyAt('00:05')->name('trials:expire')->withoutOverlapping();
 
-// Expira assinaturas pagas vencidas (via Job para garantir observers)
+// Fim de período sem renovação: cortesia expira; cobrança automática sem
+// pagamento entra em atraso (via Job para garantir observers)
 Schedule::job(new ExpireOverdueSubscriptionsJob())
     ->dailyAt('00:10')
     ->name('subscriptions:expire')
     ->withoutOverlapping();
 
-// Processa renovações de assinaturas com next_billing_at vencido
+// Troca de plano agendada (downgrade no fim do período pago): o plano, o
+// ciclo e o valor novos passam a valer na data (PlanChangeService). Antes da
+// renovação, para a cobrança do dia já sair nos termos novos.
 Schedule::call(function () {
-    Subscription::query()
-        ->where('status', 'active')
-        ->whereNotNull('next_billing_at')
-        ->where('next_billing_at', '<=', now())
-        ->select('id')
-        ->each(fn ($sub) => RenewSubscriptionJob::dispatch($sub->id));
+    app(SubscriptionCycleService::class)->applyDueScheduledChanges();
+})->dailyAt('00:15')->name('subscriptions:plan-changes')->withoutOverlapping();
+
+// Renovação local (gateways sem recorrência própria): emite a cobrança do
+// próximo ciclo alguns dias antes do vencimento, uma por período. Gateways
+// com recorrência nativa (Asaas) cobram sozinhos — só o webhook atualiza.
+Schedule::call(function () {
+    app(SubscriptionCycleService::class)->dispatchDueRenewals();
 })->dailyAt('01:00')->name('subscriptions:renew')->withoutOverlapping();
 
-// Processa retries de pagamentos falhos (2× ao dia)
-Schedule::call(function () {
-    BillingRetrySchedule::due()
-        ->select('id')
-        ->each(fn ($schedule) => RetryFailedPaymentJob::dispatch($schedule->id));
-})->twiceDaily(9, 15)->name('billing:retry')->withoutOverlapping();
+// Franquia mensal de IA: concede a janela que começou para cada assinatura
+// paga com acesso total (anual/semestral/trimestral também recebem todo mês,
+// sem acumular) — depois da expiração da madrugada, que já marcou atrasos.
+// Garantia: a reserva e o medidor já concedem a janela vencida na hora.
+// Idempotente por assinatura + início da janela.
+Schedule::command('ai:grant-monthly-quotas')
+    ->dailyAt('00:20')
+    ->name('ai:grant-monthly-quotas')
+    ->withoutOverlapping();
+
+// Régua de cobrança (lembrete D-5, pagamento não identificado, acesso
+// limitado no D+3, encerramento no D+7) — em horário comercial, depois da
+// expiração da madrugada. Idempotente: cada etapa sai uma vez por vencimento.
+Schedule::command('billing:dunning')
+    ->dailyAt('09:00')
+    ->name('billing:dunning')
+    ->withoutOverlapping();
+
+// Fim do teste grátis: e-mail + WhatsApp aos contatos de cobrança 3 dias
+// antes, 1 dia antes e no dia (horário comercial, depois da régua).
+// Idempotente por assinatura, passo e data de fim do trial.
+Schedule::command('billing:trial-notices')
+    ->dailyAt('09:10')
+    ->name('billing:trial-notices')
+    ->withoutOverlapping();
+
+// billing:retry (BillingRetrySchedule → RetryFailedPaymentJob) saiu do
+// agendador: nada cria agendamentos novos e a nova tentativa da renovação é
+// do subscriptions:renew (mesma fatura do período). Os pendentes do código
+// anterior emitiriam uma 2ª cobrança do mesmo período ou cobrariam
+// assinatura já encerrada (o job também se recusa a isso).
 
 // Onda 4, C5 — Notifica médicos sobre runs em WaitingApproval há >24h.
 Schedule::command('ai:notify-waiting-approval')
@@ -149,6 +178,20 @@ Schedule::command('queue-health:prune-history')
 Schedule::command('integrator-commands:prune')
     ->weeklyOn(1, '03:45')
     ->name('integrator-commands:prune')
+    ->withoutOverlapping();
+
+// Webhooks de billing: retenção (BILLING_WEBHOOK_RETENTION_DAYS, padrão
+// 90) só dos processados — com falha ou não processados ficam para análise.
+Schedule::command('billing:prune-webhook-events')
+    ->dailyAt('03:50')
+    ->name('billing:prune-webhook-events')
+    ->withoutOverlapping();
+
+// Pedidos de pacote de créditos de IA nunca pagos: descartados depois de
+// AI_CREDIT_PACK_PENDING_EXPIRY_DAYS (padrão 7) — não ficam como "em aberto".
+Schedule::command('ai:expire-credit-pack-orders')
+    ->dailyAt('04:10')
+    ->name('ai:expire-credit-pack-orders')
     ->withoutOverlapping();
 
 Schedule::command('integrator-outbox:publish')->everyMinute()->withoutOverlapping();

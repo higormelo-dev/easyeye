@@ -118,12 +118,16 @@ describe('PlatformFinanceService via index()', function () {
     it('calcula receita, MRR e clínicas pagantes com dado real', function () {
         actingAsManager($this, $this->admin);
 
-        $clinic       = Entity::factory()->create(['is_client' => true]);
+        $clinic = Entity::factory()->create(['is_client' => true]);
+        // Receita = cobrança automática já paga; sem gateway a assinatura
+        // seria cortesia e sem pagamento confirmado não entra no MRR.
         $subscription = Subscription::create([
-            'entity_id' => $clinic->id,
-            'plan_id'   => $this->plan->id,
-            'status'    => SubscriptionStatus::Active->value,
-            'starts_at' => now()->subMonths(2),
+            'entity_id'       => $clinic->id,
+            'plan_id'         => $this->plan->id,
+            'billing_mode'    => 'gateway',
+            'status'          => SubscriptionStatus::Active->value,
+            'starts_at'       => now()->subMonths(2),
+            'last_payment_at' => now(),
         ]);
 
         $invoice = Invoice::create([

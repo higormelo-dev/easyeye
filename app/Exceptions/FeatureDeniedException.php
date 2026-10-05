@@ -3,7 +3,7 @@
 namespace App\Exceptions;
 
 use App\DTOs\FeatureStatus;
-use App\Enums\FeatureKey;
+use App\Enums\{FeatureKey, SubscriptionAccessLevel};
 use Illuminate\Http\Request;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,18 +34,30 @@ class FeatureDeniedException extends RuntimeException
      */
     public function render(Request $request): Response
     {
-        $message = $this->status->isBoolean
-            ? __('subscriptions.feature_not_included', ['feature' => $this->feature->label()])
-            : __('subscriptions.feature_limit_reached', [
+        // Cliente em atraso com acesso limitado: IA volta com o pagamento.
+        // Mesmo status e corpo do CheckSubscription (402 + access_level).
+        $accessLevel = $this->status->deniedByAccessLevel;
+
+        $message = match (true) {
+            $accessLevel !== null    => $accessLevel->deniedMessage(),
+            $this->status->isBoolean => __('subscriptions.feature_not_included', ['feature' => $this->feature->label()]),
+            default                  => __('subscriptions.feature_limit_reached', [
                 'feature' => $this->feature->label(),
                 'limit'   => $this->status->limit,
-            ]);
+            ]),
+        };
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => $message,
-                'feature' => $this->status->toArray(),
-            ], 403);
+            return $accessLevel !== null
+                ? response()->json([
+                    'message'      => $message,
+                    'access_level' => $accessLevel->value,
+                    'feature'      => $this->status->toArray(),
+                ], SubscriptionAccessLevel::DENIED_HTTP_STATUS)
+                : response()->json([
+                    'message' => $message,
+                    'feature' => $this->status->toArray(),
+                ], 403);
         }
 
         return back()

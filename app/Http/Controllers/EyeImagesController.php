@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings, AiQuotaService};
+use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService};
 use App\DTOs\EyeImageFilters;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, FeatureKey};
@@ -31,6 +31,7 @@ class EyeImagesController extends Controller
         private readonly AiProviderSettings $providerSettings,
         private readonly AiCreditWalletService $walletService,
         private readonly AiQuotaService $quotaService,
+        private readonly AiPaywallService $paywall,
     ) {
     }
 
@@ -147,7 +148,8 @@ class EyeImagesController extends Controller
                 'can_consensus' => $canConsensus,
                 'modes'         => $modes,
                 'balance'       => $this->walletService->balance($entityId),
-                'quota'         => $this->quotaService->currentMonthSnapshot($entityId),
+                'quota'         => $this->quotaService->snapshot($entityId),
+                'paywall'       => $this->paywall->describe($entityId),
                 'max_images'    => (int) config('ai.eye_image.max_images', 4),
                 'urls'          => [
                     'estimate'   => route('panel.ai-runs.estimate'),

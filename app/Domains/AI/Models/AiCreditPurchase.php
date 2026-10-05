@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Models;
 
 use App\Enums\AI\{AiCreditPurchaseStatus, AiProvider};
+use App\Models\Billing\Invoice;
 use App\Models\{Entity, Subscription, User};
 use App\Traits\Auditable;
 use Database\Factories\AI\AiCreditPurchaseFactory;
@@ -24,6 +25,7 @@ class AiCreditPurchase extends Model
     protected $fillable = [
         'entity_id',
         'subscription_id',
+        'invoice_id',
         'requested_by',
         'credited_ledger_entry_id',
         'package_code',
@@ -66,6 +68,12 @@ class AiCreditPurchase extends Model
     public function subscription(): BelongsTo
     {
         return $this->belongsTo(Subscription::class, 'subscription_id');
+    }
+
+    /** Fatura do checkout que paga o pacote (null: pedido manual/antigo). */
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class, 'invoice_id');
     }
 
     public function requestedBy(): BelongsTo

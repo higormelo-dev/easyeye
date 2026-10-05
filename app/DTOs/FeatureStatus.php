@@ -2,7 +2,7 @@
 
 namespace App\DTOs;
 
-use App\Enums\FeatureKey;
+use App\Enums\{FeatureKey, SubscriptionAccessLevel};
 
 /**
  * Estado atual de uma feature para uma empresa.
@@ -33,7 +33,20 @@ final class FeatureStatus
          * PHP_INT_MAX quando ilimitado; -1 quando feature é booleana.
          */
         public readonly int $remaining,
+
+        /**
+         * Negada pelo nível de acesso da assinatura, não pelo plano/limite:
+         * Limited = cliente em atraso com acesso limitado pela régua de
+         * cobrança (IA bloqueada). Null = negação do plano ou do limite.
+         */
+        public readonly ?SubscriptionAccessLevel $deniedByAccessLevel = null,
     ) {
+    }
+
+    /** Negada pela régua de cobrança (acesso limitado), não pelo plano. */
+    public function isBlockedByAccessLimit(): bool
+    {
+        return $this->deniedByAccessLevel === SubscriptionAccessLevel::Limited;
     }
 
     /** Converte para array (uso em respostas de API). */
@@ -48,6 +61,7 @@ final class FeatureStatus
             'limit'        => $this->isUnlimited ? null : $this->limit,
             'used'         => $this->isBoolean ? null : $this->used,
             'remaining'    => $this->isBoolean ? null : ($this->isUnlimited ? null : $this->remaining),
+            'access_level' => $this->deniedByAccessLevel?->value,
         ];
     }
 }

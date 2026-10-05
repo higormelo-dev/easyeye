@@ -2,12 +2,12 @@
 
 use App\Domains\AI\Models\{AiCreditPurchase, AiCreditWallet, AiRun};
 use App\Domains\AI\Services\AiCreditWalletService;
-use App\Enums\AI\{AiCreditPurchaseStatus, AiRiskLevel, AiRunMode, AiRunStatus};
+use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
 use App\Jobs\AI\RunAiWorkflowJob;
 use App\Models\{Entity, Plan, PlanFeature, Subscription, User};
 use App\Models\{MedicalRecord, MedicalRecordDocumentation, Patient};
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\{Queue, Route};
 
 beforeEach(function () {
     $this->entity = Entity::factory()->create([
@@ -221,50 +221,28 @@ test('store bloqueia modo economy no painel para manter Pro em validação de do
         ->assertStatus(422);
 });
 
-test('compra de créditos cria pedido pendente sem creditar antes do pagamento', function () {
-    config()->set('ai.credit_purchases.auto_credit_without_gateway', false);
-
+test('rota antiga de compra de créditos (POST /panel/ai/credit-purchases) não existe mais: nada é criado nem creditado', function () {
     $before = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
 
-    $response = $this->actingAs($this->admin)
+    expect(Route::has('panel.ai-credit-purchases.store'))->toBeFalse();
+
+    $status = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEntityUser))
-        ->postJson(route('panel.ai-credit-purchases.store'), ['package_code' => 'starter']);
+        ->postJson('/panel/ai/credit-purchases', ['package_code' => 'starter'])
+        ->status();
 
-    $response->assertCreated()
-        ->assertJsonPath('purchase.status', AiCreditPurchaseStatus::PendingPayment->value);
-
-    $purchase = AiCreditPurchase::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect($purchase->credits)->toBe(25);
-    expect($purchase->status)->toBe(AiCreditPurchaseStatus::PendingPayment);
-
-    $after = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect((int) $after->balance)->toBe((int) $before->balance);
+    expect($status)->toBeIn([404, 405])
+        ->and(AiCreditPurchase::query()->where('entity_id', $this->entity->id)->count())->toBe(0)
+        ->and((int) AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail()->balance)->toBe((int) $before->balance);
 });
 
-test('compra de créditos pode creditar automaticamente quando a flag operacional estiver ligada', function () {
-    config()->set('ai.credit_purchases.auto_credit_without_gateway', true);
-
-    $before = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-
-    $response = $this->actingAs($this->admin)
-        ->withSession(panelSession($this->adminEntityUser))
-        ->postJson(route('panel.ai-credit-purchases.store'), ['package_code' => 'starter']);
-
-    $response->assertCreated()
-        ->assertJsonPath('purchase.status', AiCreditPurchaseStatus::Credited->value);
-
-    $after = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect((int) $after->balance)->toBe((int) $before->balance + 25);
-    expect((int) $after->lifetime_purchased)->toBeGreaterThanOrEqual(25);
-});
-
-test('compra de créditos é restrita ao admin da clínica', function () {
+test('compra de créditos pelo checkout é restrita aos contatos de cobrança (médico não compra)', function () {
     $doctor           = User::factory()->create();
     $doctorEntityUser = createEntityUser($this->entity, $doctor, ClientRule::Doctor->value);
 
     $this->actingAs($doctor)
         ->withSession(panelSession($doctorEntityUser))
-        ->postJson(route('panel.ai-credit-purchases.store'), ['package_code' => 'starter'])
+        ->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'starter', 'method' => 'pix'])
         ->assertForbidden();
 
     expect(AiCreditPurchase::query()->where('entity_id', $this->entity->id)->count())->toBe(0);

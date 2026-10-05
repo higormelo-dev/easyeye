@@ -87,10 +87,12 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
         $gateway = $gatewayRegistry->get($this->gatewayCode)
             ->withContext(new GatewayCallContext($this->correlationId, (string) $subscription->entity_id));
 
+        // Cancelamento nosso: o aviso do gateway que vem depois não é alerta.
+        Subscription::rememberRecurrenceCancelledByUs((string) $subscription->id, $subscription->gateway_subscription_id);
+
         $result = $gateway->cancelSubscription(new CancelSubscriptionDTO(
             subscriptionId: (string) $subscription->id,
             externalSubscriptionId: $subscription->gateway_subscription_id,
-            externalCustomerId: $subscription->gateway_customer_id,
             entityId: (string) $subscription->entity_id,
             metadata: [],
         ));

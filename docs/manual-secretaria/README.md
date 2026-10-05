@@ -8,6 +8,9 @@ importação, médicos (escala e bloqueios), imagens oftálmicas, assistente de 
 > (`e2e/cypress/e2e/docs/secretary-manual.cy.js`). Para atualizá-las após mudanças de tela:
 > `cd e2e && npx cypress run --browser chrome --config excludeSpecPattern=__none__ --spec cypress/e2e/docs/secretary-manual.cy.js`
 > e copie as imagens de `e2e/cypress/screenshots/secretary-manual.cy.js/` para `docs/manual-secretaria/img/`.
+> As telas de aviso de cobrança (imagens 33 e 34) vêm de `e2e/cypress/e2e/docs/billing-manual.cy.js`
+> (cria e remove sozinho clínicas de demonstração): copie
+> `e2e/cypress/screenshots/billing-manual.cy.js/sec/` para `docs/manual-secretaria/img/`.
 
 ---
 
@@ -25,8 +28,9 @@ importação, médicos (escala e bloqueios), imagens oftálmicas, assistente de 
 10. [Imagens oftálmicas](#10-imagens-oftálmicas)
 11. [Portal do Paciente: convite e compartilhamento de exame](#11-portal-do-paciente-convite-e-compartilhamento-de-exame)
 12. [Assistente de IA (consumo)](#12-assistente-de-ia-consumo)
-13. [Minha conta e saída do sistema](#13-minha-conta-e-saída-do-sistema)
-14. [O que o perfil de secretária NÃO acessa](#14-o-que-o-perfil-de-secretária-não-acessa)
+13. [Avisos sobre a assinatura da clínica](#13-avisos-sobre-a-assinatura-da-clínica)
+14. [Minha conta e saída do sistema](#14-minha-conta-e-saída-do-sistema)
+15. [O que o perfil de secretária NÃO acessa](#15-o-que-o-perfil-de-secretária-não-acessa)
 
 ---
 
@@ -379,7 +383,33 @@ a compra de créditos é do administrador.
 
 ---
 
-## 13. Minha conta e saída do sistema
+## 13. Avisos sobre a assinatura da clínica
+
+Se o pagamento da assinatura do EasyEye atrasar, um aviso aparece no topo de todas as
+telas. A secretária vê o aviso **sem valor nem link de pagamento**, com a orientação de
+**procurar o administrador da clínica** — quem paga a assinatura é o administrador, o
+financeiro ou o dono:
+
+![Aviso de acesso limitado](img/33-aviso-acesso-limitado.png)
+
+O que muda no seu dia a dia:
+
+| Situação | O que acontece para a secretária |
+|---|---|
+| Pagamento em atraso (primeiros dias) | Só o aviso — tudo continua funcionando |
+| **Acesso limitado** (3 dias de atraso) | **Agenda, pacientes, fila, mural, imagens e o "Lançar no caixa" do atendimento continuam funcionando.** Ficam bloqueados a inteligência artificial e o módulo financeiro |
+| **Acesso suspenso** (7 dias de atraso) | O painel fica bloqueado: qualquer tela mostra a página abaixo, até o pagamento ser confirmado |
+
+![Acesso suspenso](img/34-tela-bloqueio.png)
+
+Com o acesso suspenso, também ficam pausadas as **mensagens automáticas de WhatsApp** aos
+pacientes (confirmação de consulta e pesquisa) e a **TV do painel de chamadas** mostra
+"Serviço indisponível". Tudo volta sozinho quando o pagamento é confirmado — avise o
+administrador assim que perceber o aviso, para não chegar a essa etapa.
+
+---
+
+## 14. Minha conta e saída do sistema
 
 ### Meu perfil
 
@@ -401,7 +431,7 @@ Avatar → **Sair**:
 
 ---
 
-## 14. O que o perfil de secretária NÃO acessa
+## 15. O que o perfil de secretária NÃO acessa
 
 Por segurança e conformidade (LGPD/CFM), estas áreas retornam **acesso negado** para o
 perfil de secretária:

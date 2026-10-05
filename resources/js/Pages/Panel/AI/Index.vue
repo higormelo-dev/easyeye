@@ -4,13 +4,17 @@ import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import AiPaywallNotice from '@/Components/Panel/AiPaywallNotice.vue';
+import AiCreditPackCheckout from '@/Components/Billing/AiCreditPackCheckout.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
 
 const props = defineProps({
     balance: { type: Object, required: true },
+    paywall: { type: Object, default: null },
     creditPackages: { type: Array, default: () => [] },
     recentCreditPurchases: { type: Array, default: () => [] },
-    creditPurchaseAutoCredit: { type: Boolean, default: false },
     canPurchaseCredits: { type: Boolean, default: false },
+    checkoutT: { type: Object, default: () => ({}) },
     runs: { type: Object, required: true },
     analytics: { type: Object, default: () => ({}) },
     patients: { type: Array, default: () => [] },
@@ -39,7 +43,23 @@ function formatSeconds(s) {
     const r = Math.round(n % 60);
     return `${m}m ${r}s`;
 }
-const usagePercent = computed(() => analytics.value?.consumed?.usage_percent ?? null);
+// Franquia mensal: lida da carteira (mesma fonte que bloqueia a execução).
+const { date: formatDate, number: formatNumber } = useLocaleFormat();
+const quota = computed(() => analytics.value?.quota ?? {});
+const usagePercent = computed(() => quota.value?.usage_percent ?? null);
+// Renovação só para quem ganha franquia (em atraso, condicionada ao
+// pagamento); cota que sobrou (ex.: virou cortesia) mostra até quando vale,
+// sem prometer renovação.
+const quotaRenewsText = computed(() => {
+    if (quota.value?.renews_on) return label('quota_renews_on', '').replace(':date', formatDate(quota.value.renews_on));
+    if (quota.value?.renews_if_paid_on)
+        return label('quota_renews_if_paid', '').replace(':date', formatDate(quota.value.renews_if_paid_on));
+    if (quota.value?.expires_on)
+        return label('quota_expires_on', '').replace(':date', formatDate(quota.value.expires_on));
+    return '';
+});
+// Sem nenhum crédito liberado: mostra o paywall (comprar ou pedir ao admin).
+const showPaywall = computed(() => !!props.paywall && Number(props.balance?.available ?? 0) <= 0);
 const usageBarClass = computed(() => {
     const p = usagePercent.value ?? 0;
     if (p >= 90) return 'bg-danger';
@@ -48,14 +68,13 @@ const usageBarClass = computed(() => {
 });
 
 // Créditos avulsos (cortesia/comprados) — entram na carteira (balance.balance),
-// NÃO na cota do plano. Quando a cota estoura, o excedente é coberto por eles.
+// NÃO na franquia. Com a franquia da janela esgotada, as execuções usam eles.
 const purchasedCredits = computed(() => Number(props.balance?.balance ?? 0));
-const quotaOverflow = computed(() => {
-    const quota = Number(analytics.value?.plan_quota ?? 0);
-    const consumed = Number(analytics.value?.consumed?.credits ?? 0);
-    return quota > 0 ? Math.max(0, consumed - quota) : 0;
+const quotaFullyUsed = computed(() => {
+    const total = Number(quota.value?.monthly_quota ?? 0);
+    return total > 0 && Number(quota.value?.consumed_credits ?? 0) >= total;
 });
-const coveredByPurchased = computed(() => quotaOverflow.value > 0 && purchasedCredits.value > 0);
+const coveredByPurchased = computed(() => quotaFullyUsed.value && purchasedCredits.value > 0);
 
 function workflowDisplayLabel(workflow) {
     return label(`workflow_${workflow}`, workflow);
@@ -81,7 +100,6 @@ const selectedRun = ref(null);
 const draftOutput = ref('');
 const rejectReason = ref('');
 const statusFilter = ref(props.filters.status ?? '');
-const purchasingPackage = ref('');
 
 // Mensagens de feedback inline (substituem window.alert): exibidas em um alert
 // Bootstrap dismissible no topo da página. Auto-clear após 6s para erros e 4s
@@ -151,18 +169,6 @@ const statusClass = (status) => {
     );
 };
 
-const purchaseStatusClass = (status) => {
-    return (
-        {
-            pending_payment: 'badge bg-warning-subtle text-warning',
-            credited: 'badge bg-success-subtle text-success',
-            cancelled: 'badge bg-secondary-subtle text-secondary',
-            failed: 'badge bg-danger-subtle text-danger',
-            refunded: 'badge bg-info-subtle text-info',
-        }[status] ?? 'badge bg-light text-dark'
-    );
-};
-
 function filterByStatus() {
     router.get(
         route('panel.ai-runs.index'),
@@ -181,21 +187,16 @@ function goToPage(url) {
     });
 }
 
-async function purchaseCredits(packageCode) {
-    if (!packageCode || purchasingPackage.value) return;
+// Pacote pago (cartão aprovado ou webhook): saldo e paywall atualizados.
+function onCreditsPaid() {
+    router.reload({ only: ['balance', 'paywall', 'recentCreditPurchases'] });
+    showSuccess(label('credit_purchase_credited', 'Créditos adicionados.'));
+}
 
-    purchasingPackage.value = packageCode;
-    try {
-        const { data } = await window.axios.post(route('panel.ai-credit-purchases.store'), {
-            package_code: packageCode,
-        });
-        router.reload({ only: ['balance', 'recentCreditPurchases'] });
-        showSuccess(data?.message ?? label('credit_purchase_pending', 'Compra registrada.'));
-    } catch (error) {
-        showError(error?.response?.data?.message ?? label('credit_purchase_unavailable', 'Falha ao registrar compra.'));
-    } finally {
-        purchasingPackage.value = '';
-    }
+// "Comprar créditos" do aviso: leva aos pacotes desta tela.
+function goToPackages() {
+    document.getElementById('ai-credit-packages')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelector('#ai-credit-packages [data-test="ai-pack-buy"]:not([disabled])')?.focus();
 }
 
 async function loadRunDetail(runId) {
@@ -257,99 +258,46 @@ async function rejectRun() {
                 <button type="button" class="btn-close" aria-label="Close" @click="dismissMessage"></button>
             </div>
 
+            <AiPaywallNotice
+                v-if="showPaywall"
+                :paywall="paywall"
+                class="mb-3"
+                :on-buy="canPurchaseCredits ? goToPackages : null"
+            />
+
             <div class="row g-3 mb-3">
                 <div :class="canPurchaseCredits ? 'col-lg-4' : 'col-12'">
                     <div class="border rounded p-3 bg-white h-100">
                         <div class="d-flex flex-column gap-2">
                             <div>
                                 <strong>{{ label('credits_available', 'Créditos disponíveis') }}:</strong>
-                                {{ balance.available }}
+                                <span data-test="ai-balance-available">{{ formatNumber(balance.available) }}</span>
                             </div>
                             <div>
-                                <strong>{{ label('credits_reserved', 'Reservados') }}:</strong> {{ balance.reserved }}
+                                <strong>{{ label('credits_reserved', 'Reservados') }}:</strong>
+                                {{ formatNumber(balance.reserved) }}
                             </div>
                             <div>
-                                <strong>{{ label('credits_total', 'Total') }}:</strong> {{ balance.total }}
+                                <strong>{{ label('credits_total', 'Total') }}:</strong>
+                                {{ formatNumber(balance.total) }}
                             </div>
                         </div>
                         <div class="mt-2 text-muted fs-13">{{ label('support_notice') }}</div>
                     </div>
                 </div>
 
-                <div v-if="canPurchaseCredits" class="col-lg-8">
+                <div v-if="canPurchaseCredits" id="ai-credit-packages" class="col-lg-8">
                     <div class="border rounded p-3 bg-white h-100">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                            <div>
-                                <h6 class="fw-semibold mb-1">
-                                    {{ label('credit_packages_title', 'Pacotes de créditos IA') }}
-                                </h6>
-                                <div class="text-muted fs-13">
-                                    {{ label('credit_packages_subtitle', 'Créditos extras avulsos.') }}
-                                </div>
+                        <div class="mb-2">
+                            <h6 class="fw-semibold mb-1">
+                                {{ label('credit_packages_title', 'Pacotes de créditos IA') }}
+                            </h6>
+                            <div class="text-muted fs-13">
+                                {{ label('credit_packages_subtitle', 'Créditos extras avulsos.') }}
                             </div>
                         </div>
-
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>{{ label('credits', 'Créditos') }}</th>
-                                        <th>{{ label('credit_package', 'Pacote') }}</th>
-                                        <th>{{ label('amount', 'Valor') }}</th>
-                                        <th class="text-end"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="pkg in creditPackages" :key="pkg.code">
-                                        <td class="fw-semibold">{{ pkg.credits }}</td>
-                                        <td>
-                                            <div class="fw-medium">{{ pkg.name }}</div>
-                                            <div class="text-muted fs-13">
-                                                {{ pkg.unit_price_formatted }}
-                                                {{ label('credit_package_unit', 'por crédito') }}
-                                            </div>
-                                        </td>
-                                        <td>{{ pkg.price_formatted }}</td>
-                                        <td class="text-end">
-                                            <button
-                                                class="btn btn-sm"
-                                                :class="pkg.featured ? 'btn-primary' : 'btn-outline-primary'"
-                                                :disabled="!!purchasingPackage"
-                                                @click="purchaseCredits(pkg.code)"
-                                            >
-                                                <i class="ti ti-credit-card me-1"></i>
-                                                {{
-                                                    creditPurchaseAutoCredit
-                                                        ? label('credit_package_buy', 'Comprar agora')
-                                                        : label('credit_package_request', 'Solicitar compra')
-                                                }}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="mt-3" v-if="recentCreditPurchases.length">
-                            <div class="fw-semibold fs-13 mb-1">
-                                {{ label('credit_purchase_history', 'Compras recentes') }}
-                            </div>
-                            <div class="d-flex flex-wrap gap-2">
-                                <span
-                                    v-for="purchase in recentCreditPurchases"
-                                    :key="purchase.id"
-                                    class="d-inline-flex align-items-center gap-2 border rounded px-2 py-1 fs-13"
-                                >
-                                    <span>{{ purchase.credits }} · {{ purchase.amount_formatted }}</span>
-                                    <span :class="purchaseStatusClass(purchase.status)">{{
-                                        purchase.status_label
-                                    }}</span>
-                                </span>
-                            </div>
-                        </div>
-                        <div v-else class="mt-3 text-muted fs-13">
-                            {{ label('credit_purchase_empty', 'Nenhuma compra recente.') }}
-                        </div>
+                        <!-- Compra paga no checkout do sistema (Pix, boleto, cartão à vista); pedido pendente: continuar ou descartar. -->
+                        <AiCreditPackCheckout ref="packCheckout" :t="checkoutT" show-pending @paid="onCreditsPaid" />
                     </div>
                 </div>
             </div>
@@ -364,14 +312,18 @@ async function rejectRun() {
                     <span class="text-muted fs-13">{{ analytics.period.start }} — {{ analytics.period.end }}</span>
                 </div>
 
-                <!-- Cota mensal + barra de progresso -->
-                <div v-if="analytics.plan_quota > 0" class="mb-3">
-                    <div class="d-flex justify-content-between mb-1 fs-13">
-                        <span class="fw-semibold">Cota do plano</span>
-                        <span class="text-muted">
-                            <strong>{{ analytics.consumed?.credits ?? 0 }}</strong>
-                            / {{ analytics.plan_quota }} créditos
+                <!-- Franquia mensal (carteira) + barra de progresso -->
+                <div v-if="quota.monthly_quota > 0" class="mb-3" data-test="ai-quota-meter">
+                    <div class="d-flex justify-content-between mb-1 fs-13 flex-wrap gap-1">
+                        <span class="fw-semibold">{{ label('quota_title', 'Franquia mensal de IA') }}</span>
+                        <span class="text-muted" data-test="ai-quota-text">
+                            {{
+                                label('quota_credits', ':used / :quota')
+                                    .replace(':used', formatNumber(quota.consumed_credits ?? 0))
+                                    .replace(':quota', formatNumber(quota.monthly_quota))
+                            }}
                             <span v-if="usagePercent !== null" class="ms-1">({{ usagePercent }}%)</span>
+                            <span v-if="quotaRenewsText" class="ms-1">· {{ quotaRenewsText }}</span>
                         </span>
                     </div>
                     <div class="progress" style="height: 12px">
@@ -384,10 +336,13 @@ async function rejectRun() {
                             aria-valuemax="100"
                         ></div>
                     </div>
-                    <div v-if="coveredByPurchased" class="alert alert-info py-1 px-2 mt-2 mb-0 fs-13">
+                    <div
+                        v-if="coveredByPurchased"
+                        class="alert alert-info text-info-emphasis py-1 px-2 mt-2 mb-0 fs-13"
+                        data-test="ai-quota-spillover"
+                    >
                         <i class="ti ti-wallet me-1" aria-hidden="true"></i>
-                        Cota do plano esgotada. O excedente ({{ quotaOverflow }}) e os próximos usos são cobertos pelos
-                        seus <strong>créditos avulsos/cortesia</strong> ({{ purchasedCredits }} disponíveis).
+                        {{ label('quota_spillover', '').replace(':available', formatNumber(purchasedCredits)) }}
                     </div>
                 </div>
 

@@ -2,6 +2,7 @@
 
 namespace App\Models\Billing;
 
+use App\Casts\SanitizedGatewayPayload;
 use App\Enums\Billing\PaymentAttemptStatus;
 use App\Models\{Entity, Subscription};
 use App\Traits\{Auditable, HasAuditColumns};
@@ -44,7 +45,7 @@ class PaymentAttempt extends Model
             'attempt_number'   => 'integer',
             'status'           => PaymentAttemptStatus::class,
             'request_payload'  => 'array',
-            'response_payload' => 'array',
+            'response_payload' => SanitizedGatewayPayload::class,
             'http_status'      => 'integer',
             'started_at'       => 'datetime',
             'finished_at'      => 'datetime',

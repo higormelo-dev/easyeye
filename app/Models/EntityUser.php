@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\ClientRule;
 use App\Presenters\EntityUserPresenter;
 use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\{Builder, Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany};
 use Laracasts\Presenter\PresentableTrait;
 
@@ -78,6 +79,19 @@ class EntityUser extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Contatos de cobrança da empresa: vínculo ativo com perfil admin ou
+     * financeiro, ou o dono (qualquer perfil). Só eles recebem os avisos da
+     * régua e veem valor e link da fatura (a página do gateway mostra nome e
+     * CPF/CNPJ do pagador — LGPD, minimização).
+     */
+    public function scopeBillingContacts(Builder $query): Builder
+    {
+        return $query->where('active', true)
+            ->where(fn (Builder $role) => $role->whereIn('rule', [ClientRule::Admin->value, ClientRule::Financial->value])
+                ->orWhere('is_owner', true));
     }
 
     public function entity(): BelongsTo

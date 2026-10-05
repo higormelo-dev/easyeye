@@ -2,8 +2,8 @@
 
 Guia completo de utilização do sistema para o perfil **Financeiro**, passo a passo com telas
 reais. Cobre a gestão financeira da clínica de ponta a ponta: dashboard gerencial, fluxo de
-caixa, fechamento de períodos, tabela de preços, faturamento TISS, conciliação de glosas e
-relatórios.
+caixa, fechamento de períodos, tabela de preços, faturamento TISS, conciliação de glosas,
+relatórios e o pagamento da assinatura do EasyEye (Minha assinatura).
 
 > As capturas são geradas automaticamente a partir do sistema real
 > (`e2e/cypress/e2e/docs/financial-manual.cy.js`). Para atualizá-las após mudanças de tela:
@@ -12,6 +12,10 @@ relatórios.
 > copie as imagens de `e2e/cypress/screenshots/financial-manual.cy.js/` para
 > `docs/manual-financeiro/img/` e finalize com
 > `php artisan tinker --execute="require 'e2e/scripts/clean-docs-financial.php';"`.
+> As telas de assinatura e cobrança (imagens 19 a 21) vêm de
+> `e2e/cypress/e2e/docs/billing-manual.cy.js` (cria e remove sozinho clínicas de
+> demonstração): rode-o com o mesmo comando trocando o `--spec` e copie
+> `e2e/cypress/screenshots/billing-manual.cy.js/fin/` para `docs/manual-financeiro/img/`.
 
 ---
 
@@ -26,8 +30,9 @@ relatórios.
 7. [Conciliação de Glosas](#7-conciliação-de-glosas)
 8. [Relatórios financeiros](#8-relatórios-financeiros)
 9. [Relatórios operacionais](#9-relatórios-operacionais)
-10. [Minha conta](#10-minha-conta)
-11. [O que o perfil financeiro NÃO acessa](#11-o-que-o-perfil-financeiro-não-acessa)
+10. [Minha assinatura e avisos de cobrança](#10-minha-assinatura-e-avisos-de-cobrança)
+11. [Minha conta](#11-minha-conta)
+12. [O que o perfil financeiro NÃO acessa](#12-o-que-o-perfil-financeiro-não-acessa)
 
 ---
 
@@ -211,7 +216,50 @@ Informe o período (De/Até) e clique em **Filtrar**.
 
 ---
 
-## 10. Minha conta
+## 10. Minha assinatura e avisos de cobrança
+
+Além do financeiro da clínica, o perfil Financeiro também é **contato de cobrança da
+assinatura do EasyEye** — junto com o administrador e o dono. Por isso você tem o item
+**Minha assinatura** no menu e recebe os avisos de cobrança.
+
+![Minha assinatura](img/19-minha-assinatura.png)
+
+Em **Minha assinatura** você vê o plano, a situação, a próxima cobrança, as **faturas em
+aberto** (botão **Pagar**) e o **histórico de faturas**. O pagamento é feito dentro do
+EasyEye, por **Pix** (QR Code e copia e cola), **boleto** (linha digitável e PDF) ou
+**cartão de crédito**; a confirmação chega sozinha. Também dá para trocar o cartão da
+renovação, mudar de plano ou de ciclo e comprar créditos de IA. O passo a passo, com
+telas, está no
+[Manual do Administrador](../manual-administrador/README.md#16-minha-assinatura-plano-faturas-e-pagamento).
+
+### Avisos de cobrança
+
+Você recebe por **e-mail** (e por **WhatsApp**, se o seu número estiver confirmado) o
+lembrete 5 dias antes do vencimento e os avisos de atraso, sempre com o link para pagar
+dentro do sistema. No painel, o aviso aparece no topo de todas as telas, com o botão
+**Pagar agora**:
+
+![Aviso de pagamento em atraso](img/20-aviso-atraso.png)
+
+| Quando | O que acontece |
+|---|---|
+| 1 dia depois do vencimento | Aviso — tudo continua funcionando |
+| 3 dias depois do vencimento | **Acesso limitado**: IA e **todo o módulo financeiro** ficam bloqueados |
+| 7 dias depois do vencimento | **Acesso suspenso**: o painel fica bloqueado até o pagamento |
+
+No **acesso limitado**, as telas do financeiro (BI, fluxo de caixa, fechamento, tabela de
+preços, faturamento TISS, glosas, repasses e relatórios financeiros) mostram o motivo e
+o botão para pagar — **Minha assinatura continua aberta**. O lançamento no caixa feito pela
+recepção na agenda continua funcionando.
+
+![Módulo financeiro no acesso limitado](img/21-financeiro-acesso-limitado.png)
+
+Pagou? O acesso volta sozinho assim que o pagamento é confirmado. Detalhes de cada etapa
+no [Manual do Administrador](../manual-administrador/README.md#17-avisos-de-cobrança-o-que-acontece-em-cada-etapa).
+
+---
+
+## 11. Minha conta
 
 Avatar (canto superior direito) → **Editar perfil**: nome, e-mail, foto, senha e
 autenticação em dois fatores (recomendado):
@@ -222,7 +270,7 @@ autenticação em dois fatores (recomendado):
 
 ---
 
-## 11. O que o perfil financeiro NÃO acessa
+## 12. O que o perfil financeiro NÃO acessa
 
 Por desenho de segurança, estas áreas retornam **acesso negado**:
 

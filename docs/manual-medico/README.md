@@ -12,6 +12,10 @@ pacientes e conta.
 > copie as imagens de `e2e/cypress/screenshots/doctor-manual.cy.js/` para
 > `docs/manual-medico/img/` e finalize com
 > `php artisan tinker --execute="require 'e2e/scripts/clean-docs-doctor.php';"`.
+> As telas de cobrança e de créditos de IA (imagens 35 a 37) vêm de
+> `e2e/cypress/e2e/docs/billing-manual.cy.js` (cria e remove sozinho clínicas de
+> demonstração): copie `e2e/cypress/screenshots/billing-manual.cy.js/med/` para
+> `docs/manual-medico/img/`.
 
 ---
 
@@ -26,8 +30,9 @@ pacientes e conta.
 7. [Meus prompts de IA e consumo](#7-meus-prompts-de-ia-e-consumo)
 8. [Pacientes e imagens oftálmicas](#8-pacientes-e-imagens-oftálmicas)
 9. [Portal do Paciente: convite e compartilhamento de documentos](#9-portal-do-paciente-convite-e-compartilhamento-de-documentos)
-10. [Minha conta](#10-minha-conta)
-11. [O que o perfil de médico NÃO acessa](#11-o-que-o-perfil-de-médico-não-acessa)
+10. [Avisos sobre a assinatura da clínica](#10-avisos-sobre-a-assinatura-da-clínica)
+11. [Minha conta](#11-minha-conta)
+12. [O que o perfil de médico NÃO acessa](#12-o-que-o-perfil-de-médico-não-acessa)
 
 ---
 
@@ -216,6 +221,18 @@ Regras importantes:
 3. Os dados enviados são minimizados (iniciais do paciente, sem CPF/contatos) — evite
    digitar identificadores no texto livre.
 
+### Sem créditos de IA
+
+Quando a clínica fica sem créditos (a franquia do mês acabou, ou a clínica está no teste
+grátis ou em cortesia, que não têm franquia mensal), a tela de IA mostra o motivo e a
+orientação **"Peça ao administrador da clínica para comprar créditos de IA"**:
+
+![IA sem créditos](img/37-ia-sem-creditos.png)
+
+O médico **não compra créditos** — quem compra é o administrador, o financeiro ou o dono
+da clínica. Assim que a compra é paga, os créditos entram na carteira e a IA volta a
+funcionar.
+
 ---
 
 ## 7. Meus prompts de IA e consumo
@@ -350,7 +367,30 @@ Clicar novamente no mesmo selo **revoga** o acesso do paciente àquele exame.
 
 ---
 
-## 10. Minha conta
+## 10. Avisos sobre a assinatura da clínica
+
+Se o pagamento da assinatura do EasyEye atrasar, um aviso aparece no topo de todas as
+telas. O médico vê o aviso **sem valor nem link de pagamento**, com a orientação de
+procurar o administrador da clínica:
+
+![Aviso de acesso limitado](img/35-aviso-acesso-limitado.png)
+
+| Situação | O que acontece para o médico |
+|---|---|
+| Pagamento em atraso (primeiros dias) | Só o aviso — tudo continua funcionando |
+| **Acesso limitado** (3 dias de atraso) | **Agenda, prontuário, pacientes e imagens continuam funcionando.** A **inteligência artificial fica bloqueada** (assistente virtual, análises e laudos com IA) |
+| **Acesso suspenso** (7 dias de atraso) | O painel fica bloqueado até o pagamento ser confirmado |
+
+No acesso limitado, ao abrir a tela de IA o sistema explica o bloqueio:
+
+![IA bloqueada no acesso limitado](img/36-ia-bloqueada-acesso-limitado.png)
+
+Tudo volta sozinho quando o pagamento é confirmado. Avise o administrador da clínica
+assim que perceber o aviso.
+
+---
+
+## 11. Minha conta
 
 Avatar (canto superior direito) → **Editar perfil**: nome, e-mail, foto, senha e
 autenticação em dois fatores (recomendado):
@@ -361,7 +401,7 @@ autenticação em dois fatores (recomendado):
 
 ---
 
-## 11. O que o perfil de médico NÃO acessa
+## 12. O que o perfil de médico NÃO acessa
 
 Por desenho de segurança, estas áreas retornam **acesso negado** ao médico:
 

@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\PlanPrice;
+use App\Services\Security\TurnstileVerifier;
 use App\Support\BrazilianFormat;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -47,14 +50,29 @@ class RegisterRequest extends FormRequest
                 Rule::unique('entities', 'national_registration')->whereNotNull('national_registration'),
             ],
             'plan_id' => ['nullable', 'uuid', 'exists:plans,id'],
+            // Ciclo escolhido no site/cadastro; se o plano não oferecer, o
+            // trial usa o ciclo padrão do plano.
+            'billing_cycle' => ['nullable', 'string', Rule::in(PlanPrice::sellableCycleValues())],
+            // trial (padrão) = teste grátis; checkout = contratar já pagando
+            // (sem trial — o front segue para /signup-checkout/contract).
+            'start_mode' => ['nullable', 'string', Rule::in(['trial', 'checkout'])],
+            // Captcha (Cloudflare Turnstile) — só com as chaves configuradas.
+            'turnstile_token' => TurnstileVerifier::enabled()
+                ? ['required', 'string', 'max:2048', function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! app(TurnstileVerifier::class)->verify(is_string($value) ? $value : null, $this->ip())) {
+                        $fail(__('auth.register.captcha_failed'));
+                    }
+                }]
+                : ['nullable'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'company_cnpj.unique' => __('validation.cnpj_already_registered'),
-            'company_phone.regex' => __('validation.custom.company_phone.invalid'),
+            'company_cnpj.unique'      => __('validation.cnpj_already_registered'),
+            'company_phone.regex'      => __('validation.custom.company_phone.invalid'),
+            'turnstile_token.required' => __('auth.register.captcha_required'),
         ];
     }
 }

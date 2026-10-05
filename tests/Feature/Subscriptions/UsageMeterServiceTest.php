@@ -46,13 +46,11 @@ test('getCurrentUsage retorna 0 sem registros', function () {
 test('subscription factory states funcionam corretamente', function () {
     $trial    = \App\Models\Subscription::factory()->trial(14)->make();
     $expired  = \App\Models\Subscription::factory()->expired()->make();
-    $grace    = \App\Models\Subscription::factory()->inGracePeriod()->make();
     $lifetime = \App\Models\Subscription::factory()->lifetime()->make();
 
     expect($trial->isOnTrial())->toBeTrue();
     expect($expired->isActive())->toBeFalse();
-    expect($grace->inGracePeriod())->toBeTrue();
-    expect($grace->hasAccess())->toBeTrue();
+    expect($expired->hasAccess())->toBeFalse();
     expect($lifetime->isActive())->toBeTrue();
     expect($lifetime->ends_at)->toBeNull();
 });

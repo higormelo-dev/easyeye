@@ -20,7 +20,8 @@ use Illuminate\Support\Str;
  * constraint"); e as ações TISS tratavam como colisão de número qualquer
  * violação cujo SQL/bindings contivesse o nome do índice.
  *
- * O servidor de teste roda com lc_messages=C: a mensagem pt_BR é simulada com
+ * O servidor de teste pode rodar com qualquer lc_messages (C no CI, pt_BR no
+ * PostgreSQL local): a mensagem pt_BR é simulada com
  * o formato exato do catálogo pt_BR do PostgreSQL, lançada DENTRO do INSERT
  * (evento creating), no mesmo ponto em que a violação real acontece.
  */

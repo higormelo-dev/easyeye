@@ -207,6 +207,12 @@ return [
     ],
 
     'pricing' => [
+        // Billing cycle chosen by the visitor
+        'cycle_selector_label'   => 'Billing cycle',
+        'cycle_save_up_to'       => 'up to :percent% off',
+        'monthly_equivalent'     => 'works out to :price/month',
+        'savings_badge'          => 'Save :percent%',
+        'cycle_unavailable'      => 'Available on the :cycle cycle',
         'label'                  => 'Pricing',
         'title'                  => 'Plans for every clinic size',
         'subtitle'               => 'No implementation fees. Cancel anytime.',

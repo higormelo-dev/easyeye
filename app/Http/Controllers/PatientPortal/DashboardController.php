@@ -6,6 +6,7 @@ namespace App\Http\Controllers\PatientPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\{Patient, PatientAccount};
+use App\Services\Billing\ClinicServiceGate;
 use Illuminate\Support\Facades\Auth;
 use Inertia\{Inertia, Response};
 
@@ -23,7 +24,7 @@ class DashboardController extends Controller
      * titular — um cadastro (People) por clínica, todos vinculados à conta
      * pelo próprio paciente (PatientAccount::linkedPersonIds()).
      */
-    public function index(): Response
+    public function index(ClinicServiceGate $gate): Response
     {
         /** @var PatientAccount $account */
         $account = Auth::guard('patient')->user();
@@ -36,6 +37,8 @@ class DashboardController extends Controller
                 'entity_id' => $patient->entity_id,
                 'name'      => $patient->entity?->name,
                 'city'      => $patient->entity?->city,
+                // Clínica com o serviço suspenso: só consulta (aviso neutro).
+                'read_only' => $gate->portalReadOnly($patient->entity),
                 // Fase 2 — lista de documentos liberados nesta clínica.
                 'clinic_url' => route('patient-portal.clinics.show', $patient),
             ])
@@ -45,6 +48,7 @@ class DashboardController extends Controller
             'appName'     => config('app.name', 'EasyEye'),
             'patientName' => $account->person?->full_name,
             'clinics'     => $clinics,
+            'readOnly'    => trans('patient_portal.read_only'),
         ]);
     }
 }

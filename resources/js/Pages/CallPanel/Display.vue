@@ -8,12 +8,21 @@ import { ref, onMounted, onUnmounted } from 'vue';
  * 4s; chamada nova entra em destaque e é anunciada por voz (speechSynthesis,
  * pt-BR) quando o navegador da TV suporta. Recebe apenas snapshots de nome —
  * nenhum dado clínico/cadastral chega aqui.
+ *
+ * Clínica com o acesso bloqueado: "serviço indisponível" (o feed não traz
+ * chamadas); a TV segue consultando e volta sozinha quando o acesso volta.
  */
 const props = defineProps({
     clinic: { type: String, required: true },
     feed_url: { type: String, required: true },
+    unavailable: { type: Boolean, default: false },
+    texts: { type: Object, default: () => ({}) },
 });
 
+const tx = (key, fallback, replace = {}) =>
+    Object.entries(replace).reduce((text, [k, v]) => text.replace(`:${k}`, v ?? ''), props.texts?.[key] ?? fallback);
+
+const blocked = ref(props.unavailable);
 const calls = ref([]);
 const current = ref(null);
 const clock = ref('');
@@ -27,10 +36,13 @@ function speak(call) {
     try {
         if (!window.speechSynthesis) return;
         const phrase = call.doctor
-            ? `Paciente ${call.patient}. Dirigir-se ao consultório. ${call.doctor}.`
-            : `Paciente ${call.patient}. Dirigir-se ao consultório.`;
+            ? tx('speech_with_doctor', 'Paciente :patient. Dirigir-se ao consultório. :doctor.', {
+                  patient: call.patient,
+                  doctor: call.doctor,
+              })
+            : tx('speech', 'Paciente :patient. Dirigir-se ao consultório.', { patient: call.patient });
         const utter = new SpeechSynthesisUtterance(phrase);
-        utter.lang = 'pt-BR';
+        utter.lang = tx('speech_lang', 'pt-BR');
         utter.rate = 0.92;
         window.speechSynthesis.speak(utter);
     } catch {
@@ -42,8 +54,16 @@ async function poll() {
     try {
         const res = await fetch(props.feed_url, { headers: { Accept: 'application/json' } });
         if (!res.ok) return;
-        const { data } = await res.json();
-        calls.value = data;
+        const { data, unavailable } = await res.json();
+        blocked.value = !!unavailable;
+        if (blocked.value) {
+            // Nada de paciente na tela enquanto o serviço está indisponível.
+            calls.value = [];
+            current.value = null;
+
+            return;
+        }
+        calls.value = data ?? [];
 
         const newest = data[0] ?? null;
         if (newest && !seenIds.has(newest.id)) {
@@ -84,16 +104,20 @@ onUnmounted(() => {
         </header>
 
         <main class="cp-main">
-            <template v-if="current">
-                <div class="cp-label">Chamando</div>
+            <div v-if="blocked" class="cp-unavailable" role="status" data-test="call-panel-unavailable">
+                <div class="cp-unavailable-title">{{ tx('unavailable_title', 'Serviço indisponível no momento') }}</div>
+                <div class="cp-unavailable-body">{{ tx('unavailable_body', '') }}</div>
+            </div>
+            <template v-else-if="current">
+                <div class="cp-label">{{ tx('calling', 'Chamando') }}</div>
                 <div class="cp-patient">{{ current.patient }}</div>
                 <div v-if="current.doctor" class="cp-doctor">{{ current.doctor }}</div>
             </template>
-            <div v-else class="cp-idle">Aguardando chamadas…</div>
+            <div v-else class="cp-idle">{{ tx('idle', 'Aguardando chamadas…') }}</div>
         </main>
 
-        <footer v-if="calls.length > 1" class="cp-history">
-            <div class="cp-history-title">Últimas chamadas</div>
+        <footer v-if="!blocked && calls.length > 1" class="cp-history">
+            <div class="cp-history-title">{{ tx('history', 'Últimas chamadas') }}</div>
             <div class="cp-history-list">
                 <div v-for="c in calls.slice(1, 5)" :key="c.id" class="cp-history-item">
                     <span class="cp-history-time">{{ c.called_at }}</span>
@@ -106,6 +130,19 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.cp-unavailable {
+    max-width: 70vw;
+}
+.cp-unavailable-title {
+    font-size: 4vw;
+    font-weight: 700;
+    line-height: 1.15;
+}
+.cp-unavailable-body {
+    margin-top: 2vh;
+    font-size: 2vw;
+    opacity: 0.8;
+}
 .cp-screen {
     min-height: 100vh;
     background: #0b1524;

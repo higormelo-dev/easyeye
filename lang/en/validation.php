@@ -420,7 +420,6 @@ return [
         'glosa_amount'                              => 'denied amount',
         'gonioscopy_left'                           => 'gonioscopy (left eye)',
         'gonioscopy_right'                          => 'gonioscopy (right eye)',
-        'grace_period_days'                         => 'grace period days',
         'hda'                                       => 'HPI',
         'header_show_address'                       => 'header address',
         'header_show_logo'                          => 'header logo',

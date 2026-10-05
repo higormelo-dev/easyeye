@@ -420,7 +420,6 @@ return [
         'glosa_amount'                              => 'valor da glosa',
         'gonioscopy_left'                           => 'gonioscopia (OE)',
         'gonioscopy_right'                          => 'gonioscopia (OD)',
-        'grace_period_days'                         => 'dias de carência',
         'hda'                                       => 'HDA',
         'header_show_address'                       => 'endereço no cabeçalho',
         'header_show_logo'                          => 'logo no cabeçalho',

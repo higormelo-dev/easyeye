@@ -66,7 +66,7 @@ test('dashboard nao expõe nenhum dado clinico — apenas entity_id/name/city', 
 
     $clinic = $response->json('props.clinics.0');
 
-    expect(array_keys($clinic))->toEqualCanonicalizing(['entity_id', 'name', 'city', 'clinic_url']);
+    expect(array_keys($clinic))->toEqualCanonicalizing(['entity_id', 'name', 'city', 'clinic_url', 'read_only']);
 });
 
 test('rota do dashboard sem sessao patient nega acesso, nunca vaza dados', function () {

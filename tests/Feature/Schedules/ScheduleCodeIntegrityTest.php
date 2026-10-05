@@ -85,8 +85,9 @@ it('[CONCORRENCIA] serializa a numeracao SDL da mesma clinica ate o commit de qu
 
         // Mesma clínica: precisa ESPERAR (aqui estoura o lock_timeout). Antes
         // não esperava — lia o mesmo "último código" e repetia o número.
+        // 55P03 = lock_timeout (SQLSTATE; o texto muda com o lc_messages do servidor).
         expect(fn () => Schedule::create(sdlScheduleAttributes($this->entity, $this->doctor)))
-            ->toThrow(QueryException::class, 'lock timeout');
+            ->toThrow(fn (QueryException $e) => expect($e->getCode())->toBe('55P03'));
 
         // Outra clínica: não é bloqueada (lock por clínica, não global).
         $otherSchedule = Schedule::create(sdlScheduleAttributes($otherEntity, $otherDoctor));

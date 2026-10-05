@@ -177,3 +177,124 @@ describe('Cadastro — conteúdo público', () => {
         expect(wrapper.get('.plan-grid-card.selected').text()).toContain('Premium');
     });
 });
+
+describe('Cadastro — ciclo de cobrança', () => {
+    const cyclePlans = [
+        {
+            id: 'basic',
+            name: 'Básico',
+            price: 299.9,
+            price_period_label: '/mês',
+            default_cycle: 'monthly',
+            prices: [
+                {
+                    cycle: 'monthly',
+                    label: 'Mensal',
+                    months: 1,
+                    price: 299.9,
+                    period_label: '/mês',
+                    monthly_equivalent: 299.9,
+                    savings_percent: 0,
+                },
+            ],
+            features: [],
+        },
+        {
+            id: 'pro',
+            name: 'Pro',
+            price: 899.9,
+            price_period_label: '/mês',
+            default_cycle: 'monthly',
+            prices: [
+                {
+                    cycle: 'monthly',
+                    label: 'Mensal',
+                    months: 1,
+                    price: 899.9,
+                    period_label: '/mês',
+                    monthly_equivalent: 899.9,
+                    savings_percent: 0,
+                },
+                {
+                    cycle: 'yearly',
+                    label: 'Anual',
+                    months: 12,
+                    price: 8639.04,
+                    period_label: '/ano',
+                    monthly_equivalent: 719.92,
+                    savings_percent: 20,
+                },
+            ],
+            features: [],
+        },
+    ];
+
+    async function mountWithCycle(selectedPlanId, selectedCycle) {
+        wrapper = mount(Register, {
+            props: {
+                plans: cyclePlans,
+                selectedPlanId,
+                selectedCycle,
+                trialDays: 9,
+                routes: { siteHome: '/' },
+                t: {
+                    nav: { contact: 'Contato' },
+                    metrics: [],
+                    testimonials: { items: [] },
+                    contact: { trust_nps: '' },
+                },
+                tAuth: {
+                    register: {
+                        days_free: 'dias grátis',
+                        choose_cycle: 'Ciclo de cobrança',
+                        cycle_savings: 'Economize :percent%',
+                        cycle_equivalent: 'equivale a :price/mês',
+                    },
+                },
+            },
+            global: { directives: { mask: {} }, stubs: { Transition: { template: '<div><slot /></div>' } } },
+        });
+        const fields = wrapper.findAll('input');
+        await fields[0].setValue('Pessoa de Teste');
+        await fields[1].setValue('pessoa@example.com');
+        await fields[2].setValue('Password1!');
+        await fields[3].setValue('Password1!');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+        const companyFields = wrapper.findAll('input');
+        await companyFields[0].setValue('Clínica de Teste');
+        await companyFields[1].setValue('11988887777');
+    }
+
+    it('abre no ciclo escolhido na landing e envia o ciclo com o cadastro', async () => {
+        await mountWithCycle('pro', 'yearly');
+
+        const yearly = wrapper.get('.plan-cycle[data-cycle="yearly"]');
+        expect(yearly.attributes('aria-checked')).toBe('true');
+        expect(yearly.text().replace(/\s+/g, ' ')).toContain('equivale a R$ 719,92/mês · Economize 20%');
+        // Intl separa moeda e valor com espaço não separável.
+        expect(wrapper.get('.plan-grid-card.selected .plan-grid-price').text().replace(/\s/g, ' ')).toBe('R$ 8.639,04');
+        expect(wrapper.get('.plan-grid-card.selected .plan-grid-cycle').text()).toBe('/ano');
+
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+        expect(axios.post).toHaveBeenCalledWith(
+            '/register',
+            expect.objectContaining({ plan_id: 'pro', billing_cycle: 'yearly' }),
+        );
+    });
+
+    it('trocar para um plano sem o ciclo usa o ciclo do plano e esconde o seletor', async () => {
+        await mountWithCycle('pro', 'yearly');
+
+        await wrapper.findAll('.plan-grid-card')[0].trigger('click');
+
+        expect(wrapper.find('.plan-cycles').exists()).toBe(false);
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+        expect(axios.post).toHaveBeenCalledWith(
+            '/register',
+            expect.objectContaining({ plan_id: 'basic', billing_cycle: 'monthly' }),
+        );
+    });
+});

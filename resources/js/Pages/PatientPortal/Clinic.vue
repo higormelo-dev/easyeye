@@ -7,6 +7,9 @@ const props = defineProps({
     clinicName: { type: String, default: '' },
     documents: { type: Array, default: () => [] },
     lgpdExportUrl: { type: String, required: true },
+    // Serviço da clínica suspenso: só consulta (documentos e exportação seguem).
+    readOnly: { type: Boolean, default: false },
+    readOnlyNotice: { type: String, default: '' },
 });
 
 function typeIcon(type) {
@@ -32,6 +35,14 @@ function typeIcon(type) {
             <a :href="lgpdExportUrl" class="btn btn-sm btn-outline-primary">
                 <i class="ti ti-download me-1"></i>Baixar meus dados
             </a>
+        </div>
+        <div
+            v-if="readOnly"
+            class="alert alert-secondary text-secondary-emphasis small py-2"
+            role="status"
+            data-test="portal-read-only"
+        >
+            <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ readOnlyNotice }}
         </div>
         <p class="text-muted small mb-4">
             <i class="ti ti-shield-lock me-1"></i>

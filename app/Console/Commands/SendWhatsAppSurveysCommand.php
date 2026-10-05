@@ -7,9 +7,11 @@ namespace App\Console\Commands;
 use App\Enums\ScheduleSituation;
 use App\Jobs\WhatsApp\SendWhatsAppMessageJob;
 use App\Models\Schedule;
-use App\Models\WhatsApp\WhatsAppSetting;
+use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppSetting};
+use App\Services\Billing\ClinicServiceGate;
 use App\Services\WhatsApp\WhatsAppService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Enfileira pesquisas de satisfação via WhatsApp (Z-API) para atendimentos
@@ -26,7 +28,7 @@ class SendWhatsAppSurveysCommand extends Command
 
     protected $description = 'Envia pesquisas de satisfação via WhatsApp (Z-API) após atendimentos concluídos';
 
-    public function handle(WhatsAppService $service): int
+    public function handle(WhatsAppService $service, ClinicServiceGate $gate): int
     {
         $maxAgeDays = (int) config('whatsapp.survey.max_age_days', 3);
 
@@ -41,9 +43,24 @@ class SendWhatsAppSurveysCommand extends Command
             ->get()
             ->filter(fn (WhatsAppSetting $s) => $s->hasCredentials() || $globalOk);
 
-        $queued = 0;
+        $queued  = 0;
+        $skipped = 0;
 
         foreach ($settings as $setting) {
+            // Acesso da clínica bloqueado (assinatura): nada automático ao
+            // paciente — pulado com o motivo; volta sozinho com o acesso.
+            if (! $gate->allowsAutomation((string) $setting->entity_id)) {
+                $skipped++;
+                $this->line("[pulado] clínica {$setting->entity_id}: acesso bloqueado (assinatura)");
+                Log::info('WhatsApp automático pulado: acesso da clínica bloqueado.', [
+                    'entity_id' => $setting->entity_id,
+                    'kind'      => 'survey',
+                    'reason'    => ClinicServiceGate::REASON_ACCESS_BLOCKED,
+                ]);
+
+                continue;
+            }
+
             $delay = max(0, (int) $setting->survey_delay_hours);
 
             $schedules = Schedule::query()
@@ -55,9 +72,11 @@ class SendWhatsAppSurveysCommand extends Command
                 // Consulta aconteceu: já passou do delay, mas não é velha demais.
                 ->where('date_time', '<=', now()->subHours($delay))
                 ->where('date_time', '>=', now()->subDays($maxAgeDays))
+                // Pulada antes (acesso bloqueado) volta a ser enviada.
                 ->whereDoesntHave('whatsappMessages', fn ($q) => $q
                     ->where('direction', 'out')
-                    ->where('kind', 'survey'))
+                    ->where('kind', 'survey')
+                    ->where('status', '!=', WhatsAppMessage::STATUS_SKIPPED))
                 ->with(['entity:id,name', 'patient.person:id,cellphone'])
                 ->get();
 
@@ -84,7 +103,7 @@ class SendWhatsAppSurveysCommand extends Command
             }
         }
 
-        $this->info("Pesquisas enfileiradas: {$queued}");
+        $this->info("Pesquisas enfileiradas: {$queued}" . ($skipped ? " · clínicas puladas (acesso bloqueado): {$skipped}" : ''));
 
         return self::SUCCESS;
     }

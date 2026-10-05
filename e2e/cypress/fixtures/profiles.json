@@ -77,5 +77,147 @@
         "type": "saas",
         "rule": "user",
         "todo": "SEM CREDENCIAL SEEDADA — criar usuário com SaasRule 'user' na entity SaaS (medicalgroup) e preencher email/password aqui; depois remover o describe.skip dos specs deste perfil."
+    },
+    "billing.ok.admin": {
+        "email": "admin.emdia@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "admin",
+        "entity": "CY-BILL EM DIA",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL EM DIA, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.ok.financial": {
+        "email": "financeiro.emdia@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "financial",
+        "entity": "CY-BILL EM DIA",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL EM DIA, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.ok.secretary": {
+        "email": "secretaria.emdia@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "secretary",
+        "entity": "CY-BILL EM DIA",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL EM DIA, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.ok.doctor": {
+        "email": "medico.emdia@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "doctor",
+        "entity": "CY-BILL EM DIA",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL EM DIA, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.limited.admin": {
+        "email": "admin.limitado@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "admin",
+        "entity": "CY-BILL LIMITADO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL LIMITADO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.limited.doctor": {
+        "email": "medico.limitado@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "doctor",
+        "entity": "CY-BILL LIMITADO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL LIMITADO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.blocked.admin": {
+        "email": "admin.bloqueado@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/subscription/expired",
+        "type": "clinic",
+        "rule": "admin",
+        "entity": "CY-BILL BLOQUEADO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL BLOQUEADO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.blocked.secretary": {
+        "email": "secretaria.bloqueado@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/subscription/expired",
+        "type": "clinic",
+        "rule": "secretary",
+        "entity": "CY-BILL BLOQUEADO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL BLOQUEADO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.trial_ending.admin": {
+        "email": "admin.trialfim@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "admin",
+        "entity": "CY-BILL TRIAL FIM",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL TRIAL FIM, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.trial_over.admin": {
+        "email": "admin.trialvencido@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/subscription/expired",
+        "type": "clinic",
+        "rule": "admin",
+        "entity": "CY-BILL TRIAL VENCIDO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL TRIAL VENCIDO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.overdue.admin": {
+        "email": "admin.atraso@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "admin",
+        "entity": "CY-BILL ATRASO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL ATRASO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.limited.secretary": {
+        "email": "secretaria.limitado@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "secretary",
+        "entity": "CY-BILL LIMITADO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL LIMITADO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.trial_ending.doctor": {
+        "email": "medico.trialfim@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "doctor",
+        "entity": "CY-BILL TRIAL FIM",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL TRIAL FIM, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.overdue.financial": {
+        "email": "financeiro.atraso@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "financial",
+        "entity": "CY-BILL ATRASO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL ATRASO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.limited.financial": {
+        "email": "financeiro.limitado@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/panel/dashboard",
+        "type": "clinic",
+        "rule": "financial",
+        "entity": "CY-BILL LIMITADO",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL LIMITADO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
+    },
+    "billing.patient": {
+        "email": "paciente.bloqueado@cy-billing.test",
+        "password": "CyBilling@2026",
+        "landing": "/meus-documentos",
+        "type": "patient",
+        "todo": "Usuário de CENÁRIO criado por e2e/scripts/seed-billing.php (clínica CY-BILL BLOQUEADO, isolada da CLÍNICA TESTE INTEGRADOR) — rodar o seed antes de logar; clean-billing.php remove."
     }
 }

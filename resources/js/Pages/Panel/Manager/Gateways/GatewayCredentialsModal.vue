@@ -26,7 +26,15 @@ const listLoading = ref(false);
 const listError = ref('');
 
 // New credential form
-const form = ref({ label: '', secret: '', webhook_secret: '', valid_from: '', valid_to: '' });
+const form = ref({
+    label: '',
+    secret: '',
+    public_key: '',
+    handle: '',
+    webhook_secret: '',
+    valid_from: '',
+    valid_to: '',
+});
 const saving = ref(false);
 const formError = ref('');
 const showSecret = ref(false);
@@ -37,6 +45,17 @@ const secretInfo = computed(() => {
     const code = props.gateway?.code ?? '';
     return props.t?.secret_label?.[code] ?? { label: props.t?.modal_cred_api_key ?? 'API Key', hint: '' };
 });
+
+// InfinitePay (Checkout Integrado): a credencial é a InfiniteTag (handle);
+// token e segredo do webhook não existem.
+const usesHandle = computed(() => props.gateway?.code === 'infinitepay');
+const webhookHint = computed(() => props.t?.webhook_hint?.[props.gateway?.code ?? ''] ?? '');
+
+// Chave PÚBLICA do SDK JS do checkout transparente (cartão no navegador).
+// Pública por definição; a secreta (sk_/rk_) é recusada aqui e no servidor.
+const PUBLIC_KEY_GATEWAYS = ['mercadopago', 'stripe_br', 'pagarme', 'pagbank'];
+const usesPublicKey = computed(() => PUBLIC_KEY_GATEWAYS.includes(props.gateway?.code ?? ''));
+const looksSecret = (value) => /^(sk_|rk_)/.test(String(value ?? '').trim());
 
 watch(
     () => props.open,
@@ -69,7 +88,15 @@ async function loadCredentials() {
 }
 
 function resetForm() {
-    form.value = { label: '', secret: '', webhook_secret: '', valid_from: '', valid_to: '' };
+    form.value = {
+        label: '',
+        secret: '',
+        public_key: '',
+        handle: '',
+        webhook_secret: '',
+        valid_from: '',
+        valid_to: '',
+    };
     formError.value = '';
     showSecret.value = false;
     showWebhook.value = false;
@@ -78,8 +105,16 @@ function resetForm() {
 // saveCredential agora exige reason — cadastro de credencial de pagamento
 // é evento crítico (afeta capacidade de cobrar clientes).
 function saveCredential() {
-    if (!form.value.secret) {
+    if (usesHandle.value && !form.value.handle) {
+        formError.value = props.t.js_error_handle_required ?? 'Informe a InfiniteTag (handle).';
+        return;
+    }
+    if (!usesHandle.value && !form.value.secret) {
         formError.value = props.t.js_error_secret_required ?? 'Informe o secret.';
+        return;
+    }
+    if (usesPublicKey.value && looksSecret(form.value.public_key)) {
+        formError.value = props.t.js_error_public_key_secret;
         return;
     }
     openReasonModal({
@@ -93,6 +128,8 @@ function saveCredential() {
                 const body = { reason };
                 if (form.value.label) body.label = form.value.label;
                 if (form.value.secret) body.secret = form.value.secret;
+                if (usesPublicKey.value && form.value.public_key.trim()) body.public_key = form.value.public_key.trim();
+                if (usesHandle.value && form.value.handle) body.handle = form.value.handle;
                 if (form.value.webhook_secret) body.webhook_secret = form.value.webhook_secret;
                 if (form.value.valid_from) body.valid_from = form.value.valid_from;
                 if (form.value.valid_to) body.valid_to = form.value.valid_to;
@@ -220,6 +257,14 @@ function revokeCredential(cred) {
                                         >
                                         <span class="text-muted" style="font-size: 0.75rem">{{ c.created_at }}</span>
                                     </div>
+                                    <div
+                                        v-if="c.public_key"
+                                        class="text-muted font-monospace text-truncate mt-1"
+                                        style="font-size: 0.75rem"
+                                        data-test="credential-public-key"
+                                    >
+                                        {{ (t.modal_cred_public_key_current ?? ':key').replace(':key', c.public_key) }}
+                                    </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
                                     <span class="text-muted fst-italic" style="font-size: 0.75rem">{{
@@ -257,8 +302,24 @@ function revokeCredential(cred) {
                                     />
                                 </div>
 
+                                <!-- InfinitePay: InfiniteTag (handle) -->
+                                <div v-if="usesHandle" class="col-12">
+                                    <label class="form-label small fw-semibold">
+                                        {{ t.modal_cred_handle }} <span class="text-danger">*</span>
+                                    </label>
+                                    <input
+                                        v-model="form.handle"
+                                        type="text"
+                                        class="form-control form-control-sm font-monospace"
+                                        autocomplete="off"
+                                        required
+                                        :placeholder="t.modal_cred_handle_ph"
+                                    />
+                                    <div class="form-text">{{ t.modal_cred_handle_hint }}</div>
+                                </div>
+
                                 <!-- Secret key -->
-                                <div class="col-12">
+                                <div v-if="!usesHandle" class="col-12">
                                     <label class="form-label small fw-semibold">
                                         {{ secretInfo.label }} <span class="text-danger">*</span>
                                     </label>
@@ -282,8 +343,30 @@ function revokeCredential(cred) {
                                     <div v-if="secretInfo.hint" class="form-text">{{ secretInfo.hint }}</div>
                                 </div>
 
+                                <!-- Chave pública (checkout transparente: SDK do cartão no navegador) -->
+                                <div v-if="usesPublicKey" class="col-12">
+                                    <label for="gateway-public-key" class="form-label small fw-semibold">
+                                        {{ t.modal_cred_public_key }}
+                                    </label>
+                                    <input
+                                        id="gateway-public-key"
+                                        v-model="form.public_key"
+                                        type="text"
+                                        class="form-control form-control-sm font-monospace"
+                                        :class="{ 'is-invalid': looksSecret(form.public_key) }"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        aria-describedby="gateway-public-key-hint"
+                                        :placeholder="t.modal_cred_public_key_ph"
+                                        data-test="gateway-public-key"
+                                    />
+                                    <div id="gateway-public-key-hint" class="form-text">
+                                        {{ t.modal_cred_public_key_hint }}
+                                    </div>
+                                </div>
+
                                 <!-- Webhook secret -->
-                                <div class="col-12">
+                                <div v-if="!usesHandle" class="col-12">
                                     <label class="form-label small fw-semibold">
                                         {{ t.modal_cred_webhook }}
                                         <span class="text-muted fw-normal">{{ t.modal_cred_webhook_opt }}</span>
@@ -303,6 +386,7 @@ function revokeCredential(cred) {
                                             <i :class="`ti ${showWebhook ? 'ti-eye-off' : 'ti-eye'}`"></i>
                                         </button>
                                     </div>
+                                    <div v-if="webhookHint" class="form-text">{{ webhookHint }}</div>
                                 </div>
 
                                 <!-- Validity -->

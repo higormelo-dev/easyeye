@@ -1,118 +1,149 @@
 <?php
 
-use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\AiQuotaService;
-use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
-use App\Enums\ClientRule;
-use App\Enums\{FeatureKey, SubscriptionStatus};
-use App\Models\{Doctor, Entity, MedicalRecord, Patient, People, Plan, PlanFeature, Subscription, User};
-use Carbon\Carbon;
+use App\Domains\AI\Models\{AiCreditWallet, AiRun};
+use App\Domains\AI\Services\{AiCreditWalletService, AiQuotaService};
+use App\Enums\AI\AiRunStatus;
+use App\Enums\{FeatureKey, SubscriptionAccessLevel, SubscriptionBillingMode, SubscriptionStatus};
+use App\Models\{Entity, Plan, PlanFeature, Subscription};
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Carbon;
+
+/*
+ * O medidor X/Y lê a carteira — a mesma fonte que a reserva usa para
+ * bloquear — e não mais a soma de ai_runs no mês civil (bug B3/COTA-4).
+ */
 
 beforeEach(function () {
     $this->service = app(AiQuotaService::class);
-    $this->entity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $this->plan    = Plan::factory()->create(['active' => true]);
+    $this->wallet  = app(AiCreditWalletService::class);
 
-    Subscription::factory()->create([
-        'entity_id' => $this->entity->id,
-        'plan_id'   => $this->plan->id,
-        'status'    => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(),
-        'ends_at'   => now()->addMonth(),
+    $this->entity                = Entity::factory()->make(['is_client' => true, 'active' => true]);
+    $this->entity->skipAutoTrial = true;
+    $this->entity->save();
+
+    $this->plan = Plan::factory()->create(['active' => true]);
+    PlanFeature::factory()->limit(FeatureKey::AiMonthlyCredits, 80)->for($this->plan)->create();
+});
+
+afterEach(fn () => Carbon::setTestNow());
+
+it('mostra franquia, usado, renovação e saldo avulso da carteira', function () {
+    Carbon::setTestNow('2026-10-04 10:00:00');
+
+    // Cobrança automática paga: a ativação concede a janela 04/10–04/11.
+    Subscription::factory()->for($this->entity)->for($this->plan)->create([
+        'billing_mode'    => SubscriptionBillingMode::Gateway,
+        'status'          => SubscriptionStatus::Active,
+        'gateway'         => 'asaas',
+        'ends_at'         => now()->addMonth(),
+        'last_payment_at' => now(),
     ]);
+    $this->wallet->purchaseCredits($this->entity->id, 15);
+    $this->wallet->reserve($this->entity->id, 20);
 
-    $this->doctor      = User::factory()->create();
-    $this->doctorUser  = createEntityUser($this->entity, $this->doctor, ClientRule::Doctor->value);
-    $this->doctorModel = Doctor::query()->create([
-        'entity_user_id' => $this->doctorUser->id,
-        'person_id'      => People::factory()->create()->id,
-        'active'         => true,
-    ]);
+    $snap = $this->service->snapshot($this->entity->id);
 
-    $this->patient = Patient::factory()->create(['entity_id' => $this->entity->id]);
-    $this->record  = MedicalRecord::query()->create([
-        'entity_id'  => $this->entity->id,
-        'patient_id' => $this->patient->id,
-        'doctor_id'  => $this->doctorModel->id,
+    expect($snap)->toMatchArray([
+        'monthly_quota'     => 80,
+        'consumed_credits'  => 20,
+        'remaining'         => 60,
+        'usage_percent'     => 25.0,
+        'renews_on'         => '2026-11-04',
+        'expires_on'        => null,
+        'purchased_balance' => 15,
+        'available'         => 75,
     ]);
 });
 
-function makeQuotaRun($test, AiRunStatus $status, int $consumed, ?Carbon $createdAt = null): AiRun
-{
-    $run = AiRun::query()->create([
-        'entity_id'         => $test->entity->id,
-        'patient_id'        => $test->patient->id,
-        'medical_record_id' => $test->record->id,
-        'requested_by'      => $test->doctor->id,
-        'workflow'          => 'record_assist',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => $status->value,
-        'estimated_credits' => 100,
-        'reserved_credits'  => 100,
-        'consumed_credits'  => $consumed,
-    ]);
+it('assinatura que não ganha franquia não promete renovação: a cota que sobrou mostra até quando vale', function (Closure $subscription) {
+    Carbon::setTestNow('2026-10-04 10:00:00');
 
-    if ($createdAt) {
-        $run->forceFill(['created_at' => $createdAt])->save();
-    }
+    $current = $subscription($this->entity, $this->plan);
 
-    return $run;
-}
+    // Concessão antiga que ficou na carteira (período = fim da assinatura, 31/12 23:59:59).
+    $this->wallet->grantMonthlyQuota($this->entity->id, 80, CarbonImmutable::parse('2026-12-31 23:59:59'), subscriptionId: $current->id);
+    $this->wallet->reserve($this->entity->id, 30);
 
-it('soma consumed_credits de runs Approved + WaitingApproval do mês corrente', function () {
-    PlanFeature::factory()->limit(FeatureKey::AiMonthlyCredits, 1000)->for($this->plan)->create();
+    expect($current->fresh()->earnsMonthlyAiQuota())->toBeFalse()
+        ->and($this->service->snapshot($this->entity->id))->toMatchArray([
+            'monthly_quota'    => 80,
+            'consumed_credits' => 30,
+            'remaining'        => 50,
+            'renews_on'        => null,
+            'expires_on'       => '2026-12-31',
+        ]);
+})->with([
+    // Convertida em cortesia pelas migrações, com a cota antiga ainda em vigor.
+    'cortesia convertida' => fn (Entity $entity, Plan $plan) => Subscription::factory()->complimentary()->for($entity)->for($plan)->create([
+        'ends_at' => '2026-12-31 23:59:59',
+    ]),
+    // Pagante no acesso limitado (D+4): a janela seguinte só vem com o pagamento.
+    'pagante com acesso limitado' => function (Entity $entity, Plan $plan) {
+        $subscription = Subscription::factory()->for($entity)->for($plan)->create([
+            'billing_mode'    => SubscriptionBillingMode::Gateway,
+            'status'          => SubscriptionStatus::PastDue,
+            'gateway'         => 'asaas',
+            'last_payment_at' => now()->subMonth(),
+            'ends_at'         => now()->subDays(4)->endOfDay(),
+            'past_due_at'     => now()->subDays(4)->endOfDay(),
+        ]);
 
-    makeQuotaRun($this, AiRunStatus::Approved, 150);
-    makeQuotaRun($this, AiRunStatus::WaitingApproval, 50);
-    makeQuotaRun($this, AiRunStatus::Failed, 999);     // não deve contar
-    makeQuotaRun($this, AiRunStatus::Cancelled, 999);  // não deve contar
-    makeQuotaRun($this, AiRunStatus::Rejected, 999);   // não deve contar
+        expect($subscription->accessLevel())->toBe(SubscriptionAccessLevel::Limited);
 
-    $snap = $this->service->currentMonthSnapshot($this->entity->id);
+        return $subscription;
+    },
+]);
 
-    expect($snap['monthly_quota'])->toBe(1000)
-        ->and($snap['consumed_credits'])->toBe(200)
-        ->and($snap['usage_percent'])->toBe(20.0);
+it('é igual ao que a carteira libera para a reserva', function () {
+    $this->wallet->grantMonthlyQuota($this->entity->id, 30, CarbonImmutable::now()->addMonth());
+    $this->wallet->purchaseCredits($this->entity->id, 5);
+    $this->wallet->reserve($this->entity->id, 32);
+
+    $snap    = $this->service->snapshot($this->entity->id);
+    $balance = $this->wallet->balance($this->entity->id);
+
+    expect($snap['available'])->toBe($balance['available'])
+        ->and($snap['remaining'])->toBe($balance['quota_remaining'])
+        ->and($snap['consumed_credits'])->toBe($balance['quota_used'])
+        ->and($snap['monthly_quota'])->toBe($balance['quota_total'])
+        ->and($snap['available'])->toBe(3);
 });
 
-it('ignora runs de meses anteriores', function () {
-    PlanFeature::factory()->limit(FeatureKey::AiMonthlyCredits, 1000)->for($this->plan)->create();
+it('rascunho rejeitado continua contando (a reserva consumida não volta)', function () {
+    $this->wallet->grantMonthlyQuota($this->entity->id, 30, CarbonImmutable::now()->addMonth());
 
-    makeQuotaRun($this, AiRunStatus::Approved, 999, now()->subMonth());
-    makeQuotaRun($this, AiRunStatus::Approved, 100);
+    $run = AiRun::factory()->create(['entity_id' => $this->entity->id, 'status' => AiRunStatus::Reserved->value]);
+    $this->wallet->reserve($this->entity->id, 30, aiRunId: $run->id);
+    $this->wallet->consumeReservation($this->entity->id, 30, aiRunId: $run->id);
+    $run->update(['status' => AiRunStatus::Rejected->value, 'consumed_credits' => 30]);
 
-    $snap = $this->service->currentMonthSnapshot($this->entity->id);
+    $snap = $this->service->snapshot($this->entity->id);
 
-    expect($snap['consumed_credits'])->toBe(100);
+    // O medidor antigo (ai_runs aprovados do mês) mostraria 0/30 e o botão liberado.
+    expect($snap['consumed_credits'])->toBe(30)
+        ->and($snap['available'])->toBe(0);
 });
 
-it('retorna usage_percent null quando não há cota definida', function () {
-    // Sem PlanFeature para AiMonthlyCredits
-    makeQuotaRun($this, AiRunStatus::Approved, 100);
+it('não zera na virada do mês civil, só na virada da janela', function () {
+    Carbon::setTestNow('2026-01-20 09:00:00');
+    $this->wallet->grantMonthlyQuota($this->entity->id, 80, CarbonImmutable::parse('2026-02-20 00:00:00'));
+    $this->wallet->reserve($this->entity->id, 80);
 
-    $snap = $this->service->currentMonthSnapshot($this->entity->id);
+    Carbon::setTestNow('2026-02-02 09:00:00');
+    expect($this->service->snapshot($this->entity->id))
+        ->toMatchArray(['consumed_credits' => 80, 'remaining' => 0, 'usage_percent' => 100.0]);
+
+    // Janela vencida (sem nova concessão): não há franquia em vigor.
+    Carbon::setTestNow('2026-02-20 00:00:01');
+    expect($this->service->snapshot($this->entity->id))
+        ->toMatchArray(['monthly_quota' => 0, 'consumed_credits' => 0, 'usage_percent' => null, 'renews_on' => null]);
+});
+
+it('empresa sem carteira tem medidor zerado', function () {
+    $snap = $this->service->snapshot($this->entity->id);
 
     expect($snap['monthly_quota'])->toBe(0)
-        ->and($snap['consumed_credits'])->toBe(100)
-        ->and($snap['usage_percent'])->toBeNull();
-});
-
-it('inclui period_label e datas formatadas', function () {
-    PlanFeature::factory()->limit(FeatureKey::AiMonthlyCredits, 500)->for($this->plan)->create();
-
-    $snap = $this->service->currentMonthSnapshot($this->entity->id);
-
-    expect($snap)->toHaveKeys(['period_label', 'period_start', 'period_end'])
-        ->and($snap['period_start'])->toMatch('#^\d{2}/\d{2}/\d{4}$#')
-        ->and($snap['period_end'])->toMatch('#^\d{2}/\d{2}/\d{4}$#');
-});
-
-it('retorna quota 0 quando entity não tem subscription ativa', function () {
-    $other = Entity::factory()->create(['is_client' => true, 'active' => true]);
-
-    $snap = $this->service->currentMonthSnapshot($other->id);
-
-    expect($snap['monthly_quota'])->toBe(0)
-        ->and($snap['consumed_credits'])->toBe(0);
+        ->and($snap['available'])->toBe(0)
+        ->and($snap['usage_percent'])->toBeNull()
+        ->and(AiCreditWallet::query()->where('entity_id', $this->entity->id)->exists())->toBeFalse();
 });

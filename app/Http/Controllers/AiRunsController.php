@@ -6,13 +6,14 @@ namespace App\Http\Controllers;
 
 use App\Domains\AI\Exceptions\InsufficientAiCreditsException;
 use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\{AiAnalyticsService, AiCreditPurchaseService, AiCreditWalletService, AiFeedbackService, AiPayloadEnricher, AiPricingService, AiProviderSettings, AiQuotaService, AiRunDocumentationService, AiRunEstimateService, AiRunExecutionService, AiSystemPromptResolver};
+use App\Domains\AI\Services\{AiAnalyticsService, AiCreditPurchaseService, AiCreditWalletService, AiFeedbackService, AiPayloadEnricher, AiPaywallService, AiPricingService, AiProviderSettings, AiQuotaService, AiRunDocumentationService, AiRunEstimateService, AiRunExecutionService, AiSystemPromptResolver};
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
-use App\Enums\{ClientRule, EntityGate, FeatureKey};
 use App\Enums\DataAccessPurpose;
+use App\Enums\{EntityGate, FeatureKey};
 use App\Http\Requests\AI\{EstimateAiRunRequest, StoreAiRunRequest};
 use App\Jobs\AI\RunAiWorkflowJob;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, Subscription};
+use App\Services\Billing\SubscriptionNoticeService;
 use App\Services\FeatureGateService;
 use App\Traits\LogsDataAccess;
 use DomainException;
@@ -38,6 +39,7 @@ class AiRunsController extends Controller
         private readonly AiRunDocumentationService $documentationService,
         private readonly AiRunEstimateService $estimateService,
         private readonly AiSystemPromptResolver $promptResolver,
+        private readonly AiPaywallService $paywall,
     ) {
     }
 
@@ -96,13 +98,19 @@ class AiRunsController extends Controller
             : ($modes[0] ?? AiRunMode::Economy->value);
         $canPurchaseCredits = $this->canPurchaseCredits();
 
-        // ── Analítico de uso do mês corrente (consolidado em /panel/ai/usage) ──
-        $quotaSnap  = $this->quotaService->currentMonthSnapshot($entityId);
+        // ── Franquia (carteira) + analítico de uso do mês corrente ──
+        // O medidor X/Y lê a carteira (mesma fonte da reserva); o consumo do
+        // mês civil abaixo é só relatório.
+        $quotaSnap  = $this->quotaService->snapshot($entityId);
         $now        = Carbon::now();
         $monthStart = $now->copy()->startOfMonth();
         $monthEnd   = $now->copy()->endOfMonth();
 
-        $monthConsumedCredits = $quotaSnap['consumed_credits'];
+        $monthConsumedCredits = (int) AiRun::query()
+            ->where('entity_id', $entityId)
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
+            ->whereIn('status', [AiRunStatus::Approved->value, AiRunStatus::WaitingApproval->value])
+            ->sum('consumed_credits');
 
         $monthRunsTotal = (int) AiRun::query()
             ->where('entity_id', $entityId)
@@ -165,28 +173,26 @@ class AiRunsController extends Controller
                 'created_at'       => $r->created_at?->format('d/m/Y H:i'),
             ])->all();
 
-        $planQuota = $quotaSnap['monthly_quota'];
-
         return Inertia::render('Panel/AI/Index', [
-            'balance'                  => $balance,
-            'creditPackages'           => $canPurchaseCredits ? $this->creditPurchaseService->packages() : [],
-            'recentCreditPurchases'    => $canPurchaseCredits ? $this->creditPurchaseService->recentForEntity($entityId) : [],
-            'creditPurchaseAutoCredit' => (bool) config('ai.credit_purchases.auto_credit_without_gateway', false),
-            'canPurchaseCredits'       => $canPurchaseCredits,
-            'prefill'                  => $prefill,
-            'analytics'                => [
+            'balance'               => $balance,
+            'paywall'               => $this->paywall->describe($entityId),
+            'creditPackages'        => $canPurchaseCredits ? $this->creditPurchaseService->packages() : [],
+            'recentCreditPurchases' => $canPurchaseCredits ? $this->creditPurchaseService->recentForEntity($entityId) : [],
+            'canPurchaseCredits'    => $canPurchaseCredits,
+            // Textos do checkout (pacote pago no próprio sistema — AiCreditPackCheckout.vue).
+            'checkoutT' => $canPurchaseCredits ? trans('checkout') : [],
+            'prefill'   => $prefill,
+            'analytics' => [
                 'period' => [
                     'start' => $monthStart->format('d/m/Y'),
                     'end'   => $monthEnd->format('d/m/Y'),
                     'label' => $monthStart->locale('pt_BR')->isoFormat('MMMM/YYYY'),
                 ],
-                'plan_quota' => $planQuota,
+                'plan_quota' => $quotaSnap['monthly_quota'],
+                'quota'      => $quotaSnap,
                 'consumed'   => [
-                    'credits'       => $monthConsumedCredits,
-                    'runs'          => $monthRunsTotal,
-                    'usage_percent' => $planQuota > 0
-                        ? round(($monthConsumedCredits / $planQuota) * 100, 1)
-                        : null,
+                    'credits' => $monthConsumedCredits,
+                    'runs'    => $monthRunsTotal,
                 ],
                 'by_workflow' => $byWorkflow,
                 'by_mode'     => $byMode,
@@ -562,17 +568,7 @@ class AiRunsController extends Controller
                 return $run->fresh();
             });
         } catch (InsufficientAiCreditsException $e) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'message' => __('ai.insufficient_credits'),
-                    'details' => [
-                        'requested' => $e->requested,
-                        'available' => $e->available,
-                    ],
-                ], 422);
-            }
-
-            return back()->with('error', __('ai.insufficient_credits'));
+            return $this->insufficientCreditsResponse($request, $e, $entityId);
         }
 
         // afterCommit garante que o worker só lê o AiRun depois que a transaction
@@ -999,12 +995,7 @@ class AiRunsController extends Controller
                 return $run->fresh();
             });
         } catch (InsufficientAiCreditsException $e) {
-            return $request->expectsJson()
-                ? response()->json([
-                    'message' => __('ai.insufficient_credits'),
-                    'details' => ['requested' => $e->requested, 'available' => $e->available],
-                ], 422)
-                : back()->with('error', __('ai.insufficient_credits'));
+            return $this->insufficientCreditsResponse($request, $e, $entityId);
         }
 
         RunAiWorkflowJob::dispatch((string) $newRun->id)->afterCommit();
@@ -1202,9 +1193,12 @@ class AiRunsController extends Controller
             ->value('id');
     }
 
+    /** Contato de cobrança (admin, financeiro, dono) — compra pelo checkout. */
     private function canPurchaseCredits(): bool
     {
-        return session('selected_entity_user_rule') === ClientRule::Admin->value;
+        $user = auth()->user();
+
+        return $user !== null && app(SubscriptionNoticeService::class)->canSeeBilling($user, (string) session('selected_entity_id', ''));
     }
 
     /**
@@ -1292,6 +1286,12 @@ class AiRunsController extends Controller
             'credit_purchase_empty'       => __('ai.credit_purchase_empty'),
             'credit_purchase_pending'     => __('ai.credit_purchase_pending'),
             'credit_purchase_unavailable' => __('ai.credit_purchase_unavailable'),
+            'quota_title'                 => __('ai.quota_title'),
+            'quota_credits'               => __('ai.quota_credits'),
+            'quota_renews_on'             => __('ai.quota_renews_on'),
+            'quota_renews_if_paid'        => __('ai.quota_renews_if_paid'),
+            'quota_expires_on'            => __('ai.quota_expires_on'),
+            'quota_spillover'             => __('ai.quota_spillover'),
             'usage_dashboard'             => __('ai.dashboard.title'),
             'workflow'                    => __('ai.workflow'),
             'mode'                        => __('ai.mode'),
@@ -1333,6 +1333,30 @@ class AiRunsController extends Controller
             'status_failed'               => __('ai.status_failed'),
             'status_cancelled'            => __('ai.status_cancelled'),
         ];
+    }
+
+    /**
+     * Saldo insuficiente: 422 com código estável e o paywall (mensagem por
+     * situação + se o usuário pode comprar créditos), para as telas de IA
+     * mostrarem "Comprar créditos" ou "peça ao administrador".
+     */
+    private function insufficientCreditsResponse(Request $request, InsufficientAiCreditsException $e, string $entityId): JsonResponse|RedirectResponse
+    {
+        if (! $request->expectsJson()) {
+            return back()->with('error', __('ai.insufficient_credits'));
+        }
+
+        return response()->json([
+            'message' => __('ai.insufficient_credits'),
+            'code'    => AiPaywallService::CODE,
+            'details' => [
+                'requested' => $e->requested,
+                'available' => $e->available,
+            ],
+            // Com o pedido e o saldo: ainda há créditos, só que menos do que
+            // a execução pede, a mensagem diz quanto falta (não que acabou).
+            'paywall' => $this->paywall->describe($entityId, requested: $e->requested, available: $e->available),
+        ], 422);
     }
 
     private function statusTransitionErrorResponse(Request $request): JsonResponse|RedirectResponse

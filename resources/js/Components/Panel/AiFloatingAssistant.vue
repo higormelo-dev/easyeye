@@ -18,9 +18,16 @@
  *
  * Contexto de paciente/prontuário é SEMPRE opt-in — nunca enviado sem o
  * médico ativar o toggle "Usar contexto desta tela" (ver aiAssistantContext.js).
+ *
+ * Medidor: créditos disponíveis + franquia da janela (lidos da carteira).
+ * Sem créditos (422 ai_insufficient_credits) ou com acesso limitado pela
+ * régua de cobrança (402), a resposta vira o AiPaywallNotice.
  */
 import { ref, reactive, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import { aiAssistantContext } from '@/Support/aiAssistantContext';
+import AiPaywallNotice from '@/Components/Panel/AiPaywallNotice.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
+import { choice } from '@/utils/billingPeriods.js';
 
 const props = defineProps({
     ai: { type: Object, required: true },
@@ -28,6 +35,35 @@ const props = defineProps({
 
 const t = computed(() => props.ai?.t ?? {});
 const tt = (key, fallback = '') => t.value?.[key] ?? fallback;
+
+// ── Medidor (carteira) ───────────────────────────────────────────────────────
+const { date: formatDate, number: formatNumber } = useLocaleFormat();
+const quota = computed(() => props.ai?.quota ?? {});
+// Singular/plural ("1 crédito disponível") e número no idioma ("1.500").
+const availableText = computed(() => {
+    const value = props.ai?.balance?.available ?? quota.value?.available;
+    if (value === undefined || value === null) return '';
+    return choice(tt('credits_available', ':count'), Number(value), { count: formatNumber(value) });
+});
+const quotaText = computed(() => {
+    const total = Number(quota.value?.monthly_quota ?? 0);
+    if (total <= 0) return '';
+    // Renovação só para quem ganha franquia (em atraso, condicionada ao
+    // pagamento); cota que sobrou (ex.: virou cortesia) mostra até quando
+    // vale, sem prometer renovação.
+    const renewsOn = quota.value?.renews_on;
+    const renewsIfPaidOn = quota.value?.renews_if_paid_on;
+    const expiresOn = quota.value?.expires_on;
+    let tpl = tt('quota_status_undated', '');
+    if (renewsOn) tpl = tt('quota_status', '');
+    else if (renewsIfPaidOn) tpl = tt('quota_status_if_paid', '');
+    else if (expiresOn) tpl = tt('quota_status_expiring', '');
+    const date = renewsOn || renewsIfPaidOn || expiresOn;
+    return tpl
+        .replace(':used', formatNumber(quota.value?.consumed_credits ?? 0))
+        .replace(':quota', formatNumber(total))
+        .replace(':date', date ? formatDate(date) : '');
+});
 
 // ── Estado da janela ─────────────────────────────────────────────────────────
 const windowState = ref('closed'); // closed | open | minimized
@@ -220,7 +256,22 @@ function finishWithError(msg, error) {
     msg.pending = false;
     msg.role = 'error';
     const status = error?.response?.status;
-    if (status === 422 && error.response.data?.details) {
+    const data = error?.response?.data ?? {};
+    if (status === 422 && data.code === 'ai_insufficient_credits') {
+        // Sem créditos: o aviso explica a situação e o próximo passo.
+        msg.content = '';
+        msg.showPaywall = true;
+        msg.paywall = data.paywall ?? props.ai?.paywall ?? null;
+        msg.paywallLimited = false;
+        msg.paywallMessage = data.message ?? '';
+    } else if (status === 402 && data.access_level === 'limited') {
+        // Acesso limitado pela régua de cobrança: regularizar o pagamento.
+        msg.content = '';
+        msg.showPaywall = true;
+        msg.paywall = props.ai?.paywall ?? null;
+        msg.paywallLimited = true;
+        msg.paywallMessage = data.message ?? '';
+    } else if (status === 422 && error.response.data?.details) {
         msg.content =
             tt('error_generic', 'Não foi possível obter resposta. Tente novamente.') +
             ` (${error.response.data.message ?? ''})`;
@@ -410,6 +461,14 @@ onBeforeUnmount(cancelPolling);
                     >{{ tt('disclaimer', 'Apoio à decisão — não substitui julgamento clínico.') }}
                 </div>
 
+                <!-- Medidor: créditos disponíveis + franquia da janela (carteira) -->
+                <div v-if="availableText || quotaText" class="ai-chat-meter" data-test="ai-chat-meter">
+                    <i class="fas fa-coins me-1" aria-hidden="true"></i>
+                    <span v-if="availableText">{{ availableText }}</span>
+                    <span v-if="availableText && quotaText"> · </span>
+                    <span v-if="quotaText">{{ quotaText }}</span>
+                </div>
+
                 <!-- Toggle de contexto (só aparece quando a tela atual oferece contexto) -->
                 <div v-if="hasContextAvailable" class="ai-chat-context">
                     <label class="ai-context-toggle">
@@ -450,7 +509,15 @@ onBeforeUnmount(cancelPolling);
                                     <span class="spinner-border spinner-border-sm me-1"></span
                                     >{{ tt('thinking', 'Pensando...') }}
                                 </span>
-                                <span v-else class="ai-msg-content">{{ msg.content }}</span>
+                                <span v-else-if="msg.content" class="ai-msg-content">{{ msg.content }}</span>
+                                <!-- Veio da resposta do envio (422/402): anunciado como alerta. -->
+                                <AiPaywallNotice
+                                    v-if="msg.showPaywall"
+                                    :paywall="msg.paywall"
+                                    :limited="msg.paywallLimited"
+                                    :fallback-message="msg.paywallMessage"
+                                    urgent
+                                />
 
                                 <div
                                     v-if="msg.role === 'assistant' && !msg.pending && msg.medicalRecordId"
@@ -606,6 +673,13 @@ onBeforeUnmount(cancelPolling);
     background: #fff8e1;
     padding: 0.35rem 0.7rem;
     border-bottom: 1px solid #f0e6c8;
+}
+
+.ai-chat-meter {
+    font-size: 0.68rem;
+    color: var(--bs-secondary-color, #6c757d);
+    padding: 0.3rem 0.7rem;
+    border-bottom: 1px solid var(--bs-border-color, #eee);
 }
 
 .ai-chat-context {

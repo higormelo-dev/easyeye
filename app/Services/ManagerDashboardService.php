@@ -43,7 +43,13 @@ class ManagerDashboardService
     public function getSubscriptionKpis(): array
     {
         return Cache::remember('mgr_dashboard.subscription_kpis', self::CACHE_TTL, function () {
+            // Tentativa de contratação recusada pelo gateway não é assinatura.
+            // Cobrança automática do código anterior aguardando conciliação
+            // fica só em "Revisar cobrança" (mesma separação da tela de
+            // Assinaturas): a situação gravada dela não é confiável.
             $byStatus = Subscription::query()
+                ->withoutFailedActivations()
+                ->whereNot(fn ($q) => $q->needingBillingReconciliation())
                 ->select('status', DB::raw('COUNT(*) as total'))
                 ->groupBy('status')
                 ->pluck('total', 'status')
@@ -54,6 +60,16 @@ class ManagerDashboardService
             foreach (SubscriptionStatus::cases() as $status) {
                 $subscriptionCounts[$status->value] = $byStatus[$status->value] ?? 0;
             }
+
+            // Contratação aguardando o 1º pagamento não está "em atraso"
+            // (mesma separação da tela de Assinaturas).
+            $awaiting = Subscription::query()->withoutFailedActivations()->awaitingFirstPayment()
+                ->whereNot(fn ($q) => $q->needingBillingReconciliation())
+                ->count();
+
+            $subscriptionCounts[SubscriptionStatus::PastDue->value] -= $awaiting;
+            $subscriptionCounts['awaiting_payment'] = $awaiting;
+            $subscriptionCounts['needs_review']     = Subscription::query()->withoutFailedActivations()->needingBillingReconciliation()->count();
 
             $mrr = $this->computeMrr();
 
@@ -73,19 +89,30 @@ class ManagerDashboardService
             $now         = Carbon::now();
             $mrr         = $this->computeMrr();
             $activeCount = Subscription::where('status', SubscriptionStatus::Active->value)->count();
+            // ARPU só sobre quem paga: trial, cortesia e contratação que nunca
+            // pagou não entram na receita.
+            $payingCount = Subscription::where('status', SubscriptionStatus::Active->value)->billable()->everPaid()->count();
 
             $arr  = $mrr * 12;
-            $arpu = $activeCount > 0 ? round((float) $mrr / $activeCount, 2) : 0.0;
+            $arpu = $payingCount > 0 ? round((float) $mrr / $payingCount, 2) : 0.0;
 
-            // Receita em risco: assinaturas past_due
+            // Receita em risco: assinaturas past_due que já pagaram antes
+            // (valor do ciclo contratado) — contratação aguardando o 1º
+            // pagamento ainda não é receita; linha do código anterior
+            // aguardando conciliação também não (situação não confiável).
             $revenueAtRisk = Subscription::query()
                 ->where('subscriptions.status', SubscriptionStatus::PastDue->value)
+                ->whereNot(fn ($q) => $q->needingBillingReconciliation())
+                ->billable()
+                ->everPaid()
                 ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')
-                ->sum('plans.price');
+                ->sum(DB::raw('COALESCE(subscriptions.amount, plans.price)'));
 
-            // Churn mensal: cancelamentos no mês corrente
+            // Churn mensal: cancelamentos no mês corrente (tentativa recusada
+            // pelo gateway não é cancelamento — a clínica nunca saiu)
             $cancelledThisMonth = Subscription::query()
                 ->where('status', SubscriptionStatus::Cancelled->value)
+                ->withoutFailedActivations()
                 ->where('cancelled_at', '>=', $now->copy()->startOfMonth())
                 ->count();
 
@@ -137,8 +164,10 @@ class ManagerDashboardService
                         $q->whereNull('subscriptions.ends_at')
                             ->orWhere('subscriptions.ends_at', '>', $startOfMonth);
                     })
+                    ->billable()
+                    ->everPaid()
                     ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')
-                    ->sum('plans.price');
+                    ->sum(DB::raw(Subscription::monthlyAmountSql()));
 
                 $labels[] = $month->translatedFormat('M/y');
                 $values[] = (float) $snapshot;
@@ -355,12 +384,19 @@ class ManagerDashboardService
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /**
+     * Receita mensal recorrente: só a cobrança automática com pagamento já
+     * confirmado (contratação aguardando o 1º pagamento ou com erro não
+     * conta), cada ciclo convertido para o valor mensal (anual ÷ 12).
+     */
     private function computeMrr(): float
     {
         return (float) Subscription::query()
             ->where('subscriptions.status', SubscriptionStatus::Active->value)
+            ->billable()
+            ->everPaid()
             ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')
-            ->sum('plans.price');
+            ->sum(DB::raw(Subscription::monthlyAmountSql()));
     }
 
     private function batchActivationScores(array $entityIds, ActivationService $activationService): array

@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Domains\AI\Services\AiAssistantWidgetPropsBuilder;
 use App\Models\{Entity, Partner};
+use App\Services\Billing\SubscriptionNoticeService;
+use App\Services\SubscriptionService;
 use App\Support\{PanelNavigation, PanelTour};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Storage, Vite};
@@ -16,7 +18,10 @@ class HandleInertiaRequests extends Middleware
 
     public function rootView(Request $request): string
     {
-        if ($request->routeIs('panel.*') || $request->routeIs('manager.*')) {
+        // A tela de acesso bloqueado fica fora de /panel, mas usa o mesmo
+        // AppLayout do painel — no rootView 'app' (só site.scss) ela abria sem
+        // nenhum estilo do painel.
+        if ($request->routeIs('panel.*') || $request->routeIs('manager.*') || $request->routeIs('subscription.expired')) {
             return 'panel-app';
         }
 
@@ -115,6 +120,18 @@ class HandleInertiaRequests extends Middleware
                 )
                 : ['enabled' => false],
 
+            // Aviso da situação da assinatura no topo do painel da clínica
+            // (pagamento pendente/em atraso, acesso limitado, trial
+            // terminando). Só empresa cliente no painel; null no resto. Valor
+            // e link da fatura só para admin, financeiro e dono (LGPD).
+            'subscriptionBanner' => fn () => $request->routeIs('panel.*') && $request->user()
+                && session('selected_entity_is_client') && session('selected_entity_id')
+                ? app(SubscriptionNoticeService::class)->banner(
+                    app(SubscriptionService::class)->currentAccessFor($request, (string) session('selected_entity_id')),
+                    $request->user(),
+                )
+                : null,
+
             // Portal de Parceiros: partner ativo da sessão (compartilhado pelo
             // PortalLayout para mostrar nome/email/code no header).
             'partner' => fn () => $request->routeIs('portal.*')
@@ -141,7 +158,7 @@ class HandleInertiaRequests extends Middleware
         }
 
         $selectedEntityId = session('selected_entity_id');
-        $entity           = Entity::with(['subscription.plan'])->find($selectedEntityId);
+        $entity           = Entity::find($selectedEntityId);
         $photoPath        = 'users/' . $user->id . '.jpg';
 
         $entityUsers = $user->entityUsers()
@@ -171,7 +188,7 @@ class HandleInertiaRequests extends Middleware
                 'id'       => $selectedEntityId,
                 'name'     => $entity?->name ?? config('app.name'),
                 'city'     => $entity?->city ?? '',
-                'plan'     => $entity?->subscription?->plan?->name,
+                'plan'     => $this->planName($request, $entity),
                 'logo_url' => $entity?->logo
                     ? Storage::disk('public')->url($entity->logo)
                     : null,
@@ -189,6 +206,22 @@ class HandleInertiaRequests extends Middleware
                 ? ['original_name' => session('impersonating.original_user_name')]
                 : null,
         ];
+    }
+
+    /**
+     * Plano da empresa no cabeçalho: o da assinatura que dá acesso hoje
+     * (inclui a contratação aguardando o 1º pagamento e o atraso dentro da
+     * régua), a mesma consulta do CheckSubscription. Sem acesso, o da última
+     * assinatura vigente (tela de acesso bloqueado).
+     */
+    private function planName(Request $request, ?Entity $entity): ?string
+    {
+        if (! $entity) {
+            return null;
+        }
+
+        return app(SubscriptionService::class)->currentAccessFor($request, $entity)?->plan?->name
+            ?? $entity->subscription?->plan?->name;
     }
 
     /**

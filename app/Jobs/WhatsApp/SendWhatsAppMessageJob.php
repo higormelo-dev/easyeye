@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\WhatsApp;
 
 use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppSetting};
+use App\Services\Billing\ClinicServiceGate;
 use App\Services\WhatsApp\ZApiClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\{ShouldBeUnique, ShouldQueue};
@@ -46,10 +47,24 @@ class SendWhatsAppMessageJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(ZApiClient $client): void
     {
+        $gate = app(ClinicServiceGate::class);
+
         $message = WhatsAppMessage::find($this->messageId);
 
         if (! $message || $message->status !== WhatsAppMessage::STATUS_PENDING) {
             return; // já enviada/cancelada — nada a fazer
+        }
+
+        // Acesso da clínica bloqueado depois de enfileirar: não envia nem
+        // re-tenta (sem fila infinita) — fica pulada com o motivo, e o
+        // comando a reenfileira quando o acesso voltar.
+        if (! $gate->allowsAutomation($message->entity_id ? (string) $message->entity_id : null)) {
+            $message->update([
+                'status' => WhatsAppMessage::STATUS_SKIPPED,
+                'error'  => ClinicServiceGate::REASON_ACCESS_BLOCKED . ': acesso da clínica bloqueado (assinatura) — envio automático suspenso.',
+            ]);
+
+            return;
         }
 
         $setting = WhatsAppSetting::query()

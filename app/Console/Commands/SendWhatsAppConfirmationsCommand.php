@@ -7,9 +7,11 @@ namespace App\Console\Commands;
 use App\Enums\ScheduleSituation;
 use App\Jobs\WhatsApp\SendWhatsAppMessageJob;
 use App\Models\Schedule;
-use App\Models\WhatsApp\WhatsAppSetting;
+use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppSetting};
+use App\Services\Billing\ClinicServiceGate;
 use App\Services\WhatsApp\WhatsAppService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Enfileira confirmações de consulta via WhatsApp (Z-API) para todas as
@@ -26,7 +28,7 @@ class SendWhatsAppConfirmationsCommand extends Command
 
     protected $description = 'Envia confirmações de consulta via WhatsApp (Z-API) para as clínicas com a integração ativa';
 
-    public function handle(WhatsAppService $service): int
+    public function handle(WhatsAppService $service, ClinicServiceGate $gate): int
     {
         // Clínica envia com credenciais próprias OU pela instância global do
         // SaaS — a linha global (entity_id null) não é uma clínica, sai daqui.
@@ -39,9 +41,24 @@ class SendWhatsAppConfirmationsCommand extends Command
             ->get()
             ->filter(fn (WhatsAppSetting $s) => $s->hasCredentials() || $globalOk);
 
-        $queued = 0;
+        $queued  = 0;
+        $skipped = 0;
 
         foreach ($settings as $setting) {
+            // Acesso da clínica bloqueado (assinatura): nada automático ao
+            // paciente — pulado com o motivo; volta sozinho com o acesso.
+            if (! $gate->allowsAutomation((string) $setting->entity_id)) {
+                $skipped++;
+                $this->line("[pulado] clínica {$setting->entity_id}: acesso bloqueado (assinatura)");
+                Log::info('WhatsApp automático pulado: acesso da clínica bloqueado.', [
+                    'entity_id' => $setting->entity_id,
+                    'kind'      => 'confirmation',
+                    'reason'    => ClinicServiceGate::REASON_ACCESS_BLOCKED,
+                ]);
+
+                continue;
+            }
+
             $hours = max(1, (int) $setting->confirmation_hours_before);
 
             $schedules = Schedule::query()
@@ -51,9 +68,11 @@ class SendWhatsAppConfirmationsCommand extends Command
                 ->where('active', true)
                 ->whereNull('deleted_at')
                 ->whereBetween('date_time', [now(), now()->addHours($hours)])
+                // Pulada antes (acesso bloqueado) volta a ser enviada.
                 ->whereDoesntHave('whatsappMessages', fn ($q) => $q
                     ->where('direction', 'out')
-                    ->where('kind', 'confirmation'))
+                    ->where('kind', 'confirmation')
+                    ->where('status', '!=', WhatsAppMessage::STATUS_SKIPPED))
                 ->with(['entity:id,name', 'doctor.person:id,full_name', 'patient.person:id,cellphone'])
                 ->get();
 
@@ -80,7 +99,7 @@ class SendWhatsAppConfirmationsCommand extends Command
             }
         }
 
-        $this->info("Confirmações enfileiradas: {$queued}");
+        $this->info("Confirmações enfileiradas: {$queued}" . ($skipped ? " · clínicas puladas (acesso bloqueado): {$skipped}" : ''));
 
         return self::SUCCESS;
     }

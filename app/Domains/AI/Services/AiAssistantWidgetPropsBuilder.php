@@ -27,6 +27,7 @@ class AiAssistantWidgetPropsBuilder
         private readonly AiCreditWalletService $wallet,
         private readonly AiQuotaService $quotaService,
         private readonly AiProviderSettings $providerSettings,
+        private readonly AiPaywallService $paywall,
     ) {
     }
 
@@ -59,7 +60,8 @@ class AiAssistantWidgetPropsBuilder
         return [
             'enabled'  => true,
             'balance'  => $this->wallet->balance($entityId),
-            'quota'    => $this->quotaService->currentMonthSnapshot($entityId),
+            'quota'    => $this->quotaService->snapshot($entityId),
+            'paywall'  => $this->paywall->describe($entityId, $userRule),
             'workflow' => 'assistant_chat',
             'mode'     => $mode,
             'urls'     => [

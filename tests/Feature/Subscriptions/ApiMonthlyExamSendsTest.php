@@ -7,7 +7,6 @@ use App\Services\{FeatureGateService, SubscriptionService};
 
 beforeEach(function () {
     SubscriptionSetting::setValue('trial_days', 7);
-    SubscriptionSetting::setValue('grace_period_days', 3);
 
     $this->entity = Entity::factory()->create(['is_client' => true, 'active' => true]);
     $this->plan   = Plan::factory()->create(['active' => true]);

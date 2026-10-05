@@ -29,7 +29,8 @@ const { number } = useLocaleFormat();
 </script>
 
 <template>
-    <div class="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom">
+    <!-- flex-wrap: no celular as ações descem de linha em vez de estourar a largura -->
+    <div class="d-flex flex-wrap align-items-center gap-2 pb-3 mb-3 border-bottom">
         <!-- Título + subtitle + total -->
         <div class="d-flex align-items-center gap-2 me-auto">
             <h4 class="mb-0 fw-bold">{{ title }}</h4>

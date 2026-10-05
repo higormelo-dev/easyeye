@@ -3,7 +3,7 @@
 use App\Domains\AI\Models\{AiCreditLedgerEntry, AiCreditWallet};
 use App\Domains\AI\Services\AiCreditWalletService;
 use App\Enums\AI\AiLedgerEntryType;
-use App\Enums\{FeatureKey, SubscriptionStatus};
+use App\Enums\{FeatureKey, SubscriptionBillingMode, SubscriptionStatus};
 use App\Models\{Entity, Plan, PlanFeature, Subscription};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -56,9 +56,13 @@ test('grantForSubscription cria cota mensal (não balance comprado)', function (
     expect($entries)->toHaveCount(1);
     expect($entries->first()->amount)->toBe(80);
     expect($entries->first()->subscription_id)->toBe($subscription->id);
-    expect($entries->first()->metadata['source'])->toBe('subscription_cycle');
+    expect($entries->first()->metadata['source'])->toBe('subscription_window');
     expect($entries->first()->metadata['plan_id'])->toBe($plan->id);
     expect($entries->first()->metadata['kind'])->toBe('monthly_quota');
+    // Janela de 1 mês a partir do dia da ativação (não o ends_at da assinatura).
+    expect($entries->first()->metadata['window_start'])->toBe(today()->toDateString());
+    expect($entries->first()->metadata['window_end'])->toBe(today()->addMonthNoOverflow()->toDateString());
+    expect($wallet->quota_period_ends_at->toDateTimeString())->toBe(today()->addMonthNoOverflow()->toDateTimeString());
 });
 
 test('grantForSubscription não cria entry quando AiMonthlyCredits = 0', function () {
@@ -77,7 +81,7 @@ test('grantForSubscription não cria entry quando AiMonthlyCredits = 0', functio
     expect($entries)->toBe(0);
 });
 
-test('grantForSubscription é idempotente para o mesmo ciclo (ends_at)', function () {
+test('grantForSubscription é idempotente para a mesma janela', function () {
     $plan         = makePlanWithAiCredits(50);
     $subscription = makeActiveSubscription($plan);
     $service      = app(AiCreditWalletService::class);
@@ -98,27 +102,29 @@ test('grantForSubscription é idempotente para o mesmo ciclo (ends_at)', functio
     expect($count)->toBe(1);
 });
 
-test('renovação avança ends_at e dispara novo grant (reseta cota)', function () {
+test('ends_at avançando (renovação/Adicionar período) não reinicia a cota da janela', function () {
     $plan         = makePlanWithAiCredits(40);
     $subscription = makeActiveSubscription($plan);
 
-    // Renova movendo ends_at para frente — observer deve disparar novo grant.
+    app(AiCreditWalletService::class)->reserve($subscription->entity_id, 25);
+
     $subscription->update([
         'ends_at' => $subscription->ends_at->copy()->addMonth(),
     ]);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $subscription->entity_id)->firstOrFail();
 
-    // Cota é RESETADA (não acumula) — novo ciclo substitui o anterior.
+    // A janela atual já foi concedida: nada de cota nova nem consumo zerado.
     expect($wallet->monthly_quota)->toBe(40);
-    expect($wallet->monthly_quota_lifetime_granted)->toBe(80); // 2 ciclos × 40
+    expect($wallet->monthly_quota_used)->toBe(25);
+    expect($wallet->monthly_quota_lifetime_granted)->toBe(40);
 
     $grantCount = AiCreditLedgerEntry::query()
         ->where('entity_id', $subscription->entity_id)
         ->where('type', AiLedgerEntryType::Grant->value)
         ->count();
 
-    expect($grantCount)->toBe(2); // 1 entry por ciclo
+    expect($grantCount)->toBe(1);
 });
 
 test('updates que apenas mudam status mas mantém ends_at não duplicam grant', function () {
@@ -152,7 +158,7 @@ test('subscription criada em trial não dispara grant', function () {
     expect($grants)->toBe(0);
 });
 
-test('conversão de trial para Active dispara grant uma única vez', function () {
+test('conversão de trial para cobrança automática paga dispara grant uma única vez', function () {
     $plan   = makePlanWithAiCredits(25);
     $entity = Entity::factory()->create(['is_client' => false]);
 
@@ -162,9 +168,11 @@ test('conversão de trial para Active dispara grant uma única vez', function ()
     ]);
 
     $subscription->update([
-        'status'  => SubscriptionStatus::Active,
-        'ends_at' => now()->addMonth()->startOfDay(),
+        'status'       => SubscriptionStatus::Active,
+        'billing_mode' => SubscriptionBillingMode::Gateway,
+        'ends_at'      => now()->addMonth()->startOfDay(),
     ]);
+    $subscription->update(['ends_at' => now()->addMonths(2)->startOfDay()]);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $entity->id)->firstOrFail();
     expect($wallet->balance)->toBe(0);          // cota não vai para balance comprado
@@ -174,4 +182,25 @@ test('conversão de trial para Active dispara grant uma única vez', function ()
         ->where('entity_id', $entity->id)
         ->where('type', AiLedgerEntryType::Grant->value)
         ->count())->toBe(1);
+});
+
+test('trial ativado sem cobrança automática (cortesia) não recebe franquia', function () {
+    $plan   = makePlanWithAiCredits(25);
+    $entity = Entity::factory()->create(['is_client' => false]);
+
+    $subscription = Subscription::factory()->trial()->create([
+        'entity_id' => $entity->id,
+        'plan_id'   => $plan->id,
+    ]);
+
+    $subscription->update([
+        'status'       => SubscriptionStatus::Active,
+        'billing_mode' => SubscriptionBillingMode::Complimentary,
+        'ends_at'      => now()->addMonths(3),
+    ]);
+
+    expect(AiCreditLedgerEntry::query()
+        ->where('entity_id', $entity->id)
+        ->where('type', AiLedgerEntryType::Grant->value)
+        ->count())->toBe(0);
 });

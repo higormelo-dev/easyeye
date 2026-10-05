@@ -6,6 +6,8 @@ use App\Contracts\Billing\PaymentGatewayInterface;
 use App\DTOs\Billing\{
     CancelSubscriptionDTO,
     CancelSubscriptionResultDTO,
+    CardChargeDTO,
+    CardCheckoutConfigDTO,
     CreateChargeDTO,
     CreateChargeResultDTO,
     CreateSubscriptionDTO,
@@ -15,18 +17,23 @@ use App\DTOs\Billing\{
     GatewayHealthDTO,
     GatewayWebhookInputDTO,
     NormalizedWebhookEventDTO,
+    PaymentInstructionsDTO,
+    SaveCardResultDTO,
+    SavedCardDTO,
 };
 use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Services\Billing\GatewayCredentialResolver;
+use App\Support\Billing\{PayloadSanitizer, PaymentUrl};
 use Illuminate\Http\Client\{ConnectionException, Response};
 use Illuminate\Support\{Arr, Str};
 use Illuminate\Support\Facades\Http;
 
 abstract class AbstractHttpGateway implements PaymentGatewayInterface
 {
-    private ?string $correlationId = null;
+    protected ?string $correlationId = null;
 
-    private ?string $entityId = null;
+    /** Escopo das credenciais: null = SaaS (global); uuid = gateway próprio da clínica. */
+    private ?string $credentialEntityId = null;
 
     public function __construct(
         protected readonly GatewayCredentialResolver $credentialResolver,
@@ -39,7 +46,9 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
     {
         $clone                = clone $this;
         $clone->correlationId = $context->correlationId;
-        $clone->entityId      = $context->entityId;
+        // Assinatura do EasyEye cobra com a credencial do SaaS; só a cobrança
+        // feita pela própria clínica usa a credencial dela.
+        $clone->credentialEntityId = $context->useTenantCredentials ? $context->entityId : null;
 
         return $clone;
     }
@@ -75,6 +84,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
                 status: null,
                 rawResponse: $response->json() ?? [],
                 errorMessage: mb_substr($response->body(), 0, 1000),
+                httpStatus: $response->status(),
             );
         }
 
@@ -87,6 +97,12 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
             status: $this->normalizeStatus($this->extractString($json, ['status', 'data.status'])),
             rawResponse: $json ?? [],
         );
+    }
+
+    /** Padrão: a ativação cria a 1ª cobrança à parte (createCharge). */
+    public function subscriptionIssuesFirstCharge(): bool
+    {
+        return false;
     }
 
     public function cancelSubscription(CancelSubscriptionDTO $payload): CancelSubscriptionResultDTO
@@ -158,6 +174,12 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         return $this->sanitizePayload($response->json() ?? []);
     }
 
+    /** Padrão: sem cancelamento de cobrança pela API (ver PaymentGatewayInterface). */
+    public function cancelCharge(string $externalPaymentId): bool
+    {
+        return false;
+    }
+
     /**
      * Cada gateway DEVE sobrescrever este método com o parser específico.
      * O base implementa um parser genérico que provavelmente não funcionará
@@ -189,6 +211,37 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
             rawPayload: $payload->payload,
             occurredAt: now()->toIso8601String(),
         );
+    }
+
+    /**
+     * Padrão: o id do evento que o gateway manda no corpo (Asaas evt_…,
+     * Stripe evt_…, notificação do Mercado Pago, hook do Pagar.me). Gateway
+     * cuja notificação só traz o id do recurso (o mesmo em todas as
+     * notificações dele) sobrescreve e compõe com o status.
+     */
+    public function webhookEventKey(array $payload): ?string
+    {
+        return $this->extractString($payload, ['id', 'event_id', 'data.id', 'resource.id']);
+    }
+
+    /**
+     * Junta as partes que identificam uma notificação (posições fixas, parte
+     * ausente vazia). Sem nenhuma parte, null. Acima do tamanho da coluna,
+     * o hash das partes.
+     *
+     * @param list<mixed> $parts
+     */
+    protected function composeWebhookEventKey(array $parts): ?string
+    {
+        $parts = array_map(fn ($part) => is_scalar($part) ? trim((string) $part) : '', $parts);
+
+        if (implode('', $parts) === '') {
+            return null;
+        }
+
+        $key = implode('|', $parts);
+
+        return strlen($key) <= 255 ? $key : hash('sha256', $key);
     }
 
     /**
@@ -237,6 +290,135 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         );
     }
 
+    // ── Checkout transparente — padrão: não suporta (só o link) ─────────────
+
+    public function transparentMethods(): array
+    {
+        return [];
+    }
+
+    /**
+     * Cartão transparente só com a chave pública do SDK JS configurada (sem
+     * ela o formulário não tokeniza): o checkout cai no link do gateway
+     * (supportsCardLink) ou recusa o cartão com mensagem clara.
+     */
+    public function supportsTransparent(string $method): bool
+    {
+        if (! in_array($method, $this->transparentMethods(), true)) {
+            return false;
+        }
+
+        return $method !== 'credit_card' || $this->hasCardPublicKey();
+    }
+
+    /** Cobra no servidor um cartão já guardado (renovação) — não depende da chave pública. */
+    public function chargesSavedCards(): bool
+    {
+        return in_array('credit_card', $this->transparentMethods(), true);
+    }
+
+    /** Troca do cartão da renovação sem cobrar (saveCard) — só com o cartão transparente. */
+    public function supportsCardReplacement(): bool
+    {
+        return $this->supportsTransparent('credit_card');
+    }
+
+    /** A cobrança avulsa sem forma definida abre uma página do gateway que aceita cartão. */
+    public function supportsCardLink(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Parcelas na cobrança da renovação no cartão salvo (iniciada pelo
+     * lojista). Padrão: não — Pagar.me exige 1 parcela em recorrência e
+     * Mercado Pago/PagBank só documentam 1 (ver RenewSubscriptionJob).
+     */
+    public function supportsRenewalInstallments(): bool
+    {
+        return false;
+    }
+
+    /** Padrão: cartão novo recomeça a cadeia (sem referência do anterior). */
+    public function cardReferencesAfterReplacement(array $references): array
+    {
+        return [];
+    }
+
+    protected function hasCardPublicKey(): bool
+    {
+        return $this->publicKey() !== null;
+    }
+
+    public function paymentInstructions(string $method, string $externalPaymentId, array $chargePayload = []): ?PaymentInstructionsDTO
+    {
+        return null;
+    }
+
+    public function cardCheckoutConfig(): ?CardCheckoutConfigDTO
+    {
+        return null;
+    }
+
+    public function chargeCard(CardChargeDTO $payload): CreateChargeResultDTO
+    {
+        return new CreateChargeResultDTO(
+            success: false,
+            externalPaymentId: null,
+            status: null,
+            amount: null,
+            rawResponse: [],
+            errorCode: 'unsupported',
+            errorMessage: "[{$this->code()}] Cartão sem checkout transparente neste gateway.",
+        );
+    }
+
+    public function saveCard(string $customerId, string $cardToken, CustomerDTO $payer): SaveCardResultDTO
+    {
+        return new SaveCardResultDTO(success: false, errorMessage: "[{$this->code()}] Gateway sem cartão salvo pela API.");
+    }
+
+    /**
+     * Resultado de cobrança no cartão a partir da resposta do gateway (status
+     * já normalizado). Recusa vem com success=true e status failed — mesmo
+     * contrato do createCharge (ver PaymentStatus::isUnusable).
+     */
+    protected function cardResult(Response $response, ?string $externalId, ?string $status, ?float $amount, ?array $json = null, ?SavedCardDTO $savedCard = null, ?array $nextAction = null, ?string $declineMessage = null): CreateChargeResultDTO
+    {
+        return new CreateChargeResultDTO(
+            success: true,
+            externalPaymentId: $externalId,
+            status: $status,
+            amount: $amount,
+            rawResponse: $this->sanitizePayload($json ?? ($response->json() ?? [])),
+            errorMessage: $declineMessage,
+            savedCard: $savedCard,
+            nextAction: $nextAction,
+        );
+    }
+
+    /** Falha HTTP numa chamada de cartão (4xx/5xx). */
+    protected function cardFailure(Response $response, string $message): CreateChargeResultDTO
+    {
+        return new CreateChargeResultDTO(
+            success: false,
+            externalPaymentId: null,
+            status: null,
+            amount: null,
+            rawResponse: $this->sanitizePayload($response->json() ?? []),
+            errorCode: (string) $response->status(),
+            errorMessage: mb_substr($message, 0, 1000),
+        );
+    }
+
+    /** Chave pública: credencial do manager (credentials.public_key) ou config. */
+    protected function publicKey(): ?string
+    {
+        $key = $this->resolveExtraCredential('public_key');
+
+        return is_string($key) && trim($key) !== '' ? trim($key) : null;
+    }
+
     // ── Métodos sobrescrevíveis pelos gateways concretos ────────────────────
 
     protected function cancelMethod(): string
@@ -258,7 +440,13 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
 
     /**
      * Mapa de tipos de evento nativos do gateway para tipos normalizados internos.
-     * Tipos normalizados: paid | failed | cancelled | refunded | chargeback | authorized | unknown.
+     * Tipos normalizados (ver ProcessWebhookEventService):
+     *  - paid | authorized: cobrança paga;
+     *  - failed | overdue: cobrança recusada ou vencida sem pagamento;
+     *  - created: cobrança emitida/alterada (guarda link e vencimento);
+     *  - payment_cancelled: só a cobrança foi cancelada/apagada;
+     *  - cancelled: a assinatura (recorrência) foi encerrada no gateway;
+     *  - refunded | chargeback | unknown.
      */
     protected function eventTypeMap(): array
     {
@@ -368,19 +556,19 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
 
     protected function resolveSecret(): ?string
     {
-        return $this->credentialResolver->resolveSecret($this->code(), $this->entityId)
+        return $this->credentialResolver->resolveSecret($this->code(), $this->credentialEntityId)
             ?: ((string) $this->gatewayConfig('secret') ?: null);
     }
 
     protected function resolveWebhookSecret(): ?string
     {
-        return $this->credentialResolver->resolveWebhookSecret($this->code(), $this->entityId)
+        return $this->credentialResolver->resolveWebhookSecret($this->code(), $this->credentialEntityId)
             ?: ((string) $this->gatewayConfig('webhook_secret') ?: null);
     }
 
     protected function resolveExtraCredential(string $key): ?string
     {
-        return $this->credentialResolver->resolveExtra($this->code(), $key, $this->entityId)
+        return $this->credentialResolver->resolveExtra($this->code(), $key, $this->credentialEntityId)
             ?: ((string) $this->gatewayConfig($key) ?: null);
     }
 
@@ -422,6 +610,29 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         return null;
     }
 
+    /**
+     * Primeiro link de pagamento http(s) nos caminhos dados. Outro esquema
+     * (javascript:, data:…) nunca passa: o link vira href no painel e no
+     * e-mail.
+     */
+    protected function extractPaymentUrl(array $payload, array $paths): ?string
+    {
+        foreach ($paths as $path) {
+            $url = $this->httpUrl(Arr::get($payload, $path));
+
+            if ($url !== null) {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    protected function httpUrl(mixed $value): ?string
+    {
+        return PaymentUrl::safe($value);
+    }
+
     protected function extractFloat(array $payload, array $paths): ?float
     {
         foreach ($paths as $path) {
@@ -445,8 +656,8 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
     }
 
     /**
-     * Converte um tipo de evento nativo do gateway para o tipo normalizado interno.
-     * Tipos: paid | failed | cancelled | refunded | chargeback | authorized | unknown.
+     * Converte um tipo de evento nativo do gateway para o tipo normalizado
+     * interno (ver eventTypeMap()).
      */
     protected function normalizeEventType(string $rawType): string
     {
@@ -462,18 +673,11 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
     }
 
     /**
-     * Remove campos sensíveis de payloads antes de persistir.
+     * Remove dados do portador do cartão (nome, CPF/CNPJ, BIN, validade) e
+     * segredos antes de persistir — subárvores inteiras (PayloadSanitizer).
      */
     protected function sanitizePayload(array $payload): array
     {
-        $sensitiveKeys = ['card_number', 'cvv', 'card_cvv', 'card_token', 'password', 'secret', 'access_token'];
-
-        array_walk_recursive($payload, function (&$value, $key) use ($sensitiveKeys): void {
-            if (in_array(strtolower((string) $key), $sensitiveKeys, true)) {
-                $value = '***REDACTED***';
-            }
-        });
-
-        return $payload;
+        return PayloadSanitizer::clean($payload);
     }
 }

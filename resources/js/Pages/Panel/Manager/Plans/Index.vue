@@ -3,11 +3,14 @@ import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import ManagerBillingNav from '@/Components/Panel/ManagerBillingNav.vue';
 import SearchInput from '@/Components/Panel/SearchInput.vue';
 import PlanTable from './PlanTable.vue';
 import PlanCards from './PlanCards.vue';
 import PlanFormModal from './PlanFormModal.vue';
 import PlanDetailDrawer from './PlanDetailDrawer.vue';
+import TrialSettingsCard from './TrialSettingsCard.vue';
+import CheckoutSettingsCard from './CheckoutSettingsCard.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
@@ -17,6 +20,9 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     features: { type: Array, default: () => [] },
     billingCycles: { type: Array, default: () => [] },
+    trialDays: { type: Number, default: 7 },
+    // Teto de parcelas sem juros do checkout (cartão, ciclo anual).
+    checkoutMaxInstallments: { type: Number, default: 12 },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -136,6 +142,9 @@ const breadcrumbs = [
                 </template>
             </PageHeader>
 
+            <!-- ── Planos ↔ Assinaturas ─────────────────────────────────── -->
+            <ManagerBillingNav active="plans" :labels="t" />
+
             <!-- ── Search ───────────────────────────────────────────────── -->
             <SearchInput v-model="search" :placeholder="t.search_placeholder" max-width="320px" />
 
@@ -161,6 +170,12 @@ const breadcrumbs = [
                 @delete="onDelete"
                 @toggle-active="onToggleActive"
             />
+
+            <!-- ── Trial de empresas novas (sem dias de graça) ──────────── -->
+            <TrialSettingsCard :trial-days="trialDays" :t="t" />
+
+            <!-- ── Checkout: parcelas sem juros no anual ──────────────────── -->
+            <CheckoutSettingsCard :max-installments="checkoutMaxInstallments" :t="t" />
         </div>
 
         <!-- Form offcanvas -->

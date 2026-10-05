@@ -2,7 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Enums\{ActivationStep, FeatureKey, ScheduleSituation, SubscriptionStatus};
+use App\Enums\{ActivationStep, BillingCycle, FeatureKey, ScheduleSituation, SubscriptionBillingMode, SubscriptionStatus};
+use App\Enums\Billing\SubscriptionCancelledReason;
 use App\Models\{Covenant,
     Doctor,
     Entity,
@@ -104,12 +105,15 @@ class DataFakersSeeder extends Seeder
             array_fill(0, 5, $planPremium?->id),
         );
 
-        // Distribuição de status de assinatura: 60% Active, 20% Trial, 10% PastDue, 10% Expired
+        // Cenários de assinatura coerentes com as regras de cobrança (para o
+        // ambiente de teste mostrar avisos e régua): pagante em dia, cortesia,
+        // trial, pagante em atraso D+1 (aviso), em atraso D+4 (acesso
+        // limitado), contratação aguardando o 1º pagamento e cortesia vencida.
         $statusDistribution = array_merge(
-            array_fill(0, 6, SubscriptionStatus::Active),
-            array_fill(0, 2, SubscriptionStatus::Trial),
-            array_fill(0, 1, SubscriptionStatus::PastDue),
-            array_fill(0, 1, SubscriptionStatus::Expired),
+            array_fill(0, 4, 'gateway_paid'),
+            array_fill(0, 2, 'complimentary'),
+            array_fill(0, 2, 'trial'),
+            ['gateway_overdue', 'gateway_limited', 'awaiting_first_payment', 'expired'],
         );
 
         // Funções dos usuários comuns: maioria 'user', alguns 'secretary' e 'financial'
@@ -132,7 +136,7 @@ class DataFakersSeeder extends Seeder
 
         // ── Configurar cada Entity: admin, assinatura, integradores e TVs ───
         $this->command->info('⏳ Configurando Entities (assinaturas, integradores, TVs)...');
-        $entities->each(function ($entity) use ($planDistribution, $statusDistribution) {
+        $entities->values()->each(function ($entity, int $index) use ($planDistribution, $statusDistribution) {
             // Promover um usuário aleatório a admin (quando há 2+ usuários)
             $userCount = EntityUser::query()->where('entity_id', $entity->id)->count();
 
@@ -169,45 +173,13 @@ class DataFakersSeeder extends Seeder
                 }
             }
 
-            // Assinatura com status variado
+            // Assinatura: os cenários se revezam entre as empresas (todos
+            // aparecem a partir de 12 empresas); plano sorteado.
             $planId = $planDistribution[array_rand($planDistribution)];
-            $status = $statusDistribution[array_rand($statusDistribution)];
+            $status = $statusDistribution[$index % count($statusDistribution)];
 
             if ($planId) {
-                $subscriptionData = match ($status) {
-                    SubscriptionStatus::Trial => [
-                        'entity_id'     => $entity->id,
-                        'plan_id'       => $planId,
-                        'status'        => SubscriptionStatus::Trial,
-                        'trial_ends_at' => now()->addDays(fake()->numberBetween(1, 7)),
-                        'starts_at'     => now(),
-                        'ends_at'       => null,
-                    ],
-                    SubscriptionStatus::PastDue => [
-                        'entity_id'            => $entity->id,
-                        'plan_id'              => $planId,
-                        'status'               => SubscriptionStatus::PastDue,
-                        'starts_at'            => now()->subMonths(3),
-                        'ends_at'              => now()->subDays(fake()->numberBetween(1, 3)),
-                        'grace_period_ends_at' => now()->addDays(fake()->numberBetween(1, 3)),
-                    ],
-                    SubscriptionStatus::Expired => [
-                        'entity_id' => $entity->id,
-                        'plan_id'   => $planId,
-                        'status'    => SubscriptionStatus::Expired,
-                        'starts_at' => now()->subYear(),
-                        'ends_at'   => now()->subMonths(fake()->numberBetween(1, 6)),
-                    ],
-                    default => [ // Active
-                        'entity_id' => $entity->id,
-                        'plan_id'   => $planId,
-                        'status'    => SubscriptionStatus::Active,
-                        'starts_at' => now()->subMonth(),
-                        'ends_at'   => now()->addYear(),
-                    ],
-                };
-
-                Subscription::create($subscriptionData);
+                $this->seedSubscription($entity, Plan::query()->find($planId), $status);
             }
 
             // Integradores: 2-5 usuários, cada um com 2-8 equipamentos lógicos e 1-3 físicos
@@ -630,6 +602,101 @@ class DataFakersSeeder extends Seeder
      * Criar schedules cobrindo 1 mês passado e 3 meses futuros (segunda a domingo).
      * Situações realistas: passados → Attended/NoShow/Cancelled; futuros → Scheduled/Cancelled.
      */
+    /**
+     * Assinatura fake de um cenário, no lugar do trial automático da empresa
+     * (como faz a contratação de verdade). Nunca um estado impossível (ex.:
+     * cortesia "em atraso"): em atraso é sempre cobrança automática que já
+     * foi paga antes.
+     */
+    private function seedSubscription(Entity $entity, ?Plan $plan, string $scenario): void
+    {
+        if (! $plan) {
+            return;
+        }
+
+        Subscription::query()
+            ->forEntity((string) $entity->id)
+            ->inForce()
+            ->each(fn (Subscription $old) => $old->update([
+                'status'           => SubscriptionStatus::Cancelled,
+                'cancelled_at'     => now(),
+                'cancelled_reason' => SubscriptionCancelledReason::Replaced->value,
+            ]));
+
+        $amount  = $plan->priceFor(BillingCycle::Monthly) ?? (float) $plan->price;
+        $gateway = [
+            'billing_mode'            => SubscriptionBillingMode::Gateway,
+            'billing_cycle'           => BillingCycle::Monthly,
+            'amount'                  => $amount,
+            'gateway'                 => 'asaas',
+            'pinned_gateway'          => 'asaas',
+            'gateway_customer_id'     => 'cus_fake_' . Str::lower(Str::random(10)),
+            'gateway_subscription_id' => 'sub_fake_' . Str::lower(Str::random(10)),
+        ];
+
+        $overdueSince = fn (int $days) => [
+            ...$gateway,
+            'status'          => SubscriptionStatus::PastDue,
+            'billing_state'   => 'past_due',
+            'starts_at'       => now()->subMonths(3),
+            'last_payment_at' => now()->subDays($days)->subMonth(),
+            'ends_at'         => now()->subDays($days)->endOfDay(),
+            'next_billing_at' => now()->subDays($days)->endOfDay(),
+            'past_due_at'     => now()->subDays($days)->endOfDay(),
+        ];
+
+        $paidDaysAgo = fake()->numberBetween(1, 25);
+
+        Subscription::create([
+            'entity_id' => $entity->id,
+            'plan_id'   => $plan->id,
+            ...match ($scenario) {
+                'trial' => [
+                    'status'        => SubscriptionStatus::Trial,
+                    'billing_mode'  => null,
+                    'trial_ends_at' => now()->addDays(fake()->numberBetween(1, 7)),
+                    'starts_at'     => now(),
+                    'ends_at'       => null,
+                ],
+                'complimentary' => [
+                    'status'       => SubscriptionStatus::Active,
+                    'billing_mode' => SubscriptionBillingMode::Complimentary,
+                    'starts_at'    => now()->subMonth(),
+                    'ends_at'      => now()->addMonths(3)->endOfDay(),
+                ],
+                'expired' => [
+                    'status'       => SubscriptionStatus::Expired,
+                    'billing_mode' => SubscriptionBillingMode::Complimentary,
+                    'starts_at'    => now()->subYear(),
+                    'ends_at'      => now()->subMonths(fake()->numberBetween(1, 6)),
+                ],
+                // Em atraso há 1 dia: acesso total com aviso e link.
+                'gateway_overdue' => $overdueSince(1),
+                // Em atraso há 4 dias: acesso limitado (IA e financeiro bloqueados).
+                'gateway_limited' => $overdueSince(4),
+                // Contratação por boleto/Pix: acesso até o fim do dia do 1º vencimento.
+                'awaiting_first_payment' => [
+                    ...$gateway,
+                    'status'          => SubscriptionStatus::PastDue,
+                    'billing_state'   => 'pending_activation',
+                    'starts_at'       => now(),
+                    'ends_at'         => now()->addDays(2)->endOfDay(),
+                    'next_billing_at' => now()->addDays(2)->endOfDay(),
+                ],
+                // Pagante em dia (cobrança automática paga no ciclo atual).
+                default => [
+                    ...$gateway,
+                    'status'          => SubscriptionStatus::Active,
+                    'billing_state'   => 'paid',
+                    'starts_at'       => now()->subMonths(2),
+                    'last_payment_at' => now()->subDays($paidDaysAgo),
+                    'ends_at'         => now()->subDays($paidDaysAgo)->addMonth()->endOfDay(),
+                    'next_billing_at' => now()->subDays($paidDaysAgo)->addMonth()->endOfDay(),
+                ],
+            },
+        ]);
+    }
+
     private function createSchedules(): void
     {
         $doctors        = Doctor::query()->select('id', 'entity_user_id')->get();

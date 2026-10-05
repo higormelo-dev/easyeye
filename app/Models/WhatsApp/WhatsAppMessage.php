@@ -37,6 +37,13 @@ class WhatsAppMessage extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    /**
+     * Envio automático pulado (ex.: acesso da clínica bloqueado —
+     * ClinicServiceGate), com o motivo em `error`. Não conta como enviada:
+     * o comando volta a enfileirar a mesma linha quando o acesso volta.
+     */
+    public const STATUS_SKIPPED = 'skipped';
+
     public const STATUS_RECEIVED = 'received';
 
     protected $table = 'whatsapp_messages';

@@ -2,6 +2,7 @@
 
 use App\Exceptions\Billing\GatewayUnauthorizedException;
 use App\Jobs\Billing\ProcessBillingWebhookJob;
+use App\Models\Billing\WebhookEvent;
 use App\Services\Billing\WebhookIngestionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -59,7 +60,8 @@ test('webhook is rejected when no webhook_secret is configured for the gateway',
 
     $response = $this->postJson('/api/billing/webhooks/asaas', $payload);
 
-    $response->assertStatus(500);
+    // Recusa de autenticação é 401, não erro do servidor.
+    $response->assertStatus(401);
     $this->assertDatabaseCount('webhook_events', 0);
 });
 
@@ -79,4 +81,38 @@ test('webhook is rejected when webhook_secret is configured but the signature is
         ->toThrow(GatewayUnauthorizedException::class);
 
     $this->assertDatabaseCount('webhook_events', 0);
+});
+
+test('webhook com token errado responde 401 pela rota (não 500)', function () {
+    config(['billing.gateways.asaas.webhook_secret' => 'segredo-teste-com-mais-de-32-caracteres']);
+
+    $this->withHeaders(['asaas-access-token' => 'token-errado'])
+        ->postJson('/api/billing/webhooks/asaas', ['id' => 'evt_bad_token', 'event' => 'PAYMENT_RECEIVED'])
+        ->assertStatus(401)
+        ->assertJson(['ok' => false]);
+
+    $this->assertDatabaseCount('webhook_events', 0);
+});
+
+test('credenciais do webhook (Authorization do Pagar.me, token do Asaas) não são gravadas nos headers do evento', function () {
+    config([
+        'billing.gateways.asaas.webhook_secret'   => 'segredo-teste-com-mais-de-32-caracteres',
+        'billing.gateways.pagarme.webhook_secret' => 'easyeye:s3nh4-forte',
+    ]);
+
+    $asaas = $this->withHeaders(['asaas-access-token' => 'segredo-teste-com-mais-de-32-caracteres', 'x-request-id' => 'req-asaas-1'])
+        ->postJson('/api/billing/webhooks/asaas', ['id' => 'evt_headers_001', 'event' => 'PAYMENT_CREATED'])
+        ->assertOk();
+
+    $pagarme = $this->withHeaders(['Authorization' => 'Basic ' . base64_encode('easyeye:s3nh4-forte')])
+        ->postJson('/api/billing/webhooks/pagarme', ['id' => 'hook_headers_001', 'type' => 'charge.created', 'data' => ['id' => 'ch_headers_001', 'status' => 'pending']])
+        ->assertOk();
+
+    $asaasHeaders   = array_change_key_case(WebhookEvent::query()->findOrFail($asaas->json('event_id'))->headers);
+    $pagarmeHeaders = array_change_key_case(WebhookEvent::query()->findOrFail($pagarme->json('event_id'))->headers);
+
+    expect($asaasHeaders)->not->toHaveKey('asaas-access-token')
+        ->and($asaasHeaders)->toHaveKey('x-request-id')
+        ->and($pagarmeHeaders)->not->toHaveKey('authorization')
+        ->and(json_encode($pagarmeHeaders))->not->toContain(base64_encode('easyeye:s3nh4-forte'));
 });

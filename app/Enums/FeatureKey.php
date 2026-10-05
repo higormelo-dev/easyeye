@@ -76,6 +76,22 @@ enum FeatureKey: string
         return ! $this->isBoolean();
     }
 
+    /**
+     * Recurso de IA — fica indisponível quando o acesso está limitado pela
+     * régua de cobrança (cliente pagante em atraso).
+     */
+    public function isAi(): bool
+    {
+        return in_array($this, [
+            self::HasAiExamAssistant,
+            self::HasAiReportDrafting,
+            self::HasAiConsensus,
+            self::HasAiEyeImageAnalysis,
+            self::HasAiChatAssistant,
+            self::AiMonthlyCredits,
+        ], true);
+    }
+
     /** True = limite deve ser redefinido mensalmente (créditos IA). */
     public function isMonthlyReset(): bool
     {

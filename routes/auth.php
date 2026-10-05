@@ -15,16 +15,21 @@ use App\Http\Controllers\Auth\{
     UserInvitationResponseController,
     VerifyEmailController
 };
+use App\Http\Controllers\Billing\CheckoutController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
+    // CSP: o cadastro pode contratar já pagando (SDK do cartão + Turnstile).
     Route::get('register', [RegisteredUserController::class, 'create'])
+        ->middleware('checkout.csp')
         ->name('register');
 
     Route::get('register/check-email', [RegisteredUserController::class, 'checkEmail'])
         ->name('register.check-email');
 
-    Route::post('register', [RegisteredUserController::class, 'store']);
+    // Limite por IP (card testing por contas em série) — AppServiceProvider 'register'.
+    Route::post('register', [RegisteredUserController::class, 'store'])
+        ->middleware('throttle:register');
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
@@ -109,4 +114,21 @@ Route::middleware('auth')->group(function () {
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
+
+    // Checkout do cadastro no site ("contratar já pagando", sem o trial):
+    // logo após o /register, antes de confirmar e-mail/WhatsApp. Mesmas
+    // proteções do checkout do painel (contato de cobrança da clínica da
+    // sessão, limite de tentativas, idempotência) e só para clínica recém-
+    // criada que nunca pagou (billing.contact:signup).
+    Route::prefix('signup-checkout')
+        ->name('signup-checkout.')
+        ->middleware(['entity.selected', 'billing.contact:signup'])
+        ->group(function () {
+            Route::get('options', [CheckoutController::class, 'options'])->middleware('throttle:billing-checkout-read')->name('options');
+            Route::get('summary', [CheckoutController::class, 'summary'])->middleware('throttle:billing-checkout-read')->name('summary');
+            Route::post('contract', [CheckoutController::class, 'contract'])->middleware('throttle:billing-checkout-pay')->name('contract');
+            Route::get('invoices/{invoice}/instructions', [CheckoutController::class, 'instructions'])->middleware('throttle:billing-checkout-read')->name('instructions');
+            Route::post('invoices/{invoice}/charge', [CheckoutController::class, 'issueCharge'])->middleware('throttle:billing-checkout-pay')->name('charge');
+            Route::post('invoices/{invoice}/card', [CheckoutController::class, 'payWithCard'])->middleware('throttle:billing-checkout-pay')->name('card');
+        });
 });

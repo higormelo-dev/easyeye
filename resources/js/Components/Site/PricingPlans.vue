@@ -1,5 +1,28 @@
 <template>
     <div class="pricing-plans">
+        <!-- Ciclo de cobrança: o visitante escolhe a modalidade que cabe na clínica. -->
+        <div v-if="cycles.length > 1" class="pricing-cycles" role="radiogroup" :aria-label="t.cycle_selector_label">
+            <button
+                v-for="cycle in cycles"
+                :key="cycle.value"
+                type="button"
+                role="radio"
+                class="pricing-cycle"
+                :class="{ 'pricing-cycle--active': selectedCycle === cycle.value }"
+                :aria-checked="selectedCycle === cycle.value"
+                :tabindex="selectedCycle === cycle.value ? 0 : -1"
+                :data-cycle="cycle.value"
+                :aria-label="cycleAriaLabel(cycle)"
+                @click="selectedCycle = cycle.value"
+                @keydown="onCycleKeydown($event, cycle.value)"
+            >
+                <span>{{ cycle.label }}</span>
+                <span v-if="cycle.maxSavings > 0" class="pricing-cycle-save">{{
+                    t.cycle_save_up_to?.replace(':percent', cycle.maxSavings)
+                }}</span>
+            </button>
+        </div>
+
         <div class="pricing-grid">
             <article v-for="plan in listings" :key="plan.id" :class="['pricing-card', { featured: plan.is_featured }]">
                 <div
@@ -19,10 +42,19 @@
                     <span v-if="plan.is_free" class="price-value price-value--request">{{ t.on_request }}</span>
                     <template v-else>
                         <span class="pricing-amount">
-                            <span class="price-currency">R$</span>
-                            <span class="price-value">{{ formatPrice(plan.price) }}</span>
+                            <span class="price-currency">{{ currencySymbol }}</span>
+                            <span class="price-value">{{ formatPrice(plan.offer.price) }}</span>
                         </span>
-                        <span class="price-period">{{ plan.price_period_label }}</span>
+                        <span class="price-period">{{ plan.offer.period_label }}</span>
+                        <span v-if="plan.offer.months > 1" class="price-equivalent" data-test="price-equivalent">
+                            {{ t.monthly_equivalent?.replace(':price', formatMoney(plan.offer.monthly_equivalent)) }}
+                            <span v-if="plan.offer.savings_percent > 0" class="price-savings">{{
+                                t.savings_badge?.replace(':percent', plan.offer.savings_percent)
+                            }}</span>
+                        </span>
+                        <span v-if="plan.offer.unavailable" class="price-unavailable" data-test="cycle-unavailable">{{
+                            t.cycle_unavailable?.replace(':cycle', plan.offer.label)
+                        }}</span>
                     </template>
                 </div>
 
@@ -48,11 +80,7 @@
                     >
                         {{ t.contact_cta }}
                     </a>
-                    <a
-                        v-else
-                        :href="plan.register_url || registerUrl"
-                        :class="['btn', plan.is_featured ? 'btn-featured' : 'btn-outline']"
-                    >
+                    <a v-else :href="plan.ctaHref" :class="['btn', plan.is_featured ? 'btn-featured' : 'btn-outline']">
                         {{ t.choose_plan?.replace(':plan', plan.name) }}
                         <i v-if="plan.is_featured" class="ti ti-arrow-right" aria-hidden="true"></i>
                     </a>
@@ -125,11 +153,7 @@
                 </div>
                 <p>{{ t.integrator_description }}</p>
                 <a
-                    :href="
-                        integratorPlan.is_free || trialDays <= 0
-                            ? salesHref
-                            : integratorPlan.register_url || registerUrl
-                    "
+                    :href="integratorPlan.is_free || trialDays <= 0 ? salesHref : integratorPlan.ctaHref"
                     class="pricing-integrator-cta"
                 >
                     {{
@@ -156,7 +180,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     plans: { type: Array, default: () => [] },
@@ -165,6 +189,7 @@ const props = defineProps({
     registerUrl: { type: String, default: '' },
     salesHref: { type: String, default: '' },
     locale: { type: String, default: 'pt-BR' },
+    currency: { type: String, default: 'BRL' },
 });
 
 const comparisonOrder = ['max_doctors', 'max_storage_gb', 'ai_monthly_credits', 'has_inventory_module'];
@@ -205,8 +230,12 @@ const listings = computed(() =>
             groups[group].push(feature);
         }
 
+        const offer = offerFor(plan);
+
         return {
             ...plan,
+            offer,
+            ctaHref: ctaHref(plan, offer),
             featureMap: new Map(features.map((feature) => [feature.key, feature])),
             groups: Object.entries(groups)
                 .filter(([, rows]) => rows.length)
@@ -247,6 +276,90 @@ function formatPrice(price) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
+}
+
+function formatMoney(value) {
+    return new Intl.NumberFormat(props.locale.replace('_', '-'), {
+        style: 'currency',
+        currency: props.currency,
+    }).format(Number(value));
+}
+
+const currencySymbol = computed(
+    () =>
+        new Intl.NumberFormat(props.locale.replace('_', '-'), { style: 'currency', currency: props.currency })
+            .formatToParts(0)
+            .find((part) => part.type === 'currency')?.value ?? 'R$',
+);
+
+// ── Ciclo de cobrança ───────────────────────────────────────────────────────
+// Ciclos oferecidos por algum plano, do mais curto ao mais longo, com a maior
+// economia entre os planos ("até 20% off"). Planos sem preços por ciclo
+// (catálogo antigo) mostram só o preço de referência — sem seletor.
+const cycles = computed(() => {
+    const byCycle = new Map();
+
+    for (const plan of props.plans) {
+        for (const price of plan.prices ?? []) {
+            const current = byCycle.get(price.cycle);
+            byCycle.set(price.cycle, {
+                value: price.cycle,
+                label: price.label,
+                months: price.months,
+                maxSavings: Math.max(current?.maxSavings ?? 0, price.savings_percent ?? 0),
+            });
+        }
+    }
+
+    return [...byCycle.values()].sort((a, b) => a.months - b.months);
+});
+
+const selectedCycle = ref(
+    cycles.value.find((c) => c.value === 'monthly')?.value ??
+        props.plans.find((p) => p.default_cycle)?.default_cycle ??
+        cycles.value[0]?.value ??
+        null,
+);
+
+function cycleAriaLabel(cycle) {
+    const save = cycle.maxSavings > 0 ? props.t.cycle_save_up_to?.replace(':percent', cycle.maxSavings) : '';
+
+    return save ? `${cycle.label}, ${save}` : cycle.label;
+}
+
+function onCycleKeydown(event, current) {
+    const keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+    if (!(event.key in keys)) return;
+
+    event.preventDefault();
+    const list = cycles.value;
+    const index = list.findIndex((c) => c.value === current);
+    const next = list[(index + keys[event.key] + list.length) % list.length];
+    selectedCycle.value = next.value;
+    event.currentTarget?.parentElement?.querySelector(`[data-cycle="${next.value}"]`)?.focus();
+}
+
+/** Preço exibido no cartão: o do ciclo escolhido, ou o padrão do plano se ele não vende esse ciclo. */
+function offerFor(plan) {
+    const prices = plan.prices ?? [];
+
+    if (!prices.length) {
+        return { price: plan.price, period_label: plan.price_period_label, months: 1, unavailable: false };
+    }
+
+    const chosen = prices.find((p) => p.cycle === selectedCycle.value);
+    const fallback = prices.find((p) => p.cycle === plan.default_cycle) ?? prices[0];
+    const offer = chosen ?? fallback;
+
+    return { ...offer, unavailable: !chosen && !!selectedCycle.value };
+}
+
+/** O cadastro abre já no ciclo escolhido (?cycle=yearly). */
+function ctaHref(plan, offer) {
+    const href = plan.register_url || props.registerUrl;
+    if (!plan.prices?.length || !offer?.cycle || !href) return href;
+
+    return `${href}${href.includes('?') ? '&' : '?'}cycle=${encodeURIComponent(offer.cycle)}`;
 }
 </script>
 
@@ -375,6 +488,76 @@ function formatPrice(price) {
         color: var(--plan-muted);
         font-size: 0.9375rem;
         line-height: 1.5;
+    }
+    .price-equivalent,
+    .price-unavailable {
+        color: var(--plan-muted);
+        font-size: 0.875rem;
+        line-height: 1.4;
+    }
+    .price-savings {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #e3f6ec;
+        color: #0b6b3a;
+        font-weight: 700;
+        font-size: 0.8125rem;
+    }
+
+    .pricing-cycles {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+        width: fit-content;
+        max-width: 100%;
+        margin: 0 auto 28px;
+        padding: 4px;
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 999px;
+        background: #fff;
+    }
+    .pricing-cycle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 8px 18px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--navy, #0f2551);
+        font-weight: 600;
+        font-size: 0.9375rem;
+        cursor: pointer;
+        transition: background-color 160ms ease;
+
+        &:hover {
+            background: #f1f5f9;
+        }
+        &:focus-visible {
+            outline: 3px solid var(--teal, #00b4d8);
+            outline-offset: 2px;
+        }
+    }
+    .pricing-cycle--active,
+    .pricing-cycle--active:hover {
+        background: var(--navy, #0f2551);
+        color: #fff;
+    }
+    .pricing-cycle-save {
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #e3f6ec;
+        color: #0b6b3a;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .pricing-cycle--active .pricing-cycle-save {
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
     }
 
     // A medida em rem acompanha a ampliação de texto do visitante. Em um

@@ -11,6 +11,8 @@ import { Head } from '@inertiajs/vue3';
  */
 const props = defineProps({
     status: { type: Number, required: true },
+    // Motivo específico já traduzido pelo servidor (ex.: checkout sem permissão).
+    message: { type: String, default: null },
 });
 
 const CONTENT = {
@@ -73,7 +75,7 @@ function reload() {
             </div>
             <div class="ee-error__status">{{ status }}</div>
             <h1 class="ee-error__title">{{ info.title }}</h1>
-            <p class="ee-error__text">{{ info.text }}</p>
+            <p class="ee-error__text">{{ message || info.text }}</p>
 
             <div class="ee-error__actions">
                 <button type="button" class="ee-error__btn ee-error__btn--ghost" @click="goBack">

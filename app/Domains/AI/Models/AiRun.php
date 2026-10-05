@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Models;
 
-use App\Domains\AI\Services\{AiAnalyticsService, AiQuotaService};
+use App\Domains\AI\Services\AiAnalyticsService;
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Models\Concerns\BelongsToEntity;
 use App\Models\{Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, User};
@@ -172,9 +172,10 @@ class AiRun extends Model
     }
 
     /**
-     * Invalida o cache de cota da entity sempre que um run salva mudanças em
-     * status ou consumed_credits — campos que influenciam o snapshot mensal
-     * exibido no painel da IA e no dashboard /panel/usage.
+     * Invalida o cache analítico da entity sempre que um run salva mudanças
+     * em status ou consumed_credits — campos que influenciam as métricas do
+     * dashboard /panel/ai/usage. O medidor da franquia lê a carteira, sem
+     * cache (ver AiQuotaService).
      */
     protected static function booted(): void
     {
@@ -186,9 +187,7 @@ class AiRun extends Model
                 return;
             }
 
-            $entityId = (string) $run->entity_id;
-            app(AiQuotaService::class)->invalidate($entityId);
-            app(AiAnalyticsService::class)->invalidate($entityId);
+            app(AiAnalyticsService::class)->invalidate((string) $run->entity_id);
         });
     }
 }

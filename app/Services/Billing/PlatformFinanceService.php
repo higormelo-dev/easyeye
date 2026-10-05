@@ -57,7 +57,7 @@ class PlatformFinanceService
         $payingClinics = $this->payingClinicsAsOf($to);
         $newClinics    = $this->newClinics($from, $to);
         $cancellations = $this->cancellations($from, $to);
-        $delinquency   = $this->delinquencyAsOf($to);
+        $delinquency   = $this->delinquency();
 
         $arpu = $payingClinics > 0 ? round($mrr / $payingClinics, 2) : 0.0;
 
@@ -216,8 +216,12 @@ class PlatformFinanceService
                 $q->whereNull('subscriptions.ends_at')
                     ->orWhere('subscriptions.ends_at', '>', $asOf);
             })
+            ->billable()
+            // Contratação que nunca pagou (aguardando o 1º pagamento ou com
+            // erro na emissão) não é receita recorrente.
+            ->everPaid()
             ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')
-            ->sum('plans.price');
+            ->sum(DB::raw(Subscription::monthlyAmountSql()));
     }
 
     private function payingClinicsAsOf(Carbon $asOf): int
@@ -244,6 +248,8 @@ class PlatformFinanceService
                 $q->whereNull('subscriptions.ends_at')
                     ->orWhere('subscriptions.ends_at', '>', $asOf);
             })
+            ->billable()
+            ->everPaid()
             ->distinct('subscriptions.entity_id')
             ->count('subscriptions.entity_id');
     }
@@ -282,19 +288,19 @@ class PlatformFinanceService
     /**
      * @return array{count: int, amount_at_risk: float}
      */
-    private function delinquencyAsOf(Carbon $asOf): array
+    private function delinquency(): array
     {
+        // Sem período de graça: toda assinatura em atraso que já pagou antes
+        // está inadimplente (quem nunca pagou não entra na régua).
         $query = Subscription::query()
             ->where('subscriptions.status', SubscriptionStatus::PastDue->value)
-            ->where(function ($q) use ($asOf) {
-                $q->whereNull('subscriptions.grace_period_ends_at')
-                    ->orWhere('subscriptions.grace_period_ends_at', '<=', $asOf->copy()->endOfDay());
-            })
+            ->billable()
+            ->everPaid()
             ->join('plans', 'subscriptions.plan_id', '=', 'plans.id');
 
         return [
             'count'          => (clone $query)->count('subscriptions.id'),
-            'amount_at_risk' => round((float) (clone $query)->sum('plans.price'), 2),
+            'amount_at_risk' => round((float) (clone $query)->sum(DB::raw('COALESCE(subscriptions.amount, plans.price)')), 2),
         ];
     }
 

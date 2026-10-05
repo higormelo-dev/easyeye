@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\WhatsApp;
 
 use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppSetting};
+use App\Services\Billing\ClinicServiceGate;
 use App\Services\WhatsApp\{WhatsAppService, ZApiClient};
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\{ShouldBeUnique, ShouldQueue};
@@ -43,7 +44,7 @@ class ProcessWhatsAppInboundJob implements ShouldQueue, ShouldBeUnique
         return $this->inboundMessageId;
     }
 
-    public function handle(WhatsAppService $service, ZApiClient $client): void
+    public function handle(WhatsAppService $service, ZApiClient $client, ClinicServiceGate $gate): void
     {
         $inbound = WhatsAppMessage::find($this->inboundMessageId);
 
@@ -68,6 +69,26 @@ class ProcessWhatsAppInboundJob implements ShouldQueue, ShouldBeUnique
         $credentials = $setting->active ? $setting->sendingCredentials() : null;
 
         if ($ack === null || $credentials === null) {
+            return;
+        }
+
+        // Resposta automática de clínica com o acesso bloqueado: o efeito da
+        // resposta do paciente (confirmação/nota) vale, mas nada sai — fica
+        // o registro do motivo.
+        $entityId = $inbound->fresh()?->entity_id;
+
+        if (! $gate->allowsAutomation($entityId ? (string) $entityId : null)) {
+            WhatsAppMessage::create([
+                'entity_id'   => $entityId,
+                'schedule_id' => null,
+                'direction'   => 'out',
+                'kind'        => WhatsAppMessage::KIND_ACK,
+                'phone'       => $inbound->phone,
+                'body'        => $ack,
+                'status'      => WhatsAppMessage::STATUS_SKIPPED,
+                'error'       => ClinicServiceGate::REASON_ACCESS_BLOCKED . ': acesso da clínica bloqueado (assinatura) — resposta automática suspensa.',
+            ]);
+
             return;
         }
 

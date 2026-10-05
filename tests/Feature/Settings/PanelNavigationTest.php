@@ -225,6 +225,26 @@ it('nenhuma rota do menu de gestão SaaS (manager, entity não-cliente) está qu
     assertAllRoutesResolve($routes);
 });
 
+it('manager: Planos e Assinaturas são um item só, ativo nas duas telas e abrindo Assinaturas', function () {
+    $saasEntity     = Entity::factory()->create(['is_client' => false, 'active' => true]);
+    $saasEntityUser = createEntityUser($saasEntity, User::factory()->create(), 'admin');
+
+    session([
+        'selected_entity_id'        => $saasEntityUser->entity_id,
+        'selected_entity_user_id'   => $saasEntityUser->id,
+        'selected_entity_user_rule' => 'admin',
+        'selected_entity_is_client' => false,
+    ]);
+
+    $nav  = PanelNavigation::build();
+    $item = findNavItemByKey($nav, 'subscriptions');
+
+    expect(findNavItemByKey($nav, 'plans'))->toBeNull()
+        ->and($item['route'])->toBe('manager.subscriptions.index')
+        ->and($item['label'])->toBe(__('actions.sidemenu.plans_subscriptions'))
+        ->and($item['match'])->toContain('manager.plans.*', 'manager.subscriptions.*');
+});
+
 // ── 4. Labels de covertesttypes/colorvisiontypes não duplicados/trocados ───
 
 it('labels de "Tipos de teste de cobertura" e "Tipos de visão cromática" não ficam duplicados ou trocados', function () {

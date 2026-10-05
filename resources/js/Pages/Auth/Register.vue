@@ -1,18 +1,36 @@
 <script setup>
 import { Head } from '@inertiajs/vue3';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import SiteLayout from '@/Layouts/SiteLayout.vue';
+import TurnstileWidget from '@/Components/Security/TurnstileWidget.vue';
+
+// "Contratar agora": o checkout (e o tempo real — Echo/Reverb, que o bundle
+// do site não carrega) só baixa quando a pessoa escolhe pagar no cadastro.
+const SignupCheckout = defineAsyncComponent(() =>
+    import('@/echo.js').then(() => import('@/Components/Billing/SignupCheckout.vue')).then((module) => module.default),
+);
 
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
     t: { type: Object, default: () => ({}) }, // site translations for SiteLayout
     tAuth: { type: Object, default: () => ({}) }, // auth translations for the form
+    tCheckout: { type: Object, default: () => ({}) }, // checkout translations ("Contratar agora")
     plans: { type: Array, default: () => [] },
     trialDays: { type: Number, default: 0 },
     selectedPlanId: { type: String, default: null },
+    // Ciclo escolhido na landing (?cycle=yearly); null = ciclo padrão do plano.
+    selectedCycle: { type: String, default: null },
     routes: { type: Object, default: () => ({}) },
+    // Idioma do usuário (prop compartilhada pelo Inertia) — formatação de moeda.
+    locale: { type: String, default: 'pt_BR' },
+    // Cloudflare Turnstile: só com TURNSTILE_SITE_KEY/SECRET_KEY no servidor.
+    turnstileSiteKey: { type: String, default: null },
 });
+
+// ── Captcha (Turnstile) ────────────────────────────────────────
+const turnstileToken = ref('');
+const turnstile = ref(null);
 
 // ── Step state ─────────────────────────────────────────────────
 const step = ref(1);
@@ -99,6 +117,42 @@ watch(
 );
 
 const currentPlan = computed(() => props.plans.find((p) => p.id === selectedPlan.value) ?? null);
+
+// ── Billing cycle ──────────────────────────────────────────────
+// O ciclo escolhido vai junto com o trial: na contratação o time já sabe a
+// modalidade (mensal, anual...). Plano sem o ciclo cai no padrão dele.
+const intlLocale = computed(() => String(props.locale || 'pt_BR').replace('_', '-'));
+const selectedCycle = ref(props.selectedCycle ?? '');
+
+function offerFor(plan) {
+    const prices = plan?.prices ?? [];
+    if (!prices.length) return null;
+
+    return (
+        prices.find((p) => p.cycle === selectedCycle.value) ??
+        prices.find((p) => p.cycle === plan.default_cycle) ??
+        prices[0]
+    );
+}
+
+const currentOffer = computed(() => offerFor(currentPlan.value));
+
+watch(
+    currentPlan,
+    (plan) => {
+        const offer = offerFor(plan);
+        if (offer) selectedCycle.value = offer.cycle;
+    },
+    { immediate: true },
+);
+
+function formatMoney(value) {
+    return new Intl.NumberFormat(intlLocale.value, { style: 'currency', currency: 'BRL' }).format(Number(value ?? 0));
+}
+
+function planPrice(plan) {
+    return offerFor(plan) ?? { price: plan.price, period_label: plan.price_period_label };
+}
 const testimonial = computed(() => props.t.testimonials?.items?.[0] ?? null);
 
 function selectPlan(id) {
@@ -147,18 +201,46 @@ function prevStep() {
     errors.value = {};
 }
 
+// ── Como começar: teste grátis ou contratar já pagando ─────────
+const startMode = ref(props.trialDays > 0 ? 'trial' : 'checkout'); // trial | checkout
+const signup = ref(null); // { redirect, planId, cycle, planName, cycleLabel } — etapa de pagamento
+
 // ── Submit ─────────────────────────────────────────────────────
 async function submit() {
     if (!validateStep2()) return;
     loading.value = true;
     try {
-        const payload = { ...form.value, plan_id: selectedPlan.value };
+        const payload = {
+            ...form.value,
+            plan_id: selectedPlan.value,
+            billing_cycle: currentOffer.value?.cycle,
+            start_mode: startMode.value,
+            ...(props.turnstileSiteKey ? { turnstile_token: turnstileToken.value } : {}),
+        };
         const { data } = await axios.post('/register', payload);
+        if (startMode.value === 'checkout' && data.checkout && currentOffer.value?.cycle) {
+            // Conta criada (e logada): segue para o pagamento sem sair do site.
+            signup.value = {
+                redirect: data.redirect ?? '/panel/dashboard',
+                planId: selectedPlan.value,
+                cycle: currentOffer.value.cycle,
+                planName: currentPlan.value?.name ?? '',
+                cycleLabel: currentOffer.value.label ?? '',
+            };
+            step.value = 3;
+            errors.value = {};
+            return;
+        }
         if (data.redirect) {
             window.location.href = data.redirect;
         }
     } catch (err) {
-        if (err.response?.data?.errors) {
+        // O token do captcha vale uma vez: qualquer recusa pede um novo.
+        if (props.turnstileSiteKey) turnstile.value?.reset();
+
+        if (err.response?.status === 429) {
+            errors.value = { plan_id: err.response?.data?.message ?? props.tAuth.register?.too_many_signups };
+        } else if (err.response?.data?.errors) {
             errors.value = Object.fromEntries(
                 Object.entries(err.response.data.errors).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]),
             );
@@ -179,6 +261,12 @@ async function submit() {
 async function quickStart() {
     await submit();
 }
+
+const progressWidth = computed(() => {
+    const total = startMode.value === 'checkout' ? 3 : 2;
+
+    return `${Math.round((Math.min(step.value, total) / total) * 100)}%`;
+});
 
 const showPwd1 = ref(false);
 const showPwd2 = ref(false);
@@ -296,13 +384,19 @@ const showPwd2 = ref(false);
                         <div class="reg-card-header">
                             <div class="reg-card-title">
                                 <span v-if="step === 1">{{ tAuth.register?.step1_title }}</span>
-                                <span v-else>{{ tAuth.register?.step2_title }}</span>
+                                <span v-else-if="step === 2">{{ tAuth.register?.step2_title }}</span>
+                                <span v-else>{{ tAuth.register?.checkout_title }}</span>
                             </div>
                             <div class="reg-card-subtitle">
                                 <span v-if="step === 1">{{
                                     tAuth.register?.step1_subtitle?.replace(':days', trialDays)
                                 }}</span>
-                                <span v-else>{{ tAuth.register?.step2_subtitle }}</span>
+                                <span v-else-if="step === 2">{{ tAuth.register?.step2_subtitle }}</span>
+                                <span v-else>{{
+                                    tAuth.register?.checkout_subtitle
+                                        ?.replace(':plan', signup?.planName ?? '')
+                                        .replace(':cycle', signup?.cycleLabel ?? '')
+                                }}</span>
                             </div>
                         </div>
 
@@ -316,15 +410,29 @@ const showPwd2 = ref(false);
                                 <span>{{ tAuth.register?.step_personal }}</span>
                             </div>
                             <div class="step-sep"></div>
-                            <div class="step-item" :class="{ active: step === 2 }">
-                                <span class="step-num">2</span>
+                            <div class="step-item" :class="{ active: step === 2, done: step > 2 }">
+                                <span class="step-num">
+                                    <i v-if="step > 2" class="ti ti-check" style="font-size: 13px"></i>
+                                    <template v-else>2</template>
+                                </span>
                                 <span>{{ tAuth.register?.step_company }}</span>
                             </div>
+                            <template v-if="startMode === 'checkout'">
+                                <div class="step-sep"></div>
+                                <div
+                                    class="step-item"
+                                    :class="{ active: step === 3 }"
+                                    data-test="register-step-payment"
+                                >
+                                    <span class="step-num">3</span>
+                                    <span>{{ tAuth.register?.step_payment }}</span>
+                                </div>
+                            </template>
                         </div>
 
                         <!-- Progress bar -->
                         <div class="reg-progress">
-                            <div class="reg-progress-fill" :style="{ width: step === 1 ? '50%' : '100%' }"></div>
+                            <div class="reg-progress-fill" :style="{ width: progressWidth }"></div>
                         </div>
 
                         <!-- ══ Step 1 ══ -->
@@ -466,7 +574,7 @@ const showPwd2 = ref(false);
                             </div>
 
                             <!-- ══ Step 2 ══ -->
-                            <div v-else key="step2">
+                            <div v-else-if="step === 2" key="step2">
                                 <form @submit.prevent="submit" novalidate>
                                     <div class="reg-field">
                                         <label class="reg-label"
@@ -543,17 +651,54 @@ const showPwd2 = ref(false);
                                                     >{{ trialDays }} {{ tAuth.register?.days_free }}</span
                                                 >
                                                 <span class="plan-grid-name">{{ plan.name }}</span>
-                                                <span class="plan-grid-price">
-                                                    R$
+                                                <span class="plan-grid-price">{{
+                                                    formatMoney(plan.is_free ? 0 : planPrice(plan).price)
+                                                }}</span>
+                                                <span class="plan-grid-cycle">{{ planPrice(plan).period_label }}</span>
+                                            </button>
+                                        </div>
+
+                                        <div
+                                            v-if="(currentPlan?.prices?.length ?? 0) > 1"
+                                            class="plan-cycles"
+                                            role="radiogroup"
+                                            :aria-label="tAuth.register?.choose_cycle"
+                                        >
+                                            <span class="reg-label" aria-hidden="true">{{
+                                                tAuth.register?.choose_cycle
+                                            }}</span>
+                                            <button
+                                                v-for="price in currentPlan.prices"
+                                                :key="price.cycle"
+                                                type="button"
+                                                role="radio"
+                                                class="plan-cycle"
+                                                :class="{ selected: selectedCycle === price.cycle }"
+                                                :aria-checked="selectedCycle === price.cycle"
+                                                :data-cycle="price.cycle"
+                                                @click="selectedCycle = price.cycle"
+                                            >
+                                                <span class="plan-cycle-label">{{ price.label }}</span>
+                                                <span class="plan-cycle-price"
+                                                    >{{ formatMoney(price.price) }}{{ price.period_label }}</span
+                                                >
+                                                <span v-if="price.months > 1" class="plan-cycle-note">
                                                     {{
-                                                        plan.is_free
-                                                            ? '0,00'
-                                                            : Number(plan.price).toLocaleString('pt-BR', {
-                                                                  minimumFractionDigits: 2,
-                                                              })
+                                                        tAuth.register?.cycle_equivalent?.replace(
+                                                            ':price',
+                                                            formatMoney(price.monthly_equivalent),
+                                                        )
                                                     }}
+                                                    <strong v-if="price.savings_percent > 0">
+                                                        ·
+                                                        {{
+                                                            tAuth.register?.cycle_savings?.replace(
+                                                                ':percent',
+                                                                price.savings_percent,
+                                                            )
+                                                        }}</strong
+                                                    >
                                                 </span>
-                                                <span class="plan-grid-cycle">{{ plan.price_period_label }}</span>
                                             </button>
                                         </div>
 
@@ -576,12 +721,73 @@ const showPwd2 = ref(false);
                                         </p>
                                     </div>
 
+                                    <div
+                                        v-if="plans.length"
+                                        class="reg-field reg-start-modes"
+                                        role="radiogroup"
+                                        :aria-label="tAuth.register?.start_mode_label"
+                                    >
+                                        <span class="reg-label" aria-hidden="true">{{
+                                            tAuth.register?.start_mode_label
+                                        }}</span>
+                                        <button
+                                            v-if="trialDays > 0"
+                                            type="button"
+                                            role="radio"
+                                            class="reg-start-mode"
+                                            :class="{ selected: startMode === 'trial' }"
+                                            :aria-checked="startMode === 'trial'"
+                                            data-mode="trial"
+                                            @click="startMode = 'trial'"
+                                        >
+                                            <i class="ti ti-gift" aria-hidden="true"></i>
+                                            <span>
+                                                <strong>{{
+                                                    tAuth.register?.mode_trial?.replace(':days', trialDays)
+                                                }}</strong>
+                                                <small>{{ tAuth.register?.mode_trial_hint }}</small>
+                                            </span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            role="radio"
+                                            class="reg-start-mode"
+                                            :class="{ selected: startMode === 'checkout' }"
+                                            :aria-checked="startMode === 'checkout'"
+                                            data-mode="checkout"
+                                            @click="startMode = 'checkout'"
+                                        >
+                                            <i class="ti ti-credit-card" aria-hidden="true"></i>
+                                            <span>
+                                                <strong>{{ tAuth.register?.mode_checkout }}</strong>
+                                                <small>{{ tAuth.register?.mode_checkout_hint }}</small>
+                                            </span>
+                                        </button>
+                                    </div>
+
+                                    <div v-if="turnstileSiteKey" class="reg-field">
+                                        <TurnstileWidget
+                                            ref="turnstile"
+                                            :site-key="turnstileSiteKey"
+                                            :label="tAuth.register?.captcha_label"
+                                            :language="locale === 'en' ? 'en' : 'pt-BR'"
+                                            @token="turnstileToken = $event"
+                                        />
+                                        <span v-if="errors.turnstile_token" class="reg-error" role="alert">{{
+                                            errors.turnstile_token
+                                        }}</span>
+                                    </div>
+
                                     <div class="reg-btn-row">
                                         <button type="button" class="reg-btn reg-btn-secondary" @click="prevStep">
                                             <i class="ti ti-arrow-left"></i> {{ tAuth.register?.back }}
                                         </button>
                                         <button type="submit" class="reg-btn reg-btn-primary" :disabled="loading">
-                                            <span v-if="!loading">
+                                            <span v-if="!loading && startMode === 'checkout'">
+                                                {{ tAuth.register?.create_and_pay }}
+                                                <i class="ti ti-arrow-right"></i>
+                                            </span>
+                                            <span v-else-if="!loading">
                                                 {{ tAuth.register?.start_trial }}
                                                 <i class="ti ti-rocket"></i>
                                             </span>
@@ -592,7 +798,7 @@ const showPwd2 = ref(false);
                                         </button>
                                     </div>
 
-                                    <template v-if="plans.length > 1">
+                                    <template v-if="plans.length > 1 && startMode === 'trial'">
                                         <div class="reg-divider">
                                             <span>{{ tAuth.register?.or }}</span>
                                         </div>
@@ -606,6 +812,18 @@ const showPwd2 = ref(false);
                                         </button>
                                     </template>
                                 </form>
+                            </div>
+
+                            <!-- ══ Step 3: pagamento (Contratar agora) ══ -->
+                            <div v-else key="step3" data-test="register-checkout">
+                                <SignupCheckout
+                                    v-if="signup"
+                                    :t="tCheckout"
+                                    :labels="tAuth.register ?? {}"
+                                    :plan-id="signup.planId"
+                                    :cycle="signup.cycle"
+                                    :redirect="signup.redirect"
+                                />
                             </div>
                         </Transition>
 
@@ -1246,6 +1464,100 @@ const showPwd2 = ref(false);
     font-size: 10px;
     color: var(--text-muted);
     margin-top: 2px;
+}
+.plan-cycles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.plan-cycles .reg-label {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+}
+.plan-cycle {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.plan-cycle:hover,
+.plan-cycle.selected {
+    border-color: var(--teal);
+}
+.plan-cycle.selected {
+    background: rgba(0, 180, 216, 0.03);
+    box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.12);
+}
+.plan-cycle:focus-visible {
+    outline: 3px solid var(--teal);
+    outline-offset: 3px;
+}
+.plan-cycle-label {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--navy);
+}
+.plan-cycle-price {
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--teal);
+}
+.plan-cycle-note {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.reg-start-modes {
+    display: grid;
+    gap: 8px;
+}
+.reg-start-mode {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.reg-start-mode i {
+    font-size: 20px;
+    color: var(--teal);
+    margin-top: 2px;
+}
+.reg-start-mode strong,
+.reg-start-mode small {
+    display: block;
+}
+.reg-start-mode strong {
+    font-size: 13px;
+    color: var(--navy);
+}
+.reg-start-mode small {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.reg-start-mode:hover,
+.reg-start-mode.selected {
+    border-color: var(--teal);
+}
+.reg-start-mode.selected {
+    background: rgba(0, 180, 216, 0.03);
+    box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.12);
+}
+.reg-start-mode:focus-visible {
+    outline: 3px solid var(--teal);
+    outline-offset: 3px;
 }
 .plan-detail {
     border: 1.5px solid rgba(0, 180, 216, 0.3);

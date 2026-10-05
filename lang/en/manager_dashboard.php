@@ -44,6 +44,15 @@ return [
 
     // Subscription funnel
     'subscription_funnel' => 'Subscription Funnel',
+    'subscription_status' => [
+        'active'           => 'Active',
+        'trial'            => 'Trial',
+        'past_due'         => 'Past due',
+        'awaiting_payment' => 'Awaiting 1st payment',
+        'needs_review'     => 'Review billing',
+        'expired'          => 'Expired',
+        'cancelled'        => 'Cancelled',
+    ],
 
     // Conversion funnel
     'conversion_funnel_title' => 'Conversion Funnel',

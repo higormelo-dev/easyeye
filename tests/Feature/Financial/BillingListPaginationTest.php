@@ -30,6 +30,19 @@ function blpPatient(Entity $entity, Covenant $covenant, string $name): Patient
     ]);
 }
 
+/**
+ * Agendamento faturável com paciente de nome FIXO: o nome aleatório do Faker
+ * (ex.: "… Souza", "João …") casava com as buscas por paciente e fazia o teste
+ * falhar de vez em quando.
+ */
+function blpBillableSchedule(Entity $entity, string $name): Schedule
+{
+    $schedule = createBillableSchedule($entity, ['full_name' => $name]);
+    $schedule->patient->person->update(['full_name' => $name]);
+
+    return $schedule;
+}
+
 /** @param array<string, mixed> $overrides */
 function blpClaim(Entity $entity, Covenant $covenant, array $overrides = []): BillingClaim
 {
@@ -156,7 +169,7 @@ describe('busca por aba', function (): void {
         $byPatient = blpClaim($this->entity, $this->covenant, ['patient_id' => $joao->id]);
         $inBatch   = blpClaim($this->entity, $this->covenant, ['patient_id' => $maria->id, 'batch_id' => $batch->id]);
         $tiss      = app(BillingService::class)->createIndividual([
-            'schedule_id' => createBillableSchedule($this->entity)->id, 'unit_price' => 150, 'clinical_indication' => 'H40.1',
+            'schedule_id' => blpBillableSchedule($this->entity, 'Paciente Guia Tiss')->id, 'unit_price' => 150, 'clinical_indication' => 'H40.1',
         ]);
 
         // Outra clínica com o mesmo nome e códigos parecidos: nunca aparece.
@@ -186,7 +199,7 @@ describe('busca por aba', function (): void {
         $withC = blpBatch($this->entity, $this->covenant);
         $claim = blpClaim($this->entity, $this->covenant, ['patient_id' => $maria->id, 'batch_id' => $withC->id]);
 
-        $schedule = createBillableSchedule($this->entity);
+        $schedule = blpBillableSchedule($this->entity, 'Paciente Lote Tiss');
         $tissLot  = app(BillingService::class)->createBatch([
             'covenant_id'         => $schedule->covenant_id,
             'date_from'           => now()->subDay()->toDateString(),
@@ -239,7 +252,7 @@ describe('ordenação (whitelist no servidor)', function (): void {
     it('guias por valor, atendimento e paciente; desempate estável', function (): void {
         $b   = blpClaim($this->entity, $this->covenant, ['amount' => 300, 'attendance_date' => now()->subDays(2)->toDateString(), 'patient_id' => blpPatient($this->entity, $this->covenant, 'Carla')->id]);
         $a   = blpClaim($this->entity, $this->covenant, ['amount' => 100, 'attendance_date' => now()->toDateString(), 'patient_id' => blpPatient($this->entity, $this->covenant, 'Bruno')->id]);
-        $c   = blpClaim($this->entity, $this->covenant, ['amount' => 200, 'attendance_date' => now()->subDay()->toDateString(), 'patient_id' => blpPatient($this->entity, $this->covenant, 'Álvaro')->id]);
+        $c   = blpClaim($this->entity, $this->covenant, ['amount' => 200, 'attendance_date' => now()->subDay()->toDateString(), 'patient_id' => blpPatient($this->entity, $this->covenant, 'Diego')->id]);
         $old = now()->subDays(2)->startOfMonth()->toDateString();
 
         expect(blpIds(blpIndex(['from' => $old, 'claims_sort' => 'amount', 'claims_direction' => 'asc']), 'claims'))->toBe([$a->id, $c->id, $b->id])
@@ -248,9 +261,10 @@ describe('ordenação (whitelist no servidor)', function (): void {
             // Padrão: mais recentes primeiro (criação desc).
             ->and(blpIds(blpIndex(['from' => $old]), 'claims'))->toBe([$c->id, $a->id, $b->id]);
 
-        // Paciente: ordem do banco (collation C → "ÁLVARO" vem depois de "CARLA"); só confere que muda a ordem pelo nome.
-        $byPatient = blpIds(blpIndex(['from' => $old, 'claims_sort' => 'patient', 'claims_direction' => 'asc']), 'claims');
-        expect($byPatient[0])->toBe($a->id);
+        // Paciente: nomes sem acento — a posição de "Á" depende da collation do
+        // banco (C no CI, pt_BR no PostgreSQL local) e fazia o teste falhar.
+        expect(blpIds(blpIndex(['from' => $old, 'claims_sort' => 'patient', 'claims_direction' => 'asc']), 'claims'))->toBe([$a->id, $b->id, $c->id])
+            ->and(blpIds(blpIndex(['from' => $old, 'claims_sort' => 'patient', 'claims_direction' => 'desc']), 'claims'))->toBe([$c->id, $b->id, $a->id]);
     });
 
     it('lotes por total e período; a faturar por convênio', function (): void {
