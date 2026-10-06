@@ -13,6 +13,7 @@ use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
 use App\Services\ScheduleService;
+use App\Services\WhatsApp\WhatsAppService;
 use App\Support\BrazilianFormat;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -240,6 +241,9 @@ class SchedulesController extends Controller
             'telephone'          => BrazilianFormat::phone($schedule->telephone),
             'cellphone'          => BrazilianFormat::phone($schedule->cellphone),
             'cellphone_whatsapp' => (bool) $schedule->cellphone_whatsapp,
+            // Respondeu SAIR ao número que envia para a clínica: não recebe
+            // confirmação/pesquisa até responder VOLTAR.
+            'whatsapp_opted_out' => WhatsAppService::optedOutFor((string) $schedule->entity_id, $schedule->cellphone),
 
             // ── Tempos ────────────────────────────────────────────────────
             'arrived_at'   => $schedule->arrived_at?->format('d/m/Y H:i'),

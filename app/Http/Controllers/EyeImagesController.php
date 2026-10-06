@@ -574,14 +574,15 @@ class EyeImagesController extends Controller
                 $q->where('source', $f->source);
             }
 
+            // "Laudado" = laudo manual/conjunto vigente OU laudo de IA aprovado
+            // (antes só a IA contava — laudo manual ficava como "sem laudo").
+            // diagnosis_cids é metadado opcional do laudo, pode ficar vazio mesmo
+            // com laudo, então não é critério de status. Ver PatientExam::scopeReported.
             if ($f->status === 'laudado') {
-                // Fonte de verdade de "laudado" é o AiRun aprovado — o mesmo sinal
-                // que já alimenta o badge "Laudado (IA)" (examAiReport/ai_report.approved).
-                // diagnosis_cids é metadado opcional do laudo, pode ficar vazio mesmo
-                // com laudo aprovado, então não é usado aqui como critério de status.
-                $q->whereHas('aiRuns', fn (Builder $r) => $r
-                    ->where('ai_run_patient_exam.entity_id', $entityId)
-                    ->where('ai_runs.status', AiRunStatus::Approved->value));
+                $q->reported($entityId);
+            } elseif ($f->status === 'pendente') {
+                // Mesmo critério do indicador "Exames pendentes" do Dashboard.
+                $q->pendingReport($entityId);
             }
         };
     }

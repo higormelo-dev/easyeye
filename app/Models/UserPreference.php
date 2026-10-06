@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * Chaves conhecidas hoje (ver DashboardPreferencesController):
  *   - dashboard_widget_order: string[] — ordem das seções do Dashboard
+ *   - dashboard_hidden_sections: string[] — seções do Dashboard ocultas
  *   - favorite_shortcuts: {key: string, hidden: bool}[] — ordem/visibilidade
  *     dos atalhos em ModuleShortcuts
  */

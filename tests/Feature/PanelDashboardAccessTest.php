@@ -21,10 +21,11 @@ beforeEach(function () {
 
 /** Rota de destino de cada chave de `access`. */
 const DASHBOARD_ACCESS_ROUTES = [
-    'schedules' => 'panel.schedules.index',
-    'patients'  => 'panel.patients.index',
-    'doctors'   => 'panel.doctors.index',
-    'financial' => 'panel.financial.cash-flow.index',
+    'schedules'  => 'panel.schedules.index',
+    'patients'   => 'panel.patients.index',
+    'doctors'    => 'panel.doctors.index',
+    'financial'  => 'panel.financial.cash-flow.index',
+    'eye_images' => 'panel.eye-images.index',
 ];
 
 /** Papel customizado da clínica só com as permissões informadas. */
@@ -78,11 +79,11 @@ it('cada perfil recebe o acesso esperado e ele bate com a resposta real das rota
         expect($status === 403)->toBe(! $access[$key], "{$rule} → " . DASHBOARD_ACCESS_ROUTES[$key] . " respondeu {$status} com access.{$key}=" . var_export($access[$key], true));
     }
 })->with([
-    'admin'      => [ClientRule::Admin->value, ['schedules' => true, 'patients' => true, 'doctors' => true, 'financial' => true]],
-    'médico'     => [ClientRule::Doctor->value, ['schedules' => true, 'patients' => true, 'doctors' => false, 'financial' => false]],
-    'secretária' => [ClientRule::Secretary->value, ['schedules' => true, 'patients' => true, 'doctors' => true, 'financial' => false]],
-    'financeiro' => [ClientRule::Financial->value, ['schedules' => false, 'patients' => true, 'doctors' => true, 'financial' => true]],
-    'usuário'    => [ClientRule::User->value, ['schedules' => false, 'patients' => false, 'doctors' => false, 'financial' => false]],
+    'admin'      => [ClientRule::Admin->value, ['schedules' => true, 'patients' => true, 'doctors' => true, 'financial' => true, 'eye_images' => true]],
+    'médico'     => [ClientRule::Doctor->value, ['schedules' => true, 'patients' => true, 'doctors' => false, 'financial' => false, 'eye_images' => true]],
+    'secretária' => [ClientRule::Secretary->value, ['schedules' => true, 'patients' => true, 'doctors' => true, 'financial' => false, 'eye_images' => true]],
+    'financeiro' => [ClientRule::Financial->value, ['schedules' => false, 'patients' => true, 'doctors' => true, 'financial' => true, 'eye_images' => true]],
+    'usuário'    => [ClientRule::User->value, ['schedules' => false, 'patients' => false, 'doctors' => false, 'financial' => false, 'eye_images' => true]],
 ]);
 
 it('perfil usuário com a permissão patients.manage passa a abrir Pacientes e Médicos pelo Dashboard', function () {
@@ -95,7 +96,7 @@ it('perfil usuário com a permissão patients.manage passa a abrir Pacientes e M
 
     $access = dashboardAccessFor($this, User::find($user->id), $entityUser);
 
-    expect($access)->toBe(['schedules' => false, 'patients' => true, 'doctors' => true, 'financial' => false]);
+    expect($access)->toBe(['schedules' => false, 'patients' => true, 'doctors' => true, 'financial' => false, 'eye_images' => true]);
 
     foreach (dashboardRouteStatuses($this, $user, $entityUser, DASHBOARD_ACCESS_ROUTES) as $key => $status) {
         expect($status === 403)->toBe(! $access[$key], 'patients.manage → ' . DASHBOARD_ACCESS_ROUTES[$key] . " respondeu {$status}");
@@ -139,3 +140,30 @@ it('"Ver" dos pacientes recentes abre o cadastro na lista (?open=), só com paci
                 ->and($recent->firstWhere('id', $mine->id)['url'])->toBe(route('panel.patients.index', ['open' => $mine->id]));
         });
 });
+
+it('"Configure sua clínica" (passos de ativação) só vai para o administrador da clínica', function (string $rule, bool $sees) {
+    $user       = User::factory()->create();
+    $entityUser = createEntityUser($this->entity, $user, $rule);
+
+    $this->actingAs($user)
+        ->withSession(panelSession($entityUser))
+        ->get(route('panel.dashboard'))
+        ->assertOk()
+        ->assertInertia(function ($page) use ($sees) {
+            $props = $page->toArray()['props'];
+
+            if ($sees) {
+                expect($props['activation'])->not->toBeEmpty();
+            } else {
+                // Nada da configuração da clínica para os demais perfis: o card some.
+                expect($props['activation'])->toBe([])
+                    ->and($props['activationScore'])->toBe(0);
+            }
+        });
+})->with([
+    'administrador' => [ClientRule::Admin->value, true],
+    'médico'        => [ClientRule::Doctor->value, false],
+    'secretária'    => [ClientRule::Secretary->value, false],
+    'financeiro'    => [ClientRule::Financial->value, false],
+    'usuário'       => [ClientRule::User->value, false],
+]);

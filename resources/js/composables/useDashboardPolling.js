@@ -6,20 +6,28 @@ import { router } from '@inertiajs/vue3';
  * Pauses automatically when the browser tab is hidden and
  * resumes (with an immediate refresh) when the tab regains focus.
  *
+ * `manual` (opcional): props que NÃO entram no polling — só no clique em
+ * "Atualizar" (`refresh({ full: true })`), que também manda `headers` (ex.: o
+ * Dashboard pede para o servidor descartar o cache dos números de gestão).
+ *
  * @param {string[]} only       - Inertia prop keys to reload
  * @param {number}   intervalMs - Polling interval in ms (default 30s)
+ * @param {{ manual?: string[], headers?: Record<string, string> }} [options]
  */
-export function useDashboardPolling(only, intervalMs = 30_000) {
+export function useDashboardPolling(only, intervalMs = 30_000, { manual = [], headers = {} } = {}) {
     const isRefreshing = ref(false);
+    const isFullRefresh = ref(false);
     const lastUpdated = ref(new Date());
     let timer = null;
 
-    function refresh() {
+    function refresh({ full = false } = {}) {
         if (isRefreshing.value) return;
         isRefreshing.value = true;
+        isFullRefresh.value = full && manual.length > 0;
 
         router.reload({
-            only,
+            only: isFullRefresh.value ? [...only, ...manual] : only,
+            ...(isFullRefresh.value ? { headers } : {}),
             preserveScroll: true,
             // "Atualizado há X" só avança quando os dados chegaram de fato;
             // em falha (rede, 500) continua mostrando a última atualização boa.
@@ -28,6 +36,7 @@ export function useDashboardPolling(only, intervalMs = 30_000) {
             },
             onFinish: () => {
                 isRefreshing.value = false;
+                isFullRefresh.value = false;
             },
         });
     }
@@ -62,5 +71,5 @@ export function useDashboardPolling(only, intervalMs = 30_000) {
         document.removeEventListener('visibilitychange', onVisibility);
     });
 
-    return { isRefreshing, lastUpdated, refresh };
+    return { isRefreshing, isFullRefresh, lastUpdated, refresh };
 }

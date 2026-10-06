@@ -9,11 +9,11 @@ import { useDashboardPolling } from '@/composables/useDashboardPolling.js';
  * dados chegam; em falha continua mostrando a última atualização boa.
  */
 
-function mountPolling() {
+function mountPolling(options = undefined) {
     let api;
     const Host = defineComponent({
         setup() {
-            api = useDashboardPolling(['stats'], 30_000);
+            api = useDashboardPolling(['stats'], 30_000, options);
 
             return () => h('div');
         },
@@ -73,6 +73,25 @@ describe('useDashboardPolling', () => {
         api.refresh();
 
         expect(router.reload).toHaveBeenCalledOnce();
+        wrapper.unmount();
+    });
+
+    it('"Atualizar" completo: inclui as props manuais e manda os headers; o polling não', () => {
+        const { api, wrapper } = mountPolling({ manual: ['insights'], headers: { 'X-Dashboard-Refresh': '1' } });
+
+        vi.advanceTimersByTime(30_000);
+        expect(lastReloadOptions().only).toEqual(['stats']);
+        expect(lastReloadOptions().headers).toBeUndefined();
+        lastReloadOptions().onFinish();
+
+        api.refresh({ full: true });
+        expect(api.isFullRefresh.value).toBe(true);
+        expect(lastReloadOptions()).toMatchObject({
+            only: ['stats', 'insights'],
+            headers: { 'X-Dashboard-Refresh': '1' },
+        });
+        lastReloadOptions().onFinish();
+        expect(api.isFullRefresh.value).toBe(false);
         wrapper.unmount();
     });
 });

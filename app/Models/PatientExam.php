@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domains\AI\Models\AiRun;
+use App\Enums\AI\AiRunStatus;
 use App\Enums\ExamSource;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\{Builder, Model};
@@ -185,6 +186,44 @@ class PatientExam extends Model
     public function isExternal(): bool
     {
         return $this->source === ExamSource::ExternalImport;
+    }
+
+    /**
+     * Exames com laudo na clínica: laudo manual/conjunto vigente (vínculo em
+     * medical_record_documentation_exams, documentação não excluída) OU laudo
+     * de IA aprovado. Mesmo critério do filtro "Laudado" do Gerenciador de
+     * Imagens e do indicador "Exames pendentes" do Dashboard.
+     */
+    public function scopeReported(Builder $query, string $entityId): Builder
+    {
+        return $query->where(fn (Builder $q) => $this->reportedConstraint($q, $entityId));
+    }
+
+    /**
+     * Exames habilitados ainda sem laudo — desabilitado não entra: não pode
+     * ser laudado (bloqueio de laudo/PDF/IA), então não é pendência.
+     */
+    public function scopePendingReport(Builder $query, string $entityId): Builder
+    {
+        return $query->where('patient_exams.active', true)
+            ->whereNot(fn (Builder $q) => $this->reportedConstraint($q, $entityId));
+    }
+
+    private function reportedConstraint(Builder $query, string $entityId): void
+    {
+        $query
+            ->whereExists(fn ($sub) => $sub->selectRaw('1')
+                ->from('medical_record_documentation_exams as mrde')
+                ->join('medical_record_documentations as mrd', 'mrd.id', '=', 'mrde.medical_record_documentation_id')
+                ->whereColumn('mrde.patient_exam_id', 'patient_exams.id')
+                ->where('mrde.entity_id', $entityId)
+                ->whereNull('mrd.deleted_at'))
+            ->orWhereExists(fn ($sub) => $sub->selectRaw('1')
+                ->from('ai_run_patient_exam as arpe')
+                ->join('ai_runs', 'ai_runs.id', '=', 'arpe.ai_run_id')
+                ->whereColumn('arpe.patient_exam_id', 'patient_exams.id')
+                ->where('arpe.entity_id', $entityId)
+                ->where('ai_runs.status', AiRunStatus::Approved->value));
     }
 
     /**

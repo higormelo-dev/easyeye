@@ -16,7 +16,7 @@ final readonly class EyeImageFilters
 {
     private const array EYES = ['od', 'oe', 'ao'];
 
-    private const array STATUSES = ['laudado'];
+    private const array STATUSES = ['laudado', 'pendente'];
 
     public function __construct(
         public string $period = 'hoje',

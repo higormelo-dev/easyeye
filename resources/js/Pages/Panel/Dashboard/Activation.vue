@@ -17,7 +17,7 @@ const color = computed(() => {
 </script>
 
 <template>
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card border-0 shadow-sm db-card">
         <div class="card-body p-4">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <div>

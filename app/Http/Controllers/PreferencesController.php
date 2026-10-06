@@ -25,6 +25,8 @@ class PreferencesController extends Controller
      */
     private const ALLOWED_KEYS = [
         'dashboard_widget_order',
+        // Seções do Dashboard ocultas pelo usuário ("Personalizar" → olho).
+        'dashboard_hidden_sections',
         'favorite_shortcuts',
         'medical_record_layout',
         // Modelo pessoal do prontuário em TEXTO LIVRE (ticket "simplificar
@@ -54,6 +56,8 @@ class PreferencesController extends Controller
         $request->validate([
             'dashboard_widget_order'      => ['sometimes', 'array'],
             'dashboard_widget_order.*'    => ['string'],
+            'dashboard_hidden_sections'   => ['sometimes', 'array', 'max:30'],
+            'dashboard_hidden_sections.*' => ['string', 'max:40'],
             'favorite_shortcuts'          => ['sometimes', 'array'],
             'favorite_shortcuts.*.key'    => ['required_with:favorite_shortcuts', 'string'],
             'favorite_shortcuts.*.hidden' => ['sometimes', 'boolean'],

@@ -56,7 +56,7 @@ class AuthenticatedEntityController extends Controller
         ]);
 
         if ($entityUser->rule === 'doctor') {
-            session(['selected_entity_doctor_id' => $entityUser->doctor->id]);
+            session(['selected_entity_doctor_id' => $entityUser->doctor?->id]);
         }
 
         // Usuários SaaS (non-client) não devem ser redirecionados para URLs que

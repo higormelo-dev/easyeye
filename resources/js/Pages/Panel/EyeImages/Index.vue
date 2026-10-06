@@ -61,9 +61,16 @@ const doctorId = ref(props.filters?.doctor_id ?? '');
 const examTypeId = ref(props.filters?.exam_type_id ?? '');
 const equipmentId = ref(props.filters?.equipment_id ?? '');
 const cidCode = ref(props.filters?.cid_code ?? '');
-const examStatus = ref(props.filters?.status ?? ''); // '' | 'laudado'
+const examStatus = ref(props.filters?.status ?? ''); // '' | 'laudado' | 'pendente'
 const examSource = ref(props.filters?.source ?? ''); // '' | 'integrator' | 'external_import'
-const showFilters = ref(false);
+// Abre a barra de filtros quando a página já chega filtrada (ex.: card
+// "Exames pendentes" do Dashboard → ?status=pendente) — senão o filtro
+// ativo fica escondido e a lista parece incompleta.
+const showFilters = ref(
+    ['eye', 'exam_type_id', 'equipment_id', 'cid_code', 'doctor_id', 'status', 'source'].some(
+        (key) => !!props.filters?.[key],
+    ),
+);
 
 // Opções de select — vêm prontas do servidor (filtros server-side não podem
 // mais derivar as opções dos dados já carregados/filtrados no client).
@@ -1952,10 +1959,13 @@ const printEntity = computed(() => props.entity ?? {});
                     <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect
                             v-model="examStatus"
-                            :options="[{ value: 'laudado', label: 'Análise automática aprovada' }]"
+                            :options="[
+                                { value: 'pendente', label: tt('status_pending_report', 'Sem laudo') },
+                                { value: 'laudado', label: tt('status_reported', 'Laudado') },
+                            ]"
                             :value-key="'value'"
                             :label-key="'label'"
-                            :placeholder="'Todos status'"
+                            :placeholder="tt('all_statuses', 'Todos os status')"
                         />
                     </div>
 

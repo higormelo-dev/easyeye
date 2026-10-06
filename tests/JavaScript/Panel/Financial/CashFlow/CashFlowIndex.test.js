@@ -659,3 +659,24 @@ describe('Financial/CashFlow/Index — lançamento e exclusão', () => {
         );
     });
 });
+
+describe('Lançar no caixa pelo Dashboard (?new=1)', () => {
+    it('abre o lançamento vazio e limpa a URL sem empilhar histórico', async () => {
+        window.history.replaceState(null, '', '/panel/financial/cash-flow?new=1&from=2026-09-01');
+        const w = mountPage();
+        await w.vm.$nextTick();
+
+        expect(w.findComponent({ name: 'CashEntryFormModalStub' }).props('open')).toBe(true);
+        expect(w.findComponent({ name: 'CashEntryFormModalStub' }).props('entry')).toBeNull();
+        expect(lastVisit()).toEqual([INDEX_URL, { from: '2026-09-01' }, VISIT_OPTS]);
+        window.history.replaceState(null, '', '/');
+    });
+
+    it('sem ?new=1 nada abre sozinho', () => {
+        window.history.replaceState(null, '', '/panel/financial/cash-flow');
+        const w = mountPage();
+
+        expect(w.findComponent({ name: 'CashEntryFormModalStub' }).props('open')).toBe(false);
+        expect(router.get).not.toHaveBeenCalled();
+    });
+});

@@ -81,6 +81,14 @@ class Schedule extends Model
                 $schedule->assignNextCode();
             }
         });
+
+        // Remarcou (data/hora mudou): a confirmação do WhatsApp com a data
+        // antiga deixa de valer — o comando manda outra com a nova data.
+        static::updated(function (self $schedule) {
+            if ($schedule->wasChanged('date_time')) {
+                WhatsAppMessage::supersedeConfirmationsOf((string) $schedule->id);
+            }
+        });
     }
 
     /**

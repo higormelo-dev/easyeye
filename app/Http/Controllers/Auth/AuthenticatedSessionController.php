@@ -59,7 +59,7 @@ class AuthenticatedSessionController extends Controller
             ]);
 
             if ($entityUser->rule === 'doctor') {
-                session(['selected_entity_doctor_id' => $entityUser->doctor->id]);
+                session(['selected_entity_doctor_id' => $entityUser->doctor?->id]);
             }
         }
 

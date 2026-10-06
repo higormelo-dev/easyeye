@@ -92,3 +92,26 @@ describe('Agenda — calendário lateral', () => {
         expect(wrapper.text()).toContain('Horário');
     });
 });
+
+describe('Agenda — "Novo agendamento" pelo Dashboard (?new=1)', () => {
+    it('abre o formulário vazio e limpa a URL com uma visita leve (replace)', async () => {
+        window.history.replaceState(null, '', '/panel/schedules?new=1');
+        const wrapper = mountPage();
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.find('.stub-ScheduleFormModal').attributes('open')).toBe('true');
+        expect(router.get).toHaveBeenCalledWith(
+            '/_routes/panel.schedules.index',
+            {},
+            expect.objectContaining({ replace: true, preserveState: true }),
+        );
+        window.history.replaceState(null, '', '/');
+    });
+
+    it('sem ?new=1 o formulário continua fechado', () => {
+        window.history.replaceState(null, '', '/panel/schedules');
+        const wrapper = mountPage();
+
+        expect(wrapper.find('.stub-ScheduleFormModal').attributes('open')).toBe('false');
+    });
+});

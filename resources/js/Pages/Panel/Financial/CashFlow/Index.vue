@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
@@ -256,6 +256,21 @@ function openCreate() {
     editingEntry.value = null;
     formOpen.value = true;
 }
+
+// ?new=1 — "Lançar no caixa" do Dashboard abre o lançamento vazio; a URL
+// volta limpa (visita leve com replace) para recarregar não reabrir o modal.
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') !== '1') return;
+
+    openCreate();
+    params.delete('new');
+    router.get(route('panel.financial.cash-flow.index'), Object.fromEntries(params.entries()), {
+        replace: true,
+        preserveState: true,
+        preserveScroll: true,
+    });
+});
 
 function openEdit(entry) {
     if (entry.lock_reason) return;

@@ -511,7 +511,7 @@ class PanelNavigation
     }
 
     /**
-     * Catálogos globais (medicamentos, convênios) — rotas saas.role:admin
+     * Catálogos globais (medicamentos, CID-10, convênios) — rotas saas.role:admin
      * (admin ou dono); para o resto da equipe o link só daria 403.
      *
      * @return list<array<string, mixed>>
@@ -529,6 +529,13 @@ class PanelNavigation
                 'icon'  => 'ti ti-pill',
                 'label' => __('manager_medicines.menu'),
                 'match' => ['manager.medicines.*'],
+            ],
+            [
+                'key'   => 'cid10',
+                'route' => 'manager.cid10.index',
+                'icon'  => 'ti ti-stethoscope',
+                'label' => __('manager_cid10.menu'),
+                'match' => ['manager.cid10.*'],
             ],
             [
                 'key'   => 'covenants',

@@ -165,6 +165,25 @@
     }
 }
 
+/* Celular (2 cards por linha): ícone em cima do número — rótulos longos
+   ("Aguardando você", "Laudos de IA a revisar") não estouram o card. */
+@media (max-width: 575.98px) {
+    .page-dashboard .stat-card .card-body {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.5rem !important;
+    }
+    .page-dashboard .stat-card .stat-label {
+        overflow-wrap: anywhere;
+        hyphens: auto;
+    }
+    .page-dashboard .stat-card .stat-card-chevron {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+    }
+}
+
 /* ─── Quick Action Buttons ───────────────────────────────────────────── */
 .quick-action-btn {
     display: flex;
@@ -495,6 +514,8 @@
 .page-dashboard .stat-card--guides { border-top-color: #bf360c !important; }
 .page-dashboard .stat-card--receivable { border-top-color: #00695c !important; }
 .page-dashboard .stat-card--satisfaction { border-top-color: #f57f17 !important; }
+.page-dashboard .stat-card--waiting { border-top-color: #b45309 !important; }
+.page-dashboard .stat-card--ai { border-top-color: #0f766e !important; }
 
 .page-dashboard .stat-icon--patients { background: #e3f2fd; color: #1976d2; }
 .page-dashboard .stat-icon--today { background: #ede7f6; color: #5c6bc0; }
@@ -504,6 +525,95 @@
 .page-dashboard .stat-icon--guides { background: #fce4ec; color: #bf360c; }
 .page-dashboard .stat-icon--receivable { background: #e0f2f1; color: #00695c; }
 .page-dashboard .stat-icon--satisfaction { background: #fff8e1; color: #f57f17; }
+.page-dashboard .stat-icon--waiting { background: #fef3c7; color: #b45309; }
+.page-dashboard .stat-icon--ai { background: #ccfbf1; color: #0f766e; }
+
+/* ─── Próximo paciente (médico) ───────────────────────────────────────── */
+.page-dashboard .next-patient {
+    border: 1px solid var(--ee-border, #e2e8f0) !important;
+    border-left: 4px solid #1976d2 !important;
+}
+
+.page-dashboard .next-patient--waiting {
+    border-left-color: #b45309 !important;
+    background: linear-gradient(90deg, #fffbeb 0%, #ffffff 60%) !important;
+}
+
+.page-dashboard .next-patient-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    background: #e3f2fd;
+    color: #1976d2;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.page-dashboard .next-patient--waiting .next-patient-icon {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.page-dashboard .next-patient-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #475569;
+}
+
+.page-dashboard .next-patient-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0.1rem 0 0.25rem;
+}
+
+@media (max-width: 575.98px) {
+    .page-dashboard .next-patient-actions {
+        width: 100%;
+    }
+
+    .page-dashboard .next-patient-actions .btn {
+        flex: 1 1 auto;
+    }
+}
+
+/* ─── Aviso: médico sem cadastro de médico (contraste AA) ─────────────── */
+.page-dashboard .doctor-missing-alert {
+    color: #713f12 !important;
+    background: #fef9c3 !important;
+    border-color: #fde68a !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .doctor-missing-alert {
+    color: #fde68a !important;
+    background: #2a2110 !important;
+    border-color: #6d552b !important;
+}
+
+/* ─── Pendências do médico (listas curtas) ────────────────────────────── */
+.page-dashboard .pending-list-count {
+    background: #e2e8f0;
+    color: #334155;
+    font-weight: 600;
+}
+
+.page-dashboard .pending-list-count--active {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.page-dashboard .pending-list-items .list-group-item {
+    background: transparent;
+}
+
+.page-dashboard .pending-list-title {
+    font-size: 0.875rem;
+}
 
 /* ─── Module Icon Palette ─────────────────────────────────────────────── */
 .page-dashboard .module-icon--schedule {
@@ -634,6 +744,46 @@
 :root[data-bs-theme=dark] .page-dashboard .stat-icon--guides { background: rgba(191, 54, 12, 0.2); color: #ffb3a0; }
 :root[data-bs-theme=dark] .page-dashboard .stat-icon--receivable { background: rgba(0, 105, 92, 0.24); color: #73dfcf; }
 :root[data-bs-theme=dark] .page-dashboard .stat-icon--satisfaction { background: rgba(245, 127, 23, 0.2); color: #ffcc7f; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--waiting { background: rgba(180, 83, 9, 0.24); color: #fcd34d; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--ai { background: rgba(15, 118, 110, 0.26); color: #5eead4; }
+
+:root[data-bs-theme=dark] .page-dashboard .next-patient--waiting {
+    background: linear-gradient(90deg, #2a2110 0%, #0f1729 60%) !important;
+    border-left-color: #f59e0b !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .next-patient--scheduled {
+    border-left-color: #60a5fa !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .next-patient-icon {
+    background: rgba(25, 118, 210, 0.2);
+    color: #86bbff;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .next-patient--waiting .next-patient-icon {
+    background: rgba(180, 83, 9, 0.24);
+    color: #fcd34d;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .next-patient-label {
+    color: var(--ee-text-muted, #9fb0cc);
+}
+
+:root[data-bs-theme=dark] .page-dashboard .pending-list-count {
+    background: #22334c;
+    color: #c8d5ea;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .pending-list-count--active {
+    background: #3a2e18;
+    color: #ffd79c;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .pending-list-items .list-group-item {
+    border-color: #1f3048;
+    color: var(--ee-text, #e4ebfa);
+}
 
 :root[data-bs-theme=dark] .page-dashboard .module-icon--schedule {
     background: rgba(25, 118, 210, 0.2);
@@ -682,4 +832,1623 @@
     background: #1c2a43 !important;
     color: #b2c3df !important;
     border-color: #3b547a !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Dashboard v2 — "painel por função" (Panel/Dashboard.vue + Dashboard/*)
+   Tudo com prefixo db- (o ManagerDashboard também importa este arquivo).
+   Layout por CONTAINER QUERY: a largura útil muda com o menu lateral
+   aberto/recolhido, então a grade segue o espaço do painel, não a janela.
+   ═══════════════════════════════════════════════════════════════════════ */
+.page-dashboard[data-profile] {
+    --db-gap: 1rem;
+    --db-radius: 0.75rem;
+    --db-surface: #ffffff;
+    --db-border: #e5e9f0;
+    --db-text: #0f172a;
+    --db-muted: #64748b;
+    --db-faint: #94a3b8;
+    --db-good: #15803d;
+    --db-good-bg: #dcfce7;
+    --db-bad: #b91c1c;
+    --db-bad-bg: #fee2e2;
+    --db-warn: #92400e;
+    --db-warn-bg: #fef3c7;
+    --db-neutral-bg: #eef2f7;
+    container-type: inline-size;
+    container-name: db;
+    display: flex;
+    flex-direction: column;
+    gap: var(--db-gap);
+    padding-bottom: 1.5rem;
+}
+
+.page-dashboard[data-profile] > .alert,
+.page-dashboard[data-profile] > .card {
+    margin-bottom: 0;
+}
+
+/* ── Cabeçalho ─────────────────────────────────────────────────────────── */
+.db-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    padding: 0.5rem 0 0.25rem;
+}
+
+.db-header__main {
+    min-width: 0;
+}
+
+.db-header__eyebrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.db-role {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgb(var(--primary-rgb));
+    background: rgba(var(--primary-rgb), 0.09);
+}
+
+.db-header__date {
+    font-size: 0.8125rem;
+    color: var(--db-muted);
+}
+
+.db-header__title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--db-text);
+    letter-spacing: -0.01em;
+}
+
+.db-header__entity {
+    margin: 0.15rem 0 0;
+    font-size: 0.875rem;
+    color: var(--db-muted);
+}
+
+.db-header__side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.6rem;
+}
+
+.db-header__tools,
+.db-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.page-dashboard .db-header__actions .btn {
+    padding: 0.45rem 0.9rem;
+    font-weight: 600;
+}
+
+.db-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    color: var(--db-muted);
+}
+
+.db-live__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+.db-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--db-border);
+    border-radius: 0.5rem;
+    background: var(--db-surface);
+    color: var(--db-muted);
+    font-size: 0.8125rem;
+    line-height: 1;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.db-icon-btn:hover:not(:disabled),
+.db-icon-btn:focus-visible {
+    color: rgb(var(--primary-rgb));
+    border-color: rgba(var(--primary-rgb), 0.45);
+}
+
+.db-icon-btn:focus-visible,
+.db-link:focus-visible,
+.db-metric--link:focus-visible,
+.module-shortcut:focus-visible {
+    outline: 2px solid rgb(var(--primary-rgb));
+    outline-offset: 2px;
+}
+
+.db-icon-btn:disabled {
+    opacity: 0.6;
+}
+
+.db-icon-btn--labelled {
+    padding: 0 0.65rem;
+}
+
+/* ── Seções e títulos ──────────────────────────────────────────────────── */
+.db-section {
+    min-width: 0;
+}
+
+.db-section-head {
+    margin-bottom: 0.6rem;
+}
+
+.db-section-head--row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.db-section-title {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--db-muted);
+}
+
+.db-section-title__muted {
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.db-section-sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--db-muted);
+}
+
+/* ── Cards ─────────────────────────────────────────────────────────────── */
+.page-dashboard .db-card {
+    margin-bottom: 0;
+    border-radius: var(--db-radius) !important;
+    overflow: hidden;
+}
+
+.page-dashboard .db-card:hover {
+    box-shadow: var(--ee-shadow-sm) !important;
+}
+
+.db-card-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem 0.75rem;
+    padding: 0.8rem 1.1rem;
+    border-bottom: 1px solid var(--db-border);
+}
+
+.db-card-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--db-text);
+}
+
+.db-card-title > .ti {
+    font-size: 1.1rem;
+    color: rgb(var(--primary-rgb));
+}
+
+.db-card-meta {
+    font-size: 0.78rem;
+    color: var(--db-muted);
+}
+
+.db-card-body {
+    padding: 0.9rem 1.1rem 1rem;
+}
+
+.db-card-foot {
+    margin: 0.75rem 0 0;
+    font-size: 0.78rem;
+    color: var(--db-muted);
+}
+
+.db-card-note {
+    margin: 0;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.78rem;
+    color: var(--db-muted);
+    text-align: center;
+    border-top: 1px solid var(--db-border);
+}
+
+.db-card-note--inline {
+    padding: 0.4rem 0 0;
+    border-top: 0;
+    text-align: left;
+}
+
+.db-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: rgb(var(--primary-rgb));
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.db-link:hover {
+    text-decoration: underline;
+}
+
+.db-count {
+    min-width: 1.5rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: var(--db-neutral-bg);
+    color: var(--db-muted);
+}
+
+.db-count--active {
+    background: rgba(var(--primary-rgb), 0.12);
+    color: rgb(var(--primary-rgb));
+}
+
+.db-badge-live,
+.db-badge-now {
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    background: rgba(var(--primary-rgb), 0.12);
+    color: rgb(var(--primary-rgb));
+}
+
+.page-dashboard .db-btn-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1px solid var(--db-border) !important;
+    background: var(--db-surface) !important;
+    color: var(--db-text) !important;
+}
+
+.page-dashboard .db-btn-soft:hover {
+    border-color: rgba(var(--primary-rgb), 0.5) !important;
+    color: rgb(var(--primary-rgb)) !important;
+}
+
+.page-dashboard .db-icon-only {
+    width: 2rem;
+    height: 2rem;
+    justify-content: center;
+    padding: 0;
+}
+
+/* Estado vazio compacto: uma linha, não um card grande. */
+.db-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem 1rem;
+    color: var(--db-muted);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.db-empty > .ti {
+    font-size: 1.25rem;
+    color: var(--db-faint);
+}
+
+.db-empty--inline {
+    justify-content: flex-start;
+    padding: 0.85rem 1.1rem;
+    text-align: left;
+}
+
+.db-empty--flush {
+    padding: 0;
+}
+
+/* ── Indicadores (KPI) ─────────────────────────────────────────────────── */
+.db-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.db-kpi-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
+@container db (min-width: 640px) {
+    .db-kpi-grid {
+        grid-template-columns: repeat(min(var(--db-kpi-cols, 3), 3), minmax(0, 1fr));
+    }
+
+    .db-kpi-grid > :last-child:nth-child(odd) {
+        grid-column: auto;
+    }
+}
+
+@container db (min-width: 1000px) {
+    .db-kpi-grid {
+        grid-template-columns: repeat(var(--db-kpi-cols, 4), minmax(0, 1fr));
+    }
+
+    .db-kpi-grid[style*='--db-kpi-cols: 6'] {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@container db (min-width: 1360px) {
+    .db-kpi-grid[style*='--db-kpi-cols: 6'] {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+}
+
+.db-metric {
+    --db-tone-rgb: var(--primary-rgb);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.9rem 1rem 0.85rem;
+    border: 1px solid var(--db-border);
+    border-radius: var(--db-radius);
+    background: var(--db-surface);
+    box-shadow: var(--ee-shadow-sm);
+    color: var(--db-text);
+    text-decoration: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.db-metric--primary { --db-tone-rgb: var(--primary-rgb); }
+.db-metric--success { --db-tone-rgb: var(--success-rgb); }
+.db-metric--danger { --db-tone-rgb: var(--danger-rgb); }
+.db-metric--warning { --db-tone-rgb: var(--warning-rgb); }
+.db-metric--orange { --db-tone-rgb: var(--orange-rgb); }
+.db-metric--teal { --db-tone-rgb: var(--teal-rgb); }
+.db-metric--indigo { --db-tone-rgb: var(--indigo-rgb); }
+.db-metric--purple { --db-tone-rgb: var(--purple-rgb); }
+.db-metric--info { --db-tone-rgb: var(--info-rgb); }
+
+.db-metric--link {
+    cursor: pointer;
+}
+
+.db-metric--link:hover {
+    color: var(--db-text);
+    border-color: rgba(var(--db-tone-rgb), 0.45);
+    box-shadow: var(--ee-shadow);
+    transform: translateY(-1px);
+}
+
+.db-metric--alert {
+    border-color: rgba(var(--warning-rgb), 0.55);
+    box-shadow: inset 3px 0 0 rgb(var(--warning-rgb)), var(--ee-shadow-sm);
+}
+
+.db-metric__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.db-metric__label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--db-muted);
+}
+
+.db-metric__icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.55rem;
+    font-size: 1.05rem;
+    background: rgba(var(--db-tone-rgb), 0.1);
+    color: rgb(var(--db-tone-rgb));
+}
+
+.page-dashboard .db-metric__value {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--db-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.db-metric__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    min-height: 1.25rem;
+    font-size: 0.75rem;
+}
+
+.db-metric__caption {
+    color: var(--db-muted);
+}
+
+.db-metric--refreshing .db-metric__value {
+    opacity: 0.75;
+    transition: opacity 0.2s ease;
+}
+
+.db-delta {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.db-delta--good {
+    background: var(--db-good-bg);
+    color: var(--db-good);
+}
+
+.db-delta--bad {
+    background: var(--db-bad-bg);
+    color: var(--db-bad);
+}
+
+.db-delta--neutral {
+    background: var(--db-neutral-bg);
+    color: var(--db-muted);
+}
+
+.stat-skeleton--line {
+    width: 70%;
+    height: 0.8rem;
+}
+
+/* ── Linha dividida: agenda + coluna lateral; tendências ───────────────── */
+.db-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--db-gap);
+    align-items: start;
+}
+
+.db-side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--db-gap);
+    min-width: 0;
+}
+
+@container db (min-width: 960px) {
+    .db-split {
+        grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+    }
+
+    /* Agenda × coluna lateral alinhadas no topo e na base. A agenda sai do
+       fluxo (absoluta na célula) e não puxa a altura da linha: quem manda é a
+       coluna lateral, com um mínimo para a lista continuar usável. Se a coluna
+       for menor que o mínimo, o último card dela estica até a base. */
+    .db-split--agenda {
+        align-items: stretch;
+    }
+
+    .db-agenda-cell {
+        position: relative;
+        min-height: 26rem;
+    }
+
+    .db-agenda-cell > .schedule-today {
+        position: absolute;
+        inset: 0;
+    }
+
+    .db-split--agenda > .db-side > :last-child {
+        flex: 1 0 auto;
+    }
+
+    .db-split--trends {
+        grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    }
+
+    .db-split--single {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@container db (min-width: 1400px) {
+    .db-split {
+        grid-template-columns: minmax(0, 7fr) minmax(360px, 3fr);
+    }
+
+    .db-split--trends {
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+}
+
+/* ── Seções compactas vizinhas: dividem a linha ────────────────────────── */
+.db-compact-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--db-gap);
+    /* Cards da mesma linha com a mesma altura (topo e base alinhados). */
+    align-items: stretch;
+}
+
+/* "Últimos pacientes" dividindo a linha com outros cards: não define a altura
+   da linha (contain: size) — ocupa a altura dos vizinhos (com mínimo) e rola
+   por dentro. Sem isso, a lista de 8 pacientes esticava a linha e sobrava
+   branco dentro da lista de espera/aniversariantes. Sozinho, fica inteiro. */
+.recent-patients .db-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+@container db (min-width: 760px) {
+    .db-compact-row[data-count='2'] > .recent-patients,
+    .db-compact-row[data-count='4'] > .recent-patients,
+    .db-compact-row[data-count='3'] > .recent-patients:not(:last-child),
+    .db-compact-row[data-count='5'] > .recent-patients:not(:last-child) {
+        contain: size;
+        min-height: 17rem;
+    }
+}
+
+@container db (min-width: 1300px) {
+    .db-compact-row[data-count='3'] > .recent-patients,
+    .db-compact-row[data-count='5'] > .recent-patients,
+    .db-compact-row[data-count='6'] > .recent-patients {
+        contain: size;
+        min-height: 17rem;
+    }
+}
+
+/* ── Faixa de seções compactas vazias (sem card ocupando espaço) ───────── */
+.db-empty-strip__list {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.db-empty-strip__item {
+    display: flex;
+    flex: 1 1 18rem;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    padding: 0.7rem 1.1rem;
+    font-size: 0.875rem;
+    color: var(--db-muted);
+}
+
+.db-empty-strip__item + .db-empty-strip__item {
+    border-left: 1px solid var(--db-border);
+}
+
+.db-empty-strip__item > .ti {
+    font-size: 1.1rem;
+    color: var(--db-faint);
+}
+
+.db-empty-strip__item > strong {
+    color: var(--db-text, var(--ee-text));
+    font-weight: 600;
+}
+
+.db-empty-strip__item > .db-link {
+    margin-left: auto;
+}
+
+@container db (max-width: 759px) {
+    .db-empty-strip__item + .db-empty-strip__item {
+        border-left: 0;
+        border-top: 1px solid var(--db-border);
+    }
+}
+
+@container db (min-width: 760px) {
+    .db-compact-row:not([data-count='1']) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .db-compact-row[data-count='3'] > :last-child,
+    .db-compact-row[data-count='5'] > :last-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@container db (min-width: 1300px) {
+    .db-compact-row[data-count='3'],
+    .db-compact-row[data-count='5'],
+    .db-compact-row[data-count='6'] {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .db-compact-row[data-count='3'] > :last-child,
+    .db-compact-row[data-count='5'] > :last-child {
+        grid-column: auto;
+    }
+}
+
+/* ── Listas compactas (sala de espera, ligar, lista de espera...) ──────── */
+.db-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.db-list__item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.6rem 1.1rem;
+    border-bottom: 1px solid var(--db-border);
+}
+
+.db-list__item:last-child {
+    border-bottom: 0;
+}
+
+.db-card-body .db-list__item {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.db-list--dense .db-list__item {
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+}
+
+.db-list__main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.db-list__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--db-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+a.db-list__title {
+    text-decoration: none;
+}
+
+a.db-list__title:hover {
+    color: rgb(var(--primary-rgb));
+    text-decoration: underline;
+}
+
+.db-list__sub {
+    font-size: 0.75rem;
+    color: var(--db-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.db-list__side {
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+}
+
+.db-wait {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--db-text);
+}
+
+.db-wait--warning {
+    color: var(--db-warn);
+}
+
+.db-wait--danger {
+    color: var(--db-bad);
+}
+
+.schedule-badge {
+    font-weight: 600;
+}
+
+.db-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--db-neutral-bg);
+    color: var(--db-muted);
+    white-space: nowrap;
+}
+
+.db-chip--awaiting {
+    background: #e0f2fe;
+    color: #075985;
+}
+
+.db-chip--queued {
+    background: var(--db-neutral-bg);
+    color: #334155;
+}
+
+.db-chip--failed {
+    background: var(--db-bad-bg);
+    color: var(--db-bad);
+}
+
+.db-chip--none {
+    background: var(--db-warn-bg);
+    color: var(--db-warn);
+}
+
+.db-overline,
+.page-dashboard .ds-section-title {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--db-muted);
+}
+
+/* ── Confirmações (hoje | amanhã) ──────────────────────────────────────── */
+.confirm-days {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.confirm-day {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 1rem 1.1rem;
+}
+
+.confirm-day + .confirm-day {
+    border-top: 1px solid var(--db-border);
+}
+
+@container db (min-width: 900px) {
+    .confirm-days {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .confirm-day + .confirm-day {
+        border-top: 0;
+        border-left: 1px solid var(--db-border);
+    }
+}
+
+.confirm-day__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.confirm-day__title {
+    display: inline;
+    margin: 0 0.4rem 0 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--db-text);
+}
+
+.confirm-day__date {
+    font-size: 0.8125rem;
+    color: var(--db-muted);
+}
+
+.confirm-meter__numbers {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.8125rem;
+    color: var(--db-muted);
+}
+
+.confirm-meter__numbers strong {
+    font-size: 1.35rem;
+    line-height: 1;
+    color: var(--db-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.confirm-meter__pct {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--db-text);
+}
+
+.confirm-meter__bar {
+    height: 0.45rem;
+    margin: 0.4rem 0 0.35rem;
+    background: var(--db-neutral-bg);
+}
+
+.confirm-meter__bar .progress-bar {
+    background: rgb(var(--success-rgb));
+}
+
+.confirm-meter__legend {
+    font-size: 0.78rem;
+    color: var(--db-muted);
+}
+
+.confirm-shifts,
+.confirm-wa {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.6rem;
+    font-size: 0.78rem;
+    color: var(--db-muted);
+}
+
+.confirm-shift strong {
+    color: var(--db-text);
+    font-weight: 700;
+}
+
+.confirm-shift__conf {
+    color: var(--db-faint);
+}
+
+.confirm-wa__label {
+    font-size: 1rem;
+    color: #16a34a;
+}
+
+.confirm-call__time {
+    flex-shrink: 0;
+    width: 2.75rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--db-text);
+}
+
+.page-dashboard .confirm-call__phone {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Pendências do médico ──────────────────────────────────────────────── */
+.db-pending {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.pending-ok {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--db-muted);
+}
+
+.pending-ok > .ti {
+    font-size: 1.05rem;
+    color: rgb(var(--success-rgb));
+}
+
+.pending-list__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.pending-list__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--db-text);
+}
+
+.pending-list__title > .ti {
+    color: rgb(var(--primary-rgb));
+}
+
+.pending-list__hint {
+    margin: 0.15rem 0 0;
+    font-size: 0.75rem;
+    color: var(--db-muted);
+}
+
+/* ── Tabela "Atendimentos por médico" ──────────────────────────────────── */
+.page-dashboard .db-table {
+    --bs-table-bg: transparent;
+    table-layout: fixed;
+}
+
+.page-dashboard .db-table th,
+.page-dashboard .db-table td {
+    padding: 0.55rem 0.5rem;
+    font-size: 0.8125rem;
+    vertical-align: middle;
+    border-color: var(--db-border);
+    background: transparent;
+}
+
+.page-dashboard .db-table thead th {
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--db-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.page-dashboard .db-table th:first-child,
+.page-dashboard .db-table td:first-child {
+    padding-left: 1.1rem;
+    width: 40%;
+}
+
+.page-dashboard .db-table th:last-child,
+.page-dashboard .db-table td:last-child {
+    padding-right: 1.1rem;
+}
+
+.db-table__name {
+    font-weight: 600;
+    color: var(--db-text);
+}
+
+.db-mini-bar {
+    display: block;
+    height: 0.25rem;
+    margin-top: 0.3rem;
+    border-radius: 999px;
+    background: var(--db-neutral-bg);
+    overflow: hidden;
+}
+
+.db-mini-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: rgb(var(--success-rgb));
+}
+
+/* ── Financeiro: caixa de hoje, a receber, glosas ──────────────────────── */
+.db-finance-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--db-gap);
+    align-items: stretch;
+}
+
+@container db (min-width: 760px) {
+    .db-finance-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .db-finance-grid > :last-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@container db (min-width: 1200px) {
+    .db-finance-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .db-finance-grid > :last-child {
+        grid-column: auto;
+    }
+}
+
+.db-figure__value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--db-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.db-figure__value--good {
+    color: var(--db-good);
+}
+
+.db-figure__value--bad {
+    color: var(--db-bad);
+}
+
+.db-figure--hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+
+.db-figure--hero .db-figure__value {
+    font-size: 1.5rem;
+}
+
+.db-figure__hint {
+    font-size: 0.75rem;
+    color: var(--db-muted);
+}
+
+.db-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.db-rows li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    border-top: 1px dashed var(--db-border);
+    font-size: 0.8125rem;
+}
+
+.db-rows__label {
+    color: var(--db-muted);
+    text-decoration: none;
+}
+
+a.db-rows__label:hover {
+    color: rgb(var(--primary-rgb));
+    text-decoration: underline;
+}
+
+.db-rows__value {
+    font-weight: 700;
+    color: var(--db-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.db-rows--alert .db-rows__label,
+.db-rows--alert .db-rows__value {
+    color: var(--db-bad);
+}
+
+.db-rows--warn .db-rows__label,
+.db-rows--warn .db-rows__value {
+    color: var(--db-warn);
+}
+
+/* ── Gráficos ──────────────────────────────────────────────────────────── */
+.db-chart__totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.8125rem;
+    color: var(--db-muted);
+}
+
+.db-chart__totals strong {
+    color: var(--db-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.db-chart-skeleton {
+    height: 240px;
+    border-radius: 0.5rem;
+    background: linear-gradient(90deg, #eef2f7 25%, #f6f8fb 50%, #eef2f7 75%);
+    background-size: 200% 100%;
+    animation: dbShimmer 1.2s ease-in-out infinite;
+}
+
+.db-chart-skeleton--short {
+    height: 120px;
+}
+
+.db-data-toggle:focus-visible {
+    outline: 2px solid rgb(var(--primary-rgb));
+    outline-offset: 2px;
+}
+
+.page-dashboard .db-chart__table table {
+    --bs-table-bg: transparent;
+}
+
+.page-dashboard .db-chart__table th,
+.page-dashboard .db-chart__table td {
+    background: transparent;
+    font-size: 0.8125rem;
+}
+
+.db-covenants__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.db-covenants__line {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+}
+
+.db-covenants__name {
+    font-weight: 600;
+    color: var(--db-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.db-covenants__value {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.db-covenants__track {
+    margin-top: 0.3rem;
+}
+
+.db-covenants__bar {
+    display: flex;
+    height: 0.5rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(var(--primary-rgb), 0.18);
+}
+
+.db-covenants__paid {
+    background: rgb(var(--success-rgb));
+}
+
+.db-covenants__denied {
+    background: rgb(var(--danger-rgb));
+}
+
+.db-covenants__sub {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    color: var(--db-muted);
+}
+
+.db-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.875rem;
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    font-size: 0.75rem;
+    color: var(--db-muted);
+}
+
+.db-legend li::before {
+    content: '';
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    margin-right: 0.35rem;
+}
+
+.db-legend--billed::before { background: rgba(var(--primary-rgb), 0.35); }
+.db-legend--paid::before { background: rgb(var(--success-rgb)); }
+.db-legend--denied::before { background: rgb(var(--danger-rgb)); }
+
+/* ── Atalhos (linha de módulos) ────────────────────────────────────────── */
+.db-shortcuts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+    gap: 0.75rem;
+}
+
+.page-dashboard[data-profile] .module-shortcut {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.65rem;
+    min-height: 0;
+    padding: 0.7rem 0.85rem;
+    border-width: 1px !important;
+    border-radius: var(--db-radius) !important;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: left;
+}
+
+.page-dashboard[data-profile] .module-shortcut:hover {
+    transform: none;
+    background: var(--db-surface) !important;
+    border-color: rgba(var(--primary-rgb), 0.45) !important;
+}
+
+.page-dashboard[data-profile] .module-shortcut .ms-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.6rem;
+    font-size: 1.15rem;
+}
+
+.page-dashboard[data-profile] .module-shortcut i {
+    font-size: 1.15rem;
+}
+
+.page-dashboard[data-profile] .module-shortcut:hover .ms-icon {
+    transform: none;
+}
+
+.module-shortcut__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.25;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.page-dashboard[data-profile] .module-shortcut__chevron {
+    font-size: 0.95rem !important;
+    color: var(--db-faint);
+}
+
+.page-dashboard[data-profile] .module-shortcut .badge-soon {
+    position: static;
+    display: table;
+    margin-top: 0.2rem;
+}
+
+.page-dashboard .module-icon--patients { background: #eef2ff; color: #4338ca; }
+.page-dashboard .module-icon--eye { background: #ecfeff; color: #0e7490; }
+.page-dashboard .module-icon--glosas { background: #fef2f2; color: #b91c1c; }
+.page-dashboard .module-icon--bi { background: #f5f3ff; color: #6d28d9; }
+
+/* ── Próximo paciente (médico) ─────────────────────────────────────────── */
+.page-dashboard[data-profile] .next-patient {
+    margin-bottom: 0 !important;
+}
+
+/* ── Agenda: células e cabeçalho no padrão dos cards v2 ────────────────── */
+.page-dashboard .schedule-today .schedule-table thead th {
+    padding: 0.55rem 0.75rem;
+    font-size: 0.7rem;
+}
+
+.page-dashboard .schedule-today .schedule-table tbody td {
+    padding: 0.5rem 0.75rem;
+}
+
+.page-dashboard .schedule-today .schedule-table th:first-child,
+.page-dashboard .schedule-today .schedule-table td:first-child {
+    padding-left: 1.1rem;
+}
+
+/* ── Responsivo (celular) ──────────────────────────────────────────────── */
+@media (max-width: 575.98px) {
+    .db-header {
+        align-items: stretch;
+    }
+
+    .db-header__side {
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .db-header__tools {
+        justify-content: space-between;
+    }
+
+    .db-header__actions {
+        justify-content: stretch;
+    }
+
+    .db-header__actions .btn {
+        flex: 1 1 auto;
+    }
+
+    .db-header__title {
+        font-size: 1.3rem;
+    }
+
+    .page-dashboard .db-metric__value {
+        font-size: 1.3rem;
+    }
+
+    .db-shortcuts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .page-dashboard .confirm-call__phone span {
+        display: none;
+    }
+}
+
+/* ── Tema escuro ───────────────────────────────────────────────────────── */
+:root[data-bs-theme=dark] .page-dashboard[data-profile] {
+    --db-surface: #0f1729;
+    --db-border: #24344e;
+    --db-text: #e4ebfa;
+    --db-muted: #9fb0cc;
+    --db-faint: #6b7f9e;
+    --db-good: #86efac;
+    --db-good-bg: rgba(34, 197, 94, 0.16);
+    --db-bad: #fca5a5;
+    --db-bad-bg: rgba(239, 68, 68, 0.16);
+    --db-warn: #fcd34d;
+    --db-warn-bg: rgba(245, 158, 11, 0.16);
+    --db-neutral-bg: #1c2a43;
+    background: transparent;
+    padding: 0 0 1.5rem;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .db-metric {
+    background: linear-gradient(180deg, #111b30 0%, #0f1729 100%);
+}
+
+:root[data-bs-theme=dark] .page-dashboard .db-metric__icon,
+:root[data-bs-theme=dark] .page-dashboard .db-role,
+:root[data-bs-theme=dark] .page-dashboard .db-count--active,
+:root[data-bs-theme=dark] .page-dashboard .db-badge-live,
+:root[data-bs-theme=dark] .page-dashboard .db-badge-now {
+    background: rgba(var(--db-tone-rgb, var(--primary-rgb)), 0.22);
+    color: color-mix(in srgb, rgb(var(--db-tone-rgb, var(--primary-rgb))) 55%, white);
+}
+
+:root[data-bs-theme=dark] .page-dashboard .db-card-title > .ti,
+:root[data-bs-theme=dark] .page-dashboard .pending-list__title > .ti,
+:root[data-bs-theme=dark] .page-dashboard .db-link,
+:root[data-bs-theme=dark] .page-dashboard a.db-rows__label:hover,
+:root[data-bs-theme=dark] .page-dashboard a.db-list__title:hover {
+    color: #93b4ff;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .db-chip--awaiting {
+    background: rgba(56, 189, 248, 0.16);
+    color: #7dd3fc;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .db-chip--queued {
+    color: #c8d5ea;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .db-chart-skeleton {
+    background: linear-gradient(90deg, #1e2d42 25%, #253651 50%, #1e2d42 75%);
+    background-size: 200% 100%;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .module-icon--patients { background: rgba(99, 102, 241, 0.22); color: #a5b4fc; }
+:root[data-bs-theme=dark] .page-dashboard .module-icon--eye { background: rgba(6, 182, 212, 0.2); color: #67e8f9; }
+:root[data-bs-theme=dark] .page-dashboard .module-icon--glosas { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+:root[data-bs-theme=dark] .page-dashboard .module-icon--bi { background: rgba(139, 92, 246, 0.22); color: #c4b5fd; }
+
+:root[data-bs-theme=dark] .page-dashboard .db-table th,
+:root[data-bs-theme=dark] .page-dashboard .db-table td,
+:root[data-bs-theme=dark] .page-dashboard .db-chart__table th,
+:root[data-bs-theme=dark] .page-dashboard .db-chart__table td {
+    background: transparent !important;
+    color: var(--db-text);
+}
+
+:root[data-bs-theme=dark] .page-dashboard .text-success-emphasis {
+    color: #86efac !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .text-danger-emphasis {
+    color: #fca5a5 !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .text-warning-emphasis {
+    color: #fcd34d !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .db-metric,
+    .db-chart-skeleton,
+    .stat-skeleton {
+        transition: none;
+        animation: none;
+    }
+
+    .db-metric--link:hover {
+        transform: none;
+    }
+}
+
+/* ── Esqueleto (recarga pedida em "Atualizar") ─────────────────────────── */
+.stat-skeleton {
+    display: inline-block;
+    width: 3.5rem;
+    height: 1.75rem;
+    border-radius: 0.375rem;
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: dbShimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes dbShimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+:root[data-bs-theme='dark'] .stat-skeleton {
+    background: linear-gradient(90deg, #1e2d42 25%, #253651 50%, #1e2d42 75%);
+    background-size: 200% 100%;
+}
+
+/* ── Linha da consulta em andamento na agenda ──────────────────────────── */
+.schedule-row--active > td:first-child {
+    box-shadow: inset 3px 0 0 #1976d2;
+}
+
+:root[data-bs-theme='dark'] .schedule-row--active > td:first-child {
+    box-shadow: inset 3px 0 0 #60a5fa;
+}
+
+/* Seção compacta sozinha na linha (largura toda): a lista vira grade, em vez
+   de linhas esticadas com o botão lá no canto. Divisória em cima de cada
+   item, menos na primeira linha da grade. */
+@container db (min-width: 900px) {
+    .db-compact-row[data-count='1'] .db-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 2rem;
+        padding: 0 1.1rem;
+    }
+
+    .db-compact-row[data-count='1'] .db-list .db-list__item {
+        padding-left: 0;
+        padding-right: 0;
+        border-bottom: 0;
+        border-top: 1px solid var(--db-border);
+    }
+
+    .db-compact-row[data-count='1'] .db-list .db-list__item:nth-child(-n + 2) {
+        border-top: 0;
+    }
+}
+
+@container db (min-width: 1400px) {
+    .db-compact-row[data-count='1'] .db-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .db-compact-row[data-count='1'] .db-list .db-list__item:nth-child(3) {
+        border-top: 0;
+    }
+}
+
+/* Agenda com teto de altura (ao lado da coluna lateral): cabeçalho da
+   tabela fixo com o fundo do card. */
+.page-dashboard .schedule-today--capped .schedule-table thead th {
+    background: var(--db-surface) !important;
+    box-shadow: inset 0 -1px 0 var(--db-border);
+}
+
+/* Selo de situação no escuro: translúcido na cor do texto (o fundo claro
+   "acendia" na tela escura). */
+:root[data-bs-theme='dark'] .page-dashboard .schedule-badge {
+    background-color: color-mix(in srgb, var(--sb-text, #94a3b8) 24%, transparent) !important;
+    color: color-mix(in srgb, var(--sb-text, #94a3b8) 45%, white) !important;
+}
+
+/* Linhas da agenda no celular: menos respiro lateral. */
+@media (max-width: 575.98px) {
+    .page-dashboard .schedule-today .schedule-table thead th,
+    .page-dashboard .schedule-today .schedule-table tbody td {
+        padding-left: 0.6rem;
+        padding-right: 0.6rem;
+    }
+
+    .page-dashboard .schedule-today .schedule-table th:first-child,
+    .page-dashboard .schedule-today .schedule-table td:first-child {
+        padding-left: 0.85rem;
+    }
+}
+
+/* Três (ou cinco) seções compactas com duas colunas: a última ocupa a linha
+   inteira — a lista dela também vira grade. */
+@container db (min-width: 900px) and (max-width: 1299.98px) {
+    .db-compact-row[data-count='3'] > :last-child .db-list,
+    .db-compact-row[data-count='5'] > :last-child .db-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 2rem;
+        padding: 0 1.1rem;
+    }
+
+    .db-compact-row[data-count='3'] > :last-child .db-list .db-list__item,
+    .db-compact-row[data-count='5'] > :last-child .db-list .db-list__item {
+        padding-left: 0;
+        padding-right: 0;
+        border-bottom: 0;
+        border-top: 1px solid var(--db-border);
+    }
+
+    .db-compact-row[data-count='3'] > :last-child .db-list .db-list__item:nth-child(-n + 2),
+    .db-compact-row[data-count='5'] > :last-child .db-list .db-list__item:nth-child(-n + 2) {
+        border-top: 0;
+    }
 }

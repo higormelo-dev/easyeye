@@ -329,6 +329,15 @@ function copyNumericCode(field, code) {
                             >
                                 WhatsApp
                             </span>
+                            <span
+                                v-if="schedule.whatsapp_opted_out"
+                                class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1 rounded-pill"
+                                style="font-size: 0.65rem"
+                                :title="t.drawer_wa_opt_out_hint"
+                                data-test="whatsapp-opted-out"
+                            >
+                                <i class="ti ti-bell-off"></i> {{ t.drawer_wa_opt_out }}
+                            </span>
                         </span>
                     </div>
                 </div>

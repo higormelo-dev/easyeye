@@ -9,61 +9,38 @@ const props = defineProps({
     // mesmas regras das rotas): atalho sem acesso não aparece.
     access: { type: Object, default: () => ({}) },
     orderLabels: { type: Object, default: () => ({}) },
+    // Atalhos "Em breve" só para quem vai usar o módulo (administração e
+    // recepção) — o médico e os demais perfis não veem promessa de módulo.
+    showSoon: { type: Boolean, default: true },
+    profile: { type: String, default: '' },
     t: { type: Object, required: true },
 });
 
 const modules = computed(() => {
-    const all = [
-        ...(props.access.schedules
-            ? [
-                  {
-                      key: 'schedule',
-                      label: props.t.module_schedule,
-                      icon: 'ti ti-calendar',
-                      iconClass: 'module-icon--schedule',
-                      url: route('panel.schedules.index'),
-                      soon: false,
-                  },
-              ]
-            : []),
-        {
-            key: 'eye-images',
-            label: props.t.module_eye_images,
-            icon: 'ti ti-eye',
-            iconClass: 'module-icon',
-            url: route('panel.eye-images.index'),
-            soon: false,
-        },
-        ...(props.access.financial
-            ? [
-                  {
-                      key: 'tiss',
-                      label: props.t.module_tiss,
-                      icon: 'ti ti-file-invoice',
-                      iconClass: 'module-icon--tiss',
-                      url: route('panel.financial.billing.index'),
-                      soon: false,
-                  },
-                  {
-                      key: 'financial',
-                      label: props.t.module_financial,
-                      icon: 'ti ti-report-money',
-                      iconClass: 'module-icon--financial',
-                      url: route('panel.financial.cash-flow.index'),
-                      soon: false,
-                  },
-              ]
-            : []),
-        {
-            key: 'surgery',
-            label: props.t.module_surgery,
-            icon: 'ti ti-stethoscope',
-            iconClass: 'module-icon--soon',
-            url: null,
-            soon: true,
-        },
+    const a = props.access;
+    const tile = (key, label, icon, iconClass, url) => ({ key, label, icon, iconClass, url, soon: false });
+
+    const clinical = [
+        a.schedules && tile('schedule', props.t.module_schedule, 'ti ti-calendar', 'module-icon--schedule', route('panel.schedules.index')),
+        a.patients && tile('patients', props.t.module_patients, 'ti ti-users', 'module-icon--patients', route('panel.patients.index')),
+        tile('eye-images', props.t.module_eye_images, 'ti ti-eye', 'module-icon--eye', route('panel.eye-images.index')),
     ];
-    return all;
+    const financial = a.financial
+        ? [
+              tile('financial', props.t.module_financial, 'ti ti-report-money', 'module-icon--financial', route('panel.financial.cash-flow.index')),
+              tile('tiss', props.t.module_tiss, 'ti ti-file-invoice', 'module-icon--tiss', route('panel.financial.billing.index')),
+              tile('glosas', props.t.module_glosas, 'ti ti-file-x', 'module-icon--glosas', route('panel.financial.tiss.glosas.index')),
+              tile('bi', props.t.module_bi, 'ti ti-chart-bar', 'module-icon--bi', route('panel.financial.bi.index')),
+          ]
+        : [];
+    const soon = props.showSoon
+        ? [{ key: 'surgery', label: props.t.module_surgery, icon: 'ti ti-stethoscope', iconClass: 'module-icon--soon', url: null, soon: true }]
+        : [];
+
+    // Financeiro: os módulos do posto de trabalho dele primeiro.
+    const ordered = props.profile === 'financial' ? [...financial, ...clinical] : [...clinical, ...financial];
+
+    return [...ordered, ...soon].filter(Boolean);
 });
 
 // ── Atalhos favoritos (item MELHORIA "mais humano") ──────────────────────────
@@ -118,45 +95,53 @@ function resetShortcuts() {
 </script>
 
 <template>
-    <div class="d-flex justify-content-end mb-1">
-        <div data-tour="dashboard-shortcuts-customize">
-            <ActionDropdown
-                :title="t.shortcuts_title ?? 'Escolher atalhos favoritos'"
-                align="right"
-                :min-width="230"
-                btn-class="btn btn-sm btn-link text-muted text-decoration-none p-0"
-            >
-                <template #trigger>
-                    <i class="ti ti-adjustments-horizontal me-1" aria-hidden="true"></i>
-                    <span class="fs-12">{{ t.shortcuts ?? 'Atalhos' }}</span>
-                </template>
+    <section class="db-section" :aria-label="t.section_shortcuts">
+        <header class="db-section-head db-section-head--row">
+            <h2 class="db-section-title">{{ t.section_shortcuts }}</h2>
+            <div data-tour="dashboard-shortcuts-customize">
+                <ActionDropdown
+                    :title="t.shortcuts_title ?? 'Escolher atalhos favoritos'"
+                    align="right"
+                    :min-width="230"
+                    btn-class="btn btn-sm btn-link text-muted text-decoration-none p-0"
+                >
+                    <template #trigger>
+                        <i class="ti ti-adjustments-horizontal me-1" aria-hidden="true"></i>
+                        <span class="fs-12">{{ t.shortcuts ?? 'Atalhos' }}</span>
+                    </template>
 
-                <ColumnOrderMenu
-                    :title="t.shortcuts_menu ?? 'Atalhos favoritos'"
-                    :columns="orderedModules"
-                    :labels="orderLabels"
-                    toggleable
-                    @move="moveShortcut"
-                    @toggle="toggleShortcut"
-                    @reset="resetShortcuts"
-                />
-            </ActionDropdown>
-        </div>
-    </div>
+                    <ColumnOrderMenu
+                        :title="t.shortcuts_menu ?? 'Atalhos favoritos'"
+                        :columns="orderedModules"
+                        :labels="orderLabels"
+                        toggleable
+                        @move="moveShortcut"
+                        @toggle="toggleShortcut"
+                        @reset="resetShortcuts"
+                    />
+                </ActionDropdown>
+            </div>
+        </header>
 
-    <div class="row g-3 mb-4" data-tour="dashboard-shortcuts">
-        <div v-for="mod in visibleModules" :key="mod.key" class="col-6 col-sm-4 col-md-2">
+        <div class="db-shortcuts" data-tour="dashboard-shortcuts">
             <component
                 :is="mod.soon ? 'div' : 'a'"
+                v-for="mod in visibleModules"
+                :key="mod.key"
                 :href="mod.soon ? undefined : mod.url"
-                :class="['module-shortcut w-100', mod.soon ? 'disabled' : '']"
+                :class="['module-shortcut', mod.soon ? 'disabled' : '']"
+                :aria-disabled="mod.soon ? 'true' : undefined"
+                :data-module="mod.key"
             >
-                <span v-if="mod.soon" class="badge-soon">{{ t.coming_soon }}</span>
-                <span :class="`ms-icon ${mod.iconClass}`">
+                <span :class="`ms-icon ${mod.iconClass}`" aria-hidden="true">
                     <i :class="mod.icon"></i>
                 </span>
-                <span>{{ mod.label }}</span>
+                <span class="module-shortcut__label">
+                    {{ mod.label }}
+                    <span v-if="mod.soon" class="badge-soon">{{ t.coming_soon }}</span>
+                </span>
+                <i v-if="!mod.soon" class="ti ti-chevron-right module-shortcut__chevron" aria-hidden="true"></i>
             </component>
         </div>
-    </div>
+    </section>
 </template>

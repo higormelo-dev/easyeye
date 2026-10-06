@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, defineAsyncComponent } from 'vue';
+import { ref, watch, defineAsyncComponent, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ScheduleCard from './ScheduleCard.vue';
@@ -194,6 +194,22 @@ function openCreate() {
     prefillData.value = null;
     formOpen.value = true;
 }
+
+// ?new=1 — "Novo agendamento" do Dashboard abre o formulário vazio. A URL
+// volta limpa com uma visita leve (replace + preserveState, como em
+// Pacientes) para recarregar a página não reabrir o formulário.
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') !== '1') return;
+
+    openCreate();
+    params.delete('new');
+    router.get(route('panel.schedules.index'), Object.fromEntries(params.entries()), {
+        replace: true,
+        preserveState: true,
+        preserveScroll: true,
+    });
+});
 
 async function openEdit(item) {
     const res = await fetch(item.show_url, { headers: { Accept: 'application/json' } });

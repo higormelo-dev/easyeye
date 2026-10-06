@@ -35,7 +35,7 @@ return [
     ],
 
     'nav' => [
-        'dashboard'              => 'The clinic\'s day at a glance: indicators, today\'s live schedule, shortcuts, the latest registered patients and, while required steps are pending, the progress of the initial setup.',
+        'dashboard'              => 'Your day at a glance: indicators, today\'s live schedule, shortcuts and recent patients — doctors only see their own (next patient and to-dos) and each profile only what it can open. While required steps are pending, the administrator sees the progress of the initial setup.',
         'schedules'              => 'Doctors\' schedules: book, confirm, reschedule and follow the day\'s appointments, with a waiting list.',
         'patients'               => 'Patient records with visit history, medical records and documents.',
         'doctors'                => 'The clinic\'s doctors, with working hours, blocks and absences, and the details used in documents, such as the medical license.',
@@ -60,29 +60,89 @@ return [
      */
     'pages' => [
         'panel.dashboard' => [
-            'dashboard-customize' => [
-                'title'       => 'Customize the dashboard',
-                'description' => 'Choose the order of the sections on this screen (indicators, shortcuts, today\'s schedule, recent patients and, when there are any, stock alerts): drag by the handle or use the arrows. "Restore default" goes back to the original order. The order is saved for you.',
+            'dashboard-welcome' => [
+                'title'       => 'Your workstation',
+                'description' => 'The dashboard opens on your role\'s workstation — "My practice" (doctor), "Front desk", "Management", "Finance" or "Overview" — with today\'s date and your everyday actions: new appointment and new patient for the front desk and management, start appointment for doctors, new cash entry for finance. Only what you can open is shown.',
             ],
             'dashboard-live' => [
                 'title'       => 'Live updates',
-                'description' => 'The numbers and the schedule on this screen refresh on their own every 30 seconds. Here you see the time of the last update and the button to refresh right away.',
+                'description' => 'Today\'s operation (schedule, waiting room, confirmations, today\'s cash) refreshes on its own every 30 seconds. The month figures and trends do not: they load when you open the dashboard (kept for up to 10 minutes) and the refresh button recalculates everything right away.',
             ],
-            'dashboard-welcome' => [
-                'title'       => 'Welcome',
-                'description' => 'A greeting with the clinic\'s name and, if you have access to patients, shortcuts to the patient list and to register a new patient.',
+            'dashboard-customize' => [
+                'title'       => 'Customize the dashboard',
+                'description' => 'Choose the order of the sections on this screen and hide the ones you do not use (the eye shows or hides each one) — each profile only sees its own sections. Drag by the handle or use the arrows; "Restore default" goes back to the original. Your choice is saved for you.',
             ],
             'dashboard-activation' => [
                 'title'       => 'Set up your clinic',
                 'description' => 'Shows how much of the initial setup is done and the steps left, with the weight of each one. The card goes away once the required steps are done; optional ones do not hold it.',
             ],
+            'dashboard-next-patient' => [
+                'title'       => 'Next patient',
+                'description' => 'Doctors only: who has arrived and is waiting for you (first those ready for the appointment, then those dilating or in exams, in order of arrival) or, if nobody has arrived, the next booked time. "Start appointment" opens the appointment\'s medical record.',
+            ],
             'dashboard-kpis' => [
                 'title'       => 'Indicators',
-                'description' => 'Active patients, appointments booked for today and the clinic\'s active doctors. Click an indicator to open the list, when you have access to that screen. "Surgeries today" is still being prepared ("Coming soon").',
+                'description' => 'The numbers of your workstation. Doctor: today\'s appointments, who is waiting for you, your appointments and no-show rate this month, unreported exams and AI reports to review. Front desk: today\'s appointments, who is waiting, confirmed today, tomorrow\'s appointments, waiting list. Management and finance: the month to date compared with the SAME period of last month (e.g. Oct 1–6 × Sep 1–6) — the arrow shows the change and the color tells whether it is good (green) or bad (red): no-shows going up is bad, revenue going up is good. Click an indicator to open the list, when you have access to that screen.',
             ],
-            'dashboard-kpis-soon' => [
-                'title'       => 'Upcoming indicators',
-                'description' => 'Indicators being prepared, marked "Coming soon": they do not show numbers yet.',
+            'dashboard-finance-today' => [
+                'title'       => 'Today\'s cash',
+                'description' => 'Finance only: income and expenses paid today, the day balance and what is still due today. "Open cash book" takes you to the cash flow on today\'s date.',
+            ],
+            'dashboard-receivables' => [
+                'title'       => 'Receivables',
+                'description' => 'Today\'s position: pending income entries in the cash book (not yet due and overdue) and insurance claims submitted and awaiting payment (overdue ones shown separately). Each line opens the list with the same filter.',
+            ],
+            'dashboard-glosas' => [
+                'title'       => 'Claim denials to handle',
+                'description' => 'Open denials and those under appeal, highlighting the ones whose appeal deadline has passed or ends in the next few days. Click to open the denial queue already filtered.',
+            ],
+            'dashboard-trends' => [
+                'title'       => 'Trends',
+                'description' => 'Management: appointments attended × no-shows per day over the last 30 days and revenue × expenses over the last 6 months (the same chart as the BI). Finance: revenue × expenses and billed × received this month per insurer. "View data" shows the table with the numbers.',
+            ],
+            'dashboard-schedule-today' => [
+                'title'       => 'Today\'s schedule',
+                'description' => 'Today\'s appointments split into shift tabs (Morning until 1 PM, Afternoon until 6 PM and Evening), with times grouped by hour. The current shift opens on its own; the current hour is highlighted as "Now". Each row shows time, status, patient (with appointment type, insurer and arrival time) and, on larger screens, the doctor — doctors only see their own. The green icon means the patient has arrived. The button opens the full schedule on the tab\'s shift.',
+            ],
+            'dashboard-waiting-room' => [
+                'title'       => 'Waiting room',
+                'description' => 'Front desk only: who has arrived and is waiting now, in order of arrival, with the doctor, the status and how long they have been waiting (amber from 30 minutes, red from 1 hour).',
+            ],
+            'dashboard-day-summary' => [
+                'title'       => 'Day summary',
+                'description' => 'Today\'s booked, attended, still to be seen and no-shows/cancellations. Progress counts the attended over what still counts ("3 of 14 attended") — no-shows and cancellations are left out and shown separately —, with the breakdown by shift. Doctors only see their own ("My day").',
+            ],
+            'dashboard-doctors-today' => [
+                'title'       => 'Appointments per doctor',
+                'description' => 'Management only: per doctor, how many were attended out of today\'s expected, how many patients are in the clinic and the no-shows.',
+            ],
+            'dashboard-confirmations' => [
+                'title'       => 'Confirmations',
+                'description' => 'Front desk only: today\'s and tomorrow\'s appointments confirmed × not confirmed, the WhatsApp confirmation status of the remaining ones (awaiting reply, failed, not sent), appointments per shift and the "Call to confirm" list, with the phone number to dial. For today only times that have not passed are listed.',
+            ],
+            'dashboard-waitlist' => [
+                'title'       => 'Waiting list',
+                'description' => 'How many patients are waiting for a slot and the first ones on the list (same order as the Schedule panel), with doctor, preferred period and phone.',
+            ],
+            'dashboard-birthdays' => [
+                'title'       => 'Today\'s birthdays',
+                'description' => 'Clinic patients who have a birthday today, with their age and phone — only for those with access to Patients.',
+            ],
+            'dashboard-ai-waiting' => [
+                'title'       => 'AI reports waiting for approval',
+                'description' => 'Doctors only, when the clinic uses AI: AI analyses you requested or of your exams and records that are waiting for your review. "Review" opens the exam in Eye Images (or the AI screen), where you approve or reject it. With nothing pending it becomes an "all clear" line.',
+            ],
+            'dashboard-unsigned-records' => [
+                'title'       => 'Unsigned medical records',
+                'description' => 'Doctors only: your medical records from the last 30 days that have not been signed yet, with the total and the most recent ones. "Open" takes you to the record. With nothing pending it becomes an "all clear" line.',
+            ],
+            'dashboard-recent-patients' => [
+                'title'       => 'Recent patients',
+                'description' => 'For front desk and management, the most recently registered patients, with phone and code. For doctors, the last patients they saw, with the date of the last visit. Open each record ("View") or the full list ("See all").',
+            ],
+            'dashboard-stock-alerts' => [
+                'title'       => 'Stock alerts',
+                'description' => 'Shows up when products are below the minimum stock or have lots that are expired or expiring in the next 30 days. Click an alert to see its products or "View stock" for the full list.',
             ],
             'dashboard-shortcuts-customize' => [
                 'title'       => 'Choose shortcuts',
@@ -90,23 +150,7 @@ return [
             ],
             'dashboard-shortcuts' => [
                 'title'       => 'Shortcuts',
-                'description' => 'Quick access to the modules your profile can open: Eye Images for everyone, Schedule for those who see or book patients (management, doctors and front desk) and TISS Guides and Financial for management and financial staff. Items marked "Coming soon" are not available yet.',
-            ],
-            'dashboard-schedule-today' => [
-                'title'       => 'Today\'s schedule',
-                'description' => 'Today\'s appointments by time, with patient, status and, on larger screens, the doctor. The green icon means the patient has arrived; highlighted rows and the badge next to the title show appointments that are not finished yet. On busy days the list shows the first appointments and tells you the total. The button opens the full schedule, when you have access.',
-            ],
-            'dashboard-day-summary' => [
-                'title'       => 'Day summary',
-                'description' => 'Total appointments today and how many were attended, are in progress or waiting, and were cancelled or missed.',
-            ],
-            'dashboard-recent-patients' => [
-                'title'       => 'Recent patients',
-                'description' => 'The most recently registered patients and, on larger screens, each one\'s phone and code. Open each record ("View") or the full list ("See all"), when you have access to patients.',
-            ],
-            'dashboard-stock-alerts' => [
-                'title'       => 'Stock alerts',
-                'description' => 'Shows up when products are below the minimum stock or have lots that are expired or expiring in the next 30 days. Click an alert to see its products or "View stock" for the full list.',
+                'description' => 'Quick access to the modules your profile can open: Schedule and Patients for those who see or book patients, Eye Images for everyone and Financial, TISS Guides, Claim denials and BI for management and finance (who see them first). "Surgical Center" ("Coming soon") only shows up for management and front desk.',
             ],
         ],
     ],
