@@ -11,10 +11,11 @@ use Illuminate\Support\Facades\DB;
 uses(RefreshDatabase::class);
 
 /**
- * Cálculo de lentes de contato no prontuário (saiu do Gerenciador de
- * Imagens): o resultado fica vinculado à consulta. O servidor recalcula a
- * partir das entradas (nunca aceita resultado do navegador), a assinatura
- * trava a alteração e o resultado aparece na visualização e no PDF.
+ * Lente de contato (v2) no prontuário: a potência de LC SUGERIDA fica
+ * vinculada à consulta. O servidor recalcula a partir das entradas (nunca
+ * aceita resultado do navegador), a assinatura trava a alteração e o
+ * resultado aparece na visualização e no PDF. Cálculos gravados pela versão 1
+ * continuam exibidos como estão (não são migrados).
  */
 beforeEach(function () {
     $this->entity  = Entity::factory()->create(['is_client' => true]);
@@ -41,98 +42,140 @@ beforeEach(function () {
 
     $this->asDoctor = fn () => $this->withSession(panelSession($this->entityUser));
 
+    // O que a tela envia: entradas (+ resultados, que o servidor ignora).
     $this->inputs = [
+        'version'            => 2,
+        'vertex_distance_mm' => 12,
+        'profile'            => 'standard',
+        'lens_mode'          => 'auto',
+        'od'                 => ['sphere' => -5, 'cylinder' => -2, 'axis' => 180],
+        'oe'                 => ['sphere' => -2.5, 'cylinder' => null, 'axis' => null],
+    ];
+
+    // Gravado pela versão 1 (antes da v2) — exatamente o formato de então.
+    $this->legacy = [
+        'version'            => 1,
         'vertex_distance_mm' => 12,
         'vertex_od'          => -6,
         'vertex_oe'          => 6,
+        'vertex_od_result'   => -5.6,
+        'vertex_oe_result'   => 6.47,
         'se_od_sphere'       => -2,
         'se_od_cylinder'     => -1,
+        'se_od_result'       => -2.5,
+        'se_oe_sphere'       => null,
+        'se_oe_cylinder'     => null,
+        'se_oe_result'       => null,
     ];
 });
 
-function clcRecord(): MedicalRecord
+function clv2Record(): MedicalRecord
 {
     return MedicalRecord::query()->where('patient_id', test()->patient->id)->firstOrFail();
 }
 
-it('salva o cálculo na consulta com os resultados calculados pelo servidor', function () {
+function clv2NewRecord(?array $calculation = null): MedicalRecord
+{
+    return MedicalRecord::create([
+        'entity_id'                => test()->entity->id, 'patient_id' => test()->patient->id, 'doctor_id' => test()->doctor->id,
+        'main_complaint'           => 'Consulta',
+        'contact_lens_calculation' => $calculation,
+    ]);
+}
+
+function clv2Pdf(MedicalRecord $record, string $locale = 'pt_BR'): string
+{
+    app()->setLocale($locale);
+
+    return view('pdf.medical_record', ['record' => $record->fresh(), 'setting' => null])->render();
+}
+
+it('salva a consulta com a potência sugerida calculada pelo servidor (version 2)', function () {
     ($this->asDoctor)()->post(route('panel.patients.medicalrecords.store', $this->patient), [
         'doctor_id'                => $this->doctor->id,
         'main_complaint'           => 'Adaptação de lente de contato',
         'contact_lens_calculation' => $this->inputs,
     ])->assertRedirect()->assertSessionHasNoErrors();
 
-    $calc = clcRecord()->contact_lens_calculation;
+    $calc = clv2Record()->contact_lens_calculation;
 
-    expect($calc['version'])->toBe(1)
-        ->and($calc['vertex_distance_mm'])->toEqual(12)
-        ->and($calc['vertex_od'])->toEqual(-6)
-        ->and($calc['vertex_od_result'])->toEqual(-5.6)
-        ->and($calc['vertex_oe_result'])->toEqual(6.47)
-        ->and($calc['se_od_result'])->toEqual(-2.5)
-        ->and($calc['se_oe_result'])->toBeNull();
+    expect($calc['version'])->toBe(2)
+        ->and($calc['profile'])->toBe('standard')
+        ->and($calc['od'])->toEqual(['sphere' => -5, 'cylinder' => -2, 'axis' => 180])
+        ->and($calc['results']['od']['type'])->toBe('toric')
+        ->and($calc['results']['od']['theoretical'])->toEqual(['sphere' => -4.72, 'cylinder' => -1.74, 'axis' => 180, 'se' => -5.59])
+        ->and($calc['results']['od']['suggested'])->toEqual(['sphere' => -4.75, 'cylinder' => -1.75, 'axis' => 180])
+        ->and($calc['results']['oe']['suggested'])->toEqual(['sphere' => -2.5, 'cylinder' => null, 'axis' => null])
+        ->and($calc['results']['oe']['vertex_applied'])->toBeFalse();
 });
 
 it('edição recalcula e ignora resultado adulterado vindo do navegador', function () {
-    $record = MedicalRecord::create([
-        'entity_id'      => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint' => 'Consulta',
-    ]);
+    $record = clv2NewRecord();
+    $forged = ['od' => ['type' => 'spherical', 'suggested' => ['sphere' => -99, 'cylinder' => null, 'axis' => null]], 'oe' => null];
 
     ($this->asDoctor)()->put(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
-        'contact_lens_calculation' => [...$this->inputs, 'vertex_od_result' => 99, 'se_od_result' => 99],
+        'contact_lens_calculation' => [...$this->inputs, 'results' => $forged],
     ])->assertSessionHasNoErrors();
 
     $calc = $record->fresh()->contact_lens_calculation;
-    expect($calc['vertex_od_result'])->toEqual(-5.6)
-        ->and($calc['se_od_result'])->toEqual(-2.5);
+    expect($calc['results']['od']['suggested'])->toEqual(['sphere' => -4.75, 'cylinder' => -1.75, 'axis' => 180])
+        ->and($calc['results']['oe']['suggested']['sphere'])->toEqual(-2.5);
 });
 
 it('sem nada digitado (ou removido) não grava cálculo', function () {
     ($this->asDoctor)()->post(route('panel.patients.medicalrecords.store', $this->patient), [
         'doctor_id'                => $this->doctor->id,
         'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => ['vertex_distance_mm' => 12, 'vertex_od' => null],
+        'contact_lens_calculation' => ['vertex_distance_mm' => 12, 'od' => ['sphere' => null, 'cylinder' => -1]],
     ])->assertSessionHasNoErrors();
 
-    expect(clcRecord()->contact_lens_calculation)->toBeNull();
+    expect(clv2Record()->contact_lens_calculation)->toBeNull();
 });
 
-it('valores fora da faixa são recusados (422)', function () {
+it('entradas inválidas são recusadas (422): faixas, 2 casas, eixo inteiro, linha e tipo', function () {
     ($this->asDoctor)()->postJson(route('panel.patients.medicalrecords.store', $this->patient), [
         'doctor_id'                => $this->doctor->id,
         'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => ['vertex_distance_mm' => 200, 'vertex_od' => -90, 'se_od_cylinder' => 'abc'],
+        'contact_lens_calculation' => [
+            'vertex_distance_mm' => 200,
+            'profile'            => 'premium',
+            'lens_mode'          => 'rigid',
+            'od'                 => ['sphere' => -90, 'cylinder' => 'abc', 'axis' => 90.5],
+            'oe'                 => ['sphere' => -5.385, 'cylinder' => 16, 'axis' => 181],
+        ],
     ])->assertStatus(422)->assertJsonValidationErrors([
         'contact_lens_calculation.vertex_distance_mm',
-        'contact_lens_calculation.vertex_od',
-        'contact_lens_calculation.se_od_cylinder',
+        'contact_lens_calculation.profile',
+        'contact_lens_calculation.lens_mode',
+        'contact_lens_calculation.od.sphere',
+        'contact_lens_calculation.od.cylinder',
+        'contact_lens_calculation.od.axis',
+        'contact_lens_calculation.oe.sphere',
+        'contact_lens_calculation.oe.cylinder',
+        'contact_lens_calculation.oe.axis',
     ]);
-});
 
-it('mais de 2 casas decimais é recusado no cadastro e na edição (422)', function () {
-    ($this->asDoctor)()->postJson(route('panel.patients.medicalrecords.store', $this->patient), [
-        'doctor_id'                => $this->doctor->id,
-        'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => ['vertex_od' => -5.385],
-    ])->assertStatus(422)->assertJsonValidationErrors(['contact_lens_calculation.vertex_od']);
-
-    $record = MedicalRecord::create([
-        'entity_id'      => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint' => 'Consulta',
-    ]);
+    $record = clv2NewRecord();
 
     ($this->asDoctor)()->putJson(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
-        'contact_lens_calculation' => ['se_od_sphere' => -2, 'se_od_cylinder' => -0.125],
-    ])->assertStatus(422)->assertJsonValidationErrors(['contact_lens_calculation.se_od_cylinder']);
+        'contact_lens_calculation' => ['od' => ['sphere' => -2, 'cylinder' => -0.125]],
+    ])->assertStatus(422)->assertJsonValidationErrors(['contact_lens_calculation.od.cylinder']);
+});
+
+it('tela aberta antes da v2 (envia o formato 1) é recusada com aviso para recarregar — nada é gravado errado', function () {
+    $record = clv2NewRecord($this->legacy);
+
+    ($this->asDoctor)()->putJson(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
+        'contact_lens_calculation' => [...$this->legacy, 'vertex_od' => -7],
+    ])->assertStatus(422)->assertJsonValidationErrors([
+        'contact_lens_calculation.version' => __('actions.medical_records.contact_lens_outdated'),
+    ]);
+
+    expect($record->fresh()->contact_lens_calculation['vertex_od'])->toEqual(-6);
 });
 
 it('"Remover do prontuário": salvar com o cálculo nulo apaga o que estava gravado', function () {
-    $record = MedicalRecord::create([
-        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate($this->inputs),
-    ]);
+    $record = clv2NewRecord(app(ContactLensCalculator::class)->calculate($this->inputs));
 
     ($this->asDoctor)()->put(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
         'contact_lens_calculation' => null,
@@ -141,73 +184,94 @@ it('"Remover do prontuário": salvar com o cálculo nulo apaga o que estava grav
     expect($record->fresh()->contact_lens_calculation)->toBeNull();
 });
 
-it('edição sem a chave do cálculo mantém o gravado, inclusive valor anterior ao limite de 2 casas', function () {
-    $legacy = [...app(ContactLensCalculator::class)->calculate($this->inputs), 'vertex_od' => -5.385];
-    $record = MedicalRecord::create([
-        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => $legacy,
-    ]);
+it('edição sem a chave do cálculo mantém o gravado — inclusive um cálculo da versão 1', function () {
+    $record = clv2NewRecord([...$this->legacy, 'vertex_od' => -5.385]);
 
     ($this->asDoctor)()->put(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
         'main_complaint' => 'Retorno',
     ])->assertSessionHasNoErrors();
 
     expect($record->fresh()->main_complaint)->toBe('Retorno')
-        ->and($record->fresh()->contact_lens_calculation['vertex_od'])->toEqual(-5.385);
+        ->and($record->fresh()->contact_lens_calculation)->toEqual([...$this->legacy, 'vertex_od' => -5.385]);
 });
 
-it('PDF: distância ao vértice no idioma do documento', function () {
-    $record = MedicalRecord::create([
-        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate([...$this->inputs, 'vertex_distance_mm' => 12.5]),
-    ]);
+it('cálculo da versão 1 reaberto e usado de novo passa a ser gravado como v2', function () {
+    $record = clv2NewRecord($this->legacy);
 
-    app()->setLocale('pt_BR');
-    expect(view('pdf.medical_record', ['record' => $record->fresh(), 'setting' => null])->render())
-        ->toContain('vértice 12,5 mm');
+    ($this->asDoctor)()->put(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
+        'contact_lens_calculation' => [
+            'version' => 2,
+            'od'      => ['sphere' => -2, 'cylinder' => -1, 'axis' => 180],
+            'oe'      => ['sphere' => 6],
+        ],
+    ])->assertSessionHasNoErrors();
 
-    app()->setLocale('en');
-    expect(view('pdf.medical_record', ['record' => $record->fresh(), 'setting' => null])->render())
-        ->toContain('vertex 12.5 mm');
+    $calc = $record->fresh()->contact_lens_calculation;
+    expect($calc['version'])->toBe(2)
+        ->and($calc['results']['od']['suggested'])->toEqual(['sphere' => -2, 'cylinder' => -0.75, 'axis' => 180])
+        ->and($calc['results']['oe']['suggested'])->toEqual(['sphere' => 6.5, 'cylinder' => null, 'axis' => null])
+        ->and($calc)->not->toHaveKey('vertex_od');
+});
+
+it('PDF (v2): potência sugerida por olho em destaque, teórico, linha e o aviso de lente de teste', function () {
+    $record = clv2NewRecord(app(ContactLensCalculator::class)->calculate([...$this->inputs, 'vertex_distance_mm' => 12.5]));
+
+    $pt = clv2Pdf($record);
+    expect($pt)->toContain(__('pdf.contact_lens_title'))
+        ->toContain('Lente de contato sugerida')
+        ->toContain('OD −4,75 / −1,75 × 180° (tórica)  ·  OE −2,50 (esférica)')
+        ->toContain('Cálculo teórico (vértice 12,5 mm)')
+        ->toContain('vértice aplicado (acima de ±4,00 D)')
+        ->toContain('Padrão de mercado')
+        ->toContain('Sugestão para lente de teste — confirme com sobre-refração e com a tabela do fabricante.')
+        ->not->toContain('versão anterior');
+
+    expect(clv2Pdf($record, 'en'))->toContain('Suggested contact lens')
+        ->toContain('OD −4.75 / −1.75 × 180° (toric)  ·  OS −2.50 (spherical)')
+        ->toContain('Theoretical value (vertex 12.5 mm)');
+});
+
+it('PDF (v1): cálculo antigo segue no formato de então, marcado como versão anterior', function () {
+    $record = clv2NewRecord([...$this->legacy, 'vertex_distance_mm' => 12.5]);
+
+    expect(clv2Pdf($record))->toContain('Cálculo de lentes de contato (versão anterior)')
+        ->toContain('vértice 12,5 mm')
+        ->toContain('-5.60')
+        ->toContain('+6.47')
+        ->toContain('-2.50')
+        ->not->toContain('Lente de contato sugerida');
+
+    expect(clv2Pdf($record, 'en'))->toContain('vertex 12.5 mm');
 });
 
 it('prontuário assinado: o cálculo não muda', function () {
-    $record = MedicalRecord::create([
-        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate($this->inputs),
-    ]);
+    $record = clv2NewRecord(app(ContactLensCalculator::class)->calculate($this->inputs));
     $record->forceFill(['is_locked' => true, 'signed_at' => now(), 'signed_by' => $this->entityUser->id])->saveQuietly();
 
     ($this->asDoctor)()->put(route('panel.patients.medicalrecords.update', [$this->patient, $record]), [
-        'contact_lens_calculation' => ['vertex_od' => -10],
+        'contact_lens_calculation' => [...$this->inputs, 'od' => ['sphere' => -10]],
     ]);
 
-    expect($record->fresh()->contact_lens_calculation['vertex_od'])->toEqual(-6);
+    expect($record->fresh()->contact_lens_calculation['od']['sphere'])->toEqual(-5)
+        ->and($record->fresh()->contact_lens_calculation['results']['od']['suggested']['sphere'])->toEqual(-4.75);
 });
 
-it('consulta posterior: visualização, edição e PDF trazem o cálculo', function () {
-    $record = MedicalRecord::create([
-        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate($this->inputs),
-    ]);
+it('consulta posterior: visualização e edição trazem o cálculo gravado (v2 e v1, como estão)', function () {
+    $v2 = clv2NewRecord(app(ContactLensCalculator::class)->calculate($this->inputs));
+    $v1 = clv2NewRecord($this->legacy);
 
-    ($this->asDoctor)()->getJson(route('panel.patients.medicalrecords.show', [$this->patient, $record]))
+    ($this->asDoctor)()->getJson(route('panel.patients.medicalrecords.show', [$this->patient, $v2]))
         ->assertOk()
+        ->assertJsonPath('contact_lens_calculation.results.od.suggested.cylinder', -1.75);
+
+    ($this->asDoctor)()->get(route('panel.patients.medicalrecords.edit', [$this->patient, $v2]), inertiaHeaders())
+        ->assertOk()
+        ->assertJsonPath('props.medicalrecord.contact_lens_calculation.results.oe.suggested.sphere', -2.5);
+
+    ($this->asDoctor)()->getJson(route('panel.patients.medicalrecords.show', [$this->patient, $v1]))
+        ->assertOk()
+        ->assertJsonPath('contact_lens_calculation.version', 1)
         ->assertJsonPath('contact_lens_calculation.vertex_od_result', -5.6);
-
-    ($this->asDoctor)()->get(route('panel.patients.medicalrecords.edit', [$this->patient, $record]), inertiaHeaders())
-        ->assertOk()
-        ->assertJsonPath('props.medicalrecord.contact_lens_calculation.se_od_result', -2.5);
-
-    $html = view('pdf.medical_record', ['record' => $record->fresh(), 'setting' => null])->render();
-    expect($html)->toContain(__('pdf.contact_lens_title'))
-        ->toContain('-5.60')
-        ->toContain('+6.47')
-        ->toContain('-2.50');
 });
 
 /**
@@ -216,7 +280,7 @@ it('consulta posterior: visualização, edição e PDF trazem o cálculo', funct
  *
  * @param list<string> $withoutColumns colunas fora do hash (ex.: "antes da coluna existir")
  */
-function clcSignRaw(MedicalRecord $record, string $signerId, array $withoutColumns = []): void
+function clv2SignRaw(MedicalRecord $record, string $signerId, array $withoutColumns = []): void
 {
     $record   = $record->fresh();
     $signedAt = now()->startOfSecond();
@@ -234,28 +298,29 @@ function clcSignRaw(MedicalRecord $record, string $signerId, array $withoutColum
 }
 
 it('assinatura feita antes da coluna existir continua conferindo (coluna vazia fica fora do hash)', function () {
-    $record = MedicalRecord::create([
-        'entity_id'      => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint' => 'Consulta',
-    ]);
+    $record = clv2NewRecord();
 
     // Hash de antes do deploy: sem a chave contact_lens_calculation.
-    clcSignRaw($record, $this->entityUser->id, withoutColumns: ['contact_lens_calculation']);
+    clv2SignRaw($record, $this->entityUser->id, withoutColumns: ['contact_lens_calculation']);
 
     expect($record->fresh()->verifyIntegrity())->toBeTrue();
 });
 
-it('assinatura com cálculo: confere, e adulterar o cálculo no banco invalida', function () {
-    $record = MedicalRecord::create([
-        'entity_id'                => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
-        'main_complaint'           => 'Consulta',
-        'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate($this->inputs),
-    ]);
+it('assinatura com cálculo v1 (gravado antes da v2) continua conferindo — nada é migrado', function () {
+    $record = clv2NewRecord($this->legacy);
+    clv2SignRaw($record, $this->entityUser->id);
 
-    clcSignRaw($record, $this->entityUser->id);
+    expect($record->fresh()->verifyIntegrity())->toBeTrue();
+});
+
+it('assinatura com cálculo v2: confere, e adulterar a sugestão no banco invalida', function () {
+    $record = clv2NewRecord(app(ContactLensCalculator::class)->calculate($this->inputs));
+
+    clv2SignRaw($record, $this->entityUser->id);
     expect($record->fresh()->verifyIntegrity())->toBeTrue();
 
-    $tampered = [...$record->fresh()->contact_lens_calculation, 'vertex_od_result' => -9.99];
+    $tampered                                         = $record->fresh()->contact_lens_calculation;
+    $tampered['results']['od']['suggested']['sphere'] = -4.5;
     DB::table('medical_records')->where('id', $record->id)->update(['contact_lens_calculation' => json_encode($tampered)]);
 
     expect($record->fresh()->verifyIntegrity())->toBeFalse();

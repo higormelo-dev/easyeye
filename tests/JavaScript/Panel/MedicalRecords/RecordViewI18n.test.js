@@ -5,6 +5,7 @@ import MedicalRecordViewModal from '@/Pages/Panel/MedicalRecords/Components/Medi
 import PreviousRecordsCard from '@/Pages/Panel/MedicalRecords/Components/PreviousRecordsCard.vue';
 import MedicalRecordDetailDrawer from '@/Pages/Panel/MedicalRecords/MedicalRecordDetailDrawer.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import { computeContactLens } from '@/Pages/Panel/MedicalRecords/Components/contactLens.js';
 
 /**
  * Visualização da consulta (modal, drawer da lista e painel "Consultas
@@ -79,6 +80,11 @@ const detail = {
     fundoscopy_left: 'Normal',
     observation_general: 'Stable',
     observation_of_lenses: 'Soft lens',
+    // Lente de contato v2 (OD fora da faixa padrão → linha de avisos também).
+    contact_lens_calculation: computeContactLens({
+        od: { sphere: -16 },
+        oe: { sphere: -5, cylinder: -2, axis: 180 },
+    }),
     diagnosis_cids: [{ code: 'H52.1', description: 'Myopia' }],
     clinical_conduct: 'Glasses',
     follow_up_days: 30,
@@ -132,6 +138,15 @@ describe('Visualização da consulta (modal) — textos das traduções', () => 
 
         expect(labels.length).toBeGreaterThan(20);
         labels.forEach((label) => expect(label).toMatch(KEY));
+        // Lente de contato v2: sugerida, teórico, linha e avisos — rótulos e textos traduzidos.
+        [
+            'contact_lens_suggested',
+            'contact_lens_theoretical_label',
+            'contact_lens_profile',
+            'contact_lens_notes',
+        ].forEach((key) => expect(labels).toContain(`«${key}»`));
+        expect(wrapper.text()).toContain('«contact_lens_note_out_of_range»');
+        expect(wrapper.text()).toContain('«contact_lens_type_toric»');
         expect(new Set(labels).size).toBe(labels.length);
         ['tab_anamnesis', 'tab_exam', 'tab_refraction', 'tab_findings', 'diagnosis_conduct'].forEach((key) =>
             expect(wrapper.text()).toContain(`«${key}»`),

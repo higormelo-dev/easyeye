@@ -134,8 +134,12 @@ const sections = computed(() => {
         [tt('addition', 'Adição'), d.addition_type],
         [tt('lens_away_label', 'Lente longe'), d.lens_away],
         [tt('lens_near_label', 'Lente perto'), d.lens_near],
-        // Cálculo de lentes de contato vinculado à consulta.
-        ...contactLensSummary(d.contact_lens_calculation, props.t, locale.value).map((row) => [row.label, row.value]),
+        // Lente de contato da consulta: sugerida por olho + teórico, linha e
+        // avisos (v2); cálculo da versão 1 no formato antigo.
+        ...contactLensSummary(d.contact_lens_calculation, props.t, locale.value, { detailed: true }).map((row) => [
+            row.label,
+            row.value,
+        ]),
     ]);
     if (refracao.length) out.push({ title: tt('tab_refraction', 'Refração'), icon: 'fa-glasses', rows: refracao });
 

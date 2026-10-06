@@ -33,7 +33,9 @@ use App\Models\{
     VisualAcuityType,
     WaitingList
 };
-use App\Models\WhatsApp\WhatsAppMessage;
+use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppOptOut, WhatsAppSetting};
+use App\Services\ContactLensFormatter;
+use App\Services\WhatsApp\WhatsAppService;
 use BackedEnum;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
@@ -74,6 +76,7 @@ final class PatientDataExporter
             'appointments'       => $this->appointments($patient),
             'waiting_list'       => $this->waitingList($patient),
             'messages'           => $this->messages($patient, $scheduleIds),
+            'whatsapp_opt_outs'  => $this->whatsappOptOuts($patient, $scheduleIds),
             'panel_calls'        => $this->panelCalls($patient, $scheduleIds),
             'financial'          => $this->financial($patient),
             'tiss_guides'        => $this->tissGuides($patient),
@@ -301,6 +304,8 @@ final class PatientDataExporter
             'clinical_conduct'         => $v('clinical_conduct'),
             'follow_up_days'           => $v('follow_up_days'),
             'contact_lens_calculation' => $this->list($v('contact_lens_calculation')) ?: null,
+            // Em texto: v2 = potência de LC sugerida por olho (e o tipo); v1 = formato antigo.
+            'contact_lens_summary' => app(ContactLensFormatter::class)->text($this->list($v('contact_lens_calculation')) ?: null),
         ];
     }
 
@@ -395,7 +400,47 @@ final class PatientDataExporter
                 'status'       => $m->status,
                 'survey_score' => $m->survey_score,
                 'sent_at'      => $this->iso($m->sent_at),
+                'delivered_at' => $this->iso($m->delivered_at),
+                'read_at'      => $this->iso($m->read_at),
                 'answered_at'  => $this->iso($m->answered_at),
+            ])->all();
+    }
+
+    /**
+     * Descadastros do WhatsApp (respondeu SAIR ou o provedor recusou) dos
+     * celulares do paciente — do cadastro e dos agendamentos — no número da
+     * clínica e no do EasyEye (o que envia para ela). SAIR no número do
+     * EasyEye vale para todas as clínicas que usam esse número.
+     */
+    private function whatsappOptOuts(Patient $patient, Collection $scheduleIds): array
+    {
+        $phones = Schedule::withTrashed()->whereIn('id', $scheduleIds)->pluck('cellphone')
+            ->push($patient->person?->cellphone)
+            ->map(fn ($raw) => WhatsAppService::normalizePhone($raw))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($phones->isEmpty()) {
+            return [];
+        }
+
+        $senders = WhatsAppSetting::query()
+            ->where(fn ($q) => $q->where('entity_id', $patient->entity_id)->orWhereNull('entity_id'))
+            ->get(['id', 'entity_id'])
+            ->keyBy('id');
+
+        return WhatsAppOptOut::query()
+            ->whereIn('whatsapp_setting_id', $senders->keys())
+            ->whereIn('phone', $phones)
+            ->orderBy('opted_out_at')
+            ->get()
+            ->map(fn (WhatsAppOptOut $o) => [
+                'channel'      => 'whatsapp',
+                'sender'       => $senders->get($o->whatsapp_setting_id)?->entity_id === null ? 'easyeye' : 'clinic',
+                'phone'        => $o->phone,
+                'source'       => $o->source,
+                'opted_out_at' => $this->iso($o->opted_out_at),
             ])->all();
     }
 

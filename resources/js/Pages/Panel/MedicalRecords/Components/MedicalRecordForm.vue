@@ -10,7 +10,7 @@ import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
 import MedicalRecordImagingModal from './MedicalRecordImagingModal.vue';
 import MedicalRecordProceduresModal from './MedicalRecordProceduresModal.vue';
 import ContactLensCalculatorModal from './ContactLensCalculatorModal.vue';
-import { contactLensSummary, omitUnchangedContactLens } from './contactLens.js';
+import { contactLensSummary, isLegacyContactLens, omitUnchangedContactLens } from './contactLens.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
 import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard.js';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
@@ -1076,10 +1076,17 @@ async function confirmPresbyopiaCalc() {
 
 // ──────────────────────────────────────────────────────────────────────────
 // Lentes de contato (saiu do Gerenciador de Imagens): o modal devolve
-// entradas + resultados; grava junto com a consulta ao salvar.
+// entradas + resultados; grava junto com a consulta ao salvar. O resumo
+// mostra a potência de LC SUGERIDA por olho (v2); cálculo da versão 1 segue
+// no formato antigo, marcado como "versão anterior".
 // ──────────────────────────────────────────────────────────────────────────
 const { locale } = useLocaleFormat();
 const contactLensRows = computed(() => contactLensSummary(form.contact_lens_calculation, i18n.value, locale.value));
+const contactLensTitle = computed(() =>
+    isLegacyContactLens(form.contact_lens_calculation)
+        ? `${tt('contact_lens_title', 'Cálculo de lentes de contato')} (${tt('contact_lens_legacy', 'versão anterior')})`
+        : tt('contact_lens_title', 'Cálculo de lentes de contato'),
+);
 
 function applyContactLens(calculation) {
     form.contact_lens_calculation = calculation;
@@ -2724,12 +2731,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             </div>
                             <!-- Cálculo de lentes de contato vinculado a esta consulta. -->
                             <div v-if="contactLensRows.length" class="col-12" data-contact-lens-summary>
-                                <span class="pmr-label d-block">{{
-                                    tt('contact_lens_title', 'Cálculo de lentes de contato')
-                                }}</span>
+                                <span class="pmr-label d-block">{{ contactLensTitle }}</span>
                                 <ul class="list-unstyled small mb-0">
                                     <li v-for="row in contactLensRows" :key="row.key">
-                                        <span class="text-muted">{{ row.label }}:</span> {{ row.value }}
+                                        <span class="text-muted">{{ `${row.label}: ` }}</span>
+                                        <span :class="{ 'fw-semibold': row.key === 'suggested' }">{{ row.value }}</span>
                                     </li>
                                 </ul>
                             </div>
@@ -3789,9 +3795,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                     v-model="medSearchQuery"
                                     type="text"
                                     class="form-control form-control-sm"
-                                    :placeholder="
-                                        t.med_search_ph ?? 'Nome comercial ou genérico (2+ letras)…'
-                                    "
+                                    :placeholder="t.med_search_ph ?? 'Nome comercial ou genérico (2+ letras)…'"
                                     :disabled="prescription.length >= maxMedicines"
                                     @input="searchMedicines"
                                 />

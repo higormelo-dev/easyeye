@@ -1,0 +1,1487 @@
+{
+  "_doc": "Vetores do cálculo de lentes de contato v2, lidos pelo Pest (tests/Unit/Services/ContactLensCalculatorTest.php) e pelo Vitest (tests/JavaScript/Panel/MedicalRecords/ContactLensCalculator.test.js): o PHP e o JS têm de dar exatamente estes resultados. Esperados calculados por uma referência independente em aritmética decimal (não pelo código testado). d = vertex_distance_mm. Teóricos com 2 casas (meio para cima); sugerida = valor mais próximo da grade do perfil (empate → mais positivo; cilindro empatado → menor magnitude; eixo empatado → sobe). \"spec_vector\": vetor pedido na especificação (os estimados errados foram corrigidos: -4,50 → -4,27; -5,00 -2,00 x 180 → meridianos -4,72/-6,46 e cilindro -1,74; -14,00 → -11,99, dentro da faixa).",
+  "version": 2,
+  "vertex_threshold": 4.0,
+  "toric_min_cylinder": 0.75,
+  "note_codes": [
+    "no_cylinder",
+    "out_of_range",
+    "cylinder_out_of_range",
+    "axis_missing",
+    "plano_check"
+  ],
+  "profiles": {
+    "standard": {
+      "spherical": {
+        "sphere_ranges": [
+          {
+            "from": -12,
+            "to": -6,
+            "step": 0.5
+          },
+          {
+            "from": -6,
+            "to": 6,
+            "step": 0.25
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "step": 0.5
+          }
+        ]
+      },
+      "toric": {
+        "sphere_ranges": [
+          {
+            "from": -9,
+            "to": -6,
+            "step": 0.5
+          },
+          {
+            "from": -6,
+            "to": 6,
+            "step": 0.25
+          }
+        ],
+        "cylinders": [
+          -0.75,
+          -1.25,
+          -1.75,
+          -2.25,
+          -2.75
+        ],
+        "axis_step": 10
+      }
+    },
+    "extended": {
+      "spherical": {
+        "sphere_ranges": [
+          {
+            "from": -20,
+            "to": 20,
+            "step": 0.25
+          }
+        ]
+      },
+      "toric": {
+        "sphere_ranges": [
+          {
+            "from": -20,
+            "to": 20,
+            "step": 0.25
+          }
+        ],
+        "cylinders": [
+          -0.75,
+          -1.25,
+          -1.75,
+          -2.25,
+          -2.75,
+          -3.25,
+          -3.75,
+          -4.25,
+          -4.75,
+          -5.25,
+          -5.75
+        ],
+        "axis_step": 5
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "-2,50 sem vértice (até ±4,00 D)",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -2.5,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -2.5,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -2.5
+        },
+        "suggested": {
+          "sphere": -2.5,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "-3,75 sem vértice",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -3.75,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -3.75,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -3.75
+        },
+        "suggested": {
+          "sphere": -3.75,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "-4,00 sem vértice (não é > 4)",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -4.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -4.0,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -4.0
+        },
+        "suggested": {
+          "sphere": -4.0,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "-4,50 vértice → -4,27 → -4,25",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -4.5,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -4.27,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -4.27
+        },
+        "suggested": {
+          "sphere": -4.25,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-5,00 vértice → -4,72 → -4,75",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -5.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -4.72,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -4.72
+        },
+        "suggested": {
+          "sphere": -4.75,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-6,00 vértice → -5,60 → -5,50",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -6.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -5.6,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -5.6
+        },
+        "suggested": {
+          "sphere": -5.5,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-8,00 vértice → -7,30 → -7,50 (passo 0,50 além de 6)",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -8.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -7.3,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -7.3
+        },
+        "suggested": {
+          "sphere": -7.5,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "+5,00 vértice → +5,32 → +5,25",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": 5.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": 5.32,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": 5.32
+        },
+        "suggested": {
+          "sphere": 5.25,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "+7,00 vértice → +7,64 → +7,50",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": 7.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": 7.64,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": 7.64
+        },
+        "suggested": {
+          "sphere": 7.5,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-2,00 -0,50 x 90 → esférica pelo EE -2,25",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -2.0,
+          "cylinder": -0.5,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -2.0,
+          "cylinder": -0.5,
+          "axis": 90,
+          "se": -2.25
+        },
+        "suggested": {
+          "sphere": -2.25,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "-2,50 -1,25 x 180 → tórica",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -2.5,
+          "cylinder": -1.25,
+          "axis": 180
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -2.5,
+          "cylinder": -1.25,
+          "axis": 180,
+          "se": -3.12
+        },
+        "suggested": {
+          "sphere": -2.5,
+          "cylinder": -1.25,
+          "axis": 180
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "-5,00 -2,00 x 180 → meridianos -4,72/-6,46 → tórica -4,75 / -1,75 x 180",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -5.0,
+          "cylinder": -2.0,
+          "axis": 180
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -4.72,
+          "cylinder": -1.74,
+          "axis": 180,
+          "se": -5.59
+        },
+        "suggested": {
+          "sphere": -4.75,
+          "cylinder": -1.75,
+          "axis": 180
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-2,00 -1,00 x 175 → eixo 180 (empate sobe); cilindro -1,00 empata → -0,75",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -2.0,
+          "cylinder": -1.0,
+          "axis": 175
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -2.0,
+          "cylinder": -1.0,
+          "axis": 175,
+          "se": -2.5
+        },
+        "suggested": {
+          "sphere": -2.0,
+          "cylinder": -0.75,
+          "axis": 180
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "+1,00 +1,50 x 90 → transposto +2,50 -1,50 x 180 → cilindro empata → -1,25",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": 1.0,
+          "cylinder": 1.5,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": 2.5,
+          "cylinder": -1.5,
+          "axis": 180,
+          "se": 1.75
+        },
+        "suggested": {
+          "sphere": 2.5,
+          "cylinder": -1.25,
+          "axis": 180
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "-4,00 -4,00 x 10 → cilindro -3,48 além de -2,75 (padrão)",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -4.0,
+          "cylinder": -4.0,
+          "axis": 10
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -3.82,
+          "cylinder": -3.48,
+          "axis": 10,
+          "se": -5.56
+        },
+        "suggested": {
+          "sphere": -3.75,
+          "cylinder": null,
+          "axis": 10
+        },
+        "vertex_applied": true,
+        "notes": [
+          "cylinder_out_of_range"
+        ]
+      }
+    },
+    {
+      "name": "-14,00 → vértice -11,99 → -12,00 (DENTRO da faixa padrão)",
+      "spec_vector": true,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -14.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -11.99,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -11.99
+        },
+        "suggested": {
+          "sphere": -12.0,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-16,00 → vértice -13,42 → fora da faixa padrão",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -16.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -13.42,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -13.42
+        },
+        "suggested": null,
+        "vertex_applied": true,
+        "notes": [
+          "out_of_range"
+        ]
+      }
+    },
+    {
+      "name": "-4,00 -4,00 x 10 na faixa estendida → -3,75 / -3,25 x 10",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "extended",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -4.0,
+          "cylinder": -4.0,
+          "axis": 10
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -3.82,
+          "cylinder": -3.48,
+          "axis": 10,
+          "se": -5.56
+        },
+        "suggested": {
+          "sphere": -3.75,
+          "cylinder": -3.25,
+          "axis": 10
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-16,00 na faixa estendida → -13,42 → -13,50",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "extended",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -16.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -13.42,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -13.42
+        },
+        "suggested": {
+          "sphere": -13.5,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-3,00 -6,50 x 45 na faixa estendida (cilindro alto, eixo de 5 em 5)",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "extended",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -3.0,
+          "cylinder": -6.5,
+          "axis": 45
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -2.9,
+          "cylinder": -5.63,
+          "axis": 45,
+          "se": -5.71
+        },
+        "suggested": {
+          "sphere": -3.0,
+          "cylinder": -5.75,
+          "axis": 45
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "-2,00 -7,00 x 90 na faixa estendida → cilindro além de -5,75",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "extended",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -2.0,
+          "cylinder": -7.0,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -1.95,
+          "cylinder": -6.17,
+          "axis": 90,
+          "se": -5.04
+        },
+        "suggested": {
+          "sphere": -2.0,
+          "cylinder": null,
+          "axis": 90
+        },
+        "vertex_applied": true,
+        "notes": [
+          "cylinder_out_of_range"
+        ]
+      }
+    },
+    {
+      "name": "modo esférica força EE em astigmatismo relevante",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "spherical",
+        "eye": {
+          "sphere": -2.5,
+          "cylinder": -1.25,
+          "axis": 180
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -2.5,
+          "cylinder": -1.25,
+          "axis": 180,
+          "se": -3.12
+        },
+        "suggested": {
+          "sphere": -3.0,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "modo tórica com cilindro baixo → menor cilindro de estoque",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "toric",
+        "eye": {
+          "sphere": -2.0,
+          "cylinder": -0.5,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -2.0,
+          "cylinder": -0.5,
+          "axis": 90,
+          "se": -2.25
+        },
+        "suggested": {
+          "sphere": -2.0,
+          "cylinder": -0.75,
+          "axis": 90
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "modo tórica sem cilindro → esférica com aviso",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "toric",
+        "eye": {
+          "sphere": -3.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -3.0,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -3.0
+        },
+        "suggested": {
+          "sphere": -3.0,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": [
+          "no_cylinder"
+        ]
+      }
+    },
+    {
+      "name": "tórica sem eixo → aviso informe o eixo",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -2.5,
+          "cylinder": -1.25,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -2.5,
+          "cylinder": -1.25,
+          "axis": null,
+          "se": -3.12
+        },
+        "suggested": {
+          "sphere": -2.5,
+          "cylinder": -1.25,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": [
+          "axis_missing"
+        ]
+      }
+    },
+    {
+      "name": "eixo 0 vale 180",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -2.0,
+          "cylinder": -1.0,
+          "axis": 0
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -2.0,
+          "cylinder": -1.0,
+          "axis": 180,
+          "se": -2.5
+        },
+        "suggested": {
+          "sphere": -2.0,
+          "cylinder": -0.75,
+          "axis": 180
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "cilindro positivo com eixo 30 → transposto x 120",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": 1.0,
+          "cylinder": 1.5,
+          "axis": 30
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": 2.5,
+          "cylinder": -1.5,
+          "axis": 120,
+          "se": 1.75
+        },
+        "suggested": {
+          "sphere": 2.5,
+          "cylinder": -1.25,
+          "axis": 120
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "+0,12 → plano (0,00) com aviso",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": 0.12,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": 0.12,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": 0.12
+        },
+        "suggested": {
+          "sphere": 0.0,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": [
+          "plano_check"
+        ]
+      }
+    },
+    {
+      "name": "plano tórico 0,00 -1,25 x 90",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": 0.0,
+          "cylinder": -1.25,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": 0.0,
+          "cylinder": -1.25,
+          "axis": 90,
+          "se": -0.62
+        },
+        "suggested": {
+          "sphere": 0.0,
+          "cylinder": -1.25,
+          "axis": 90
+        },
+        "vertex_applied": false,
+        "notes": [
+          "plano_check"
+        ]
+      }
+    },
+    {
+      "name": "-6,76 → -6,25: empate na grade de 0,50 → -6,00 (máximo positivo)",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -6.76,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -6.25,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -6.25
+        },
+        "suggested": {
+          "sphere": -6.0,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "+6,00 → +6,47 → +6,50",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": 6.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": 6.47,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": 6.47
+        },
+        "suggested": {
+          "sphere": 6.5,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "+9,00 → +10,09: fora da faixa padrão (+8,00)",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": 9.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": 10.09,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": 10.09
+        },
+        "suggested": null,
+        "vertex_applied": true,
+        "notes": [
+          "out_of_range"
+        ]
+      }
+    },
+    {
+      "name": "tórica com esférico além de -9,00 (padrão) → sem sugestão",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -11.0,
+          "cylinder": -1.0,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -9.72,
+          "cylinder": -0.77,
+          "axis": 90,
+          "se": -10.1
+        },
+        "suggested": null,
+        "vertex_applied": true,
+        "notes": [
+          "out_of_range"
+        ]
+      }
+    },
+    {
+      "name": "cilindro -3,00 sem vértice: empate com a ponta → -2,75",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -1.0,
+          "cylinder": -3.0,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -1.0,
+          "cylinder": -3.0,
+          "axis": 90,
+          "se": -2.5
+        },
+        "suggested": {
+          "sphere": -1.0,
+          "cylinder": -2.75,
+          "axis": 90
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    },
+    {
+      "name": "-1,00 -3,25 x 90: vértice aplicado → cilindro -3,06 fora da faixa",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -1.0,
+          "cylinder": -3.25,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "toric",
+        "theoretical": {
+          "sphere": -0.99,
+          "cylinder": -3.06,
+          "axis": 90,
+          "se": -2.52
+        },
+        "suggested": {
+          "sphere": -1.0,
+          "cylinder": null,
+          "axis": 90
+        },
+        "vertex_applied": true,
+        "notes": [
+          "cylinder_out_of_range"
+        ]
+      }
+    },
+    {
+      "name": "distância ao vértice 14 mm",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 14,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -6.0,
+          "cylinder": null,
+          "axis": null
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -5.54,
+          "cylinder": 0.0,
+          "axis": null,
+          "se": -5.54
+        },
+        "suggested": {
+          "sphere": -5.5,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": true,
+        "notes": []
+      }
+    },
+    {
+      "name": "cilindro -0,25 abaixo de 0,75 no automático → esférica pelo EE",
+      "spec_vector": false,
+      "input": {
+        "vertex_distance_mm": 12,
+        "profile": "standard",
+        "lens_mode": "auto",
+        "eye": {
+          "sphere": -3.0,
+          "cylinder": -0.25,
+          "axis": 90
+        }
+      },
+      "expected": {
+        "type": "spherical",
+        "theoretical": {
+          "sphere": -3.0,
+          "cylinder": -0.25,
+          "axis": 90,
+          "se": -3.12
+        },
+        "suggested": {
+          "sphere": -3.0,
+          "cylinder": null,
+          "axis": null
+        },
+        "vertex_applied": false,
+        "notes": []
+      }
+    }
+  ],
+  "sphere_grid_cases": [
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": -6.25,
+      "expected": -6.0
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": 6.25,
+      "expected": 6.5
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": -12.25,
+      "expected": -12.0
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": -12.26,
+      "expected": null
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": 8.24,
+      "expected": 8.0
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": 8.25,
+      "expected": null
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": 0.12,
+      "expected": 0.0
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": 0.13,
+      "expected": 0.25
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": -0.12,
+      "expected": 0.0
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": -0.13,
+      "expected": -0.25
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": -2.37,
+      "expected": -2.25
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": -7.25,
+      "expected": -7.0
+    },
+    {
+      "profile": "standard",
+      "lens": "spherical",
+      "value": -7.26,
+      "expected": -7.5
+    },
+    {
+      "profile": "standard",
+      "lens": "toric",
+      "value": -9.25,
+      "expected": -9.0
+    },
+    {
+      "profile": "standard",
+      "lens": "toric",
+      "value": -9.26,
+      "expected": null
+    },
+    {
+      "profile": "standard",
+      "lens": "toric",
+      "value": 6.12,
+      "expected": 6.0
+    },
+    {
+      "profile": "standard",
+      "lens": "toric",
+      "value": 6.13,
+      "expected": null
+    },
+    {
+      "profile": "standard",
+      "lens": "toric",
+      "value": -6.25,
+      "expected": -6.0
+    },
+    {
+      "profile": "standard",
+      "lens": "toric",
+      "value": -6.24,
+      "expected": -6.0
+    },
+    {
+      "profile": "extended",
+      "lens": "spherical",
+      "value": -20.12,
+      "expected": -20.0
+    },
+    {
+      "profile": "extended",
+      "lens": "spherical",
+      "value": -20.13,
+      "expected": null
+    },
+    {
+      "profile": "extended",
+      "lens": "spherical",
+      "value": 20.12,
+      "expected": 20.0
+    },
+    {
+      "profile": "extended",
+      "lens": "spherical",
+      "value": 20.13,
+      "expected": null
+    },
+    {
+      "profile": "extended",
+      "lens": "spherical",
+      "value": -13.42,
+      "expected": -13.5
+    }
+  ],
+  "cylinder_cases": [
+    {
+      "profile": "standard",
+      "value": -1.0,
+      "expected": -0.75
+    },
+    {
+      "profile": "standard",
+      "value": -1.5,
+      "expected": -1.25
+    },
+    {
+      "profile": "standard",
+      "value": -2.0,
+      "expected": -1.75
+    },
+    {
+      "profile": "standard",
+      "value": -2.5,
+      "expected": -2.25
+    },
+    {
+      "profile": "standard",
+      "value": -3.0,
+      "expected": -2.75
+    },
+    {
+      "profile": "standard",
+      "value": -3.01,
+      "expected": null
+    },
+    {
+      "profile": "standard",
+      "value": -0.25,
+      "expected": -0.75
+    },
+    {
+      "profile": "standard",
+      "value": -1.1,
+      "expected": -1.25
+    },
+    {
+      "profile": "standard",
+      "value": -0.75,
+      "expected": -0.75
+    },
+    {
+      "profile": "extended",
+      "value": -6.0,
+      "expected": -5.75
+    },
+    {
+      "profile": "extended",
+      "value": -6.01,
+      "expected": null
+    },
+    {
+      "profile": "extended",
+      "value": -3.48,
+      "expected": -3.25
+    },
+    {
+      "profile": "extended",
+      "value": -5.63,
+      "expected": -5.75
+    }
+  ],
+  "axis_cases": [
+    {
+      "step": 10,
+      "axis": 175,
+      "expected": 180
+    },
+    {
+      "step": 10,
+      "axis": 5,
+      "expected": 10
+    },
+    {
+      "step": 10,
+      "axis": 4,
+      "expected": 180
+    },
+    {
+      "step": 10,
+      "axis": 15,
+      "expected": 20
+    },
+    {
+      "step": 10,
+      "axis": 14,
+      "expected": 10
+    },
+    {
+      "step": 10,
+      "axis": 180,
+      "expected": 180
+    },
+    {
+      "step": 10,
+      "axis": 1,
+      "expected": 180
+    },
+    {
+      "step": 5,
+      "axis": 92,
+      "expected": 90
+    },
+    {
+      "step": 5,
+      "axis": 93,
+      "expected": 95
+    },
+    {
+      "step": 5,
+      "axis": 178,
+      "expected": 180
+    },
+    {
+      "step": 5,
+      "axis": 2,
+      "expected": 180
+    },
+    {
+      "step": 5,
+      "axis": 3,
+      "expected": 5
+    }
+  ]
+}

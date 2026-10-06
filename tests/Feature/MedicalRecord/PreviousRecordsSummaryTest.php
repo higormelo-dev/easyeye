@@ -123,24 +123,36 @@ it('omite linhas sem dado (null) — a UI esconde a linha inteira', function () 
         ->and($summary['conduct'])->toBeNull();
 });
 
-it('consulta anterior com cálculo de lentes de contato: o painel recebe o resultado gravado', function () {
+it('consulta anterior com lente de contato: o painel recebe o cálculo gravado (v2 e v1, como estão)', function () {
     MedicalRecord::create([
         'patient_id'               => $this->patient->id,
         'doctor_id'                => $this->doctor->id,
         'main_complaint'           => 'Adaptação de lente de contato',
         'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate([
-            'vertex_od' => -6, 'vertex_oe' => 6, 'se_od_sphere' => -2, 'se_od_cylinder' => -1,
+            'od' => ['sphere' => -5, 'cylinder' => -2, 'axis' => 180], 'oe' => ['sphere' => -2.5],
         ]),
     ]);
+    // Gravado pela versão 1 (antes da v2), um ano antes: segue no formato antigo.
+    $old = MedicalRecord::create([
+        'patient_id'               => $this->patient->id,
+        'doctor_id'                => $this->doctor->id,
+        'main_complaint'           => 'Consulta antiga',
+        'contact_lens_calculation' => ['version' => 1, 'vertex_distance_mm' => 12, 'vertex_od' => -6, 'vertex_od_result' => -5.6],
+    ]);
+    $old->forceFill(['created_at' => now()->subYear()])->saveQuietly();
 
-    $summary = $this->get(route('panel.patients.medicalrecords.create', $this->patient))
-        ->viewData('page')['props']['previousRecords'][0]['summary'];
+    $previous = $this->get(route('panel.patients.medicalrecords.create', $this->patient))
+        ->viewData('page')['props']['previousRecords'];
 
-    expect($summary['contact_lens']['vertex_distance_mm'])->toEqual(12)
-        ->and($summary['contact_lens']['vertex_od_result'])->toEqual(-5.6)
-        ->and($summary['contact_lens']['vertex_oe_result'])->toEqual(6.47)
-        ->and($summary['contact_lens']['se_od_result'])->toEqual(-2.5)
-        ->and($summary['contact_lens']['se_oe_result'])->toBeNull();
+    $v2 = $previous[0]['summary']['contact_lens'];
+    expect($v2['version'])->toBe(2)
+        ->and($v2['profile'])->toBe('standard')
+        ->and($v2['results']['od']['type'])->toBe('toric')
+        ->and($v2['results']['od']['suggested'])->toEqual(['sphere' => -4.75, 'cylinder' => -1.75, 'axis' => 180])
+        ->and($v2['results']['oe']['suggested'])->toEqual(['sphere' => -2.5, 'cylinder' => null, 'axis' => null])
+        ->and($previous[1]['summary']['contact_lens'])->toEqual([
+            'version' => 1, 'vertex_distance_mm' => 12, 'vertex_od' => -6, 'vertex_od_result' => -5.6,
+        ]);
 });
 
 it('abrir o novo prontuário registra o acesso (o resumo das consultas anteriores é dado clínico)', function () {

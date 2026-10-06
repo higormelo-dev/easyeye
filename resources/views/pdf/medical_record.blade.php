@@ -376,20 +376,44 @@
     </div>
 </div>
 @endif
-{{-- Cálculo de lentes de contato da consulta (ContactLensCalculator) --}}
+{{-- Lente de contato da consulta (ContactLensCalculator): v2 mostra a potência
+     SUGERIDA por olho + cálculo teórico (ContactLensFormatter, mesmos textos da
+     tela); v1 (gravado antes da v2) segue no formato antigo, como está. --}}
 @php
-    $clc = is_array($record->contact_lens_calculation) ? $record->contact_lens_calculation : null;
-    // Dioptria com sinal e 2 casas (mesma notação da calculadora na tela).
+    $clc          = is_array($record->contact_lens_calculation) ? $record->contact_lens_calculation : null;
+    $clcFormatter = app(\App\Services\ContactLensFormatter::class);
+    $clcLegacy    = $clcFormatter->isLegacy($clc);
+    // v1: dioptria com sinal e 2 casas (notação de então).
     $diopter = static fn ($v) => $v === null ? '—' : (($v > 0 ? '+' : '') . number_format((float) $v, 2, '.', ''));
     // Distância ao vértice no idioma do documento, sem zeros à toa ("12", "12,5").
     $vertexMm = \Illuminate\Support\Number::format((float) ($clc['vertex_distance_mm'] ?? 12), maxPrecision: 2, locale: app()->getLocale());
-    // Vértice: esférico digitado → lente de contato (deixa claro que só o esférico foi convertido).
+    // v1: esférico digitado → lente de contato (deixa claro que só o esférico foi convertido).
     $vertexEye = static fn ($in, $out) => $out === null ? '—' : $diopter($in) . ' → ' . $diopter($out);
 @endphp
-@if($clc)
+@if($clc && ! $clcLegacy && $clcFormatter->hasResult($clc))
 <div class="row">
     <div class="col col-12">
         <span class="field-label">{{ __('pdf.contact_lens_title') }}</span>
+    </div>
+</div>
+@foreach($clcFormatter->rows($clc) as $clcRow)
+<div class="row">
+    <div class="col col-12">
+        <span class="field-label">{{ $clcRow['label'] }}</span>
+        {{-- A potência prescritível em destaque; o resto é conferência. --}}
+        <span class="field-value"@if($clcRow['key'] === 'suggested') style="font-weight: bold"@endif>{{ $clcRow['value'] }}</span>
+    </div>
+</div>
+@endforeach
+<div class="row">
+    <div class="col col-12">
+        <span class="field-label">{{ __('actions.medical_records.contact_lens_footer') }}</span>
+    </div>
+</div>
+@elseif($clc && $clcLegacy)
+<div class="row">
+    <div class="col col-12">
+        <span class="field-label">{{ __('pdf.contact_lens_title') }} ({{ __('actions.medical_records.contact_lens_legacy') }})</span>
     </div>
 </div>
 <div class="row">

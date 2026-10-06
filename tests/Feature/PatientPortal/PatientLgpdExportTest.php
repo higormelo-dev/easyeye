@@ -89,21 +89,44 @@ test('titular baixa os proprios dados: 200, JSON com o conteudo clinico real, e 
     expect($lgpdRequest->responded_at)->not->toBeNull();
 });
 
-test('exportacao traz o calculo de lentes de contato gravado na consulta', function () {
+test('exportacao traz a lente de contato sugerida gravada na consulta (dado e texto)', function () {
     $f = makeLgpdExportFixture();
     $f['record']->update([
         'contact_lens_calculation' => app(ContactLensCalculator::class)->calculate([
-            'vertex_od' => -6, 'se_od_sphere' => -2, 'se_od_cylinder' => -1,
+            'od' => ['sphere' => -5, 'cylinder' => -2, 'axis' => 180], 'oe' => ['sphere' => -2.5],
         ]),
     ]);
     loginAsPatient($f['account']);
 
-    $data = json_decode($this->get(route('patient-portal.clinics.export', $f['patient']))->getContent(), true);
-    $clc  = $data['medical_records'][0]['contact_lens_calculation'];
+    $data   = json_decode($this->get(route('patient-portal.clinics.export', $f['patient']))->getContent(), true);
+    $record = $data['medical_records'][0];
+    $clc    = $record['contact_lens_calculation'];
 
-    expect($clc['vertex_od'])->toEqual(-6)
-        ->and($clc['vertex_od_result'])->toEqual(-5.6)
-        ->and($clc['se_od_result'])->toEqual(-2.5);
+    expect($clc['version'])->toBe(2)
+        ->and($clc['od'])->toEqual(['sphere' => -5, 'cylinder' => -2, 'axis' => 180])
+        ->and($clc['results']['od']['type'])->toBe('toric')
+        ->and($clc['results']['od']['suggested'])->toEqual(['sphere' => -4.75, 'cylinder' => -1.75, 'axis' => 180])
+        ->and($record['contact_lens_summary'])->toStartWith(
+            __('actions.medical_records.contact_lens_suggested') . ': OD −4,75 / −1,75 × 180° (tórica)  ·  OE −2,50 (esférica)',
+        );
+});
+
+test('exportacao de calculo gravado na versao 1 sai como esta (formato antigo)', function () {
+    $f = makeLgpdExportFixture();
+    $f['record']->update([
+        'contact_lens_calculation' => [
+            'version'      => 1, 'vertex_distance_mm' => 12, 'vertex_od' => -6, 'vertex_od_result' => -5.6,
+            'se_od_sphere' => -2, 'se_od_cylinder' => -1, 'se_od_result' => -2.5,
+        ],
+    ]);
+    loginAsPatient($f['account']);
+
+    $record = json_decode($this->get(route('patient-portal.clinics.export', $f['patient']))->getContent(), true)['medical_records'][0];
+
+    expect($record['contact_lens_calculation']['vertex_od_result'])->toEqual(-5.6)
+        ->and($record['contact_lens_calculation']['se_od_result'])->toEqual(-2.5)
+        ->and($record['contact_lens_summary'])->toContain('OD: -6.00 → -5.60')
+        ->and($record['contact_lens_summary'])->toContain('OD: -2.50');
 });
 
 test('registra data_access_log com patient_account_id (nao user_id) e purpose lgpd_request', function () {

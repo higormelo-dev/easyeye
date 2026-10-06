@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\{Doctor, Patient};
+use App\Services\ContactLensCalculator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -282,18 +283,11 @@ class StoreMedicalRecordRequest extends FormRequest
             'fundoscopy_left'           => ['nullable', 'string', 'max:5000'],
             'observation_general'       => ['nullable', 'string', 'max:5000'],
             'observation_of_lenses'     => ['nullable', 'string', 'max:5000'],
-            // Cálculo de lentes de contato — só ENTRADAS; os resultados são
-            // recalculados no servidor (ContactLensCalculator). Faixas
-            // clínicas plausíveis: barram valor digitado errado (ex.: -90). Até 2
-            // casas: o valor exibido na tela e no PDF é o mesmo usado no cálculo.
-            'contact_lens_calculation'                    => ['nullable', 'array'],
-            'contact_lens_calculation.vertex_distance_mm' => ['nullable', 'numeric', 'decimal:0,2', 'min:5', 'max:25'],
-            'contact_lens_calculation.vertex_od'          => ['nullable', 'numeric', 'decimal:0,2', 'min:-40', 'max:40'],
-            'contact_lens_calculation.vertex_oe'          => ['nullable', 'numeric', 'decimal:0,2', 'min:-40', 'max:40'],
-            'contact_lens_calculation.se_od_sphere'       => ['nullable', 'numeric', 'decimal:0,2', 'min:-40', 'max:40'],
-            'contact_lens_calculation.se_od_cylinder'     => ['nullable', 'numeric', 'decimal:0,2', 'min:-15', 'max:15'],
-            'contact_lens_calculation.se_oe_sphere'       => ['nullable', 'numeric', 'decimal:0,2', 'min:-40', 'max:40'],
-            'contact_lens_calculation.se_oe_cylinder'     => ['nullable', 'numeric', 'decimal:0,2', 'min:-15', 'max:15'],
+            // Lente de contato (v2) — só ENTRADAS; os resultados são
+            // recalculados no servidor (ContactLensCalculator, que também
+            // define as faixas e a versão aceita).
+            'contact_lens_calculation' => ['nullable', 'array'],
+            ...ContactLensCalculator::validationRules(),
             // Diagnóstico — CBO obrigatório (array de {code, description})
             'diagnosis_cids'               => ['nullable', 'array', 'max:20'],
             'diagnosis_cids.*.code'        => ['required_with:diagnosis_cids', 'string', 'max:10'],
@@ -310,6 +304,8 @@ class StoreMedicalRecordRequest extends FormRequest
             'doctor_id.required' => __('actions.medical_records.doctor_required_validation'),
             'doctor_id.exists'   => __('actions.medical_records.doctor_exists_validation'),
             'schedule_id.exists' => __('actions.medical_records.schedule_exists_validation'),
+            // Tela aberta antes da v2 da calculadora (envia version 1).
+            'contact_lens_calculation.version.in' => __('actions.medical_records.contact_lens_outdated'),
         ];
     }
 
