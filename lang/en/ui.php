@@ -15,20 +15,23 @@ return [
 
     // ICD-10 diagnosis search (Components/Panel/Cid10Picker.vue)
     'cid10' => [
-        'placeholder'    => 'Search by code or diagnosis (e.g. H40.1, glaucoma)…',
-        'search_label'   => 'Search diagnosis (ICD-10)',
-        'suggestions'    => 'Diagnosis suggestions',
-        'most_used'      => 'Most used',
-        'custom'         => 'Custom',
-        'create'         => "Add new diagnosis: ':term'",
-        'primary'        => 'Primary diagnosis',
-        'mark_primary'   => 'Mark as primary diagnosis',
-        'primary_toggle' => 'Primary diagnosis: :item',
-        'remove'         => 'Remove :item',
-        'searching'      => 'Searching…',
-        'results_one'    => ':count result',
-        'results_other'  => ':count results',
-        'no_results'     => 'No diagnosis found.',
+        'placeholder'  => 'Search by code or diagnosis (e.g. H40.1, glaucoma)…',
+        'search_label' => 'Search diagnosis (ICD-10)',
+        'suggestions'  => 'Diagnosis suggestions',
+        'most_used'    => 'Most used',
+        'custom'       => 'Custom',
+        // Code created in the manager (outside the official DATASUS table).
+        'non_official'      => 'Outside the official table',
+        'non_official_hint' => 'Code outside the official ICD-10 table (DATASUS): TISS claims may be rejected.',
+        'create'            => "Add new diagnosis: ':term'",
+        'primary'           => 'Primary diagnosis',
+        'mark_primary'      => 'Mark as primary diagnosis',
+        'primary_toggle'    => 'Primary diagnosis: :item',
+        'remove'            => 'Remove :item',
+        'searching'         => 'Searching…',
+        'results_one'       => ':count result',
+        'results_other'     => ':count results',
+        'no_results'        => 'No diagnosis found.',
     ],
 
     // Cadastro de paciente (componente compartilhado Pacientes/Agenda).

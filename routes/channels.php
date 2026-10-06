@@ -1,6 +1,6 @@
 <?php
 
-use App\Broadcasting\{ClinicBillingChannel, ClinicImportChannel, ManagerAiCatalogSyncChannel, ManagerCovenantImportChannel, ManagerMedicineImportChannel, ManagerMedicinePosologyBatchChannel};
+use App\Broadcasting\{ClinicBillingChannel, ClinicImportChannel, ManagerAiCatalogSyncChannel, ManagerCid10ImportChannel, ManagerCovenantImportChannel, ManagerMedicineImportChannel, ManagerMedicinePosologyBatchChannel};
 use Illuminate\Support\Facades\Broadcast;
 
 /*
@@ -16,6 +16,9 @@ Broadcast::channel('manager.imports.medicines.{importId}', ManagerMedicineImport
 
 // Progresso do lote "Gerar posologia com IA" do catálogo global (manager).
 Broadcast::channel('manager.medicines.posology-batches.{batchId}', ManagerMedicinePosologyBatchChannel::class);
+
+// Progresso da importação da CID-10 (DATASUS) no catálogo global (manager).
+Broadcast::channel('manager.imports.cid10.{importId}', ManagerCid10ImportChannel::class);
 
 // Progresso da sincronização do catálogo global de convênios com a ANS (manager).
 Broadcast::channel('manager.imports.covenants.{importId}', ManagerCovenantImportChannel::class);

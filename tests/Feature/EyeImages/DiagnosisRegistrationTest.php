@@ -57,7 +57,7 @@ function filterEyeImagesByDiagnosis($test, User $actingUser, $entityUser, array 
 }
 
 it('médico registra um diagnóstico CID-10 no exame', function () {
-    $cid = Cid10Code::create(['code' => 'H40.1', 'description' => 'Glaucoma primário de ângulo aberto']);
+    $cid = Cid10Code::updateOrCreate(['code' => 'H40.1'], ['description' => 'Glaucoma primário de ângulo aberto']);
 
     updateExamDiagnosis($this, $this->doctor, $this->doctorEntityUser, $this->exam, [
         'diagnoses' => [
@@ -76,8 +76,8 @@ it('médico registra um diagnóstico CID-10 no exame', function () {
 });
 
 it('médico registra múltiplos diagnósticos com um marcado is_primary', function () {
-    Cid10Code::create(['code' => 'H40.1', 'description' => 'Glaucoma primário de ângulo aberto']);
-    Cid10Code::create(['code' => 'H35.0', 'description' => 'Retinopatia de fundo']);
+    Cid10Code::updateOrCreate(['code' => 'H40.1'], ['description' => 'Glaucoma primário de ângulo aberto']);
+    Cid10Code::updateOrCreate(['code' => 'H35.0'], ['description' => 'Retinopatia de fundo']);
 
     updateExamDiagnosis($this, $this->doctor, $this->doctorEntityUser, $this->exam, [
         'diagnoses' => [
@@ -110,7 +110,7 @@ it('admin (não-doctor) recebe 403 ao tentar salvar diagnóstico — bloqueado p
 });
 
 it('payload com código CID-10 duplicado no mesmo request retorna 422', function () {
-    Cid10Code::create(['code' => 'H40.1', 'description' => 'Glaucoma primário de ângulo aberto']);
+    Cid10Code::updateOrCreate(['code' => 'H40.1'], ['description' => 'Glaucoma primário de ângulo aberto']);
 
     $res = updateExamDiagnosis($this, $this->doctor, $this->doctorEntityUser, $this->exam, [
         'diagnoses' => [
@@ -139,7 +139,7 @@ it('cadastro de diagnóstico customizado: primeira vez cria, segunda vez (case/e
 });
 
 it('busca combina CID-10 + customizados da entidade e isola customizados de outra entidade', function () {
-    Cid10Code::create(['code' => 'H40.1', 'description' => 'Glaucoma primário de ângulo aberto']);
+    Cid10Code::updateOrCreate(['code' => 'H40.1'], ['description' => 'Glaucoma primário de ângulo aberto']);
 
     EntityCustomDiagnosis::create([
         'entity_id'       => $this->entity->id,
@@ -164,8 +164,8 @@ it('busca combina CID-10 + customizados da entidade e isola customizados de outr
 });
 
 it('diagnóstico usado mais vezes aparece antes de outro usado menos (ordenação por uso)', function () {
-    $popular = Cid10Code::create(['code' => 'P01', 'description' => 'Diagnostico Popular Teste']);
-    $rare    = Cid10Code::create(['code' => 'R01', 'description' => 'Diagnostico Raro Teste']);
+    $popular = Cid10Code::updateOrCreate(['code' => 'P01'], ['description' => 'Diagnostico Popular Teste']);
+    $rare    = Cid10Code::updateOrCreate(['code' => 'R01'], ['description' => 'Diagnostico Raro Teste']);
 
     $examA = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
     $examB = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
@@ -247,7 +247,7 @@ it('custom_diagnosis_id de outra entidade é rejeitado (422, isolamento multi-te
 });
 
 it('audit_logs recebe entrada quando diagnosis_cids do exame é atualizado', function () {
-    Cid10Code::create(['code' => 'H40.1', 'description' => 'Glaucoma primário de ângulo aberto']);
+    Cid10Code::updateOrCreate(['code' => 'H40.1'], ['description' => 'Glaucoma primário de ângulo aberto']);
 
     updateExamDiagnosis($this, $this->doctor, $this->doctorEntityUser, $this->exam, [
         'diagnoses' => [['code' => 'H40.1', 'description' => 'Glaucoma primário de ângulo aberto']],

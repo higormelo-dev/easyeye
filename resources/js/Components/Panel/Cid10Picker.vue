@@ -90,6 +90,8 @@ const FALLBACK_TEXT = {
     suggestions: 'Sugestões de diagnóstico',
     most_used: 'Mais usados',
     custom: 'Customizado',
+    non_official: 'Fora da tabela oficial',
+    non_official_hint: 'Código fora da tabela oficial da CID-10 (DATASUS): guias TISS podem recusar.',
     create: "Cadastrar novo diagnóstico: ':term'",
     primary: 'Diagnóstico principal',
     mark_primary: 'Marcar como diagnóstico principal',
@@ -455,6 +457,14 @@ function moveActive(delta) {
                         v-if="!item.code"
                         class="badge bg-secondary-subtle text-secondary-emphasis ms-1 cid-listbox__badge"
                         >{{ text.custom }}</span
+                    >
+                    <!-- Código criado no manager: fora da tabela oficial (TISS pode recusar). -->
+                    <span
+                        v-else-if="item.source === 'custom'"
+                        class="badge bg-warning-subtle text-warning-emphasis ms-1 cid-listbox__badge"
+                        :title="text.non_official_hint"
+                        data-test="cid-non-official"
+                        >{{ text.non_official }}</span
                     >
                 </li>
 

@@ -15,20 +15,23 @@ return [
 
     // Busca de diagnóstico CID-10 (Components/Panel/Cid10Picker.vue)
     'cid10' => [
-        'placeholder'    => 'Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…',
-        'search_label'   => 'Buscar diagnóstico (CID-10)',
-        'suggestions'    => 'Sugestões de diagnóstico',
-        'most_used'      => 'Mais usados',
-        'custom'         => 'Customizado',
-        'create'         => "Cadastrar novo diagnóstico: ':term'",
-        'primary'        => 'Diagnóstico principal',
-        'mark_primary'   => 'Marcar como diagnóstico principal',
-        'primary_toggle' => 'Diagnóstico principal: :item',
-        'remove'         => 'Remover :item',
-        'searching'      => 'Buscando…',
-        'results_one'    => ':count resultado',
-        'results_other'  => ':count resultados',
-        'no_results'     => 'Nenhum diagnóstico encontrado.',
+        'placeholder'  => 'Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…',
+        'search_label' => 'Buscar diagnóstico (CID-10)',
+        'suggestions'  => 'Sugestões de diagnóstico',
+        'most_used'    => 'Mais usados',
+        'custom'       => 'Customizado',
+        // Código criado no manager (fora da tabela oficial do DATASUS).
+        'non_official'      => 'Fora da tabela oficial',
+        'non_official_hint' => 'Código fora da tabela oficial da CID-10 (DATASUS): guias TISS podem recusar.',
+        'create'            => "Cadastrar novo diagnóstico: ':term'",
+        'primary'           => 'Diagnóstico principal',
+        'mark_primary'      => 'Marcar como diagnóstico principal',
+        'primary_toggle'    => 'Diagnóstico principal: :item',
+        'remove'            => 'Remover :item',
+        'searching'         => 'Buscando…',
+        'results_one'       => ':count resultado',
+        'results_other'     => ':count resultados',
+        'no_results'        => 'Nenhum diagnóstico encontrado.',
     ],
 
     // Cadastro de paciente (componente compartilhado Pacientes/Agenda).

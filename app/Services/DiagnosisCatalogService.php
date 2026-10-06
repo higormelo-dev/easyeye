@@ -36,7 +36,7 @@ class DiagnosisCatalogService
         $cid10Results = Cid10Code::query()
             ->search($term)
             ->limit($poolSize)
-            ->get(['id', 'code', 'description']);
+            ->get(['id', 'code', 'description', 'source']);
 
         $customResults = EntityCustomDiagnosis::query()
             ->where('entity_id', $entityId)
@@ -66,6 +66,8 @@ class DiagnosisCatalogService
                 'custom_diagnosis_id' => null,
                 'description'         => $c->description,
                 'use_count'           => (int) ($cid10UseCounts[$c->id] ?? 0),
+                // custom = criado no manager, fora da tabela oficial (selo no Cid10Picker).
+                'source' => $c->source,
             ])
             ->concat($customResults->map(fn (EntityCustomDiagnosis $d) => [
                 'type'                => DiagnosisType::Custom->value,
@@ -91,7 +93,7 @@ class DiagnosisCatalogService
     {
         return EntityDiagnosisUsage::query()
             ->where('entity_id', $entityId)
-            ->with(['cid10Code:id,code,description', 'customDiagnosis:id,name'])
+            ->with(['cid10Code:id,code,description,source', 'customDiagnosis:id,name'])
             ->orderByDesc('use_count')
             ->limit($limit)
             ->get()
@@ -106,6 +108,7 @@ class DiagnosisCatalogService
                     ? (string) $u->cid10Code?->description
                     : (string) $u->customDiagnosis?->name,
                 'use_count' => (int) $u->use_count,
+                'source'    => $u->diagnosis_type === DiagnosisType::Cid10 ? $u->cid10Code?->source : null,
             ])
             ->values();
     }

@@ -217,6 +217,25 @@ describe('Cid10Picker (idioma)', () => {
         expect(wrapper.get('[role="status"]').text()).toBe('1 result');
     });
 
+    it('código criado no manager (source=custom) aparece com o selo "fora da tabela oficial"', async () => {
+        page.props = {
+            t_ui: {
+                cid10: { ...EN, non_official: 'Outside the official table', non_official_hint: 'TISS may reject' },
+            },
+        };
+        respondWith([
+            { code: 'H59.7', description: 'Complicação pós-operatória', source: 'custom' },
+            { code: 'H40.1', description: 'Glaucoma primário de ângulo aberto', source: 'datasus' },
+        ]);
+        mountPicker();
+
+        await typeQuery('H5');
+        const badges = wrapper.findAll('[data-test="cid-non-official"]');
+        expect(badges).toHaveLength(1);
+        expect(badges[0].text()).toBe('Outside the official table');
+        expect(badges[0].attributes('title')).toBe('TISS may reject');
+    });
+
     it('placeholder do pai tem prioridade; sem t_ui cai no português', () => {
         mountPicker({ placeholder: 'Buscar CID da guia' });
         expect(input().attributes('placeholder')).toBe('Buscar CID da guia');

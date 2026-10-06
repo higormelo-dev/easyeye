@@ -17,7 +17,9 @@ class Cid10SearchController extends Controller
 
         $results = Cid10Code::search($q)
             ->limit(15)
-            ->get(['id', 'code', 'description', 'category']);
+            // source=custom: código criado no manager (fora da tabela oficial) —
+            // o Cid10Picker mostra o selo.
+            ->get(['id', 'code', 'description', 'category', 'source']);
 
         // shape=select: formato consumido por SearchSelect.vue em modo remoto
         // (Gerenciador de Imagens, filtro de Diagnóstico). Valor = code, não o
@@ -26,7 +28,7 @@ class Cid10SearchController extends Controller
             return response()->json(['data' => $results->map(fn (Cid10Code $c) => [
                 'id'        => $c->code,
                 'label'     => $c->code . ' – ' . $c->description,
-                'sub_label' => $c->category,
+                'sub_label' => $c->isCustom() ? trim($c->category . ' · ' . __('ui.cid10.non_official'), ' ·') : $c->category,
             ])]);
         }
 

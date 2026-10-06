@@ -7,6 +7,8 @@ use App\Http\Controllers\Manager\{
     AiModelPricesController,
     AiProvidersController,
     AiUsageController,
+    Cid10CodesController,
+    Cid10ImportsController,
     CovenantImportsController,
     CovenantPlansController,
     CovenantsController,
@@ -435,6 +437,28 @@ Route::group([
             ->whereUuid('batch')
             ->middleware('throttle:manager-destructive')
             ->name('medicines.posology-batches.cancel');
+    });
+
+    // ── Catálogo global da CID-10 (diagnóstico de todas as clínicas) — admin only
+    // Lista oficial do DATASUS + códigos personalizados; importação do
+    // CID10CSV.zip com progresso por WebSocket (sem endpoint de status).
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('cid10', [Cid10CodesController::class, 'index'])->name('cid10.index');
+        Route::post('cid10', [Cid10CodesController::class, 'store'])->name('cid10.store');
+        Route::put('cid10/{cid10}', [Cid10CodesController::class, 'update'])
+            ->whereUuid('cid10')
+            ->name('cid10.update');
+        Route::delete('cid10/{cid10}', [Cid10CodesController::class, 'destroy'])
+            ->whereUuid('cid10')
+            ->middleware('throttle:manager-destructive')
+            ->name('cid10.destroy');
+        Route::post('cid10/imports', [Cid10ImportsController::class, 'store'])
+            ->middleware('throttle:manager-destructive')
+            ->name('cid10.imports.store');
+        Route::post('cid10/imports/{import}/cancel', [Cid10ImportsController::class, 'cancel'])
+            ->whereUuid('import')
+            ->middleware('throttle:manager-destructive')
+            ->name('cid10.imports.cancel');
     });
 
     // ── Catálogo global de convênios (operadoras da ANS + manuais) — admin only

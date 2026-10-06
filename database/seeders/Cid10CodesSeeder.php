@@ -3,18 +3,30 @@
 namespace Database\Seeders;
 
 use App\Models\Cid10Code;
+use App\Services\Cid10CatalogImporter;
 use Illuminate\Database\Seeder;
 
 class Cid10CodesSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach ($this->codes() as $code) {
-            Cid10Code::firstOrCreate(
-                ['code' => $code['code']],
-                ['description' => $code['description'], 'category' => $code['category']],
-            );
-        }
+        // Primeiro a seleção oftalmológica (categorias curadas para a busca do
+        // oftalmologista); depois a lista completa oficial, que acrescenta os
+        // demais códigos e põe a descrição OFICIAL em todo código da lista.
+        // Sem eventos: carga de sistema, não ação de usuário (não enche a
+        // trilha de auditoria com ~200 "created" a cada instalação).
+        Cid10Code::withoutEvents(function () {
+            foreach ($this->codes() as $code) {
+                Cid10Code::firstOrCreate(
+                    ['code' => $code['code']],
+                    ['description' => $code['description'], 'category' => $code['category']],
+                );
+            }
+        });
+
+        $result = app(Cid10CatalogImporter::class)->import();
+
+        $this->command?->info("CID-10 completa (DATASUS): {$result['read']} códigos lidos, {$result['inserted']} novos, {$result['corrected']} descrições corrigidas para a oficial.");
     }
 
     /** @return array<int, array{code: string, description: string, category: string}> */
