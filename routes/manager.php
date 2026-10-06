@@ -23,6 +23,7 @@ use App\Http\Controllers\Manager\{
     IntegratorUpdatesController,
     ManagerDashboardController,
     MedicineImportsController,
+    MedicinePosologyBatchesController,
     MedicinesController,
     PartnersController,
     PlansController,
@@ -404,6 +405,10 @@ Route::group([
         Route::get('medicines', [MedicinesController::class, 'index'])->name('medicines.index');
         Route::post('medicines', [MedicinesController::class, 'store'])->name('medicines.store');
         Route::put('medicines/{medicine}', [MedicinesController::class, 'update'])->name('medicines.update');
+        // Revisão da posologia gerada por IA com um clique (sem abrir o formulário).
+        Route::post('medicines/{medicine}/posology/approve', [MedicinesController::class, 'approvePosology'])
+            ->middleware('throttle:120,1')
+            ->name('medicines.posology.approve');
         Route::delete('medicines/{medicine}', [MedicinesController::class, 'destroy'])
             ->middleware('throttle:manager-destructive')
             ->name('medicines.destroy');
@@ -418,6 +423,18 @@ Route::group([
         Route::post('medicines/ai-posology', [MedicinesController::class, 'aiPosology'])
             ->middleware('throttle:10,1')
             ->name('medicines.ai-posology');
+        // Posologia por IA em LOTE (filtros aplicados): prévia, início (fila) e
+        // cancelamento — progresso só por WebSocket (sem endpoint de status).
+        Route::get('medicines/posology-batches/preview', [MedicinePosologyBatchesController::class, 'preview'])
+            ->middleware('throttle:30,1')
+            ->name('medicines.posology-batches.preview');
+        Route::post('medicines/posology-batches', [MedicinePosologyBatchesController::class, 'store'])
+            ->middleware('throttle:manager-destructive')
+            ->name('medicines.posology-batches.store');
+        Route::post('medicines/posology-batches/{batch}/cancel', [MedicinePosologyBatchesController::class, 'cancel'])
+            ->whereUuid('batch')
+            ->middleware('throttle:manager-destructive')
+            ->name('medicines.posology-batches.cancel');
     });
 
     // ── Catálogo global de convênios (operadoras da ANS + manuais) — admin only

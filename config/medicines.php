@@ -34,4 +34,34 @@ return [
         // Verificação semanal automática (só lê dados públicos).
         'sync_enabled' => (bool) env('CMED_SYNC_ENABLED', false),
     ],
+
+    // Sugestão de posologia por IA (botão e lote). Inclui o raciocínio dos
+    // modelos gpt-5* — abaixo de ~1500 eles podem esgotar pensando e não responder.
+    'posology_ai' => [
+        'max_output_tokens' => (int) env('MEDICINE_POSOLOGY_AI_MAX_OUTPUT_TOKENS', 2000),
+    ],
+
+    /*
+    | Posologia sugerida gerada por IA em lote (Manager → Medicamentos):
+    | uma chamada de IA por grupo de itens iguais (princípio ativo +
+    | concentração + forma), em fila, com progresso por WebSocket.
+    */
+    'posology_batch' => [
+        // Teto de chamadas (grupos) por lote; o restante fica para o próximo.
+        'max_groups' => (int) env('MEDICINE_POSOLOGY_BATCH_MAX_GROUPS', 200),
+
+        // Pausa entre chamadas (throttle simples para o limite do provedor).
+        'delay_ms' => (int) env('MEDICINE_POSOLOGY_BATCH_DELAY_MS', 500),
+
+        // Novas tentativas de um grupo em erro transitório (demora/sobrecarga/429).
+        'retries'               => (int) env('MEDICINE_POSOLOGY_BATCH_RETRIES', 2),
+        'retry_backoff_seconds' => [5, 15],
+
+        // Falhas seguidas que encerram o lote (provedor fora do ar: não gasta à toa).
+        'max_consecutive_failures' => (int) env('MEDICINE_POSOLOGY_BATCH_MAX_CONSECUTIVE_FAILURES', 5),
+
+        // Cada job processa grupos por no máximo isto e agenda a continuação
+        // (fica abaixo do retry_after de 90 s da fila).
+        'job_time_budget_seconds' => (int) env('MEDICINE_POSOLOGY_BATCH_JOB_BUDGET', 45),
+    ],
 ];

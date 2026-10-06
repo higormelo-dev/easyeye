@@ -94,4 +94,81 @@ describe('Manager → Medicamentos: drawer de detalhes', () => {
     it('sem item selecionado não mostra rodapé', () => {
         expect(mountDrawer(null).find('footer').exists()).toBe(false);
     });
+
+    it('posologia gerada por IA não revisada: selo e quando foi gerada', () => {
+        const wrapper = mountDrawer({
+            ...cmed,
+            dosage: '1 gota',
+            posology_pending_review: true,
+            posology_ai_generated_at: '05/10/2026 10:00',
+        });
+
+        expect(wrapper.find('[data-test="ai-review-badge"]').text()).toContain('posology_ai_badge');
+        expect(wrapper.find('[data-test="ai-note"]').text()).toContain('posology_ai_generated');
+    });
+
+    it('gerada por IA e já revisada: sem selo, com o histórico', () => {
+        const wrapper = mountDrawer({
+            ...cmed,
+            dosage: '1 gota',
+            posology_pending_review: false,
+            posology_ai_generated_at: '05/10/2026 10:00',
+            posology_reviewed_at: '06/10/2026 09:00',
+        });
+
+        expect(wrapper.find('[data-test="ai-review-badge"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="ai-note"]').text()).toContain('posology_ai_reviewed');
+    });
+});
+
+describe('aprovar a posologia gerada por IA na gaveta', () => {
+    const tt = new Proxy({}, { get: (o, k) => (typeof k === 'string' ? k : o[k]) });
+    const med = {
+        id: 'p-1',
+        name: 'ACU FRESH',
+        source: 'cmed',
+        dosage: '1 gota',
+        posology_pending_review: true,
+        posology_ai_generated_at: '05/10/2026 18:56',
+    };
+
+    it('pendente: "Aprovar" e "Aprovar e próximo" emitem approve; editar vira secundário', async () => {
+        const wrapper = mount(MedicineDetailDrawer, {
+            props: { open: true, medicine: med, t: tt, hasNextPending: true },
+            global: {
+                stubs: {
+                    OffcanvasPanel: {
+                        props: ['open'],
+                        template: '<div><slot name="header" /><slot /><slot name="footer" /></div>',
+                    },
+                },
+            },
+        });
+
+        await wrapper.find('[data-test="drawer-approve"]').trigger('click');
+        await wrapper.find('[data-test="drawer-approve-next"]').trigger('click');
+
+        expect(wrapper.emitted('approve')).toEqual([
+            [med, false],
+            [med, true],
+        ]);
+        expect(wrapper.find('.btn-outline-primary').text()).toContain('edit_posology');
+    });
+
+    it('sem próxima pendente esconde "Aprovar e próximo"; revisada não mostra aprovar; erro e mensagem aparecem', () => {
+        const stubs = { OffcanvasPanel: { props: ['open'], template: '<div><slot /><slot name="footer" /></div>' } };
+        const last = mount(MedicineDetailDrawer, {
+            props: { open: true, medicine: med, t: tt, hasNextPending: false, approveMessage: 'acabou' },
+            global: { stubs },
+        });
+        expect(last.find('[data-test="drawer-approve-next"]').exists()).toBe(false);
+        expect(last.find('[data-test="approve-message"]').text()).toContain('acabou');
+
+        const reviewed = mount(MedicineDetailDrawer, {
+            props: { open: true, medicine: { ...med, posology_pending_review: false }, t: tt, approveError: 'falhou' },
+            global: { stubs },
+        });
+        expect(reviewed.find('[data-test="drawer-approve"]').exists()).toBe(false);
+        expect(reviewed.find('[data-test="approve-error"]').text()).toContain('falhou');
+    });
 });

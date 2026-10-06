@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers\Manager;
 
-use App\Enums\{ImportStatus, MedicineSource};
+use App\Domains\AI\Services\AiUsdBrlRate;
+use App\Enums\{ImportStatus, MedicinePosologySource, MedicineSource};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\{MedicinePosologyAiRequest, MedicineRequest};
-use App\Models\{Medicine, MedicineImport, MedicinePresentation};
+use App\Models\{Medicine, MedicineImport, MedicinePosologyBatch, MedicinePosologyBatchGroup, MedicinePresentation};
 use App\Services\Audit\AuditLogger;
-use App\Services\Medicines\{MedicineCatalogSearch, MedicinePosologyAiException, MedicinePosologyAiService};
+use App\Services\Medicines\{MedicineCatalogFilters, MedicinePosologyAiException, MedicinePosologyAiService, MedicinePosologyBatchService};
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Validation\ValidationException;
 use Inertia\{Inertia, Response};
 
 /**
@@ -26,60 +28,20 @@ use Inertia\{Inertia, Response};
  */
 class MedicinesController extends Controller
 {
-    private const POSOLOGY_FIELDS = ['dosage', 'frequency', 'duration', 'instructions'];
-
-    /** Ordenação aceita pela tabela (whitelist — vai direto pro ORDER BY). */
-    private const SORTS = ['name', 'laboratory', 'source', 'cmed_situation', 'active'];
-
-    /** Situação do item na lista de preços da CMED (coluna "Situação na CMED"). */
-    private const CMED_SITUATIONS = ['marketed', 'not_marketed', 'left_list'];
-
-    /**
-     * Ordem da situação na CMED: comercializado, não comercializado, fora da
-     * lista atual e, por último, os curados (não se aplica).
-     */
-    private const CMED_SITUATION_ORDER = "CASE WHEN medicines.source <> 'cmed' THEN 3 WHEN medicines.active = false THEN 2 WHEN medicines.is_marketed THEN 0 ELSE 1 END";
-
     public function __construct(
-        private readonly MedicineCatalogSearch $catalogSearch,
         private readonly TenantContext $tenant,
         private readonly AuditLogger $audit,
         private readonly MedicinePosologyAiService $posologyAi,
+        private readonly MedicineCatalogFilters $catalogFilters,
+        private readonly MedicinePosologyBatchService $posologyBatches,
+        private readonly AiUsdBrlRate $usdBrl,
     ) {
     }
 
     public function index(Request $request): Response
     {
-        $filters = [
-            'search'         => $request->string('search')->trim()->value(),
-            'source'         => in_array($request->input('source'), ['manual', 'cmed'], true) ? $request->input('source') : '',
-            'status'         => in_array($request->input('status'), ['active', 'inactive'], true) ? $request->input('status') : '',
-            'cmed_situation' => in_array($request->input('cmed_situation'), self::CMED_SITUATIONS, true) ? $request->input('cmed_situation') : '',
-            'ophthalmic'     => $request->boolean('ophthalmic'),
-            'sort'           => in_array($request->input('sort'), self::SORTS, true) ? $request->input('sort') : 'name',
-            'direction'      => $request->input('direction') === 'desc' ? 'desc' : 'asc',
-        ];
-
-        $query = $this->globalCatalog()->with('presentation:id,name');
-
-        if ($filters['search'] !== '') {
-            $this->catalogSearch->apply($query, $filters['search']);
-        }
-
-        $query->when($filters['source'], fn (Builder $q, string $source) => $q->where('source', $source))
-            ->when($filters['status'] === 'active', fn (Builder $q) => $q->where('active', true))
-            ->when($filters['status'] === 'inactive', fn (Builder $q) => $q->where('active', false))
-            ->when($filters['ophthalmic'], fn (Builder $q) => $q->where('is_ophthalmic', true))
-            ->when($filters['cmed_situation'], fn (Builder $q, string $situation) => $this->whereCmedSituation($q, $situation));
-
-        // Coluna derivada: ordena pela expressão; as demais, pela coluna (whitelist).
-        $filters['sort'] === 'cmed_situation'
-            ? $query->orderByRaw(self::CMED_SITUATION_ORDER . ' ' . $filters['direction'])
-            : $query->orderBy('medicines.' . $filters['sort'], $filters['direction']);
-
-        $query->orderBy('medicines.name')
-            ->orderBy('medicines.concentration')
-            ->orderBy('medicines.id');
+        $filters = $this->catalogFilters->normalize($request->query());
+        $query   = $this->catalogFilters->query($filters)->with('presentation:id,name');
 
         $runningImport = MedicineImport::query()
             ->whereIn('status', [ImportStatus::Pending->value, ImportStatus::Processing->value])
@@ -107,7 +69,12 @@ class MedicinesController extends Controller
             // Botão "Gerar com IA": IAs "Configuradas" no painel de provedores
             // (chave + modelo), Principal primeiro — com mais de uma, o admin escolhe.
             'aiProviders' => fn () => $this->posologyAi->providers(),
-            't'           => trans('manager_medicines'),
+            // Lote "Gerar posologia com IA": em andamento (barra por WebSocket),
+            // histórico e teto de chamadas por lote.
+            'runningPosologyBatch' => fn () => $this->posologyBatches->running()?->progressPayload(),
+            'posologyBatches'      => fn () => $this->recentPosologyBatches(),
+            'posologyBatchCap'     => $this->posologyBatches->maxGroups(),
+            't'                    => trans('manager_medicines'),
         ]);
     }
 
@@ -118,6 +85,7 @@ class MedicinesController extends Controller
         $this->tenant->withoutScope(function () use ($data) {
             $medicine            = new Medicine([...$data, 'source' => MedicineSource::Manual]);
             $medicine->entity_id = null;
+            $this->markPosologyReviewed($medicine);
             $medicine->save();
         });
 
@@ -131,12 +99,62 @@ class MedicinesController extends Controller
 
         if ($model->source === MedicineSource::Cmed) {
             // Cadastro e status da CMED são controlados pela importação.
-            abort_if(array_diff(array_keys($data), self::POSOLOGY_FIELDS) !== [], 422, __('manager_medicines.cmed_only_posology'));
+            abort_if(array_diff(array_keys($data), Medicine::POSOLOGY_FIELDS) !== [], 422, __('manager_medicines.cmed_only_posology'));
         }
 
-        $this->tenant->withoutScope(fn () => $model->update($data));
+        $this->tenant->withoutScope(function () use ($model, $data) {
+            $model->fill($data);
+
+            // Salvo pelo modal de edição (que sempre manda a posologia): o
+            // admin revisou — a posologia gerada por IA vira manual.
+            if (array_intersect(array_keys($data), Medicine::POSOLOGY_FIELDS) !== []) {
+                $this->markPosologyReviewed($model);
+            }
+
+            $model->save();
+        });
 
         return back()->with('success', __('manager_medicines.saved'));
+    }
+
+    /**
+     * Posologia vista e salva pelo admin = manual e revisada (quem/quando).
+     * Sem posologia: volta a "sem posologia". A data em que a IA gerou
+     * (posology_ai_generated_at) fica como histórico.
+     */
+    private function markPosologyReviewed(Medicine $model): void
+    {
+        $has = $model->hasPosology();
+
+        $model->forceFill([
+            'posology_source'      => $has ? MedicinePosologySource::Manual : null,
+            'posology_reviewed_at' => $has ? now() : null,
+            'posology_reviewed_by' => $has ? auth()->id() : null,
+        ]);
+    }
+
+    /**
+     * Aprova a posologia gerada por IA como está (revisão em um clique):
+     * mesmo efeito de salvar pelo modal — passa a "revisada" (origem manual,
+     * quem/quando), sem tocar no texto. A data em que a IA gerou fica como
+     * histórico. Só vale para posologia ainda pendente (outra pessoa pode ter
+     * aprovado/editado nesse meio-tempo).
+     */
+    public function approvePosology(string $medicine): RedirectResponse
+    {
+        $model = $this->globalCatalog()->findOrFail($medicine);
+
+        if (! $model->posologyPendingReview() || ! $model->hasPosology()) {
+            throw ValidationException::withMessages(['posology' => __('manager_medicines.posology_approve_not_pending')]);
+        }
+
+        $model->update([
+            'posology_source'      => MedicinePosologySource::Manual,
+            'posology_reviewed_at' => now(),
+            'posology_reviewed_by' => auth()->id(),
+        ]);
+
+        return back()->with('success', __('manager_medicines.posology_approved', ['name' => $model->name]));
     }
 
     public function destroy(Request $request, string $medicine): RedirectResponse
@@ -183,15 +201,7 @@ class MedicinesController extends Controller
         if (! empty($data['medicine_id'])) {
             // Item salvo: dados do banco (inclui apresentação/classe da CMED), nunca os do cliente.
             $model    = $this->globalCatalog()->with('presentation:id,name')->findOrFail($data['medicine_id']);
-            $medicine = [
-                'nome'               => $model->name,
-                'principio_ativo'    => $model->active_ingredient,
-                'concentracao'       => $model->concentration,
-                'forma_farmaceutica' => $model->presentation?->name ?? $model->formLabel(),
-                'apresentacao'       => $model->presentation_detail,
-                'classe_terapeutica' => $model->therapeutic_class,
-                'uso_oftalmico'      => (bool) $model->is_ophthalmic,
-            ];
+            $medicine = $this->posologyAi->catalogContext($model);
         } else {
             $presentation = empty($data['medicine_presentation_id']) ? null : MedicinePresentation::withoutGlobalScopes()
                 ->whereNull('entity_id')
@@ -239,22 +249,10 @@ class MedicinesController extends Controller
         return $m->is_marketed ? 'marketed' : 'not_marketed';
     }
 
-    /** Mesmo critério de cmedSituation(), como filtro SQL. */
-    private function whereCmedSituation(Builder $query, string $situation): void
-    {
-        $query->where('medicines.source', MedicineSource::Cmed->value);
-
-        match ($situation) {
-            'marketed'     => $query->where('medicines.active', true)->where('medicines.is_marketed', true),
-            'not_marketed' => $query->where('medicines.active', true)->where('medicines.is_marketed', false),
-            default        => $query->where('medicines.active', false),
-        };
-    }
-
     /** @return Builder<Medicine> */
     private function globalCatalog(): Builder
     {
-        return Medicine::withoutGlobalScopes()->whereNull('medicines.entity_id')->whereNull('medicines.deleted_at');
+        return $this->catalogFilters->globalCatalog();
     }
 
     /** @return array<string, mixed> */
@@ -284,6 +282,11 @@ class MedicinesController extends Controller
             'frequency'                => $m->frequency,
             'duration'                 => $m->duration,
             'instructions'             => $m->instructions,
+            // Selo "IA – revisar": gerada em lote, ainda não revisada no modal.
+            'posology_source'          => $m->posology_source?->value,
+            'posology_pending_review'  => $m->posologyPendingReview(),
+            'posology_ai_generated_at' => $m->posology_ai_generated_at?->isoFormat('L LT'),
+            'posology_reviewed_at'     => $m->posology_reviewed_at?->isoFormat('L LT'),
         ];
     }
 
@@ -293,6 +296,8 @@ class MedicinesController extends Controller
         $active = $this->globalCatalog()->where('active', true);
 
         return [
+            // Posologias geradas por IA aguardando revisão (atalho "Revisar agora").
+            'ai_pending' => $this->globalCatalog()->where('posology_source', MedicinePosologySource::Ai->value)->count(),
             'active'     => (clone $active)->count(),
             'cmed'       => (clone $active)->where('source', MedicineSource::Cmed->value)->count(),
             'manual'     => (clone $active)->where('source', MedicineSource::Manual->value)->count(),
@@ -319,5 +324,81 @@ class MedicinesController extends Controller
                 'finished_at'             => $i->finished_at?->isoFormat('L LT'),
             ])
             ->all();
+    }
+
+    /**
+     * Histórico dos lotes de posologia por IA: quem, quando, filtros, IA,
+     * grupos, itens atualizados, falhas e custo real (US$ e R$).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function recentPosologyBatches(): array
+    {
+        $rate = $this->usdBrl->current();
+
+        return MedicinePosologyBatch::query()
+            ->with([
+                'user:id,name',
+                'groups' => fn ($q) => $q->where('status', MedicinePosologyBatchGroup::STATUS_FAILED)->orderBy('position'),
+            ])
+            ->latest()
+            ->limit(10)
+            ->get()
+            ->map(fn (MedicinePosologyBatch $b) => [
+                ...$b->progressPayload(),
+                'user'               => $b->user?->name,
+                'filters_summary'    => $this->filtersSummary((array) $b->filters),
+                'estimated_cost_usd' => $b->estimated_cost_usd,
+                'cost_brl'           => round((float) $b->cost_usd * $rate['rate'], 4),
+                'failures'           => $b->groups->take(20)->map(fn (MedicinePosologyBatchGroup $g) => [
+                    'label' => $g->label,
+                    'error' => $g->error,
+                ])->values()->all(),
+                'created_at'  => $b->created_at?->isoFormat('L LT'),
+                'finished_at' => $b->finished_at?->isoFormat('L LT'),
+            ])
+            ->all();
+    }
+
+    /**
+     * Filtros do lote em texto (histórico).
+     *
+     * @param array<string, mixed> $filters
+     *
+     * @return list<string>
+     */
+    private function filtersSummary(array $filters): array
+    {
+        $parts = [];
+
+        if (($filters['search'] ?? '') !== '') {
+            $parts[] = __('manager_medicines.batch_filter_search', ['term' => $filters['search']]);
+        }
+
+        if (($filters['source'] ?? '') !== '') {
+            $parts[] = __('manager_medicines.source_' . $filters['source']);
+        }
+
+        if (($filters['cmed_situation'] ?? '') !== '') {
+            $parts[] = __('manager_medicines.' . match ($filters['cmed_situation']) {
+                'marketed'     => 'cmed_marketed',
+                'not_marketed' => 'not_marketed',
+                default        => 'cmed_left_list',
+            });
+        }
+
+        if (($filters['status'] ?? '') !== '') {
+            $parts[] = __('manager_medicines.status_' . $filters['status']);
+        }
+
+        if (($filters['posology'] ?? '') !== '') {
+            $parts[] = __('manager_medicines.posology_filter_' . $filters['posology']);
+        }
+
+        if (! empty($filters['ophthalmic'])) {
+            $parts[] = __('manager_medicines.filter_ophthalmic');
+        }
+
+        return $parts;
     }
 }

@@ -15,7 +15,7 @@ defineProps({
     t: { type: Object, default: () => ({}) },
 });
 
-defineEmits(['view', 'edit', 'delete', 'toggleActive']);
+defineEmits(['view', 'edit', 'delete', 'toggleActive', 'approve']);
 </script>
 
 <template>
@@ -48,6 +48,13 @@ defineEmits(['view', 'edit', 'delete', 'toggleActive']);
                                 :label-inactive="t.status_inactive"
                             />
                             <span
+                                v-if="m.posology_pending_review"
+                                class="badge badge-soft-warning rounded fs-12 fw-medium"
+                                :title="t.posology_ai_badge_hint"
+                                data-test="ai-review-badge"
+                                ><i class="ti ti-sparkles me-1" aria-hidden="true"></i>{{ t.posology_ai_badge }}</span
+                            >
+                            <span
                                 v-if="cmedSituation(m, t)"
                                 class="badge rounded fs-12 fw-medium"
                                 :class="cmedSituation(m, t).cls"
@@ -76,6 +83,14 @@ defineEmits(['view', 'edit', 'delete', 'toggleActive']);
                 <hr class="my-2 mt-auto" />
 
                 <ActionIconGroup align="end" gap="tight">
+                    <ActionIconButton
+                        v-if="m.posology_pending_review"
+                        icon="ti ti-check"
+                        variant="success"
+                        :title="t.posology_approve_hint"
+                        data-test="card-approve"
+                        @click="$emit('approve', m)"
+                    />
                     <ActionIconButton icon="ti ti-eye" :title="t.action_view" @click="$emit('view', m)" />
                     <ActionIconButton
                         icon="ti ti-edit"

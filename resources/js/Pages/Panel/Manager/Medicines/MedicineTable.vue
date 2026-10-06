@@ -19,7 +19,7 @@ const props = defineProps({
     t: { type: Object, default: () => ({}) },
 });
 
-defineEmits(['sort', 'view', 'edit', 'delete', 'toggleActive']);
+defineEmits(['sort', 'view', 'edit', 'delete', 'toggleActive', 'approve']);
 
 const currentSort = computed(() => props.filters.sort ?? 'name');
 const currentDir = computed(() => props.filters.direction ?? 'asc');
@@ -114,6 +114,14 @@ function posology(m) {
                         >
                             <i class="ti ti-clipboard-text me-1"></i>{{ posology(m) }}
                         </div>
+                        <!-- Gerada por IA em lote e ainda não revisada no modal de edição. -->
+                        <span
+                            v-if="m.posology_pending_review"
+                            class="badge badge-soft-warning rounded fs-11 fw-medium"
+                            :title="t.posology_ai_badge_hint"
+                            data-test="ai-review-badge"
+                            ><i class="ti ti-sparkles me-1" aria-hidden="true"></i>{{ t.posology_ai_badge }}</span
+                        >
                     </td>
                     <td class="d-none d-lg-table-cell">
                         <div style="font-size: 0.875rem">{{ m.form ?? '—' }}</div>
@@ -163,6 +171,14 @@ function posology(m) {
                     </td>
                     <td class="text-end">
                         <ActionIconGroup align="end" gap="tight">
+                            <ActionIconButton
+                                v-if="m.posology_pending_review"
+                                icon="ti ti-check"
+                                variant="success"
+                                :title="t.posology_approve_hint"
+                                data-test="row-approve"
+                                @click="$emit('approve', m)"
+                            />
                             <ActionIconButton icon="ti ti-eye" :title="t.action_view" @click="$emit('view', m)" />
                             <ActionDropdown
                                 btn-class="ee-action-icon ee-action-icon--default"

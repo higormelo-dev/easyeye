@@ -63,8 +63,40 @@ vi.mock('@/Pages/Panel/Manager/Medicines/MedicineFormModal.vue', () => ({
 }));
 vi.mock('@/Pages/Panel/Manager/Medicines/MedicineDetailDrawer.vue', () => ({
     default: {
-        props: ['open', 'medicine'],
-        template: '<div class="drawer-stub" :data-open="String(open)" :data-medicine="medicine?.id ?? \'\'" />',
+        props: ['open', 'medicine', 'hasNextPending', 'approveMessage', 'approveError'],
+        emits: ['approve'],
+        template: `<div class="drawer-stub" :data-open="String(open)" :data-medicine="medicine?.id ?? ''"
+            :data-has-next="String(!!hasNextPending)" :data-message="approveMessage" :data-error="approveError">
+            <button class="drawer-approve" @click="$emit('approve', medicine, false)" />
+            <button class="drawer-approve-next" @click="$emit('approve', medicine, true)" /></div>`,
+    },
+}));
+// Lote de posologia por IA: painel e modal têm testes próprios (o painel usa
+// useImportProgress — aqui fica só o contrato com a página).
+vi.mock('@/Pages/Panel/Manager/Medicines/PosologyBatchPanel.vue', () => ({
+    default: {
+        props: ['running', 'batches'],
+        emits: ['progress'],
+        data: () => ({ shown: null }),
+        mounted() {
+            this.$emit('progress', this.running);
+        },
+        methods: {
+            show(batch) {
+                this.shown = batch;
+                this.$emit('progress', batch);
+            },
+        },
+        template: '<div class="panel-stub" :data-running="running?.id ?? \'\'" :data-shown="shown?.id ?? \'\'" />',
+    },
+}));
+vi.mock('@/Pages/Panel/Manager/Medicines/PosologyBatchModal.vue', () => ({
+    default: {
+        props: ['open', 'filters', 'aiProviders'],
+        emits: ['close', 'started', 'running'],
+        template: `<div class="batch-modal-stub" :data-open="String(open)" :data-filters="JSON.stringify(filters)">
+            <button class="batch-started" @click="$emit('started')" />
+            <button class="batch-running" @click="$emit('running', { id: 'b-9', progress: 10, is_done: false })" /></div>`,
     },
 }));
 vi.mock('@/Components/Panel/ConfirmationWithReasonModal.vue', () => ({
@@ -504,5 +536,188 @@ describe('Manager → Medicamentos', () => {
             expect(history).toContain('Nada mudou desde a última carga.');
             expect(history).toContain('Download da CMED/Anvisa');
         });
+    });
+
+    describe('posologia por IA em lote', () => {
+        const AI = [{ code: 'openai', label: 'OpenAI', model: 'gpt-4o' }];
+        const runningBatch = {
+            id: 'b-1',
+            progress: 40,
+            is_done: false,
+            channel: 'manager.medicines.posology-batches.b-1',
+        };
+
+        it('sem IA configurada o botão não aparece', () => {
+            expect(mountPage().find('[data-test="batch-button"]').exists()).toBe(false);
+        });
+
+        it('botão abre a prévia com os filtros APLICADOS; ao iniciar vai para a aba do lote', async () => {
+            const filters = { search: 'pred', source: 'cmed', ophthalmic: true, sort: 'name', direction: 'asc' };
+            const wrapper = mountPage({ aiProviders: AI, filters });
+
+            expect(wrapper.find('.batch-modal-stub').attributes('data-open')).toBe('false');
+            await wrapper.find('[data-test="batch-button"]').trigger('click');
+
+            const modal = wrapper.find('.batch-modal-stub');
+            expect(modal.attributes('data-open')).toBe('true');
+            expect(JSON.parse(modal.attributes('data-filters'))).toEqual(filters);
+
+            await wrapper.find('.batch-started').trigger('click');
+            expect(wrapper.find('.batch-modal-stub').attributes('data-open')).toBe('false');
+            expect(wrapper.find('[data-test="tab-posology"]').classes()).toContain('active');
+        });
+
+        it('com um lote rodando o botão mostra o progresso e leva à aba (não abre outro)', async () => {
+            const wrapper = mountPage({ aiProviders: AI, runningPosologyBatch: runningBatch });
+            await flushPromises();
+            const button = wrapper.find('[data-test="batch-button"]');
+
+            expect(button.text()).toContain('40%');
+            expect(button.find('.spinner-border').exists()).toBe(true);
+
+            await button.trigger('click');
+            expect(wrapper.find('.batch-modal-stub').attributes('data-open')).toBe('false');
+            expect(wrapper.find('[data-test="tab-posology"]').classes()).toContain('active');
+        });
+
+        it('a prévia achou um lote já rodando: o painel passa a mostrar o progresso dele', async () => {
+            const wrapper = mountPage({ aiProviders: AI });
+            await wrapper.find('.batch-running').trigger('click');
+            await flushPromises();
+
+            expect(wrapper.find('.panel-stub').attributes('data-shown')).toBe('b-9');
+            expect(wrapper.find('[data-test="batch-button"]').text()).toContain('10%');
+        });
+
+        it('filtro "Posologia" consulta o servidor', async () => {
+            const wrapper = mountPage();
+            await wrapper.find('[data-test="filter-posology"]').setValue('ai_pending');
+            await flushPromises();
+
+            expect(router.get).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ posology: 'ai_pending' }),
+                expect.objectContaining({ only: ['medicines', 'filters'] }),
+            );
+        });
+
+        it('selo "IA – revisar" na tabela e nos cards só para a posologia não revisada', async () => {
+            const aiRows = [
+                { ...rows[0], dosage: '1 gota', posology_pending_review: true, posology_source: 'ai' },
+                { ...rows[1], posology_pending_review: false, posology_source: 'manual' },
+            ];
+            const wrapper = mountPage({ medicines: { data: aiRows, links: [], last_page: 1, total: 2 } });
+
+            const [aiRow, manualRow] = wrapper.findAll('tbody tr');
+            expect(aiRow.find('[data-test="ai-review-badge"]').text()).toContain('posology_ai_badge');
+            expect(aiRow.find('[data-test="ai-review-badge"]').attributes('title')).toBe('posology_ai_badge_hint');
+            expect(manualRow.find('[data-test="ai-review-badge"]').exists()).toBe(false);
+
+            await wrapper.find('.to-cards').trigger('click');
+            expect(wrapper.findAll('[data-test="ai-review-badge"]')).toHaveLength(1);
+            try {
+                localStorage.removeItem('mgr_medicines_view');
+            } catch {
+                // sem armazenamento
+            }
+        });
+    });
+});
+
+describe('revisão da posologia gerada por IA em um clique', () => {
+    const pending = (id, name) => ({
+        id,
+        name,
+        source: 'cmed',
+        source_label: 'CMED/Anvisa',
+        is_ophthalmic: true,
+        is_marketed: true,
+        active: true,
+        dosage: '1 gota',
+        frequency: '4x ao dia',
+        posology_pending_review: true,
+    });
+    const reviewRows = [pending('p-1', 'ACU FRESH'), rows[1], pending('p-2', 'LACRIFILM')];
+
+    beforeEach(() => vi.clearAllMocks());
+
+    it('aviso com a contagem; "Revisar agora" filtra as pendentes e abre a primeira', async () => {
+        const wrapper = mountPage({ stats: { ai_pending: 2 } });
+
+        expect(wrapper.find('[data-test="review-banner"]').text()).toContain('posology_review_banner');
+
+        await wrapper.find('[data-test="review-now"]').trigger('click');
+        await flushPromises();
+        expect(router.get.mock.calls.at(-1)[1]).toMatchObject({ posology: 'ai_pending' });
+
+        // A lista volta filtrada: abre a primeira pendente.
+        await wrapper.setProps({
+            medicines: { data: [reviewRows[0], reviewRows[2]], links: [], last_page: 1, total: 2 },
+        });
+        await flushPromises();
+        expect(wrapper.find('.drawer-stub').attributes('data-open')).toBe('true');
+        expect(wrapper.find('.drawer-stub').attributes('data-medicine')).toBe('p-1');
+    });
+
+    it('sem pendentes, não mostra o aviso', () => {
+        expect(
+            mountPage({ stats: { ai_pending: 0 } })
+                .find('[data-test="review-banner"]')
+                .exists(),
+        ).toBe(false);
+    });
+
+    it('aprovar na linha da tabela chama a rota de aprovação daquele item', async () => {
+        const wrapper = mountPage({ medicines: { data: reviewRows, links: [], last_page: 1, total: 3 } });
+        const approveButtons = wrapper.findAll('[data-test="row-approve"]');
+
+        expect(approveButtons).toHaveLength(2); // só as pendentes
+        await approveButtons[0].trigger('click');
+
+        expect(router.post.mock.calls[0][0]).toContain('manager.medicines.posology.approve');
+        expect(router.post.mock.calls[0][0]).toContain('p-1');
+    });
+
+    it('"Aprovar e próximo" aprova e abre a próxima pendente; na última avisa que acabou', async () => {
+        router.post.mockImplementation((url, data, options) => {
+            options.onSuccess?.();
+            options.onFinish?.();
+        });
+        const wrapper = mountPage({ medicines: { data: reviewRows, links: [], last_page: 1, total: 3 } });
+
+        await wrapper.findAll('[data-test="row-approve"]')[0].trigger('click'); // garante que nada quebra fora da gaveta
+        // Abre a gaveta na primeira pendente pelo botão "ver detalhes".
+        await wrapper.findAll('tbody tr')[0].find('button[title="action_view"]').trigger('click');
+        expect(wrapper.find('.drawer-stub').attributes('data-has-next')).toBe('true');
+
+        await wrapper.find('.drawer-approve-next').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('.drawer-stub').attributes('data-medicine')).toBe('p-2');
+
+        // p-2 aprovada e servidor devolve as duas já revisadas: não há próxima.
+        const reviewed = reviewRows.map((r) => ({ ...r, posology_pending_review: false }));
+        router.post.mockImplementation((url, data, options) => {
+            options.onSuccess?.();
+            options.onFinish?.();
+        });
+        await wrapper.setProps({ medicines: { data: reviewed, links: [], last_page: 1, total: 3 } });
+        await wrapper.find('.drawer-approve-next').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('.drawer-stub').attributes('data-message')).toBe('posology_review_last');
+        router.post.mockReset();
+    });
+
+    it('erro do servidor (já não está pendente) aparece na gaveta', async () => {
+        router.post.mockImplementation((url, data, options) => {
+            options.onError?.({ posology: 'Esta posologia não está mais aguardando revisão.' });
+            options.onFinish?.();
+        });
+        const wrapper = mountPage({ medicines: { data: reviewRows, links: [], last_page: 1, total: 3 } });
+        await wrapper.findAll('tbody tr')[0].find('button[title="action_view"]').trigger('click');
+
+        await wrapper.find('.drawer-approve').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('.drawer-stub').attributes('data-error')).toContain('não está mais aguardando');
+        router.post.mockReset();
     });
 });

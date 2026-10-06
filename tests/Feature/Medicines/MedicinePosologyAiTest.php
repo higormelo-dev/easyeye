@@ -202,6 +202,28 @@ it('resposta que não é JSON: 422 pedindo preenchimento manual', function () {
         ->assertJsonPath('message', __('manager_medicines.ai_no_suggestion'));
 });
 
+it('modelo de raciocínio que não devolve texto: erro próprio ("não concluiu"), não "sem posologia"', function () {
+    // gpt-5-mini com limite baixo gastava tudo raciocinando e devolvia texto vazio.
+    fakePosologyAi('');
+
+    asPosologyAdmin()
+        ->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
+        ->assertStatus(422)
+        ->assertJsonPath('reason', 'empty_output')
+        ->assertJsonPath('message', fn (string $m) => str_contains($m, 'não concluiu') || str_contains($m, 'did not finish'));
+});
+
+it('pede folga de saída para o raciocínio dos modelos gpt-5 (configurável)', function () {
+    $provider = fakePosologyAi(posologyJson());
+
+    asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])->assertOk();
+    expect($provider->requests[0]->maxOutputTokens)->toBeGreaterThanOrEqual(2000);
+
+    config(['medicines.posology_ai.max_output_tokens' => 3000]);
+    asPosologyAdmin()->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])->assertOk();
+    expect(end($provider->requests)->maxOutputTokens)->toBe(3000);
+});
+
 it('falha do provedor: 422 com mensagem genérica (sem detalhe técnico) e run marcado como falho', function () {
     fakePosologyAi(new RuntimeException('OpenAI request failed [500]: segredo-interno'));
 

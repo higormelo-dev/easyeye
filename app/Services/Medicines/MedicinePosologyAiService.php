@@ -8,6 +8,7 @@ use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiPayloadEnricher, AiProviderSettings, AiRunExecutionService};
 use App\Domains\AI\Support\AiJsonOutput;
 use App\Enums\AI\{AiProvider, AiRiskLevel, AiRunMode, AiRunStatus};
+use App\Models\Medicine;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -74,11 +75,42 @@ class MedicinePosologyAiService
     }
 
     /**
-     * @param array<string, mixed> $medicine dados do catálogo (nunca dado de paciente)
+     * Dados do item salvo que vão para a IA (inclui apresentação/classe da
+     * CMED) — só catálogo: EAN, registro e laboratório não vão.
      *
-     * @return array{dosage: string, frequency: string, duration: string, instructions: string, note: string, provider: string, provider_label: string}
+     * @return array<string, mixed>
      */
-    public function suggest(array $medicine, string $saasEntityId, string $userId, ?string $provider = null): array
+    public function catalogContext(Medicine $model): array
+    {
+        return [
+            'nome'               => $model->name,
+            'principio_ativo'    => $model->active_ingredient,
+            'concentracao'       => $model->concentration,
+            'forma_farmaceutica' => $model->presentation?->name ?? $model->formLabel(),
+            'apresentacao'       => $model->presentation_detail,
+            'classe_terapeutica' => $model->therapeutic_class,
+            'uso_oftalmico'      => (bool) $model->is_ophthalmic,
+        ];
+    }
+
+    /**
+     * IA da execução (ver chooseProvider) — o lote valida a escolha antes de
+     * entrar na fila.
+     *
+     * @return array{code: string, label: string, model: ?string}
+     */
+    public function resolveProvider(?string $provider): array
+    {
+        return $this->chooseProvider($provider);
+    }
+
+    /**
+     * @param array<string, mixed> $medicine dados do catálogo (nunca dado de paciente)
+     * @param array<string, mixed> $metadata extra no registro da execução (ex.: id do lote)
+     *
+     * @return array{dosage: string, frequency: string, duration: string, instructions: string, note: string, provider: string, provider_label: string, ai_run_id: string}
+     */
+    public function suggest(array $medicine, string $saasEntityId, string $userId, ?string $provider = null, array $metadata = []): array
     {
         $chosen = $this->chooseProvider($provider);
 
@@ -107,13 +139,18 @@ class MedicinePosologyAiService
             'reserved_credits'  => 0,
             'consumed_credits'  => 0,
             'input_summary'     => [
-                'user_prompt'       => $payload['user_prompt'],
-                'system_prompt'     => $payload['system_prompt'] ?? null,
-                'context'           => $payload['context'] ?? [],
-                'expects_json'      => true,
-                'max_output_tokens' => 600,
+                'user_prompt'   => $payload['user_prompt'],
+                'system_prompt' => $payload['system_prompt'] ?? null,
+                'context'       => $payload['context'] ?? [],
+                'expects_json'  => true,
+                // Modelos de raciocínio (gpt-5*) gastam este limite PENSANDO
+                // antes de escrever: com 600 o gpt-5-mini usava ~576 no
+                // raciocínio e devolvia texto vazio (cobrado). Folga aqui não
+                // encarece — só se paga o que o modelo usa.
+                'max_output_tokens' => (int) config('medicines.posology_ai.max_output_tokens', 2000),
                 'metadata'          => [
-                    'source'          => 'manager_medicines',
+                    ...$metadata,
+                    'source'          => $metadata['source'] ?? 'manager_medicines',
                     'pinned_provider' => $chosen['code'],
                     // Só catálogo (nunca paciente): libera provedor bloqueado
                     // para pacientes (ProviderDataPolicy) — ver AiOrchestrator.
@@ -133,7 +170,9 @@ class MedicinePosologyAiService
                 'error'     => $e->getMessage(),
             ]);
 
-            throw new MedicinePosologyAiException($this->failureMessage($e, $chosen['label']));
+            [$message, $transient] = $this->failureMessage($e, $chosen['label']);
+
+            throw new MedicinePosologyAiException($message, $transient ? MedicinePosologyAiException::TRANSIENT : null, (string) $run->id);
         }
 
         $run->refresh();
@@ -143,21 +182,27 @@ class MedicinePosologyAiService
             $run->update(['status' => AiRunStatus::Approved->value, 'approved_by' => $userId, 'approved_at' => now()]);
         }
 
+        if (trim((string) $run->final_output) === '') {
+            throw new MedicinePosologyAiException(__('manager_medicines.ai_empty_output', ['provider' => $chosen['label']]), MedicinePosologyAiException::EMPTY_OUTPUT, (string) $run->id);
+        }
+
         $suggestion = $this->normalize(AiJsonOutput::decode((string) $run->final_output) ?? []);
 
         if ($suggestion['dosage'] === '' && $suggestion['frequency'] === '') {
-            throw new MedicinePosologyAiException($suggestion['note'] !== '' ? $suggestion['note'] : __('manager_medicines.ai_no_suggestion'));
+            throw new MedicinePosologyAiException($suggestion['note'] !== '' ? $suggestion['note'] : __('manager_medicines.ai_no_suggestion'), MedicinePosologyAiException::NO_SUGGESTION, (string) $run->id);
         }
 
-        return [...$suggestion, 'provider' => $chosen['code'], 'provider_label' => $chosen['label']];
+        return [...$suggestion, 'provider' => $chosen['code'], 'provider_label' => $chosen['label'], 'ai_run_id' => (string) $run->id];
     }
 
     /**
      * Mensagem para o admin: QUAL IA falhou e o tipo (demora / sobrecarga do
      * provedor) — nunca o texto técnico do provedor. Com outra IA disponível,
-     * sugere escolher outra.
+     * sugere escolher outra. Demora/sobrecarga = transitório (o lote tenta de novo).
+     *
+     * @return array{0: string, 1: bool} mensagem e se o erro é transitório
      */
-    private function failureMessage(Throwable $e, string $provider): string
+    private function failureMessage(Throwable $e, string $provider): array
     {
         $raw = strtolower($e->getMessage());
 
@@ -169,7 +214,9 @@ class MedicinePosologyAiService
 
         $message = __('manager_medicines.' . $cause, ['provider' => $provider]);
 
-        return count($this->providers()) > 1 ? $message . ' ' . __('manager_medicines.ai_try_other') : $message . ' ' . __('manager_medicines.ai_try_again');
+        $message = count($this->providers()) > 1 ? $message . ' ' . __('manager_medicines.ai_try_other') : $message . ' ' . __('manager_medicines.ai_try_again');
+
+        return [$message, $cause !== 'ai_failed_provider'];
     }
 
     /**
@@ -212,7 +259,7 @@ class MedicinePosologyAiService
      *
      * @return array{dosage: string, frequency: string, duration: string, instructions: string, note: string}
      */
-    private function normalize(array $data): array
+    public function normalize(array $data): array
     {
         $text = static function (mixed $value, int $max): string {
             $value = is_scalar($value) ? (string) $value : '';

@@ -282,6 +282,15 @@ php artisan reverb:restart       # Reverb fecha as conexões e o cron sobe de no
 (`routes/channels.php`, `app/Broadcasting`) ou config do Reverb — ele é um
 processo longo e não relê o código sozinho.
 
+Canal novo (10/2026): `manager.medicines.posology-batches.{batchId}`
+(`ManagerMedicinePosologyBatchChannel`) — progresso do lote "Gerar posologia
+com IA" em Manager → Medicamentos. No deploy que o traz: `php artisan migrate
+--force` (colunas de revisão em `medicines` + tabelas
+`medicine_posology_batches`/`_groups`), `php artisan queue:restart` e
+`php artisan reverb:restart`. O job agenda a própria continuação a cada
+`MEDICINE_POSOLOGY_BATCH_JOB_BUDGET` segundos (padrão 45, abaixo do
+`retry_after` de 90 s da fila).
+
 ## 4. Como verificar
 
 No nó da aplicação:

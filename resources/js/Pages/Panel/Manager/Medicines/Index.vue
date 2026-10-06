@@ -10,8 +10,11 @@ import { useConfirmationWithReason } from '@/composables/useConfirmationWithReas
 import MedicineTable from './MedicineTable.vue';
 import MedicineCards from './MedicineCards.vue';
 import MedicineDetailDrawer from './MedicineDetailDrawer.vue';
+import { choice } from '@/utils/billingPeriods.js';
 import MedicineFormModal from './MedicineFormModal.vue';
 import { useImportProgress } from '@/composables/useImportProgress';
+import PosologyBatchModal from './PosologyBatchModal.vue';
+import PosologyBatchPanel from './PosologyBatchPanel.vue';
 
 /**
  * Manager → Medicamentos: catálogo GLOBAL usado na busca do receituário de
@@ -30,6 +33,11 @@ const props = defineProps({
     autoSync: { type: Boolean, default: false },
     // IAs configuradas (botão "Gerar com IA" no formulário; com 2+, o admin escolhe).
     aiProviders: { type: Array, default: () => [] },
+    // Lote "Gerar posologia com IA": em andamento (progressPayload) ou null,
+    // histórico e teto de chamadas por lote.
+    runningPosologyBatch: { type: Object, default: null },
+    posologyBatches: { type: Array, default: () => [] },
+    posologyBatchCap: { type: Number, default: 0 },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -65,6 +73,7 @@ const source = ref(props.filters.source ?? '');
 const status = ref(props.filters.status ?? '');
 const cmedSituation = ref(props.filters.cmed_situation ?? '');
 const ophthalmic = ref(!!props.filters.ophthalmic);
+const posology = ref(props.filters.posology ?? '');
 const sort = ref(props.filters.sort ?? 'name');
 const direction = ref(props.filters.direction ?? 'asc');
 
@@ -77,6 +86,7 @@ function applyFilters() {
             status: status.value || undefined,
             cmed_situation: cmedSituation.value || undefined,
             ophthalmic: ophthalmic.value ? 1 : undefined,
+            posology: posology.value || undefined,
             // Ordem padrão (nome A→Z) fica fora da URL.
             sort: sort.value !== 'name' || direction.value !== 'asc' ? sort.value : undefined,
             direction: sort.value !== 'name' || direction.value !== 'asc' ? direction.value : undefined,
@@ -96,7 +106,7 @@ watch(search, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(applyFilters, 350);
 });
-watch([source, status, cmedSituation, ophthalmic], applyFilters);
+watch([source, status, cmedSituation, ophthalmic, posology], applyFilters);
 
 // ── Cadastro / edição ────────────────────────────────────────────────────
 const formOpen = ref(false);
@@ -130,12 +140,105 @@ function editFromDetail(medicine) {
     openEdit(medicine);
 }
 
-// A linha mudou (ativar/editar): o drawer aberto acompanha.
+// A linha mudou (ativar/editar/aprovar): o drawer aberto acompanha.
 watch(
     () => props.medicines.data,
     (rows) => {
         if (detail.value) detail.value = rows.find((r) => r.id === detail.value.id) ?? detail.value;
+
+        // "Revisar agora": filtrou as pendentes — abre a primeira.
+        if (openFirstPending.value) {
+            openFirstPending.value = false;
+            const first = rows.find((r) => r.posology_pending_review);
+            if (first) openDetail(first);
+        }
     },
+);
+
+// ── Revisão da posologia gerada por IA em um clique ──────────────────────
+const approving = ref(false);
+const approveError = ref('');
+const approveMessage = ref('');
+const openFirstPending = ref(false);
+
+/** Próxima pendente na página (depois da atual, na ordem da lista). */
+function nextPendingAfter(medicine, rows = props.medicines.data) {
+    const index = rows.findIndex((r) => r.id === medicine.id);
+
+    return (
+        rows.slice(index + 1).find((r) => r.posology_pending_review) ??
+        rows.slice(0, Math.max(index, 0)).find((r) => r.posology_pending_review) ??
+        null
+    );
+}
+
+const hasNextPending = computed(() => !!detail.value && !!nextPendingAfter(detail.value));
+
+function approvePosology(medicine, goNext = false) {
+    if (approving.value) return;
+
+    approving.value = true;
+    approveError.value = '';
+    approveMessage.value = '';
+
+    router.post(
+        route('manager.medicines.posology.approve', medicine.id),
+        {},
+        {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['medicines', 'stats', 'flash'],
+            onSuccess: () => {
+                // Com o filtro "não revisada" a linha sai da lista: a gaveta
+                // não pode seguir mostrando o item como pendente.
+                const fresh = props.medicines.data.find((r) => r.id === medicine.id);
+                if (detail.value?.id === medicine.id) {
+                    detail.value = fresh ?? { ...medicine, posology_pending_review: false, posology_source: 'manual' };
+                }
+
+                if (!goNext) return;
+
+                const next = nextPendingAfter(medicine);
+                if (next) {
+                    detail.value = next;
+                    detailOpen.value = true;
+                } else {
+                    approveMessage.value = props.t.posology_review_last;
+                }
+            },
+            onError: (errors) => {
+                approveError.value = errors.posology ?? Object.values(errors)[0] ?? '';
+            },
+            onFinish: () => {
+                approving.value = false;
+            },
+        },
+    );
+}
+
+// Mensagens da gaveta valem só para o item em que apareceram.
+watch(
+    () => detail.value?.id,
+    () => {
+        approveError.value = '';
+        if (!approving.value) approveMessage.value = '';
+    },
+);
+
+function reviewNow() {
+    if (posology.value === 'ai_pending') {
+        const first = props.medicines.data.find((r) => r.posology_pending_review);
+        if (first) openDetail(first);
+        return;
+    }
+    openFirstPending.value = true;
+    posology.value = 'ai_pending';
+}
+
+const reviewBanner = computed(() =>
+    choice(props.t.posology_review_banner, Number(props.stats?.ai_pending ?? 0), {
+        count: number(props.stats?.ai_pending ?? 0),
+    }),
 );
 
 // ── Exclusão: justificativa obrigatória + auditoria (padrão do manager) ──
@@ -310,6 +413,39 @@ function listLabel(imp) {
     return imp.list_published_at ? (props.t.list_published ?? '').replace(':date', imp.list_published_at) : null;
 }
 
+// ── Posologia por IA em lote (filtros aplicados) ─────────────────────────
+// O painel (aba "Posologia por IA") acompanha o lote por WebSocket e avisa o
+// estado aqui: com um lote rodando, o botão do cabeçalho mostra o progresso
+// em vez de abrir outro.
+const batchPanel = ref(null);
+const batchProgress = ref(props.runningPosologyBatch);
+const batchRunning = computed(() => !!batchProgress.value && !batchProgress.value.is_done);
+const batchModalOpen = ref(false);
+
+function onBatchButton() {
+    if (batchRunning.value) {
+        tab.value = 'posology';
+        return;
+    }
+    batchModalOpen.value = true;
+}
+
+function onBatchStarted() {
+    batchModalOpen.value = false;
+    tab.value = 'posology';
+}
+
+function onBatchAlreadyRunning(batch) {
+    batchPanel.value?.show(batch);
+    tab.value = 'posology';
+}
+
+const batchButtonText = computed(() =>
+    batchRunning.value
+        ? (props.t.batch_button_running ?? '').replace(':progress', String(batchProgress.value.progress ?? 0))
+        : props.t.batch_button,
+);
+
 const breadcrumbs = [
     { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
     { label: props.t.page_title, url: '#', active: true },
@@ -330,6 +466,22 @@ const breadcrumbs = [
         >
             <template #actions>
                 <button
+                    v-if="aiProviders.length || batchRunning"
+                    type="button"
+                    class="btn btn-soft-primary fs-13"
+                    :title="batchRunning ? t.batch_button_running_hint : t.batch_button_hint"
+                    :aria-label="batchButtonText"
+                    data-test="batch-button"
+                    @click="onBatchButton"
+                >
+                    <span v-if="batchRunning" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    <i v-else class="ti ti-sparkles" aria-hidden="true"></i
+                    ><span class="d-none d-lg-inline ms-1">{{ batchButtonText }}</span
+                    ><span class="d-inline d-lg-none ms-1">{{
+                        batchRunning ? `${batchProgress.progress ?? 0}%` : t.batch_button_short
+                    }}</span>
+                </button>
+                <button
                     type="button"
                     class="btn btn-outline-primary fs-13"
                     :title="t.btn_import"
@@ -349,6 +501,20 @@ const breadcrumbs = [
                 </button>
             </template>
         </PageHeader>
+
+        <!-- Posologias geradas por IA aguardando revisão: atalho para revisar em sequência -->
+        <div
+            v-if="(stats.ai_pending ?? 0) > 0"
+            class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2"
+            role="status"
+            data-test="review-banner"
+        >
+            <i class="ti ti-sparkles" aria-hidden="true"></i>
+            <span class="flex-grow-1">{{ reviewBanner }}</span>
+            <button type="button" class="btn btn-sm btn-warning" data-test="review-now" @click="reviewNow">
+                <i class="ti ti-checklist me-1" aria-hidden="true"></i>{{ t.posology_review_now }}
+            </button>
+        </div>
 
         <!-- Números do catálogo -->
         <div class="row g-2 mb-3">
@@ -388,6 +554,24 @@ const breadcrumbs = [
                     <span v-if="importRunning" class="spinner-border spinner-border-sm ms-1" aria-hidden="true"></span>
                 </button>
             </li>
+            <li
+                v-if="aiProviders.length || posologyBatches.length || batchProgress"
+                class="nav-item"
+                role="presentation"
+            >
+                <button
+                    type="button"
+                    class="nav-link"
+                    :class="{ active: tab === 'posology' }"
+                    role="tab"
+                    :aria-selected="tab === 'posology'"
+                    data-test="tab-posology"
+                    @click="tab = 'posology'"
+                >
+                    <i class="ti ti-sparkles me-1"></i>{{ t.tab_posology_batches }}
+                    <span v-if="batchRunning" class="spinner-border spinner-border-sm ms-1" aria-hidden="true"></span>
+                </button>
+            </li>
         </ul>
 
         <!-- ════════ Catálogo ════════ -->
@@ -415,6 +599,17 @@ const breadcrumbs = [
                     <option value="active">{{ t.status_active }}</option>
                     <option value="inactive">{{ t.status_inactive }}</option>
                 </select>
+                <select
+                    v-model="posology"
+                    class="form-select w-auto"
+                    :aria-label="t.filter_posology"
+                    data-test="filter-posology"
+                >
+                    <option value="">{{ t.filter_posology_all }}</option>
+                    <option value="empty">{{ t.posology_filter_empty }}</option>
+                    <option value="ai_pending">{{ t.posology_filter_ai_pending }}</option>
+                    <option value="reviewed">{{ t.posology_filter_reviewed }}</option>
+                </select>
                 <div class="form-check mb-0">
                     <input id="flt-oft" v-model="ophthalmic" type="checkbox" class="form-check-input" />
                     <label for="flt-oft" class="form-check-label">{{ t.filter_ophthalmic }}</label>
@@ -431,6 +626,7 @@ const breadcrumbs = [
                 @edit="openEdit"
                 @delete="remove"
                 @toggle-active="toggleActive"
+                @approve="approvePosology($event)"
             />
             <MedicineCards
                 v-else
@@ -440,6 +636,7 @@ const breadcrumbs = [
                 @edit="openEdit"
                 @delete="remove"
                 @toggle-active="toggleActive"
+                @approve="approvePosology($event)"
             />
         </div>
 
@@ -757,6 +954,27 @@ const breadcrumbs = [
             </div>
         </div>
 
+        <!-- ════════ Posologia por IA (lote) ════════ -->
+        <div v-show="tab === 'posology'">
+            <PosologyBatchPanel
+                ref="batchPanel"
+                :running="runningPosologyBatch"
+                :batches="posologyBatches"
+                :t="t"
+                @progress="batchProgress = $event"
+            />
+        </div>
+
+        <PosologyBatchModal
+            :open="batchModalOpen"
+            :filters="filters"
+            :ai-providers="aiProviders"
+            :t="t"
+            @close="batchModalOpen = false"
+            @started="onBatchStarted"
+            @running="onBatchAlreadyRunning"
+        />
+
         <MedicineFormModal
             :open="formOpen"
             :medicine="editing"
@@ -771,8 +989,13 @@ const breadcrumbs = [
             :open="detailOpen"
             :medicine="detail"
             :t="t"
+            :approving="approving"
+            :has-next-pending="hasNextPending"
+            :approve-message="approveMessage"
+            :approve-error="approveError"
             @close="detailOpen = false"
             @edit="editFromDetail"
+            @approve="approvePosology"
         />
 
         <!-- Confirmação destrutiva com justificativa -->

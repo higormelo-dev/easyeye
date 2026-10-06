@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\MedicineSource;
+use App\Enums\{MedicinePosologySource, MedicineSource};
 use App\Services\Medicines\CmedPresentationParser;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -17,6 +17,9 @@ class Medicine extends Model
     use HasUuids;
     use SoftDeletes;
 
+    /** Colunas da posologia sugerida (dose, frequência, duração, orientações). */
+    public const POSOLOGY_FIELDS = ['dosage', 'frequency', 'duration', 'instructions'];
+
     protected $fillable = [
         'entity_id',
         'medicine_presentation_id',
@@ -25,6 +28,11 @@ class Medicine extends Model
         'frequency',
         'duration',
         'instructions',
+        'posology_source',
+        'posology_ai_generated_at',
+        'posology_ai_batch_id',
+        'posology_reviewed_at',
+        'posology_reviewed_by',
         'active',
         'active_ingredient',
         'concentration',
@@ -50,6 +58,10 @@ class Medicine extends Model
             'is_marketed'      => 'boolean',
             'source'           => MedicineSource::class,
             'source_synced_at' => 'datetime',
+
+            'posology_source'          => MedicinePosologySource::class,
+            'posology_ai_generated_at' => 'datetime',
+            'posology_reviewed_at'     => 'datetime',
         ];
     }
 
@@ -65,6 +77,12 @@ class Medicine extends Model
                 : null;
 
             $medicine->search_text = self::searchTextFor($medicine->getAttributes(), $presentation);
+
+            // Posologia mexida sem origem explícita (seeder, cadastro manual):
+            // é manual. O lote de IA grava a origem "ai" explicitamente.
+            if ($medicine->isDirty(self::POSOLOGY_FIELDS) && ! $medicine->isDirty('posology_source')) {
+                $medicine->posology_source = $medicine->hasPosology() ? MedicinePosologySource::Manual : null;
+            }
         });
     }
 
@@ -96,6 +114,24 @@ class Medicine extends Model
     public static function normalizeSearch(string $text): string
     {
         return trim((string) preg_replace('/\s+/', ' ', mb_strtolower(Str::ascii($text), 'UTF-8')));
+    }
+
+    /** Algum campo da posologia sugerida preenchido? */
+    public function hasPosology(): bool
+    {
+        foreach (self::POSOLOGY_FIELDS as $field) {
+            if (trim((string) $this->getAttribute($field)) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Posologia gerada em lote pela IA e ainda não revisada pelo admin. */
+    public function posologyPendingReview(): bool
+    {
+        return $this->posology_source === MedicinePosologySource::Ai;
     }
 
     /** Forma farmacêutica legível (código CMED traduzido). */

@@ -11,9 +11,14 @@ const props = defineProps({
     open: { type: Boolean, required: true },
     medicine: { type: Object, default: null },
     t: { type: Object, default: () => ({}) },
+    // Revisão em um clique: aprovando agora, há outro pendente na página e erro/aviso.
+    approving: { type: Boolean, default: false },
+    hasNextPending: { type: Boolean, default: false },
+    approveMessage: { type: String, default: '' },
+    approveError: { type: String, default: '' },
 });
 
-defineEmits(['close', 'edit']);
+defineEmits(['close', 'edit', 'approve']);
 
 const m = computed(() => props.medicine);
 const situation = computed(() => (m.value ? cmedSituation(m.value, props.t) : null));
@@ -37,6 +42,19 @@ const registry = computed(() => {
     ].filter(([, value]) => value);
 });
 
+// Origem IA: quando gerou e, se já revisada, quando foi revisada.
+const aiNote = computed(() => {
+    if (!m.value?.posology_ai_generated_at) return '';
+    if (m.value.posology_pending_review) {
+        return (props.t.posology_ai_generated ?? '').replace(':date', m.value.posology_ai_generated_at);
+    }
+    if (!m.value.posology_reviewed_at) return '';
+
+    return (props.t.posology_ai_reviewed ?? '')
+        .replace(':date', m.value.posology_ai_generated_at)
+        .replace(':reviewed', m.value.posology_reviewed_at);
+});
+
 const posology = computed(() =>
     m.value
         ? [
@@ -50,7 +68,7 @@ const posology = computed(() =>
 </script>
 
 <template>
-    <OffcanvasPanel :open="open" :width="440" :close-label="t.close" @close="$emit('close')">
+    <OffcanvasPanel :open="open" :width="540" :close-label="t.close" @close="$emit('close')">
         <!-- Header -->
         <template #header>
             <div class="min-w-0">
@@ -78,10 +96,42 @@ const posology = computed(() =>
         <!-- Ação no rodapé fixo: o slot #header empilha o que vem depois do
              título, e o botão ficava solto embaixo dos badges. -->
         <template v-if="m" #footer>
-            <button type="button" class="btn btn-light" @click="$emit('close')">{{ t.close }}</button>
-            <button type="button" class="btn btn-primary" @click="$emit('edit', m)">
-                <i class="ti ti-edit me-1"></i>{{ m.source === 'cmed' ? t.edit_posology : t.edit }}
-            </button>
+            <!-- Pendente de revisão: aprovar como está é a ação principal (o X fecha). -->
+            <div
+                v-if="m.posology_pending_review"
+                class="d-flex flex-wrap flex-sm-nowrap justify-content-end gap-2 w-100"
+            >
+                <button type="button" class="btn btn-outline-primary text-nowrap me-auto" @click="$emit('edit', m)">
+                    <i class="ti ti-edit me-1"></i>{{ t.edit_posology }}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-success text-nowrap d-inline-flex align-items-center gap-1"
+                    :disabled="approving"
+                    :title="t.posology_approve_hint"
+                    data-test="drawer-approve"
+                    @click="$emit('approve', m, false)"
+                >
+                    <span v-if="approving" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    <i v-else class="ti ti-check" aria-hidden="true"></i>{{ t.posology_approve }}
+                </button>
+                <button
+                    v-if="hasNextPending"
+                    type="button"
+                    class="btn btn-outline-success text-nowrap d-inline-flex align-items-center gap-1"
+                    :disabled="approving"
+                    data-test="drawer-approve-next"
+                    @click="$emit('approve', m, true)"
+                >
+                    <i class="ti ti-player-track-next" aria-hidden="true"></i>{{ t.posology_approve_next }}
+                </button>
+            </div>
+            <template v-else>
+                <button type="button" class="btn btn-light" @click="$emit('close')">{{ t.close }}</button>
+                <button type="button" class="btn btn-primary" @click="$emit('edit', m)">
+                    <i class="ti ti-edit me-1"></i>{{ m.source === 'cmed' ? t.edit_posology : t.edit }}
+                </button>
+            </template>
         </template>
 
         <!-- Body -->
@@ -101,8 +151,31 @@ const posology = computed(() =>
                 </div>
             </div>
 
+            <div v-if="approveError" class="alert alert-danger small py-2" role="alert" data-test="approve-error">
+                {{ approveError }}
+            </div>
+            <div
+                v-else-if="approveMessage"
+                class="alert alert-success small py-2"
+                role="status"
+                data-test="approve-message"
+            >
+                <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ approveMessage }}
+            </div>
             <div class="mdd-section">
-                <div class="mdd-section__title"><i class="ti ti-clipboard-text me-1"></i> {{ t.posology_title }}</div>
+                <div class="mdd-section__title d-flex align-items-center gap-2 flex-wrap">
+                    <span><i class="ti ti-clipboard-text me-1"></i> {{ t.posology_title }}</span>
+                    <span
+                        v-if="m.posology_pending_review"
+                        class="badge badge-soft-warning rounded fs-11 fw-medium text-none"
+                        :title="t.posology_ai_badge_hint"
+                        data-test="ai-review-badge"
+                        ><i class="ti ti-sparkles me-1" aria-hidden="true"></i>{{ t.posology_ai_badge }}</span
+                    >
+                </div>
+                <p v-if="aiNote" class="small text-muted mb-2" data-test="ai-note">
+                    <i class="ti ti-sparkles me-1" aria-hidden="true"></i>{{ aiNote }}
+                </p>
                 <div v-if="posology.length" class="mdd-table">
                     <div v-for="[label, value] in posology" :key="label" class="mdd-row">
                         <span class="mdd-label">{{ label }}</span
@@ -131,6 +204,10 @@ const posology = computed(() =>
     margin-bottom: 0.5rem;
     padding-bottom: 0.25rem;
     border-bottom: 1px solid var(--bs-border-color);
+}
+.text-none {
+    text-transform: none;
+    letter-spacing: normal;
 }
 .mdd-table {
     display: grid;
