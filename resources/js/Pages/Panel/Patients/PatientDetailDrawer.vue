@@ -248,6 +248,14 @@ function invitePortal() {
                                 style="font-size: 0.65rem"
                                 >WhatsApp</span
                             >
+                            <span
+                                v-if="patient.whatsapp_opted_out"
+                                class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1 rounded-pill"
+                                style="font-size: 0.65rem"
+                                :title="ui.wa_opted_out_hint"
+                                data-test="whatsapp-opted-out"
+                                ><i class="ti ti-bell-off"></i> {{ ui.wa_opted_out }}</span
+                            >
                         </span>
                     </div>
                 </div>

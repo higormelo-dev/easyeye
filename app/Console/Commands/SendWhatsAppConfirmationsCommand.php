@@ -14,7 +14,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Enfileira confirmações de consulta via WhatsApp (Z-API) para todas as
+ * Enfileira confirmações de consulta via WhatsApp (API oficial — Gupshup) para todas as
  * clínicas com a feature ativa.
  *
  * Seleção: consultas Scheduled cujo horário cai dentro da janela
@@ -26,12 +26,12 @@ class SendWhatsAppConfirmationsCommand extends Command
 {
     protected $signature = 'whatsapp:send-confirmations {--dry-run : Lista sem enfileirar}';
 
-    protected $description = 'Envia confirmações de consulta via WhatsApp (Z-API) para as clínicas com a integração ativa';
+    protected $description = 'Envia confirmações de consulta via WhatsApp (API oficial — Gupshup) para as clínicas com a integração ativa';
 
     public function handle(WhatsAppService $service, ClinicServiceGate $gate): int
     {
-        // Clínica envia com credenciais próprias OU pela instância global do
-        // SaaS — a linha global (entity_id null) não é uma clínica, sai daqui.
+        // Clínica envia pelo app próprio OU pelo app global do EasyEye — a
+        // linha global (entity_id null) não é uma clínica, sai daqui.
         $globalOk = WhatsAppSetting::globalSetting()?->isOperational() ?? false;
 
         $settings = WhatsAppSetting::query()
@@ -39,7 +39,7 @@ class SendWhatsAppConfirmationsCommand extends Command
             ->where('active', true)
             ->where('confirmation_enabled', true)
             ->get()
-            ->filter(fn (WhatsAppSetting $s) => $s->hasCredentials() || $globalOk);
+            ->filter(fn (WhatsAppSetting $s) => $s->hasApp() || $globalOk);
 
         $queued  = 0;
         $skipped = 0;
@@ -73,7 +73,7 @@ class SendWhatsAppConfirmationsCommand extends Command
                     ->where('direction', 'out')
                     ->where('kind', 'confirmation')
                     ->where('status', '!=', WhatsAppMessage::STATUS_SKIPPED))
-                ->with(['entity:id,name', 'doctor.person:id,full_name', 'patient.person:id,cellphone'])
+                ->with(['entity:id,name', 'doctor.person:id,full_name', 'patient.person:id,cellphone,whatsapp'])
                 ->get();
 
             foreach ($schedules as $schedule) {

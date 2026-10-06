@@ -33,6 +33,9 @@ return [
 
     // Cadastro de paciente (componente compartilhado Pacientes/Agenda).
     'patient_form' => [
+        // Mobile replied STOP to the clinic/EasyEye WhatsApp.
+        'wa_opted_out'           => 'Opted out of WhatsApp',
+        'wa_opted_out_hint'      => 'This mobile replied STOP: it gets no confirmation or survey via WhatsApp until it replies START.',
         'occupation'             => 'Occupation',
         'occupation_placeholder' => 'E.g.: teacher, driver, retired',
         // Insurer plan (ANS product or clinic plan)

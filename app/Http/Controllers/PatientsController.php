@@ -7,6 +7,7 @@ use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\PatientResource;
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
 use App\Services\PatientService;
+use App\Services\WhatsApp\WhatsAppService;
 use App\Support\BrazilianFormat;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
@@ -247,6 +248,7 @@ class PatientsController extends Controller
                 'telephone'           => BrazilianFormat::phone($person->telephone),
                 'cellphone'           => BrazilianFormat::phone($person->cellphone),
                 'whatsapp'            => (bool) $person->whatsapp,
+                'whatsapp_opted_out'  => WhatsAppService::optedOutFor((string) $record->entity_id, $person->cellphone),
                 'zipcode'             => $person->zipcode ? $person->present()->getZipcode() : null,
                 'address'             => $person->address,
                 'number'              => $person->number,

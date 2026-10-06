@@ -878,10 +878,10 @@ Route::group(
                     ->middleware('throttle:manager-destructive') // ação rara e de alto impacto
                     ->name('security.two-factor.toggle');
 
-                // WhatsApp (Z-API): a configuração NÃO fica aqui — é exclusiva
-                // do dono do SaaS em /panel/manager/whatsapp (a conta Z-API e
-                // o Client-Token pertencem à empresa dona do SaaS; a clínica
-                // usufrui do número próprio sem nunca ver credencial).
+                // WhatsApp (Gupshup): a configuração NÃO fica aqui — é exclusiva
+                // do dono do SaaS em /panel/manager/whatsapp (a conta de
+                // parceiro Gupshup é da empresa dona do SaaS; a clínica usa o
+                // número do EasyEye ou o próprio sem nunca ver credencial).
 
                 // Gateways de pagamento próprios da clínica: REMOVIDO — a
                 // funcionalidade não existe mais para clínicas (todas usam o

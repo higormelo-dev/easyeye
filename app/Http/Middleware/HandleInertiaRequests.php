@@ -178,7 +178,7 @@ class HandleInertiaRequests extends Middleware
                 // (ordem do Dashboard, atalhos favoritos...). Ver UserPreference.
                 'preferences' => $user->preference?->data ?? [],
                 // Verificação do WhatsApp do responsável (código OTP via
-                // Z-API) — alimenta o banner de confirmação do AppLayout.
+                // WhatsApp oficial) — alimenta o banner de confirmação do AppLayout.
                 // has_phone distingue "sem número cadastrado" (nada a
                 // confirmar) de "pendente de confirmação".
                 'has_phone'      => filled($user->phone),

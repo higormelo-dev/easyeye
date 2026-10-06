@@ -107,7 +107,7 @@ Schedule::command('ai:expire-stale-runs')
     ->name('ai:expire-stale-runs')
     ->withoutOverlapping();
 
-// WhatsApp (Z-API) — confirmação de consulta: roda de hora em hora dentro do
+// WhatsApp (Gupshup) — confirmação de consulta: roda de hora em hora dentro do
 // horário comercial; a idempotência é do banco (1 confirmação por consulta),
 // então repetição nunca duplica mensagem. Horário restrito por respeito ao
 // paciente (nada de mensagem de madrugada).
@@ -115,6 +115,13 @@ Schedule::command('whatsapp:send-confirmations')
     ->hourly()
     ->between('8:00', '20:00')
     ->name('whatsapp:send-confirmations')
+    ->withoutOverlapping();
+
+// WhatsApp — mensagens presas em `sending` (worker caiu no meio da chamada à
+// Gupshup) viram failed unknown_delivery + alerta; nunca reenvia sozinho.
+Schedule::command('whatsapp:sweep-stuck')
+    ->everyTenMinutes()
+    ->name('whatsapp:sweep-stuck')
     ->withoutOverlapping();
 
 // Catálogo global de convênios ← Cadastro de Operadoras da ANS (dados
@@ -146,7 +153,7 @@ Schedule::command('ai:sync-model-catalog')
     ->name('ai:sync-model-catalog')
     ->withoutOverlapping();
 
-// WhatsApp (Z-API) — pesquisa de satisfação pós-atendimento (delay por
+// WhatsApp (Gupshup) — pesquisa de satisfação pós-atendimento (delay por
 // clínica; max_age_days evita spam retroativo ao ativar a feature).
 Schedule::command('whatsapp:send-surveys')
     ->hourly()

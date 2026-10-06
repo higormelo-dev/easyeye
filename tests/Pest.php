@@ -7,6 +7,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\{Covenant, Doctor, Entity, EntityIntegrator, EntityUser, EntityUserIntegrator, Patient, PatientAccount, People, Plan, PlanFeature, Schedule, Subscription, User};
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\Request;
 use Tests\TestCase;
 
@@ -370,4 +371,66 @@ function actingAsFinancialEntityUser(Entity $entity): EntityUser
     test()->withSession(panelSession($entityUser))->actingAs($user);
 
     return $entityUser;
+}
+
+/*
+|--------------------------------------------------------------------------
+| WhatsApp oficial (Gupshup) — Partner API falsa
+|--------------------------------------------------------------------------
+*/
+
+/** Driver gupshup com credenciais de parceiro de teste (modo e-mail + client secret). */
+function useGupshupDriver(): void
+{
+    config([
+        'whatsapp.driver'                  => 'gupshup',
+        'whatsapp.gupshup.base_url'        => 'https://partner.gupshup.io',
+        'whatsapp.gupshup.auth_mode'       => 'partner_token',
+        'whatsapp.gupshup.universal_token' => null,
+        'whatsapp.gupshup.partner_email'   => 'parceiro@easyeye.test',
+        'whatsapp.gupshup.partner_secret'  => 'client-secret-test',
+    ]);
+}
+
+/**
+ * Http::fake da Partner API: login do parceiro e token do app fixos; $stubs
+ * (ex.: o envio v3) têm precedência.
+ *
+ * @param array<string, mixed> $stubs
+ */
+function fakeGupshup(array $stubs = []): void
+{
+    Http::fake(array_merge($stubs, [
+        'partner.gupshup.io/partner/account/login' => Http::response(['token' => 'PARTNER-TOKEN']),
+        'partner.gupshup.io/partner/app/*/token'   => Http::response(['status' => 'success', 'token' => ['token' => 'sk_app_token']]),
+    ]));
+}
+
+/** @return list<Illuminate\Http\Client\Request> envios (v3/message) feitos à Gupshup */
+function gupshupSentMessages(): array
+{
+    return Http::recorded(fn ($request) => str_ends_with($request->url(), '/v3/message'))
+        ->map(fn ($pair) => $pair[0])
+        ->values()
+        ->all();
+}
+
+/**
+ * Parâmetros do corpo e valor de cada botão de um envio de template.
+ *
+ * @return array{name: string, language: string, body: list<string>, buttons: list<string>}
+ */
+function gupshupTemplateOf(Illuminate\Http\Client\Request $request): array
+{
+    $components = collect($request['template']['components'] ?? []);
+
+    return [
+        'name'     => (string) $request['template']['name'],
+        'language' => (string) $request['template']['language']['code'],
+        'body'     => collect($components->firstWhere('type', 'body')['parameters'] ?? [])->pluck('text')->all(),
+        'buttons'  => $components->where('type', 'button')
+            ->map(fn ($b) => $b['parameters'][0]['payload'] ?? $b['parameters'][0]['text'] ?? '')
+            ->values()
+            ->all(),
+    ];
 }

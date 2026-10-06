@@ -349,21 +349,26 @@ Route::group([
         ->middleware('throttle:manager-destructive')
         ->name('ai-usage.export');
 
-    // ── WhatsApp (Z-API) por clínica ───────────────────────────────────────────
+    // ── WhatsApp oficial (Gupshup): app global + por clínica ───────────────────
     // Configuração EXCLUSIVA do dono/admin do SaaS (Gate SaasAdminPanel dentro
-    // do controller): a conta Z-API pertence à empresa dona — cada clínica
-    // ganha uma instância (número próprio), mas nunca vê as credenciais.
+    // do controller): a conta de parceiro Gupshup pertence à empresa dona — a
+    // clínica usa o número do EasyEye ou o próprio, sem ver credencial.
     Route::get('whatsapp', [WhatsAppController::class, 'index'])->name('whatsapp.index');
-    // Instância GLOBAL do SaaS (padrão pra clínica sem número próprio) —
+    // App GLOBAL do EasyEye (padrão pra clínica sem número próprio) —
     // rotas fixas ANTES de whatsapp/{entity} pra não colidir com o binding.
     Route::patch('whatsapp/global', [WhatsAppController::class, 'updateGlobal'])
         ->middleware('throttle:manager-destructive')
         ->name('whatsapp.global.update');
-    Route::post('whatsapp/global/test', [WhatsAppController::class, 'testGlobal'])->name('whatsapp.global.test');
+    // Teste = saúde do app na Gupshup ou mensagem de teste (template pago).
+    Route::post('whatsapp/global/test', [WhatsAppController::class, 'testGlobal'])
+        ->middleware('throttle:manager-destructive')
+        ->name('whatsapp.global.test');
     Route::patch('whatsapp/{entity}', [WhatsAppController::class, 'update'])
         ->middleware('throttle:manager-destructive')
         ->name('whatsapp.update');
-    Route::post('whatsapp/{entity}/test', [WhatsAppController::class, 'test'])->name('whatsapp.test');
+    Route::post('whatsapp/{entity}/test', [WhatsAppController::class, 'test'])
+        ->middleware('throttle:manager-destructive')
+        ->name('whatsapp.test');
 
     // ── Modelos de Documento Globais — admin only ──────────────────────────────
     Route::middleware('saas.role:admin')->group(function () {

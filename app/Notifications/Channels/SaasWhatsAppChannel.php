@@ -14,9 +14,10 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Canal WhatsApp dos avisos do SaaS para a clínica (régua de cobrança, fim do
- * teste grátis, cobrança enviada pelo manager). Usa SEMPRE a instância GLOBAL
- * do SaaS (a mesma do código de verificação do cadastro) — nunca a da
- * clínica, que pode estar bloqueada. Não passa pelo ClinicServiceGate: o
+ * teste grátis, cobrança enviada pelo manager), por template aprovado. Usa
+ * SEMPRE o app GLOBAL do EasyEye na Gupshup (o mesmo do código de
+ * verificação do cadastro) — nunca o número da clínica, que pode estar
+ * bloqueada. Não passa pelo ClinicServiceGate: o
  * gate barra automações da clínica para pacientes, não estes avisos.
  *
  * Só para o telefone VERIFICADO do contato (users.phone_verified_at); sem

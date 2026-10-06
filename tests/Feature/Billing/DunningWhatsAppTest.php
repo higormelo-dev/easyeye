@@ -7,11 +7,12 @@ use App\Enums\{BillingCycle, ClientRule, SubscriptionAccessLevel};
 use App\Jobs\WhatsApp\SendSaasWhatsAppNoticeJob;
 use App\Models\Billing\{Invoice, SubscriptionDunningStep};
 use App\Models\{Entity, Plan, Subscription, User};
-use App\Models\WhatsApp\WhatsAppSetting;
+use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppOptOut, WhatsAppSetting};
 use App\Notifications\Channels\SaasWhatsAppChannel;
 use App\Notifications\SubscriptionDunningNotification;
 use App\Services\Billing\{ClinicServiceGate, DunningService};
-use App\Services\WhatsApp\ZApiClient;
+use App\Services\WhatsApp\Contracts\WhatsAppProvider;
+use App\Services\WhatsApp\{WhatsAppService, WhatsAppTemplates};
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Mail\Events\MessageSent;
@@ -20,26 +21,28 @@ use Illuminate\Support\Facades\{Event, Http, Queue};
 
 /**
  * Rodada 5 — A5b: os passos da régua (D-5, D+1, D+3, D+7…) também saem
- * pelo WhatsApp, pela instância GLOBAL do SaaS (nunca a da clínica), para o
- * contato de cobrança com telefone verificado, com o link para pagar DENTRO
- * do sistema. Sem telefone verificado: só e-mail. Falha no WhatsApp não
+ * pelo WhatsApp — template aprovado (Gupshup), pelo app GLOBAL do EasyEye
+ * (nunca o da clínica) — para o contato de cobrança com telefone verificado,
+ * com o link para pagar DENTRO do sistema no botão do template. Sem telefone verificado: só e-mail. Falha no WhatsApp não
  * impede o e-mail nem a régua; clínica bloqueada (ClinicServiceGate) continua
  * recebendo estes avisos. Fora do horário comercial, espera a janela.
  */
 beforeEach(function () {
     Carbon::setTestNow(CarbonImmutable::parse('2026-10-01 09:00:00'));
     Http::preventStrayRequests();
-    config([
-        'whatsapp.driver'                     => 'zapi',
-        'whatsapp.zapi.base_url'              => 'https://api.z-api.io',
-        'billing.enforce_subscription_access' => true,
-    ]);
+    // Antes de limitar/encerrar, a régua confere o pagamento no Asaas: a
+    // recorrência sem cobrança paga (não pago conclusivo).
+    Http::fake(fn (Request $r) => $r->method() === 'GET' && str_starts_with($r->url(), 'https://api.asaas.com/v3/subscriptions/')
+        ? Http::response(['id' => 'sub_zap_001', 'status' => 'ACTIVE', 'deleted' => false, 'hasMore' => false, 'data' => []])
+        : null);
+    useGupshupDriver();
+    config(['billing.enforce_subscription_access' => true]);
 
-    WhatsAppSetting::create([
+    $this->global = WhatsAppSetting::create([
         'entity_id'     => null,
         'active'        => true,
         'webhook_token' => WhatsAppSetting::generateWebhookToken(),
-        'credentials'   => ['instance_id' => 'GLOBAL-SAAS', 'instance_token' => 'TOKEN-SAAS', 'client_token' => 'CLIENT-SAAS'],
+        'app_id'        => 'GLOBAL-SAAS',
     ]);
 
     $this->plan                  = Plan::factory()->create(['active' => true, 'name' => 'Pro']);
@@ -47,12 +50,12 @@ beforeEach(function () {
     $this->clinic->skipAutoTrial = true;
     $this->clinic->save();
 
-    // A clínica tem número próprio — os avisos do SaaS NUNCA usam esta instância.
+    // A clínica tem número próprio — os avisos do SaaS NUNCA usam este app.
     WhatsAppSetting::create([
         'entity_id'     => $this->clinic->id,
         'active'        => true,
         'webhook_token' => WhatsAppSetting::generateWebhookToken(),
-        'credentials'   => ['instance_id' => 'CLINIC-OWN', 'instance_token' => 'TOKEN-CLINIC', 'client_token' => 'CLIENT-CLINIC'],
+        'app_id'        => 'CLINIC-OWN',
     ]);
 
     $this->admin = User::factory()->create(['phone' => '(11) 98888-7777', 'phone_verified_at' => now()]);
@@ -98,49 +101,87 @@ function r5ZapRunAt(string $at): array
     return app(DunningService::class)->run();
 }
 
-/** @return list<Request> mensagens enviadas à Z-API */
-function r5ZapMessages(): array
+function r5ZapOk(): void
 {
-    return Http::recorded(fn (Request $r) => str_contains($r->url(), 'api.z-api.io'))->map(fn ($pair) => $pair[0])->values()->all();
+    fakeGupshup(['partner.gupshup.io/partner/app/*/v3/message' => Http::response(['messages' => [['id' => 'gs-1']]])]);
 }
 
-it('D+1: WhatsApp pela instância global ao contato com telefone verificado, com o link para pagar a fatura no sistema', function () {
-    Http::fake(['https://api.z-api.io/*' => Http::response(['messageId' => 'm-1'])]);
+it('D+1: template pelo app global ao contato com telefone verificado, com o link para pagar a fatura no sistema', function () {
+    r5ZapOk();
 
     r5ZapRunAt('2026-10-09 09:00:00');
 
-    $messages = r5ZapMessages();
+    $messages = gupshupSentMessages();
+    $template = gupshupTemplateOf($messages[0]);
+    $payUrl   = route('panel.my-subscription.index', ['invoice' => $this->invoice->id]);
 
     expect($messages)->toHaveCount(1)
-        ->and($messages[0]->url())->toContain('/instances/GLOBAL-SAAS/token/TOKEN-SAAS/send-text')
-        ->and($messages[0]->url())->not->toContain('CLINIC-OWN')
-        ->and($messages[0]['phone'])->toBe('5511988887777')
-        ->and($messages[0]['message'])->toContain(route('panel.my-subscription.index', ['invoice' => $this->invoice->id]))
-        ->and($messages[0]['message'])->toContain('R$')
-        ->and($messages[0]['message'])->toContain('08/10/2026')
+        ->and($messages[0]->url())->toBe('https://partner.gupshup.io/partner/app/GLOBAL-SAAS/v3/message')
+        ->and($messages[0]['to'])->toBe('5511988887777')
+        ->and($template['name'])->toBe('easyeye_cobranca_vencida')
+        ->and($template['language'])->toBe('pt_BR')
+        // {{1}} valor · {{2}} clínica · {{3}} vencimento · {{4}} limitação
+        ->and($template['body'][0])->toContain('R$')
+        ->and($template['body'][1])->toBe($this->clinic->name)
+        ->and($template['body'][2])->toBe('08/10/2026')
+        // Botão "Abrir o EasyEye": sufixo do link da fatura dentro do sistema.
+        ->and($template['buttons'])->toBe([SendSaasWhatsAppNoticeJob::urlSuffix($payUrl)])
+        ->and($template['buttons'][0])->toContain((string) $this->invoice->id)
         // Nunca o link do gateway.
-        ->and($messages[0]['message'])->not->toContain('asaas.com');
+        ->and(json_encode($messages[0]->data()))->not->toContain('asaas.com');
 
     $step = SubscriptionDunningStep::query()->where('step', DunningStep::Overdue->value)->sole();
     expect($step->recipients_count)->toBe(2)
         ->and($step->metadata['whatsapp_recipients'])->toBe(1);
+
+    // Trilha/custo em whatsapp_messages, sem clínica (comunicação do SaaS).
+    $logged = WhatsAppMessage::query()->where('kind', WhatsAppMessage::KIND_SAAS_NOTICE)->sole();
+    expect($logged->entity_id)->toBeNull()
+        ->and($logged->status)->toBe('sent')
+        ->and($logged->provider_message_id)->toBe('gs-1')
+        ->and($logged->template)->toBe('easyeye_cobranca_vencida')
+        ->and($logged->body)->toContain($payUrl);
 });
 
-it('lembrete D-5 e acesso limitado D+3 também saem pelo WhatsApp (texto curto da etapa)', function () {
-    Http::fake(['https://api.z-api.io/*' => Http::response(['messageId' => 'm-1'])]);
+it('lembrete D-5 e acesso limitado D+3 também saem pelo WhatsApp (template da etapa)', function () {
+    r5ZapOk();
 
     r5ZapRunAt('2026-10-03 09:00:00');
     r5ZapRunAt('2026-10-11 09:00:00');
 
-    $texts = array_map(fn (Request $r) => (string) $r['message'], r5ZapMessages());
+    $templates = array_map(fn (Request $r) => gupshupTemplateOf($r), gupshupSentMessages());
 
-    expect($texts)->toHaveCount(2)
-        ->and($texts[0])->toContain('vence em 08/10/2026')
-        ->and($texts[1])->toContain('IA e financeiro estão bloqueados');
+    expect($templates)->toHaveCount(2)
+        ->and($templates[0]['name'])->toBe('easyeye_cobranca_lembrete')
+        ->and($templates[0]['body'][2])->toBe('08/10/2026')
+        ->and($templates[1]['name'])->toBe('easyeye_cobranca_acesso_limitado');
 });
 
-it('falha na Z-API não impede o e-mail nem a régua (sem exceção, etapa registrada)', function () {
-    Http::fake(['https://api.z-api.io/*' => Http::response(['error' => 'offline'], 500)]);
+it('cada aviso do SaaS tem template configurado com as variáveis que o corpo usa', function () {
+    $templates = app(WhatsAppTemplates::class);
+
+    foreach (array_keys((array) config('whatsapp.templates')) as $key) {
+        $config = $templates->config($key);
+
+        foreach ($config['body'] as $variable) {
+            expect(__("whatsapp.templates.{$key}", [], 'pt_BR'))->toContain(":{$variable}")
+                ->and(__("whatsapp.templates.{$key}", [], 'en'))->toContain(":{$variable}");
+        }
+    }
+});
+
+it('contato que respondeu SAIR ao número do EasyEye não recebe o aviso (o e-mail segue)', function () {
+    r5ZapOk();
+    app(WhatsAppService::class)->optOut($this->global, '5511988887777');
+
+    r5ZapRunAt('2026-10-09 09:00:00');
+
+    expect(gupshupSentMessages())->toBe([])
+        ->and(WhatsAppOptOut::query()->count())->toBe(1);
+});
+
+it('falha na Gupshup não impede o e-mail nem a régua (sem exceção, etapa registrada)', function () {
+    fakeGupshup(['partner.gupshup.io/partner/app/*/v3/message' => Http::response(['status' => 'error', 'message' => 'offline'], 500)]);
     $mails = 0;
     Event::listen(MessageSent::class, function () use (&$mails) {
         $mails++;
@@ -154,8 +195,8 @@ it('falha na Z-API não impede o e-mail nem a régua (sem exceção, etapa regis
 });
 
 it('clínica bloqueada (D+7): o aviso do SaaS sai pelo WhatsApp mesmo com o ClinicServiceGate barrando as automações dela', function () {
-    Http::fake([
-        'https://api.z-api.io/*'                             => Http::response(['messageId' => 'm-1']),
+    fakeGupshup([
+        'partner.gupshup.io/partner/app/*/v3/message'        => Http::response(['messages' => [['id' => 'gs-1']]]),
         'https://api.asaas.com/v3/subscriptions/sub_zap_001' => Http::response(['deleted' => true, 'id' => 'sub_zap_001']),
     ]);
 
@@ -167,10 +208,10 @@ it('clínica bloqueada (D+7): o aviso do SaaS sai pelo WhatsApp mesmo com o Clin
     expect($this->subscription->fresh()->accessLevel())->toBe(SubscriptionAccessLevel::None)
         ->and($gate->allowsAutomation($this->clinic))->toBeFalse();
 
-    $messages = r5ZapMessages();
+    $messages = gupshupSentMessages();
     expect($messages)->toHaveCount(1)
-        ->and($messages[0]->url())->toContain('GLOBAL-SAAS')
-        ->and((string) $messages[0]['message'])->toContain(route('panel.my-subscription.index'));
+        ->and($messages[0]->url())->toContain('/partner/app/GLOBAL-SAAS/')
+        ->and(gupshupTemplateOf($messages[0])['buttons'][0])->toBe(SendSaasWhatsAppNoticeJob::urlSuffix(route('panel.my-subscription.index')));
 });
 
 it('fora do horário comercial o WhatsApp espera o início da janela (08h)', function () {
@@ -188,25 +229,57 @@ it('fora do horário comercial o WhatsApp espera o início da janela (08h)', fun
 });
 
 it('a régua só manda WhatsApp para contato de cobrança e respeita BILLING_NOTICES_WHATSAPP_ENABLED', function () {
-    Http::fake(['https://api.z-api.io/*' => Http::response(['messageId' => 'm-1'])]);
+    r5ZapOk();
     config(['billing.notices.whatsapp_enabled' => false]);
 
     r5ZapRunAt('2026-10-09 09:00:00');
 
-    expect(r5ZapMessages())->toBe([])
+    expect(gupshupSentMessages())->toBe([])
         ->and(SubscriptionDunningStep::query()->sole()->metadata['whatsapp_recipients'])->toBe(0);
 });
 
-it('job do WhatsApp: falha da Z-API volta para a fila com espera (até 3 tentativas); na última desiste sem exceção', function () {
-    Http::fake(['https://api.z-api.io/*' => Http::response(['error' => 'offline'], 500)]);
+it('job do WhatsApp: falha transitória da Gupshup volta para a fila com espera (até 3 tentativas)', function () {
+    fakeGupshup(['partner.gupshup.io/partner/app/*/v3/message' => Http::response(['status' => 'error', 'message' => 'offline'], 500)]);
     $this->travelTo(CarbonImmutable::parse('2026-10-09 10:00:00'));
 
     $notification = new SubscriptionDunningNotification($this->subscription, DunningStep::Overdue, '2026-10-08', ['entity' => 'Clínica', 'amount' => 299.9, 'invoice_id' => $this->invoice->id]);
     $notification->shouldSend($this->admin, 'mail'); // etapa vale (D+1)
 
     $job = (new SendSaasWhatsAppNoticeJob((string) $this->admin->id, $notification, 'pt_BR'))->withFakeQueueInteractions();
-    $job->handle(app(ZApiClient::class));
+    $job->handle(app(WhatsAppProvider::class), app(WhatsAppService::class), app(WhatsAppTemplates::class));
     $job->assertReleased(60);
 
-    expect($job->tries)->toBe(3);
+    // A linha da trilha nasce antes da chamada (sem duplicidade em
+    // timeout) e fica pending, esperando a nova tentativa do mesmo job.
+    expect($job->tries)->toBe(3)
+        ->and(WhatsAppMessage::query()->sole()->status)->toBe('pending')
+        ->and(WhatsAppMessage::query()->sole()->error_code)->toBe('http_500');
+});
+
+it('job do WhatsApp: falha permanente (template inexistente) desiste na hora, registrada como falha', function () {
+    fakeGupshup(['partner.gupshup.io/partner/app/*/v3/message' => Http::response(['error' => ['code' => 132001, 'message' => 'Template name does not exist in the translation']], 400)]);
+    $this->travelTo(CarbonImmutable::parse('2026-10-09 10:00:00'));
+
+    $notification = new SubscriptionDunningNotification($this->subscription, DunningStep::Overdue, '2026-10-08', ['entity' => 'Clínica', 'amount' => 299.9, 'invoice_id' => $this->invoice->id]);
+
+    $job = (new SendSaasWhatsAppNoticeJob((string) $this->admin->id, $notification, 'pt_BR'))->withFakeQueueInteractions();
+    $job->handle(app(WhatsAppProvider::class), app(WhatsAppService::class), app(WhatsAppTemplates::class));
+    $job->assertNotReleased();
+
+    $logged = WhatsAppMessage::query()->sole();
+    expect($logged->status)->toBe('failed')
+        ->and($logged->error_code)->toBe('meta_132001');
+});
+
+it('aviso em inglês usa o template "en" só quando aprovado (WHATSAPP_TEMPLATE_LANGUAGES)', function () {
+    r5ZapOk();
+    $this->travelTo(CarbonImmutable::parse('2026-10-09 10:00:00'));
+    $notification = new SubscriptionDunningNotification($this->subscription, DunningStep::Overdue, '2026-10-08', ['entity' => 'Clinic', 'amount' => 299.9, 'invoice_id' => $this->invoice->id]);
+
+    SendSaasWhatsAppNoticeJob::dispatchSync((string) $this->admin->id, $notification, 'en');
+    config(['whatsapp.template_languages' => ['pt_BR', 'en']]);
+    SendSaasWhatsAppNoticeJob::dispatchSync((string) $this->admin->id, $notification, 'en');
+
+    $languages = array_map(fn (Request $r) => gupshupTemplateOf($r)['language'], gupshupSentMessages());
+    expect($languages)->toBe(['pt_BR', 'en']);
 });

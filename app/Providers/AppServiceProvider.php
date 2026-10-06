@@ -9,8 +9,12 @@ use App\Domains\AI\Repositories\{EloquentAiModelPriceRepository, EloquentAiRunPr
 use App\Domains\AI\Services\{AiCircuitBreakerService, AiProviderManager, AiProviderSettings};
 use App\Enums\AI\AiProvider;
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
+use App\Models\WhatsApp\WhatsAppSetting;
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
+use App\Services\Billing\{GatewayRegistry, WebhookIngestionService};
+use App\Services\WhatsApp\Contracts\WhatsAppProvider;
+use App\Services\WhatsApp\Providers\{GupshupProvider, MockWhatsAppProvider};
 use App\Support\Database\AccentInsensitiveSearch;
 use App\Support\TenantContext;
 use Carbon\Carbon;
@@ -37,6 +41,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AiModelPriceRepositoryInterface::class, EloquentAiModelPriceRepository::class);
         $this->app->bind(AiRunProviderCallStoreInterface::class, EloquentAiRunProviderCallStore::class);
         $this->app->bind(AiRunRepositoryInterface::class, EloquentAiRunRepository::class);
+
+        // WhatsApp oficial: gupshup envia de verdade; mock (padrão, também
+        // com WHATSAPP_DRIVER vazio) só simula — mesmo padrão do TISS.
+        $this->app->bind(WhatsAppProvider::class, fn ($app): WhatsAppProvider => config('whatsapp.driver') === 'gupshup'
+            ? $app->make(GupshupProvider::class)
+            : $app->make(MockWhatsAppProvider::class));
 
         // Circuit breaker dos providers LLM. Threshold/cooldown configuráveis via env.
         $this->app->singleton(AiCircuitBreakerInterface::class, function (): AiCircuitBreakerService {
@@ -265,6 +275,47 @@ class AppServiceProvider extends ServiceProvider
         // (XML/CSV com drill-down) não tinham nenhum teto — sessão comprometida
         // conseguia automatizar parsing de XML/geração de relatório sem barreira.
         // -------------------------------------------------------------------------
+        // Webhook do WhatsApp (Gupshup): limite por token da URL — cada
+        // configuração (app) tem o seu. O IP não serve: com trustProxies '*'
+        // ele vem do X-Forwarded-For, que qualquer um forja. Token que não
+        // existe cai num balde GLOBAL (chave fixa whatsapp-webhook:unknown) —
+        // senão cada token aleatório ganharia o seu e o limite nunca
+        // estouraria. Mesma resposta 404 genérica até estourar (429).
+        // Webhook de billing: limite por gateway (código da URL), alto — os
+        // eventos chegam em rajada (CONFIRMED + RECEIVED, renovações do mês) e
+        // 429 conta como falha de entrega no Asaas (fila penalizada/pausada).
+        // Só a requisição com o token/assinatura válidos do gateway conta no
+        // balde dele: sem token ou com token falso, balde próprio e pequeno
+        // por IP — um flood falso nunca gera 429 para o gateway de verdade.
+        // Gateway que não existe cai num balde único pequeno.
+        RateLimiter::for('billing-webhook', static function (Request $r) {
+            $gateway = strtolower((string) $r->route('gateway'));
+
+            if (! app(GatewayRegistry::class)->has($gateway)) {
+                return Limit::perMinute(60)->by('billing-webhook:unknown');
+            }
+
+            if (! app(WebhookIngestionService::class)->authenticates($gateway, $r->headers->all(), (string) $r->getContent())) {
+                return Limit::perMinute(max(1, (int) config('billing.webhooks.invalid_rate_limit_per_minute', 30)))
+                    ->by('billing-webhook:invalid:' . $gateway . ':' . $r->ip());
+            }
+
+            return Limit::perMinute(max(60, (int) config('billing.webhooks.rate_limit_per_minute', 3000)))
+                ->by('billing-webhook:' . $gateway);
+        });
+
+        RateLimiter::for('whatsapp-webhook', static function (Request $r) {
+            $token = (string) $r->route('token');
+
+            if ($token === '' || ! WhatsAppSetting::query()->where('webhook_token', $token)->exists()) {
+                return Limit::perMinute(max(1, (int) config('whatsapp.webhook.unknown_rate_limit_per_minute', 60)))
+                    ->by('whatsapp-webhook:unknown');
+            }
+
+            return Limit::perMinute(max(1, (int) config('whatsapp.webhook.rate_limit_per_minute', 1200)))
+                ->by('whatsapp-webhook:' . sha1($token));
+        });
+
         RateLimiter::for(
             'financial-write',
             static fn (Request $r) => Limit::perMinute(30)->by(

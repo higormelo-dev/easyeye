@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * Verificação de WhatsApp do responsável no registro (/register).
  *
  * `users.phone` já existia; estas colunas guardam o estado da verificação
- * por código OTP enviado via instância global Z-API do SaaS:
+ * por código OTP enviado via app global de WhatsApp do SaaS:
  *  - phone_verified_at: quando o número foi confirmado (análogo de
  *    email_verified_at). Contato confirmado = lead qualificado para o time
  *    comercial entrar em contato via WhatsApp.

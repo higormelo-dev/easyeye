@@ -57,6 +57,19 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /**
+     * Fora da trilha de auditoria: o hash do código de verificação do
+     * WhatsApp (HMAC de 6 dígitos) e os contadores que mudam a cada envio —
+     * phone_verified_at continua auditado.
+     *
+     * @var list<string>
+     */
+    protected array $auditExclude = [
+        'phone_verification_code',
+        'phone_verification_expires_at',
+        'phone_verification_attempts',
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -76,7 +89,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'two_factor_secret'         => 'encrypted',
             'two_factor_recovery_codes' => 'encrypted',
             'two_factor_confirmed_at'   => 'datetime',
-            // Verificação de WhatsApp do responsável (OTP via Z-API)
+            // Verificação de WhatsApp do responsável (OTP via WhatsApp oficial — Gupshup)
             'phone_verified_at'             => 'datetime',
             'phone_verification_expires_at' => 'datetime',
         ];

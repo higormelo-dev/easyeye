@@ -33,6 +33,63 @@ describe('KpiCard', () => {
         expect(wrapper.emitted('click')).toHaveLength(1);
     });
 
+    it('ação (action): botão SEM aria-pressed (abre algo, não é filtro) e emite click', async () => {
+        const wrapper = mount(KpiCard, { props: { label: 'Sem assinatura', value: '2', action: true } });
+
+        expect(wrapper.element.tagName).toBe('BUTTON');
+        expect(wrapper.attributes('aria-pressed')).toBeUndefined();
+
+        await wrapper.trigger('click');
+        expect(wrapper.emitted('click')).toHaveLength(1);
+    });
+
+    it('estático não emite click', async () => {
+        const wrapper = mount(KpiCard, { props: { label: 'X', value: '0' } });
+
+        await wrapper.trigger('click');
+        expect(wrapper.emitted('click')).toBeUndefined();
+    });
+
+    it('tinted: faixa, ícone em círculo e destaque ativo na cor do tom (tokens do tema)', () => {
+        const props = {
+            label: 'Em atraso',
+            value: '3',
+            icon: 'ti ti-alert-triangle',
+            tone: 'warning',
+            toggle: true,
+            tinted: true,
+        };
+        const idle = mount(KpiCard, { props });
+        const active = mount(KpiCard, { props: { ...props, active: true } });
+
+        expect(idle.classes()).toEqual(expect.arrayContaining(['kpi-card--tinted', 'kpi-card--tone-warning']));
+        expect(idle.attributes('style')).toContain('--kpi-tone-rgb: var(--warning-rgb)');
+        expect(idle.get('.kpi-card__bubble').find('i.ti-alert-triangle').exists()).toBe(true);
+        expect(idle.findAll('i.ti-alert-triangle')).toHaveLength(1);
+        expect(idle.classes()).not.toContain('kpi-card--tinted-active');
+
+        expect(active.classes()).toContain('kpi-card--tinted-active');
+        expect(active.classes()).not.toContain('kpi-card--active');
+    });
+
+    it('tinted aceita cores extras do tema (ex.: orange); sem tinted elas caem no neutro', () => {
+        const tinted = mount(KpiCard, { props: { label: 'X', value: '1', tone: 'orange', tinted: true } });
+        const plain = mount(KpiCard, { props: { label: 'X', value: '1', tone: 'orange' } });
+
+        expect(tinted.attributes('style')).toContain('--kpi-tone-rgb: var(--orange-rgb)');
+        expect(plain.classes()).toContain('border-secondary');
+    });
+
+    it('sem tinted o visual padrão não muda (outras telas)', () => {
+        const wrapper = mount(KpiCard, {
+            props: { label: 'X', value: '1', icon: 'ti ti-cash', tone: 'success', toggle: true, active: true },
+        });
+
+        expect(wrapper.find('.kpi-card__bubble').exists()).toBe(false);
+        expect(wrapper.classes()).toContain('kpi-card--active');
+        expect(wrapper.attributes('style')).toBeUndefined();
+    });
+
     it('tom desconhecido cai no neutro; carregando mostra placeholder sem valor', () => {
         const wrapper = mount(KpiCard, {
             props: { label: 'X', value: '9', tone: 'rainbow', loading: true, testId: 'x' },

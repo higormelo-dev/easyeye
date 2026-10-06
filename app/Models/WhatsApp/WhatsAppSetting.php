@@ -8,17 +8,20 @@ use App\Models\Entity;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 use Illuminate\Support\Str;
 
 /**
- * Configuração Z-API (WhatsApp) por clínica — confirmação de consulta +
- * pesquisa de satisfação.
+ * Configuração do WhatsApp oficial (Gupshup) — linha GLOBAL (entity_id
+ * nulo: app/número do EasyEye, padrão de todas as clínicas) ou da clínica
+ * (toggles de confirmação/pesquisa e, opcionalmente, app próprio).
  *
- * `credentials` = {instance_id, instance_token, client_token}, criptografado
- * at rest via cast encrypted:array (padrão GatewayCredential). O instance_id
- * é DUPLICADO em coluna própria em claro para o webhook indexar — não é
- * segredo; os tokens são e nunca saem do cast.
+ * - app_id: id do app na Gupshup, em claro (não é segredo; roteia o
+ *   webhook). Os tokens do parceiro ficam só no .env; os do app, só em cache.
+ * - webhook_token: compõe a URL do webhook (identifica a configuração).
+ * - webhook_secret: segredo cifrado que a Gupshup manda como header em cada
+ *   chamada (meta da subscription).
+ * Os dois ficam FORA da auditoria ($auditExclude).
  */
 class WhatsAppSetting extends Model
 {
@@ -26,13 +29,19 @@ class WhatsAppSetting extends Model
     use HasAuditColumns;
     use HasUuids;
 
+    /** Header com o segredo do webhook (meta da subscription Gupshup). */
+    public const WEBHOOK_SECRET_HEADER = 'X-EasyEye-Webhook-Secret';
+
     protected $table = 'whatsapp_settings';
 
     protected $fillable = [
         'entity_id',
-        'credentials',
-        'instance_id',
+        'provider',
+        'app_id',
         'webhook_token',
+        'webhook_secret',
+        'subscription_id',
+        'webhook_subscribed_at',
         'active',
         'confirmation_enabled',
         'confirmation_hours_before',
@@ -40,10 +49,16 @@ class WhatsAppSetting extends Model
         'survey_delay_hours',
     ];
 
+    protected $hidden = ['webhook_token', 'webhook_secret'];
+
+    /** @var list<string> segredos nunca vão para audit_logs */
+    protected array $auditExclude = ['webhook_token', 'webhook_secret'];
+
     protected function casts(): array
     {
         return [
-            'credentials'               => 'encrypted:array',
+            'webhook_secret'            => 'encrypted',
+            'webhook_subscribed_at'     => 'datetime',
             'active'                    => 'boolean',
             'confirmation_enabled'      => 'boolean',
             'survey_enabled'            => 'boolean',
@@ -57,25 +72,34 @@ class WhatsAppSetting extends Model
         return $this->belongsTo(Entity::class, 'entity_id');
     }
 
+    public function optOuts(): HasMany
+    {
+        return $this->hasMany(WhatsAppOptOut::class, 'whatsapp_setting_id');
+    }
+
     public static function generateWebhookToken(): string
     {
         return Str::random(48);
     }
 
-    public function hasCredentials(): bool
+    public static function generateWebhookSecret(): string
     {
-        $c = $this->credentials ?? [];
+        return Str::random(64);
+    }
 
-        return ! empty($c['instance_id']) && ! empty($c['instance_token']) && ! empty($c['client_token']);
+    /** App Gupshup cadastrado (próprio da clínica ou o global). */
+    public function hasApp(): bool
+    {
+        return filled($this->app_id);
     }
 
     public function isOperational(): bool
     {
-        return $this->active && $this->hasCredentials();
+        return $this->active && $this->hasApp();
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // Instância GLOBAL do SaaS (entity_id NULL — singleton via unique parcial)
+    // App GLOBAL do EasyEye (entity_id NULL — singleton via unique parcial)
     // ──────────────────────────────────────────────────────────────────────
 
     public function isGlobal(): bool
@@ -90,13 +114,13 @@ class WhatsAppSetting extends Model
     }
 
     /**
-     * Setting cujas CREDENCIAIS devem ser usadas para enviar por esta clínica:
-     * as próprias quando plugou número próprio; senão a instância global do
-     * SaaS (se operacional). Null = não há como enviar.
+     * Configuração pela qual esta clínica ENVIA: o app próprio, quando
+     * cadastrado; senão o app global do EasyEye (se operacional). Null = não
+     * há como enviar.
      */
-    public function sendingCredentials(): ?self
+    public function sendingSetting(): ?self
     {
-        if ($this->hasCredentials()) {
+        if ($this->hasApp()) {
             return $this;
         }
 
@@ -106,11 +130,11 @@ class WhatsAppSetting extends Model
     }
 
     /**
-     * A clínica consegue enviar mensagens? (toggles próprios ativos + alguma
-     * credencial disponível — própria ou global).
+     * A clínica consegue enviar mensagens? (integração ativa + algum app
+     * disponível — próprio ou global).
      */
     public function canSend(): bool
     {
-        return $this->active && $this->sendingCredentials() !== null;
+        return $this->active && $this->sendingSetting() !== null;
     }
 }

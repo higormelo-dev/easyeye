@@ -89,7 +89,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:6,1')
         ->name('verification.send');
 
-    // ── Verificação de WhatsApp do responsável (código OTP via Z-API) ────────
+    // ── Verificação de WhatsApp do responsável (código OTP via WhatsApp oficial) ────────
     // Par do fluxo de e-mail acima: confirma o segundo canal de contato
     // capturado no /register. O gate `phone.verified` (grupo /panel)
     // redireciona para verify-phone até a confirmação. Reenvio 3/10min;

@@ -6,9 +6,9 @@
  * Cobre:
  *  - captura: company_phone agora é validado e persistido (users.phone +
  *    entities.cellphone) — antes era coletado na UI e descartado;
- *  - envio: código OTP disparado pós-registro quando a instância global
- *    Z-API está operacional (job na fila; hash sha256 no banco, nunca o
- *    código em claro);
+ *  - envio: código OTP disparado pós-registro quando o app global do
+ *    WhatsApp (Gupshup) está operacional (job na fila; hash sha256 no banco,
+ *    nunca o código em claro) e entregue como template de autenticação;
  *  - confirmação: código correto marca phone_verified_at; errado consome
  *    tentativas (5 invalidam); expirado nunca valida;
  *  - rotas: throttle e autenticação.
@@ -17,9 +17,11 @@
 use App\Jobs\WhatsApp\SendPhoneVerificationCodeJob;
 use App\Models\Entity;
 use App\Models\{Plan, User};
-use App\Models\WhatsApp\WhatsAppSetting;
+use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppSetting};
 use App\Services\Auth\PhoneVerificationService;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\{Http, Queue};
 
 function operationalGlobalWhatsApp(): WhatsAppSetting
 {
@@ -27,11 +29,7 @@ function operationalGlobalWhatsApp(): WhatsAppSetting
         'entity_id'     => null,
         'active'        => true,
         'webhook_token' => WhatsAppSetting::generateWebhookToken(),
-        'credentials'   => [
-            'instance_id'    => 'test-instance',
-            'instance_token' => 'test-token',
-            'client_token'   => 'test-client',
-        ],
+        'app_id'        => 'global-app-otp',
     ]);
 }
 
@@ -280,4 +278,55 @@ test('tela verify-phone redireciona para o painel quando já confirmado', functi
     $this->actingAs($user)
         ->get(route('phone.verification.notice'))
         ->assertRedirect(route('panel.dashboard', absolute: false));
+});
+
+// ── Entrega: template de AUTENTICAÇÃO pelo app global (Gupshup) ─────────────
+
+test('job envia o código pelo template de autenticação do app global e registra sem o código', function () {
+    config([
+        'whatsapp.driver'                  => 'gupshup',
+        'whatsapp.gupshup.auth_mode'       => '',
+        'whatsapp.gupshup.universal_token' => null,
+        'whatsapp.gupshup.partner_email'   => 'parceiro@easyeye.test',
+        'whatsapp.gupshup.partner_secret'  => 'client-secret',
+    ]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'partner.gupshup.io/partner/account/login'                 => Http::response(['token' => 'PARTNER-TOKEN']),
+        'partner.gupshup.io/partner/app/global-app-otp/token'      => Http::response(['status' => 'success', 'token' => ['token' => 'sk_app_otp']]),
+        'partner.gupshup.io/partner/app/global-app-otp/v3/message' => Http::response(['messages' => [['id' => 'gs-otp-1']], 'messaging_product' => 'whatsapp']),
+    ]);
+
+    operationalGlobalWhatsApp();
+    $user = userWithPhone();
+
+    SendPhoneVerificationCodeJob::dispatchSync((string) $user->id, '5511988887777', '482913', 'pt_BR');
+
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/partner/app/global-app-otp/v3/message')
+        && $r->header('Authorization')[0] === 'sk_app_otp'
+        && $r['to'] === '5511988887777'
+        && $r['type'] === 'template'
+        && $r['template']['name'] === 'easyeye_codigo_verificacao'
+        && $r['template']['language'] === ['code' => 'pt_BR']
+        && $r['template']['components'] === [
+            ['type' => 'body', 'parameters' => [['type' => 'text', 'text' => '482913']]],
+            ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => '482913']]],
+        ]);
+
+    $message = WhatsAppMessage::query()->where('kind', WhatsAppMessage::KIND_VERIFICATION)->firstOrFail();
+    expect($message->status)->toBe('sent')
+        ->and($message->entity_id)->toBeNull()
+        ->and($message->provider_message_id)->toBe('gs-otp-1')
+        ->and($message->template)->toBe('easyeye_codigo_verificacao')
+        ->and($message->body)->not->toContain('482913')
+        ->and(json_encode($message->payload))->not->toContain('482913');
+});
+
+test('job do código usa a fila do WhatsApp e cifra o payload (código não fica em claro na fila)', function () {
+    config(['whatsapp.queue' => 'whatsapp']);
+
+    $job = new SendPhoneVerificationCodeJob('user-1', '5511988887777', '123456');
+
+    expect($job->queue)->toBe('whatsapp')
+        ->and($job)->toBeInstanceOf(ShouldBeEncrypted::class);
 });

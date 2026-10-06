@@ -33,6 +33,9 @@ return [
 
     // Cadastro de paciente (componente compartilhado Pacientes/Agenda).
     'patient_form' => [
+        // Celular respondeu SAIR ao WhatsApp da clínica/EasyEye.
+        'wa_opted_out'           => 'Descadastrado do WhatsApp',
+        'wa_opted_out_hint'      => 'Este celular respondeu SAIR: não recebe confirmação nem pesquisa por WhatsApp até responder VOLTAR.',
         'occupation'             => 'Profissão',
         'occupation_placeholder' => 'Ex.: professora, motorista, aposentado(a)',
         // Plano do convênio (produto da ANS ou plano da clínica)

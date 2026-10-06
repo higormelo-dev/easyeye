@@ -1,673 +1,535 @@
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import KpiCard from '@/Components/Panel/KpiCard.vue';
+import SearchInput from '@/Components/Panel/SearchInput.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
+import WhatsAppStatusBar from './WhatsAppStatusBar.vue';
+import WhatsAppClinicTable from './WhatsAppClinicTable.vue';
+import WhatsAppClinicCards from './WhatsAppClinicCards.vue';
+import WhatsAppClinicDrawer from './WhatsAppClinicDrawer.vue';
+import WhatsAppClinicFormModal from './WhatsAppClinicFormModal.vue';
+import WhatsAppGlobalPanel from './WhatsAppGlobalPanel.vue';
+import WhatsAppTemplates from './WhatsAppTemplates.vue';
 
 /**
- * Manager → WhatsApp (Z-API): configuração POR CLÍNICA, exclusiva do dono/
- * admin do SaaS. Cada clínica recebe uma instância Z-API (número próprio) —
- * as credenciais são da conta da empresa dona e nunca chegam à clínica.
+ * Manager → WhatsApp oficial (Gupshup), no padrão de Manager → Medicamentos:
+ * faixa de situação única, KPIs (os de filtro são botões), abas Clínicas
+ * (busca/filtros/paginação no servidor, tabela ou cards, gaveta de detalhes e
+ * modal de configuração) · Número do EasyEye (app global) · Modelos.
+ * Exclusivo do admin do SaaS. Nenhum segredo chega aqui: credenciais do
+ * parceiro ficam no .env e o segredo do webhook só no servidor.
  */
 const props = defineProps({
-    clinics: { type: Array, default: () => [] },
-    // Instância Z-API GLOBAL do SaaS (padrão pra clínica sem número próprio).
+    // Paginador do Laravel (20 por página) com as clínicas da página.
+    clinics: { type: Object, default: () => ({ data: [], links: [], last_page: 1 }) },
+    filters: { type: Object, default: () => ({}) },
+    kpis: { type: Object, default: () => ({}) },
+    // App do número do EasyEye (padrão pra clínica sem número próprio).
     global: { type: Object, default: null },
-    // 'zapi' = envia de verdade; 'mock' = simulação (nada sai pra Z-API).
+    // 'gupshup' = envia de verdade; 'mock' = simulação (também com driver vazio).
     driver: { type: String, default: 'mock' },
+    simulated: { type: Boolean, default: true },
+    partner: { type: Object, default: () => ({ configured: false, auth_mode: null }) },
+    templates: { type: Array, default: () => [] },
+    templateLanguages: { type: Array, default: () => ['pt_BR'] },
     routes: { type: Object, required: true },
     t: { type: Object, required: true },
 });
 
-const breadcrumbs = [];
+const { number } = useLocaleFormat();
+const ui = computed(() => props.t.ui ?? {});
 
-function url(key, entityId) {
-    return props.routes[key].replace('__ID__', entityId);
+// ── Abas (lembradas na URL: ?tab=global|templates) ───────────────────────
+const TABS = ['clinics', 'global', 'templates'];
+const tab = ref(TABS.includes(props.filters.tab) ? props.filters.tab : 'clinics');
+
+function setTab(value) {
+    tab.value = value;
+    try {
+        const url = new URL(window.location.href);
+        if (value === 'clinics') url.searchParams.delete('tab');
+        else url.searchParams.set('tab', value);
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+        // sem history (preview/teste): a aba vale só nesta visita
+    }
 }
+
+const tabIcons = { clinics: 'ti-building-hospital', global: 'ti-building-broadcast-tower', templates: 'ti-message-2' };
+
+// Setas ←/→ entre as abas (padrão WAI-ARIA de tablist).
+function onTabKey(event, current) {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const next = TABS[(TABS.indexOf(current) + step + TABS.length) % TABS.length];
+    setTab(next);
+    document.getElementById(`wa-tab-${next}`)?.focus();
+}
+
+// ── Tabela / cards (preferência por navegador) ───────────────────────────
+const VIEW_KEY = 'mgr_whatsapp_view';
+const view = ref(readView());
+
+// Sem preferência salva, o celular abre em cards (a tabela esconde colunas).
+function readView() {
+    let saved = null;
+    try {
+        saved = localStorage.getItem(VIEW_KEY);
+    } catch {
+        // armazenamento bloqueado: segue o tamanho da tela
+    }
+    if (saved === 'cards' || saved === 'table') return saved;
+
+    return window.matchMedia?.('(max-width: 575.98px)').matches ? 'cards' : 'table';
+}
+
+function setView(value) {
+    view.value = value;
+    try {
+        localStorage.setItem(VIEW_KEY, value);
+    } catch {
+        // armazenamento bloqueado: vale só nesta visita
+    }
+}
+
+// ── Filtros (server-side, na URL) ────────────────────────────────────────
+const search = ref(props.filters.search ?? '');
+const numberFilter = ref(props.filters.number ?? '');
+const automation = ref(props.filters.automation ?? '');
+
+const hasFilters = computed(() => !!(search.value || numberFilter.value || automation.value));
+
+function applyFilters() {
+    router.get(
+        route('manager.whatsapp.index'),
+        {
+            search: search.value || undefined,
+            number: numberFilter.value || undefined,
+            automation: automation.value || undefined,
+        },
+        { preserveState: true, preserveScroll: true, replace: true, only: ['clinics', 'filters'] },
+    );
+}
+
+let searchTimer = null;
+watch(search, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyFilters, 350);
+});
+watch([numberFilter, automation], applyFilters);
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function clearFilters() {
+    clearTimeout(searchTimer);
+    search.value = '';
+    numberFilter.value = '';
+    automation.value = '';
+}
+
+// ── KPIs (os que filtram a lista são botões com aria-pressed) ────────────
+const kpiCards = computed(() => [
+    {
+        key: 'clinics',
+        tone: 'primary',
+        icon: 'ti ti-building-hospital',
+        toggle: true,
+        active: !numberFilter.value && !automation.value,
+    },
+    { key: 'own', tone: 'success', icon: 'ti ti-brand-whatsapp', toggle: true, active: numberFilter.value === 'own' },
+    {
+        key: 'global',
+        tone: 'cyan',
+        icon: 'ti ti-building-broadcast-tower',
+        toggle: true,
+        active: numberFilter.value === 'global',
+    },
+    {
+        key: 'confirmations',
+        tone: 'purple',
+        icon: 'ti ti-calendar-check',
+        toggle: true,
+        active: automation.value === 'confirmation',
+    },
+    { key: 'messages_sent', tone: 'indigo', icon: 'ti ti-send' },
+    { key: 'opt_outs', tone: 'orange', icon: 'ti ti-user-off' },
+]);
+
+function onKpi(key) {
+    setTab('clinics');
+    if (key === 'clinics') {
+        numberFilter.value = '';
+        automation.value = '';
+    } else if (key === 'own' || key === 'global') {
+        numberFilter.value = numberFilter.value === key ? '' : key;
+    } else if (key === 'confirmations') {
+        automation.value = automation.value === 'confirmation' ? '' : 'confirmation';
+    }
+}
+
+// ── Gaveta de detalhes ───────────────────────────────────────────────────
+const detail = ref(null);
+const detailOpen = ref(false);
+
+function openDetail(clinic) {
+    detail.value = clinic;
+    detailOpen.value = true;
+}
+
+// A lista recarregou (salvou/filtrou): a gaveta acompanha a linha nova.
+watch(
+    () => props.clinics?.data,
+    (rows) => {
+        if (detail.value) detail.value = rows?.find((r) => r.id === detail.value.id) ?? detail.value;
+    },
+);
+
+// ── Verificação do app próprio (menu ⋮ e gaveta) ─────────────────────────
+const clinicHealth = ref({});
+const checkingClinic = ref(null);
 
 function csrf() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 }
 
-// ── Modal de configuração por clínica ───────────────────────────────────────
-const showModal = ref(false);
-const editing = ref(null); // clinic row
-const saving = ref(false);
-const savedFlash = ref('');
-const webhookWarn = ref(false);
-const errors = ref({});
+async function verifyClinic(clinic) {
+    if (!clinic || checkingClinic.value) return;
+    checkingClinic.value = clinic.id;
+    try {
+        const { data } = await window.axios.post(
+            props.routes.test.replace('__ID__', clinic.id),
+            {},
+            { headers: { 'X-CSRF-TOKEN': csrf() } },
+        );
+        clinicHealth.value = { ...clinicHealth.value, [clinic.id]: data };
+    } catch (e) {
+        clinicHealth.value = {
+            ...clinicHealth.value,
+            [clinic.id]: { ok: false, error: e.response?.data?.error ?? props.t.connection.failed },
+        };
+    } finally {
+        checkingClinic.value = null;
+    }
+}
 
-const form = reactive({
-    active: false,
-    confirmation_enabled: true,
-    confirmation_hours_before: 24,
-    survey_enabled: true,
-    survey_delay_hours: 2,
-    instance_id: '',
-    instance_token: '',
-    client_token: '',
-});
+function testFromList(clinic) {
+    openDetail(clinic);
+    verifyClinic(clinic);
+}
+
+// ── Modal de configuração ────────────────────────────────────────────────
+const formOpen = ref(false);
+const editing = ref(null);
 
 function openConfig(clinic) {
     editing.value = clinic;
-    Object.assign(form, {
-        active: clinic.setting?.active ?? false,
-        confirmation_enabled: clinic.setting?.confirmation_enabled ?? true,
-        confirmation_hours_before: clinic.setting?.confirmation_hours_before ?? 24,
-        survey_enabled: clinic.setting?.survey_enabled ?? true,
-        survey_delay_hours: clinic.setting?.survey_delay_hours ?? 2,
-        instance_id: '',
-        instance_token: '',
-        client_token: '',
-    });
-    errors.value = {};
-    webhookWarn.value = false;
-    testResult.value = null;
-    showModal.value = true;
+    formOpen.value = true;
 }
 
-async function save() {
-    if (!editing.value) return;
-    saving.value = true;
-    errors.value = {};
-    webhookWarn.value = false;
-    try {
-        const { data } = await window.axios.patch(url('update', editing.value.id), form, {
-            headers: { 'X-CSRF-TOKEN': csrf() },
-        });
-        savedFlash.value = data.message;
-        webhookWarn.value = !data.webhook_ok;
-        setTimeout(() => {
-            savedFlash.value = '';
-        }, 3000);
-        form.instance_id = form.instance_token = form.client_token = '';
-        router.reload({ only: ['clinics'], preserveScroll: true });
-    } catch (e) {
-        errors.value = e.response?.data?.errors ?? {};
-    } finally {
-        saving.value = false;
-    }
+function configureFromDetail(clinic) {
+    detailOpen.value = false;
+    openConfig(clinic);
 }
 
-// ── Teste de conexão ─────────────────────────────────────────────────────────
-const testing = ref(false);
-const testResult = ref(null);
-
-// Credenciais recém-digitadas (ainda não salvas) — completas quando os 3
-// campos estão preenchidos. Permite testar ANTES de salvar.
-const typedCredentials = computed(() =>
-    form.instance_id && form.instance_token && form.client_token
-        ? { instance_id: form.instance_id, instance_token: form.instance_token, client_token: form.client_token }
-        : null,
-);
-
-// Sem credencial própria o teste da clínica cai na instância global.
-const canTest = computed(() =>
-    Boolean(typedCredentials.value || editing.value?.setting?.has_credentials || props.global?.has_credentials),
-);
-
-async function testConnection() {
-    if (!editing.value) return;
-    testing.value = true;
-    testResult.value = null;
-    try {
-        const { data } = await window.axios.post(url('test', editing.value.id), typedCredentials.value ?? {}, {
-            headers: { 'X-CSRF-TOKEN': csrf() },
-        });
-        testResult.value = data;
-    } catch (e) {
-        testResult.value = { ok: false, error: e.response?.data?.error ?? 'Erro ao testar.' };
-    } finally {
-        testing.value = false;
-    }
+function onClinicSaved(clinicId) {
+    delete clinicHealth.value[clinicId];
+    router.reload({ only: ['clinics', 'kpis'], preserveScroll: true });
 }
 
-// Remove as credenciais salvas da clínica — ela volta a usar a instância
-// padrão (ou fica "Não configurado" se a global não existir).
-async function clearCredentials() {
-    if (!editing.value?.setting?.has_credentials) return;
-    if (!window.confirm(props.t.credentials.clear_confirm)) return;
-    saving.value = true;
-    errors.value = {};
-    try {
-        const { data } = await window.axios.patch(
-            url('update', editing.value.id),
-            {
-                active: form.active,
-                confirmation_enabled: form.confirmation_enabled,
-                confirmation_hours_before: form.confirmation_hours_before,
-                survey_enabled: form.survey_enabled,
-                survey_delay_hours: form.survey_delay_hours,
-                clear_credentials: true,
-            },
-            { headers: { 'X-CSRF-TOKEN': csrf() } },
-        );
-        savedFlash.value = data.message;
-        setTimeout(() => {
-            savedFlash.value = '';
-        }, 3000);
-        if (editing.value.setting) editing.value.setting.has_credentials = false;
-        testResult.value = null;
-        router.reload({ only: ['clinics'], preserveScroll: true });
-    } catch (e) {
-        errors.value = e.response?.data?.errors ?? {};
-    } finally {
-        saving.value = false;
-    }
+// ── Número do EasyEye (aba própria; a faixa de situação aciona por aqui) ─
+const globalPanel = ref(null);
+const globalHealth = ref(null);
+const globalSaving = ref(false);
+const globalTesting = ref(false);
+
+function goConfigureGlobal() {
+    setTab('global');
 }
 
-const configuredCount = computed(() => props.clinics.filter((c) => c.setting?.has_credentials).length);
-const activeCount = computed(() => props.clinics.filter((c) => c.setting?.active).length);
-
-// ── Instância GLOBAL do SaaS ─────────────────────────────────────────────────
-const gForm = reactive({
-    active: props.global?.active ?? true,
-    instance_id: '',
-    instance_token: '',
-    client_token: '',
-});
-const gSaving = ref(false);
-const gFlash = ref('');
-const gErrors = ref({});
-const gTesting = ref(false);
-const gResult = ref(null);
-const gWebhookWarn = ref(false);
-
-const gTypedCredentials = computed(() =>
-    gForm.instance_id && gForm.instance_token && gForm.client_token
-        ? { instance_id: gForm.instance_id, instance_token: gForm.instance_token, client_token: gForm.client_token }
-        : null,
-);
-const gCanTest = computed(() => Boolean(gTypedCredentials.value || props.global?.has_credentials));
-
-async function saveGlobal() {
-    gSaving.value = true;
-    gErrors.value = {};
-    gWebhookWarn.value = false;
-    try {
-        const { data } = await window.axios.patch(props.routes.global_update, gForm, {
-            headers: { 'X-CSRF-TOKEN': csrf() },
-        });
-        gFlash.value = data.message;
-        gWebhookWarn.value = !data.webhook_ok;
-        setTimeout(() => {
-            gFlash.value = '';
-        }, 3000);
-        gForm.instance_id = gForm.instance_token = gForm.client_token = '';
-        router.reload({ only: ['global'], preserveScroll: true });
-    } catch (e) {
-        gErrors.value = e.response?.data?.errors ?? {};
-    } finally {
-        gSaving.value = false;
-    }
+function registerGlobalWebhook() {
+    globalPanel.value?.registerWebhook();
 }
 
-async function clearGlobalCredentials() {
-    if (!props.global?.has_credentials) return;
-    if (!window.confirm(props.t.credentials.clear_global_confirm)) return;
-    gSaving.value = true;
-    gErrors.value = {};
-    try {
-        const { data } = await window.axios.patch(
-            props.routes.global_update,
-            {
-                active: gForm.active,
-                clear_credentials: true,
-            },
-            { headers: { 'X-CSRF-TOKEN': csrf() } },
-        );
-        gFlash.value = data.message;
-        setTimeout(() => {
-            gFlash.value = '';
-        }, 3000);
-        gResult.value = null;
-        router.reload({ only: ['global'], preserveScroll: true });
-    } catch (e) {
-        gErrors.value = e.response?.data?.errors ?? {};
-    } finally {
-        gSaving.value = false;
-    }
+function verifyGlobal() {
+    globalPanel.value?.verify();
 }
 
-async function testGlobal() {
-    gTesting.value = true;
-    gResult.value = null;
-    try {
-        const { data } = await window.axios.post(props.routes.global_test, gTypedCredentials.value ?? {}, {
-            headers: { 'X-CSRF-TOKEN': csrf() },
-        });
-        gResult.value = data;
-    } catch (e) {
-        gResult.value = { ok: false, error: e.response?.data?.error ?? 'Erro ao testar.' };
-    } finally {
-        gTesting.value = false;
-    }
+function openGlobalTest() {
+    setTab('global');
+    globalPanel.value?.focusTest();
 }
+
+const breadcrumbs = [];
 </script>
 
 <template>
-    <AppLayout :title="t.title" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
-            <PageHeader :title="t.title" :subtitle="t.manager_subtitle" />
-
-            <div v-if="driver === 'mock'" class="alert alert-warning d-flex align-items-center gap-2">
-                <i class="fas fa-triangle-exclamation"></i>
-                <div>{{ t.manager.mock_warning }}</div>
-            </div>
-
-            <div class="d-flex gap-2 mb-3">
-                <span class="badge bg-light text-dark border">{{ clinics.length }} {{ t.manager.clinics }}</span>
-                <span class="badge bg-info-subtle text-info border border-info-subtle"
-                    >{{ configuredCount }} {{ t.manager.configured }}</span
+    <AppLayout :title="ui.page_title" :breadcrumbs="breadcrumbs">
+        <PageHeader
+            :title="ui.page_title"
+            :total="kpis.clinics ?? null"
+            :total-label="ui.total_label"
+            :view="view"
+            :view-table-title="ui.view_table"
+            :view-cards-title="ui.view_cards"
+            :show-view-toggle="tab === 'clinics'"
+            @set-view="setView"
+        >
+            <template #actions>
+                <button
+                    v-if="global?.has_app"
+                    type="button"
+                    class="btn btn-outline-success fs-13"
+                    :title="ui.send_test_hint"
+                    :aria-label="ui.send_test_hint"
+                    data-test="header-send-test"
+                    @click="openGlobalTest"
                 >
-                <span class="badge bg-success-subtle text-success border border-success-subtle"
-                    >{{ activeCount }} {{ t.manager.active }}</span
+                    <i class="ti ti-brand-whatsapp" aria-hidden="true"></i
+                    ><span class="d-none d-sm-inline ms-1">{{ ui.send_test }}</span>
+                </button>
+            </template>
+        </PageHeader>
+
+        <WhatsAppStatusBar
+            :simulated="simulated"
+            :partner="partner"
+            :global="global"
+            :health="globalHealth"
+            :checking="globalTesting"
+            :busy="globalSaving"
+            :t="t"
+            @configure="goConfigureGlobal"
+            @register-webhook="registerGlobalWebhook"
+            @verify="verifyGlobal"
+        />
+
+        <!-- KPIs (tinted; os de filtro são botões) -->
+        <section class="wa-kpis mb-3" :aria-label="ui.kpis_label">
+            <KpiCard
+                v-for="card in kpiCards"
+                :key="card.key"
+                tinted
+                :toggle="!!card.toggle"
+                :active="!!card.active"
+                :tone="card.tone"
+                :icon="card.icon"
+                :label="ui.kpis?.[card.key] ?? card.key"
+                :hint="ui.kpi_hints?.[card.key] ?? ''"
+                :value="number(kpis[card.key] ?? 0)"
+                :test-id="card.key"
+                :data-kpi="card.key"
+                @click="onKpi(card.key)"
+            />
+        </section>
+
+        <!-- Abas -->
+        <ul class="nav nav-tabs mb-3" role="tablist" :aria-label="ui.tabs_label">
+            <li v-for="key in ['clinics', 'global', 'templates']" :key="key" class="nav-item" role="presentation">
+                <button
+                    :id="`wa-tab-${key}`"
+                    type="button"
+                    class="nav-link"
+                    :class="{ active: tab === key }"
+                    role="tab"
+                    :aria-selected="tab === key"
+                    :aria-controls="`wa-panel-${key}`"
+                    :tabindex="tab === key ? 0 : -1"
+                    :data-test="`tab-${key}`"
+                    @click="setTab(key)"
+                    @keydown="onTabKey($event, key)"
                 >
+                    <i :class="`ti ${tabIcons[key]} me-1`" aria-hidden="true"></i>{{ ui.tabs?.[key] }}
+                    <span
+                        v-if="key === 'global' && !global?.has_app"
+                        class="badge rounded-pill bg-danger ms-1 wa-tab-dot"
+                        aria-hidden="true"
+                        >!</span
+                    >
+                </button>
+            </li>
+        </ul>
+
+        <!-- ════════ Clínicas ════════ -->
+        <div
+            v-show="tab === 'clinics'"
+            id="wa-panel-clinics"
+            role="tabpanel"
+            aria-labelledby="wa-tab-clinics"
+            data-test="panel-clinics"
+        >
+            <div class="wa-filters mb-3" role="search" :aria-label="ui.filters_label">
+                <SearchInput
+                    v-model="search"
+                    class="wa-filters__search"
+                    wrapper-class=""
+                    :placeholder="ui.search_placeholder"
+                    :clear-label="ui.search_clear"
+                    max-width="320px"
+                />
+                <label class="visually-hidden" for="wa-filter-number">{{ ui.filter_number }}</label>
+                <select
+                    id="wa-filter-number"
+                    v-model="numberFilter"
+                    class="form-select form-select-sm"
+                    data-test="filter-number"
+                >
+                    <option value="">{{ ui.filter_number_all }}</option>
+                    <option v-for="key in ['own', 'global', 'none']" :key="key" :value="key">
+                        {{ ui.sending?.[key] }}
+                    </option>
+                </select>
+                <label class="visually-hidden" for="wa-filter-automation">{{ ui.filter_automation }}</label>
+                <select
+                    id="wa-filter-automation"
+                    v-model="automation"
+                    class="form-select form-select-sm"
+                    data-test="filter-automation"
+                >
+                    <option value="">{{ ui.filter_automation_all }}</option>
+                    <option v-for="key in ['confirmation', 'survey', 'none']" :key="key" :value="key">
+                        {{ ui.automation?.[key] }}
+                    </option>
+                </select>
+                <button
+                    v-if="hasFilters"
+                    type="button"
+                    class="btn btn-link btn-sm text-decoration-none text-nowrap px-1"
+                    data-test="filter-clear"
+                    @click="clearFilters"
+                >
+                    <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ ui.filter_clear }}
+                </button>
             </div>
 
-            <!-- Instância GLOBAL do SaaS -->
-            <div class="card mb-3">
-                <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
-                        <h6 class="mb-0">
-                            <i class="fab fa-whatsapp text-success me-2"></i>{{ t.manager.global_title }}
-                            <span
-                                v-if="global?.has_credentials && global?.active"
-                                class="badge bg-success-subtle text-success border border-success-subtle ms-2"
-                                >{{ t.manager.status_active }}</span
-                            >
-                            <span
-                                v-else-if="global?.has_credentials"
-                                class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-2"
-                                >{{ t.manager.status_inactive }}</span
-                            >
-                            <span v-else class="badge bg-light text-muted border ms-2">{{
-                                t.manager.status_unconfigured
-                            }}</span>
-                        </h6>
-                        <span v-if="gFlash" class="badge bg-success-subtle text-success">{{ gFlash }}</span>
-                    </div>
-                    <p class="text-muted small mb-3">{{ t.manager.global_hint }}</p>
-
-                    <div class="row g-2 mb-2">
-                        <div class="col-12 col-md-4">
-                            <label class="form-label small">{{ t.credentials.instance_id }}</label>
-                            <input
-                                v-model="gForm.instance_id"
-                                type="text"
-                                class="form-control form-control-sm"
-                                :class="{ 'is-invalid': gErrors.instance_id }"
-                                autocomplete="off"
-                                :placeholder="global?.instance_id ?? ''"
-                            />
-                            <div v-if="gErrors.instance_id" class="invalid-feedback">{{ gErrors.instance_id[0] }}</div>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <label class="form-label small">{{ t.credentials.instance_token }}</label>
-                            <input
-                                v-model="gForm.instance_token"
-                                type="password"
-                                class="form-control form-control-sm"
-                                :class="{ 'is-invalid': gErrors.instance_token }"
-                                autocomplete="new-password"
-                            />
-                            <div v-if="gErrors.instance_token" class="invalid-feedback">
-                                {{ gErrors.instance_token[0] }}
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <label class="form-label small">{{ t.credentials.client_token }}</label>
-                            <input
-                                v-model="gForm.client_token"
-                                type="password"
-                                class="form-control form-control-sm"
-                                :class="{ 'is-invalid': gErrors.client_token }"
-                                autocomplete="new-password"
-                            />
-                            <div v-if="gErrors.client_token" class="invalid-feedback">
-                                {{ gErrors.client_token[0] }}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-check form-switch mb-2">
-                        <input id="gActive" v-model="gForm.active" class="form-check-input" type="checkbox" />
-                        <label for="gActive" class="form-check-label small">{{ t.manager.global_active }}</label>
-                    </div>
-
-                    <div v-if="global?.webhook_url" class="mb-2">
-                        <div class="fw-semibold small mb-1">{{ t.webhook.title }}</div>
-                        <div v-if="gWebhookWarn" class="alert alert-warning py-1 small mb-2">
-                            {{ t.webhook.warn_failed }}
-                        </div>
-                        <code class="d-block bg-light border rounded p-2 text-break" style="font-size: 0.7rem">{{
-                            global.webhook_url
-                        }}</code>
-                    </div>
-
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <button
-                            type="button"
-                            class="btn btn-outline-secondary btn-sm"
-                            :disabled="gTesting || !gCanTest"
-                            :title="gCanTest ? '' : t.connection.fill_first"
-                            @click="testGlobal"
-                        >
-                            <span v-if="gTesting" class="spinner-border spinner-border-sm me-1"></span>
-                            <i v-else class="fas fa-plug me-1"></i>
-                            {{ gTesting ? t.connection.testing : t.connection.test }}
-                        </button>
-                        <span v-if="gResult?.ok && gResult.connected" class="badge bg-success-subtle text-success">{{
-                            t.connection.connected
-                        }}</span>
-                        <span v-else-if="gResult?.ok" class="badge bg-warning-subtle text-warning-emphasis">{{
-                            t.connection.disconnected
-                        }}</span>
-                        <span v-else-if="gResult" class="badge bg-danger-subtle text-danger">{{ gResult.error }}</span>
-
-                        <button
-                            v-if="global?.has_credentials"
-                            type="button"
-                            class="btn btn-outline-danger btn-sm ms-auto"
-                            :disabled="gSaving"
-                            @click="clearGlobalCredentials"
-                        >
-                            <i class="fas fa-trash-can me-1"></i>{{ t.credentials.clear }}
-                        </button>
-
-                        <button
-                            type="button"
-                            class="btn btn-primary btn-sm"
-                            :class="{ 'ms-auto': !global?.has_credentials }"
-                            :disabled="gSaving"
-                            @click="saveGlobal"
-                        >
-                            <span v-if="gSaving" class="spinner-border spinner-border-sm me-1"></span>
-                            <i v-else class="fas fa-save me-1"></i>{{ t.save }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>{{ t.manager.clinic }}</th>
-                            <th>{{ t.manager.status }}</th>
-                            <th class="text-center">{{ t.toggles.confirmation_enabled }}</th>
-                            <th class="text-center">{{ t.toggles.survey_enabled }}</th>
-                            <th class="text-center">{{ t.stats.survey_average }} (30d)</th>
-                            <th class="text-end"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="clinic in clinics" :key="clinic.id">
-                            <td class="fw-semibold">{{ clinic.name }}</td>
-                            <td>
-                                <span
-                                    v-if="clinic.setting?.active && clinic.setting?.has_credentials"
-                                    class="badge bg-success-subtle text-success border border-success-subtle"
-                                >
-                                    <i class="fab fa-whatsapp me-1"></i>{{ t.manager.status_active }}
-                                </span>
-                                <span
-                                    v-else-if="clinic.setting?.active && global?.has_credentials && global?.active"
-                                    class="badge bg-info-subtle text-info border border-info-subtle"
-                                >
-                                    <i class="fab fa-whatsapp me-1"></i>{{ t.manager.status_via_global }}
-                                </span>
-                                <span
-                                    v-else-if="clinic.setting?.has_credentials"
-                                    class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"
-                                >
-                                    {{ t.manager.status_inactive }}
-                                </span>
-                                <span v-else class="badge bg-light text-muted border">
-                                    {{ t.manager.status_unconfigured }}
-                                </span>
-                            </td>
-                            <td class="text-center">
-                                <i v-if="clinic.setting?.confirmation_enabled" class="fas fa-check text-success"></i>
-                                <i v-else class="fas fa-minus text-muted"></i>
-                            </td>
-                            <td class="text-center">
-                                <i v-if="clinic.setting?.survey_enabled" class="fas fa-check text-success"></i>
-                                <i v-else class="fas fa-minus text-muted"></i>
-                            </td>
-                            <td class="text-center">
-                                <template v-if="clinic.stats?.survey_average">
-                                    {{ clinic.stats.survey_average }}
-                                    <i class="fas fa-star text-warning" style="font-size: 0.7rem"></i>
-                                </template>
-                                <span v-else class="text-muted">—</span>
-                            </td>
-                            <td class="text-end">
-                                <button
-                                    type="button"
-                                    class="btn btn-outline-primary btn-sm"
-                                    @click="openConfig(clinic)"
-                                >
-                                    <i class="fas fa-gear me-1"></i>{{ t.manager.configure }}
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <WhatsAppClinicTable
+                v-if="view === 'table'"
+                :clinics="clinics"
+                :has-filters="hasFilters"
+                :t="t"
+                @view="openDetail"
+                @configure="openConfig"
+                @test="testFromList"
+            />
+            <WhatsAppClinicCards
+                v-else
+                :clinics="clinics"
+                :has-filters="hasFilters"
+                :t="t"
+                @view="openDetail"
+                @configure="openConfig"
+                @test="testFromList"
+            />
         </div>
 
-        <!-- Modal de configuração -->
-        <Teleport to="body">
-            <div
-                v-if="showModal"
-                class="modal fade show d-block"
-                style="background: rgba(0, 0, 0, 0.5)"
-                @click.self="showModal = false"
-            >
-                <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <div class="modal-header py-2">
-                            <h6 class="modal-title">
-                                <i class="fab fa-whatsapp text-success me-2"></i>{{ editing?.name }}
-                            </h6>
-                            <button type="button" class="btn-close" @click="showModal = false"></button>
-                        </div>
-                        <div class="modal-body">
-                            <!-- Credenciais -->
-                            <div class="border rounded p-3 mb-3">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <span class="fw-semibold small">{{ t.credentials.title }}</span>
-                                    <span
-                                        v-if="editing?.setting?.has_credentials"
-                                        class="badge bg-success-subtle text-success"
-                                        >{{ t.credentials.configured }}</span
-                                    >
-                                    <span v-else class="badge bg-warning-subtle text-warning-emphasis">{{
-                                        t.credentials.not_configured
-                                    }}</span>
-                                </div>
-                                <p class="text-muted" style="font-size: 0.75rem">{{ t.credentials.hint }}</p>
-                                <p
-                                    v-if="editing?.setting?.has_credentials"
-                                    class="text-muted fst-italic"
-                                    style="font-size: 0.72rem"
-                                >
-                                    {{ t.credentials.replace_hint }}
-                                </p>
+        <!-- ════════ Número do EasyEye ════════ -->
+        <div
+            v-show="tab === 'global'"
+            id="wa-panel-global"
+            role="tabpanel"
+            aria-labelledby="wa-tab-global"
+            data-test="panel-global"
+        >
+            <WhatsAppGlobalPanel
+                ref="globalPanel"
+                :global="global"
+                :routes="routes"
+                :t="t"
+                @health="globalHealth = $event"
+                @saving="globalSaving = $event"
+                @testing="globalTesting = $event"
+            />
+        </div>
 
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <label class="form-label small">{{ t.credentials.instance_id }}</label>
-                                        <input
-                                            v-model="form.instance_id"
-                                            type="text"
-                                            class="form-control form-control-sm"
-                                            :class="{ 'is-invalid': errors.instance_id }"
-                                            autocomplete="off"
-                                            :placeholder="editing?.setting?.instance_id ?? ''"
-                                        />
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small">{{ t.credentials.instance_token }}</label>
-                                        <input
-                                            v-model="form.instance_token"
-                                            type="password"
-                                            class="form-control form-control-sm"
-                                            :class="{ 'is-invalid': errors.instance_token }"
-                                            autocomplete="new-password"
-                                        />
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label small">{{ t.credentials.client_token }}</label>
-                                        <input
-                                            v-model="form.client_token"
-                                            type="password"
-                                            class="form-control form-control-sm"
-                                            :class="{ 'is-invalid': errors.client_token }"
-                                            autocomplete="new-password"
-                                        />
-                                    </div>
-                                </div>
+        <!-- ════════ Modelos ════════ -->
+        <div
+            v-show="tab === 'templates'"
+            id="wa-panel-templates"
+            role="tabpanel"
+            aria-labelledby="wa-tab-templates"
+            data-test="panel-templates"
+        >
+            <WhatsAppTemplates :templates="templates" :enabled-languages="templateLanguages" :t="t.manager" />
+        </div>
 
-                                <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                                    <button
-                                        type="button"
-                                        class="btn btn-outline-secondary btn-sm"
-                                        :disabled="testing || !canTest"
-                                        :title="canTest ? '' : t.connection.fill_first"
-                                        @click="testConnection"
-                                    >
-                                        <span v-if="testing" class="spinner-border spinner-border-sm me-1"></span>
-                                        <i v-else class="fas fa-plug me-1"></i>
-                                        {{ testing ? t.connection.testing : t.connection.test }}
-                                    </button>
-                                    <span
-                                        v-if="testResult?.ok && testResult.connected"
-                                        class="badge bg-success-subtle text-success"
-                                        >{{ t.connection.connected }}</span
-                                    >
-                                    <span
-                                        v-else-if="testResult?.ok"
-                                        class="badge bg-warning-subtle text-warning-emphasis"
-                                        >{{ t.connection.disconnected }}</span
-                                    >
-                                    <span v-else-if="testResult" class="badge bg-danger-subtle text-danger">{{
-                                        testResult.error
-                                    }}</span>
+        <WhatsAppClinicDrawer
+            :open="detailOpen"
+            :clinic="detail"
+            :health="detail ? (clinicHealth[detail.id] ?? null) : null"
+            :checking="!!detail && checkingClinic === detail.id"
+            :t="t"
+            @close="detailOpen = false"
+            @configure="configureFromDetail"
+            @verify="verifyClinic"
+        />
 
-                                    <button
-                                        v-if="editing?.setting?.has_credentials"
-                                        type="button"
-                                        class="btn btn-outline-danger btn-sm ms-auto"
-                                        :disabled="saving"
-                                        @click="clearCredentials"
-                                    >
-                                        <i class="fas fa-trash-can me-1"></i>{{ t.credentials.clear }}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Webhook -->
-                            <div v-if="editing?.setting?.webhook_url" class="border rounded p-3 mb-3">
-                                <div class="fw-semibold small mb-1">{{ t.webhook.title }}</div>
-                                <p class="text-muted mb-2" style="font-size: 0.72rem">{{ t.webhook.hint }}</p>
-                                <div v-if="webhookWarn" class="alert alert-warning py-1 small mb-2">
-                                    {{ t.webhook.warn_failed }}
-                                </div>
-                                <code
-                                    class="d-block bg-light border rounded p-2 text-break"
-                                    style="font-size: 0.7rem"
-                                    >{{ editing.setting.webhook_url }}</code
-                                >
-                            </div>
-
-                            <!-- Toggles -->
-                            <div class="form-check form-switch mb-2">
-                                <input
-                                    v-model="form.active"
-                                    type="checkbox"
-                                    class="form-check-input"
-                                    id="mgr-wpp-active"
-                                    role="switch"
-                                />
-                                <label class="form-check-label fw-semibold small" for="mgr-wpp-active">{{
-                                    t.toggles.active
-                                }}</label>
-                            </div>
-
-                            <div class="border rounded p-2 mb-2">
-                                <div class="form-check form-switch">
-                                    <input
-                                        v-model="form.confirmation_enabled"
-                                        type="checkbox"
-                                        class="form-check-input"
-                                        id="mgr-wpp-confirm"
-                                        role="switch"
-                                    />
-                                    <label class="form-check-label small fw-semibold" for="mgr-wpp-confirm">{{
-                                        t.toggles.confirmation_enabled
-                                    }}</label>
-                                </div>
-                                <div class="d-flex align-items-center gap-2 mt-1">
-                                    <label class="small text-muted mb-0">{{
-                                        t.toggles.confirmation_hours_before
-                                    }}</label>
-                                    <input
-                                        v-model.number="form.confirmation_hours_before"
-                                        type="number"
-                                        min="1"
-                                        max="168"
-                                        class="form-control form-control-sm"
-                                        style="width: 80px"
-                                    />
-                                    <span class="small text-muted">h</span>
-                                </div>
-                            </div>
-
-                            <div class="border rounded p-2">
-                                <div class="form-check form-switch">
-                                    <input
-                                        v-model="form.survey_enabled"
-                                        type="checkbox"
-                                        class="form-check-input"
-                                        id="mgr-wpp-survey"
-                                        role="switch"
-                                    />
-                                    <label class="form-check-label small fw-semibold" for="mgr-wpp-survey">{{
-                                        t.toggles.survey_enabled
-                                    }}</label>
-                                </div>
-                                <div class="d-flex align-items-center gap-2 mt-1">
-                                    <label class="small text-muted mb-0">{{ t.toggles.survey_delay_hours }}</label>
-                                    <input
-                                        v-model.number="form.survey_delay_hours"
-                                        type="number"
-                                        min="0"
-                                        max="168"
-                                        class="form-control form-control-sm"
-                                        style="width: 80px"
-                                    />
-                                    <span class="small text-muted">h</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="modal-footer py-2 d-flex justify-content-between">
-                            <span v-if="savedFlash" class="badge bg-success-subtle text-success">{{ savedFlash }}</span>
-                            <span v-else></span>
-                            <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-secondary btn-sm" @click="showModal = false">
-                                    Fechar
-                                </button>
-                                <button type="button" class="btn btn-primary btn-sm" :disabled="saving" @click="save">
-                                    <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
-                                    <i v-else class="fas fa-floppy-disk me-1"></i>{{ t.save }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Teleport>
+        <WhatsAppClinicFormModal
+            :open="formOpen"
+            :clinic="editing"
+            :global-has-app="!!global?.has_app"
+            :routes="routes"
+            :t="t"
+            @close="formOpen = false"
+            @saved="onClinicSaved"
+        />
     </AppLayout>
 </template>
+
+<style scoped>
+.wa-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+/* Tela larga: os seis numa linha só (abaixo disso os rótulos cortavam). */
+@media (min-width: 1600px) {
+    .wa-kpis {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+}
+/* Celular: 2 por linha (os rótulos quebram em duas linhas). */
+@media (max-width: 575.98px) {
+    .wa-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+}
+.wa-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+.wa-filters__search {
+    flex: 0 1 320px;
+}
+.wa-filters .form-select {
+    width: auto;
+    min-width: 170px;
+    max-width: 100%;
+}
+.wa-tab-dot {
+    font-size: 0.6rem;
+    vertical-align: top;
+}
+@media (max-width: 575.98px) {
+    .wa-filters__search,
+    .wa-filters .form-select {
+        flex: 1 1 100%;
+    }
+    /* A busca limita a 320px (inline): no celular ocupa a largura toda, como os selects. */
+    .wa-filters__search :deep(.input-group) {
+        max-width: none !important;
+    }
+    .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    .nav-tabs .nav-link {
+        white-space: nowrap;
+    }
+}
+</style>

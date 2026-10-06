@@ -51,7 +51,7 @@ class RegisterAction
         // Código de verificação do WhatsApp do responsável — segundo canal de
         // contato confirmado (o time comercial usa o número validado para
         // finalizar a venda do plano). Nunca pode quebrar o registro:
-        // indisponibilidade da instância Z-API só loga e o usuário reenvia
+        // indisponibilidade do WhatsApp (app global) só loga e o usuário reenvia
         // depois pelo banner do painel.
         try {
             app(PhoneVerificationService::class)->sendCode($result['user']);

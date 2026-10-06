@@ -12,7 +12,7 @@ use App\Http\Controllers\Api\{ClinicResourcesController,
     PatientsController,
     SchedulesController};
 use App\Http\Controllers\Api\{EquipmentOperationReceiptController, OfflineSnapshotController};
-use App\Http\Controllers\Api\{ReceiptReconciliationController, WhatsAppWebhookController};
+use App\Http\Controllers\Api\{GupshupWebhookController, ReceiptReconciliationController};
 use App\Http\Controllers\Billing\WebhookController;
 use App\Http\Middleware\IntegratorEquipmentOperation;
 use Illuminate\Support\Facades\Route;
@@ -75,10 +75,13 @@ Route::post('billing/webhooks/{gateway}', WebhookController::class)
     ->name('billing.webhooks')
     ->middleware('throttle:240,1');
 
-// Webhook "ao receber" da Z-API (WhatsApp) — URL por clínica via token
-// aleatório; tenant identificado pelo token + cross-check do instanceId no
-// payload (ver WhatsAppWebhookController). Sem auth de sessão: rota pública
-// idempotente, mesmo padrão do webhook de billing acima.
-Route::post('whatsapp/webhooks/{token}', WhatsAppWebhookController::class)
-    ->name('whatsapp.webhooks')
-    ->middleware('throttle:240,1');
+// Webhook v3 da Gupshup (WhatsApp oficial): mensagens do paciente e status
+// das enviadas. URL por configuração (token aleatório) + header de segredo
+// + gs_app_id do app — ver GupshupWebhookController. Sem auth de sessão:
+// rota pública idempotente, mesmo padrão do webhook de billing acima. Limite
+// por TOKEN da URL (não por IP, forjável atrás do proxy) e folgado: cada
+// mensagem enviada gera até 3 status (sent, delivered, read) — ver
+// RateLimiter "whatsapp-webhook" no AppServiceProvider.
+Route::post('whatsapp/gupshup/webhook/{token}', GupshupWebhookController::class)
+    ->name('whatsapp.gupshup.webhook')
+    ->middleware('throttle:whatsapp-webhook');
