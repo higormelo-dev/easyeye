@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Enums\{ActivationStep, BillingCycle, FeatureKey, ScheduleSituation, SubscriptionBillingMode, SubscriptionStatus};
+use App\Enums\{ActivationStep, BillingCycle, ScheduleSituation, SubscriptionBillingMode, SubscriptionStatus};
 use App\Enums\Billing\SubscriptionCancelledReason;
 use App\Models\{Covenant,
     Doctor,
@@ -25,16 +25,9 @@ use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use RuntimeException;
 
 class DataFakersSeeder extends Seeder
 {
-    private const INTEGRATOR_TEST_ENTITY_NAME = 'Clínica Teste Integrador';
-
-    // Público: reutilizado por EnsureTestFinancialProfilesCommand para achar
-    // a mesma clínica de teste sem duplicar o literal em dois lugares.
-    public const INTEGRATOR_TEST_ENTITY_SUBDOMAIN = 'clinica-teste-integrador';
-
     /**
      * Run the database seeds.
      */
@@ -50,6 +43,13 @@ class DataFakersSeeder extends Seeder
             VisitTypesSeeder::class,
             ExamTypesSeeder::class,
         ]);
+
+        // Clínica Teste Integrador tem seeder próprio (também roda em
+        // produção); aqui só garante que exista quando este seeder roda
+        // sozinho — a agenda dela vem do createSchedules() abaixo.
+        if (! Entity::where('subdomain', IntegratorTestClinicSeeder::ENTITY_SUBDOMAIN)->exists()) {
+            $this->call(IntegratorTestClinicSeeder::class);
+        }
 
         $peopleCount = $this->seedInt('SEED_FAKE_PEOPLE', 3000, 1);
         $this->command->info("⏳ Criando People ({$peopleCount})...");
@@ -69,7 +69,7 @@ class DataFakersSeeder extends Seeder
             ->whereNot('name', 'Medical Group')
             // Esta clínica é reservada para testes de API de integradores e não
             // deve receber massa fake (principalmente equipamentos).
-            ->whereNot('subdomain', self::INTEGRATOR_TEST_ENTITY_SUBDOMAIN)
+            ->whereNot('subdomain', IntegratorTestClinicSeeder::ENTITY_SUBDOMAIN)
             ->get();
 
         $usersCount = $this->seedInt('SEED_FAKE_USERS', 95, 1);
@@ -77,26 +77,9 @@ class DataFakersSeeder extends Seeder
         $users = User::factory($usersCount)->create(['password' => Hash::make('123456789')]);
 
         // ── Planos ──────────────────────────────────────────────────────────
-        $planBasico         = Plan::where('slug', 'basico')->first();
-        $planPro            = Plan::where('slug', 'pro')->first();
-        $planPremium        = Plan::where('slug', 'premium')->first();
-        $integratorTestPlan = Plan::query()
-            ->where('active', true)
-            ->whereHas('features', static function ($query): void {
-                $query->where('feature', FeatureKey::HasApiIntegrator->value)
-                    ->where('value', '1');
-            })
-            ->orderByDesc('sort_order')
-            ->orderByDesc('price')
-            ->first();
-
-        if (! $integratorTestPlan) {
-            throw new RuntimeException(
-                'Nenhum plano ativo com acesso à API de integradores foi encontrado. Execute o PlanSeeder antes do DataFakersSeeder.',
-            );
-        }
-
-        $integratorTestPlan->loadMissing('features');
+        $planBasico  = Plan::where('slug', 'basico')->first();
+        $planPro     = Plan::where('slug', 'pro')->first();
+        $planPremium = Plan::where('slug', 'premium')->first();
 
         // Distribuição de planos: 20% Básico, 50% Pro, 30% Premium
         $planDistribution = array_merge(
@@ -196,276 +179,6 @@ class DataFakersSeeder extends Seeder
                 });
             });
         });
-
-        // ── Integrador de teste com credenciais fixas ────────────────────────
-        $testEntity = Entity::updateOrCreate(
-            ['subdomain' => self::INTEGRATOR_TEST_ENTITY_SUBDOMAIN],
-            [
-                'name'      => self::INTEGRATOR_TEST_ENTITY_NAME,
-                'city'      => 'São Paulo',
-                'state'     => 'SP',
-                'country'   => 'BR',
-                'is_client' => true,
-                'active'    => true,
-            ],
-        );
-
-        // Evita múltiplas assinaturas acessíveis em re-seed e garante
-        // leitura determinística do middleware de acesso da API.
-        Subscription::query()
-            ->where('entity_id', $testEntity->id)
-            ->delete();
-
-        Subscription::create([
-            'entity_id' => $testEntity->id,
-            'plan_id'   => $integratorTestPlan->id,
-            'status'    => SubscriptionStatus::Active,
-            'starts_at' => now()->subMonth(),
-            'ends_at'   => now()->addYear(),
-        ]);
-
-        $testIntegratorUser = EntityUserIntegrator::updateOrCreate(
-            ['email' => 'integrador@teste.com'],
-            [
-                'entity_id'         => $testEntity->id,
-                'name'              => 'Integrador de Teste',
-                'email_verified_at' => now(),
-                'password'          => Hash::make('Integrador@123'),
-                'active'            => true,
-            ],
-        );
-
-        $testIntegrator = EntityIntegrator::updateOrCreate(
-            ['mac' => 'AA:BB:CC:DD:EE:01'],
-            [
-                'entity_user_integrator_id' => $testIntegratorUser->id,
-                'name'                      => 'Equipamento Teste 01',
-                'ip'                        => '192.168.1.100',
-                'active'                    => true,
-            ],
-        );
-
-        EntityIntegrator::updateOrCreate(
-            ['mac' => 'AA:BB:CC:DD:EE:02'],
-            [
-                'entity_user_integrator_id' => $testIntegratorUser->id,
-                'name'                      => 'Equipamento Teste 02',
-                'ip'                        => '192.168.1.101',
-                'active'                    => true,
-            ],
-        );
-
-        // Regra de negócio: esta clínica é exclusiva para testes da API de
-        // integradores e deve permanecer sem equipamentos cadastrados.
-        EntityIntegratorEquipment::withTrashed()
-            ->whereHas('integrator.user', static function ($query) use ($testEntity) {
-                $query->where('entity_id', $testEntity->id);
-            })
-            ->forceDelete();
-
-        // ── Usuários fixos da Clínica Teste Integrador ───────────────────────
-
-        // Admin
-        $testAdminPerson = People::updateOrCreate(
-            ['email' => 'admin@clinicateste.com'],
-            [
-                'full_name' => 'ADMIN CLÍNICA TESTE',
-                'cellphone' => '',
-            ],
-        );
-        $testAdminUser = User::updateOrCreate(
-            ['email' => 'admin@clinicateste.com'],
-            [
-                'name'              => $testAdminPerson->full_name,
-                'email_verified_at' => now(),
-                'password'          => Hash::make('Admin@123'),
-            ],
-        );
-        EntityUser::updateOrCreate(
-            [
-                'entity_id' => $testEntity->id,
-                'user_id'   => $testAdminUser->id,
-            ],
-            [
-                'rule'   => 'admin',
-                'active' => true,
-            ],
-        );
-
-        // Dra. Ana Lima
-        $testAnaPersona = People::updateOrCreate(
-            ['email' => 'dra.ana@clinicateste.com'],
-            [
-                'full_name' => 'DRA. ANA LIMA',
-                'cellphone' => '',
-            ],
-        );
-        $testAnaUser = User::updateOrCreate(
-            ['email' => 'dra.ana@clinicateste.com'],
-            [
-                'name'              => $testAnaPersona->full_name,
-                'email_verified_at' => now(),
-                'password'          => Hash::make('Medico@123'),
-            ],
-        );
-        $testAnaEntityUser = EntityUser::updateOrCreate(
-            [
-                'entity_id' => $testEntity->id,
-                'user_id'   => $testAnaUser->id,
-            ],
-            [
-                'rule'   => 'doctor',
-                'active' => true,
-            ],
-        );
-        $testAnaDoctor = Doctor::updateOrCreate(
-            ['entity_user_id' => $testAnaEntityUser->id],
-            [
-                'person_id'        => $testAnaPersona->id,
-                'record'           => '123456',
-                'record_specialty' => '12345',
-                'color'            => '#e91e63',
-                'partner'          => false,
-                'active'           => true,
-            ],
-        );
-
-        // Dr. Carlos Souza
-        $testCarlosPerson = People::updateOrCreate(
-            ['email' => 'dr.carlos@clinicateste.com'],
-            [
-                'full_name' => 'DR. CARLOS SOUZA',
-                'cellphone' => '',
-            ],
-        );
-        $testCarlosUser = User::updateOrCreate(
-            ['email' => 'dr.carlos@clinicateste.com'],
-            [
-                'name'              => $testCarlosPerson->full_name,
-                'email_verified_at' => now(),
-                'password'          => Hash::make('Medico@123'),
-            ],
-        );
-        $testCarlosEntityUser = EntityUser::updateOrCreate(
-            [
-                'entity_id' => $testEntity->id,
-                'user_id'   => $testCarlosUser->id,
-            ],
-            [
-                'rule'   => 'doctor',
-                'active' => true,
-            ],
-        );
-        $testCarlosDoctor = Doctor::updateOrCreate(
-            ['entity_user_id' => $testCarlosEntityUser->id],
-            [
-                'person_id'        => $testCarlosPerson->id,
-                'record'           => '654321',
-                'record_specialty' => '54321',
-                'color'            => '#1976d2',
-                'partner'          => false,
-                'active'           => true,
-            ],
-        );
-
-        // Secretária
-        $testSecretaryPerson = People::updateOrCreate(
-            ['email' => 'secretaria@clinicateste.com'],
-            [
-                'full_name' => 'SECRETÁRIA CLÍNICA TESTE',
-                'cellphone' => '',
-            ],
-        );
-        $testSecretaryUser = User::updateOrCreate(
-            ['email' => 'secretaria@clinicateste.com'],
-            [
-                'name'              => $testSecretaryPerson->full_name,
-                'email_verified_at' => now(),
-                'password'          => Hash::make('Secretaria@123'),
-            ],
-        );
-        EntityUser::updateOrCreate(
-            [
-                'entity_id' => $testEntity->id,
-                'user_id'   => $testSecretaryUser->id,
-            ],
-            [
-                'rule'   => 'secretary',
-                'active' => true,
-            ],
-        );
-
-        // Financeiro
-        // BUGFIX: a Clínica Teste Integrador (única com credenciais fixas e
-        // conhecidas) nunca tinha usuário 'financial' — impossível testar o
-        // fluxo financeiro sem depender da distribuição aleatória das outras
-        // entities fake (senha desconhecida, ~14% de chance por usuário).
-        $testFinanceiroPerson = People::updateOrCreate(
-            ['email' => 'financeiro@clinicateste.com'],
-            [
-                'full_name' => 'FINANCEIRO CLÍNICA TESTE',
-                'cellphone' => '',
-            ],
-        );
-        $testFinanceiroUser = User::updateOrCreate(
-            ['email' => 'financeiro@clinicateste.com'],
-            [
-                'name'              => $testFinanceiroPerson->full_name,
-                'email_verified_at' => now(),
-                'password'          => Hash::make('Financeiro@123'),
-            ],
-        );
-        EntityUser::updateOrCreate(
-            [
-                'entity_id' => $testEntity->id,
-                'user_id'   => $testFinanceiroUser->id,
-            ],
-            [
-                'rule'   => 'financial',
-                'active' => true,
-            ],
-        );
-
-        $this->createTestEntityData($testEntity);
-
-        $testPlanApiAccess     = $integratorTestPlan->featureValue(FeatureKey::HasApiIntegrator) ?? '0';
-        $testPlanExamSendLimit = $integratorTestPlan->featureValue(FeatureKey::ApiMonthlyExamSends) ?? 'n/a';
-
-        $this->command->info('');
-        $this->command->info('═══════════════════════════════════════════════════════');
-        $this->command->info('  INTEGRADOR DE TESTE — credenciais fixas');
-        $this->command->info('═══════════════════════════════════════════════════════');
-        $this->command->info('  POST /api/integrators/signin');
-        $this->command->info('  email    : integrador@teste.com');
-        $this->command->info('  password : Integrador@123');
-        $this->command->info('  code     : ' . $testIntegrator->code);
-        $this->command->info('  entity   : ' . $testEntity->name);
-        $this->command->info('  plano    : ' . $integratorTestPlan->name . " (has_api_integrator={$testPlanApiAccess}, api_monthly_exam_sends={$testPlanExamSendLimit})");
-        $this->command->info('═══════════════════════════════════════════════════════');
-        $this->command->info('');
-        $this->command->info('═══════════════════════════════════════════════════════');
-        $this->command->info('  CLÍNICA TESTE — credenciais fixas');
-        $this->command->info('═══════════════════════════════════════════════════════');
-        $this->command->info('  ADMIN');
-        $this->command->info('  email   : admin@clinicateste.com');
-        $this->command->info('  password: Admin@123');
-        $this->command->info('───────────────────────────────────────────────────────');
-        $this->command->info('  MÉDICO 1 — Dra. Ana Lima');
-        $this->command->info('  email   : dra.ana@clinicateste.com');
-        $this->command->info('  password: Medico@123');
-        $this->command->info('  MÉDICO 2 — Dr. Carlos Souza');
-        $this->command->info('  email   : dr.carlos@clinicateste.com');
-        $this->command->info('  password: Medico@123');
-        $this->command->info('───────────────────────────────────────────────────────');
-        $this->command->info('  SECRETÁRIA');
-        $this->command->info('  email   : secretaria@clinicateste.com');
-        $this->command->info('  password: Secretaria@123');
-        $this->command->info('───────────────────────────────────────────────────────');
-        $this->command->info('  FINANCEIRO');
-        $this->command->info('  email   : financeiro@clinicateste.com');
-        $this->command->info('  password: Financeiro@123');
-        $this->command->info('═══════════════════════════════════════════════════════');
-        $this->command->info('');
 
         // ── Patients ─────────────────────────────────────────────────────────
         $this->command->info('⏳ Criando Patients...');
@@ -891,32 +604,6 @@ class DataFakersSeeder extends Seeder
         }
 
         return $schedules;
-    }
-
-    /**
-     * Criar pacientes para a entidade de teste do integrador.
-     * Schedules são gerados pelo createSchedules() via Doctor::all().
-     */
-    private function createTestEntityData(Entity $entity): void
-    {
-        $this->command->info('⏳ Criando pacientes de teste para Clínica Teste Integrador...');
-
-        $skinTypes = SkinType::all();
-        $irisTypes = IrisType::all();
-        $covenants = Covenant::all();
-
-        for ($i = 0; $i < 20; $i++) {
-            $person = People::factory()->create();
-            Patient::create([
-                'entity_id'   => $entity->id,
-                'person_id'   => $person->id,
-                'covenant_id' => $covenants->isNotEmpty() ? $covenants->random()->id : null,
-                'skin_id'     => $skinTypes->random()->id,
-                'iris_id'     => $irisTypes->random()->id,
-                'card_number' => fake()->optional(0.6)->creditCardNumber(),
-                'active'      => true,
-            ]);
-        }
     }
 
     /**

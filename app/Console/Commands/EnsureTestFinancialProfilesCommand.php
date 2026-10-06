@@ -5,27 +5,37 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\{Entity, EntityUser, People, User};
-use Database\Seeders\DataFakersSeeder;
+use App\Support\SeedCredentials;
+use Database\Seeders\IntegratorTestClinicSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\{DB, Hash};
 
 /**
- * Backfill leve e idempotente do usuário 'financial' nas clínicas de teste,
- * sem rodar o DataFakersSeeder inteiro (que gera empresas fake novas a cada
- * execução — não é seguro repetir em staging/produção a cada deploy).
+ * Backfill leve e idempotente do usuário 'financial' nas clínicas de TESTE
+ * (dev/homologação), sem rodar o DataFakersSeeder inteiro (que gera empresas
+ * fake novas a cada execução).
  *
- * Motivo de existir: o pipeline de deploy roda `migrate --force` mas não
- * roda seeders (por padrão, e com razão — DataFakersSeeder não é idempotente
- * na parte de geração de empresas). Isso deixa ambientes cujo banco foi
- * seedado ANTES da correção em DataFakersSeeder (commit 37a4080) sem nenhum
- * usuário com perfil Financeiro pra QA testar — mesmo com o código já certo.
+ * Motivo de existir: ambientes cujo banco foi seedado ANTES da correção em
+ * DataFakersSeeder (commit 37a4080) ficaram sem nenhum usuário com perfil
+ * Financeiro para o QA testar.
+ *
+ * Duas partes:
+ *  - promoção: em cada clínica sem Financeiro, um entity_user que não é
+ *    admin/médico (escolhido ao acaso) vira Financeiro. Muda o perfil de uma
+ *    pessoa REAL de uma clínica REAL — por isso é RECUSADA em produção (só
+ *    dev/homologação, onde as clínicas são de teste);
+ *  - financeiro@clinicateste.com (Clínica Teste Integrador) com a senha fixa
+ *    do repositório: só no modo fixo (APP_ENV=local ou
+ *    SEED_FIXED_CREDENTIALS=true — App\Support\SeedCredentials). Fora dele
+ *    (homologação/produção) aponta o IntegratorTestClinicSeeder (senha
+ *    aleatória).
  *
  * Uso:
  *   php artisan clinics:ensure-financial-profiles            # dry-run, lista o que faria
  *   php artisan clinics:ensure-financial-profiles --force    # aplica
  *
- * Seguro rodar repetidas vezes (inclusive num hook de deploy "Post"): cada
- * clínica só é tocada se ainda não tiver nenhum entity_user com rule=financial.
+ * NÃO é para hook de deploy de produção. Repetir é seguro: cada clínica só é
+ * tocada se ainda não tiver nenhum entity_user com rule=financial.
  */
 class EnsureTestFinancialProfilesCommand extends Command
 {
@@ -37,6 +47,14 @@ class EnsureTestFinancialProfilesCommand extends Command
     public function handle(): int
     {
         $force = (bool) $this->option('force');
+
+        // Promover alguém de uma clínica real a Financeiro em produção muda o
+        // acesso de uma pessoa real: recusado.
+        if (app()->environment('production')) {
+            $this->error('Recusado em produção: este comando promove usuários de clínicas a Financeiro e só serve para dev/homologação. Para a Clínica Teste Integrador, rode: php artisan db:seed --class=IntegratorTestClinicSeeder --force (senha aleatória).');
+
+            return self::FAILURE;
+        }
 
         $entitiesMissingFinancial = Entity::query()
             ->where('code', '!=', 'ENT-0000000001') // entidade reservada do SaaS, nunca é clínica cliente
@@ -54,7 +72,7 @@ class EnsureTestFinancialProfilesCommand extends Command
             }
         }
 
-        $testEntity               = Entity::where('subdomain', DataFakersSeeder::INTEGRATOR_TEST_ENTITY_SUBDOMAIN)->first();
+        $testEntity               = Entity::where('subdomain', IntegratorTestClinicSeeder::ENTITY_SUBDOMAIN)->first();
         $testEntityNeedsFixedUser = $testEntity
             && ! EntityUser::query()
                 ->where('entity_id', $testEntity->id)
@@ -63,6 +81,14 @@ class EnsureTestFinancialProfilesCommand extends Command
 
         if ($testEntityNeedsFixedUser) {
             $this->warn("  • Clínica Teste Integrador ({$testEntity->code}) também sem o financeiro@clinicateste.com fixo.");
+
+            // Fora do modo fixo (homologação roda APP_ENV=testing!) a senha
+            // fixa do repositório seria uma porta aberta. O seeder cria o
+            // usuário com senha aleatória mostrada uma vez.
+            if (! SeedCredentials::fixed()) {
+                $this->line('    Rode: php artisan db:seed --class=IntegratorTestClinicSeeder --force (senha aleatória).');
+                $testEntityNeedsFixedUser = false;
+            }
         }
 
         if ($entitiesMissingFinancial->isEmpty() && ! $testEntityNeedsFixedUser) {

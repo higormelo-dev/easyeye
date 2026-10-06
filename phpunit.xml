@@ -29,6 +29,11 @@
              nascem sem plano ativo, logo sem trial. -->
         <env name="BILLING_ENFORCE_SUBSCRIPTION_ACCESS" value="false"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
+        <!-- Senhas fixas dos seeders e código do WhatsApp simulado: só em
+             dev local e nos testes automatizados (a homologação também roda
+             APP_ENV=testing, mas sem estas chaves). -->
+        <env name="SEED_FIXED_CREDENTIALS" value="true"/>
+        <env name="WHATSAPP_MOCK_REQUIRES_CODE" value="true"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="FILESYSTEM_DISK" value="local"/>

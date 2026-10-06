@@ -46,6 +46,12 @@ class DatabaseSeeder extends Seeder
         $this->call(ReportSettingContentSeeder::class);
         $this->call(ReportSettingVariableSeeder::class);
 
+        // Clínica de testes da API, treinamento e demonstração — também em
+        // homologação/produção. Senhas fixas só em local/testes automatizados
+        // (SEED_FIXED_CREDENTIALS); fora disso, aleatórias mostradas uma vez
+        // (e a fixa de um seed antigo é substituída). Idempotente.
+        $this->call(IntegratorTestClinicSeeder::class);
+
         if (app()->environment(['local', 'testing'])) {
             $this->call(DataFakersSeeder::class);
         }

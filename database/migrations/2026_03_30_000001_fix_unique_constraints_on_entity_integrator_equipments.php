@@ -24,12 +24,14 @@ return new class() extends Migration {
 
     /**
      * Reverse the migrations.
+     *
+     * Irreversível de propósito: depois desta migration a tabela aceita ip/mac
+     * repetidos (registros excluídos e a massa fake usa 0.0.0.0), então
+     * recriar o UNIQUE global falhava e travava `migrate:refresh`/`reset` no
+     * meio, deixando o banco pela metade. A unicidade dos ativos segue na
+     * aplicação.
      */
     public function down(): void
     {
-        Schema::table('entity_integrator_equipments', function (Blueprint $table) {
-            $table->unique('ip');
-            $table->unique('mac');
-        });
     }
 };
