@@ -384,7 +384,7 @@ class PagBankGateway extends AbstractHttpGateway
             publicKey: $this->publicKey() ?? $this->fetchPublicKey(),
             sdkUrl: self::SDK_URL,
             tokenization: 'encrypted_card',
-            maxInstallments: 12,
+            maxInstallments: $this->cardMaxInstallments(),
         );
     }
 

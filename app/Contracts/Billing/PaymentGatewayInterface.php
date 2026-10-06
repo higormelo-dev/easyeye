@@ -2,7 +2,7 @@
 
 namespace App\Contracts\Billing;
 
-use App\DTOs\Billing\{CancelSubscriptionDTO, CancelSubscriptionResultDTO, CardChargeDTO, CardCheckoutConfigDTO, CreateChargeDTO, CreateChargeResultDTO, CreateSubscriptionDTO, CreateSubscriptionResultDTO, CustomerDTO, GatewayCallContext, GatewayHealthDTO, GatewayWebhookInputDTO, NormalizedWebhookEventDTO, PaymentInstructionsDTO, SaveCardResultDTO};
+use App\DTOs\Billing\{CancelSubscriptionDTO, CancelSubscriptionResultDTO, CardChargeDTO, CardCheckoutConfigDTO, CreateChargeDTO, CreateChargeResultDTO, CreateSubscriptionDTO, CreateSubscriptionResultDTO, CustomerDTO, GatewayCallContext, GatewayHealthDTO, GatewayWebhookInputDTO, HostedCheckoutDTO, HostedCheckoutResultDTO, NormalizedWebhookEventDTO, PaymentInstructionsDTO, RefundRequestDTO, RefundResultDTO, SaveCardResultDTO};
 use App\Exceptions\Billing\GatewayIntegrationException;
 
 interface PaymentGatewayInterface
@@ -110,6 +110,13 @@ interface PaymentGatewayInterface
     public function cardCheckoutConfig(): ?CardCheckoutConfigDTO;
 
     /**
+     * Teto de parcelas do cartão transparente no próprio gateway (o mesmo de
+     * cardCheckoutConfig()->maxInstallments), sem resolver chave pública nem
+     * chamar a API — a tela Manager → Gateways mostra a capacidade.
+     */
+    public function cardMaxInstallments(): int;
+
+    /**
      * Cria e paga a cobrança no cartão (token do SDK ou cartão salvo), com
      * parcelas e, se pedido, guardando o cartão para a renovação. Recusa =
      * success true com status failed (ou success false com o erro da API).
@@ -118,4 +125,71 @@ interface PaymentGatewayInterface
 
     /** Guarda (troca) o cartão da renovação sem cobrar. */
     public function saveCard(string $customerId, string $cardToken, CustomerDTO $payer): SaveCardResultDTO;
+
+    // ── Checkout hospedado (cartão na página do gateway) ────────────────────
+
+    /**
+     * O cartão é pago numa página hospedada do gateway (Asaas Checkout), com
+     * volta para o EasyEye pelas URLs de callback — no lugar do link da
+     * fatura. A confirmação é sempre pelo webhook.
+     */
+    public function supportsHostedCardCheckout(): bool;
+
+    /**
+     * Abre o checkout hospedado (recorrente quando o DTO traz o ciclo; senão
+     * avulso). Nunca lança por recusa da API: success false com o erro.
+     *
+     * @throws GatewayIntegrationException falha sem resposta (timeout, 429)
+     */
+    public function createHostedCheckout(HostedCheckoutDTO $payload): HostedCheckoutResultDTO;
+
+    /** Cancela um checkout hospedado ainda aberto. True = cancelado (ou já não estava aberto). Nunca lança. */
+    public function cancelHostedCheckout(string $externalCheckoutId): bool;
+
+    // ── Estorno ──────────────────────────────────────────────────────────────
+
+    /** Estorna pagamento pela API (o manager só mostra "Estornar" quando true). */
+    public function supportsRefund(): bool;
+
+    /** Aceita estorno de parte do valor. */
+    public function supportsPartialRefund(): bool;
+
+    /**
+     * Pede o estorno (total sem valor; parcial com valor). O resultado diz se
+     * já foi concluído (done) ou só pedido (requested — a confirmação chega
+     * pelo webhook). Recusa da API = success false. Sem resposta definitiva
+     * (timeout, conexão, 5xx depois de enviar o pedido) = inconclusive — o
+     * chamador confere (refundStatus) antes de pedir de novo.
+     *
+     * @throws GatewayIntegrationException 429 (o gateway pediu para esperar — nada foi feito)
+     */
+    public function refund(RefundRequestDTO $payload): RefundResultDTO;
+
+    /**
+     * Confere no gateway um pedido de estorno (sem resposta definitiva, ou
+     * parado em "solicitado"): RefundResultDTO::checked com status done
+     * (devolvido), requested (em andamento — note diz o quê, ex.: boleto
+     * aguardando a conta do pagador), failed (negado/cancelado) ou not_found
+     * (o pedido nunca chegou ao gateway). null = o gateway não permite
+     * conferir.
+     *
+     * @param float       $amount           valor do pedido
+     * @param string|null $externalRefundId id do estorno no gateway, quando ele devolveu
+     * @param string      $since            ISO 8601: quando o pedido foi feito
+     *
+     * @throws GatewayIntegrationException a consulta falhou (tentar depois)
+     */
+    public function refundStatus(string $externalPaymentId, float $amount, ?string $externalRefundId, string $since): ?RefundResultDTO;
+
+    // ── Conferência ──────────────────────────────────────────────────────────
+
+    /**
+     * Situação atual da cobrança no gateway como o evento normalizado
+     * equivalente (ex.: paga → 'paid'), para aplicar pagamento cujo webhook
+     * se perdeu ou atrasou (régua antes de encerrar, billing:reconcile-overdue).
+     * Null = o gateway não tem como dizer (sem consulta pela API).
+     *
+     * @throws GatewayIntegrationException falha na consulta
+     */
+    public function paymentStatusEvent(string $externalPaymentId): ?NormalizedWebhookEventDTO;
 }

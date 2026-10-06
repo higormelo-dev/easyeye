@@ -23,17 +23,17 @@ function stripeGateway(): StripeBrGateway
 {
     // Credenciais só pela config: sem consulta a gateway_credentials.
     $resolver = new class() extends GatewayCredentialResolver {
-        public function resolveSecret(string $gatewayCode, ?string $entityId = null): ?string
+        public function resolveSecret(string $gatewayCode): ?string
         {
             return null;
         }
 
-        public function resolveWebhookSecret(string $gatewayCode, ?string $entityId = null): ?string
+        public function resolveWebhookSecret(string $gatewayCode): ?string
         {
             return null;
         }
 
-        public function resolveExtra(string $gatewayCode, string $key, ?string $entityId = null): ?string
+        public function resolveExtra(string $gatewayCode, string $key): ?string
         {
             return null;
         }

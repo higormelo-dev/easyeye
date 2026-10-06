@@ -4,8 +4,9 @@ namespace App\Jobs\Billing;
 
 use App\DTOs\Billing\{CancelSubscriptionDTO, CreateSubscriptionDTO, GatewayCallContext};
 use App\Enums\BillingCycle;
+use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Models\{Plan, Subscription};
-use App\Services\Billing\{BillingLogService, GatewayRegistry};
+use App\Services\Billing\{BillingLogService, GatewayAlertService, GatewayRegistry};
 use App\Support\Billing\BillingCustomer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -52,6 +53,22 @@ class RecreateGatewayRecurrenceJob implements ShouldQueue
 
     public function handle(GatewayRegistry $registry, BillingLogService $billingLog): void
     {
+        try {
+            $this->recreate($registry, $billingLog);
+        } catch (GatewayIntegrationException $e) {
+            // 429: tenta de novo depois do tempo pedido pela API, não na hora.
+            if ($e->isRateLimit()) {
+                $this->release(max(1, (int) $e->retryAfter()));
+
+                return;
+            }
+
+            throw $e;
+        }
+    }
+
+    private function recreate(GatewayRegistry $registry, BillingLogService $billingLog): void
+    {
         $subscription = Subscription::query()->with(['entity', 'plan'])->find($this->subscriptionId);
 
         if (! $subscription || blank($subscription->gateway) || ! $registry->has((string) $subscription->gateway)) {
@@ -94,6 +111,10 @@ class RecreateGatewayRecurrenceJob implements ShouldQueue
             }
 
             Subscription::query()->whereKey($subscription->id)->update(['gateway_subscription_id' => $created->externalSubscriptionId]);
+
+            if ($subscription->payment_method === 'credit_card') {
+                $this->dropCard($subscription->fresh(['entity']) ?? $subscription, (string) $created->externalSubscriptionId, $billingLog);
+            }
         }
 
         // 2) A antiga deixa de cobrar (cancelamento nosso: o aviso do gateway não é alerta).
@@ -119,6 +140,57 @@ class RecreateGatewayRecurrenceJob implements ShouldQueue
             subscription: $subscription,
             gatewayCode: $subscription->gateway,
             correlationId: $this->correlationId,
+        );
+    }
+
+    /**
+     * A recorrência estava no cartão (criada pelo Asaas Checkout) e a nova
+     * nasce sem ele: a API só cria assinatura no cartão com os dados ou o
+     * token do cartão, que o EasyEye nunca vê (PCI —
+     * https://docs.asaas.com/docs/pci-dss-1). A nova é "pergunte ao cliente"
+     * (UNDEFINED): ninguém é cobrado no cartão sem saber. Os dados do cartão
+     * saem da assinatura, a clínica vê em Minha assinatura que precisa pagar
+     * a próxima fatura no cartão para voltar à recorrência no cartão, e o
+     * time é avisado.
+     */
+    private function dropCard(Subscription $subscription, string $newRecurrenceId, BillingLogService $billingLog): void
+    {
+        $payload                             = (array) ($subscription->gateway_payload ?? []);
+        $payload['card_reregister_required'] = [
+            'since'               => now()->toIso8601String(),
+            'previous_recurrence' => $this->previousRecurrenceId,
+            'new_recurrence'      => $newRecurrenceId,
+            'card'                => array_filter(['brand' => $subscription->card_brand, 'last4' => $subscription->card_last4]),
+        ];
+
+        $subscription->update([
+            'gateway_payload'   => $payload,
+            'payment_method'    => null,
+            'gateway_card_id'   => null,
+            'card_brand'        => null,
+            'card_last4'        => null,
+            'card_installments' => null,
+        ]);
+
+        $billingLog->log(
+            level: 'warning',
+            message: 'Troca de plano: a recorrência no cartão foi refeita sem o cartão (boleto/Pix/cartão pela fatura) — a clínica precisa pagar a próxima fatura no cartão para voltar à recorrência no cartão.',
+            context: ['previous_recurrence' => $this->previousRecurrenceId, 'new_recurrence' => $newRecurrenceId],
+            entityId: (string) $subscription->entity_id,
+            subscription: $subscription,
+            gatewayCode: $subscription->gateway,
+            correlationId: $this->correlationId,
+        );
+
+        app(GatewayAlertService::class)->alert(
+            gateway: (string) $subscription->gateway,
+            kind: 'card_reregister',
+            params: ['entity' => (string) $subscription->entity?->name, 'subscription' => $newRecurrenceId],
+            message: "Troca de plano de {$subscription->entity?->name}: a recorrência nova ({$newRecurrenceId}) nasceu sem o cartão — a clínica foi avisada para pagar a próxima fatura no cartão.",
+            level: 'warning',
+            throttleKey: $newRecurrenceId,
+            throttleMinutes: 60 * 24,
+            entityId: (string) $subscription->entity_id,
         );
     }
 

@@ -4,13 +4,14 @@ namespace App\Services\Billing;
 
 use App\Enums\Billing\{CancellationReason, DunningStep, InvoiceStatus};
 use App\Enums\{SubscriptionBillingMode, SubscriptionStatus};
+use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Models\Billing\{Invoice, SubscriptionDunningStep};
 use App\Models\{Entity, Subscription, User};
 use App\Notifications\Channels\SaasWhatsAppChannel;
 use App\Notifications\SubscriptionDunningNotification;
 use App\Support\Billing\{DunningSchedule, NoticeLocale};
 use Illuminate\Support\{Carbon, Collection, Str};
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{Cache, DB};
 use Throwable;
 
 /**
@@ -59,6 +60,7 @@ class DunningService
         private readonly BillingCancellationService $cancellation,
         private readonly BillingLogService $billingLog,
         private readonly GatewayRegistry $registry,
+        private readonly GatewayPaymentReconciler $reconciler,
     ) {
     }
 
@@ -260,6 +262,13 @@ class DunningService
 
     private function process(string $subscriptionId): ?DunningStep
     {
+        // Antes de limitar o acesso ou encerrar: o pagamento pode ter
+        // acontecido no gateway sem o webhook chegar (fila pausada, atraso).
+        // Pago lá → aplicado pelo caminho do webhook e a etapa não acontece.
+        if (! $this->confirmUnpaidAtGateway($subscriptionId)) {
+            return null;
+        }
+
         $result = DB::transaction(function () use ($subscriptionId): ?array {
             $entityId = Subscription::query()->whereKey($subscriptionId)->value('entity_id');
             $entity   = $entityId ? Entity::query()->whereKey($entityId)->lockForUpdate()->first() : null;
@@ -336,6 +345,92 @@ class DunningService
         ]);
 
         return $step;
+    }
+
+    /**
+     * Etapa que limita o acesso (D+3) ou encerra (D+7): confere no gateway as
+     * cobranças em aberto (GatewayPaymentReconciler — Asaas: GET
+     * /v3/payments/{id}). Só "não pago" CONCLUSIVO deixa seguir. False = não
+     * seguir hoje: o pagamento foi aplicado agora (a régua relê e não acha
+     * mais atraso) ou a consulta não foi conclusiva (timeout, 5xx, chave
+     * recusada, 429) — a etapa é adiada para a próxima rodada; depois de
+     * billing.dunning.max_gateway_check_deferrals adiamentos seguidos, alerta
+     * crítico ao time (a régua nunca encerra sozinha sem conferir).
+     */
+    private function confirmUnpaidAtGateway(string $subscriptionId): bool
+    {
+        $subscription = Subscription::query()->find($subscriptionId);
+        $step         = $subscription ? $this->stepFor($subscription) : null;
+
+        if ($subscription === null || ! in_array($step, [DunningStep::Limited, DunningStep::Terminated, DunningStep::FirstChargeTerminated], true)) {
+            return true;
+        }
+
+        $dueOn = $this->referenceDate($subscription, $step);
+
+        if ($dueOn !== null && $subscription->dunningSteps()->where('step', $step->value)->whereDate('due_on', $dueOn)->exists()) {
+            return true;
+        }
+
+        try {
+            $applied = $this->reconciler->reconcileSubscription($subscription, strict: true);
+        } catch (Throwable $e) {
+            if (! $e instanceof GatewayIntegrationException) {
+                report($e);
+            }
+
+            $this->deferStep($subscription, $step, (string) $dueOn, $e);
+
+            return false;
+        }
+
+        Cache::forget($this->deferralKey($subscription, $step, (string) $dueOn));
+
+        return ! $applied;
+    }
+
+    /**
+     * Conferência inconclusiva: a etapa fica para a próxima rodada. Conta os
+     * adiamentos seguidos da etapa/vencimento; no limite, alerta crítico ao
+     * time (uma vez por dia) — sem encerrar/limitar sozinho.
+     */
+    private function deferStep(Subscription $subscription, DunningStep $step, string $dueOn, Throwable $e): void
+    {
+        $key   = $this->deferralKey($subscription, $step, $dueOn);
+        $count = (int) Cache::get($key, 0) + 1;
+        $max   = max(1, (int) config('billing.dunning.max_gateway_check_deferrals', 3));
+        $rate  = $e instanceof GatewayIntegrationException && $e->isRateLimit();
+
+        Cache::put($key, $count, now()->addDays(60));
+
+        $this->billingLog->log(
+            level: $count >= $max ? 'critical' : 'warning',
+            message: $rate
+                ? 'Régua: o gateway pediu para esperar (429) antes de conferir o pagamento — etapa adiada para a próxima rodada.'
+                : 'Régua: não foi possível conferir o pagamento no gateway (sem resposta conclusiva) — etapa adiada para a próxima rodada; nada é limitado nem encerrado sem conferir.',
+            context: ['step' => $step->value, 'due_on' => $dueOn, 'deferrals' => $count, 'error' => mb_substr($e->getMessage(), 0, 300)],
+            entityId: (string) $subscription->entity_id,
+            subscription: $subscription,
+            gatewayCode: $subscription->gateway,
+        );
+
+        if ($count >= $max) {
+            app(GatewayAlertService::class)->alert(
+                gateway: (string) $subscription->gateway,
+                kind: 'dunning_check_failed',
+                params: ['entity' => (string) $subscription->entity?->name, 'step' => $step->value, 'count' => $count, 'detail' => mb_substr($e->getMessage(), 0, 200)],
+                message: "Régua de {$subscription->entity?->name}: a etapa {$step->value} foi adiada {$count} vezes sem conseguir conferir o pagamento no gateway — conferir à mão.",
+                level: 'critical',
+                throttleKey: (string) $subscription->id . ':' . $step->value . ':' . $dueOn,
+                throttleMinutes: 60 * 24,
+                entityId: (string) $subscription->entity_id,
+            );
+        }
+    }
+
+    private function deferralKey(Subscription $subscription, DunningStep $step, string $dueOn): string
+    {
+        return "billing:dunning:gateway-check-deferrals:{$subscription->id}:{$step->value}:{$dueOn}";
     }
 
     /**

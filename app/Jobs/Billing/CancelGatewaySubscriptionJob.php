@@ -4,6 +4,7 @@ namespace App\Jobs\Billing;
 
 use App\DTOs\Billing\{CancelSubscriptionDTO, GatewayCallContext};
 use App\Enums\Billing\BillingEventType;
+use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Models\Subscription;
 use App\Services\Billing\{BillingLogService, FinancialEventService, GatewayRegistry};
 use Illuminate\Bus\Queueable;
@@ -53,10 +54,16 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
         return [300, 900, 3600, 21600, 86400];
     }
 
+    /**
+     * @param string|null $externalSubscriptionId recorrência a cancelar quando não é a
+     *                                            vigente da linha (ex.: a anterior, substituída pela do Asaas
+     *                                            Checkout; ou a criada por um checkout que não valeu)
+     */
     public function __construct(
         public readonly string $subscriptionId,
         public readonly string $gatewayCode,
         public readonly string $correlationId,
+        public readonly ?string $externalSubscriptionId = null,
     ) {
         $this->onQueue((string) config('billing.webhooks.queue', 'default'));
     }
@@ -67,9 +74,10 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
         BillingLogService $billingLogService,
     ): void {
         $subscription = Subscription::query()->find($this->subscriptionId);
+        $externalId   = $this->externalSubscriptionId ?? $subscription?->gateway_subscription_id;
 
         // Assinatura removida ou sem ID externo — nada a fazer no gateway
-        if (! $subscription || ! $subscription->gateway_subscription_id) {
+        if (! $subscription || ! $externalId) {
             return;
         }
 
@@ -88,14 +96,25 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
             ->withContext(new GatewayCallContext($this->correlationId, (string) $subscription->entity_id));
 
         // Cancelamento nosso: o aviso do gateway que vem depois não é alerta.
-        Subscription::rememberRecurrenceCancelledByUs((string) $subscription->id, $subscription->gateway_subscription_id);
+        Subscription::rememberRecurrenceCancelledByUs((string) $subscription->id, $externalId);
 
-        $result = $gateway->cancelSubscription(new CancelSubscriptionDTO(
-            subscriptionId: (string) $subscription->id,
-            externalSubscriptionId: $subscription->gateway_subscription_id,
-            entityId: (string) $subscription->entity_id,
-            metadata: [],
-        ));
+        try {
+            $result = $gateway->cancelSubscription(new CancelSubscriptionDTO(
+                subscriptionId: (string) $subscription->id,
+                externalSubscriptionId: $externalId,
+                entityId: (string) $subscription->entity_id,
+                metadata: [],
+            ));
+        } catch (GatewayIntegrationException $e) {
+            // 429: tenta depois do tempo pedido pela API, não na hora.
+            if ($e->isRateLimit()) {
+                $this->release(max(1, (int) $e->retryAfter()));
+
+                return;
+            }
+
+            throw $e;
+        }
 
         if (! $result->success) {
             $attempt = $this->attempts();

@@ -4,15 +4,20 @@ namespace App\Http\Controllers\Manager;
 
 use App\Enums\Billing\CredentialScope;
 use App\Http\Controllers\Controller;
-use App\Models\Billing\{EntityGatewayAccess, Gateway, GatewayCredential};
-use App\Models\Entity;
+use App\Models\Billing\{Gateway, GatewayCredential};
 use App\Services\Audit\AuditLogger;
-use App\Services\Billing\GatewayDefaultService;
+use App\Services\Billing\{GatewayCredentialResolver, GatewayDefaultService, GatewayRegistry};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
 use Inertia\{Inertia, Response};
 use InvalidArgumentException;
 
+/**
+ * Manager → Gateways: gateways de pagamento do DONO do SaaS, usados para
+ * cobrar as clínicas (assinatura e pacotes de créditos de IA). Clínica não
+ * tem gateway próprio nem recebe pagamento por eles — as credenciais são
+ * sempre globais (entity_id NULL, scope global).
+ */
 class GatewaysController extends Controller
 {
     /** Gateway cuja credencial é a InfiniteTag (handle), não um token. */
@@ -21,6 +26,7 @@ class GatewaysController extends Controller
     public function __construct(
         private readonly GatewayDefaultService $defaultService,
         private readonly AuditLogger $audit,
+        private readonly GatewayRegistry $registry,
     ) {
     }
 
@@ -30,11 +36,9 @@ class GatewaysController extends Controller
             ->withCount([
                 'credentials as active_credentials_count' => fn ($q) => $q
                     ->whereNull('entity_id')
-                    ->where('scope', 'global')
+                    ->where('scope', CredentialScope::Global->value)
                     ->where('active', true)
                     ->whereNull('deleted_at'),
-                'entityAccess as entities_with_access_count' => fn ($q) => $q
-                    ->where('enabled', true),
             ])
             ->orderBy('priority')
             ->get();
@@ -66,7 +70,7 @@ class GatewaysController extends Controller
     {
         $credentials = $gateway->credentials()
             ->whereNull('entity_id')
-            ->where('scope', 'global')
+            ->where('scope', CredentialScope::Global->value)
             ->orderByDesc('active')
             ->orderByDesc('created_at')
             ->get()
@@ -192,7 +196,7 @@ class GatewaysController extends Controller
             'valid_to'       => $request->valid_to,
         ]);
 
-        Cache::forget("gateway_credential:{$gateway->code}:global");
+        Cache::forget(GatewayCredentialResolver::cacheKey($gateway->code));
         $this->defaultService->forgetCache();
 
         // Audit: rotação de credencial é evento crítico — registra qual gateway,
@@ -239,7 +243,7 @@ class GatewaysController extends Controller
 
         $credential->update(['active' => false]);
 
-        Cache::forget("gateway_credential:{$gateway->code}:global");
+        Cache::forget(GatewayCredentialResolver::cacheKey($gateway->code));
         $this->defaultService->forgetCache();
 
         $this->audit->recordAdminAction(
@@ -260,58 +264,11 @@ class GatewaysController extends Controller
         return response()->json(['message' => __('gateways.credential_revoked')]);
     }
 
-    public function entityAccess(Gateway $gateway): JsonResponse
-    {
-        $entities = Entity::query()
-            ->where('is_client', true)
-            ->whereNull('deleted_at')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code']);
-
-        $accessMap = EntityGatewayAccess::query()
-            ->where('gateway_id', $gateway->id)
-            ->pluck('enabled', 'entity_id')
-            ->map(fn ($v) => (bool) $v);
-
-        $data = $entities->map(fn (Entity $e) => [
-            'entity_id'  => $e->id,
-            'code'       => $e->code,
-            'name'       => $e->name,
-            'enabled'    => $accessMap->get((string) $e->id, false),
-            'toggle_url' => route('manager.gateways.entity-access.toggle', [$gateway, $e]),
-        ]);
-
-        return response()->json(['data' => $data]);
-    }
-
-    public function toggleEntityAccess(Gateway $gateway, Entity $entity): JsonResponse
-    {
-        if ($entity->isSaas()) {
-            return response()->json(['message' => __('gateways.saas_entity_forbidden')], 422);
-        }
-
-        $access = EntityGatewayAccess::query()->firstOrNew([
-            'gateway_id' => $gateway->id,
-            'entity_id'  => $entity->id,
-        ]);
-
-        $access->enabled = ! $access->enabled;
-        $access->save();
-
-        return response()->json([
-            'enabled' => $access->enabled,
-            'message' => $access->enabled
-                ? __('gateways.gateway_enabled_for', ['gateway' => $gateway->name, 'entity' => $entity->name])
-                : __('gateways.gateway_disabled_for', ['gateway' => $gateway->name, 'entity' => $entity->name]),
-        ]);
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function toRow(Gateway $g): array
     {
-        $credCount   = $g->active_credentials_count ?? 0;
-        $clinicCount = $g->entities_with_access_count ?? 0;
+        $credCount = $g->active_credentials_count ?? 0;
 
         return [
             'id'                        => $g->id,
@@ -328,18 +285,64 @@ class GatewaysController extends Controller
             'credentials_label'         => $credCount > 0
                 ? trans_choice('gateways.credentials_active', $credCount, ['count' => $credCount])
                 : null,
-            'entities_with_access_count' => $clinicCount,
-            'clinics_label'              => $clinicCount > 0
-                ? trans_choice('gateways.clinics_count', $clinicCount, ['count' => $clinicCount])
-                : null,
             'can_be_default' => (bool) $g->active && $credCount > 0,
+            'capabilities'   => $this->capabilities($g->code),
+            // Último health check real (billing:gateway-health, diário).
+            'health' => is_array($g->health) ? [
+                'status'     => $g->health['status'] ?? null,
+                'healthy'    => (bool) ($g->health['healthy'] ?? false),
+                'message'    => $g->health['message'] ?? null,
+                'checked_at' => $g->health_checked_at?->toIso8601String(),
+            ] : null,
             // Route URLs
             'set_default_url'       => route('manager.gateways.set-default', $g),
             'toggle_active_url'     => route('manager.gateways.toggle-active', $g),
             'priority_url'          => route('manager.gateways.priority', $g),
             'credentials_url'       => route('manager.gateways.credentials', $g),
             'credentials_store_url' => route('manager.gateways.credentials.store', $g),
-            'entity_access_url'     => route('manager.gateways.entity-access', $g),
+        ];
+    }
+
+    /**
+     * O que o gateway faz hoje na EasyEye, lido dos métodos de capacidade da
+     * classe (sem chamada HTTP — nada aqui busca chave pública na API):
+     *  - transparent: formas cobradas sem sair do EasyEye (pix/boleto/cartão);
+     *    cartão transparente ainda depende da chave pública na credencial;
+     *  - card_link: cobrança sem forma definida abre a página do gateway com cartão;
+     *  - max_installments: teto de parcelas do cartão transparente (null = sem cartão);
+     *  - saved_card_renewal: renova cobrando o cartão guardado no gateway;
+     *  - card_replacement: troca o cartão da renovação sem cobrar (exige a chave pública);
+     *  - native_recurrence: a recorrência é do gateway (ele emite cada ciclo);
+     *    senão o EasyEye emite a cobrança de cada renovação;
+     *  - hosted_card_checkout: cartão pago na página hospedada do gateway, com
+     *    volta para o EasyEye (Asaas Checkout);
+     *  - refund / partial_refund: o manager estorna pela API.
+     *
+     * Null quando o código não tem classe registrada (gateway só no banco).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function capabilities(string $code): ?array
+    {
+        if (! $this->registry->has($code)) {
+            return null;
+        }
+
+        $gateway     = $this->registry->get($code);
+        $transparent = array_values($gateway->transparentMethods());
+        $hasCard     = in_array('credit_card', $transparent, true);
+
+        return [
+            'transparent'        => $transparent,
+            'card_link'          => $gateway->supportsCardLink(),
+            'max_installments'   => $hasCard ? $gateway->cardMaxInstallments() : null,
+            'saved_card_renewal' => $gateway->chargesSavedCards(),
+            'card_replacement'   => $gateway->supportsCardReplacement(),
+            'native_recurrence'  => $gateway->subscriptionIssuesFirstCharge(),
+            // Cartão na página hospedada do gateway (Asaas Checkout) e estorno pela API.
+            'hosted_card_checkout' => $gateway->supportsHostedCardCheckout(),
+            'refund'               => $gateway->supportsRefund(),
+            'partial_refund'       => $gateway->supportsRefund() && $gateway->supportsPartialRefund(),
         ];
     }
 }

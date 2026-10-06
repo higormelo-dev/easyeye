@@ -71,9 +71,13 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
     });
 });
 
+// Limite por GATEWAY (não por IP) e folgado: o Asaas trata qualquer resposta
+// diferente de 200 — inclusive 429 — como falha e pausa a fila depois de 15
+// falhas seguidas (https://docs.asaas.com/docs/penalização-de-filas). Ver
+// RateLimiter "billing-webhook" no AppServiceProvider.
 Route::post('billing/webhooks/{gateway}', WebhookController::class)
     ->name('billing.webhooks')
-    ->middleware('throttle:240,1');
+    ->middleware('throttle:billing-webhook');
 
 // Webhook v3 da Gupshup (WhatsApp oficial): mensagens do paciente e status
 // das enviadas. URL por configuração (token aleatório) + header de segredo

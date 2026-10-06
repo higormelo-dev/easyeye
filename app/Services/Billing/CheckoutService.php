@@ -10,7 +10,7 @@ use App\Events\Billing\InvoicePaid;
 use App\Exceptions\Billing\{CheckoutException, GatewayIntegrationException, GatewayResolutionException, SubscriptionSupersededException};
 use App\Models\Billing\{Gateway, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
-use App\Support\Billing\{BillingCustomer, PlanPricing};
+use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PlanPricing};
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -34,8 +34,11 @@ use Throwable;
  *  - cartão: token do SDK JS oficial do gateway (o número nunca passa por
  *    aqui), parcelas sem juros no ciclo anual, cartão guardado no gateway
  *    para a renovação (RenewSubscriptionJob cobra sozinho);
- *  - gateway/forma sem transparente (InfinitePay; cartão no Asaas): o link
- *    da cobrança (payment_url).
+ *  - cartão no Asaas: Asaas Checkout (página hospedada — HostedCheckoutService):
+ *    a clínica vai ao ambiente seguro do Asaas e volta para Minha assinatura;
+ *    fatura de período vira assinatura no cartão (troca segura da recorrência);
+ *  - gateway/forma sem transparente nem checkout hospedado (InfinitePay): o
+ *    link da cobrança (payment_url).
  *
  * Isolamento: toda fatura é procurada pela clínica da sessão (de outra
  * clínica = 404). Idempotência: trava por clínica (uma operação de pagamento
@@ -63,6 +66,7 @@ class CheckoutService
         private readonly CircuitBreakerService $circuitBreaker,
         private readonly PlanChangeService $planChanges,
         private readonly AiCreditPackCheckoutService $aiPacks,
+        private readonly HostedCheckoutService $hosted,
     ) {
     }
 
@@ -218,6 +222,10 @@ class CheckoutService
 
         if ($method->isCard()) {
             if (! $gateway->supportsTransparent($method->value)) {
+                if ($gateway->supportsHostedCardCheckout()) {
+                    return $this->hostedFor($subscription, $invoice, $gateway, $issue);
+                }
+
                 if (! $gateway->supportsCardLink()) {
                     throw CheckoutException::make('card_unavailable');
                 }
@@ -282,6 +290,10 @@ class CheckoutService
         $gateway = $this->gatewayFor($subscription);
 
         if (! $gateway->supportsTransparent(CheckoutMethod::Card->value)) {
+            if ($gateway->supportsHostedCardCheckout()) {
+                return $this->hostedFor($subscription, $invoice, $gateway, issue: true);
+            }
+
             if (! $gateway->supportsCardLink()) {
                 throw CheckoutException::make('card_unavailable');
             }
@@ -450,7 +462,7 @@ class CheckoutService
         $gateway = $this->newPurchaseGateway($entity, $plan);
         $useCard = $method->isCard() && $gateway->supportsTransparent($method->value);
 
-        if ($method->isCard() && ! $useCard && ! $gateway->supportsCardLink()) {
+        if ($method->isCard() && ! $useCard && ! $gateway->supportsHostedCardCheckout() && ! $gateway->supportsCardLink()) {
             throw CheckoutException::make('card_unavailable');
         }
 
@@ -500,6 +512,12 @@ class CheckoutService
         }
 
         $resolved = $this->resolveGateway((string) $subscription->gateway);
+
+        // Cartão no checkout hospedado (Asaas Checkout): a 1ª fatura é paga na
+        // página do Asaas e vira a assinatura no cartão.
+        if ($invoice !== null && $method->isCard() && ! $resolved->supportsTransparent($method->value) && $resolved->supportsHostedCardCheckout()) {
+            return [...$result, ...$this->hostedFor($subscription->loadMissing(['entity', 'plan']), $invoice, $resolved, issue: true)];
+        }
 
         if ($invoice === null || ! $resolved->supportsTransparent($method->value)) {
             return [...$result, ...($invoice ? $this->linkResponse($invoice, $method) : ['mode' => 'link', 'method' => $method->value, 'payment_url' => null])];
@@ -566,7 +584,7 @@ class CheckoutService
                 }
 
                 $this->validInstallments($card->installments, $gateway, (float) $quote['amount_now'], $cycle);
-            } elseif (! $gateway->supportsCardLink()) {
+            } elseif (! $gateway->supportsHostedCardCheckout() && ! $gateway->supportsCardLink()) {
                 throw CheckoutException::make('card_unavailable');
             }
         }
@@ -614,8 +632,12 @@ class CheckoutService
         if (filled($invoice->external_invoice_id) && in_array($invoice->payment_method, [null, $method->value], true)) {
             try {
                 $found = $gateway->paymentInstructions($method->value, (string) $invoice->external_invoice_id, $invoice->raw_gateway_payload ?? []);
-            } catch (GatewayIntegrationException) {
-                throw CheckoutException::make('gateway_error', 502);
+            } catch (GatewayIntegrationException $e) {
+                // Erro do gateway (credencial, limite, fora do ar) — não é
+                // "forma indisponível": a tela pede para tentar de novo.
+                Log::warning('Checkout: instruções de pagamento não geradas pelo gateway.', ['invoice_id' => $invoice->id, 'gateway' => $gateway->code(), 'trigger' => $e->getTriggerType()]);
+
+                throw CheckoutException::make('instructions_failed', 503);
             }
 
             if ($found !== null && ! $this->expired($found)) {
@@ -701,6 +723,10 @@ class CheckoutService
                 paymentMethod: $transparent ? $method->value : null,
                 metadata: BillingCustomer::chargeMetadata($entity, ['attempt_number' => $attempt]),
                 idempotencyKey: $key,
+                // Tentativa anterior sem resposta definitiva: o gateway pode
+                // ter criado a cobrança — reaproveita em vez de emitir outra.
+                knownChargeIds: $invoice->knownChargeIds(),
+                lookupBeforeCreate: ChargeIdempotency::previousAttemptInconclusive($invoice),
             ));
         } catch (GatewayIntegrationException $e) {
             $this->circuitBreaker->recordFailure($gateway->code(), $e->getTriggerType(), (string) $entity->id);
@@ -1381,11 +1407,11 @@ class CheckoutService
         // Cartão sem a chave pública do SDK: pelo link do gateway quando ele
         // tem página que aceita cartão; senão a forma não aparece.
         $methods = collect(CheckoutMethod::cases())
-            ->reject(fn (CheckoutMethod $method) => $method->isCard() && ! $gateway->supportsTransparent($method->value) && ! $gateway->supportsCardLink())
+            ->reject(fn (CheckoutMethod $method) => $method->isCard() && ! $gateway->supportsTransparent($method->value) && ! $gateway->supportsHostedCardCheckout() && ! $gateway->supportsCardLink())
             ->map(fn (CheckoutMethod $method) => [
                 'method' => $method->value,
                 'label'  => __("checkout.methods.{$method->value}"),
-                'mode'   => $gateway->supportsTransparent($method->value) ? 'transparent' : 'link',
+                'mode'   => self::methodMode($gateway, $method),
             ])->values()->all();
 
         $cycle ??= $subscription?->effectiveCycle();
@@ -1405,7 +1431,7 @@ class CheckoutService
 
         if ($config === null) {
             return [
-                'mode'        => 'link',
+                'mode'        => self::methodMode($gateway, CheckoutMethod::Card),
                 'method'      => CheckoutMethod::Card->value,
                 'card'        => null,
                 'payment_url' => $invoice?->payment_url,
@@ -1423,6 +1449,55 @@ class CheckoutService
                 // RenewSubscriptionJob): a tela avisa ao parcelar.
                 'renewal_in_full' => ! $gateway->supportsRenewalInstallments(),
             ],
+        ];
+    }
+
+    /**
+     * Como a forma é paga neste gateway: transparent (na tela do EasyEye),
+     * hosted (cartão no checkout hospedado do gateway, com volta para o
+     * EasyEye — Asaas Checkout) ou link (página da cobrança).
+     */
+    public static function methodMode(PaymentGatewayInterface $gateway, CheckoutMethod $method): string
+    {
+        return match (true) {
+            $gateway->supportsTransparent($method->value)               => 'transparent',
+            $method->isCard() && $gateway->supportsHostedCardCheckout() => 'hosted',
+            default                                                     => 'link',
+        };
+    }
+
+    /**
+     * Cartão no checkout hospedado (HostedCheckoutService). Leitura (GET):
+     * só o checkout já aberto e válido; sem ele, issue_required — o POST
+     * abre (fatura de período da assinatura: recorrência no cartão; o resto:
+     * cobrança avulsa).
+     *
+     * @return array<string, mixed>
+     */
+    private function hostedFor(Subscription $subscription, Invoice $invoice, PaymentGatewayInterface $gateway, bool $issue): array
+    {
+        $recurrent = $this->hosted->qualifiesForRecurrence($subscription, $invoice, $gateway);
+
+        if (! $issue && ($open = $this->hosted->usableFor($invoice, $gateway, $recurrent)) !== null) {
+            return ['invoice' => $this->invoiceRow($invoice, true), ...$this->hosted->response($open, $gateway)];
+        }
+
+        if (! $issue) {
+            return [
+                'invoice'        => $this->invoiceRow($invoice, true),
+                'mode'           => 'hosted',
+                'method'         => CheckoutMethod::Card->value,
+                'checkout_url'   => null,
+                'recurrent'      => $recurrent,
+                'issue_required' => true,
+            ];
+        }
+
+        $entity = $subscription->entity ?? Entity::query()->findOrFail($subscription->entity_id);
+
+        return [
+            'invoice' => $this->invoiceRow($invoice, true),
+            ...$this->hosted->open($entity, $invoice, $subscription, $gateway, $this->customerId($gateway, $subscription, $entity), $recurrent),
         ];
     }
 
@@ -1460,11 +1535,19 @@ class CheckoutService
             'next_billing_at'           => $subscription->next_billing_at?->toDateString(),
             'gateway'                   => $subscription->gateway,
             'payment_method'            => $subscription->payment_method,
-            'card'                      => $subscription->hasSavedCard() ? ['brand' => $subscription->card_brand, 'last4' => $subscription->card_last4] : null,
-            'card_installments'         => $subscription->card_installments,
-            'can_pay'                   => $billable,
-            'can_change_card'           => $billable && $this->resolveGateway((string) $subscription->gateway)->supportsCardReplacement(),
-            'renewal_in_full'           => $subscription->hasSavedCard() && (int) $subscription->card_installments > 1 && filled($subscription->gateway)
+            // Cartão da renovação: o guardado no gateway (transparente) ou o
+            // da assinatura no cartão do Asaas (Asaas Checkout).
+            'card' => $subscription->hasSavedCard() || ($subscription->payment_method === 'credit_card' && filled($subscription->card_last4) && filled($subscription->gateway_subscription_id))
+                ? ['brand' => $subscription->card_brand, 'last4' => $subscription->card_last4]
+                : null,
+            'card_installments' => $subscription->card_installments,
+            // A troca de plano refez a recorrência no cartão sem o cartão (a
+            // API não recria no cartão sem os dados dele): pagar a próxima
+            // fatura no cartão volta a recorrência para o cartão.
+            'card_reregister_required' => $billable && is_array(data_get($subscription->gateway_payload, 'card_reregister_required')),
+            'can_pay'                  => $billable,
+            'can_change_card'          => $billable && $this->resolveGateway((string) $subscription->gateway)->supportsCardReplacement(),
+            'renewal_in_full'          => $subscription->hasSavedCard() && (int) $subscription->card_installments > 1 && filled($subscription->gateway)
                 && $this->registry->has((string) $subscription->gateway)
                 && ! $this->registry->get((string) $subscription->gateway)->supportsRenewalInstallments(),
             'scheduled_change' => ($change = $subscription->scheduledChange()) !== null ? [
@@ -1493,8 +1576,10 @@ class CheckoutService
             'payment_method' => $invoice->payment_method,
             'payment_url'    => $payable ? $invoice->payment_url : null,
             'can_pay'        => $payable,
-            'kind'           => $invoice->isPlanChange() ? 'plan_change' : 'period',
-            'plan_change'    => $invoice->isPlanChange() ? [
+            // Pago no checkout hospedado (CHECKOUT_PAID), aguardando a confirmação da cobrança.
+            'awaiting_confirmation' => $payable && $this->hosted->awaitingConfirmation($invoice),
+            'kind'                  => $invoice->isPlanChange() ? 'plan_change' : 'period',
+            'plan_change'           => $invoice->isPlanChange() ? [
                 'plan'  => ['id' => (string) data_get($invoice->metadata, 'plan_change.plan_id'), 'name' => data_get($invoice->metadata, 'plan_change.plan_name')],
                 'cycle' => data_get($invoice->metadata, 'plan_change.billing_cycle'),
             ] : null,

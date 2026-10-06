@@ -52,6 +52,8 @@ class RenewSubscriptionJob implements ShouldQueue
 
     public function __construct(
         public readonly string $subscriptionId,
+        // Reagendamentos por 429 (limite da API) já feitos neste dia.
+        public readonly int $rateLimitRetries = 0,
     ) {
         $this->onQueue((string) config('billing.webhooks.queue', 'default'));
     }
@@ -158,7 +160,37 @@ class RenewSubscriptionJob implements ShouldQueue
                 dueDate: $chargeDueDate->toDateString(),
                 idempotencyKey: $chargeKey,
                 metadata: BillingCustomer::chargeMetadata($entity),
+                // Tentativa anterior sem resposta definitiva (timeout/5xx):
+                // o gateway pode ter criado a cobrança — reaproveita
+                // (Asaas: sem chave de idempotência, busca pela referência).
+                knownChargeIds: $invoice->knownChargeIds(),
+                lookupBeforeCreate: ChargeIdempotency::previousAttemptInconclusive($invoice),
             ));
+        } catch (GatewayIntegrationException $e) {
+            // 429: a API pediu para esperar — nova tentativa depois do tempo
+            // dela (no máximo 3 vezes no dia), nunca na hora.
+            if ($e->isRateLimit() && $this->rateLimitRetries < 3) {
+                self::dispatch($this->subscriptionId, $this->rateLimitRetries + 1)
+                    ->delay(now()->addSeconds(max(30, (int) $e->retryAfter())));
+
+                return;
+            }
+
+            $circuitBreaker->recordFailure($gatewayCode, $e->getTriggerType(), (string) $entity->id);
+            $this->recordFailure(
+                $subscription,
+                $invoice,
+                $gatewayCode,
+                $attemptNumber,
+                $idempotencyKey,
+                $chargeKey,
+                $correlationId,
+                $e->getMessage(),
+                $financialEventService,
+                errorCode: $e->getTriggerType(),
+            );
+
+            return;
         } catch (Throwable $e) {
             $circuitBreaker->recordFailure($gatewayCode, 'exception', (string) $entity->id);
             $this->recordFailure(

@@ -66,16 +66,4 @@ return [
         'open_charge_cancelled' => 'O boleto/Pix já emitido foi cancelado no meio de pagamento e nenhuma nova cobrança será emitida.',
         'none'                  => 'Nenhuma nova cobrança será emitida.',
     ],
-
-    // WhatsApp (instância global do SaaS): o essencial do e-mail, curto, com
-    // o link para pagar dentro do sistema (Minha assinatura).
-    'whatsapp' => [
-        'reminder'                => '*:app*: a assinatura de :entity (:amount) vence em :date. Pague pelo painel, em Minha assinatura: :url',
-        'reminder_card'           => '*:app*: a assinatura de :entity (:amount) será cobrada no cartão final :last4 em :date. Para trocar o cartão ou pagar de outra forma: :url',
-        'overdue'                 => '*:app*: não identificamos o pagamento de :amount da assinatura de :entity (vencimento :date). Em :limited_date, IA e financeiro serão bloqueados. Pague pelo painel: :url',
-        'limited'                 => '*:app*: o pagamento de :amount da assinatura de :entity segue em aberto e IA e financeiro estão bloqueados. Em :blocked_date, o acesso ao painel será suspenso. Pague pelo painel: :url',
-        'terminated'              => '*:app*: a assinatura de :entity foi encerrada por falta de pagamento. Para voltar a usar, contrate em Minha assinatura: :url',
-        'first_charge_overdue'    => '*:app*: a 1ª cobrança da assinatura de :entity (:amount) venceu em :date e o acesso foi suspenso. Ele volta assim que o pagamento for confirmado. Pague pelo painel: :url',
-        'first_charge_terminated' => '*:app*: a contratação de :entity foi cancelada porque a 1ª cobrança não foi paga. Para contratar de novo: :url',
-    ],
 ];

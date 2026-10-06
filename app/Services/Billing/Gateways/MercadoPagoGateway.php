@@ -15,6 +15,8 @@ use App\DTOs\Billing\{
     GatewayWebhookInputDTO,
     NormalizedWebhookEventDTO,
     PaymentInstructionsDTO,
+    RefundRequestDTO,
+    RefundResultDTO,
     SaveCardResultDTO,
     SavedCardDTO,
 };
@@ -386,6 +388,116 @@ class MercadoPagoGateway extends AbstractHttpGateway
         return $this->sanitizePayload($response->json() ?? []);
     }
 
+    public function supportsRefund(): bool
+    {
+        return true;
+    }
+
+    /** Parcial: POST /v1/payments/{id}/refunds com amount (até 180 dias). */
+    public function supportsPartialRefund(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Estorno pelo manager (refundPayment). A resposta é o estorno criado:
+     * status approved = devolvido; outro (in_process…) = pedido, confirmado
+     * depois pelo webhook do pagamento (refunded, ou approved com
+     * transaction_amount_refunded no parcial).
+     */
+    public function refund(RefundRequestDTO $payload): RefundResultDTO
+    {
+        try {
+            $json = $this->refundPayment($payload->externalPaymentId, $payload->idempotencyKey, $payload->amount);
+        } catch (GatewayIntegrationException $e) {
+            if ($e->isRateLimit()) {
+                throw $e;
+            }
+
+            // Timeout/5xx: pode ter sido feito — o mesmo pedido reenviado usa a
+            // MESMA X-Idempotency-Key; antes disso, refundStatus confere.
+            if (in_array($e->getTriggerType(), ['timeout', 'http_5xx'], true)) {
+                return RefundResultDTO::inconclusive($e->getMessage(), $e->httpStatus());
+            }
+
+            return RefundResultDTO::failed($e->getMessage(), $e->httpStatus());
+        }
+
+        $status = strtolower((string) ($json['status'] ?? ''));
+
+        return new RefundResultDTO(
+            success: true,
+            status: $status === 'approved' ? RefundResultDTO::STATUS_DONE : RefundResultDTO::STATUS_REQUESTED,
+            amount: isset($json['amount']) && is_numeric($json['amount']) ? (float) $json['amount'] : $payload->amount,
+            externalRefundId: isset($json['id']) ? (string) $json['id'] : null,
+            rawResponse: $json,
+        );
+    }
+
+    /**
+     * Conferência do pedido de estorno: GET /v1/payments/{id}/refunds (lista
+     * dos estornos do pagamento — id, amount, status, date_created). Com o id
+     * devolvido no pedido, por ele; senão o de mesmo valor criado a partir do
+     * pedido. approved = devolvido; in_process/pending = em andamento;
+     * rejected/cancelled = não devolveu.
+     */
+    public function refundStatus(string $externalPaymentId, float $amount, ?string $externalRefundId, string $since): ?RefundResultDTO
+    {
+        if (! ctype_digit($externalPaymentId)) {
+            return null;
+        }
+
+        $response = $this->request('GET', 'payment_refunds', [], ['id' => $externalPaymentId]);
+
+        if ($response->status() === 404) {
+            return RefundResultDTO::checked(RefundResultDTO::STATUS_NOT_FOUND);
+        }
+
+        if (! $response->successful()) {
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
+        }
+
+        $rows = collect(array_is_list((array) $response->json()) ? (array) $response->json() : (array) $response->json('results', []))
+            ->filter(fn ($row) => is_array($row));
+        $from  = Carbon::parse($since)->subMinutes(10);
+        $match = filled($externalRefundId)
+            ? $rows->first(fn (array $row) => (string) ($row['id'] ?? '') === (string) $externalRefundId)
+            : $rows->first(fn (array $row) => abs((float) ($row['amount'] ?? 0) - $amount) < 0.005
+                && filled($row['date_created'] ?? null) && Carbon::parse((string) $row['date_created'])->greaterThanOrEqualTo($from));
+
+        if ($match === null) {
+            return RefundResultDTO::checked(RefundResultDTO::STATUS_NOT_FOUND);
+        }
+
+        $refundId = isset($match['id']) ? (string) $match['id'] : null;
+
+        return match (strtolower((string) ($match['status'] ?? ''))) {
+            'approved' => RefundResultDTO::checked(RefundResultDTO::STATUS_DONE, amount: $amount, externalRefundId: $refundId),
+            'rejected', 'cancelled' => RefundResultDTO::checked(RefundResultDTO::STATUS_FAILED, 'cancelled', $amount, $refundId),
+            default => RefundResultDTO::checked(RefundResultDTO::STATUS_REQUESTED, 'in_progress', $amount, $refundId),
+        };
+    }
+
+    /** Situação atual (GET /v1/payments/{id}) como o evento do webhook "payment". */
+    public function paymentStatusEvent(string $externalPaymentId): ?NormalizedWebhookEventDTO
+    {
+        if (! ctype_digit($externalPaymentId)) {
+            return null;
+        }
+
+        $body = ['type' => 'payment', 'action' => 'payment.updated', 'data' => ['id' => $externalPaymentId]];
+
+        $event = $this->parseWebhook(new GatewayWebhookInputDTO(
+            gatewayCode: $this->code(),
+            headers: [],
+            body: (string) json_encode($body),
+            payload: $body,
+            externalEventId: null,
+        ));
+
+        return $event->eventType === 'unknown' ? null : $event;
+    }
+
     // ── Checkout transparente ────────────────────────────────────────────────
 
     public function transparentMethods(): array
@@ -458,7 +570,7 @@ class MercadoPagoGateway extends AbstractHttpGateway
             publicKey: $this->publicKey(),
             sdkUrl: self::SDK_URL,
             tokenization: 'card_token',
-            maxInstallments: 12,
+            maxInstallments: $this->cardMaxInstallments(),
             extra: ['requires' => ['payment_method_id', 'issuer_id']],
         );
     }
@@ -837,8 +949,21 @@ class MercadoPagoGateway extends AbstractHttpGateway
             $externalPaymentId = (string) ($mpPayment['id'] ?? $dataId);
             $status            = $this->normalizeMpPaymentStatus($mpStatus);
             $normalizedType    = $this->eventTypeForPaymentStatus($mpStatus);
-            $amount            = isset($mpPayment['transaction_amount']) ? (float) $mpPayment['transaction_amount'] : null;
-            $metadata          = array_merge($metadata, array_filter([
+            $refunded          = isset($mpPayment['transaction_amount_refunded']) && is_numeric($mpPayment['transaction_amount_refunded'])
+                ? round((float) $mpPayment['transaction_amount_refunded'], 2)
+                : null;
+
+            // Estorno parcial: o pagamento segue approved, com o valor
+            // devolvido em transaction_amount_refunded.
+            if ($refunded !== null && $refunded > 0) {
+                $metadata['refunded_total'] = $refunded;
+
+                if ($mpStatus === 'approved') {
+                    $normalizedType = 'partially_refunded';
+                }
+            }
+            $amount   = isset($mpPayment['transaction_amount']) ? (float) $mpPayment['transaction_amount'] : null;
+            $metadata = array_merge($metadata, array_filter([
                 'invoice_id'      => $this->extractString($mpPayment, ['external_reference', 'metadata.invoice_id']),
                 'subscription_id' => $this->extractString($mpPayment, ['metadata.subscription_id']),
                 'mp_status'       => $mpStatus,

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Services;
 
-use App\Domains\AI\Models\AiCreditPurchase;
+use App\Domains\AI\Models\{AiCreditPurchase, AiCreditWallet};
 use App\Enums\AI\{AiCreditPurchaseStatus, AiProvider};
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -389,10 +389,133 @@ class AiCreditPurchaseService
         $status = $purchase->fresh()?->status;
 
         return match ($status) {
-            AiCreditPurchaseStatus::Credited       => $this->refundPurchase($purchase, $reason),
+            AiCreditPurchaseStatus::Credited       => $this->reverseRemainderFromGateway($purchase, $reason),
             AiCreditPurchaseStatus::PendingPayment => $this->cancelPurchase($purchase, $reason),
             default                                => $purchase->fresh() ?? $purchase,
         };
+    }
+
+    /**
+     * Estorno total/chargeback confirmado pelo gateway de pacote creditado:
+     * tira da carteira só o que ainda não saiu — créditos do pacote menos os
+     * já retirados por estornos parciais anteriores (PARTIALLY_REFUNDED e
+     * depois REFUNDED do restante não tiram em dobro) —, sem deixar o saldo
+     * negativo. O que faltar (a clínica já usou) fica em
+     * metadata.gateway_reversal.shortfall para o chamador alertar o time.
+     * Idempotente: chave própria no ledger e o pedido vira estornado.
+     */
+    private function reverseRemainderFromGateway(AiCreditPurchase $purchase, string $reason): AiCreditPurchase
+    {
+        return DB::transaction(function () use ($purchase, $reason): AiCreditPurchase {
+            $locked = AiCreditPurchase::query()->whereKey($purchase->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== AiCreditPurchaseStatus::Credited) {
+                return $locked;
+            }
+
+            $alreadyRevoked = (int) data_get($locked->metadata, 'partial_refund.revoked_credits', 0);
+            $toRevoke       = max(0, (int) $locked->credits - $alreadyRevoked);
+            $wallet         = AiCreditWallet::query()->where('entity_id', $locked->entity_id)->lockForUpdate()->first();
+            $available      = max(0, (int) ($wallet?->balance ?? 0) - (int) ($wallet?->reserved_balance ?? 0));
+            $revoke         = min($toRevoke, $available);
+
+            if ($revoke > 0) {
+                $this->walletService->revokePurchaseCredits(
+                    entityId: (string) $locked->entity_id,
+                    amount: $revoke,
+                    subscriptionId: $locked->subscription_id ? (string) $locked->subscription_id : null,
+                    description: "Estorno da compra {$locked->id} confirmado pelo gateway.",
+                    idempotencyKey: "ai-credit-purchase:{$locked->id}:gateway-reversal",
+                    metadata: [
+                        'ai_credit_purchase_id' => (string) $locked->id,
+                        'package_code'          => (string) $locked->package_code,
+                        'amount_cents'          => (int) $locked->amount_cents,
+                        'refund_reason'         => $reason,
+                        'already_revoked'       => $alreadyRevoked,
+                    ],
+                );
+            }
+
+            $locked->update([
+                'status'      => AiCreditPurchaseStatus::Refunded->value,
+                'refunded_at' => now(),
+                'metadata'    => array_merge((array) $locked->metadata, [
+                    'refund_reason'    => $reason,
+                    'gateway_reversal' => [
+                        'already_revoked' => $alreadyRevoked,
+                        'revoked'         => $revoke,
+                        'shortfall'       => $toRevoke - $revoke,
+                        'at'              => now()->toIso8601String(),
+                    ],
+                ]),
+            ]);
+
+            return $locked->fresh();
+        });
+    }
+
+    /**
+     * Estorno PARCIAL do pagamento de um pacote já creditado: tira da
+     * carteira os créditos proporcionais ao valor devolvido (arredondado para
+     * baixo), sem deixar o saldo comprado negativo. O que faltar de saldo (a
+     * clínica já usou) fica registrado como `shortfall` — o chamador alerta o
+     * time. Idempotente pelo total devolvido: um novo evento com o mesmo
+     * total não tira nada; um total maior tira só a diferença. O pedido segue
+     * creditado (só o estorno total o marca como estornado).
+     *
+     * @return array{target: int, revoked: int, shortfall: int}
+     */
+    public function revokeProportionallyFromGateway(AiCreditPurchase $purchase, float $refundedTotal, float $paidAmount, string $reason): array
+    {
+        return DB::transaction(function () use ($purchase, $refundedTotal, $paidAmount, $reason): array {
+            $locked = AiCreditPurchase::query()->whereKey($purchase->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== AiCreditPurchaseStatus::Credited || $paidAmount <= 0) {
+                return ['target' => 0, 'revoked' => 0, 'shortfall' => 0];
+            }
+
+            $ratio    = max(0.0, min(1.0, $refundedTotal / $paidAmount));
+            $target   = (int) floor((int) $locked->credits * $ratio + 1e-9);
+            $partial  = (array) data_get($locked->metadata, 'partial_refund', []);
+            $handled  = (int) ($partial['handled_credits'] ?? 0);
+            $toRevoke = $target - $handled;
+
+            if ($toRevoke <= 0) {
+                return ['target' => $target, 'revoked' => 0, 'shortfall' => 0];
+            }
+
+            $wallet  = AiCreditWallet::query()->where('entity_id', $locked->entity_id)->lockForUpdate()->first();
+            $balance = max(0, (int) ($wallet?->balance ?? 0) - (int) ($wallet?->reserved_balance ?? 0));
+            $revoke  = min($toRevoke, $balance);
+
+            if ($revoke > 0) {
+                $this->walletService->revokePurchaseCredits(
+                    entityId: (string) $locked->entity_id,
+                    amount: $revoke,
+                    subscriptionId: $locked->subscription_id ? (string) $locked->subscription_id : null,
+                    description: "Estorno parcial da compra {$locked->id}.",
+                    idempotencyKey: "ai-credit-purchase:{$locked->id}:partial-refund:{$target}",
+                    metadata: [
+                        'ai_credit_purchase_id' => (string) $locked->id,
+                        'package_code'          => (string) $locked->package_code,
+                        'refunded_total'        => round($refundedTotal, 2),
+                        'refund_reason'         => $reason,
+                    ],
+                );
+            }
+
+            $locked->update(['metadata' => array_merge((array) $locked->metadata, [
+                'partial_refund' => [
+                    'handled_credits' => $target,
+                    'revoked_credits' => (int) ($partial['revoked_credits'] ?? 0) + $revoke,
+                    'shortfall'       => (int) ($partial['shortfall'] ?? 0) + ($toRevoke - $revoke),
+                    'refunded_total'  => round($refundedTotal, 2),
+                    'at'              => now()->toIso8601String(),
+                ],
+            ])]);
+
+            return ['target' => $target, 'revoked' => $revoke, 'shortfall' => $toRevoke - $revoke];
+        });
     }
 
     /**

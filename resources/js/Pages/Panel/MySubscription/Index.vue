@@ -31,6 +31,12 @@ import { useTrans } from '@/composables/useTrans.js';
  * fatura da assinatura (nunca num pedido de créditos); ?plan={id}&cycle={ciclo}
  * abre a contratação. Pagamento confirmado chega pelo tempo real (billing.{entityId})
  * e a tela relê o resumo.
+ *
+ * Volta do ambiente seguro do Asaas (cartão — Asaas Checkout):
+ * ?checkout_return=success|cancel|expired&checkout_invoice={id}. "success" só
+ * diz que o pagador concluiu a página: a tela mostra "aguardando
+ * confirmação" até o webhook confirmar (tempo real). Os parâmetros saem da
+ * URL depois de lidos.
  */
 const props = defineProps({
     checkout: { type: Object, required: true },
@@ -91,6 +97,40 @@ function isOverdue(invoice) {
 // ── Recarregar o resumo (props) ───────────────────────────────────────────────
 const justPaid = ref(false);
 
+// ── Volta do ambiente seguro do gateway (Asaas Checkout) ───────────────────
+const CHECKOUT_RETURNS = ['success', 'cancel', 'expired'];
+const checkoutReturn = ref(null); // { result, invoiceId }
+
+function readCheckoutReturn() {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('checkout_return');
+    if (!CHECKOUT_RETURNS.includes(result)) return;
+
+    checkoutReturn.value = { result, invoiceId: params.get('checkout_invoice') };
+    params.delete('checkout_return');
+    params.delete('checkout_invoice');
+    const query = params.toString();
+    try {
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+    } catch {
+        // sem history (ambiente de teste): só não limpa a URL
+    }
+}
+
+readCheckoutReturn();
+
+// Aguardando confirmação: a volta com sucesso ou o checkout pago (CHECKOUT_PAID) de alguma fatura.
+const awaitingConfirmation = computed(
+    () =>
+        !justPaid.value &&
+        ((checkoutReturn.value?.result === 'success' &&
+            openInvoices.value
+                .concat(openAiPacks.value)
+                .some((i) => !checkoutReturn.value.invoiceId || i.id === checkoutReturn.value.invoiceId)) ||
+            openInvoices.value.concat(openAiPacks.value).some((i) => i.awaiting_confirmation)),
+);
+
 function reloadSummary() {
     router.reload({ only: ['checkout'] });
 }
@@ -98,6 +138,7 @@ function reloadSummary() {
 useBillingRealtime(() => props.checkout?.realtime, {
     onPaid: () => {
         justPaid.value = true;
+        checkoutReturn.value = null;
         reloadSummary();
     },
     onResync: () => {
@@ -111,6 +152,10 @@ const modal = ref({ open: false, kind: null, invoice: null, contract: null, opti
 
 // Fatura de pacote de IA traz as formas do gateway dela (a clínica em cortesia não tem `payment`).
 const paymentFor = (invoice) => invoice?.payment ?? payment.value;
+
+// Já paga no cartão (ambiente seguro) aguardando a confirmação: sem "Pagar" — outro
+// pagamento cobraria o cartão de novo (o servidor também recusa: 409).
+const canPay = (invoice) => !!invoice?.can_pay && !invoice.awaiting_confirmation && !!paymentFor(invoice);
 
 function openPay(invoice) {
     modal.value = {
@@ -322,7 +367,7 @@ watch(
                 openInvoices.value.find((i) => i.id === invoiceId) ??
                 openAiPacks.value.find((i) => i.id === invoiceId) ??
                 openInvoices.value.find((i) => i.kind !== 'ai_credit_pack');
-            if (invoice) openPay(invoice);
+            if (invoice && canPay(invoice)) openPay(invoice);
         } else if (planId && plans.value.some((p) => p.id === planId)) {
             selectedPlanId.value = planId;
             const cycle = params.get('cycle');
@@ -355,6 +400,31 @@ watch(
                     data-test="ai-pack-discarded"
                 >
                     <i class="ti ti-trash me-2 fs-5" aria-hidden="true"></i>{{ discardedNotice }}
+                </div>
+                <div
+                    v-if="awaitingConfirmation"
+                    class="alert alert-info text-info-emphasis d-flex align-items-center"
+                    role="status"
+                    data-test="checkout-return-awaiting"
+                >
+                    <span class="spinner-grow spinner-grow-sm text-primary me-2" aria-hidden="true"></span
+                    >{{ pt.checkout_return_success }}
+                </div>
+                <div
+                    v-else-if="!justPaid && ['cancel', 'expired'].includes(checkoutReturn?.result)"
+                    class="alert alert-warning text-warning-emphasis d-flex align-items-center"
+                    :data-test="`checkout-return-${checkoutReturn.result}`"
+                >
+                    <i class="ti ti-alert-circle me-2 fs-5" aria-hidden="true"></i
+                    >{{ checkoutReturn.result === 'cancel' ? pt.checkout_return_cancel : pt.checkout_return_expired }}
+                </div>
+                <!-- A troca de plano refez a cobrança automática sem o cartão: pagar a próxima no cartão volta. -->
+                <div
+                    v-if="subscription?.card_reregister_required"
+                    class="alert alert-warning text-warning-emphasis d-flex align-items-center"
+                    data-test="my-subscription-card-reregister"
+                >
+                    <i class="ti ti-credit-card-off me-2 fs-5" aria-hidden="true"></i>{{ pt.card_reregister }}
                 </div>
             </div>
 
@@ -473,6 +543,12 @@ watch(
                                             <span class="badge ms-1" :class="invoiceBadge(invoice.status)">{{
                                                 invoiceStatus(invoice.status)
                                             }}</span>
+                                            <span
+                                                v-if="invoice.awaiting_confirmation"
+                                                class="badge badge-soft-info ms-1"
+                                                data-test="open-invoice-awaiting"
+                                                >{{ pt.awaiting_confirmation }}</span
+                                            >
                                         </div>
                                         <div class="small text-muted">
                                             {{ invoiceLabel(invoice) }} ·
@@ -483,8 +559,9 @@ watch(
                                             }}
                                         </div>
                                     </div>
+                                    <!-- Pago no cartão aguardando a confirmação: sem "Pagar" (cobraria de novo). -->
                                     <button
-                                        v-if="invoice.can_pay && paymentFor(invoice)"
+                                        v-if="canPay(invoice)"
                                         type="button"
                                         class="btn btn-primary text-nowrap"
                                         data-test="open-invoice-pay"
@@ -562,7 +639,7 @@ watch(
                                         </div>
                                         <div v-else class="d-flex gap-2">
                                             <button
-                                                v-if="invoice.can_pay && paymentFor(invoice)"
+                                                v-if="canPay(invoice)"
                                                 type="button"
                                                 class="btn btn-primary text-nowrap"
                                                 data-test="open-ai-pack-pay"
@@ -797,7 +874,7 @@ watch(
                                     <td class="small">{{ invoice.paid_at ? dateTime(invoice.paid_at) : '—' }}</td>
                                     <td class="text-end">
                                         <button
-                                            v-if="invoice.can_pay && paymentFor(invoice)"
+                                            v-if="canPay(invoice)"
                                             type="button"
                                             class="btn btn-sm btn-outline-primary"
                                             @click="openPay(invoice)"
@@ -826,7 +903,7 @@ watch(
                                 {{ pt.col_paid_at }}: {{ dateTime(invoice.paid_at) }}
                             </div>
                             <button
-                                v-if="invoice.can_pay && paymentFor(invoice)"
+                                v-if="canPay(invoice)"
                                 type="button"
                                 class="btn btn-sm btn-primary mt-2 w-100"
                                 @click="openPay(invoice)"

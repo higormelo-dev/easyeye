@@ -301,11 +301,15 @@ describe('Pix e boleto', function () {
 
         Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
 
-        // Cartão no Asaas: link da fatura.
+        // Cartão no Asaas: ambiente seguro do Asaas (Asaas Checkout). A leitura
+        // (GET) não abre o checkout — pede o POST (issue_required).
         ckoAs()->getJson(route('panel.my-subscription.instructions', ['invoice' => $invoice->id, 'method' => 'credit_card']))
             ->assertOk()
-            ->assertJsonPath('data.mode', 'link')
-            ->assertJsonPath('data.payment_url', 'https://www.asaas.com/i/080225913252');
+            ->assertJsonPath('data.mode', 'hosted')
+            ->assertJsonPath('data.issue_required', true)
+            ->assertJsonPath('data.recurrent', true);
+
+        Http::assertNotSent(fn (Request $r) => $r->method() === 'POST');
     });
 
     it('Pix pago pelo webhook: fatura paga e InvoicePaid no canal da clínica (a tela libera sozinha)', function () {
@@ -551,7 +555,7 @@ describe('contratar pagando', function () {
         expect(Subscription::query()->forEntity((string) $this->clinic->id)->value('cancelled_reason'))->toBe(SubscriptionCancelledReason::ActivationFailed->value);
     });
 
-    it('cartão no Asaas: sem transparente — a contratação sai pela fatura (link)', function () {
+    it('cartão no Asaas: sem transparente — a contratação abre o Asaas Checkout (assinatura no cartão), sem tokenizar nem guardar cartão aqui', function () {
         config(['billing.default_gateway' => 'asaas']);
 
         Http::fake(function (Request $request) {
@@ -575,6 +579,10 @@ describe('contratar pagando', function () {
                 return Http::response(['id' => 'sub_VXJBYgP2u0eO', 'status' => 'ACTIVE', 'cycle' => 'MONTHLY', 'value' => 299.9]);
             }
 
+            if ($url === 'https://api.asaas.com/v3/checkouts') {
+                return Http::response(['id' => 'chk_contrato', 'status' => 'ACTIVE', 'minutesToExpire' => 60, 'link' => 'https://asaas.com/checkoutSession/show?id=chk_contrato']);
+            }
+
             return Http::response([], 404);
         });
 
@@ -584,7 +592,13 @@ describe('contratar pagando', function () {
             'method'        => 'credit_card',
             'card_token'    => 'nao-usado',
         ])->assertOk()
-            ->assertJsonPath('data.mode', 'link');
+            ->assertJsonPath('data.mode', 'hosted')
+            ->assertJsonPath('data.recurrent', true)
+            ->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_contrato');
+
+        Http::assertSent(fn (Request $r) => $r->url() === 'https://api.asaas.com/v3/checkouts'
+            && $r['chargeTypes'] === ['RECURRENT'] && $r['billingTypes'] === ['CREDIT_CARD']
+            && $r['subscription']['cycle'] === 'MONTHLY' && $r['customer'] === 'cus_000005219613');
 
         expect(Subscription::query()->find($response->json('data.subscription.id'))->gateway_card_id)->toBeNull();
 

@@ -33,7 +33,9 @@ class Invoice extends Model
         'period_end',
         'due_at',
         'paid_at',
+        'gateway_checked_at',
         'amount',
+        'refunded_amount',
         'currency',
         'status',
         'billing_reason',
@@ -50,7 +52,9 @@ class Invoice extends Model
             'period_end'           => 'date',
             'due_at'               => 'datetime',
             'paid_at'              => 'datetime',
+            'gateway_checked_at'   => 'datetime',
             'amount'               => 'decimal:2',
+            'refunded_amount'      => 'decimal:2',
             'status'               => InvoiceStatus::class,
             'metadata'             => 'array',
             'raw_gateway_payload'  => SanitizedGatewayPayload::class,
@@ -162,6 +166,31 @@ class Invoice extends Model
             ->where('external_payment_id', '!=', $chargeId)
             ->where('status', PaymentStatus::Paid->value)
             ->exists();
+    }
+
+    /**
+     * Todas as cobranças desta fatura que o EasyEye já conhece no gateway
+     * (vigente, mantidas pelo checkout, desligadas, canceladas, a que pagou e
+     * as dos pagamentos registrados). A retentativa da emissão reaproveita
+     * só cobrança com a nossa referência que NÃO esteja aqui.
+     *
+     * @return list<string>
+     */
+    public function knownChargeIds(): array
+    {
+        $ids = [
+            (string) $this->external_invoice_id,
+            (string) data_get($this->metadata, 'paid_by_charge', ''),
+            ...array_map('strval', (array) data_get($this->metadata, 'cancelled_charges', [])),
+            ...array_map('strval', (array) data_get($this->metadata, 'detached_charges', [])),
+            ...$this->payments()->whereNotNull('external_payment_id')->pluck('external_payment_id')->map(fn ($id) => (string) $id)->all(),
+        ];
+
+        foreach ((array) ($this->payment_instructions ?? []) as $entry) {
+            $ids[] = (string) data_get($entry, 'charge_id', '');
+        }
+
+        return array_values(array_unique(array_filter($ids, fn (string $id) => $id !== '')));
     }
 
     /**

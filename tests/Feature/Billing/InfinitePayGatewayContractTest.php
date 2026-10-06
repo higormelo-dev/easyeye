@@ -49,17 +49,17 @@ function ipcGateway(array $extras = ['handle' => 'easyeye'], ?string $secret = n
             parent::__construct(0);
         }
 
-        public function resolveSecret(string $gatewayCode, ?string $entityId = null): ?string
+        public function resolveSecret(string $gatewayCode): ?string
         {
             return $this->secret;
         }
 
-        public function resolveWebhookSecret(string $gatewayCode, ?string $entityId = null): ?string
+        public function resolveWebhookSecret(string $gatewayCode): ?string
         {
             return null;
         }
 
-        public function resolveExtra(string $gatewayCode, string $key, ?string $entityId = null): ?string
+        public function resolveExtra(string $gatewayCode, string $key): ?string
         {
             return $this->extras[$key] ?? null;
         }

@@ -29,4 +29,12 @@ interface QueriesGatewayRecurrences
      * @throws GatewayIntegrationException falha na consulta
      */
     public function findRecurrenceIdsByReference(string $externalReference): array;
+
+    /**
+     * Muda o vencimento da próxima cobrança que a recorrência ainda vai
+     * gerar (não mexe nas já geradas). True = alterado.
+     *
+     * @throws GatewayIntegrationException falha sem resposta
+     */
+    public function updateRecurrenceNextDueDate(string $externalSubscriptionId, string $nextDueDate): bool;
 }

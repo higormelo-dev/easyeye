@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\{ClientRule, SubscriptionBillingMode, SubscriptionStatus};
+use App\Jobs\WhatsApp\SendSaasWhatsAppNoticeJob;
 use App\Models\Billing\SubscriptionTrialNotice;
 use App\Models\{Entity, Plan, Subscription, User};
 use App\Models\WhatsApp\WhatsAppSetting;
@@ -10,7 +11,6 @@ use App\Notifications\TrialEndingNotification;
 use App\Services\Billing\TrialEndingNoticeService;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\{Artisan, Http, Notification};
 
@@ -141,17 +141,21 @@ it('chave BILLING_TRIAL_NOTICES_ENABLED=false desliga os avisos', function () {
     Notification::assertNothingSent();
 });
 
-it('WhatsApp pela instância global para o dono com telefone verificado (falha da Z-API não impede o e-mail)', function () {
-    config(['whatsapp.driver' => 'zapi', 'whatsapp.zapi.base_url' => 'https://api.z-api.io']);
+it('WhatsApp pelo app global (template) para o dono com telefone verificado (falha da Gupshup não impede o e-mail)', function () {
+    useGupshupDriver();
     WhatsAppSetting::create([
         'entity_id'     => null,
         'active'        => true,
         'webhook_token' => WhatsAppSetting::generateWebhookToken(),
-        'credentials'   => ['instance_id' => 'GLOBAL-TRIAL', 'instance_token' => 'TOKEN-TRIAL', 'client_token' => 'CLIENT-TRIAL'],
+        'app_id'        => 'GLOBAL-TRIAL',
     ]);
     $this->owner->forceFill(['phone_verified_at' => now()])->save();
 
-    Http::fake(['https://api.z-api.io/*' => Http::response(['error' => 'instance offline'], 500)]);
+    fakeGupshup(['partner.gupshup.io/partner/app/*/v3/message' => Http::sequence()
+        ->push(['status' => 'error', 'message' => 'Internal error'], 500)
+        ->push(['status' => 'error', 'message' => 'Internal error'], 500)
+        ->push(['status' => 'error', 'message' => 'Internal error'], 500)
+        ->whenEmpty(Http::response(['messages' => [['id' => 'gs-trial']]]))]);
     r5TrialRunAt('2026-10-10 09:10:00');
 
     // Falhou o WhatsApp: o passo ficou registrado e o e-mail saiu (fila síncrona dos testes).
@@ -159,13 +163,16 @@ it('WhatsApp pela instância global para o dono com telefone verificado (falha d
     expect($notice->recipients_count)->toBe(2)
         ->and($notice->whatsapp_count)->toBe(1);
 
-    Http::fake(['https://api.z-api.io/*' => Http::response(['messageId' => 'm-1'])]);
     r5TrialRunAt('2026-10-12 09:10:00');
 
-    Http::assertSent(fn (Request $r) => str_contains($r->url(), '/instances/GLOBAL-TRIAL/')
-        && $r['phone'] === '5521977776666'
-        && str_contains((string) $r['message'], route('panel.my-subscription.index'))
-        && str_contains((string) $r['message'], '13/10/2026'));
+    $last     = collect(gupshupSentMessages())->last();
+    $template = gupshupTemplateOf($last);
+
+    expect($last->url())->toBe('https://partner.gupshup.io/partner/app/GLOBAL-TRIAL/v3/message')
+        ->and($last['to'])->toBe('5521977776666')
+        ->and($template['name'])->toBe('easyeye_teste_termina_amanha')
+        ->and($template['body'])->toContain('13/10/2026')
+        ->and($template['buttons'])->toBe([SendSaasWhatsAppNoticeJob::urlSuffix(route('panel.my-subscription.index'))]);
 });
 
 it('o comando roda pelo agendador todo dia em horário comercial', function () {

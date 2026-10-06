@@ -444,7 +444,10 @@ class BillingSubscriptionOrchestrator
             ));
         } catch (GatewayIntegrationException $e) {
             // Timeout: o gateway pode ter criado a recorrência mesmo assim.
-            $this->undoUnconfirmedRecurrence($gateway, $subscription, $e->getMessage());
+            // Limite da API (a chamada nem saiu): nada a desfazer.
+            if (! $e->isRateLimit()) {
+                $this->undoUnconfirmedRecurrence($gateway, $subscription, $e->getMessage());
+            }
 
             throw $e;
         }

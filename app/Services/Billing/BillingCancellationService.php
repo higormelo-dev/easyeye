@@ -112,6 +112,10 @@ class BillingCancellationService
             ],
         );
 
+        // Checkout de cartão aberto ou pago aguardando a 1ª cobrança: deixa de
+        // valer (senão o Asaas segue cobrando o cartão da assinatura cancelada).
+        $this->supersedeHostedCheckouts($subscription, 'subscription_cancelled', $correlationId);
+
         // ── Fase 2: Gateway — cancelamento assíncrono e resiliente ────────────
         if ($cancelAtGateway && $subscription->gateway && $subscription->gateway_subscription_id) {
             $this->dispatchGatewayCancellation($subscription, $correlationId);
@@ -205,6 +209,10 @@ class BillingCancellationService
             source: $source,
         );
 
+        // Checkouts de cartão da assinatura encerrada deixam de valer (HTTP
+        // depois do commit, quando chamado dentro de transação — régua D+7).
+        $this->supersedeHostedCheckouts($subscription, 'subscription_expired', $correlationId);
+
         // Expirações também devem cancelar no gateway para evitar cobranças futuras
         if ($cancelAtGateway && $subscription->gateway && $subscription->gateway_subscription_id) {
             $this->dispatchGatewayCancellation($subscription, $correlationId);
@@ -230,11 +238,61 @@ class BillingCancellationService
      */
     public function stopGatewayRecurrence(Subscription $subscription, ?string $correlationId = null): ?bool
     {
+        // A recorrência para (substituída, virou cortesia, encerrada): a que
+        // um checkout de cartão criaria também não pode nascer.
+        $this->supersedeHostedCheckouts($subscription, 'recurrence_stopped', $correlationId);
+
         if (! $subscription->gateway || ! $subscription->gateway_subscription_id) {
             return null;
         }
 
         return $this->dispatchGatewayCancellation($subscription, $correlationId ?? (string) Str::uuid());
+    }
+
+    /**
+     * Cancela no gateway uma recorrência pelo id dela, que não é (mais) a
+     * vigente da linha — a anterior que o Asaas Checkout substituiu, ou a
+     * criada por um checkout que não valeu. Tenta na hora; falhou, o job
+     * tenta de novo (CancelGatewaySubscriptionJob com o id explícito). O
+     * aviso do gateway que vem depois não é alerta (cancelamento nosso).
+     *
+     * @return bool true = cancelada agora
+     */
+    public function cancelRecurrenceById(Subscription $subscription, string $externalSubscriptionId, ?string $correlationId = null): bool
+    {
+        $correlationId ??= (string) Str::uuid();
+
+        if (blank($subscription->gateway) || ! $this->gatewayRegistry->has((string) $subscription->gateway)) {
+            return false;
+        }
+
+        Subscription::rememberRecurrenceCancelledByUs((string) $subscription->id, $externalSubscriptionId);
+
+        try {
+            $result = $this->gatewayRegistry->get((string) $subscription->gateway)
+                ->withContext(new GatewayCallContext($correlationId, (string) $subscription->entity_id))
+                ->cancelSubscription(new CancelSubscriptionDTO(
+                    subscriptionId: (string) $subscription->id,
+                    externalSubscriptionId: $externalSubscriptionId,
+                    entityId: (string) $subscription->entity_id,
+                    metadata: [],
+                ));
+
+            if ($result->success) {
+                return true;
+            }
+        } catch (Throwable) {
+            // segue para o job
+        }
+
+        CancelGatewaySubscriptionJob::dispatch(
+            subscriptionId: (string) $subscription->id,
+            gatewayCode: (string) $subscription->gateway,
+            correlationId: $correlationId,
+            externalSubscriptionId: $externalSubscriptionId,
+        );
+
+        return false;
     }
 
     /**
@@ -309,6 +367,20 @@ class BillingCancellationService
         }
 
         return $result;
+    }
+
+    /**
+     * Checkouts de cartão (Asaas Checkout) da assinatura deixam de valer —
+     * HostedCheckoutService::supersedeForSubscription. Nunca lança (o
+     * cancelamento local já valeu).
+     */
+    public function supersedeHostedCheckouts(Subscription $subscription, string $reason, ?string $correlationId = null, bool $recurrentOnly = false): void
+    {
+        try {
+            app(HostedCheckoutService::class)->supersedeForSubscription($subscription, $reason, $correlationId, $recurrentOnly);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

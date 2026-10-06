@@ -397,7 +397,7 @@ describe('/subscription/expired passa pelos mesmos controles de segurança do pa
             'entity_id'     => null,
             'active'        => true,
             'webhook_token' => WhatsAppSetting::generateWebhookToken(),
-            'credentials'   => ['instance_id' => 'test-instance', 'instance_token' => 'test-token', 'client_token' => 'test-client'],
+            'app_id'        => 'global-app-test',
         ]);
 
         limitedPanelAs()->get(route('subscription.expired'))->assertRedirect(route('phone.verification.notice'));

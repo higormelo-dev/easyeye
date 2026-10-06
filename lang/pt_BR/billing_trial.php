@@ -21,10 +21,4 @@ return [
         'subject' => 'Seu teste grátis do :app termina hoje',
         'line'    => 'O teste grátis de :entity termina hoje, :date. Contrate um plano pelo painel, em Minha assinatura, para continuar usando o :app.',
     ],
-
-    'whatsapp' => [
-        'three_days' => '*:app*: o teste grátis de :entity termina em :days dias (:date). Para continuar sem interrupção, contrate pelo painel: :url',
-        'one_day'    => '*:app*: o teste grátis de :entity termina amanhã (:date). Contrate pelo painel para não perder o acesso: :url',
-        'today'      => '*:app*: o teste grátis de :entity termina hoje (:date). Contrate pelo painel para continuar: :url',
-    ],
 ];

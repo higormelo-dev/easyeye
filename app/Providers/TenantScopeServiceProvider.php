@@ -6,7 +6,7 @@ namespace App\Providers;
 
 use App\Domains\AI\Models\{AiCircuitBreaker, AiCreditLedgerEntry, AiCreditPurchase, AiCreditWallet, AiDoctorPrompt, AiRunFeedback};
 use App\Models\{AdditionType, AuditLog, BillingBatch, BillingClaim, CashClose, ClinicResource, ColorVisionType, Covenant, CovenantPlan, CoverTestType, DataAccessLog, EntityActivation, ExamType, FeatureUsage, FinancialCashEntry, FinancialCategory, Indication, IrisType, Lense, LgpdRequest, Medicine, MedicinePresentation, NearPointConvergence, Notice, PartnerCommission, PartnerLead, PatientConsent, PatientImport, Procedure, ProcedurePrice, RecordVersion, ReferralCode, ReportSetting, ScheduleEvent, SkinType, Subscription, SurgeryType, VisitType, VisualAcuityType, WaitingList};
-use App\Models\Billing\{BillingLog, BillingRetrySchedule, Cancellation, EntityGatewayAccess, FinancialEvent, GatewayCircuitBreaker, GatewayCredential, GatewayFallbackRule, Invoice, Payment, PaymentAttempt, SubscriptionChange, TenantGatewaySetting, WebhookEvent};
+use App\Models\Billing\{BillingLog, BillingRetrySchedule, Cancellation, FinancialEvent, GatewayCircuitBreaker, GatewayFallbackRule, Invoice, Payment, PaymentAttempt, SubscriptionChange, TenantGatewaySetting, WebhookEvent};
 use App\Models\Scopes\EntityScope;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +22,9 @@ use Illuminate\Support\ServiceProvider;
  * Excluídos de propósito (entity_id é membership/cross-entidade, não posse):
  *   - EntityUser            (troca de entidade lista todas as vinculações)
  *   - EntityUserIntegrator  (integração por usuário, área manager/API)
+ *   - GatewayCredential     (credencial só do dono do SaaS, sempre entity_id
+ *                            NULL — o auto-set gravaria a clínica ativa e a
+ *                            credencial sumiria do GatewayCredentialResolver)
  *
  * O scope é INERTE quando não há tenant vinculado (manager/webhook/job/CLI),
  * preservando os fluxos cross-entidade. Ver EntityScope/TenantContext.
@@ -48,10 +51,8 @@ class TenantScopeServiceProvider extends ServiceProvider
         BillingLog::class,
         BillingRetrySchedule::class,
         Cancellation::class,
-        EntityGatewayAccess::class,
         FinancialEvent::class,
         GatewayCircuitBreaker::class,
-        GatewayCredential::class,
         GatewayFallbackRule::class,
         Invoice::class,
         Payment::class,

@@ -26,6 +26,8 @@ return [
         'scheduled_change_not_cancellable' => 'This plan change can no longer be undone (the date has arrived or the new charge was already paid).',
         'ai_pack_unavailable'              => 'The clinic\'s plan does not include AI features, or no credit packs are on sale right now.',
         'ai_pack_not_discardable'          => 'This credit order can no longer be discarded (the payment was already confirmed or the order is no longer open).',
+        'card_awaiting_confirmation'       => 'The card payment for this invoice was already made and is waiting for confirmation. There is no need to pay again — this screen updates by itself.',
+        'instructions_failed'              => 'The Pix/boleto could not be generated right now. Please try again in a moment.',
         'card_requires_verified_email'     => 'To try another card, first confirm your e-mail (we sent the link at sign-up). Pix and boleto are still available.',
 
         // Browser only (no server response or outside the JSON contract).
@@ -152,6 +154,25 @@ return [
         'realtime_off'  => 'Automatic updates are unavailable right now. After paying, use the button below.',
         'check_status'  => 'I have paid — refresh',
         'still_pending' => 'The payment has not been confirmed yet. Pix usually takes seconds; boleto, up to 3 business days.',
+
+        // Card on the gateway secure environment (Asaas Checkout).
+        'method_hosted'           => ':gateway secure environment',
+        'method_hint_card_hosted' => 'You enter the card in the :gateway secure environment and come back here.',
+        'hosted_title'            => 'Pay in the :gateway secure environment',
+        'hosted_body'             => 'For your security, the card is entered on the :gateway page — EasyEye never sees or stores the number. After paying, you come back to this screen, which shows when the payment is confirmed.',
+        'hosted_recurrent'        => 'The card stays registered with :gateway and the next renewals are charged to it automatically.',
+        'hosted_button'           => 'Go to secure payment',
+        'hosted_expires'          => 'This payment link is valid until :date.',
+        'hosted_charge_on'        => 'The card is charged on the invoice due date, :date — access continues as usual until then.',
+        'hosted_missing'          => 'The secure payment could not be opened right now. Please try again.',
+    ],
+
+    // Hosted checkout items (name up to 30 characters; description up to 150).
+    'hosted' => [
+        'item_subscription' => 'EasyEye :plan',
+        'item_upgrade'      => 'EasyEye upgrade :plan',
+        'item_ai_pack'      => ':credits AI credits',
+        'description'       => 'Invoice :reference :cycle',
     ],
 
     // "My subscription" page (clinic panel).
@@ -229,6 +250,13 @@ return [
         'ai_pack_discard_keep'       => 'Keep order',
         'ai_pack_discard_confirm'    => 'Discard this credit order? The charge issued (Pix/boleto) is cancelled.',
         'ai_pack_discarded'          => 'Credit order discarded.',
+
+        // Back from the gateway secure environment (Asaas Checkout).
+        'checkout_return_success' => 'Payment sent through the secure environment. Waiting for confirmation — this screen updates by itself.',
+        'checkout_return_cancel'  => 'The payment in the secure environment was not completed. You can try again whenever you want.',
+        'checkout_return_expired' => 'The payment link expired. Open the payment again to generate a new one.',
+        'awaiting_confirmation'   => 'Awaiting confirmation',
+        'card_reregister'         => 'With the plan change, the automatic card charge was recreated without the card (for security, EasyEye does not store its data). To pay by card automatically again, pay the next invoice by card here in My subscription.',
 
         // AI credit packs (My subscription and the AI screen).
         'ai_title'            => 'AI credits',

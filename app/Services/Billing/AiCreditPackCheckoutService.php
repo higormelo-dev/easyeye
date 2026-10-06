@@ -14,7 +14,7 @@ use App\Exceptions\Billing\{CheckoutException, GatewayIntegrationException, Gate
 use App\Models\Billing\{Gateway, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Subscription, User};
 use App\Services\SubscriptionService;
-use App\Support\Billing\{BillingCustomer, PaymentUrl};
+use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PaymentUrl};
 use Carbon\CarbonImmutable;
 use Closure;
 use DomainException;
@@ -67,6 +67,7 @@ class AiCreditPackCheckoutService
         private readonly BillingLogService $billingLog,
         private readonly FinancialEventService $financialEvents,
         private readonly CircuitBreakerService $circuitBreaker,
+        private readonly HostedCheckoutService $hosted,
     ) {
     }
 
@@ -260,6 +261,11 @@ class AiCreditPackCheckoutService
     {
         if ($method->isCard()) {
             if (! $gateway->supportsTransparent($method->value)) {
+                // Asaas: cartão à vista no checkout hospedado (DETACHED).
+                if ($gateway->supportsHostedCardCheckout()) {
+                    return $this->hostedFor($entity, $invoice, $gateway, $issue);
+                }
+
                 return $this->linkFor($entity, $invoice, $gateway, $method, $issue);
             }
 
@@ -596,6 +602,10 @@ class AiCreditPackCheckoutService
                 paymentMethod: $transparent ? $method->value : null,
                 metadata: BillingCustomer::chargeMetadata($entity, ['attempt_number' => $attempt, 'kind' => Invoice::BILLING_REASON_AI_CREDIT_PACK]),
                 idempotencyKey: $key,
+                // Tentativa anterior sem resposta definitiva: reaproveita a
+                // cobrança que o gateway tenha criado (Asaas: pela referência).
+                knownChargeIds: $invoice->knownChargeIds(),
+                lookupBeforeCreate: ChargeIdempotency::previousAttemptInconclusive($invoice),
             ));
         } catch (GatewayIntegrationException $e) {
             $this->circuitBreaker->recordFailure($gateway->code(), $e->getTriggerType(), (string) $entity->id);
@@ -915,6 +925,18 @@ class AiCreditPackCheckoutService
         $isPaid     = in_array($eventType, self::PAID_TYPES, true);
         $isReversal = in_array($eventType, self::REVERSAL_TYPES, true);
 
+        // Estorno de parte do valor: créditos proporcionais revertidos
+        // (RefundService), o pedido segue creditado e a fatura, paga.
+        if ($eventType === 'partially_refunded') {
+            if ($payment !== null && $payment->status !== PaymentStatus::Paid && $invoice->status !== InvoiceStatus::Paid) {
+                $this->confirm($invoice, $payment, 'webhook', $correlationId);
+                $payment->refresh();
+                $invoice->refresh();
+            }
+
+            return [$invoice, $payment, app(RefundService::class)->applyPartialRefund($invoice, $payment, null, $n, $correlationId), []];
+        }
+
         // Estorno/chargeback já aplicado a este pagamento (reentrega depois
         // da retenção de webhook_events): nada de novo evento financeiro/log.
         if ($isReversal && $payment !== null && $payment->status === ($eventType === 'refunded' ? PaymentStatus::Refunded : PaymentStatus::Chargeback)) {
@@ -988,14 +1010,18 @@ class AiCreditPackCheckoutService
         }
 
         if ($isPaid) {
-            if ($payment?->status === PaymentStatus::Paid) {
+            if (in_array($payment?->status, [PaymentStatus::Paid, PaymentStatus::Duplicate], true)) {
                 return [$invoice, $payment, 'duplicate', []];
             }
 
             if ($invoice->status === InvoiceStatus::Paid) {
+                // Pago de novo por outra cobrança: registrado em duplicidade
+                // (não credita nada; o manager estorna pela tela).
+                $payment = $this->recordDuplicatePayment($n, $invoice, $payment);
+
                 $this->billingLog->log(
                     level: 'warning',
-                    message: 'Pagamento para pacote de IA já pago — conferir duplicidade no gateway.',
+                    message: 'Pagamento para pacote de IA já pago — registrado em duplicidade; estornar pelo manager.',
                     context: ['external_payment_id' => $n->externalPaymentId, 'amount' => $n->amount],
                     entityId: (string) $invoice->entity_id,
                     invoice: $invoice,
@@ -1045,7 +1071,27 @@ class AiCreditPackCheckoutService
             $purchase = $this->purchaseOf($invoice);
 
             if ($purchase !== null) {
-                $this->purchases->reverseFromGateway($purchase, $refund ? 'gateway_refund' : 'gateway_chargeback');
+                $reversed  = $this->purchases->reverseFromGateway($purchase, $refund ? 'gateway_refund' : 'gateway_chargeback');
+                $shortfall = (int) data_get($reversed->metadata, 'gateway_reversal.shortfall', 0);
+
+                // A clínica já usou parte dos créditos: o saldo não fica
+                // negativo — o que faltou retirar vira alerta para o time.
+                if ($shortfall > 0) {
+                    app(GatewayAlertService::class)->alert(
+                        gateway: (string) $n->gatewayCode,
+                        kind: 'refund_credits',
+                        params: ['entity' => (string) $invoice->entity?->name, 'reference' => (string) $invoice->reference, 'shortfall' => $shortfall, 'revoked' => (int) data_get($reversed->metadata, 'gateway_reversal.revoked', 0)],
+                        message: "Estorno do pacote de IA {$invoice->reference}: {$shortfall} créditos não puderam ser retirados (a clínica já usou) — conferir.",
+                        level: 'critical',
+                        throttleKey: (string) $invoice->id . ':reversal',
+                        throttleMinutes: 60 * 24 * 30,
+                        entityId: (string) $invoice->entity_id,
+                    );
+                }
+            }
+
+            if ($refund && $payment !== null) {
+                app(RefundService::class)->markFullyRefunded($payment);
             }
 
             $this->financialEvents->record(
@@ -1105,6 +1151,11 @@ class AiCreditPackCheckoutService
             ? ['status' => PaymentStatus::Refunded->value, 'refunded_at' => now()]
             : ['status' => PaymentStatus::Chargeback->value, 'chargeback_at' => now()]);
 
+        // Estorno pedido pelo manager para a duplicidade: concluído.
+        if ($refund && $payment !== null) {
+            app(RefundService::class)->markFullyRefunded($payment, touchInvoice: false);
+        }
+
         $paidBy = data_get($invoice->metadata, 'paid_by_charge');
 
         $this->financialEvents->record(
@@ -1133,6 +1184,39 @@ class AiCreditPackCheckoutService
         );
 
         return [$invoice, $payment, $refund ? 'ai_pack_duplicate_refunded' : 'ai_pack_duplicate_chargeback', []];
+    }
+
+    /**
+     * Pagamento confirmado para o pacote já quitado por outra cobrança:
+     * Payment com status duplicate (nunca paid — não credita nem conta como a
+     * cobrança que quitou), estornável pelo manager.
+     */
+    private function recordDuplicatePayment(NormalizedWebhookEventDTO $n, Invoice $invoice, ?Payment $payment): ?Payment
+    {
+        if (blank($n->externalPaymentId)) {
+            return $payment;
+        }
+
+        $payment ??= Payment::query()->create([
+            'entity_id'           => $invoice->entity_id,
+            'invoice_id'          => $invoice->id,
+            'subscription_id'     => null,
+            'gateway_code'        => $n->gatewayCode,
+            'external_payment_id' => $n->externalPaymentId,
+            'status'              => PaymentStatus::Pending->value,
+            'amount'              => $n->amount ?? (float) $invoice->amount,
+            'currency'            => $n->currency ?? $invoice->currency,
+            'idempotency_key'     => 'webhook:' . $n->gatewayCode . ':' . $n->externalPaymentId,
+            'metadata'            => ['source' => 'webhook', 'kind' => Invoice::BILLING_REASON_AI_CREDIT_PACK],
+        ]);
+
+        $payment->update([
+            'status'   => PaymentStatus::Duplicate->value,
+            'paid_at'  => now(),
+            'metadata' => [...(array) ($payment->metadata ?? []), 'duplicate_payment' => true, 'paid_by_charge' => data_get($invoice->metadata, 'paid_by_charge')],
+        ]);
+
+        return $payment;
     }
 
     /**
@@ -1214,7 +1298,7 @@ class AiCreditPackCheckoutService
         }
 
         if (! $gateway->supportsTransparent($method->value)) {
-            if (! $gateway->supportsCardLink()) {
+            if (! $gateway->supportsHostedCardCheckout() && ! $gateway->supportsCardLink()) {
                 throw CheckoutException::make('card_unavailable');
             }
 
@@ -1420,11 +1504,11 @@ class AiCreditPackCheckoutService
     private function paymentOptions(PaymentGatewayInterface $gateway, ?float $amount): array
     {
         $methods = collect(CheckoutMethod::cases())
-            ->reject(fn (CheckoutMethod $method) => $method->isCard() && ! $gateway->supportsTransparent($method->value) && ! $gateway->supportsCardLink())
+            ->reject(fn (CheckoutMethod $method) => $method->isCard() && ! $gateway->supportsTransparent($method->value) && ! $gateway->supportsHostedCardCheckout() && ! $gateway->supportsCardLink())
             ->map(fn (CheckoutMethod $method) => [
                 'method' => $method->value,
                 'label'  => __("checkout.methods.{$method->value}"),
-                'mode'   => $gateway->supportsTransparent($method->value) ? 'transparent' : 'link',
+                'mode'   => CheckoutService::methodMode($gateway, $method),
             ])->values()->all();
 
         return ['gateway' => $gateway->code(), 'methods' => $methods, ...$this->cardPayload($gateway, (float) ($amount ?? 0))];
@@ -1436,7 +1520,7 @@ class AiCreditPackCheckoutService
         $config = $gateway->supportsTransparent(CheckoutMethod::Card->value) ? $gateway->cardCheckoutConfig() : null;
 
         if ($config === null) {
-            return ['mode' => 'link', 'method' => CheckoutMethod::Card->value, 'card' => null];
+            return ['mode' => CheckoutService::methodMode($gateway, CheckoutMethod::Card), 'method' => CheckoutMethod::Card->value, 'card' => null];
         }
 
         return [
@@ -1451,6 +1535,28 @@ class AiCreditPackCheckoutService
                 'saved_card'       => null,
                 'renewal_in_full'  => false,
             ],
+        ];
+    }
+
+    /**
+     * Cartão do pacote no checkout hospedado do gateway (avulso, à vista).
+     * Leitura (GET): só o já aberto; sem ele, issue_required.
+     *
+     * @return array<string, mixed>
+     */
+    private function hostedFor(Entity $entity, Invoice $invoice, PaymentGatewayInterface $gateway, bool $issue): array
+    {
+        if (($open = $this->hosted->usableFor($invoice, $gateway, false)) !== null) {
+            return ['invoice' => $this->invoiceRow($invoice), ...$this->hosted->response($open, $gateway)];
+        }
+
+        if (! $issue) {
+            return ['invoice' => $this->invoiceRow($invoice), 'mode' => 'hosted', 'method' => CheckoutMethod::Card->value, 'checkout_url' => null, 'issue_required' => true];
+        }
+
+        return [
+            'invoice' => $this->invoiceRow($invoice),
+            ...$this->hosted->open($entity, $invoice, null, $gateway, $this->customerId($gateway, $entity, $invoice), recurrent: false),
         ];
     }
 

@@ -35,6 +35,7 @@ class Payment extends Model
         'payment_method',
         'gateway_fee',
         'net_amount',
+        'refunded_amount',
         'metadata',
         'raw_gateway_payload',
         'correlation_id',
@@ -48,6 +49,7 @@ class Payment extends Model
             'amount'              => 'decimal:2',
             'gateway_fee'         => 'decimal:2',
             'net_amount'          => 'decimal:2',
+            'refunded_amount'     => 'decimal:2',
             'paid_at'             => 'datetime',
             'failed_at'           => 'datetime',
             'refunded_at'         => 'datetime',
@@ -83,5 +85,11 @@ class Payment extends Model
     public function attempts(): HasMany
     {
         return $this->hasMany(PaymentAttempt::class, 'payment_id');
+    }
+
+    /** Pedidos de estorno (manager) deste pagamento. */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(BillingRefund::class, 'payment_id');
     }
 }

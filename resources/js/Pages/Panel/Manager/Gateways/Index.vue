@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import GatewayCard from './GatewayCard.vue';
 import GatewayCredentialsModal from './GatewayCredentialsModal.vue';
-import GatewayEntityAccessModal from './GatewayEntityAccessModal.vue';
 import GatewayPriorityModal from './GatewayPriorityModal.vue';
 import GatewayChangeDefaultModal from './GatewayChangeDefaultModal.vue';
 
@@ -28,19 +28,6 @@ function closeCredentials() {
     credGateway.value = null;
 }
 
-// ── Entity access modal ───────────────────────────────────────────────────────
-const eaOpen = ref(false);
-const eaGateway = ref(null);
-
-function openEntityAccess(g) {
-    eaGateway.value = g;
-    eaOpen.value = true;
-}
-function closeEntityAccess() {
-    eaOpen.value = false;
-    eaGateway.value = null;
-}
-
 // ── Priority modal ────────────────────────────────────────────────────────────
 const prioOpen = ref(false);
 const prioGateway = ref(null);
@@ -61,6 +48,7 @@ const defaultOpen = ref(false);
 <template>
     <AppLayout :title="t.title" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
+            <PageHeader :title="t.title" :total="gateways.length" />
             <!-- Page subtitle -->
             <p class="text-muted small mb-4" v-html="t.subtitle"></p>
 
@@ -104,49 +92,23 @@ const defaultOpen = ref(false);
                 </button>
             </div>
 
-            <!-- ── Context cards ───────────────────────────────────────────────── -->
-            <div class="row g-3 mb-4">
-                <!-- SaaS Billing -->
-                <div class="col-md-6">
-                    <div class="card border-primary border-opacity-50 h-100">
-                        <div class="card-body py-3">
-                            <div class="d-flex gap-3 align-items-start">
-                                <div
-                                    class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 bg-primary bg-opacity-10"
-                                    style="width: 38px; height: 38px"
-                                >
-                                    <i class="ti ti-building-store text-primary fs-18"></i>
-                                </div>
-                                <div>
-                                    <p class="fw-semibold mb-1 small">{{ t.ctx_saas_title }}</p>
-                                    <p class="text-muted mb-1" style="font-size: 0.8rem" v-html="t.ctx_saas_desc"></p>
-                                    <span class="badge badge-soft-primary" style="font-size: 0.72rem">{{
-                                        t.ctx_saas_badge
-                                    }}</span>
-                                </div>
-                            </div>
+            <!-- ── Context card: gateways do dono do SaaS (cobram as clínicas) ───── -->
+            <div class="card border-primary border-opacity-50 mb-4" data-test="gateways-context">
+                <div class="card-body py-3">
+                    <div class="d-flex gap-3 align-items-start">
+                        <div
+                            class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 bg-primary bg-opacity-10"
+                            style="width: 38px; height: 38px"
+                        >
+                            <i class="ti ti-building-store text-primary fs-18"></i>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Tenant Payment -->
-                <div class="col-md-6">
-                    <div class="card border-success border-opacity-50 h-100">
-                        <div class="card-body py-3">
-                            <div class="d-flex gap-3 align-items-start">
-                                <div
-                                    class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 bg-success bg-opacity-10"
-                                    style="width: 38px; height: 38px"
-                                >
-                                    <i class="ti ti-building-hospital text-success fs-18"></i>
-                                </div>
-                                <div>
-                                    <p class="fw-semibold mb-1 small">{{ t.ctx_tenant_title }}</p>
-                                    <p class="text-muted mb-1" style="font-size: 0.8rem" v-html="t.ctx_tenant_desc"></p>
-                                    <span class="badge badge-soft-success" style="font-size: 0.72rem">{{
-                                        t.ctx_tenant_badge
-                                    }}</span>
-                                </div>
+                        <div class="min-w-0">
+                            <p class="fw-semibold mb-1 small">{{ t.ctx_saas_title }}</p>
+                            <p class="text-muted mb-2" style="font-size: 0.8rem" v-html="t.ctx_saas_desc"></p>
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="badge badge-soft-primary" style="font-size: 0.72rem">{{
+                                    t.ctx_saas_badge
+                                }}</span>
                             </div>
                         </div>
                     </div>
@@ -160,7 +122,6 @@ const defaultOpen = ref(false);
                         :gateway="gateway"
                         :t="t"
                         @open-credentials="openCredentials"
-                        @open-entity-access="openEntityAccess"
                         @open-priority="openPriority"
                         @open-set-default="defaultOpen = true"
                     />
@@ -170,7 +131,7 @@ const defaultOpen = ref(false);
                 <div v-if="gateways.length === 0" class="col-12">
                     <div class="text-center py-5 text-muted">
                         <i class="ti ti-credit-card-off fs-40 d-block mb-2 opacity-40"></i>
-                        <p class="small mb-0">Nenhum gateway cadastrado.</p>
+                        <p class="small mb-0">{{ t.empty_state ?? 'Nenhum gateway cadastrado.' }}</p>
                     </div>
                 </div>
             </div>
@@ -186,8 +147,6 @@ const defaultOpen = ref(false);
         />
 
         <GatewayCredentialsModal :open="credOpen" :gateway="credGateway" :t="t" @close="closeCredentials" />
-
-        <GatewayEntityAccessModal :open="eaOpen" :gateway="eaGateway" :t="t" @close="closeEntityAccess" />
 
         <GatewayPriorityModal :open="prioOpen" :gateway="prioGateway" :t="t" @close="closePriority" />
     </AppLayout>

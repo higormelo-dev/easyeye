@@ -13,7 +13,4 @@ return [
     'how'              => 'O pagamento é feito dentro do painel, em Minha assinatura, por Pix, boleto ou cartão.',
     'pay'              => 'Pagar no painel',
     'paid_note'        => 'Se o pagamento já foi feito, desconsidere este aviso.',
-
-    'whatsapp'             => '*:app*: há uma cobrança da assinatura de :entity (plano :plan) de :amount, vencimento :date. Pague pelo painel: :url',
-    'whatsapp_plan_change' => '*:app*: a troca de :entity para o plano :plan foi solicitada. Pague a diferença de :amount (vencimento :date) pelo painel: :url',
 ];

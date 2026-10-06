@@ -3,6 +3,7 @@
 use App\DTOs\Billing\{CancelSubscriptionDTO, CancelSubscriptionResultDTO, CreateChargeDTO, CreateSubscriptionDTO, CustomerDTO, GatewayWebhookInputDTO};
 use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Services\Billing\Gateways\AsaasGateway;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -420,25 +421,35 @@ it('mapeia cada evento de cobrança e de assinatura documentado', function (stri
     ['PAYMENT_OVERDUE', 'overdue'],
     ['PAYMENT_DELETED', 'payment_cancelled'],
     ['PAYMENT_REFUNDED', 'refunded'],
-    ['PAYMENT_PARTIALLY_REFUNDED', 'unknown'],
-    ['PAYMENT_REFUND_IN_PROGRESS', 'unknown'],
-    ['PAYMENT_REFUND_DENIED', 'unknown'],
+    ['PAYMENT_PARTIALLY_REFUNDED', 'partially_refunded'],
+    ['PAYMENT_REFUND_IN_PROGRESS', 'refund_in_progress'],
+    ['PAYMENT_REFUND_DENIED', 'refund_denied'],
     ['PAYMENT_RECEIVED_IN_CASH_UNDONE', 'refunded'],
     ['PAYMENT_CHARGEBACK_REQUESTED', 'chargeback'],
     ['PAYMENT_CHARGEBACK_DISPUTE', 'chargeback'],
     ['PAYMENT_AWAITING_CHARGEBACK_REVERSAL', 'unknown'],
     ['PAYMENT_DUNNING_REQUESTED', 'unknown'],
-    ['PAYMENT_BANK_SLIP_CANCELLED', 'unknown'],
+    ['PAYMENT_BANK_SLIP_CANCELLED', 'instructions_invalidated'],
     ['PAYMENT_BANK_SLIP_VIEWED', 'unknown'],
     ['PAYMENT_CHECKOUT_VIEWED', 'unknown'],
     ['PAYMENT_SPLIT_CANCELLED', 'unknown'],
     ['PAYMENT_SPLIT_DIVERGENCE_BLOCK', 'unknown'],
     ['PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED', 'unknown'],
-    ['SUBSCRIPTION_CREATED', 'unknown'],
-    ['SUBSCRIPTION_UPDATED', 'unknown'],
+    ['SUBSCRIPTION_CREATED', 'subscription_created'],
+    ['SUBSCRIPTION_UPDATED', 'subscription_updated'],
     ['SUBSCRIPTION_INACTIVATED', 'cancelled'],
     ['SUBSCRIPTION_DELETED', 'cancelled'],
     ['SUBSCRIPTION_SPLIT_DISABLED', 'unknown'],
+    ['CHECKOUT_CREATED', 'checkout_created'],
+    ['CHECKOUT_PAID', 'checkout_paid'],
+    ['CHECKOUT_CANCELED', 'checkout_canceled'],
+    ['CHECKOUT_EXPIRED', 'checkout_expired'],
+    ['ACCESS_TOKEN_CREATED', 'unknown'],
+    ['ACCESS_TOKEN_ENABLED', 'unknown'],
+    ['ACCESS_TOKEN_DISABLED', 'access_token_alert'],
+    ['ACCESS_TOKEN_DELETED', 'access_token_alert'],
+    ['ACCESS_TOKEN_EXPIRING_SOON', 'access_token_alert'],
+    ['ACCESS_TOKEN_EXPIRED', 'access_token_alert'],
     ['EVENTO_QUE_NAO_EXISTE', 'unknown'],
 ]);
 
@@ -452,7 +463,9 @@ it('evento de cobrança: ids, valor, vencimento, link da fatura e a referência 
         ->and($n->status)->toBe('pending')
         ->and($n->dueDate)->toBe('2026-10-08')
         ->and($n->paymentUrl)->toBe('https://www.asaas.com/i/080225913252')
-        ->and($n->metadata)->toBe(['subscription_id' => '9f1c2d3e-0000-4000-8000-0000000000aa']);
+        ->and($n->metadata)->toBe(['subscription_id' => '9f1c2d3e-0000-4000-8000-0000000000aa', 'billing_type' => 'UNDEFINED'])
+        // occurredAt = dateCreated do evento (horário de Brasília), não a hora do processamento.
+        ->and(CarbonImmutable::parse($n->occurredAt)->setTimezone('America/Sao_Paulo')->format('Y-m-d H:i:s'))->toBe('2026-10-04 10:00:00');
 });
 
 it('evento SUBSCRIPTION_* usa só o id da recorrência — nunca a externalReference', function () {
@@ -476,5 +489,6 @@ it('evento SUBSCRIPTION_* usa só o id da recorrência — nunca a externalRefer
         ->and($n->externalSubscriptionId)->toBe('sub_duplicada')
         ->and($n->externalPaymentId)->toBeNull()
         ->and($n->status)->toBeNull()
-        ->and($n->metadata)->toBe([]);
+        // Só os dados da recorrência — nada de subscription_id/invoice_id pela referência.
+        ->and($n->metadata)->toBe(['recurrence' => ['status' => 'INACTIVE', 'deleted' => true]]);
 });

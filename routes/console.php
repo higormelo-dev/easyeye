@@ -59,6 +59,30 @@ Schedule::command('ai:grant-monthly-quotas')
     ->name('ai:grant-monthly-quotas')
     ->withoutOverlapping();
 
+// Conciliação leve antes da régua: faturas vencidas com cobrança no gateway
+// são conferidas na API e o pagamento cujo webhook não chegou (atraso, fila
+// pausada) é aplicado — teto por execução e parada no 429.
+Schedule::command('billing:reconcile-overdue')
+    ->dailyAt('08:30')
+    ->name('billing:reconcile-overdue')
+    ->withoutOverlapping();
+
+// Estornos pedidos pelo manager parados em "solicitado": conferidos no
+// gateway (sem resposta definitiva: em minutos; os demais depois de 30 dias)
+// e liberados só quando o gateway diz que não existem ou foram negados.
+Schedule::command('billing:check-refunds')
+    ->hourly()
+    ->name('billing:check-refunds')
+    ->withoutOverlapping();
+
+// Health check real dos gateways (Asaas: GET /v3/myAccount/status/) — mantém
+// a chave em uso (3 meses sem uso = desabilitada) e alerta o time quando a
+// credencial é recusada ou é de outro ambiente.
+Schedule::command('billing:gateway-health')
+    ->dailyAt('06:10')
+    ->name('billing:gateway-health')
+    ->withoutOverlapping();
+
 // Régua de cobrança (lembrete D-5, pagamento não identificado, acesso
 // limitado no D+3, encerramento no D+7) — em horário comercial, depois da
 // expiração da madrugada. Idempotente: cada etapa sai uma vez por vencimento.

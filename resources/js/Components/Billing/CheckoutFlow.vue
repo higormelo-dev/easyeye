@@ -26,8 +26,11 @@ import { useTrans } from '@/composables/useTrans.js';
  * Formas: Pix (QR + copia-e-cola + validade), boleto (linha digitável +
  * PDF + vencimento), cartão (SDK oficial do gateway, só o token sai do
  * navegador; parcelas sem juros no anual) e, onde o gateway não tem
- * transparente (InfinitePay; cartão no Asaas), o link externo — avisando que
- * abre o site do gateway.
+ * transparente (InfinitePay), o link externo — avisando que abre o site do
+ * gateway. Cartão no Asaas: o ambiente seguro do Asaas (Asaas Checkout,
+ * modo `hosted`) — a clínica vai à página do Asaas na mesma aba e volta para
+ * Minha assinatura ("aguardando confirmação"); a fatura do plano vira
+ * assinatura no cartão.
  *
  * Confirmação: evento `.invoice.paid` no canal privado billing.{entityId}
  * (tempo real, sem polling). Sem tempo real, "Já paguei — atualizar" relê o
@@ -51,17 +54,19 @@ const RETRY_DELAYS = [3, 5, 8, 13, 21];
 
 const ui = computed(() => props.t?.ui ?? {});
 const { tx } = useTrans(() => ui.value);
-const { money } = useLocaleFormat();
+const { money, date, dateTime } = useLocaleFormat();
 
 const headingId = `ee-checkout-step-${useId()}`;
 const heading = ref(null);
 const cardForm = ref(null);
 
-const step = ref('choose'); // choose | loading | pix | boleto | card | link | processing | paid
+const step = ref('choose'); // choose | loading | pix | boleto | card | link | hosted | processing | paid
 const method = ref(null);
 const instructions = ref(null);
 const cardConfig = ref(null);
 const paymentUrl = ref(null);
+// Checkout hospedado (Asaas Checkout): link da página segura, validade e se vira assinatura no cartão.
+const hosted = ref({ url: null, expiresAt: null, recurrent: false, firstChargeOn: null });
 const error = ref(null);
 const notice = ref('');
 const checking = ref(false);
@@ -96,6 +101,7 @@ const maxInstallments = computed(() =>
 function methodHint(info) {
     if (info.method === 'pix') return ui.value.method_hint_pix;
     if (info.method === 'boleto') return ui.value.method_hint_boleto;
+    if (info.mode === 'hosted') return tx('method_hint_card_hosted', { gateway: gatewayName.value });
     const split = maxInstallments.value > 1 ? ` ${tx('method_hint_card_split', { count: maxInstallments.value })}` : '';
 
     return `${ui.value.method_hint_card}${split}`;
@@ -130,20 +136,50 @@ const stepTitle = computed(
             boleto: ui.value.boleto_title,
             card: ui.value.card_title,
             link: tx('link_title', { gateway: gatewayName.value }),
+            hosted: tx('hosted_title', { gateway: gatewayName.value }),
             processing: ui.value.processing,
             paid: ui.value.paid_title,
         })[step.value] ?? '',
 );
 
-const safePaymentUrl = computed(() => {
+function safeHttps(value) {
     try {
-        const url = new URL(String(paymentUrl.value ?? ''));
+        const url = new URL(String(value ?? ''));
 
         return url.protocol === 'https:' ? url.href : '';
     } catch {
         return '';
     }
+}
+
+const safePaymentUrl = computed(() => safeHttps(paymentUrl.value));
+const safeHostedUrl = computed(() => safeHttps(hosted.value.url));
+// Assinatura no cartão com a 1ª cobrança no vencimento futuro da fatura.
+const firstChargeLater = computed(() => {
+    const on = hosted.value.firstChargeOn;
+    if (!hosted.value.recurrent || !on) return false;
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    return on > iso;
 });
+
+/** Vai para a página segura do gateway (mesma aba): a volta é pela URL de callback. */
+function goToHosted() {
+    if (!safeHostedUrl.value) return;
+    window.location.assign(safeHostedUrl.value);
+}
+
+function useHosted(res) {
+    hosted.value = {
+        url: res?.checkout_url ?? res?.payment_url ?? null,
+        expiresAt: res?.expires_at ?? null,
+        recurrent: !!res?.recurrent,
+        firstChargeOn: res?.first_charge_on ?? null,
+    };
+
+    return go('hosted');
+}
 
 function go(next) {
     step.value = next;
@@ -201,6 +237,8 @@ function applyResponse(res) {
     if (res?.invoice) useInvoice(res.invoice);
 
     if (res?.status === 'paid') return markPaid();
+
+    if (res?.mode === 'hosted') return useHosted(res);
 
     if (res?.mode === 'link') {
         paymentUrl.value = res.payment_url ?? null;
@@ -266,6 +304,7 @@ async function choose(code) {
     retryState.value = { count: 0, seconds: 0 };
     instructions.value = null;
     paymentUrl.value = null;
+    hosted.value = { url: null, expiresAt: null, recurrent: false, firstChargeOn: null };
 
     const info = methods.value.find((m) => m.method === code);
 
@@ -309,6 +348,8 @@ async function sendCard(payload, key) {
     if (res?.invoice) useInvoice(res.invoice);
 
     if (res?.status === 'paid') return markPaid();
+
+    if (res?.mode === 'hosted') return useHosted(res);
 
     if (res?.mode === 'link') {
         paymentUrl.value = res.payment_url ?? null;
@@ -468,6 +509,14 @@ defineExpose({ choose, step });
                             <i class="ti ti-external-link me-1" aria-hidden="true"></i
                             >{{ tx('method_external', { gateway: gatewayName }) }}
                         </span>
+                        <span
+                            v-else-if="info.mode === 'hosted'"
+                            class="badge badge-soft-secondary mt-1"
+                            data-test="method-hosted"
+                        >
+                            <i class="ti ti-shield-lock me-1" aria-hidden="true"></i
+                            >{{ tx('method_hosted', { gateway: gatewayName }) }}
+                        </span>
                     </span>
                     <i class="ti ti-chevron-right text-muted" aria-hidden="true"></i>
                 </button>
@@ -539,6 +588,36 @@ defineExpose({ choose, step });
                         <i class="ti ti-refresh me-1" aria-hidden="true"></i>{{ ui.retry }}
                     </button>
                 </div>
+            </div>
+
+            <div v-else-if="step === 'hosted'" data-test="checkout-hosted">
+                <p class="small">{{ tx('hosted_body', { gateway: gatewayName }) }}</p>
+                <p v-if="hosted.recurrent" class="small text-muted" data-test="checkout-hosted-recurrent">
+                    <i class="ti ti-repeat me-1" aria-hidden="true"></i
+                    >{{ tx('hosted_recurrent', { gateway: gatewayName }) }}
+                </p>
+                <p v-if="firstChargeLater" class="small text-muted" data-test="checkout-hosted-charge-on">
+                    <i class="ti ti-calendar me-1" aria-hidden="true"></i
+                    >{{ tx('hosted_charge_on', { date: date(hosted.firstChargeOn) }) }}
+                </p>
+                <button
+                    v-if="safeHostedUrl"
+                    type="button"
+                    class="btn btn-primary"
+                    data-test="checkout-hosted-go"
+                    @click="goToHosted"
+                >
+                    <i class="ti ti-shield-lock me-1" aria-hidden="true"></i>{{ ui.hosted_button }}
+                </button>
+                <div v-else class="alert alert-warning text-warning-emphasis small mb-0">
+                    <p class="mb-2">{{ ui.hosted_missing }}</p>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="load">
+                        <i class="ti ti-refresh me-1" aria-hidden="true"></i>{{ ui.retry }}
+                    </button>
+                </div>
+                <p v-if="hosted.expiresAt && safeHostedUrl" class="small text-muted mt-2 mb-0">
+                    {{ tx('hosted_expires', { date: dateTime(hosted.expiresAt) }) }}
+                </p>
             </div>
 
             <div v-else-if="step === 'processing'" class="text-center py-3" data-test="checkout-processing">

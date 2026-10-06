@@ -21,10 +21,4 @@ return [
         'subject' => 'Your :app free trial ends today',
         'line'    => 'The :entity free trial ends today, :date. Subscribe to a plan in the panel, under My subscription, to keep using :app.',
     ],
-
-    'whatsapp' => [
-        'three_days' => '*:app*: the :entity free trial ends in :days days (:date). To continue without interruption, subscribe in the panel: :url',
-        'one_day'    => '*:app*: the :entity free trial ends tomorrow (:date). Subscribe in the panel so you do not lose access: :url',
-        'today'      => '*:app*: the :entity free trial ends today (:date). Subscribe in the panel to continue: :url',
-    ],
 ];

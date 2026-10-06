@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Billing;
 
+use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Models\Billing\WebhookEvent;
 use App\Services\Billing\ProcessWebhookEventService;
 use Illuminate\Bus\Queueable;
@@ -35,7 +36,19 @@ class ProcessBillingWebhookJob implements ShouldQueue
             return;
         }
 
-        $service->process($event);
+        try {
+            $service->process($event);
+        } catch (GatewayIntegrationException $e) {
+            // 429 numa consulta ao gateway: reprocessa depois do tempo pedido
+            // pela API (RateLimit-Reset/Retry-After), nunca na hora.
+            if ($e->isRateLimit()) {
+                $this->release(max(1, (int) $e->retryAfter()));
+
+                return;
+            }
+
+            throw $e;
+        }
     }
 
     public function failed(Throwable $exception): void

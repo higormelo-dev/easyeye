@@ -218,6 +218,10 @@ class PlanChangeService
 
         $this->cancelCharges($subscription, $toCancel, $correlationId);
 
+        // Checkout de cartão recorrente aberto/pago com os termos atuais: a
+        // recorrência dele cobraria os termos antigos depois da troca.
+        app(BillingCancellationService::class)->supersedeHostedCheckouts($subscription, 'plan_changed', $correlationId, recurrentOnly: true);
+
         if ($subscription->hasGatewayRecurrence()) {
             // Recorrência do gateway (Asaas): a próxima cobrança dela já sai
             // no novo valor/ciclo, a partir do fim do período pago.
@@ -321,6 +325,8 @@ class PlanChangeService
         });
 
         $this->cancelCharges($subscription, $toCancel, $correlationId);
+
+        app(BillingCancellationService::class)->supersedeHostedCheckouts($subscription, 'plan_change_undone', $correlationId, recurrentOnly: true);
 
         if ($subscription->hasGatewayRecurrence()) {
             // A recorrência já refeita nos termos novos volta aos atuais.

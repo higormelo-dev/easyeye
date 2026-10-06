@@ -16,8 +16,12 @@ use App\DTOs\Billing\{
     GatewayCallContext,
     GatewayHealthDTO,
     GatewayWebhookInputDTO,
+    HostedCheckoutDTO,
+    HostedCheckoutResultDTO,
     NormalizedWebhookEventDTO,
     PaymentInstructionsDTO,
+    RefundRequestDTO,
+    RefundResultDTO,
     SaveCardResultDTO,
     SavedCardDTO,
 };
@@ -26,14 +30,11 @@ use App\Services\Billing\GatewayCredentialResolver;
 use App\Support\Billing\{PayloadSanitizer, PaymentUrl};
 use Illuminate\Http\Client\{ConnectionException, Response};
 use Illuminate\Support\{Arr, Str};
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\{Cache, Http, Log};
 
 abstract class AbstractHttpGateway implements PaymentGatewayInterface
 {
     protected ?string $correlationId = null;
-
-    /** Escopo das credenciais: null = SaaS (global); uuid = gateway próprio da clínica. */
-    private ?string $credentialEntityId = null;
 
     public function __construct(
         protected readonly GatewayCredentialResolver $credentialResolver,
@@ -44,11 +45,10 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
 
     public function withContext(GatewayCallContext $context): static
     {
+        // A credencial é sempre a do dono do SaaS (global): clínica não tem
+        // gateway próprio — o contexto só leva a correlação.
         $clone                = clone $this;
         $clone->correlationId = $context->correlationId;
-        // Assinatura do EasyEye cobra com a credencial do SaaS; só a cobrança
-        // feita pela própria clínica usa a credencial dela.
-        $clone->credentialEntityId = $context->useTenantCredentials ? $context->entityId : null;
 
         return $clone;
     }
@@ -360,6 +360,12 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         return null;
     }
 
+    /** Padrão: até 12x (Mercado Pago, Pagar.me, PagBank); a Stripe BR é só à vista. */
+    public function cardMaxInstallments(): int
+    {
+        return 12;
+    }
+
     public function chargeCard(CardChargeDTO $payload): CreateChargeResultDTO
     {
         return new CreateChargeResultDTO(
@@ -417,6 +423,58 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         $key = $this->resolveExtraCredential('public_key');
 
         return is_string($key) && trim($key) !== '' ? trim($key) : null;
+    }
+
+    // ── Checkout hospedado — padrão: não há ────────────────────────────────
+
+    public function supportsHostedCardCheckout(): bool
+    {
+        return false;
+    }
+
+    public function createHostedCheckout(HostedCheckoutDTO $payload): HostedCheckoutResultDTO
+    {
+        return new HostedCheckoutResultDTO(
+            success: false,
+            externalCheckoutId: null,
+            url: null,
+            errorMessage: "[{$this->code()}] Gateway sem checkout hospedado.",
+        );
+    }
+
+    public function cancelHostedCheckout(string $externalCheckoutId): bool
+    {
+        return false;
+    }
+
+    // ── Estorno — padrão: não suporta (o manager não mostra o botão) ────────
+
+    public function supportsRefund(): bool
+    {
+        return false;
+    }
+
+    public function supportsPartialRefund(): bool
+    {
+        return false;
+    }
+
+    public function refund(RefundRequestDTO $payload): RefundResultDTO
+    {
+        return RefundResultDTO::failed("[{$this->code()}] Estorno pela API não suportado neste gateway.");
+    }
+
+    /** Padrão: sem conferência do estorno pela API. */
+    public function refundStatus(string $externalPaymentId, float $amount, ?string $externalRefundId, string $since): ?RefundResultDTO
+    {
+        return null;
+    }
+
+    // ── Conferência — padrão: sem consulta normalizada ──────────────────────
+
+    public function paymentStatusEvent(string $externalPaymentId): ?NormalizedWebhookEventDTO
+    {
+        return null;
     }
 
     // ── Métodos sobrescrevíveis pelos gateways concretos ────────────────────
@@ -500,6 +558,16 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
     /**
      * Executa uma requisição HTTP ao gateway.
      * Diferencia timeout (ConnectionException) de erro HTTP para circuit breaker.
+     *
+     * 429 (limite da API): a resposta volta normalmente para quem chamou, e
+     * a espera pedida (RateLimit-Reset ou Retry-After —
+     * https://docs.asaas.com/reference/rate-e-quota-limit) vale só para o
+     * que estourou: o limite de frequência é por endpoint — só a rota
+     * (método + endpoint) fica em espera; a cota de 12h é da conta — o
+     * gateway inteiro espera; sem os headers (limite de GETs simultâneos),
+     * espera curta só na rota. Até lá, a chamada nem sai — lança
+     * GatewayIntegrationException rateLimited com os segundos restantes, e
+     * os jobs reagendam para depois (nunca repetem na hora).
      */
     protected function request(
         string $method,
@@ -508,6 +576,10 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         array $replacements = [],
         ?string $idempotencyKey = null,
     ): Response {
+        $route = strtoupper($method) . ':' . $endpointKey;
+
+        $this->assertNotRateLimited($route);
+
         $url = $this->buildEndpoint($endpointKey, $replacements);
 
         try {
@@ -515,7 +587,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
                 ->withHeaders($this->authHeaders())
                 ->withHeaders($this->extraHeaders($idempotencyKey));
 
-            return match (strtoupper($method)) {
+            $response = match (strtoupper($method)) {
                 'GET'    => $client->get($url, $payload),
                 'DELETE' => $client->delete($url, $payload),
                 'PATCH'  => $client->patch($url, $payload),
@@ -524,6 +596,89 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
             };
         } catch (ConnectionException $e) {
             throw GatewayIntegrationException::timeout($this->code(), $e->getMessage());
+        }
+
+        if ($response->status() === 429) {
+            $this->rememberRateLimit($response, $route);
+        }
+
+        return $response;
+    }
+
+    /** Segundos até a API liberar de novo, pelos headers do 429 (padrão 60s, teto 1h). */
+    protected function retryAfterSeconds(Response $response): int
+    {
+        foreach (['RateLimit-Reset', 'Retry-After', 'X-RateLimit-Reset'] as $header) {
+            $value = trim((string) $response->header($header));
+
+            if ($value !== '' && ctype_digit($value)) {
+                $seconds = (int) $value;
+
+                // Alguns gateways mandam o instante (epoch) em vez dos segundos.
+                if ($seconds > 1_000_000_000) {
+                    $seconds -= now()->getTimestamp();
+                }
+
+                return max(1, min(3600, $seconds));
+            }
+        }
+
+        return 60;
+    }
+
+    /** Espera da conta inteira (cota) ou, com $route, só daquela rota. */
+    private function rateLimitKey(?string $route = null): string
+    {
+        return 'billing:gateway:' . $this->code() . ':rate_limited_until' . ($route !== null ? ':' . $route : '');
+    }
+
+    /** O 429 traz o tempo de espera (RateLimit-Reset/Retry-After). */
+    protected function hasRetryAfterHeader(Response $response): bool
+    {
+        foreach (['RateLimit-Reset', 'Retry-After', 'X-RateLimit-Reset'] as $header) {
+            if (ctype_digit(trim((string) $response->header($header)))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** 429 da cota da conta (Asaas: 25 mil requisições em 12h), pela mensagem. */
+    protected function isQuotaRateLimit(Response $response): bool
+    {
+        return preg_match('/\b(cota|quota)\b/iu', $response->body()) === 1;
+    }
+
+    private function rememberRateLimit(Response $response, string $route): void
+    {
+        $quota   = $this->isQuotaRateLimit($response);
+        $timed   = $this->hasRetryAfterHeader($response);
+        $seconds = $timed || $quota
+            ? $this->retryAfterSeconds($response)
+            // Concorrência (sem tempo pedido): espera curta, só nesta rota.
+            : max(1, (int) config('billing.rate_limit.concurrency_backoff_seconds', 5));
+        $key = $quota ? $this->rateLimitKey() : $this->rateLimitKey($route);
+
+        Cache::put($key, now()->addSeconds($seconds)->getTimestamp(), $seconds);
+
+        Log::warning("[{$this->code()}] Limite da API atingido (429): " . ($quota ? 'todas as chamadas' : "chamadas a {$route}") . " suspensas por {$seconds}s.", [
+            'remaining' => $response->header('RateLimit-Remaining'),
+            'reset'     => $response->header('RateLimit-Reset'),
+        ]);
+    }
+
+    /** Ainda dentro da espera pedida pelo último 429 (da conta ou desta rota): não chama. */
+    private function assertNotRateLimited(string $route): void
+    {
+        $now = now()->getTimestamp();
+
+        foreach ([$this->rateLimitKey(), $this->rateLimitKey($route)] as $key) {
+            $until = Cache::get($key);
+
+            if (is_int($until) && $until > $now) {
+                throw GatewayIntegrationException::rateLimited($this->code(), $until - $now);
+            }
         }
     }
 
@@ -556,19 +711,19 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
 
     protected function resolveSecret(): ?string
     {
-        return $this->credentialResolver->resolveSecret($this->code(), $this->credentialEntityId)
+        return $this->credentialResolver->resolveSecret($this->code())
             ?: ((string) $this->gatewayConfig('secret') ?: null);
     }
 
     protected function resolveWebhookSecret(): ?string
     {
-        return $this->credentialResolver->resolveWebhookSecret($this->code(), $this->credentialEntityId)
+        return $this->credentialResolver->resolveWebhookSecret($this->code())
             ?: ((string) $this->gatewayConfig('webhook_secret') ?: null);
     }
 
     protected function resolveExtraCredential(string $key): ?string
     {
-        return $this->credentialResolver->resolveExtra($this->code(), $key, $this->credentialEntityId)
+        return $this->credentialResolver->resolveExtra($this->code(), $key)
             ?: ((string) $this->gatewayConfig($key) ?: null);
     }
 

@@ -88,4 +88,34 @@ return [
             'orphan_recurrence'          => 'Recorrência órfã no gateway (achada pela referência)',
         ],
     ],
+
+    'reconcile_overdue' => [
+        'done'         => 'Faturas vencidas conferidas no gateway: :checked; pagamentos aplicados: :applied.',
+        'dry_run'      => 'Simulação: :count fatura(s) vencida(s) seriam conferidas no gateway. Nada foi consultado nem gravado.',
+        'rate_limited' => 'O gateway pediu para esperar (429): a conferência parou e continua na próxima execução.',
+    ],
+
+    'check_refunds' => [
+        'done' => 'Estornos solicitados conferidos no gateway: :checked (concluídos: :done; liberados: :released; em andamento: :pending; sem conferência: :unchecked).',
+    ],
+
+    'gateway_health' => [
+        'none'        => 'Nenhum gateway ativo para conferir.',
+        'col_gateway' => 'Gateway',
+        'col_status'  => 'Situação',
+        'col_message' => 'Detalhe',
+    ],
+
+    'asaas_notifications' => [
+        'no_gateway'          => 'Asaas não está registrado.',
+        'col_customer'        => 'Cliente no Asaas',
+        'col_result'          => 'Resultado',
+        'result_already'      => 'Já estavam desligadas',
+        'result_disabled'     => 'Notificações desligadas',
+        'result_disabled_dry' => 'Seriam desligadas',
+        'result_failed'       => 'Falhou (tente de novo)',
+        'result_not_found'    => 'Cliente não encontrado no Asaas',
+        'done'                => 'Clientes: :total; desligadas agora: :disabled; já estavam: :already; falhas: :failed.',
+        'dry_run_done'        => 'Simulação: :total cliente(s); :disabled seriam alterados; :already já estão; :failed sem resposta. Nada foi alterado.',
+    ],
 ];

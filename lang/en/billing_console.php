@@ -88,4 +88,34 @@ return [
             'orphan_recurrence'          => 'Orphan recurrence on the gateway (found by reference)',
         ],
     ],
+
+    'reconcile_overdue' => [
+        'done'         => 'Overdue invoices checked on the gateway: :checked; payments applied: :applied.',
+        'dry_run'      => 'Dry run: :count overdue invoice(s) would be checked on the gateway. Nothing was queried or saved.',
+        'rate_limited' => 'The gateway asked to wait (429): the check stopped and continues on the next run.',
+    ],
+
+    'check_refunds' => [
+        'done' => 'Requested refunds checked on the gateway: :checked (completed: :done; released: :released; in progress: :pending; not checked: :unchecked).',
+    ],
+
+    'gateway_health' => [
+        'none'        => 'No active gateway to check.',
+        'col_gateway' => 'Gateway',
+        'col_status'  => 'Status',
+        'col_message' => 'Detail',
+    ],
+
+    'asaas_notifications' => [
+        'no_gateway'          => 'Asaas is not registered.',
+        'col_customer'        => 'Asaas customer',
+        'col_result'          => 'Result',
+        'result_already'      => 'Already disabled',
+        'result_disabled'     => 'Notifications disabled',
+        'result_disabled_dry' => 'Would be disabled',
+        'result_failed'       => 'Failed (try again)',
+        'result_not_found'    => 'Customer not found on Asaas',
+        'done'                => 'Customers: :total; disabled now: :disabled; already: :already; failures: :failed.',
+        'dry_run_done'        => 'Dry run: :total customer(s); :disabled would change; :already already are; :failed without answer. Nothing was changed.',
+    ],
 ];

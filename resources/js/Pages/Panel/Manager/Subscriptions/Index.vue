@@ -3,6 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import KpiCard from '@/Components/Panel/KpiCard.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 import SearchInput from '@/Components/Panel/SearchInput.vue';
 import ManagerBillingNav from '@/Components/Panel/ManagerBillingNav.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
@@ -10,6 +12,7 @@ import SubscriptionTable from './SubscriptionTable.vue';
 import SubscriptionCards from './SubscriptionCards.vue';
 import SubscriptionDetailDrawer from './SubscriptionDetailDrawer.vue';
 import SubscriptionCreateModal from './SubscriptionCreateModal.vue';
+import NoSubscriptionDrawer from './NoSubscriptionDrawer.vue';
 import SubscriptionExtendModal from './SubscriptionExtendModal.vue';
 import SubscriptionTermsModal from './SubscriptionTermsModal.vue';
 
@@ -26,6 +29,8 @@ const props = defineProps({
     canManagePlans: { type: Boolean, default: false },
     t: { type: Object, default: () => ({}) },
 });
+
+const { number } = useLocaleFormat();
 
 // ── View toggle ──────────────────────────────────────────────────────────────
 function readView() {
@@ -100,20 +105,50 @@ function onSort({ sort, direction }) {
 
 // Atalhos do resumo: filtram a lista pela situação/modalidade.
 const summaryCards = computed(() => [
-    { key: 'trial', mode: 'trial', icon: 'ti-clock-play', label: props.t.summary_trial },
-    { key: 'gateway', mode: 'gateway', icon: 'ti-credit-card', label: props.t.summary_gateway },
-    { key: 'complimentary', mode: 'complimentary', icon: 'ti-gift', label: props.t.summary_complimentary },
-    { key: 'past_due', status: 'past_due', icon: 'ti-alert-triangle', label: props.t.summary_past_due },
+    // tone: cor do card (KpiCard tinted, tokens do tema) — uma por estado;
+    // frias = situação normal, quentes = pede atenção. Trial não usa info:
+    // a cor principal do tema é personalizável e pode coincidir com o azul.
+    { key: 'trial', mode: 'trial', icon: 'ti-clock-play', tone: 'purple', label: props.t.summary_trial },
+    { key: 'gateway', mode: 'gateway', icon: 'ti-credit-card', tone: 'primary', label: props.t.summary_gateway },
+    {
+        key: 'complimentary',
+        mode: 'complimentary',
+        icon: 'ti-gift',
+        tone: 'success',
+        label: props.t.summary_complimentary,
+    },
+    {
+        key: 'past_due',
+        status: 'past_due',
+        icon: 'ti-alert-triangle',
+        tone: 'warning',
+        label: props.t.summary_past_due,
+    },
     {
         key: 'awaiting_payment',
         status: 'awaiting_payment',
         icon: 'ti-hourglass',
+        tone: 'orange',
         label: props.t.summary_awaiting_payment,
     },
-    { key: 'without_access', status: 'no_access', icon: 'ti-lock', label: props.t.summary_without_access },
+    {
+        key: 'without_access',
+        status: 'no_access',
+        icon: 'ti-lock',
+        tone: 'danger',
+        label: props.t.summary_without_access,
+    },
     // Cobrança automática do código anterior aguardando conciliação: só aparece quando há.
     ...(props.summary?.needs_review
-        ? [{ key: 'needs_review', status: 'needs_review', icon: 'ti-file-search', label: props.t.summary_needs_review }]
+        ? [
+              {
+                  key: 'needs_review',
+                  status: 'needs_review',
+                  icon: 'ti-file-search',
+                  tone: 'indigo',
+                  label: props.t.summary_needs_review,
+              },
+          ]
         : []),
     // O gateway desativou a recorrência (cobrança passou para o sistema): só aparece quando há.
     ...(props.summary?.recurrence_alert
@@ -122,6 +157,7 @@ const summaryCards = computed(() => [
                   key: 'recurrence_alert',
                   status: 'recurrence_alert',
                   icon: 'ti-repeat-off',
+                  tone: 'pink',
                   label: props.t.summary_recurrence_alert,
               },
           ]
@@ -181,6 +217,15 @@ function openCreate(preset = {}) {
 
 function openCreateFor(s) {
     openCreate({ entity_id: s.entity_id, plan_id: s.plan_id });
+}
+
+// ── Card "Sem assinatura": quais empresas e criar a de cada uma ─────────────
+const noSubOpen = ref(false);
+const noSubscriptionCount = computed(() => Number(props.summary?.no_subscription ?? 0));
+
+function createForCompany(entityId) {
+    noSubOpen.value = false;
+    openCreate({ entity_id: entityId });
 }
 
 // Vindo de Planos ("Nova assinatura neste plano"): ?new=1&new_plan=<id>.
@@ -312,36 +357,43 @@ const breadcrumbs = [
 
             <!-- ── Resumo (assinatura vigente de cada empresa) ──────────── -->
             <section class="sub-summary mb-3" :aria-label="t.summary_label">
-                <button
+                <KpiCard
                     v-for="card in summaryCards"
                     :key="card.key"
-                    type="button"
-                    class="sub-summary__item"
-                    :class="{ 'sub-summary__item--active': isSummaryActive(card) }"
-                    :aria-pressed="isSummaryActive(card)"
+                    tinted
+                    toggle
+                    :active="isSummaryActive(card)"
+                    :tone="card.tone"
+                    :icon="`ti ${card.icon}`"
+                    :label="card.label"
+                    :value="number(summary[card.key] ?? 0)"
                     :data-summary="card.key"
                     @click="applySummary(card)"
-                >
-                    <i :class="['ti', card.icon]" aria-hidden="true"></i>
-                    <span class="sub-summary__value">{{ summary[card.key] ?? 0 }}</span>
-                    <span class="sub-summary__label">{{ card.label }}</span>
-                </button>
-                <button
-                    type="button"
-                    class="sub-summary__item"
-                    :title="t.summary_no_sub_hint"
+                />
+                <!-- Empresas sem assinatura não têm linha na lista (não há o que
+                     filtrar): o card mostra QUAIS são. Com 0, só informa. -->
+                <KpiCard
+                    tinted
+                    :action="noSubscriptionCount > 0"
+                    tone="cyan"
+                    icon="ti ti-building-plus"
+                    :label="t.summary_no_subscription"
+                    :value="number(noSubscriptionCount)"
+                    :hint="noSubscriptionCount > 0 ? t.summary_no_sub_hint : t.summary_no_sub_none"
                     data-summary="no_subscription"
-                    @click="openCreate()"
-                >
-                    <i class="ti ti-building-plus" aria-hidden="true"></i>
-                    <span class="sub-summary__value">{{ summary.no_subscription ?? 0 }}</span>
-                    <span class="sub-summary__label">{{ t.summary_no_subscription }}</span>
-                </button>
+                    @click="noSubOpen = true"
+                />
             </section>
 
             <!-- ── Busca e filtros ─────────────────────────────────────── -->
             <div class="sub-filters mb-3" role="search">
-                <SearchInput v-model="search" :placeholder="t.search_placeholder" max-width="320px" />
+                <SearchInput
+                    v-model="search"
+                    class="sub-filters__search"
+                    wrapper-class=""
+                    :placeholder="t.search_placeholder"
+                    max-width="320px"
+                />
                 <label class="visually-hidden" for="sub-filter-status">{{ t.filter_status }}</label>
                 <select id="sub-filter-status" v-model="filterForm.status" class="form-select form-select-sm">
                     <option value="">{{ t.filter_status_all }}</option>
@@ -367,7 +419,12 @@ const breadcrumbs = [
                     <option value="current">{{ t.filter_scope_current }}</option>
                     <option value="all">{{ t.filter_scope_all }}</option>
                 </select>
-                <button v-if="hasFilters" type="button" class="btn btn-sm btn-link text-nowrap" @click="clearFilters">
+                <button
+                    v-if="hasFilters"
+                    type="button"
+                    class="btn btn-link btn-sm text-decoration-none text-nowrap px-1"
+                    @click="clearFilters"
+                >
                     <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear }}
                 </button>
             </div>
@@ -422,6 +479,14 @@ const breadcrumbs = [
             @block="onBlock"
         />
 
+        <NoSubscriptionDrawer
+            :open="noSubOpen"
+            :total="noSubscriptionCount"
+            :t="t"
+            @close="noSubOpen = false"
+            @create="createForCompany"
+        />
+
         <SubscriptionCreateModal
             :open="createOpen"
             :plans="plans"
@@ -468,44 +533,15 @@ const breadcrumbs = [
 <style scoped>
 .sub-summary {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.75rem;
 }
-.sub-summary__item {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-rows: auto auto;
-    column-gap: 0.5rem;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--bs-border-color);
-    border-radius: var(--bs-border-radius);
-    background: var(--bs-body-bg);
-    color: var(--bs-body-color);
-    text-align: left;
-}
-.sub-summary__item:hover,
-.sub-summary__item--active {
-    border-color: var(--bs-primary);
-}
-.sub-summary__item--active {
-    background: var(--bs-primary-bg-subtle);
-}
-.sub-summary__item .ti {
-    grid-row: 1 / span 2;
-    font-size: 1.25rem;
-    color: var(--bs-secondary-color);
-}
-.sub-summary__value {
-    font-size: 1.125rem;
-    font-weight: 700;
-    line-height: 1.2;
-    font-variant-numeric: tabular-nums;
-}
-.sub-summary__label {
-    font-size: 0.75rem;
-    color: var(--bs-secondary-color);
-    line-height: 1.2;
+/* Celular: 2 por linha (os rótulos quebram em duas linhas). */
+@media (max-width: 575.98px) {
+    .sub-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
 }
 .sub-filters {
     display: flex;
@@ -513,14 +549,22 @@ const breadcrumbs = [
     gap: 0.5rem;
     align-items: center;
 }
+.sub-filters__search {
+    flex: 0 1 320px;
+}
 .sub-filters .form-select {
     width: auto;
     min-width: 160px;
     max-width: 100%;
 }
 @media (max-width: 575.98px) {
+    .sub-filters__search,
     .sub-filters .form-select {
         flex: 1 1 100%;
+    }
+    /* A busca limita a 320px (inline): no celular ocupa a largura toda, como os selects. */
+    .sub-filters__search :deep(.input-group) {
+        max-width: none !important;
     }
 }
 </style>

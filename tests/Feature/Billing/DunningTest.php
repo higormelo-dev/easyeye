@@ -201,7 +201,14 @@ it('cliente pagante: D-5, D+1, D+3 e D+7 — cada etapa uma vez, só para admin,
         ->toEqualCanonicalizing(['reminder', 'overdue', 'limited', 'terminated'])
         ->and(SubscriptionDunningStep::where('subscription_id', $subscription->id)->where('step', 'reminder')->value('recipients_count'))->toBe(3);
 
-    Http::assertSentCount(1);
+    // Antes de limitar (D+3) e de encerrar (D+7) a régua conferiu no gateway
+    // se a cobrança foi paga (só GET da recorrência); fora isso, só o
+    // cancelamento da recorrência.
+    $sent = Http::recorded()->map(fn (array $pair) => $pair[0]);
+
+    expect($sent->reject(fn ($r) => $r->method() === 'GET')->count())->toBe(1)
+        ->and($sent->filter(fn ($r) => $r->method() === 'GET')->every(fn ($r) => str_contains($r->url(), '/v3/subscriptions/sub_regua_001')))->toBeTrue()
+        ->and($sent->filter(fn ($r) => $r->method() === 'GET')->count())->toBeGreaterThan(0);
 });
 
 it('pagou no D+2: não avisa acesso limitado nem encerra; o aviso na fila deixa de valer', function () {
@@ -553,9 +560,13 @@ describe('encerramento no D+7: o e-mail diz exatamente o que aconteceu com as co
 
     it('recorrência cujo cancelamento falhou agora: diz que está em andamento, sem afirmar o cancelamento', function () use ($terminatedText) {
         Queue::fake();
-        // O Asaas fora do ar (troca o fake do beforeEach, que responde 200).
+        // O cancelamento no Asaas falha (troca o fake do beforeEach, que
+        // responde 200); a conferência do pagamento (GET) funciona — sem ela
+        // a régua nem encerraria (adia a etapa).
         Http::swap(new Factory());
-        Http::fake(['https://api.asaas.com/v3/subscriptions/*' => Http::response(['errors' => [['code' => 'unavailable']]], 503)]);
+        Http::fake(fn (Request $r) => $r->method() === 'GET'
+            ? Http::response(['object' => 'list', 'id' => 'sub_x', 'status' => 'ACTIVE', 'deleted' => false, 'hasMore' => false, 'data' => []])
+            : Http::response(['errors' => [['code' => 'unavailable']]], 503));
         dunningPaying(['status' => SubscriptionStatus::PastDue, 'past_due_at' => '2026-10-08 23:59:59']);
 
         dunningRunAt('2026-10-15 09:00:00');

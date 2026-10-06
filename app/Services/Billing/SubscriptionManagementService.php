@@ -191,6 +191,10 @@ class SubscriptionManagementService
 
         if ($stopRecurrence) {
             $this->cancellation->cancelGatewayRecurrence($stopRecurrence, $correlationId);
+        } else {
+            // Virou cortesia sem recorrência no gateway: checkout de cartão
+            // aberto/pago da cobrança automática deixa de valer.
+            $this->cancellation->supersedeHostedCheckouts($subscription, 'became_complimentary', $correlationId);
         }
 
         return $change;
@@ -280,6 +284,7 @@ class SubscriptionManagementService
             if ($old->hasGatewayRecurrence()) {
                 $this->cancellation->cancelGatewayRecurrence($old, $correlationId);
             } elseif (filled($old->gateway)) {
+                $this->cancellation->supersedeHostedCheckouts($old, 'subscription_replaced', $correlationId);
                 $this->cancellation->cancelOpenCharges($old, correlationId: $correlationId);
             }
         });

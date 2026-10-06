@@ -294,6 +294,7 @@ class SubscriptionCycleService
             }
 
             if (filled($old->gateway)) {
+                $this->cancellation->supersedeHostedCheckouts($old, 'subscription_replaced', $correlationId);
                 $this->cancellation->cancelOpenCharges($old, correlationId: $correlationId);
             }
         });
@@ -522,6 +523,10 @@ class SubscriptionCycleService
                 'new'           => SubscriptionManagementService::snapshot($subscription->fresh('plan')),
             ],
         ]);
+
+        // Checkout de cartão recorrente aberto/pago nos termos anteriores ao
+        // upgrade deixa de valer (HTTP depois do commit).
+        $this->cancellation->supersedeHostedCheckouts($subscription, 'plan_upgraded', $correlationId, recurrentOnly: true);
 
         // Recorrência do gateway (Asaas): refeita nos novos termos, com a
         // próxima cobrança no novo fim de período — só depois do commit.

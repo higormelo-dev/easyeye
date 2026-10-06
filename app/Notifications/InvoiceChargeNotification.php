@@ -69,9 +69,14 @@ class InvoiceChargeNotification extends Notification implements SendsSaasWhatsAp
             ->salutation(__('billing_charge_notice.salutation', ['app' => config('app.name')]));
     }
 
-    public function toSaasWhatsApp(object $notifiable): ?string
+    /** @return array{template: string, values: array<string, string>, url: string} */
+    public function toSaasWhatsApp(object $notifiable): ?array
     {
-        return __($this->invoice->isPlanChange() ? 'billing_charge_notice.whatsapp_plan_change' : 'billing_charge_notice.whatsapp', [...$this->params(), 'url' => $this->url()]);
+        return [
+            'template' => $this->invoice->isPlanChange() ? 'saas_charge_plan_change' : 'saas_charge',
+            'values'   => $this->params(),
+            'url'      => $this->url(),
+        ];
     }
 
     /** @return array<string, mixed> */

@@ -13,7 +13,4 @@ return [
     'how'              => 'Payment is made inside the panel, under My subscription, by Pix, bank slip or card.',
     'pay'              => 'Pay in the panel',
     'paid_note'        => 'If you have already paid, please disregard this notice.',
-
-    'whatsapp'             => '*:app*: there is a charge for the :entity subscription (:plan plan) of :amount, due :date. Pay in the panel: :url',
-    'whatsapp_plan_change' => '*:app*: the change of :entity to the :plan plan was requested. Pay the difference of :amount (due :date) in the panel: :url',
 ];

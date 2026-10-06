@@ -7,7 +7,8 @@ use App\Jobs\WhatsApp\{ProcessWhatsAppInboundJob, SendWhatsAppMessageJob};
 use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator, Patient, PatientAccount, PatientCall, People, Plan, PlanFeature, Schedule, Subscription};
 use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppSetting};
 use App\Services\Billing\ClinicServiceGate;
-use App\Services\WhatsApp\ZApiClient;
+use App\Services\WhatsApp\Contracts\WhatsAppProvider;
+use App\Services\WhatsApp\{WhatsAppService, WhatsAppTemplates};
 use Carbon\{Carbon, CarbonImmutable};
 use Illuminate\Bus\UniqueLock;
 use Illuminate\Support\Facades\{Cache, Http, Queue, Route};
@@ -59,10 +60,9 @@ function blockedClinicAccess(string $level): Subscription
 
 function blockedClinicWhatsApp(): Schedule
 {
-    WhatsAppSetting::create([
+    test()->wppSetting = WhatsAppSetting::create([
         'entity_id'                 => test()->clinic->id,
-        'credentials'               => ['instance_id' => 'INST1', 'instance_token' => 'TOK1', 'client_token' => 'CT1'],
-        'instance_id'               => 'INST1',
+        'app_id'                    => 'clinic-own-app',
         'webhook_token'             => str_repeat('w', 48),
         'active'                    => true,
         'confirmation_enabled'      => true,
@@ -72,13 +72,14 @@ function blockedClinicWhatsApp(): Schedule
     ]);
 
     return Schedule::query()->create([
-        'entity_id' => test()->clinic->id,
-        'doctor_id' => createDoctorForEntity(test()->clinic)->id,
-        'full_name' => 'MARIA DA SILVA',
-        'cellphone' => '61999998888',
-        'date_time' => now()->addHours(5),
-        'situation' => ScheduleSituation::Scheduled->value,
-        'active'    => true,
+        'entity_id'          => test()->clinic->id,
+        'doctor_id'          => createDoctorForEntity(test()->clinic)->id,
+        'full_name'          => 'MARIA DA SILVA',
+        'cellphone'          => '61999998888',
+        'cellphone_whatsapp' => true,
+        'date_time'          => now()->addHours(5),
+        'situation'          => ScheduleSituation::Scheduled->value,
+        'active'             => true,
     ]);
 }
 
@@ -148,10 +149,10 @@ describe('WhatsApp automático', function () {
         // Bloqueou antes de o worker pegar a mensagem.
         $sub->update(['ends_at' => now()->subMinute()]);
 
-        $client = Mockery::mock(ZApiClient::class);
-        $client->shouldNotReceive('sendText');
+        $provider = Mockery::mock(WhatsAppProvider::class);
+        $provider->shouldNotReceive('sendTemplate');
 
-        (new SendWhatsAppMessageJob((string) $message->id))->handle($client);
+        (new SendWhatsAppMessageJob((string) $message->id))->handle($provider, app(WhatsAppService::class), app(WhatsAppTemplates::class), app(ClinicServiceGate::class));
 
         $message->refresh();
         expect($message->status)->toBe(WhatsAppMessage::STATUS_SKIPPED)
@@ -187,18 +188,18 @@ describe('WhatsApp automático', function () {
         $schedule = blockedClinicWhatsApp();
 
         $out = WhatsAppMessage::create([
-            'entity_id' => $this->clinic->id, 'schedule_id' => $schedule->id, 'direction' => 'out', 'kind' => 'confirmation',
+            'entity_id' => $this->clinic->id, 'schedule_id' => $schedule->id, 'whatsapp_setting_id' => $this->wppSetting->id, 'direction' => 'out', 'kind' => 'confirmation',
             'phone'     => '5561999998888', 'body' => 'Confirma?', 'status' => WhatsAppMessage::STATUS_SENT, 'sent_at' => now()->subHour(),
         ]);
         $in = WhatsAppMessage::create([
-            'entity_id' => $this->clinic->id, 'direction' => 'in', 'kind' => 'reply', 'phone' => '5561999998888', 'body' => '1', 'status' => WhatsAppMessage::STATUS_RECEIVED,
+            'entity_id' => $this->clinic->id, 'whatsapp_setting_id' => $this->wppSetting->id, 'direction' => 'in', 'kind' => 'reply', 'phone' => '5561999998888', 'body' => '1', 'status' => WhatsAppMessage::STATUS_RECEIVED,
         ]);
 
         $sub->update(['ends_at' => now()->subMinute()]);
 
-        $client = Mockery::mock(ZApiClient::class);
-        $client->shouldNotReceive('sendText');
-        app()->instance(ZApiClient::class, $client);
+        $provider = Mockery::mock(WhatsAppProvider::class);
+        $provider->shouldNotReceive('sendSessionText');
+        app()->instance(WhatsAppProvider::class, $provider);
 
         app()->call([new ProcessWhatsAppInboundJob((string) $in->id), 'handle']);
 

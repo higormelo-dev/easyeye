@@ -509,10 +509,17 @@ class StripeBrGateway extends AbstractHttpGateway
     }
 
     /**
+     * Parcelamento: a Stripe não documenta parcelas para conta BR
+     * (https://docs.stripe.com/payments/installments) — só à vista.
+     */
+    public function cardMaxInstallments(): int
+    {
+        return 1;
+    }
+
+    /**
      * Stripe.js (Payment Element + stripe.createConfirmationToken; pm_ do
-     * fluxo legado também é aceito). Parcelamento: a Stripe não documenta
-     * parcelas para conta BR (https://docs.stripe.com/payments/installments)
-     * — só à vista.
+     * fluxo legado também é aceito). Só à vista (cardMaxInstallments).
      */
     public function cardCheckoutConfig(): ?CardCheckoutConfigDTO
     {
@@ -521,7 +528,7 @@ class StripeBrGateway extends AbstractHttpGateway
             publicKey: $this->publicKey(),
             sdkUrl: self::SDK_URL,
             tokenization: 'confirmation_token',
-            maxInstallments: 1,
+            maxInstallments: $this->cardMaxInstallments(),
             extra: ['elements_options' => ['mode' => 'payment', 'currency' => 'brl', 'setupFutureUsage' => 'off_session', 'paymentMethodTypes' => ['card']]],
         );
     }

@@ -8,6 +8,7 @@ import { useTrans } from '@/composables/useTrans.js';
 import { choice } from '@/utils/billingPeriods.js';
 import SubscriptionHistory from './SubscriptionHistory.vue';
 import ReasonField from '@/Components/Panel/ReasonField.vue';
+import PaymentRefundModal from './PaymentRefundModal.vue';
 import { useSubscriptionPresenter } from './useSubscriptionPresenter.js';
 
 const props = defineProps({
@@ -216,6 +217,57 @@ async function sendCharge(invoiceId) {
             busy: false,
             error: e?.response?.data?.message ?? props.t.request_failed,
             done: '',
+        };
+    }
+}
+
+// ── Estorno de pagamento (total/parcial, com justificativa) ────────────────
+const refund = ref({ open: false, payment: null, invoice: null, done: '' });
+const { tx: txRefund } = useTrans(() => props.t.refund ?? {});
+
+function openRefund(payment, invoice) {
+    refund.value = { open: true, payment, invoice, done: '' };
+}
+
+async function onRefunded(msg) {
+    refund.value = { ...refund.value, open: false, done: msg };
+    invoicesLoaded.value = false;
+    await loadInvoices();
+}
+
+const REFUND_BADGE = {
+    requested: 'badge-soft-warning',
+    done: 'badge-soft-info',
+    failed: 'badge-soft-danger',
+    cancelled: 'badge-soft-secondary',
+};
+
+// Situação do pedido vista no gateway (conferência) ou o envio pendente/sem resposta.
+function refundNote(r) {
+    const notes = props.t.refund?.notes ?? {};
+    if (r.check_note) return notes[r.check_note] ?? r.check_note;
+    if (r.status === 'requested' && ['queued', 'inconclusive'].includes(r.gateway_state))
+        return notes[r.gateway_state] ?? '';
+    return '';
+}
+
+// "Conferir" o estorno parado em "solicitado": concluído, em andamento ou liberado.
+const refundCheck = ref({ id: null, busy: false, message: '', error: '' });
+
+async function checkRefund(r) {
+    if (!r?.check_url || refundCheck.value.busy) return;
+    refundCheck.value = { id: r.id, busy: true, message: '', error: '' };
+    try {
+        const { data } = await window.axios.post(r.check_url, {}, { headers: { Accept: 'application/json' } });
+        refundCheck.value = { id: r.id, busy: false, message: data?.message ?? '', error: '' };
+        invoicesLoaded.value = false;
+        await loadInvoices();
+    } catch (e) {
+        refundCheck.value = {
+            id: r.id,
+            busy: false,
+            message: '',
+            error: e?.response?.data?.message ?? props.t.request_failed,
         };
     }
 }
@@ -742,24 +794,120 @@ const tabs = computed(() => [
                                 <div
                                     v-for="pay in inv.payments"
                                     :key="pay.id"
-                                    class="d-flex align-items-center justify-content-between py-1 border-bottom"
+                                    class="py-1 border-bottom"
+                                    data-test="sdd-payment"
                                 >
-                                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <span class="badge" :class="pay.status_badge">{{ pay.status }}</span>
-                                        <span class="text-uppercase">{{ pay.gateway_code }}</span>
-                                        <code v-if="pay.external_payment_id" class="small">{{
-                                            pay.external_payment_id
-                                        }}</code>
+                                    <div class="d-flex align-items-center justify-content-between gap-2">
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <span class="badge" :class="pay.status_badge">{{
+                                                pay.status_label || pay.status
+                                            }}</span>
+                                            <span class="text-uppercase">{{ pay.gateway_code }}</span>
+                                            <code v-if="pay.external_payment_id" class="small">{{
+                                                pay.external_payment_id
+                                            }}</code>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fw-semibold">
+                                                {{ money(pay.amount, pay.currency || 'BRL') }}
+                                            </div>
+                                            <div v-if="pay.paid_at" class="text-success small">
+                                                <i class="ti ti-check me-1" aria-hidden="true"></i
+                                                >{{ dateTime(pay.paid_at) }}
+                                            </div>
+                                            <div v-if="pay.failed_at" class="text-danger small">
+                                                <i class="ti ti-x me-1" aria-hidden="true"></i
+                                                >{{ dateTime(pay.failed_at) }}
+                                            </div>
+                                            <div
+                                                v-if="pay.refunded_amount > 0"
+                                                class="text-info small"
+                                                data-test="sdd-payment-refunded"
+                                            >
+                                                {{
+                                                    txRefund('refunded_value', {
+                                                        amount: money(pay.refunded_amount, pay.currency || 'BRL'),
+                                                    })
+                                                }}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="text-end">
-                                        <div class="fw-semibold">{{ money(pay.amount, pay.currency || 'BRL') }}</div>
-                                        <div v-if="pay.paid_at" class="text-success small">
-                                            <i class="ti ti-check me-1" aria-hidden="true"></i
-                                            >{{ dateTime(pay.paid_at) }}
-                                        </div>
-                                        <div v-if="pay.failed_at" class="text-danger small">
-                                            <i class="ti ti-x me-1" aria-hidden="true"></i>{{ dateTime(pay.failed_at) }}
-                                        </div>
+
+                                    <!-- Estornos pedidos pelo manager -->
+                                    <ul v-if="pay.refunds?.length" class="list-unstyled small mb-1 mt-1">
+                                        <li
+                                            v-for="r in pay.refunds"
+                                            :key="r.id"
+                                            class="d-flex flex-wrap align-items-center gap-2"
+                                            data-test="sdd-refund"
+                                            :data-status="r.status"
+                                        >
+                                            <span
+                                                class="badge"
+                                                :class="REFUND_BADGE[r.status] ?? 'badge-soft-secondary'"
+                                                >{{ t.refund?.[`status_${r.status}`] ?? r.status }}</span
+                                            >
+                                            <span>{{ money(r.amount, pay.currency || 'BRL') }}</span>
+                                            <span v-if="r.requested_at" class="text-muted"
+                                                >· {{ dateTime(r.requested_at) }}</span
+                                            >
+                                            <span v-if="r.requested_by" class="text-muted">· {{ r.requested_by }}</span>
+                                            <span v-if="refundNote(r)" class="text-muted" data-test="sdd-refund-note"
+                                                >· {{ refundNote(r) }}</span
+                                            >
+                                            <button
+                                                v-if="r.can_check && r.check_url"
+                                                type="button"
+                                                class="btn btn-link btn-sm p-0 align-baseline"
+                                                :title="t.refund?.check_hint"
+                                                :disabled="refundCheck.busy && refundCheck.id === r.id"
+                                                data-test="sdd-refund-check"
+                                                @click="checkRefund(r)"
+                                            >
+                                                <i class="ti ti-refresh me-1" aria-hidden="true"></i
+                                                >{{ t.refund?.check }}
+                                            </button>
+                                            <a
+                                                v-if="r.request_url"
+                                                :href="r.request_url"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                :title="t.refund?.request_url_hint"
+                                            >
+                                                <i class="ti ti-external-link me-1" aria-hidden="true"></i
+                                                >{{ t.refund?.request_url }}
+                                            </a>
+                                        </li>
+                                    </ul>
+
+                                    <div
+                                        v-if="refundCheck.id && pay.refunds?.some((r) => r.id === refundCheck.id)"
+                                        class="small mt-1"
+                                        :class="refundCheck.error ? 'text-danger' : 'text-success'"
+                                        :role="refundCheck.error ? 'alert' : 'status'"
+                                        data-test="sdd-refund-check-result"
+                                    >
+                                        {{ refundCheck.error || refundCheck.message }}
+                                    </div>
+
+                                    <div v-if="pay.refund?.can_refund" class="mt-1">
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            :title="t.refund?.button_hint"
+                                            data-test="sdd-payment-refund"
+                                            @click="openRefund(pay, inv)"
+                                        >
+                                            <i class="ti ti-receipt-refund me-1" aria-hidden="true"></i
+                                            >{{ t.refund?.button }}
+                                        </button>
+                                    </div>
+                                    <div
+                                        v-if="refund.done && refund.payment?.id === pay.id"
+                                        class="text-success small mt-1"
+                                        role="status"
+                                    >
+                                        {{ refund.done }}
                                     </div>
                                 </div>
                             </div>
@@ -810,6 +958,14 @@ const tabs = computed(() => [
                 </template>
             </div>
         </template>
+        <PaymentRefundModal
+            :open="refund.open"
+            :payment="refund.payment"
+            :invoice="refund.invoice"
+            :t="t"
+            @close="refund.open = false"
+            @refunded="onRefunded"
+        />
     </OffcanvasPanel>
 </template>
 

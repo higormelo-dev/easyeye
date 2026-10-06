@@ -639,6 +639,24 @@ describe('listagem, histórico e busca de empresas', function () {
         $names = collect(subMgrAs()->getJson(route('manager.subscriptions.entities'))->json('data'))->pluck('id');
         expect($names)->not->toContain($this->saas->id);
     });
+
+    it('card "Sem assinatura": lista só as empresas clientes sem assinatura, no mesmo critério do contador', function () {
+        // $this->clinic nasce sem assinatura; outra com trial; a empresa SaaS nunca aparece.
+        $withSub = subMgrClinic(['name' => 'Clínica Com Plano']);
+        Subscription::factory()->trial()->for($withSub)->for($this->plan)->create();
+        $alsoNone = subMgrClinic(['name' => 'Clínica Nova']);
+
+        $response = subMgrAs()->getJson(route('manager.subscriptions.entities', ['without_subscription' => 1]))->assertOk();
+        $ids      = collect($response->json('data'))->pluck('id');
+
+        expect($ids->sort()->values()->all())->toBe(collect([$this->clinic->id, $alsoNone->id])->sort()->values()->all())
+            ->and($response->json('data.0.created_at'))->toBe($alsoNone->created_at->toDateString())
+            ->and($response->json('data.0.current'))->toBeNull();
+
+        // Mesmo número que o card do resumo mostra.
+        subMgrAs()->get(route('manager.subscriptions.index'))->assertOk()
+            ->assertInertia(fn ($page) => $page->where('summary.no_subscription', $ids->count()));
+    });
 });
 
 describe('controle de acesso', function () {

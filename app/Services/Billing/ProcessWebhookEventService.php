@@ -5,11 +5,13 @@ namespace App\Services\Billing;
 use App\Contracts\Billing\PaymentGatewayInterface;
 use App\DTOs\Billing\{GatewayWebhookInputDTO, NormalizedWebhookEventDTO};
 use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentStatus, WebhookEventStatus};
-use App\Enums\{SubscriptionBillingMode, SubscriptionStatus};
-use App\Models\Billing\{Invoice, Payment, WebhookEvent};
+use App\Enums\{BillingCycle, SubscriptionBillingMode, SubscriptionStatus};
+use App\Jobs\Billing\CancelGatewayChargeJob;
+use App\Models\Billing\{HostedCheckout, Invoice, Payment, WebhookEvent};
 use App\Models\{Entity, Subscription};
 use App\Support\Billing\PaymentUrl;
 use Carbon\{CarbonImmutable, CarbonInterface};
+use Closure;
 use Illuminate\Support\{Collection, Str};
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -55,6 +57,21 @@ class ProcessWebhookEventService
     /** Cobrança emitida/alterada: guarda link e vencimento */
     private const CHARGE_CREATED_TYPES = ['created'];
 
+    /** Estorno de parte do valor: registra o devolvido, sem mudar fatura nem acesso. */
+    private const PARTIAL_REFUND_TYPES = ['partially_refunded'];
+
+    /** Andamento/negativa do estorno pedido: só o pedido do manager muda (RefundService). */
+    private const REFUND_STATUS_TYPES = ['refund_in_progress', 'refund_denied'];
+
+    /**
+     * Chamadas ao gateway decididas dentro da transação (desfazer recorrência
+     * do checkout, cancelar a recorrência substituída, alinhar vencimento,
+     * cancelar checkout aberto) — rodam depois do commit.
+     *
+     * @var list<Closure>
+     */
+    private array $deferred = [];
+
     public function __construct(
         private readonly GatewayRegistry $gatewayRegistry,
         private readonly BillingLogService $billingLogService,
@@ -62,6 +79,9 @@ class ProcessWebhookEventService
         private readonly SubscriptionCycleService $cycles,
         private readonly AiCreditPackCheckoutService $aiPacks,
         private readonly GatewayRecurrenceLossService $recurrenceLoss,
+        private readonly HostedCheckoutService $hostedCheckouts,
+        private readonly RefundService $refunds,
+        private readonly GatewayAlertService $alerts,
     ) {
     }
 
@@ -92,22 +112,14 @@ class ProcessWebhookEventService
                 receivedAt: $webhookEvent->received_at?->toIso8601String(),
             ));
 
-            $eventType = strtolower($normalized->eventType);
+            $eventType  = strtolower($normalized->eventType);
+            $normalized = $this->withRefundedTotal($gateway, $normalized, $eventType);
 
-            [$subscription, $invoice, $payment, $outcome, $replaced, $staleCharges] = DB::transaction(
-                fn (): array => $this->apply($normalized, $eventType, $correlationId),
-            );
+            [$subscription, $invoice, $payment, $outcome] = $this->run($gateway, $normalized, $eventType, $correlationId);
 
             if (! $webhookEvent->entity_id && ($subscription || $invoice)) {
                 $webhookEvent->entity_id = $subscription?->entity_id ?? $invoice->entity_id;
             }
-
-            // Cobrança recorrente das assinaturas substituídas: fora da transação (HTTP).
-            $this->cycles->stopRecurrences($replaced, $correlationId);
-
-            // Paga por uma das cobranças da fatura: as outras (a vigente que o
-            // checkout desligou, o boleto/Pix da outra forma) deixam de valer.
-            $this->cancelStaleCharges($gateway, $invoice, $staleCharges, $correlationId);
 
             $webhookEvent->update([
                 'event_type'         => $normalized->eventType,
@@ -164,18 +176,172 @@ class ProcessWebhookEventService
     }
 
     /**
+     * Aplica um evento normalizado que não veio de uma notificação do
+     * gateway — o pagamento conferido na API (régua antes de encerrar,
+     * billing:reconcile-overdue) ou o estorno confirmado na resposta do
+     * pedido do manager — pelo MESMO caminho do webhook (idempotente: o
+     * webhook que chegar depois é duplicado).
+     */
+    public function applyNormalized(NormalizedWebhookEventDTO $normalized, string $source = 'reconcile'): string
+    {
+        $correlationId = (string) Str::uuid();
+        $gateway       = $this->gatewayRegistry->get($normalized->gatewayCode);
+        $eventType     = strtolower($normalized->eventType);
+
+        [$subscription, $invoice, $payment, $outcome] = $this->run($gateway, $this->withRefundedTotal($gateway, $normalized, $eventType), $eventType, $correlationId);
+
+        $this->billingLogService->log(
+            level: str_starts_with($outcome, 'alert_') ? 'warning' : 'info',
+            message: 'Evento conferido no gateway aplicado (sem webhook).',
+            context: ['event_type' => $normalized->eventType, 'outcome' => $outcome, 'source' => $source, 'external_payment_id' => $normalized->externalPaymentId],
+            entityId: $subscription?->entity_id ?? $invoice?->entity_id,
+            subscription: $subscription,
+            invoice: $invoice,
+            payment: $payment,
+            gatewayCode: $normalized->gatewayCode,
+            correlationId: $correlationId,
+        );
+
+        return $outcome;
+    }
+
+    /**
+     * Transação (empresa e assinatura travadas) e, depois do commit, as
+     * chamadas ao gateway: recorrência das substituídas, cobranças que
+     * deixaram de valer e as decididas pelo checkout hospedado.
+     *
+     * @return array{0: ?Subscription, 1: ?Invoice, 2: ?Payment, 3: string}
+     */
+    private function run(PaymentGatewayInterface $gateway, NormalizedWebhookEventDTO $normalized, string $eventType, string $correlationId): array
+    {
+        $this->deferred = [];
+
+        [$subscription, $invoice, $payment, $outcome, $replaced, $staleCharges] = DB::transaction(
+            fn (): array => $this->apply($normalized, $eventType, $correlationId),
+        );
+
+        $deferred       = $this->deferred;
+        $this->deferred = [];
+
+        // Cobrança recorrente das assinaturas substituídas: fora da transação (HTTP).
+        $this->cycles->stopRecurrences($replaced, $correlationId);
+
+        foreach ($deferred as $call) {
+            try {
+                $call();
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        // Paga por uma das cobranças da fatura: as outras (a vigente que o
+        // checkout desligou, o boleto/Pix da outra forma) deixam de valer.
+        $this->cancelStaleCharges($gateway, $invoice, $staleCharges, $correlationId);
+
+        return [$subscription, $invoice, $payment, $outcome];
+    }
+
+    /**
+     * Estorno parcial sem o total devolvido na notificação: consulta a
+     * cobrança no gateway (fora da transação) para saber quanto já voltou.
+     */
+    private function withRefundedTotal(PaymentGatewayInterface $gateway, NormalizedWebhookEventDTO $n, string $eventType): NormalizedWebhookEventDTO
+    {
+        if (! in_array($eventType, self::PARTIAL_REFUND_TYPES, true) || isset($n->metadata['refunded_total']) || blank($n->externalPaymentId)) {
+            return $n;
+        }
+
+        try {
+            $current = $gateway->paymentStatusEvent((string) $n->externalPaymentId);
+        } catch (Throwable) {
+            $current = null;
+        }
+
+        $total = $current?->metadata['refunded_total'] ?? null;
+
+        return is_numeric($total) ? $this->withMetadata($n, ['refunded_total' => (float) $total]) : $n;
+    }
+
+    /** @param array<string, mixed> $extra */
+    private function withMetadata(NormalizedWebhookEventDTO $n, array $extra): NormalizedWebhookEventDTO
+    {
+        return new NormalizedWebhookEventDTO(
+            gatewayCode: $n->gatewayCode,
+            eventType: $n->eventType,
+            externalEventId: $n->externalEventId,
+            externalSubscriptionId: $n->externalSubscriptionId,
+            externalPaymentId: $n->externalPaymentId,
+            externalInvoiceId: $n->externalInvoiceId,
+            status: $n->status,
+            amount: $n->amount,
+            currency: $n->currency,
+            metadata: [...$n->metadata, ...$extra],
+            rawPayload: $n->rawPayload,
+            occurredAt: $n->occurredAt,
+            dueDate: $n->dueDate,
+            paymentUrl: $n->paymentUrl,
+        );
+    }
+
+    /**
      * Resolve e aplica o evento com a empresa e a assinatura travadas.
      *
      * @return array{0: ?Subscription, 1: ?Invoice, 2: ?Payment, 3: string, 4: Collection<int, Subscription>, 5: list<string>}
      */
     private function apply(NormalizedWebhookEventDTO $n, string $eventType, string $correlationId): array
     {
+        // Chave de API perto de expirar, desabilitada, expirada ou removida
+        // (ACCESS_TOKEN_* do Asaas): alerta ao time, nada mais muda.
+        if ($eventType === 'access_token_alert') {
+            return [null, null, null, $this->alertAccessToken($n), collect(), []];
+        }
+
+        // Valor/vencimento alterados ou registro do boleto cancelado: o
+        // Pix/linha digitável guardados dessa cobrança não valem mais.
+        if (($n->metadata['invalidate_instructions'] ?? false) === true) {
+            $this->invalidateInstructions($n);
+        }
+
+        if ($eventType === 'instructions_invalidated') {
+            return [null, null, $this->findPayment($n), 'instructions_invalidated', collect(), []];
+        }
+
+        // Andamento do estorno pedido (PAYMENT_REFUND_IN_PROGRESS) ou estorno
+        // negado (PAYMENT_REFUND_DENIED — boleto): só o pedido do manager
+        // muda; pagamento, fatura e assinatura ficam como estão.
+        if (in_array($eventType, self::REFUND_STATUS_TYPES, true)) {
+            $payment = $this->findPayment($n);
+
+            return [null, $payment?->invoice_id ? Invoice::query()->find($payment->invoice_id) : null, $payment, $this->refunds->applyGatewayRefundStatus($payment, $eventType, $n, $correlationId), collect(), []];
+        }
+
+        // Checkout hospedado (Asaas Checkout): ciclo de vida, assinatura
+        // criada por ele e a 1ª cobrança — que só passa para a fatura quando
+        // é confirmada (a cobrança anterior da fatura vale até lá).
+        if (($checkout = $this->hostedCheckouts->forEvent($n)) !== null) {
+            // Empresa primeiro (mesma ordem do resto do billing), depois o checkout.
+            Entity::query()->whereKey($checkout->entity_id)->lockForUpdate()->first();
+            $checkout = HostedCheckout::query()->whereKey($checkout->id)->lockForUpdate()->firstOrFail();
+
+            $handled        = $this->hostedCheckouts->handleWebhook($n, $eventType, $checkout, $correlationId);
+            $this->deferred = [...$this->deferred, ...$handled['deferred']];
+            $n              = $handled['event'];
+
+            if ($handled['outcome'] !== null) {
+                return [$checkout->subscription, $checkout->invoice, $this->findPayment($n), $handled['outcome'], collect(), []];
+            }
+        }
+
         $knownPayment = $this->findPayment($n);
 
         // Cobrança de pacote de créditos de IA (fatura sem assinatura): o
         // serviço do pacote aplica — credita, estorna — sem tocar assinatura.
         if (($pack = $this->aiCreditPackInvoice($n, $knownPayment)) !== null) {
             [$invoice, $payment, $outcome, $stale] = $this->aiPacks->applyWebhook($n, $eventType, $pack, $correlationId);
+
+            if ($outcome === 'ai_credits_granted') {
+                $this->deferred = [...$this->deferred, ...$this->hostedCheckouts->supersedeOpenCheckouts($invoice, $n->externalPaymentId, $correlationId)];
+            }
 
             return [null, $invoice, $payment, $outcome, collect(), $stale];
         }
@@ -278,8 +444,13 @@ class ProcessWebhookEventService
             [$outcome, $replaced] = $this->applyPaid($subscription, $invoice, $payment, $n, $governed, $correlationId);
 
             if ($invoice && in_array($outcome, ['activated', 'renewed'], true)) {
-                $stale = $this->retireOtherCharges($invoice->refresh(), (string) $n->externalPaymentId);
+                $stale          = $this->retireOtherCharges($invoice->refresh(), (string) $n->externalPaymentId);
+                $this->deferred = [...$this->deferred, ...$this->hostedCheckouts->supersedeOpenCheckouts($invoice, $n->externalPaymentId, $correlationId)];
             }
+        } elseif (in_array($eventType, self::PARTIAL_REFUND_TYPES, true)) {
+            $outcome = $this->applyPartialRefund($subscription, $invoice, $payment, $n, $governed, $correlationId);
+        } elseif ($eventType === 'subscription_updated') {
+            $outcome = $this->checkRecurrenceDivergence($subscription, $n, $governed, $correlationId);
         } elseif (in_array($eventType, self::UNPAID_TYPES, true)) {
             $outcome = $this->applyUnpaid($subscription, $invoice, $payment, $n, $eventType, $governed, $correlationId);
         } elseif (in_array($eventType, self::SUBSCRIPTION_CANCELLED_TYPES, true)) {
@@ -288,6 +459,10 @@ class ProcessWebhookEventService
             $outcome = $this->applyPaymentCancelled($invoice, $payment);
         } elseif (in_array($eventType, self::REFUNDED_TYPES, true)) {
             $outcome = $this->applyRefunded($subscription, $invoice, $payment, $correlationId);
+
+            if ($payment !== null) {
+                $this->refunds->markFullyRefunded($payment);
+            }
         } elseif (in_array($eventType, self::CHARGEBACK_TYPES, true)) {
             $outcome = $this->applyChargeback($subscription, $invoice, $payment, $governed, $correlationId);
         } elseif (in_array($eventType, self::CHARGE_CREATED_TYPES, true)) {
@@ -370,10 +545,20 @@ class ProcessWebhookEventService
                 $cancelled = false;
             }
 
+            // Falhou agora (limite da API, timeout, 5xx): o job tenta de novo
+            // com espera; só esgotado vira alerta crítico (cancelar à mão).
             if (! $cancelled) {
+                try {
+                    CancelGatewayChargeJob::dispatch($gateway->code(), $chargeId, $invoice?->id ? (string) $invoice->id : null, $correlationId)
+                        ->delay(now()->addMinutes(2));
+                } catch (Throwable $e) {
+                    // Fila síncrona: a tentativa já rodou (e alertou se esgotou).
+                    report($e);
+                }
+
                 $this->billingLogService->log(
-                    level: 'critical',
-                    message: 'Fatura paga por uma das cobranças; outra cobrança dela segue aberta no gateway e não pôde ser cancelada — cancelar manualmente (se paga, estornar).',
+                    level: 'warning',
+                    message: 'Fatura paga por uma das cobranças; outra cobrança dela não pôde ser cancelada agora no gateway — nova tentativa agendada.',
                     context: ['external_charge_id' => $chargeId],
                     entityId: $invoice?->entity_id,
                     invoice: $invoice,
@@ -624,12 +809,19 @@ class ProcessWebhookEventService
     ): array {
         // Idempotência por pagamento: confirmado de novo (ex.: CONFIRMED e
         // depois RECEIVED no Asaas) não estende de novo.
-        if ($payment?->status === PaymentStatus::Paid) {
+        if (in_array($payment?->status, [PaymentStatus::Paid, PaymentStatus::Duplicate], true)) {
             return ['duplicate', collect()];
         }
 
+        // Fatura já quitada por OUTRA cobrança: o dinheiro entrou de novo
+        // (ex.: dois checkouts de cartão, Pix antigo pago depois). Registrado
+        // como pagamento em duplicidade (não quita nada — a cobrança que
+        // quitou segue sendo a única "paga"), com alerta, para o manager
+        // estornar pela tela.
         if ($invoice?->status === InvoiceStatus::Paid) {
-            $this->alert($subscription, $invoice, $payment, 'Pagamento para fatura já paga — conferir duplicidade no gateway.', $n, $correlationId);
+            $payment = $this->recordDuplicatePayment($invoice, $payment, $n);
+
+            $this->alert($subscription, $invoice, $payment, 'Pagamento para fatura já paga — registrado em duplicidade; estornar pelo manager (Assinaturas → faturas).', $n, $correlationId);
 
             return ['alert_invoice_already_paid', collect()];
         }
@@ -676,6 +868,40 @@ class ProcessWebhookEventService
         );
 
         return [$wasAwaitingFirst ? 'activated' : 'renewed', $replaced];
+    }
+
+    /**
+     * Pagamento em duplicidade: o Payment da cobrança (criado se ainda não
+     * existe) fica com status duplicate e a data do pagamento — nunca paid
+     * (Invoice::isSettledByCharge/isSettledByAnotherCharge seguem apontando
+     * a cobrança que quitou). Estornável pelo manager (RefundService).
+     */
+    private function recordDuplicatePayment(Invoice $invoice, ?Payment $payment, NormalizedWebhookEventDTO $n): ?Payment
+    {
+        if (blank($n->externalPaymentId)) {
+            return $payment;
+        }
+
+        $payment ??= Payment::query()->create([
+            'entity_id'           => $invoice->entity_id,
+            'invoice_id'          => $invoice->id,
+            'subscription_id'     => $invoice->subscription_id,
+            'gateway_code'        => $n->gatewayCode,
+            'external_payment_id' => $n->externalPaymentId,
+            'status'              => PaymentStatus::Pending->value,
+            'amount'              => $n->amount ?? (float) $invoice->amount,
+            'currency'            => $n->currency ?? $invoice->currency,
+            'idempotency_key'     => 'webhook:' . $n->gatewayCode . ':' . $n->externalPaymentId,
+            'metadata'            => ['source' => 'webhook'],
+        ]);
+
+        $payment->update([
+            'status'   => PaymentStatus::Duplicate->value,
+            'paid_at'  => now(),
+            'metadata' => [...(array) ($payment->metadata ?? []), 'duplicate_payment' => true, 'paid_by_charge' => data_get($invoice->metadata, 'paid_by_charge')],
+        ]);
+
+        return $payment;
     }
 
     private function applyUnpaid(
@@ -847,6 +1073,11 @@ class ProcessWebhookEventService
             ? ['status' => PaymentStatus::Refunded->value, 'refunded_at' => now()]
             : ['status' => PaymentStatus::Chargeback->value, 'chargeback_at' => now()]);
 
+        // Estorno pedido pelo manager para a duplicidade: concluído.
+        if ($refund && $payment !== null) {
+            $this->refunds->markFullyRefunded($payment, touchInvoice: false);
+        }
+
         $this->financialEventService->record(
             eventType: $refund ? BillingEventType::PaymentRefunded : BillingEventType::ChargebackReceived,
             entityId: (string) $invoice->entity_id,
@@ -919,6 +1150,138 @@ class ProcessWebhookEventService
         return 'chargeback';
     }
 
+    /**
+     * Estorno parcial da cobrança que pagou a fatura: só registra o valor
+     * devolvido (RefundService) — fatura paga e acesso como estão. Pagamento
+     * que ainda não estava aplicado (o aviso do pago se perdeu e chegou só o
+     * do estorno parcial) é aplicado antes.
+     */
+    private function applyPartialRefund(?Subscription $subscription, ?Invoice $invoice, ?Payment $payment, NormalizedWebhookEventDTO $n, bool $governed, string $correlationId): string
+    {
+        if ($invoice === null) {
+            $this->alert($subscription, null, $payment, 'Estorno parcial de cobrança sem fatura identificável — conferir no gateway.', $n, $correlationId);
+
+            return 'alert_partial_refund_unknown';
+        }
+
+        if ($payment !== null && $payment->status !== PaymentStatus::Paid && $invoice->status !== InvoiceStatus::Paid) {
+            $this->applyPaid($subscription, $invoice, $payment, $n, $governed, $correlationId);
+            $payment->refresh();
+            $invoice->refresh();
+        }
+
+        return $this->refunds->applyPartialRefund($invoice, $payment, $subscription, $n, $correlationId);
+    }
+
+    /**
+     * SUBSCRIPTION_UPDATED da recorrência vigente: valor, ciclo ou vencimento
+     * alterados direto no painel do gateway. Não muda a assinatura aqui (o que
+     * a clínica paga é o contratado) — alerta o time sobre a divergência.
+     */
+    private function checkRecurrenceDivergence(?Subscription $subscription, NormalizedWebhookEventDTO $n, bool $governed, string $correlationId): string
+    {
+        if ($subscription === null || ! $governed || $this->isForeignRecurrence($n, $subscription) || blank($n->externalSubscriptionId)) {
+            return 'ignored';
+        }
+
+        $recurrence = (array) ($n->metadata['recurrence'] ?? []);
+        $change     = $subscription->scheduledChange();
+        $amounts    = array_filter([$subscription->recurringAmount(), isset($change['amount']) ? (float) $change['amount'] : null], fn ($v) => $v !== null);
+        $cycles     = array_filter([$subscription->effectiveCycle()?->toAsaas(), isset($change['billing_cycle']) ? BillingCycle::tryFrom((string) $change['billing_cycle'])?->toAsaas() : null]);
+        $issues     = [];
+
+        if (isset($recurrence['value']) && $amounts !== [] && ! collect($amounts)->contains(fn ($a) => abs((float) $a - (float) $recurrence['value']) < 0.005)) {
+            $issues['value'] = ['gateway' => (float) $recurrence['value'], 'expected' => array_values($amounts)];
+        }
+
+        if (isset($recurrence['cycle']) && $cycles !== [] && ! in_array(strtoupper((string) $recurrence['cycle']), $cycles, true)) {
+            $issues['cycle'] = ['gateway' => (string) $recurrence['cycle'], 'expected' => array_values($cycles)];
+        }
+
+        // A próxima a ser gerada: o próximo vencimento nosso ou um ciclo
+        // inteiro depois (a do próximo período já pode ter sido gerada).
+        if (isset($recurrence['next_due_date']) && $subscription->next_billing_at !== null && ($months = $subscription->effectiveCycle()?->months()) > 0) {
+            $next     = CarbonImmutable::instance($subscription->next_billing_at)->startOfDay();
+            $accepted = collect(range(0, 2))->map(fn (int $k) => $next->addMonthsNoOverflow($k * $months)->toDateString());
+
+            if (! $accepted->contains((string) $recurrence['next_due_date'])) {
+                $issues['next_due_date'] = ['gateway' => (string) $recurrence['next_due_date'], 'expected' => $next->toDateString()];
+            }
+        }
+
+        if ($issues === []) {
+            return 'recurrence_in_sync';
+        }
+
+        $this->alerts->alert(
+            gateway: $n->gatewayCode,
+            kind: 'recurrence_diverged',
+            params: ['entity' => (string) $subscription->entity?->name, 'subscription' => (string) $n->externalSubscriptionId, 'fields' => implode(', ', array_keys($issues))],
+            message: 'A recorrência no gateway foi alterada fora do EasyEye (valor, ciclo ou vencimento diferentes da assinatura) — conferir e ajustar no painel do gateway.',
+            level: 'critical',
+            throttleKey: (string) $n->externalSubscriptionId . ':' . md5((string) json_encode($issues)),
+            throttleMinutes: 60 * 24,
+            entityId: (string) $subscription->entity_id,
+        );
+
+        $this->alert($subscription, null, null, 'Recorrência alterada no gateway diverge da assinatura: ' . json_encode($issues), $n, $correlationId);
+
+        return 'alert_recurrence_diverged';
+    }
+
+    /** ACCESS_TOKEN_* (https://docs.asaas.com/docs/eventos-para-chaves-de-api): alerta ao time. */
+    private function alertAccessToken(NormalizedWebhookEventDTO $n): string
+    {
+        $token = (array) ($n->metadata['access_token'] ?? []);
+
+        $this->alerts->alert(
+            gateway: $n->gatewayCode,
+            kind: 'access_token',
+            params: [
+                'event'   => (string) ($token['event'] ?? ''),
+                'name'    => (string) ($token['name'] ?? ''),
+                'reason'  => (string) ($token['disable_reason'] ?? ''),
+                'expires' => (string) ($token['expires_by_lack'] ?? $token['expiration_date'] ?? ''),
+            ],
+            message: 'Chave de API do gateway: ' . ($token['event'] ?? 'evento') . ' — trocar ou reativar antes que as cobranças parem.',
+            level: 'critical',
+            throttleKey: (string) ($token['event'] ?? '') . ':' . (string) ($token['id'] ?? ''),
+            throttleMinutes: 60 * 12,
+        );
+
+        return 'alert_access_token';
+    }
+
+    /**
+     * Tira das faturas o Pix/boleto guardados desta cobrança (valor ou
+     * vencimento mudou; boleto vencido cancelado): a próxima abertura do
+     * checkout consulta o gateway de novo. A cobrança segue valendo.
+     */
+    private function invalidateInstructions(NormalizedWebhookEventDTO $n): void
+    {
+        $chargeId = (string) $n->externalPaymentId;
+
+        if ($chargeId === '') {
+            return;
+        }
+
+        Invoice::query()
+            ->where('gateway_code', $n->gatewayCode)
+            ->whereNotNull('payment_instructions')
+            ->where(fn ($q) => $q->where('external_invoice_id', $chargeId)
+                ->orWhereIn('id', Payment::query()->where('gateway_code', $n->gatewayCode)->where('external_payment_id', $chargeId)->select('invoice_id')))
+            ->lockForUpdate()
+            ->get()
+            ->each(function (Invoice $invoice) use ($chargeId): void {
+                $entries = array_filter(
+                    (array) ($invoice->payment_instructions ?? []),
+                    fn ($entry) => (string) data_get($entry, 'charge_id', '') !== $chargeId,
+                );
+
+                $invoice->forceFill(['payment_instructions' => $entries !== [] ? $entries : null])->save();
+            });
+    }
+
     // ── Apoio ────────────────────────────────────────────────────────────────
 
     /**
@@ -969,6 +1332,7 @@ class ProcessWebhookEventService
             ...self::REFUNDED_TYPES,
             ...self::CHARGEBACK_TYPES,
             ...self::CHARGE_CREATED_TYPES,
+            ...self::PARTIAL_REFUND_TYPES,
         ], true);
     }
 

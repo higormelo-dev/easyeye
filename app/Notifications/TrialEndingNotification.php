@@ -67,9 +67,10 @@ class TrialEndingNotification extends Notification implements SendsSaasWhatsApp,
             ->salutation(__('billing_trial.salutation', ['app' => config('app.name')]));
     }
 
-    public function toSaasWhatsApp(object $notifiable): ?string
+    /** @return array{template: string, values: array<string, string|int>, url: string} */
+    public function toSaasWhatsApp(object $notifiable): ?array
     {
-        return __("billing_trial.whatsapp.{$this->step}", [...$this->params(), 'url' => $this->url()]);
+        return ['template' => "saas_trial_{$this->step}", 'values' => $this->params(), 'url' => $this->url()];
     }
 
     /** @return array<string, mixed> */

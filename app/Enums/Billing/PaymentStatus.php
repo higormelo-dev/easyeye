@@ -12,6 +12,14 @@ enum PaymentStatus: string
     case Refunded   = 'refunded';
     case Chargeback = 'chargeback';
 
+    /**
+     * Pagamento confirmado para uma fatura que JÁ estava paga por outra
+     * cobrança (ex.: dois checkouts de cartão pagos): o dinheiro entrou, mas
+     * não quita nada — fica registrado para o manager estornar pela tela.
+     * Nunca conta como "a cobrança que quitou" (Invoice::isSettledByCharge).
+     */
+    case Duplicate = 'duplicate';
+
     /** Status da cobrança devolvido pelo gateway (já normalizado pelo adapter). */
     public static function fromGatewayStatus(?string $status): self
     {

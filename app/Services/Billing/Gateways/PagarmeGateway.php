@@ -571,7 +571,7 @@ class PagarmeGateway extends AbstractHttpGateway
             publicKey: $this->publicKey(),
             sdkUrl: self::SDK_URL,
             tokenization: 'card_token',
-            maxInstallments: 12,
+            maxInstallments: $this->cardMaxInstallments(),
         );
     }
 

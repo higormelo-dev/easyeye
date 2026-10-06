@@ -10,7 +10,6 @@ use App\Models\WhatsApp\WhatsAppSetting;
 use App\Notifications\InvoiceChargeNotification;
 use App\Services\Billing\InvoiceChargeNoticeService;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\{Http, Notification};
 
@@ -190,17 +189,17 @@ it('usuário da clínica não envia cobrança pelo manager (403)', function () {
     Notification::assertNothingSent();
 });
 
-it('WhatsApp pela instância global do SaaS para o contato com telefone verificado, com o link do sistema', function () {
-    config(['whatsapp.driver' => 'zapi', 'whatsapp.zapi.base_url' => 'https://api.z-api.io']);
+it('WhatsApp pelo app global do EasyEye (template) para o contato com telefone verificado, com o link do sistema', function () {
+    useGupshupDriver();
     WhatsAppSetting::create([
         'entity_id'     => null,
         'active'        => true,
         'webhook_token' => WhatsAppSetting::generateWebhookToken(),
-        'credentials'   => ['instance_id' => 'GLOBAL-R5', 'instance_token' => 'TOKEN-R5', 'client_token' => 'CLIENT-R5'],
+        'app_id'        => 'GLOBAL-R5',
     ]);
     $this->clinicAdmin->forceFill(['phone_verified_at' => now()])->save();
 
-    Http::fake(['https://api.z-api.io/*' => Http::response(['zaapId' => 'z1', 'messageId' => 'm1', 'id' => 'm1'])]);
+    fakeGupshup(['partner.gupshup.io/partner/app/*/v3/message' => Http::response(['messages' => [['id' => 'gs-r5']]])]);
 
     $invoice = r5Upgrade();
 
@@ -209,10 +208,15 @@ it('WhatsApp pela instância global do SaaS para o contato com telefone verifica
         ->assertJsonPath('data.whatsapp', 1)
         ->assertJsonPath('data.channels', ['mail', 'whatsapp']);
 
-    Http::assertSentCount(1);
-    Http::assertSent(fn (Request $r) => str_contains($r->url(), '/instances/GLOBAL-R5/token/TOKEN-R5/send-text')
-        && $r['phone'] === '5511988887777'
-        && str_contains((string) $r['message'], '/panel/my-subscription?invoice=' . $invoice->id)
-        && str_contains((string) $r['message'], 'Premium')
-        && ! str_contains((string) $r['message'], 'mercadopago'));
+    $messages = gupshupSentMessages();
+    $template = gupshupTemplateOf($messages[0]);
+
+    expect($messages)->toHaveCount(1)
+        ->and($messages[0]->url())->toBe('https://partner.gupshup.io/partner/app/GLOBAL-R5/v3/message')
+        ->and($messages[0]->header('Authorization')[0])->toBe('sk_app_token')
+        ->and($messages[0]['to'])->toBe('5511988887777')
+        ->and($template['name'])->toBe('easyeye_cobranca_troca_plano')
+        ->and($template['body'])->toContain('Premium')
+        ->and($template['buttons'][0])->toEndWith('my-subscription?invoice=' . $invoice->id)
+        ->and(json_encode($messages[0]->data()))->not->toContain('mercadopago');
 });

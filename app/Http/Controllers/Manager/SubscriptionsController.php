@@ -8,11 +8,11 @@ use App\Enums\{BillingCycle, SaasRule, SubscriptionBillingMode, SubscriptionStat
 use App\Exceptions\Billing\{BillingException, CheckoutException, SubscriptionSupersededException};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\DestructiveActionRequest;
-use App\Http\Requests\Manager\Subscriptions\{ExtendSubscriptionRequest, StoreSubscriptionRequest, UpdateSubscriptionTermsRequest};
-use App\Models\Billing\{BillingRetrySchedule, Invoice, SubscriptionChange};
+use App\Http\Requests\Manager\Subscriptions\{ExtendSubscriptionRequest, RefundPaymentRequest, StoreSubscriptionRequest, UpdateSubscriptionTermsRequest};
+use App\Models\Billing\{BillingRefund, BillingRetrySchedule, Invoice, Payment, SubscriptionChange};
 use App\Models\{Entity, Plan, PlanPrice, Subscription, SubscriptionSetting, User};
 use App\Services\Audit\AuditLogger;
-use App\Services\Billing\{BillingCancellationService, BillingSubscriptionOrchestrator, GatewayRecurrenceLossService, InvoiceChargeNoticeService, PlanChangeService, SubscriptionCycleService, SubscriptionManagementService};
+use App\Services\Billing\{BillingCancellationService, BillingSubscriptionOrchestrator, GatewayRecurrenceLossService, InvoiceChargeNoticeService, PlanChangeService, RefundService, SubscriptionCycleService, SubscriptionManagementService};
 use App\Services\SubscriptionService;
 use App\Support\Billing\{DunningSchedule, PlanPricing};
 use App\Support\BrazilianFormat;
@@ -42,6 +42,7 @@ class SubscriptionsController extends Controller
         private readonly SubscriptionCycleService $cycles,
         private readonly InvoiceChargeNoticeService $chargeNotices,
         private readonly GatewayRecurrenceLossService $recurrenceLoss,
+        private readonly RefundService $refunds,
     ) {
     }
 
@@ -228,7 +229,8 @@ class SubscriptionsController extends Controller
      */
     public function entities(Request $request): JsonResponse
     {
-        $search = $request->string('search')->trim()->value();
+        $search              = $request->string('search')->trim()->value();
+        $withoutSubscription = $request->boolean('without_subscription');
         // CNPJ pode ser alfanumérico (IN RFB 2.229/2024): compara sem pontuação.
         $document = preg_match('/\d/', $search) ? (string) BrazilianFormat::documentChars($search) : '';
 
@@ -243,9 +245,11 @@ class SubscriptionsController extends Controller
                 }
             }))
             ->when($request->filled('id'), fn ($q) => $q->whereKey($request->string('id')->value()))
+            // Card "Sem assinatura": mesmo critério do contador do resumo.
+            ->when($withoutSubscription, fn ($q) => $q->whereDoesntHave('subscriptions', fn ($s) => $s->withoutFailedActivations()))
             ->orderBy('name')
-            ->limit(20)
-            ->get(['id', 'name', 'national_registration', 'active']);
+            ->limit($withoutSubscription ? 50 : 20)
+            ->get(['id', 'name', 'national_registration', 'active', 'created_at']);
 
         $current = Subscription::query()
             ->whereIn('entity_id', $entities->pluck('id'))
@@ -258,12 +262,13 @@ class SubscriptionsController extends Controller
             $s = $current->get($e->id);
 
             return [
-                'id'        => $e->id,
-                'name'      => $e->name,
-                'sub_label' => BrazilianFormat::cpfCnpj($e->national_registration) ?? '',
-                'document'  => $e->national_registration,
-                'active'    => (bool) $e->active,
-                'current'   => $s ? [
+                'id'         => $e->id,
+                'name'       => $e->name,
+                'sub_label'  => BrazilianFormat::cpfCnpj($e->national_registration) ?? '',
+                'document'   => $e->national_registration,
+                'active'     => (bool) $e->active,
+                'created_at' => $e->created_at?->toDateString(),
+                'current'    => $s ? [
                     'id'             => $s->id,
                     'plan_id'        => $s->plan_id,
                     'plan_name'      => $s->plan?->name,
@@ -687,7 +692,7 @@ class SubscriptionsController extends Controller
     public function invoices(Subscription $subscription): JsonResponse
     {
         $invoices = Invoice::query()
-            ->with('payments')
+            ->with(['payments.refunds.requester'])
             ->where('subscription_id', $subscription->id)
             ->orderByDesc('created_at')
             ->get()
@@ -709,11 +714,21 @@ class SubscriptionsController extends Controller
                 'due_at'             => $inv->due_at?->toIso8601String(),
                 'paid_at'            => $inv->paid_at?->toIso8601String(),
                 'created_at'         => $inv->created_at->toIso8601String(),
+                'refunded_amount'    => (float) $inv->refunded_amount,
                 'payments'           => $inv->payments->map(fn ($p) => [
-                    'id'                  => $p->id,
-                    'status'              => $p->status,
-                    'status_badge'        => $this->paymentStatusBadge((string) $p->status),
-                    'amount'              => (float) $p->amount,
+                    'id'              => $p->id,
+                    'status'          => $p->status,
+                    'status_label'    => __('manager_subscriptions.payment_status.' . ($p->status?->value ?? (string) $p->status)),
+                    'status_badge'    => $this->paymentStatusBadge((string) ($p->status?->value ?? $p->status)),
+                    'amount'          => (float) $p->amount,
+                    'refunded_amount' => (float) $p->refunded_amount,
+                    // Estorno pelo manager: só no gateway com estorno pela API e pagamento pago.
+                    'refund'  => $this->refunds->options($p),
+                    'refunds' => $p->refunds->sortByDesc('created_at')->values()->map(fn ($r) => [
+                        ...$this->refunds->row($r),
+                        'check_url' => route('manager.subscriptions.payments.refunds.check', ['subscription' => $subscription->id, 'invoice' => $inv->id, 'payment' => $p->id, 'refund' => $r->id]),
+                    ])->all(),
+                    'refund_url'          => route('manager.subscriptions.payments.refund', ['subscription' => $subscription->id, 'invoice' => $inv->id, 'payment' => $p->id]),
                     'currency'            => $p->currency,
                     'gateway_code'        => $p->gateway_code,
                     'external_payment_id' => $p->external_payment_id,
@@ -724,6 +739,84 @@ class SubscriptionsController extends Controller
             ]);
 
         return response()->json(['data' => $invoices]);
+    }
+
+    /**
+     * Estorna (total ou parcial) um pagamento pago da assinatura, com
+     * justificativa e auditoria. Fica "estorno solicitado" até o gateway
+     * confirmar (webhook ou refunds[] DONE) — RefundService.
+     */
+    public function refund(RefundPaymentRequest $request, Subscription $subscription, Invoice $invoice, Payment $payment): JsonResponse
+    {
+        abort_unless($invoice->subscription_id === $subscription->id && $payment->invoice_id === $invoice->id, 404);
+
+        try {
+            $refund = $this->refunds->request($payment, $request->amount(), $request->reason(), $request->user());
+        } catch (BillingException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $this->audit->recordAdminAction(
+            event: 'manager.subscription.payment.refund',
+            targetEntityId: (string) $subscription->entity_id,
+            targetUserId: null,
+            auditableType: 'payment',
+            auditableId: (string) $payment->id,
+            reason: $request->reason(),
+            newValues: [
+                'refund_id'           => (string) $refund->id,
+                'amount'              => (float) $refund->amount,
+                'partial'             => (bool) $refund->partial,
+                'status'              => $refund->status,
+                'gateway'             => $refund->gateway_code,
+                'external_payment_id' => $refund->external_payment_id,
+                'invoice_reference'   => $invoice->reference,
+            ],
+            request: $request,
+            oldValues: ['payment_status' => $payment->status?->value, 'refunded_amount' => (float) $payment->refunded_amount],
+        );
+
+        return response()->json([
+            'message' => __(match (true) {
+                $refund->status === BillingRefund::STATUS_DONE               => 'manager_subscriptions.refund.done',
+                $refund->gateway_state === BillingRefund::STATE_QUEUED       => 'manager_subscriptions.refund.queued',
+                $refund->gateway_state === BillingRefund::STATE_INCONCLUSIVE => 'manager_subscriptions.refund.inconclusive',
+                default                                                      => 'manager_subscriptions.refund.requested',
+            }),
+            'data' => $this->refunds->row($refund),
+        ]);
+    }
+
+    /**
+     * Confere no gateway o pedido de estorno ainda "solicitado" (sem
+     * resposta definitiva, aguardando o gateway ou parado): concluído,
+     * em andamento ou liberado para um novo pedido — RefundService::check.
+     */
+    public function checkRefund(Request $request, Subscription $subscription, Invoice $invoice, Payment $payment, BillingRefund $refund): JsonResponse
+    {
+        abort_unless($invoice->subscription_id === $subscription->id && $payment->invoice_id === $invoice->id && $refund->payment_id === $payment->id, 404);
+
+        $before  = ['status' => $refund->status, 'gateway_state' => $refund->gateway_state];
+        $outcome = $this->refunds->check($refund);
+        $fresh   = $refund->fresh() ?? $refund;
+
+        $this->audit->recordAdminAction(
+            event: 'manager.subscription.payment.refund_check',
+            targetEntityId: (string) $subscription->entity_id,
+            targetUserId: null,
+            auditableType: 'payment',
+            auditableId: (string) $payment->id,
+            reason: __('manager_subscriptions.refund.check_audit_reason'),
+            newValues: ['refund_id' => (string) $refund->id, 'outcome' => $outcome, 'status' => $fresh->status, 'check_note' => $fresh->check_note],
+            request: $request,
+            oldValues: $before,
+        );
+
+        return response()->json([
+            'message' => __("manager_subscriptions.refund.check_results.{$outcome}"),
+            'outcome' => $outcome,
+            'data'    => $this->refunds->row($fresh),
+        ]);
     }
 
     public function retries(Subscription $subscription): JsonResponse
@@ -1219,6 +1312,7 @@ class SubscriptionsController extends Controller
             'refunded'   => 'badge-soft-info',
             'chargeback' => 'badge-soft-danger',
             'cancelled'  => 'badge-soft-secondary',
+            'duplicate'  => 'badge-soft-orange',
             default      => 'badge-soft-secondary',
         };
     }

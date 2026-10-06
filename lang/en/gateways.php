@@ -4,25 +4,22 @@ declare(strict_types=1);
 
 return [
     // Page
-    'title'      => 'Payment Gateways',
-    'subtitle'   => 'Manage the gateways used by <strong>EasyEye</strong> to charge subscriptions and control which gateways each clinic can use to receive patient payments.',
+    'title'      => 'EasyEye Payment Gateways',
+    'subtitle'   => 'Gateways of the company that owns <strong>EasyEye</strong>, used to charge clinics: plan subscriptions and AI credit packs.',
     'breadcrumb' => 'Payment Gateways',
 
     // Default gateway banner
     'default_banner_title'    => 'System Default Gateway',
-    'default_banner_subtitle' => '— used to bill all subscription plans',
+    'default_banner_subtitle' => '— used to charge clinics for subscriptions and AI credit packs',
     'default_banner_change'   => 'Change',
     'no_default_title'        => 'No default gateway defined.',
     'no_default_subtitle'     => 'Subscription billing will fail until a default gateway is configured.',
     'no_default_action'       => 'Set now',
 
-    // Context cards
-    'ctx_saas_title'   => 'SaaS Billing — charge clinics',
-    'ctx_saas_desc'    => 'Credentials used by EasyEye to charge monthly fees. Configure via <strong>Credentials</strong> and set the default above.',
-    'ctx_saas_badge'   => 'Global credentials in database',
-    'ctx_tenant_title' => 'Tenant Payment — clinics receive from patients',
-    'ctx_tenant_desc'  => 'Each clinic configures its own credentials. Enable access via <strong>Clinic Access</strong>.',
-    'ctx_tenant_badge' => 'Isolated credentials per clinic',
+    // Context card
+    'ctx_saas_title' => 'What these gateways are for',
+    'ctx_saas_desc'  => 'The credentials belong to the company that owns EasyEye: the system uses them to charge clinics for <strong>subscriptions</strong> and <strong>AI credit packs</strong>, and the money goes to the EasyEye account. Add them under <strong>Credentials</strong> and set the default above.',
+    'ctx_saas_badge' => 'EasyEye global credentials',
 
     // Gateway card
     'default_badge'       => 'Default',
@@ -35,19 +32,52 @@ return [
     'billing_credentials' => 'Billing credentials',
     'credentials_active'  => '{1} 1 active|[2,*] :count active',
     'credentials_none'    => 'No credential',
-    'clinics_with_access' => 'Clinics with access',
-    'clinics_none'        => 'None',
-    'clinics_count'       => '{1} 1 clinic|[2,*] :count clinics',
 
     // Capabilities
-    'cap_subscriptions' => 'Subscriptions',
-    'cap_one_time'      => 'One-time charges',
-    'cap_refunds'       => 'Refunds',
-    'cap_webhooks'      => 'Webhooks',
+
+    // What the gateway does in EasyEye today (gateway class capability methods)
+    'caps_title'                 => 'In EasyEye today',
+    'caps_transparent'           => 'Without leaving EasyEye:',
+    'caps_method'                => ['pix' => 'Pix', 'boleto' => 'Boleto', 'credit_card' => 'Card'],
+    'caps_card_public_key_title' => 'Transparent card only with the public key saved in the credential (optional for PagBank).',
+    'caps_link_only'             => 'Gateway link only',
+    'caps_link_only_title'       => "The clinic pays on the gateway's page (Pix and card there).",
+    'caps_card_link'             => 'Card via link',
+    'caps_card_link_title'       => "A charge without a set method opens the gateway's page, which accepts cards.",
+    'caps_hosted_card'           => 'Card in the secure environment',
+    'caps_hosted_card_title'     => "The card is entered on the gateway's hosted page (Asaas Checkout) and the clinic comes back to EasyEye; the plan invoice becomes a card subscription.",
+    'caps_refund'                => 'Full refund by the system',
+    'caps_refund_title'          => 'The manager refunds paid payments through the gateway (Subscriptions → detail → invoices).',
+    'caps_refund_partial'        => 'Full and partial refund',
+    'caps_refund_partial_title'  => 'The manager refunds paid payments through the gateway, full or partial (Subscriptions → detail → invoices).',
+    'health_title'               => 'API connection',
+    'health_checked_at'          => 'checked on :date',
+    'health_status'              => [
+        'ok'                   => 'Working',
+        'auth_error'           => 'Key refused',
+        'environment_mismatch' => 'Key from another environment',
+        'not_configured'       => 'Not configured',
+        'rate_limited'         => 'API rate limit',
+        'unreachable'          => 'No response',
+        'config_only'          => 'Configured',
+    ],
+    'caps_installments'            => 'Up to :countx on card',
+    'caps_installments_one'        => 'Card: single payment only',
+    'caps_installments_title'      => 'Gateway limit; checkout uses the lowest of this, the maximum set in Plans and the cycle months.',
+    'caps_saved_card'              => 'Renews on saved card',
+    'caps_saved_card_title'        => 'Renewal charges the card stored at the gateway, without the clinic typing it again.',
+    'caps_card_replacement'        => 'Card replacement',
+    'caps_card_replacement_title'  => 'The clinic replaces the renewal card without being charged (requires the public key).',
+    'caps_native_recurrence'       => 'Gateway recurrence',
+    'caps_native_recurrence_title' => 'The gateway itself issues the charge for each subscription cycle.',
+    'caps_local_renewal'           => 'Renewal by EasyEye',
+    'caps_local_renewal_title'     => 'EasyEye issues the charge for each renewal on this gateway.',
+
+    // Empty state
+    'empty_state' => 'No gateway registered.',
 
     // Footer buttons
     'btn_credentials'       => 'Credentials',
-    'btn_entity_access'     => 'Clinic Access',
     'btn_set_default'       => 'Set as Default',
     'btn_current_default'   => 'Current Default Gateway',
     'btn_activate_first'    => 'Activate the gateway first',
@@ -64,7 +94,7 @@ return [
 
     // Modal: Credentials
     'modal_cred_title'       => 'Billing Credentials',
-    'modal_cred_alert'       => 'These credentials are used by <strong>EasyEye</strong> to charge clinics for subscriptions. The key is <strong>never displayed</strong> after saving. When a new one is added, the previous is automatically deactivated.',
+    'modal_cred_alert'       => 'These credentials are used by <strong>EasyEye</strong> to charge clinics for subscriptions and AI credit packs. The key is <strong>never displayed</strong> after saving. When a new one is added, the previous is automatically deactivated.',
     'modal_cred_history'     => 'Credential history',
     'modal_cred_loading'     => '',
     'modal_cred_empty'       => 'No credentials added yet.',
@@ -91,16 +121,6 @@ return [
     'modal_cred_public_key_current' => 'Public key: :key',
     'js_error_public_key_secret'    => 'This looks like the secret key (sk_/rk_). Enter the public key.',
 
-    // Modal: Entity access
-    'modal_ea_title'     => 'Clinic Access',
-    'modal_ea_alert'     => 'Enable this gateway for clinics that will configure their own credentials and receive patient payments. The clinic will only see the gateway in their panel after being enabled here.',
-    'modal_ea_search_ph' => 'Filter by clinic name or code…',
-    'modal_ea_loading'   => 'Loading clinics…',
-    'modal_ea_empty'     => 'No clinics found.',
-    'modal_ea_close'     => 'Close',
-    'modal_ea_enable'    => 'Enable',
-    'modal_ea_disable'   => 'Disable',
-
     // Modal: Priority
     'modal_priority_title'  => 'Fallback Priority',
     'modal_priority_desc'   => 'Lower value = higher priority in automatic fallback. Does not affect the default gateway (set explicitly above).',
@@ -113,11 +133,10 @@ return [
     'js_confirm_revoke'            => 'Revoke this credential? This action cannot be undone.',
 
     // JS error fallbacks
-    'js_error_set_default'  => 'Error setting default gateway.',
-    'js_error_generic'      => 'Error.',
-    'js_error_save'         => 'Error saving.',
-    'js_error_load'         => 'Error loading.',
-    'js_error_load_clinics' => 'Error loading clinics.',
+    'js_error_set_default' => 'Error setting default gateway.',
+    'js_error_generic'     => 'Error.',
+    'js_error_save'        => 'Error saving.',
+    'js_error_load'        => 'Error loading.',
 
     // JS credential list labels (passed from view to JS)
     'js_no_label' => 'No label',
@@ -166,9 +185,6 @@ return [
     'priority_updated'       => 'Priority updated.',
     'credential_saved'       => 'Credential saved successfully. The previous credential was deactivated.',
     'credential_revoked'     => 'Credential revoked.',
-    'saas_entity_forbidden'  => 'The SaaS entity cannot be configured here.',
-    'gateway_enabled_for'    => ':gateway enabled for :entity.',
-    'gateway_disabled_for'   => ':gateway disabled for :entity.',
     'error_inactive_gateway' => 'The gateway must be active to be set as default.',
     'error_no_credential'    => 'The gateway must have at least one active credential.',
 ];

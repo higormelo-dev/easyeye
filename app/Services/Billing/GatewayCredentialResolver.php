@@ -2,26 +2,21 @@
 
 namespace App\Services\Billing;
 
+use App\Enums\Billing\CredentialScope;
 use App\Models\Billing\GatewayCredential;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Resolução de credenciais de gateway com separação explícita de contexto.
+ * Resolução das credenciais de gateway do DONO do SaaS.
  *
- * ┌─────────────────────────────────────────────────────────────────────┐
- * │  CONTEXTO 1 — SaaS billing (entityId = null)                       │
- * │  Propósito: cobrar CLÍNICAS pela assinatura do EasyEye             │
- * │  Fonte: gateway_credentials (scope=global, entity_id=null)         │
- * │  Gerenciado em: /panel/manager/gateways                            │
- * ├─────────────────────────────────────────────────────────────────────┤
- * │  CONTEXTO 2 — Tenant payment (entityId = uuid da clínica)          │
- * │  Propósito: clínica recebe pagamentos dos PACIENTES dela            │
- * │  Fonte: gateway_credentials (scope=tenant, entity_id=uuid)         │
- * │  NÃO cai para global — chave do SaaS ≠ chave da clínica           │
- * └─────────────────────────────────────────────────────────────────────┘
+ * Os gateways servem só para o EasyEye cobrar as CLÍNICAS (assinatura e
+ * pacotes de créditos de IA). Clínica não tem gateway próprio: a credencial é
+ * sempre a global (gateway_credentials com scope=global e entity_id NULL),
+ * cadastrada em /panel/manager/gateways. Qualquer linha com entity_id é
+ * ignorada — mesmo que alguém a grave por fora.
  *
- * Credenciais são gerenciadas 100% via banco de dados.
- * Não há dependência de variáveis de ambiente para chaves de API.
+ * Sem credencial no banco, o gateway cai na configuração do .env
+ * (config('billing.gateways.*'), ver AbstractHttpGateway::resolveSecret).
  */
 class GatewayCredentialResolver
 {
@@ -31,62 +26,13 @@ class GatewayCredentialResolver
     }
 
     /**
-     * Resolve a chave secreta/token de API para o gateway.
+     * Resolve a chave secreta/token de API do gateway.
      *
-     * @param string      $gatewayCode Código do gateway (ex: 'asaas')
-     * @param string|null $entityId    null = contexto SaaS billing | uuid = contexto tenant
+     * @param string $gatewayCode Código do gateway (ex: 'asaas')
      */
-    public function resolveSecret(string $gatewayCode, ?string $entityId = null): ?string
+    public function resolveSecret(string $gatewayCode): ?string
     {
-        return $this->resolveSecretFromDb($gatewayCode, $entityId);
-    }
-
-    /**
-     * Resolve o webhook secret para validação de assinatura.
-     */
-    public function resolveWebhookSecret(string $gatewayCode, ?string $entityId = null): ?string
-    {
-        return $this->resolveCredentialFromDb($gatewayCode, $entityId)?->webhook_secret;
-    }
-
-    /**
-     * Resolve credenciais extras (ex: client_id, public_key).
-     */
-    public function resolveExtra(string $gatewayCode, string $key, ?string $entityId = null): ?string
-    {
-        $credential = $this->resolveCredentialFromDb($gatewayCode, $entityId);
-
-        if (! $credential || ! is_array($credential->credentials)) {
-            return null;
-        }
-
-        $value = $credential->credentials[$key] ?? null;
-
-        return is_string($value) && $value !== '' ? $value : null;
-    }
-
-    /**
-     * Verifica se um tenant tem gateway próprio configurado.
-     */
-    public function tenantHasGateway(string $gatewayCode, string $entityId): bool
-    {
-        return $this->resolveCredentialFromDb($gatewayCode, $entityId) !== null;
-    }
-
-    /**
-     * Invalida o cache para o gateway/tenant específico.
-     */
-    public function forgetCache(string $gatewayCode, ?string $entityId = null): void
-    {
-        Cache::forget("gateway_credential:{$gatewayCode}:" . ($entityId ?? 'global'));
-    }
-
-    // ── Helpers privados ──────────────────────────────────────────────────
-
-    private function resolveSecretFromDb(string $gatewayCode, ?string $entityId): ?string
-    {
-        $credential  = $this->resolveCredentialFromDb($gatewayCode, $entityId);
-        $credentials = $credential?->credentials;
+        $credentials = $this->resolveCredentialFromDb($gatewayCode)?->credentials;
 
         if (! is_array($credentials)) {
             return null;
@@ -103,18 +49,54 @@ class GatewayCredentialResolver
         return null;
     }
 
-    private function resolveCredentialFromDb(string $gatewayCode, ?string $entityId): ?GatewayCredential
+    /**
+     * Resolve o webhook secret para validação de assinatura.
+     */
+    public function resolveWebhookSecret(string $gatewayCode): ?string
     {
-        $cacheKey = "gateway_credential:{$gatewayCode}:" . ($entityId ?? 'global');
+        return $this->resolveCredentialFromDb($gatewayCode)?->webhook_secret;
+    }
 
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($gatewayCode, $entityId): ?GatewayCredential {
-            $scope = $entityId ? 'tenant' : 'global';
+    /**
+     * Resolve credenciais extras (ex: handle, public_key).
+     */
+    public function resolveExtra(string $gatewayCode, string $key): ?string
+    {
+        $credential = $this->resolveCredentialFromDb($gatewayCode);
 
+        if (! $credential || ! is_array($credential->credentials)) {
+            return null;
+        }
+
+        $value = $credential->credentials[$key] ?? null;
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Invalida o cache da credencial do gateway.
+     */
+    public function forgetCache(string $gatewayCode): void
+    {
+        Cache::forget(self::cacheKey($gatewayCode));
+    }
+
+    /** Mesma chave que o manager esquece ao salvar/revogar credencial. */
+    public static function cacheKey(string $gatewayCode): string
+    {
+        return "gateway_credential:{$gatewayCode}:global";
+    }
+
+    // ── Helpers privados ──────────────────────────────────────────────────
+
+    private function resolveCredentialFromDb(string $gatewayCode): ?GatewayCredential
+    {
+        return Cache::remember(self::cacheKey($gatewayCode), $this->cacheTtl, static function () use ($gatewayCode): ?GatewayCredential {
             return GatewayCredential::query()
                 ->whereHas('gateway', static fn ($q) => $q->where('code', $gatewayCode))
                 ->where('active', true)
-                ->where('scope', $scope)
-                ->where(fn ($q) => $entityId ? $q->where('entity_id', $entityId) : $q->whereNull('entity_id'))
+                ->where('scope', CredentialScope::Global->value)
+                ->whereNull('entity_id')
                 ->whereNull('deleted_at')
                 ->where(static fn ($q) => $q->whereNull('valid_from')->orWhere('valid_from', '<=', now()))
                 ->where(static fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()))

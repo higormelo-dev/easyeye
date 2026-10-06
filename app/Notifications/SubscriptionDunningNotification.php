@@ -119,25 +119,26 @@ class SubscriptionDunningNotification extends Notification implements SendsSaasW
     }
 
     /**
-     * WhatsApp: o essencial do e-mail (etapa, valor, datas) e o link para
-     * pagar dentro do sistema — a fatura em Minha assinatura; no
-     * encerramento, Minha assinatura (contratar de novo).
+     * WhatsApp (template saas_dunning_*): o essencial do e-mail (etapa,
+     * valor, datas) e o link para pagar dentro do sistema no botão — a fatura
+     * em Minha assinatura; no encerramento, Minha assinatura (contratar de novo).
+     *
+     * @return array{template: string, values: array<string, mixed>, url: string}
      */
-    public function toSaasWhatsApp(object $notifiable): ?string
+    public function toSaasWhatsApp(object $notifiable): ?array
     {
-        $params = $this->params();
-        $step   = $this->step;
-        $key    = match (true) {
+        $step = $this->step;
+        $key  = match (true) {
             $step === DunningStep::Reminder && is_array($this->context['card'] ?? null) => 'reminder_card',
             default                                                                     => $step->value,
         };
         $invoiceId = $step->terminates() ? null : ($this->context['invoice_id'] ?? null);
 
-        return __("billing_dunning.whatsapp.{$key}", [
-            ...$params,
-            'last4' => (string) data_get($this->context, 'card.last4', ''),
-            'url'   => route('panel.my-subscription.index', array_filter(['invoice' => $invoiceId])),
-        ]);
+        return [
+            'template' => "saas_dunning_{$key}",
+            'values'   => [...$this->params(), 'last4' => (string) data_get($this->context, 'card.last4', '')],
+            'url'      => route('panel.my-subscription.index', array_filter(['invoice' => $invoiceId])),
+        ];
     }
 
     /**

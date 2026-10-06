@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Gateway de pagamento do DONO do SaaS: cobra as clínicas pela assinatura e
+ * pelos pacotes de créditos de IA. Clínica não tem gateway próprio.
+ */
 class Gateway extends Model
 {
     use Auditable;
@@ -25,6 +29,8 @@ class Gateway extends Model
         'supports_webhooks',
         'priority',
         'config',
+        'health',
+        'health_checked_at',
     ];
 
     protected function casts(): array
@@ -38,6 +44,8 @@ class Gateway extends Model
             'supports_webhooks'         => 'boolean',
             'priority'                  => 'integer',
             'config'                    => 'array',
+            'health'                    => 'array',
+            'health_checked_at'         => 'datetime',
             'created_at'                => 'datetime',
             'updated_at'                => 'datetime',
             'deleted_at'                => 'datetime',
@@ -47,10 +55,5 @@ class Gateway extends Model
     public function credentials(): HasMany
     {
         return $this->hasMany(GatewayCredential::class, 'gateway_id');
-    }
-
-    public function entityAccess(): HasMany
-    {
-        return $this->hasMany(EntityGatewayAccess::class, 'gateway_id');
     }
 }

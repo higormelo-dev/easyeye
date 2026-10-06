@@ -23,7 +23,7 @@ A renovação no cartão salvo é **à vista** em todos os gateways: o Pagar.me 
 
 ## Chave pública do SDK (manager → Gateways → credencial)
 
-Sem a chave pública o cartão não é transparente: vai pelo link do gateway (Asaas, InfinitePay, Stripe) ou some das formas de pagamento (Mercado Pago, Pagar.me). Formatos aceitos:
+Sem a chave pública o cartão não é transparente: vai pelo link do gateway (InfinitePay, Stripe) ou some das formas de pagamento (Mercado Pago, Pagar.me). No **Asaas** o cartão é sempre pelo **Asaas Checkout** (página hospedada, com volta para Minha assinatura) — ver [asaas-configuracao.md](asaas-configuracao.md). Formatos aceitos:
 
 | Gateway | Chave pública |
 |---|---|
@@ -186,10 +186,11 @@ php artisan billing:trial-notices --dry-run   # quantos avisos de fim de teste s
 
 ### WhatsApp do SaaS para a clínica (obrigatório para os avisos pelo WhatsApp)
 
-- Sai pela **instância GLOBAL** (Manager → WhatsApp, linha sem clínica — a mesma do código de verificação do cadastro) com `WHATSAPP_DRIVER=zapi`. **Nunca** pela instância da clínica, e o `ClinicServiceGate` não barra estes avisos (clínica bloqueada continua recebendo a régua).
-- Destinatário: contato de cobrança (admin, financeiro, dono) com **WhatsApp verificado** (`users.phone_verified_at`). Sem número verificado → só e-mail (fica no log `[whatsapp:saas-notice]`).
-- Fila `WHATSAPP_QUEUE`, até 3 tentativas (1 min, 10 min); falha final só no log — o e-mail já saiu por outro job e a régua segue.
-- Texto curto, sem dado de paciente, com o link **dentro do sistema** (`/panel/my-subscription`, com `?invoice=<id>` quando há fatura a pagar). O link do gateway nunca vai no WhatsApp.
+- Sai pelo **app GLOBAL do EasyEye na Gupshup** (Manager → WhatsApp, "Número do EasyEye" — o mesmo do código de verificação do cadastro) com `WHATSAPP_DRIVER=gupshup` e as credenciais `GUPSHUP_*` no `.env` (passo a passo em `docs/integracoes/whatsapp-gupshup.md`). **Nunca** pelo número da clínica, e o `ClinicServiceGate` não barra estes avisos (clínica bloqueada continua recebendo a régua).
+- Cada etapa é um **template aprovado na Meta** (`easyeye_cobranca_*`, `easyeye_teste_termina_*`, `easyeye_cobranca_enviada`, `easyeye_cobranca_troca_plano` — lista e texto em `docs/integracoes/whatsapp-gupshup.md` §6). Template não aprovado = falha permanente registrada em `whatsapp_messages` (o e-mail segue).
+- Destinatário: contato de cobrança (admin, financeiro, dono) com **WhatsApp verificado** (`users.phone_verified_at`) e que não respondeu SAIR ao número do EasyEye. Sem número verificado → só e-mail (fica no log `[whatsapp:saas-notice]`).
+- Fila `WHATSAPP_QUEUE`, até 3 tentativas só para falha transitória (1 min, 10 min); falha final registrada em `whatsapp_messages` (tipo `saas_notice`) — o e-mail já saiu por outro job e a régua segue.
+- Sem dado de paciente, com o link **dentro do sistema** no botão do template (`/panel/my-subscription`, com `?invoice=<id>` quando há fatura a pagar). O link do gateway nunca vai no WhatsApp.
 
 ### Asaas — eventos de webhook a assinar no painel
 
@@ -203,7 +204,7 @@ Doc: <https://docs.asaas.com/docs/eventos-para-assinaturas>.
 ### Recorrência desativada pelo gateway (decisão: avisar o manager + régua)
 
 - `SUBSCRIPTION_INACTIVATED`/`SUBSCRIPTION_DELETED` do Asaas (e o equivalente dos outros: `customer.subscription.deleted` do Stripe, preapproval cancelado do Mercado Pago) **não** cancelam nem bloqueiam mais a assinatura. Quem pagou segue com acesso até o fim do período pago.
-- A cobrança passa para a **renovação local** (`gateway_subscription_id` fica nulo): a próxima fatura sai do `subscriptions:renew` (01:00, alguns dias antes do vencimento) e a clínica paga em Minha assinatura (Pix/boleto/cartão; no Asaas o cartão é o link). Sem pagamento, régua normal (D-5, D+1, D+3, D+7).
+- A cobrança passa para a **renovação local** (`gateway_subscription_id` fica nulo): a próxima fatura sai do `subscriptions:renew` (01:00, alguns dias antes do vencimento) e a clínica paga em Minha assinatura (Pix/boleto/cartão; no Asaas o cartão é o Asaas Checkout). Sem pagamento, régua normal (D-5, D+1, D+3, D+7).
 - Alerta: badge **"Recorrência desativada"** em Manager → Assinaturas (filtro e card de resumo próprios, aviso no detalhe com "Marcar como visto"), log de billing (warning) e e-mail para os usuários **admin, financeiro e dono** da empresa do SaaS (com e-mail confirmado). Uma vez por recorrência (o Asaas manda INACTIVATED e depois DELETED; reentregas não duplicam). Histórico: `SubscriptionChange` `gateway_recurrence_lost`.
 - Sem alerta (só o log do webhook): assinatura que não é a vigente (substituída, cancelada, cortesia), recorrência desconhecida e recorrência que o **próprio sistema** cancelou (troca, cortesia, encerramento, recorrência refeita — gravado em `gateway_payload.recurrences_cancelled_by_us` antes da chamada).
 
@@ -227,3 +228,78 @@ Doc: <https://docs.asaas.com/docs/eventos-para-assinaturas>.
 ### Tela de IA — pedido de créditos pendente
 
 - IA → Uso e créditos mostra o pedido de créditos ainda não pago com **Continuar pagamento** (abre o checkout da fatura do pedido) e **Descartar** (confirmação; mesma rota `DELETE /panel/my-subscription/ai-credits/{invoice}`).
+
+## Gateways só do dono do SaaS (sem gateway por clínica)
+
+Os gateways de Manager → Gateways são da empresa dona do EasyEye e servem só para cobrar as clínicas (assinatura e pacotes de créditos de IA). Clínica não tem gateway próprio nem recebe pagamento por eles.
+
+- Removidos: "Acesso por Clínica" (rotas `manager.gateways.entity-access*`, modal, contagem no card) e a credencial por clínica (`GatewayCallContext::useTenantCredentials`, ramo `tenant` do `GatewayCredentialResolver`, case `CredentialScope::Tenant`). O resolvedor só lê `scope = global` com `entity_id` NULL; sem ela, cai no `.env`.
+- `php artisan migrate` roda:
+  - `2026_10_11_000000_drop_entity_gateway_access_table` — derruba `entity_gateway_access` (o `down` recria o schema vazio);
+  - `2026_10_11_000100_delete_tenant_gateway_credentials` — apaga de vez as credenciais com `entity_id` ou `scope` diferente de `global` (inclusive soft-deleted). Sem volta: o `down` é vazio.
+- Antes de migrar (opcional, para registro): `SELECT count(*) FROM entity_gateway_access;` e `SELECT count(*) FROM gateway_credentials WHERE entity_id IS NOT NULL OR scope <> 'global';`.
+- Depois: `php artisan optimize:clear` (rotas/config em cache) e `npm run build`. Nada muda para a credencial global cadastrada no manager.
+
+## Rodada 6 — Asaas: notificações desligadas, Asaas Checkout, correções de risco e estorno pelo manager
+
+Guia completo do painel do Asaas (webhook, eventos, chave Pix, boleto vencido, antecedência da recorrência, domínio, whitelist, sandbox × produção, rotação de chave): **[asaas-configuracao.md](asaas-configuracao.md)**.
+
+### Comandos do deploy (nesta ordem)
+
+```bash
+php artisan migrate                       # billing_hosted_checkouts, billing_gateway_customers, billing_refunds + refunded_amount, gateways.health, billing_refunds.gateway_state/last_checked_at/check_note e invoices.gateway_checked_at
+php artisan config:cache && php artisan route:cache
+php artisan billing:asaas-disable-notifications --dry-run   # clientes já cadastrados no Asaas
+php artisan billing:asaas-disable-notifications             # uma vez (idempotente)
+php artisan billing:gateway-health                          # conferir a chave (card do Asaas em Manager → Gateways)
+npm run build
+```
+
+Sem mudança de canal/evento do Reverb (o aviso de pagamento continua o `InvoicePaid` em `billing.{entityId}`) — não precisa de `reverb:restart`.
+
+### No painel do Asaas (obrigatório)
+
+- Webhook: incluir os eventos **`CHECKOUT_*`**, **`SUBSCRIPTION_CREATED`/`SUBSCRIPTION_UPDATED`**, **`PAYMENT_PARTIALLY_REFUNDED`**, **`PAYMENT_BANK_SLIP_CANCELLED`** e **`ACCESS_TOKEN_*`** (lista completa no guia), envio **sequencial** e o e-mail de alerta de fila pausada.
+- Domínio do EasyEye nos dados comerciais (volta do Asaas Checkout).
+- Antecedência da geração das cobranças da assinatura em 7 dias; boleto pagável depois do vencimento por pelo menos 7 dias; chave Pix cadastrada.
+
+### Agendador novo
+
+- `billing:gateway-health` (06:10) — chamada leve e autenticada (`GET /v3/myAccount/status/`): mantém a chave em uso (3 meses sem uso = desabilitada) e alerta o time em chave recusada/de outro ambiente.
+- `billing:reconcile-overdue` (08:30, antes da régua das 09:00) — confere no gateway as faturas vencidas com cobrança emitida e aplica o pagamento cujo webhook não chegou (teto `BILLING_RECONCILE_MAX_PER_RUN`, pausa `BILLING_RECONCILE_PAUSE_MS`, para no 429; começa pelas nunca/há mais tempo conferidas e pula as conferidas no dia).
+- `billing:check-refunds` (de hora em hora) — confere no gateway os estornos pedidos pelo manager parados em "solicitado" (sem resposta definitiva: depois de 10 min; os demais: depois de `BILLING_REFUND_EXPIRE_DAYS`, padrão 30) e só libera um novo pedido quando o gateway diz que o estorno não existe ou foi negado.
+
+### Variáveis novas (`.env`)
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `ASAAS_HOSTED_CHECKOUT` | `true` | Cartão no Asaas pelo Asaas Checkout (`false` volta ao link da fatura) |
+| `ASAAS_CHECKOUT_MINUTES_TO_EXPIRE` | `60` | Validade do checkout (10–1440) |
+| `ASAAS_CHECKOUT_ITEM_IMAGE` | — | Imagem do item do checkout, só se o Asaas exigir `imageBase64` |
+| `BILLING_WEBHOOK_RATE_LIMIT_PER_MINUTE` | `3000` | Limite da rota de webhook **por gateway**, só para requisições com o token/assinatura válidos |
+| `BILLING_WEBHOOK_INVALID_RATE_LIMIT_PER_MINUTE` | `30` | Sem token/token inválido: balde próprio por IP (flood falso não gera 429 para o gateway) |
+| `BILLING_DUNNING_MAX_GATEWAY_CHECK_DEFERRALS` | `3` | Régua: adiamentos seguidos (conferência sem resposta conclusiva) antes do alerta crítico |
+| `BILLING_REFUND_EXPIRE_DAYS` / `BILLING_REFUND_CHECK_PER_RUN` | `30` / `50` | Conferência dos estornos parados (`billing:check-refunds`) |
+| `BILLING_RATE_LIMIT_CONCURRENCY_BACKOFF_SECONDS` | `5` | Espera da rota depois de 429 sem tempo pedido (concorrência) |
+| `BILLING_RECONCILE_MAX_PER_RUN` / `BILLING_RECONCILE_PAUSE_MS` / `BILLING_RECONCILE_LOOKBACK_DAYS` | `100` / `300` / `60` | Conciliação diária |
+
+### O que mudou no comportamento
+
+- **Notificações do Asaas desligadas** (`notificationDisabled`) em todo cliente criado ou reaproveitado; marcado em `billing_gateway_customers`.
+- **Cartão no Asaas = Asaas Checkout**: a fatura do plano vira assinatura no cartão; a recorrência boleto/Pix antiga só é cancelada depois da 1ª cobrança no cartão confirmada (e a cobrança antiga da fatura é cancelada). Pacote de IA e diferença do upgrade: checkout avulso.
+- **Idempotência no Asaas** (sem chave de idempotência na API): depois de timeout/5xx, a emissão (renovação, reemissão do checkout, pacote de IA, upgrade) procura a cobrança pela referência (`GET /v3/payments?externalReference=`) e a reaproveita.
+- **Régua**: antes de limitar (D+3) e encerrar (D+7), confere a cobrança no gateway; paga lá → aplica e não limita/encerra.
+- **Pix/boleto**: 401/403/429/5xx do Asaas mostram "não foi possível gerar agora, tente de novo" (antes viravam "forma indisponível"); 401/403 alertam o time.
+- **429**: respeita `RateLimit-Reset`/`Retry-After`; jobs reagendam para depois.
+- **Webhook**: sem limite por IP; `occurredAt` = `dateCreated` do evento; ciclo desconhecido é erro (não vira mensal); `SUBSCRIPTION_UPDATED` divergente alerta o time.
+- **Estorno pelo manager** (Asaas e Mercado Pago): Assinaturas → detalhe → faturas → Estornar (total/parcial, justificativa, auditoria); "solicitado" até o gateway confirmar. Estorno parcial registra `refunded_amount` (pagamento e fatura) e o evento financeiro `payment_partially_refunded`; pacote de IA tira os créditos proporcionais.
+
+#### Correções da revisão (mesma rodada)
+
+- Checkout de cartão recorrente pendente deixa de valer quando a assinatura é cancelada, encerrada (D+7), substituída, vira cortesia ou troca de plano: o aberto é cancelado no Asaas e a assinatura no cartão que um checkout pago criou é desfeita antes de cobrar. A recorrência nova só é adotada com a assinatura governada, a fatura a pagar e os mesmos termos.
+- Segundo checkout com o 1º pago aguardando confirmação: recusado (409) e "Pagar" some da tela. Pagamento em duplicidade vira `payments.status = duplicate` (não quita a fatura) e é estornável pelo manager.
+- Cobranças seguintes da recorrência do checkout com a referência herdada renovam o período (nunca caem na fatura já paga).
+- Troca de plano com a recorrência no cartão: refeita sem o cartão (`UNDEFINED`), cartão sai da assinatura, aviso em Minha assinatura e ao time.
+- Estorno: timeout/5xx = "solicitado" inconclusivo (conferido antes de outro pedido), 429 = enviado por job com a mesma chave, "Conferir" no manager, `PAYMENT_REFUND_DENIED`/`_IN_PROGRESS`, "total" depois de parcial com o valor restante, um pedido por vez. Pacote de IA: estorno do restante depois de um parcial não tira créditos em dobro.
+- Régua: só encerra com "não pago" conclusivo; conferência sem resposta adia e alerta depois de N adiamentos. 429 congela só a rota (a cota, a conta); cobrança que deixou de valer e não cancelou agora vai para `CancelGatewayChargeJob`. Chave recusada: um registro crítico por janela. Timeout na criação nunca reaproveita a cobrança vigente/vencida.
+

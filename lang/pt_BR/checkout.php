@@ -27,6 +27,8 @@ return [
         'scheduled_change_not_cancellable' => 'Esta mudança de plano não pode mais ser desfeita (a data chegou ou a cobrança nova já foi paga).',
         'ai_pack_unavailable'              => 'O plano da clínica não inclui recursos de IA, ou não há pacotes de créditos à venda agora.',
         'ai_pack_not_discardable'          => 'Este pedido de créditos não pode mais ser descartado (o pagamento já foi confirmado ou o pedido não está mais em aberto).',
+        'instructions_failed'              => 'Não foi possível gerar o Pix/boleto agora. Tente de novo em instantes.',
+        'card_awaiting_confirmation'       => 'O pagamento no cartão desta fatura já foi feito e está aguardando a confirmação. Não é preciso pagar de novo — esta tela atualiza sozinha.',
 
         // Só no navegador (sem resposta do servidor ou fora do contrato JSON).
         'rate_limited'    => 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente de novo.',
@@ -152,6 +154,25 @@ return [
         'realtime_off'  => 'A atualização automática está indisponível agora. Depois de pagar, use o botão abaixo.',
         'check_status'  => 'Já paguei — atualizar',
         'still_pending' => 'O pagamento ainda não foi confirmado. Pix costuma levar segundos; boleto, até 3 dias úteis.',
+
+        // Cartão no ambiente seguro do gateway (Asaas Checkout).
+        'method_hosted'           => 'Ambiente seguro de :gateway',
+        'method_hint_card_hosted' => 'Você digita o cartão no ambiente seguro de :gateway e volta para cá.',
+        'hosted_title'            => 'Pagar no ambiente seguro de :gateway',
+        'hosted_body'             => 'Para sua segurança, o cartão é digitado na página de :gateway — o EasyEye não vê nem guarda o número. Depois de pagar, você volta para esta tela, que mostra quando o pagamento for confirmado.',
+        'hosted_recurrent'        => 'O cartão fica cadastrado em :gateway e as próximas renovações são cobradas nele sozinhas.',
+        'hosted_button'           => 'Ir para o pagamento seguro',
+        'hosted_expires'          => 'Este link de pagamento vale até :date.',
+        'hosted_charge_on'        => 'O cartão é cobrado no vencimento da fatura, em :date — até lá o acesso segue normal.',
+        'hosted_missing'          => 'Não foi possível abrir o pagamento seguro agora. Tente de novo.',
+    ],
+
+    // Itens do checkout hospedado (nome até 30 caracteres; descrição até 150).
+    'hosted' => [
+        'item_subscription' => 'EasyEye :plan',
+        'item_upgrade'      => 'Upgrade EasyEye :plan',
+        'item_ai_pack'      => ':credits créditos de IA',
+        'description'       => 'Fatura :reference :cycle',
     ],
 
     // Página "Minha assinatura" (painel da clínica).
@@ -229,6 +250,13 @@ return [
         'ai_pack_discard_keep'       => 'Manter pedido',
         'ai_pack_discard_confirm'    => 'Descartar este pedido de créditos? A cobrança gerada (Pix/boleto) é cancelada.',
         'ai_pack_discarded'          => 'Pedido de créditos descartado.',
+
+        // Volta do ambiente seguro do gateway (Asaas Checkout).
+        'checkout_return_success' => 'Pagamento enviado pelo ambiente seguro. Aguardando a confirmação — esta tela atualiza sozinha.',
+        'checkout_return_cancel'  => 'O pagamento no ambiente seguro não foi concluído. Você pode tentar de novo quando quiser.',
+        'checkout_return_expired' => 'O link de pagamento expirou. Abra o pagamento de novo para gerar outro.',
+        'awaiting_confirmation'   => 'Aguardando confirmação',
+        'card_reregister'         => 'Com a troca de plano, a cobrança automática no cartão foi refeita sem o cartão (por segurança, o EasyEye não guarda os dados dele). Para voltar a pagar no cartão automaticamente, pague a próxima fatura com cartão aqui em Minha assinatura.',
 
         // Pacotes de créditos de IA (Minha assinatura e tela de IA).
         'ai_title'            => 'Créditos de IA',

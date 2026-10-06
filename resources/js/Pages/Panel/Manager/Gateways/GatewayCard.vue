@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -7,9 +7,38 @@ const props = defineProps({
     t: { type: Object, default: () => ({}) },
 });
 
-const emit = defineEmits(['open-credentials', 'open-entity-access', 'open-priority', 'open-set-default']);
+defineEmits(['open-credentials', 'open-priority', 'open-set-default']);
 
 const toggling = ref(false);
+
+// O que o gateway faz hoje na EasyEye (GatewaysController::capabilities).
+const caps = computed(() => props.gateway.capabilities ?? null);
+const methodLabel = (method) => props.t.caps_method?.[method] ?? method;
+// Último health check real (billing:gateway-health).
+const health = computed(() => props.gateway.health ?? null);
+const healthBadge = computed(() => {
+    const status = health.value?.status;
+    if (!status) return null;
+    if (status === 'ok') return { cls: 'badge-soft-success', icon: 'ti-circle-check' };
+    if (['auth_error', 'environment_mismatch', 'not_configured'].includes(status))
+        return { cls: 'badge-soft-danger', icon: 'ti-alert-octagon' };
+    if (status === 'config_only') return { cls: 'badge-soft-secondary', icon: 'ti-settings' };
+    return { cls: 'badge-soft-warning', icon: 'ti-alert-triangle' };
+});
+const healthLabel = computed(() => props.t.health_status?.[health.value?.status] ?? health.value?.status ?? '');
+const healthTitle = computed(() => {
+    if (!health.value) return '';
+    const when = health.value.checked_at ? new Date(health.value.checked_at).toLocaleString() : '';
+    return [health.value.message, when ? (props.t.health_checked_at ?? '').replace(':date', when) : '']
+        .filter(Boolean)
+        .join(' — ');
+});
+
+const installmentsLabel = computed(() => {
+    const max = caps.value?.max_installments;
+    if (!max) return null;
+    return max <= 1 ? props.t.caps_installments_one : (props.t.caps_installments ?? '').replace(':count', max);
+});
 
 async function toggleActive() {
     toggling.value = true;
@@ -23,10 +52,10 @@ async function toggleActive() {
         });
         const json = await res.json();
         if (res.ok) {
-            if (window.showSuccessToast) showSuccessToast(json.message);
+            if (window.showSuccessToast) window.showSuccessToast(json.message);
             router.reload({ only: ['gateways', 'defaultGateway'] });
         } else {
-            if (window.showErrorToast) showErrorToast(json.message ?? props.t.js_error_generic);
+            if (window.showErrorToast) window.showErrorToast(json.message ?? props.t.js_error_generic);
         }
     } finally {
         toggling.value = false;
@@ -46,10 +75,10 @@ async function setDefault() {
     });
     const json = await res.json();
     if (res.ok) {
-        if (window.showSuccessToast) showSuccessToast(json.message);
+        if (window.showSuccessToast) window.showSuccessToast(json.message);
         router.reload({ only: ['gateways', 'defaultGateway'] });
     } else {
-        if (window.showErrorToast) showErrorToast(json.message ?? props.t.js_error_set_default);
+        if (window.showErrorToast) window.showErrorToast(json.message ?? props.t.js_error_set_default);
     }
 }
 </script>
@@ -131,57 +160,130 @@ async function setDefault() {
                 </span>
             </div>
 
-            <!-- Clinics with access -->
-            <div class="d-flex align-items-center justify-content-between mb-3">
+            <!-- Health check real (diário) -->
+            <div
+                v-if="healthBadge"
+                class="d-flex align-items-center justify-content-between mb-2"
+                data-test="gateway-health"
+            >
                 <div class="d-flex align-items-center gap-2">
-                    <i class="ti ti-building-hospital text-muted" style="font-size: 0.95rem"></i>
-                    <span class="small text-muted">{{ t.clinics_with_access }}</span>
+                    <i class="ti ti-heartbeat text-muted" style="font-size: 0.95rem"></i>
+                    <span class="small text-muted">{{ t.health_title }}</span>
                 </div>
-                <span v-if="gateway.clinics_label" class="badge badge-soft-primary" style="font-size: 0.72rem">{{
-                    gateway.clinics_label
-                }}</span>
-                <span v-else class="badge badge-soft-secondary" style="font-size: 0.72rem">{{ t.clinics_none }}</span>
+                <span
+                    class="badge"
+                    :class="healthBadge.cls"
+                    style="font-size: 0.72rem"
+                    :title="healthTitle"
+                    :data-status="health.status"
+                >
+                    <i :class="['ti me-1', healthBadge.icon]"></i>{{ healthLabel }}
+                </span>
             </div>
 
-            <!-- Capabilities -->
-            <div class="d-flex flex-wrap gap-1">
-                <span v-if="gateway.supports_subscriptions" class="badge badge-soft-success" style="font-size: 0.7rem">
-                    <i class="ti ti-refresh me-1"></i>{{ t.cap_subscriptions }}
-                </span>
-                <span
-                    v-if="gateway.supports_one_time_charges"
-                    class="badge badge-soft-success"
-                    style="font-size: 0.7rem"
-                >
-                    <i class="ti ti-bolt me-1"></i>{{ t.cap_one_time }}
-                </span>
-                <span v-if="gateway.supports_refunds" class="badge badge-soft-success" style="font-size: 0.7rem">
-                    <i class="ti ti-arrow-back me-1"></i>{{ t.cap_refunds }}
-                </span>
-                <span v-if="gateway.supports_webhooks" class="badge badge-soft-success" style="font-size: 0.7rem">
-                    <i class="ti ti-webhook me-1"></i>{{ t.cap_webhooks }}
-                </span>
+            <!-- O que faz hoje na EasyEye (métodos da classe do gateway) -->
+            <div v-if="caps" class="mt-3 pt-2 border-top" data-test="gateway-caps">
+                <div class="small text-muted mb-1">{{ t.caps_title }}</div>
+                <div class="d-flex flex-wrap align-items-center gap-1">
+                    <template v-if="caps.transparent.length">
+                        <span class="small text-muted me-1">{{ t.caps_transparent }}</span>
+                        <span
+                            v-for="method in caps.transparent"
+                            :key="method"
+                            class="badge badge-soft-info"
+                            style="font-size: 0.7rem"
+                            :title="method === 'credit_card' ? t.caps_card_public_key_title : undefined"
+                            :data-test="`gateway-cap-method-${method}`"
+                        >
+                            {{ methodLabel(method) }}
+                        </span>
+                    </template>
+                    <span
+                        v-else
+                        class="badge badge-soft-warning"
+                        style="font-size: 0.7rem"
+                        :title="t.caps_link_only_title"
+                        data-test="gateway-cap-link-only"
+                    >
+                        <i class="ti ti-external-link me-1"></i>{{ t.caps_link_only }}
+                    </span>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    <span
+                        v-if="caps.hosted_card_checkout"
+                        class="badge badge-soft-secondary"
+                        style="font-size: 0.7rem"
+                        :title="t.caps_hosted_card_title"
+                        data-test="gateway-cap-hosted"
+                    >
+                        <i class="ti ti-shield-lock me-1"></i>{{ t.caps_hosted_card }}
+                    </span>
+                    <span
+                        v-else-if="caps.card_link"
+                        class="badge badge-soft-secondary"
+                        style="font-size: 0.7rem"
+                        :title="t.caps_card_link_title"
+                    >
+                        <i class="ti ti-link me-1"></i>{{ t.caps_card_link }}
+                    </span>
+                    <span
+                        v-if="caps.refund"
+                        class="badge badge-soft-secondary"
+                        style="font-size: 0.7rem"
+                        :title="caps.partial_refund ? t.caps_refund_partial_title : t.caps_refund_title"
+                        data-test="gateway-cap-refund"
+                    >
+                        <i class="ti ti-receipt-refund me-1"></i
+                        >{{ caps.partial_refund ? t.caps_refund_partial : t.caps_refund }}
+                    </span>
+                    <span
+                        v-if="installmentsLabel"
+                        class="badge badge-soft-secondary"
+                        style="font-size: 0.7rem"
+                        :title="t.caps_installments_title"
+                        data-test="gateway-cap-installments"
+                    >
+                        <i class="ti ti-credit-card me-1"></i>{{ installmentsLabel }}
+                    </span>
+                    <span
+                        v-if="caps.saved_card_renewal"
+                        class="badge badge-soft-secondary"
+                        style="font-size: 0.7rem"
+                        :title="t.caps_saved_card_title"
+                    >
+                        <i class="ti ti-repeat me-1"></i>{{ t.caps_saved_card }}
+                    </span>
+                    <span
+                        v-if="caps.card_replacement"
+                        class="badge badge-soft-secondary"
+                        style="font-size: 0.7rem"
+                        :title="t.caps_card_replacement_title"
+                    >
+                        <i class="ti ti-replace me-1"></i>{{ t.caps_card_replacement }}
+                    </span>
+                    <span
+                        class="badge badge-soft-secondary"
+                        style="font-size: 0.7rem"
+                        :title="caps.native_recurrence ? t.caps_native_recurrence_title : t.caps_local_renewal_title"
+                        data-test="gateway-cap-recurrence"
+                    >
+                        <i class="ti ti-calendar-repeat me-1"></i
+                        >{{ caps.native_recurrence ? t.caps_native_recurrence : t.caps_local_renewal }}
+                    </span>
+                </div>
             </div>
         </div>
 
         <!-- ── Card Footer ─────────────────────────────────────────────────── -->
         <div class="card-footer bg-transparent py-2 px-3">
-            <div class="d-flex gap-2 mb-2">
-                <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary flex-grow-1"
-                    @click="$emit('open-credentials', gateway)"
-                >
-                    <i class="ti ti-key me-1"></i>{{ t.btn_credentials }}
-                </button>
-                <button
-                    type="button"
-                    class="btn btn-sm btn-outline-success flex-grow-1"
-                    @click="$emit('open-entity-access', gateway)"
-                >
-                    <i class="ti ti-building-hospital me-1"></i>{{ t.btn_entity_access }}
-                </button>
-            </div>
+            <button
+                type="button"
+                class="btn btn-sm btn-outline-primary w-100 mb-2"
+                data-test="gateway-btn-credentials"
+                @click="$emit('open-credentials', gateway)"
+            >
+                <i class="ti ti-key me-1"></i>{{ t.btn_credentials }}
+            </button>
 
             <!-- Default button -->
             <template v-if="!gateway.is_default">
@@ -245,9 +347,9 @@ async function setDefault() {
     color: #d1a936;
 }
 
-/* Modo dark: botões outline e toggle usam a mesma cor viva do modo
-   claro (--primary/--success), o que soa "gritante" repetido em 6
-   cards. Aqui só no dark mode, tons mais discretos/profundos. */
+/* Modo dark: botão outline e toggle usam a mesma cor viva do modo
+   claro (--primary), o que soa "gritante" repetido em 6 cards. Aqui só
+   no dark mode, tons mais discretos/profundos. */
 :root[data-bs-theme='dark'] .btn-outline-primary {
     --bs-btn-color: #6ea0dd;
     --bs-btn-border-color: #6ea0dd;
@@ -255,14 +357,6 @@ async function setDefault() {
     --bs-btn-hover-border-color: #6ea0dd;
     color: #6ea0dd;
     border-color: #6ea0dd;
-}
-:root[data-bs-theme='dark'] .btn-outline-success {
-    --bs-btn-color: #5fa77e;
-    --bs-btn-border-color: #5fa77e;
-    --bs-btn-hover-bg: #5fa77e;
-    --bs-btn-hover-border-color: #5fa77e;
-    color: #5fa77e;
-    border-color: #5fa77e;
 }
 :root[data-bs-theme='dark'] .form-check-input:checked {
     background-color: #4a7dc2;

@@ -253,7 +253,7 @@ Route::group([
         ->middleware('throttle:manager-destructive')
         ->name('ai-model-prices.update');
 
-    // ── Gateways de Pagamento — admin only (credenciais = máxima criticidade) ──
+    // ── Gateways de Pagamento do SaaS — admin only (credenciais = máxima criticidade) ──
     Route::middleware('saas.role:admin')->group(function () {
         Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');
         Route::patch('gateways/{gateway}/set-default', [GatewaysController::class, 'setDefault'])->name('gateways.set-default');
@@ -266,8 +266,9 @@ Route::group([
         Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [GatewaysController::class, 'revokeCredential'])
             ->middleware('throttle:manager-destructive')
             ->name('gateways.credentials.revoke');
-        Route::get('gateways/{gateway}/entity-access', [GatewaysController::class, 'entityAccess'])->name('gateways.entity-access');
-        Route::patch('gateways/{gateway}/entity-access/{entity}', [GatewaysController::class, 'toggleEntityAccess'])->name('gateways.entity-access.toggle');
+        // Sem "acesso por clínica": os gateways são só do dono do SaaS, para
+        // cobrar as clínicas (assinatura e pacotes de IA). Clínica não tem
+        // gateway próprio nem recebe pagamento por eles.
     });
 
     // ── Assinaturas — admin ou financial (operação de cobrança) ────────────────
@@ -300,6 +301,16 @@ Route::group([
         Route::post('subscriptions/{subscription}/invoices/{invoice}/send-charge', [SubscriptionsController::class, 'sendCharge'])
             ->middleware('throttle:manager-destructive')
             ->name('subscriptions.invoices.send-charge');
+        // Estornar pagamento (total ou parcial), com justificativa — só no
+        // gateway com estorno pela API; "solicitado" até o gateway confirmar.
+        Route::post('subscriptions/{subscription}/invoices/{invoice}/payments/{payment}/refund', [SubscriptionsController::class, 'refund'])
+            ->middleware('throttle:manager-destructive')
+            ->name('subscriptions.payments.refund');
+        // Conferir no gateway o estorno parado em "solicitado": concluído,
+        // em andamento ou liberado (não existe/negado lá).
+        Route::post('subscriptions/{subscription}/invoices/{invoice}/payments/{payment}/refunds/{refund}/check', [SubscriptionsController::class, 'checkRefund'])
+            ->middleware('throttle:manager-destructive')
+            ->name('subscriptions.payments.refunds.check');
         // Aviso "o gateway desativou a recorrência" visto pelo time.
         Route::post('subscriptions/{subscription}/recurrence-alert/acknowledge', [SubscriptionsController::class, 'acknowledgeRecurrenceAlert'])
             ->name('subscriptions.recurrence-alert.acknowledge');

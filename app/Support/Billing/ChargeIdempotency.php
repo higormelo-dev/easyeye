@@ -52,6 +52,26 @@ final class ChargeIdempotency
         return is_string($previous) && $previous !== '' ? $previous : (string) $last->idempotency_key;
     }
 
+    /**
+     * A última tentativa de emitir a cobrança da fatura falhou sem resposta
+     * definitiva (timeout, conexão, 5xx, limite): o gateway pode ter criado a
+     * cobrança. Sem chave de idempotência no gateway (Asaas), a próxima
+     * emissão procura a cobrança pela referência antes de criar outra.
+     */
+    public static function previousAttemptInconclusive(Invoice $invoice): bool
+    {
+        $last = PaymentAttempt::query()
+            ->where('invoice_id', $invoice->id)
+            ->orderByDesc('attempt_number')
+            ->orderByDesc('created_at')
+            ->first();
+
+        return $last !== null
+            && $last->status === PaymentAttemptStatus::Failed
+            && $last->error_code !== self::CIRCUIT_OPEN
+            && ! self::isDefinitive($last->error_code);
+    }
+
     public static function isDefinitive(?string $errorCode): bool
     {
         if ($errorCode === null || $errorCode === '') {

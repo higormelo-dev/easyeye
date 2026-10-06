@@ -31,6 +31,11 @@ return [
         'reminder_days_before'  => (int) env('BILLING_DUNNING_REMINDER_DAYS_BEFORE', 5),
         'soft_block_after_days' => (int) env('BILLING_DUNNING_SOFT_BLOCK_AFTER_DAYS', 3),
         'hard_block_after_days' => (int) env('BILLING_DUNNING_HARD_BLOCK_AFTER_DAYS', 7),
+        // Antes de limitar (D+3) ou encerrar (D+7), o pagamento é conferido no
+        // gateway; sem resposta conclusiva (timeout, 5xx, chave recusada, 429)
+        // a etapa é adiada. Depois de tantos adiamentos seguidos, alerta
+        // crítico ao time — a régua nunca encerra sozinha sem conferir.
+        'max_gateway_check_deferrals' => (int) env('BILLING_DUNNING_MAX_GATEWAY_CHECK_DEFERRALS', 3),
     ],
 
     // Fim do teste grátis (comando billing:trial-notices): e-mail + WhatsApp
@@ -115,6 +120,40 @@ return [
         // billing:prune-webhook-events apaga os processados há mais que isso
         // (os com falha ou não processados ficam).
         'retention_days' => (int) env('BILLING_WEBHOOK_RETENTION_DAYS', 90),
+        // Limite da rota pública de webhook, por gateway (não por IP — o
+        // Asaas penaliza a fila depois de 15 falhas seguidas e 429 conta
+        // como falha: https://docs.asaas.com/docs/penalização-de-filas).
+        'rate_limit_per_minute' => (int) env('BILLING_WEBHOOK_RATE_LIMIT_PER_MINUTE', 3000),
+        // Requisição sem token/assinatura válida: balde próprio, pequeno, por
+        // IP — um flood com token falso nunca gasta o balde do gateway.
+        'invalid_rate_limit_per_minute' => (int) env('BILLING_WEBHOOK_INVALID_RATE_LIMIT_PER_MINUTE', 30),
+    ],
+
+    // 429 dos gateways (https://docs.asaas.com/reference/rate-e-quota-limit):
+    // com RateLimit-Reset/Retry-After, só a rota que estourou espera esse
+    // tempo (a cota de 12h, a conta inteira); sem eles (concorrência), espera
+    // curta só naquela rota.
+    'rate_limit' => [
+        'concurrency_backoff_seconds' => (int) env('BILLING_RATE_LIMIT_CONCURRENCY_BACKOFF_SECONDS', 5),
+    ],
+
+    // Estornos pedidos pelo manager parados em "solicitado" (billing:check-refunds):
+    // os sem resposta definitiva são conferidos no gateway em minutos; os
+    // demais, depois de expire_days — só liberados se o gateway disser que
+    // não existem ou foram negados.
+    'refunds' => [
+        'expire_days'   => (int) env('BILLING_REFUND_EXPIRE_DAYS', 30),
+        'check_per_run' => (int) env('BILLING_REFUND_CHECK_PER_RUN', 50),
+    ],
+
+    // Conciliação diária (billing:reconcile-overdue): faturas vencidas com
+    // cobrança no gateway são conferidas na API e o pagamento perdido
+    // (webhook atrasado, fila pausada) é aplicado. Teto por execução e pausa
+    // entre consultas para respeitar o limite da API.
+    'reconcile' => [
+        'max_per_run'   => (int) env('BILLING_RECONCILE_MAX_PER_RUN', 100),
+        'pause_ms'      => (int) env('BILLING_RECONCILE_PAUSE_MS', 300),
+        'lookback_days' => (int) env('BILLING_RECONCILE_LOOKBACK_DAYS', 60),
     ],
 
     'circuit_breaker' => [
@@ -152,16 +191,33 @@ return [
             // UNDEFINED = o cliente escolhe boleto, Pix ou cartão na fatura.
             // BOLETO, PIX ou CREDIT_CARD forçam uma forma só.
             'billing_type' => env('ASAAS_BILLING_TYPE', 'UNDEFINED'),
-            'endpoints'    => [
-                'customers'             => '/v3/customers',
-                'subscriptions'         => '/v3/subscriptions',
-                'subscription_cancel'   => '/v3/subscriptions/{id}',
-                'subscription_show'     => '/v3/subscriptions/{id}',
-                'subscription_payments' => '/v3/subscriptions/{id}/payments',
-                'charges'               => '/v3/payments',
-                'payments'              => '/v3/payments/{id}',
-                'payment_pix_qr_code'   => '/v3/payments/{id}/pixQrCode',
-                'payment_boleto_line'   => '/v3/payments/{id}/identificationField',
+            // Cartão pelo Asaas Checkout (página hospedada — o EasyEye nunca
+            // vê o cartão): recorrência no cartão (RECURRENT) e cobranças
+            // avulsas (DETACHED). minutes_to_expire: 10 a 1440. item_image:
+            // PNG/JPG (caminho) mandado em items[].imageBase64, só se o
+            // Asaas exigir. false = cartão volta pelo link da fatura.
+            'hosted_checkout' => [
+                'enabled'           => env('ASAAS_HOSTED_CHECKOUT', true),
+                'minutes_to_expire' => (int) env('ASAAS_CHECKOUT_MINUTES_TO_EXPIRE', 60),
+                'item_image'        => env('ASAAS_CHECKOUT_ITEM_IMAGE'),
+            ],
+            'endpoints' => [
+                'customers'               => '/v3/customers',
+                'customer_show'           => '/v3/customers/{id}',
+                'subscriptions'           => '/v3/subscriptions',
+                'subscription_cancel'     => '/v3/subscriptions/{id}',
+                'subscription_show'       => '/v3/subscriptions/{id}',
+                'subscription_update'     => '/v3/subscriptions/{id}',
+                'subscription_payments'   => '/v3/subscriptions/{id}/payments',
+                'charges'                 => '/v3/payments',
+                'payments'                => '/v3/payments/{id}',
+                'payment_pix_qr_code'     => '/v3/payments/{id}/pixQrCode',
+                'payment_boleto_line'     => '/v3/payments/{id}/identificationField',
+                'payment_refund'          => '/v3/payments/{id}/refund',
+                'payment_bankslip_refund' => '/v3/payments/{id}/bankSlip/refund',
+                'checkouts'               => '/v3/checkouts',
+                'checkout_cancel'         => '/v3/checkouts/{id}/cancel',
+                'account_status'          => '/v3/myAccount/status/',
             ],
         ],
         'mercadopago' => [

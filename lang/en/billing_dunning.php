@@ -66,16 +66,4 @@ return [
         'open_charge_cancelled' => 'The bank slip/Pix already issued was cancelled with the payment provider, and no new charges will be issued.',
         'none'                  => 'No new charges will be issued.',
     ],
-
-    // WhatsApp (SaaS global instance): the essentials of the e-mail, short,
-    // with the link to pay inside the system (My subscription).
-    'whatsapp' => [
-        'reminder'                => '*:app*: the :entity subscription (:amount) is due on :date. Pay in the panel, under My subscription: :url',
-        'reminder_card'           => '*:app*: the :entity subscription (:amount) will be charged to the card ending in :last4 on :date. To change the card or pay another way: :url',
-        'overdue'                 => '*:app*: we have not identified the payment of :amount for the :entity subscription (due :date). On :limited_date, AI and financial will be blocked. Pay in the panel: :url',
-        'limited'                 => '*:app*: the payment of :amount for the :entity subscription is still open and AI and financial are blocked. On :blocked_date, access to the panel will be suspended. Pay in the panel: :url',
-        'terminated'              => '*:app*: the :entity subscription was ended for non-payment. To use it again, subscribe under My subscription: :url',
-        'first_charge_overdue'    => '*:app*: the 1st charge of the :entity subscription (:amount) was due on :date and access was suspended. It comes back as soon as the payment is confirmed. Pay in the panel: :url',
-        'first_charge_terminated' => '*:app*: the :entity subscription was cancelled because the 1st charge was not paid. To subscribe again: :url',
-    ],
 ];

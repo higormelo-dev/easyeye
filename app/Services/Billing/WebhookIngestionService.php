@@ -9,6 +9,7 @@ use App\Support\Billing\PayloadSanitizer;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class WebhookIngestionService
 {
@@ -93,6 +94,36 @@ class WebhookIngestionService
         );
 
         return $event;
+    }
+
+    /**
+     * A requisição traz o token/assinatura válidos do gateway (mesma conferência
+     * do ingest). Usado pelo limite da rota (RateLimiter "billing-webhook"):
+     * a inválida cai num balde próprio e pequeno, nunca no do gateway.
+     */
+    public function authenticates(string $gatewayCode, array $headers, string $body): bool
+    {
+        try {
+            if (! $this->gatewayRegistry->has($gatewayCode)) {
+                return false;
+            }
+
+            $payload = json_decode($body, true);
+            $payload = is_array($payload) ? $payload : [];
+            $gateway = $this->gatewayRegistry->get($gatewayCode);
+
+            return $gateway->validateWebhookSignature(new GatewayWebhookInputDTO(
+                gatewayCode: $gatewayCode,
+                headers: $headers,
+                body: $body,
+                payload: $payload,
+                externalEventId: $gateway->webhookEventKey($payload),
+                signature: $this->extractSignature($headers),
+                receivedAt: now()->toIso8601String(),
+            ));
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function extractSignature(array $headers): ?string
