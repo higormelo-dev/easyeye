@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ScheduleEvent;
+use App\Support\CurrentDoctor;
 use Closure;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,7 @@ class ScheduleEventsController extends Controller
     public function store(Request $request): JsonResponse
     {
         $entityId = session('selected_entity_id');
+        $this->authorizeDoctorScope($request->input('doctor_id'));
 
         $request->validate([
             'doctor_id' => ['nullable', 'uuid', $this->doctorBelongsToEntityRule()],
@@ -46,6 +48,8 @@ class ScheduleEventsController extends Controller
     {
         $entityId = session('selected_entity_id');
         abort_if($scheduleEvent->entity_id !== $entityId, 403);
+        $this->authorizeDoctorScope($scheduleEvent->doctor_id);
+        $this->authorizeDoctorScope($request->input('doctor_id'));
 
         $request->validate([
             'doctor_id' => ['nullable', 'uuid', $this->doctorBelongsToEntityRule()],
@@ -68,10 +72,22 @@ class ScheduleEventsController extends Controller
     public function destroy(ScheduleEvent $scheduleEvent): JsonResponse
     {
         abort_if($scheduleEvent->entity_id !== session('selected_entity_id'), 403);
+        $this->authorizeDoctorScope($scheduleEvent->doctor_id);
 
         $scheduleEvent->delete();
 
         return response()->json(['message' => 'Compromisso removido.']);
+    }
+
+    /**
+     * Perfil médico mexe só nos próprios compromissos e nos da clínica (sem
+     * médico — os mesmos que a Agenda dele mostra); sem cadastro de médico,
+     * em nenhum (App\Support\CurrentDoctor).
+     */
+    private function authorizeDoctorScope(?string $doctorId): void
+    {
+        abort_if(CurrentDoctor::isMissing(), 403, CurrentDoctor::missingMessage());
+        abort_unless(CurrentDoctor::canAccessDoctorId($doctorId, allowClinicWide: true), 403, __('schedules.unauthorized'));
     }
 
     /**

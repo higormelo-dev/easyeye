@@ -227,7 +227,7 @@ class ReportSettingService
             foreach ($globalSetting->contents as $content) {
                 $contentCopy = $content->replicate([
                     'id', 'report_setting_id', 'created_at', 'updated_at',
-                    'deleted_at', 'created_by', 'updated_by',
+                    'deleted_at', 'created_by', 'updated_by', 'deleted_by',
                 ]);
                 $contentCopy->report_setting_id = $copy->id;
                 $contentCopy->save();
@@ -320,7 +320,7 @@ class ReportSettingService
             foreach ($source->contents as $content) {
                 $contentCopy = $content->replicate([
                     'id', 'report_setting_id', 'created_at', 'updated_at',
-                    'deleted_at', 'created_by', 'updated_by',
+                    'deleted_at', 'created_by', 'updated_by', 'deleted_by',
                 ]);
                 $contentCopy->report_setting_id = $localSetting->id;
                 $contentCopy->save();
@@ -416,7 +416,7 @@ class ReportSettingService
                     // CRIA novo content + variables na cópia local
                     $contentCopy = $globalContent->replicate([
                         'id', 'report_setting_id', 'created_at', 'updated_at',
-                        'deleted_at', 'created_by', 'updated_by',
+                        'deleted_at', 'created_by', 'updated_by', 'deleted_by',
                     ]);
                     $contentCopy->report_setting_id = $copy->id;
                     $contentCopy->save();
@@ -472,8 +472,10 @@ class ReportSettingService
         $keptIds = [];
 
         foreach ($contents as $row) {
+            // Só conteúdo DESTE template: um id de outro template (de outra
+            // clínica, inclusive) virava update no conteúdo alheio.
             $content = isset($row['id'])
-                ? ReportSettingContent::find($row['id'])
+                ? $setting->contents()->whereKey($row['id'])->first()
                 : null;
 
             $data = [

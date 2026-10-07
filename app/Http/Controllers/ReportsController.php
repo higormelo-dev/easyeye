@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, EntityGate, ScheduleSituation};
+use App\Enums\{DataAccessPurpose, EntityGate, ScheduleSituation};
 use App\Models\{Covenant, Doctor, Entity, Schedule};
+use App\Services\DataAccessLogService;
+use App\Support\CurrentDoctor;
+use App\Support\Export\SpreadsheetWriter;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\{Request, Response as HttpResponse};
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 class ReportsController extends Controller
@@ -37,13 +42,15 @@ class ReportsController extends Controller
                 ['label' => __('actions.sidemenu.schedules'), 'url' => route('panel.schedules.index'), 'active' => false],
                 ['label' => __('actions.reports.schedules_label'), 'url' => '#', 'active' => true],
             ],
-            'doctors'    => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
-            'covenants'  => $covenants,
-            'situations' => $situations,
-            'filters'    => $request->only(['date_from', 'date_until', 'doctor_id', 'covenant_id', 'situation']),
-            'schedules'  => [],
-            'summary'    => null,
-            'byDoctor'   => [],
+            'doctors'           => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
+            'covenants'         => $covenants,
+            'situations'        => $situations,
+            'filters'           => $request->only(['date_from', 'date_until', 'doctor_id', 'covenant_id', 'situation']),
+            'schedules'         => [],
+            'summary'           => null,
+            'byDoctor'          => [],
+            'doctorMissing'     => CurrentDoctor::isMissing(),
+            'doctorMissingText' => CurrentDoctor::missingMessage(),
         ];
 
         if (! $request->filled('date_from')) {
@@ -78,11 +85,7 @@ class ReportsController extends Controller
             $query->where('situation', $situation);
         }
 
-        $loggedDoctor = $this->loggedDoctor();
-
-        if ($loggedDoctor) {
-            $query->where('doctor_id', $loggedDoctor->id);
-        }
+        $this->scopeToLoggedDoctor($query);
 
         $schedules = $query->orderBy('date_time')->get();
 
@@ -133,10 +136,12 @@ class ReportsController extends Controller
                 ['label' => __('actions.sidemenu.schedules'), 'url' => route('panel.schedules.index'), 'active' => false],
                 ['label' => __('actions.reports.absenteeism_label'), 'url' => '#', 'active' => true],
             ],
-            'doctors'   => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
-            'filters'   => $request->only(['date_from', 'date_until', 'doctor_id']),
-            'schedules' => [],
-            'summary'   => null,
+            'doctors'           => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
+            'filters'           => $request->only(['date_from', 'date_until', 'doctor_id']),
+            'schedules'         => [],
+            'summary'           => null,
+            'doctorMissing'     => CurrentDoctor::isMissing(),
+            'doctorMissingText' => CurrentDoctor::missingMessage(),
         ];
 
         if (! $request->filled('date_from')) {
@@ -164,19 +169,18 @@ class ReportsController extends Controller
         if ($doctorId = $request->input('doctor_id')) {
             $query->where('doctor_id', $doctorId);
         }
-        $loggedDoctor = $this->loggedDoctor();
-
-        if ($loggedDoctor) {
-            $query->where('doctor_id', $loggedDoctor->id);
-        }
+        $this->scopeToLoggedDoctor($query);
 
         $schedules = $query->orderBy('date_time')->get();
 
-        $totalInPeriod = Schedule::where('entity_id', $entityId)
+        // Denominador com o MESMO recorte de médico da lista (antes ignorava o
+        // médico logado e a taxa saía sobre a clínica inteira).
+        $totalQuery = Schedule::where('entity_id', $entityId)
             ->whereBetween('date_time', [$dateFrom, $dateUntil])
             ->whereNull('deleted_at')
-            ->when($request->input('doctor_id'), fn ($q) => $q->where('doctor_id', $request->input('doctor_id')))
-            ->count();
+            ->when($request->input('doctor_id'), fn ($q) => $q->where('doctor_id', $request->input('doctor_id')));
+        $this->scopeToLoggedDoctor($totalQuery);
+        $totalInPeriod = $totalQuery->count();
 
         $summary = [
             'total_absent'     => $schedules->count(),
@@ -201,17 +205,227 @@ class ReportsController extends Controller
         ]));
     }
 
-    private function loggedDoctor(): ?Doctor
+    // ── Primeira consulta (Fase 1 / B3) ─────────────────────────────────────
+
+    /** Período máximo do relatório (dias). */
+    public const FIRST_VISITS_MAX_DAYS = 366;
+
+    /**
+     * Pacientes cuja PRIMEIRA consulta atendida na clínica cai no período:
+     * data, paciente, médico, convênio e tipo. Filtro por médico; perfil
+     * médico vê só as primeiras consultas que foram com ele (CurrentDoctor).
+     * Sem período informado: o mês atual até hoje.
+     */
+    public function firstConsultations(Request $request): InertiaResponse
     {
-        if (session('user_rule') !== ClientRule::Doctor->value) {
-            return null;
+        $entity                    = $this->authorizeFirstConsultations();
+        [$from, $until, $doctorId] = $this->firstConsultationsFilters($request, (string) $entity->id);
+
+        $doctorMissing = CurrentDoctor::isMissing();
+        $isDoctor      = CurrentDoctor::isDoctorProfile();
+        $schedules     = $doctorMissing ? collect() : $this->firstConsultationsQuery((string) $entity->id, $from, $until, $doctorId)->get();
+        $locale        = app()->getLocale();
+
+        return Inertia::render('Panel/Reports/FirstConsultations', [
+            'breadcrumbs' => [
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.schedules'), 'url' => route('panel.schedules.index'), 'active' => false],
+                ['label' => __('first_consultations.title'), 'url' => '#', 'active' => true],
+            ],
+            'filters' => [
+                'date_from'  => $from->toDateString(),
+                'date_until' => $until->toDateString(),
+                'doctor_id'  => $isDoctor ? null : $doctorId,
+            ],
+            'doctors' => $isDoctor ? [] : $this->doctorsByEntity((string) $entity->id)
+                ->map(fn ($d) => ['id' => (string) $d->id, 'name' => $d->user_name])
+                ->values(),
+            'rows' => $schedules->map(fn (Schedule $s) => [
+                'id'             => (string) $s->id,
+                'date_time'      => $s->date_time->copy()->locale($locale)->isoFormat('L LT'),
+                'patient_name'   => $s->patient?->person?->full_name ?? $s->full_name,
+                'patient_code'   => $s->patient?->code,
+                'doctor_name'    => $s->doctor?->entityUser?->user?->name ?? '—',
+                'covenant'       => $s->covenant?->name,
+                'type'           => $this->visitTypeLabel($s),
+                'is_urgent_care' => $s->isUrgentCare(),
+            ])->values(),
+            'summary' => [
+                'total'     => $schedules->count(),
+                'by_doctor' => $schedules
+                    ->groupBy('doctor_id')
+                    ->map(fn ($group) => [
+                        'name'  => $group->first()->doctor?->entityUser?->user?->name ?? '—',
+                        'total' => $group->count(),
+                    ])
+                    ->sortByDesc('total')
+                    ->values(),
+            ],
+            'period' => [
+                'from'  => $from->copy()->locale($locale)->isoFormat('L'),
+                'until' => $until->copy()->locale($locale)->isoFormat('L'),
+            ],
+            'isDoctor'          => $isDoctor,
+            'doctorMissing'     => $doctorMissing,
+            'doctorMissingText' => CurrentDoctor::missingMessage(),
+            'urls'              => ['export' => route('panel.schedules.reports.first-consultations.export')],
+            't'                 => trans('first_consultations'),
+        ]);
+    }
+
+    /**
+     * Exportação (CSV/XLSX, mesmo gerador dos relatórios financeiros) com o
+     * mesmo recorte da tela. Leva nome de paciente: registro de acesso
+     * (Export) por linha exportada.
+     */
+    public function exportFirstConsultations(Request $request, SpreadsheetWriter $sheets, DataAccessLogService $accessLog): HttpResponse
+    {
+        $entity = $this->authorizeFirstConsultations();
+        abort_if(CurrentDoctor::isMissing(), 403, CurrentDoctor::missingMessage());
+
+        [$from, $until, $doctorId] = $this->firstConsultationsFilters($request, (string) $entity->id);
+        $schedules                 = $this->firstConsultationsQuery((string) $entity->id, $from, $until, $doctorId)->get();
+        $format                    = in_array($request->query('format'), ['xlsx', 'csv'], true) ? (string) $request->query('format') : 'csv';
+
+        $rows = [[
+            __('first_consultations.col_date'),
+            __('first_consultations.col_patient'),
+            __('first_consultations.col_patient_code'),
+            __('first_consultations.col_doctor'),
+            __('first_consultations.col_covenant'),
+            __('first_consultations.col_type'),
+        ]];
+
+        foreach ($schedules as $s) {
+            $rows[] = [
+                $s->date_time->format(__('first_consultations.datetime_format')),
+                $s->patient?->person?->full_name ?? $s->full_name,
+                $s->patient?->code,
+                $s->doctor?->entityUser?->user?->name,
+                $s->covenant?->name,
+                $this->visitTypeLabel($s),
+            ];
         }
 
-        return Doctor::query()
-            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-            ->where('doctors.entity_user_id', session('selected_entity_user_id'))
-            ->select('doctors.*')
-            ->first();
+        $accessLog->logMany($schedules, DataAccessPurpose::Export);
+
+        $filename = 'primeiras_consultas_' . $from->toDateString() . '_' . $until->toDateString();
+
+        if ($format === 'xlsx' && SpreadsheetWriter::supportsXlsx()) {
+            return response($sheets->xlsx($rows, __('first_consultations.sheet_name')), 200, [
+                'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '.xlsx"',
+            ]);
+        }
+
+        return response($sheets->csv($rows, (string) __('financial_reports.decimal_separator')), 200, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+        ]);
+    }
+
+    /**
+     * Admin/financeiro (mesmo Gate dos outros relatórios de agenda) e o
+     * médico — este com o recorte dele (a rota já deixa os três passarem).
+     */
+    private function authorizeFirstConsultations(): Entity
+    {
+        $entity = Entity::findOrFail(session('selected_entity_id'));
+
+        abort_unless(
+            Gate::allows(EntityGate::ViewFinancial->value, $entity) || CurrentDoctor::isDoctorProfile(),
+            403,
+        );
+
+        return $entity;
+    }
+
+    /**
+     * Período (padrão: mês atual até hoje; teto FIRST_VISITS_MAX_DAYS) e o
+     * médico do filtro — perfil médico: sempre ele (CurrentDoctor).
+     *
+     * @return array{0: Carbon, 1: Carbon, 2: ?string}
+     */
+    private function firstConsultationsFilters(Request $request, string $entityId): array
+    {
+        $validated = $request->validate([
+            'date_from'  => ['nullable', 'date_format:Y-m-d'],
+            'date_until' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'doctor_id'  => ['nullable', 'uuid'],
+        ]);
+
+        $from  = isset($validated['date_from']) ? Carbon::parse($validated['date_from'])->startOfDay() : now()->startOfMonth();
+        $until = isset($validated['date_until']) ? Carbon::parse($validated['date_until'])->endOfDay() : now()->endOfDay();
+
+        if ($from->diffInDays($until) > self::FIRST_VISITS_MAX_DAYS) {
+            throw ValidationException::withMessages([
+                'date_until' => __('first_consultations.period_too_long', ['days' => self::FIRST_VISITS_MAX_DAYS]),
+            ]);
+        }
+
+        if (CurrentDoctor::isDoctorProfile()) {
+            return [$from, $until, CurrentDoctor::doctor()?->id ? (string) CurrentDoctor::doctor()->id : null];
+        }
+
+        $doctorId = $validated['doctor_id'] ?? null;
+        $valid    = $doctorId && $this->doctorsByEntity($entityId)->contains('id', $doctorId);
+
+        return [$from, $until, $valid ? (string) $doctorId : null];
+    }
+
+    /**
+     * A 1ª consulta ATENDIDA de cada paciente na clínica (não existe outra
+     * atendida antes dela — desempate pelo id no mesmo horário), dentro do
+     * período. Com médico: só as que foram com ele.
+     *
+     * @return Builder<Schedule>
+     */
+    private function firstConsultationsQuery(string $entityId, Carbon $from, Carbon $until, ?string $doctorId): Builder
+    {
+        $attended = ScheduleSituation::Attended->value;
+
+        return Schedule::query()
+            ->with(['doctor.entityUser.user', 'covenant', 'visitType', 'patient.person'])
+            ->where('schedules.entity_id', $entityId)
+            ->whereNotNull('schedules.patient_id')
+            ->where('schedules.situation', $attended)
+            ->whereBetween('schedules.date_time', [$from, $until])
+            ->when($doctorId, fn (Builder $q) => $q->where('schedules.doctor_id', $doctorId))
+            ->whereNotExists(fn ($prev) => $prev->selectRaw('1')
+                ->from('schedules as prev')
+                ->where('prev.entity_id', $entityId)
+                ->whereColumn('prev.patient_id', 'schedules.patient_id')
+                ->where('prev.situation', $attended)
+                ->whereNull('prev.deleted_at')
+                ->where(fn ($earlier) => $earlier
+                    ->whereColumn('prev.date_time', '<', 'schedules.date_time')
+                    ->orWhere(fn ($tie) => $tie
+                        ->whereColumn('prev.date_time', '=', 'schedules.date_time')
+                        ->whereColumn('prev.id', '<', 'schedules.id'))))
+            ->orderBy('schedules.date_time');
+    }
+
+    private function visitTypeLabel(Schedule $s): ?string
+    {
+        return $s->visitType?->name ?? $s->attendance_type?->label();
+    }
+
+    /**
+     * Perfil médico (regra única de App\Support\CurrentDoctor): só os
+     * agendamentos dele; sem cadastro de médico, nenhum — nunca a clínica
+     * inteira. Admin/financeiro: sem recorte.
+     */
+    private function scopeToLoggedDoctor(Builder $query): void
+    {
+        if (! CurrentDoctor::isDoctorProfile()) {
+            return;
+        }
+
+        $doctor = CurrentDoctor::doctor();
+
+        $doctor
+            ? $query->where('doctor_id', $doctor->id)
+            : $query->whereRaw('1 = 0');
     }
 
     private function doctorsByEntity(string $entityId)

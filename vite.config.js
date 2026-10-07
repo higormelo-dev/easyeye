@@ -69,6 +69,10 @@ export default defineConfig(({ command, mode, ssrBuild }) => {
             // porque o banner injeta jQuery por chunk e reordenar IIFEs legadas é
             // frágil — então elevamos o limite do aviso em vez de fragmentar.
             chunkSizeWarningLimit: 900,
+            // O cálculo do tamanho gzip de cada chunk no relatório do build
+            // estourava o teto de 1 GB de heap do `npm run build`
+            // (--max-old-space-size=1024) — só afeta o log, não os arquivos.
+            reportCompressedSize: false,
             rollupOptions: {
                 output: {
                     // Declara jQuery/$ no topo de CADA chunk para que IIFEs legadas

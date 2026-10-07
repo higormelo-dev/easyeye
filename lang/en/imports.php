@@ -34,7 +34,7 @@ return [
         'optional_columns'   => 'Optional',
         'col_name'           => 'Patient full name',
         'or'                 => 'or',
-        'dedup_hint'         => 'Existing patients (same CPF or name+phone) are skipped automatically without overwriting data.',
+        'dedup_hint'         => 'Existing patients (same CPF or name+phone) are skipped automatically without overwriting data. Same name and date of birth as an existing patient makes the row an error (duplicate); same name with a different or missing date of birth is imported with a warning. An inactive health plan makes the row an error.',
 
         'history_title' => 'Import History',
         'rows'          => 'rows',
@@ -176,7 +176,7 @@ return [
         'optional_columns'   => 'Optional',
         'col_name'           => 'Patient name and appointment date/time',
         'or'                 => 'or',
-        'dedup_hint'         => 'Doctor is resolved by import code or license number (required). Patient is resolved by import code or CPF (optional — with no match, the appointment is created with just the provided name).',
+        'dedup_hint'         => 'Doctor is resolved by import code or license number (required). Patient is resolved by import code or CPF (optional — with no match, the appointment is created with just the provided name). An inactive health plan makes the row an error.',
 
         'history_title' => 'Import History',
         'rows'          => 'rows',

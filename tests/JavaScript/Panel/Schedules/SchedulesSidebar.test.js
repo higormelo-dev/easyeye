@@ -79,7 +79,7 @@ describe('Agenda — calendário lateral', () => {
         expect(router.get).toHaveBeenCalledWith(
             '/_routes/panel.schedules.index',
             expect.objectContaining({ date: '2026-12-15' }),
-            expect.objectContaining({ only: ['scheduleItems', 'filters'] }),
+            expect.objectContaining({ only: ['scheduleItems', 'filters', 'counters'] }),
         );
     });
 

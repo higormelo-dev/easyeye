@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\WaitingListRequest;
 use App\Models\WaitingList;
+use App\Support\CurrentDoctor;
 use Illuminate\Http\{JsonResponse, Request};
 
 class WaitingListController extends Controller
@@ -16,6 +17,17 @@ class WaitingListController extends Controller
     {
         $entityId = session('selected_entity_id');
         $doctorId = $request->input('doctor_id');
+
+        // Perfil médico: só a fila dele (sem cadastro de médico, nenhuma).
+        if (CurrentDoctor::isDoctorProfile()) {
+            $own = CurrentDoctor::doctor();
+
+            if ($own === null) {
+                return response()->json(['data' => [], 'count' => 0]);
+            }
+
+            $doctorId = (string) $own->id;
+        }
 
         $query = WaitingList::where('entity_id', $entityId)
             ->where('active', true)
@@ -67,6 +79,8 @@ class WaitingListController extends Controller
     public function destroy(WaitingList $waitingList): JsonResponse
     {
         abort_if($waitingList->entity_id !== session('selected_entity_id'), 403);
+        abort_if(CurrentDoctor::isMissing(), 403, CurrentDoctor::missingMessage());
+        abort_unless(CurrentDoctor::canAccessDoctorId($waitingList->doctor_id), 403);
 
         $waitingList->delete();
 
@@ -85,11 +99,14 @@ class WaitingListController extends Controller
         ]);
 
         $entityId = session('selected_entity_id');
+        abort_if(CurrentDoctor::isMissing(), 403, CurrentDoctor::missingMessage());
+        $ownDoctorId = CurrentDoctor::isDoctorProfile() ? (string) CurrentDoctor::doctor()?->id : null;
 
         foreach ($request->input('ids') as $position => $id) {
             WaitingList::where('id', $id)
                 ->where('entity_id', $entityId)
                 ->where('active', true)
+                ->when($ownDoctorId, fn ($q) => $q->where('doctor_id', $ownDoctorId))
                 ->update(['position' => $position + 1]);
         }
 

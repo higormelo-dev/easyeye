@@ -17,6 +17,9 @@ const props = defineProps({
     search: { type: String, default: '' },
     columns: { type: Array, required: true },
     t: { type: Object, default: () => ({}) },
+    // Ações extras por linha (ex.: "Escala e bloqueios" dos Recursos): links
+    // { key, label, icon, url } com __ID__ no lugar do id — BaseSettingController::getRowLinks().
+    rowLinks: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(['view', 'edit', 'toggleActive', 'delete', 'restore']);
@@ -177,6 +180,15 @@ onUnmounted(() => removeSuccessListener?.());
                                     <button class="dropdown-item rounded-1" @click="emit('edit', item)">
                                         <i class="ti ti-edit me-1"></i> {{ t.action_edit ?? 'Editar' }}
                                     </button>
+                                </li>
+                                <li v-for="link in rowLinks" :key="link.key">
+                                    <a
+                                        class="dropdown-item rounded-1"
+                                        :href="link.url.replace('__ID__', item.id)"
+                                        :data-testid="`row-link-${link.key}`"
+                                    >
+                                        <i :class="`${link.icon} me-1`" aria-hidden="true"></i> {{ link.label }}
+                                    </a>
                                 </li>
                                 <li>
                                     <button class="dropdown-item rounded-1" @click="emit('toggleActive', item)">

@@ -261,6 +261,7 @@ test('aprovação exige permissão médica e atualiza execução', function () {
 
     $doctor           = User::factory()->create();
     $doctorEntityUser = createEntityUser($this->entity, $doctor, ClientRule::Doctor->value);
+    doctorRecordForEntityUser($doctorEntityUser); // aprovar exige cadastro de médico ativo
 
     $this->actingAs($doctor)
         ->withSession(panelSession($doctorEntityUser))
@@ -279,6 +280,7 @@ test('rejeição médica marca run como rejected e persiste motivo', function ()
 
     $doctor           = User::factory()->create();
     $doctorEntityUser = createEntityUser($this->entity, $doctor, ClientRule::Doctor->value);
+    doctorRecordForEntityUser($doctorEntityUser); // aprovar exige cadastro de médico ativo
 
     $this->actingAs($doctor)
         ->withSession(panelSession($doctorEntityUser))
@@ -299,6 +301,7 @@ test('decision rate limit bloqueia approve/reject após exceder limite por minut
 
     $doctor           = User::factory()->create();
     $doctorEntityUser = createEntityUser($this->entity, $doctor, ClientRule::Doctor->value);
+    doctorRecordForEntityUser($doctorEntityUser); // aprovar exige cadastro de médico ativo
 
     $this->actingAs($doctor)
         ->withSession(panelSession($doctorEntityUser))

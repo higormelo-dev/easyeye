@@ -3,18 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Enums\{CashEntryReferenceType, ClientRule, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleSituation};
-use App\Exceptions\AttendanceRequiresCashEntryException;
+use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleSlotUnavailableException};
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
 use App\Http\Requests\ScheduleRequest;
 use App\Jobs\NotifyScheduleChangeJob;
-use App\Models\{Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, IrisType, MedicalRecord, PatientCall, People, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
+use App\Models\{ClinicResource, Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, IrisType, MedicalRecord, PatientCall, People, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
 use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
+use App\Rules\ActiveCovenant;
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
-use App\Services\ScheduleService;
+use App\Services\Schedules\{AgendaFilters, AgendaQueryService, ScheduleAvailabilityService};
+use App\Services\{ScheduleSeriesService, ScheduleService};
 use App\Services\WhatsApp\WhatsAppService;
-use App\Support\BrazilianFormat;
+use App\Support\{BrazilianFormat, CurrentDoctor, PatientAccess};
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -36,20 +38,29 @@ class SchedulesController extends Controller
         $this->service         = $scheduleService;
     }
 
-    public function index(Request $request, ProcedurePriceService $procedurePrices): InertiaResponse
+    public function index(Request $request, ProcedurePriceService $procedurePrices, AgendaQueryService $agenda): InertiaResponse
     {
-        $entityId     = session('selected_entity_id');
-        $loggedDoctor = $this->loggedDoctor();
-        $dateStr      = $request->filled('date') ? $request->string('date')->value() : now()->toDateString();
-        $date         = Carbon::parse($dateStr);
-        $doctor       = $loggedDoctor ? (string) $loggedDoctor->id : $request->string('doctor', 'tudo')->value();
-        $bout         = $request->integer('bout', 1);
-        $search       = $request->string('search')->trim()->value();
+        $entityId     = (string) session('selected_entity_id');
+        $isDoctor     = CurrentDoctor::isDoctorProfile();
+        $loggedDoctor = CurrentDoctor::doctor();
+        // Perfil médico sem cadastro de médico: nada da clínica (antes caía na
+        // visão de todos os médicos) — a tela mostra o aviso.
+        $doctorMissing = $isDoctor && ! $loggedDoctor;
+        // Filtros da URL (data/período, médico, turno, chip de situação,
+        // especialidade, sala, busca) — escopo de médico sempre do servidor.
+        $filters = AgendaFilters::fromRequest($request, $entityId, $loggedDoctor);
+        // Telefone/WhatsApp do paciente só para quem tem acesso a Pacientes.
+        $canSeePatients = app(PatientAccess::class)->current();
 
         return Inertia::render('Panel/Schedules/Index', [
-            'scheduleItems' => fn () => $this->buildScheduleItems($entityId, $date, $doctor, $bout, $search, $loggedDoctor),
-            'doctors'       => fn () => $this->buildDoctorList($entityId, $loggedDoctor),
-            'covenants'     => fn () => Covenant::where(function ($q) use ($entityId) {
+            'scheduleItems' => fn () => $doctorMissing ? [] : $this->buildScheduleItems($agenda, $filters, $canSeePatients),
+            // Contadores do topo (mesma conta do Dashboard) — também são os
+            // chips de filtro; ignoram o próprio chip e a busca.
+            'counters' => fn () => $doctorMissing
+                ? [...array_fill_keys(AgendaFilters::STATUSES, 0), 'urgent_care' => null]
+                : $agenda->counters($filters),
+            'doctors'   => fn () => $doctorMissing ? [] : $this->buildDoctorList($entityId, $loggedDoctor),
+            'covenants' => fn () => Covenant::where(function ($q) use ($entityId) {
                 $q->where('entity_id', $entityId)->orWhereNull('entity_id');
             })->where('active', true)->orderBy('name')->get(['id', 'name']),
             'visitTypes' => fn () => VisitType::where(function ($q) use ($entityId) {
@@ -88,12 +99,8 @@ class SchedulesController extends Controller
             // canRegisterCash acima (EntityGate::ViewFinancial) — quem não
             // tem acesso financeiro nem vê o botão, sem depender só do
             // middleware da rota pra esconder algo que 403aria.
-            'reportsUrls' => Gate::allows(EntityGate::ViewFinancial->value, Entity::find($entityId))
-                ? [
-                    'production'  => route('panel.schedules.reports.production'),
-                    'absenteeism' => route('panel.schedules.reports.absenteeism'),
-                ]
-                : null,
+            // Primeira consulta: também para o médico (com o recorte dele).
+            'reportsUrls' => $this->reportsUrls($entityId, $isDoctor),
             // Lista completa e fixa — o dropdown de situação no card usa isso
             // diretamente (todas as opções sempre disponíveis, nenhuma some
             // depois de selecionada; ver ScheduleCard.vue).
@@ -111,14 +118,26 @@ class SchedulesController extends Controller
                 'icon'       => $m->icon(),
                 'text_class' => $m->textClass(),
             ])->values(),
-            'filters' => [
-                'date'   => $date->format('Y-m-d'),
-                'doctor' => $doctor,
-                'bout'   => $bout,
-                'search' => $search,
+            'filters' => $filters->toArray(),
+            // Salas/equipamentos ativos (filtro "Sala/equipamento").
+            'resourceOptions' => fn () => ClinicResource::query()
+                ->where('entity_id', $entityId)
+                ->where('active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'type'])
+                ->map(fn (ClinicResource $r) => ['id' => $r->id, 'name' => $r->name, 'type_label' => $r->typeLabel()])
+                ->values(),
+            'canSeePatients' => $canSeePatients,
+            'urls'           => [
+                'print'         => route('panel.schedules.print'),
+                'availability'  => route('panel.schedules.availability'),
+                'seriesPreview' => route('panel.schedules.series.preview'),
+                // Contador "Pronto atendimento" leva à fila do dia.
+                'urgentCare' => route('panel.urgent-care.index'),
             ],
-            'isDoctor' => ! is_null($loggedDoctor),
-            'isStaff'  => in_array(session('user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true),
+            'isDoctor'      => $isDoctor,
+            'doctorMissing' => $doctorMissing,
+            'isStaff'       => in_array(session('selected_entity_user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true),
             // Painel de chamadas (TV da sala de espera) — opcional por clínica.
             'callPanelEnabled' => (bool) Entity::whereKey(session('selected_entity_id'))->value('call_panel_enabled'),
             't'                => trans('schedules'),
@@ -223,6 +242,17 @@ class SchedulesController extends Controller
             'doctor_record' => $doctor?->record,
             'doctor_color'  => $doctor?->color,
 
+            // ── Formulário de edição (ScheduleFormModal) ──────────────────
+            // Valores crus: sem eles o "Editar" abria com nome/convênio/tipo
+            // vazios e o PUT apagava o convênio (inclusive o já inativado,
+            // que a regra deixa manter — App\Rules\ActiveCovenant).
+            'full_name'       => $schedule->full_name,
+            'covenant_id'     => $schedule->covenant_id,
+            'covenant_active' => $schedule->covenant ? (bool) $schedule->covenant->active : null,
+            'visit_id'        => $schedule->visit_id,
+            'attendance_type' => $schedule->attendance_type?->value,
+            'specialty_area'  => $schedule->specialty_area?->value,
+
             // ── Atendimento ───────────────────────────────────────────────
             'covenant_name'        => $schedule->covenant?->name,
             'visit_type_name'      => $schedule->visitType?->name,
@@ -235,6 +265,20 @@ class SchedulesController extends Controller
             'situation_badge' => $schedule->situation->badgeClass(),
             'situation_icon'  => $schedule->situation->icon(),
 
+            // ── Encaixe, pronto atendimento e série de sessões ────────────
+            'is_fit_in'          => (bool) $schedule->is_fit_in,
+            'is_urgent_care'     => $schedule->isUrgentCare(),
+            'series_id'          => $schedule->series_id,
+            'session_number'     => $schedule->session_number,
+            'session_total'      => $schedule->session_total,
+            'series'             => $this->seriesRows($schedule),
+            'series_cancellable' => $this->seriesCancellableCount($schedule),
+            'cancel_series_url'  => $schedule->series_id ? route('panel.schedules.series.cancel-future', $schedule->id) : null,
+            // Ficha impressa = cadastro do paciente: mesma regra de Pacientes.
+            'patient_sheet_url' => $schedule->patient_id && app(PatientAccess::class)->current()
+                ? route('panel.schedules.patient-sheet', $schedule->id)
+                : null,
+
             // ── Contato ───────────────────────────────────────────────────
             // Formatado para o drawer; o form de edição (v-mask) aceita o valor
             // formatado e o ScheduleRequest volta para só dígitos.
@@ -244,6 +288,11 @@ class SchedulesController extends Controller
             // Respondeu SAIR ao número que envia para a clínica: não recebe
             // confirmação/pesquisa até responder VOLTAR.
             'whatsapp_opted_out' => WhatsAppService::optedOutFor((string) $schedule->entity_id, $schedule->cellphone),
+            // Conversa no WhatsApp (só com acesso a Pacientes) — mesma regra
+            // da linha da agenda.
+            ...(app(PatientAccess::class)->current()
+                ? $this->whatsAppFields($schedule, WhatsAppService::optedOutPhones((string) $schedule->entity_id, [$this->cellphoneOf($schedule)]))
+                : []),
 
             // ── Tempos ────────────────────────────────────────────────────
             'arrived_at'   => $schedule->arrived_at?->format('d/m/Y H:i'),
@@ -277,16 +326,47 @@ class SchedulesController extends Controller
         ]]);
     }
 
-    public function store(ScheduleRequest $request): JsonResponse
+    public function store(ScheduleRequest $request, ScheduleSeriesService $series): JsonResponse
     {
-        $entityId = session()->get('selected_entity_id');
+        $entityId    = session()->get('selected_entity_id');
+        $doctorId    = (string) $request->input('doctor_id');
+        $dateTime    = Carbon::parse($request->input('date_time'));
+        $isFitIn     = $request->boolean('is_fit_in');
+        $resourceIds = array_map('strval', (array) $request->input('resource_ids', []));
 
-        // ── Recorrência ──────────────────────────────────────────────────────
+        // ── Série de sessões (datas 2..N confirmadas na prévia) ─────────────
+        // Cada data passa pela regra do horário principal; qualquer conflito
+        // recusa a série inteira, dizendo quais datas (nada é gravado).
+        $extraDates = collect((array) $request->input('series_dates', []))
+            ->map(fn ($date) => Carbon::parse($date))
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($extraDates !== [] && ($conflicts = $series->conflicts($doctorId, $extraDates, $resourceIds, $isFitIn))) {
+            return response()->json([
+                'message' => trans_choice('schedules.series_has_conflicts', count($conflicts), ['count' => count($conflicts)]) . ' ' . $conflicts[0],
+                'errors'  => ['series_dates' => $conflicts],
+            ], 422);
+        }
+
+        // ── Recorrência antiga (semanal/mensal "até a data") ────────────────
+        // Datas que o médico não atende continuam sendo puladas; sala
+        // indisponível numa delas recusa o pedido inteiro, dizendo qual sala,
+        // quando e por quê. As ocorrências viram uma série ("2/5").
         $recurrenceType    = $request->input('recurrence_type');  // weekly | monthly | null
         $recurrenceUntil   = $request->input('recurrence_until'); // Y-m-d | null
-        $recurrenceGroupId = ($recurrenceType && $recurrenceUntil)
-            ? (string) Str::uuid()
-            : null;
+        $recurrenceGroupId = null;
+
+        if ($extraDates === [] && $recurrenceType && $recurrenceUntil) {
+            [$extraDates, $roomError] = $this->legacyRecurrenceDates($doctorId, $dateTime, $recurrenceType, $recurrenceUntil, $resourceIds, $isFitIn);
+
+            if ($roomError) {
+                return response()->json(['message' => $roomError, 'errors' => ['resource_ids' => [$roomError]]], 422);
+            }
+
+            $recurrenceGroupId = (string) Str::uuid();
+        }
 
         // Nasce Agendado; a situação pedida no formulário (se houver) entra
         // pelo fluxo logo abaixo, na MESMA transação — nunca por mass
@@ -296,16 +376,34 @@ class SchedulesController extends Controller
             [
                 'entity_id'           => $entityId,
                 'situation'           => ScheduleSituation::Scheduled->value,
+                'is_fit_in'           => $isFitIn,
                 'recurrence_group_id' => $recurrenceGroupId,
                 'recurrence_type'     => $recurrenceGroupId ? $recurrenceType : null,
                 'recurrence_until'    => $recurrenceGroupId ? $recurrenceUntil : null,
+                'series_id'           => $extraDates !== [] ? ($recurrenceGroupId ?? (string) Str::uuid()) : null,
+                'session_number'      => $extraDates !== [] ? 1 : null,
+                'session_total'       => $extraDates !== [] ? count($extraDates) + 1 : null,
             ],
         );
 
+        // Tudo ou nada: agendamento, sala, situação pedida e as demais sessões
+        // da série. Encaixe confere o teto do turno sob lock antes de gravar.
         try {
-            $schedule = DB::transaction(function () use ($baseData, $request): Schedule {
+            $schedule = DB::transaction(function () use ($baseData, $request, $doctorId, $dateTime, $isFitIn, $resourceIds, $extraDates, $series): Schedule {
+                if ($isFitIn) {
+                    $this->service->assertFitInCapacity($doctorId, $dateTime);
+                }
+
                 $schedule = $this->model->create($baseData);
                 $this->applyRequestedSituation($request, $schedule);
+
+                if ($resourceIds !== []) {
+                    $schedule->resources()->sync($resourceIds);
+                }
+
+                if ($extraDates !== []) {
+                    $series->createSessions($schedule, $extraDates, $resourceIds);
+                }
 
                 return $schedule;
             });
@@ -314,16 +412,8 @@ class SchedulesController extends Controller
         } catch (AttendanceRequiresCashEntryException) {
             // Agendamento novo nunca tem caixa: nada foi gravado (rollback).
             return $this->cashEntryRequiredResponse();
-        }
-
-        // Sync resources (many-to-many)
-        if ($resourceIds = $request->input('resource_ids')) {
-            $schedule->resources()->sync($resourceIds);
-        }
-
-        // ── Gera ocorrências recorrentes ─────────────────────────────────────
-        if ($recurrenceGroupId) {
-            $this->createRecurringOccurrences($schedule, $recurrenceType, $recurrenceUntil, $entityId);
+        } catch (ScheduleSlotUnavailableException $e) {
+            return $this->slotUnavailableResponse($e);
         }
 
         // Mark waiting list entry as converted if the schedule came from it
@@ -344,8 +434,10 @@ class SchedulesController extends Controller
         NotifyScheduleChangeJob::dispatch($schedule->id, ScheduleNotification::EVENT_CREATED);
 
         return response()->json([
-            'message' => __('schedules.created'),
-            'data'    => $schedule,
+            'message' => $extraDates !== []
+                ? __('schedules.series_created', ['count' => count($extraDates) + 1])
+                : __('schedules.created'),
+            'data' => $schedule,
         ], 201);
     }
 
@@ -357,7 +449,15 @@ class SchedulesController extends Controller
         // demais campos do formulário também não são gravados (422 = nada mudou).
         try {
             DB::transaction(function () use ($request, $schedule): void {
-                $schedule->update($request->scheduleAttributes());
+                $attributes = $request->scheduleAttributes();
+
+                // Encaixe: teto do turno de destino conferido sob lock (o
+                // próprio agendamento não conta).
+                if (! empty($attributes['is_fit_in'])) {
+                    $this->service->assertFitInCapacity((string) $attributes['doctor_id'], Carbon::parse($attributes['date_time']), (string) $schedule->id);
+                }
+
+                $schedule->update($attributes);
                 $this->applyRequestedSituation($request, $schedule);
                 $schedule->resources()->sync($request->input('resource_ids', []));
             });
@@ -365,6 +465,8 @@ class SchedulesController extends Controller
             $this->rethrowUnlessSlotConflict($e);
         } catch (AttendanceRequiresCashEntryException) {
             return $this->cashEntryRequiredResponse();
+        } catch (ScheduleSlotUnavailableException $e) {
+            return $this->slotUnavailableResponse($e);
         }
 
         Cache::forget("waiting_room:{$schedule->entity_id}");
@@ -475,6 +577,12 @@ class SchedulesController extends Controller
             // deixava reagendar com médico de OUTRA clínica. Mesmo closure já
             // usado em ScheduleRequest::rules() para store()/update().
             'doctor_id' => ['nullable', 'uuid', function ($attribute, $value, $fail) {
+                if (! CurrentDoctor::canAccessDoctorId((string) $value)) {
+                    $fail(__('schedules.doctor_only_own'));
+
+                    return;
+                }
+
                 $exists = DB::table('doctors')
                     ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
                     ->where('doctors.id', $value)
@@ -486,50 +594,101 @@ class SchedulesController extends Controller
                     $fail(__('validation.custom.schedule.doctor_not_found'));
                 }
             }],
+            // Encaixe: sem o campo, a remarcação mantém o que o agendamento é.
+            'is_fit_in' => ['nullable', 'boolean'],
         ]);
 
         $entityId = session()->get('selected_entity_id');
         $doctorId = $request->input('doctor_id') ?: $schedule->doctor_id;
         $dateTime = Carbon::parse($request->input('date_time'));
+        $isFitIn  = $request->input('is_fit_in') !== null ? $request->boolean('is_fit_in') : (bool) $schedule->is_fit_in;
 
-        $errors = $this->service->validateSlot($doctorId, $dateTime);
+        // A sala/equipamento reservado acompanha a remarcação: valida escala,
+        // bloqueio e conflito do recurso no novo horário (o próprio agendamento
+        // antigo, que será cancelado, não conta como conflito — nem na cota de
+        // encaixe do turno).
+        $resourceIds = $schedule->resources()->pluck('clinic_resources.id')->map(fn ($id) => (string) $id)->all();
+        $errors      = $isFitIn
+            ? $this->service->validateFitIn($doctorId, $dateTime, (string) $schedule->id, $resourceIds)
+            : array_merge(
+                $this->service->validateSlot($doctorId, $dateTime),
+                $this->service->resourceErrors($resourceIds, $dateTime, (string) $schedule->id),
+            );
 
         if (! empty($errors)) {
-            return response()->json(['message' => $errors[0]], 422);
+            return response()->json(['message' => $errors[0], 'errors' => ['date_time' => [$errors[0]]]], 422);
         }
 
-        $newSchedule = $this->model->create([
-            'entity_id'          => $entityId,
-            'doctor_id'          => $doctorId,
-            'patient_id'         => $schedule->patient_id,
-            'covenant_id'        => $schedule->covenant_id,
-            'visit_id'           => $schedule->visit_id,
-            'full_name'          => $schedule->full_name,
-            'date_time'          => $dateTime,
-            'telephone'          => $schedule->telephone,
-            'cellphone'          => $schedule->cellphone,
-            'cellphone_whatsapp' => $schedule->cellphone_whatsapp,
-            'notes'              => $schedule->notes,
-            'situation'          => ScheduleSituation::Scheduled->value,
-            'active'             => true,
-        ]);
+        // Remarcar cria um agendamento NOVO com o convênio do antigo: convênio
+        // inativado no meio do caminho não passa adiante (a recepção edita o
+        // agendamento e escolhe um ativo antes de remarcar).
+        if ($schedule->covenant_id && ! ActiveCovenant::isActive((string) $schedule->covenant_id)) {
+            $message = __('validation.custom.covenant.reschedule_inactive', [
+                'name' => (string) Covenant::withoutGlobalScopes()->whereKey($schedule->covenant_id)->value('name'),
+            ]);
 
-        $cancelNote    = __('schedules.reschedule_note', ['code' => $newSchedule->code]);
-        $fromSituation = $schedule->situation;
+            return response()->json(['message' => $message, 'errors' => ['covenant_id' => [$message]]], 422);
+        }
 
-        $schedule->update([
-            'situation'           => ScheduleSituation::Cancelled->value,
-            'cancellation_reason' => $cancelNote,
-        ]);
+        // Agendamento novo + cancelamento do antigo numa transação só (o novo
+        // nunca fica sem o antigo cancelado, nem o contrário). A sessão de
+        // série continua na série ("3/10"); encaixe confere o teto sob lock.
+        try {
+            $newSchedule = DB::transaction(function () use ($schedule, $entityId, $doctorId, $dateTime, $isFitIn, $resourceIds): Schedule {
+                if ($isFitIn) {
+                    $this->service->assertFitInCapacity($doctorId, $dateTime, (string) $schedule->id);
+                }
 
-        ScheduleSituationLog::create([
-            'schedule_id'    => $schedule->id,
-            'entity_user_id' => session('selected_entity_user_id'),
-            'from_situation' => $fromSituation->value,
-            'to_situation'   => ScheduleSituation::Cancelled->value,
-            'notes'          => $cancelNote,
-            'created_at'     => now(),
-        ]);
+                $newSchedule = $this->model->create([
+                    'entity_id'          => $entityId,
+                    'doctor_id'          => $doctorId,
+                    'patient_id'         => $schedule->patient_id,
+                    'covenant_id'        => $schedule->covenant_id,
+                    'visit_id'           => $schedule->visit_id,
+                    'attendance_type'    => $schedule->attendance_type,
+                    'specialty_area'     => $schedule->specialty_area,
+                    'full_name'          => $schedule->full_name,
+                    'date_time'          => $dateTime,
+                    'telephone'          => $schedule->telephone,
+                    'cellphone'          => $schedule->cellphone,
+                    'cellphone_whatsapp' => (bool) $schedule->cellphone_whatsapp,
+                    'notes'              => $schedule->notes,
+                    'situation'          => ScheduleSituation::Scheduled->value,
+                    'is_fit_in'          => $isFitIn,
+                    'series_id'          => $schedule->series_id,
+                    'session_number'     => $schedule->session_number,
+                    'session_total'      => $schedule->session_total,
+                    'active'             => true,
+                ]);
+
+                if ($resourceIds !== []) {
+                    $newSchedule->resources()->sync($resourceIds);
+                }
+
+                $cancelNote    = __('schedules.reschedule_note', ['code' => $newSchedule->code]);
+                $fromSituation = $schedule->situation;
+
+                $schedule->update([
+                    'situation'           => ScheduleSituation::Cancelled->value,
+                    'cancellation_reason' => $cancelNote,
+                ]);
+
+                ScheduleSituationLog::create([
+                    'schedule_id'    => $schedule->id,
+                    'entity_user_id' => session('selected_entity_user_id'),
+                    'from_situation' => $fromSituation->value,
+                    'to_situation'   => ScheduleSituation::Cancelled->value,
+                    'notes'          => $cancelNote,
+                    'created_at'     => now(),
+                ]);
+
+                return $newSchedule;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            $this->rethrowUnlessSlotConflict($e);
+        } catch (ScheduleSlotUnavailableException $e) {
+            return $this->slotUnavailableResponse($e);
+        }
 
         Cache::forget("waiting_room:{$schedule->entity_id}");
 
@@ -557,12 +716,20 @@ class SchedulesController extends Controller
             $request->input('time'),
             $entityId,
             $entityUserId,
+            $this->doctorScopeForBulk(),
         );
 
         $message = __('schedules.bulk_updated', ['updated' => $result['updated']]);
 
         if ($result['skipped'] > 0) {
             $message .= ' ' . __('schedules.bulk_skipped_sched', ['skipped' => $result['skipped']]);
+        }
+
+        // Motivo das linhas recusadas pela validação (horário/escala do médico
+        // ou sala ocupada/fora da escala/bloqueada) — as 3 primeiras na
+        // mensagem, todas em `blocked`.
+        if ($result['blocked'] !== []) {
+            $message .= ' ' . collect($result['blocked'])->take(3)->pluck('message')->implode(' · ');
         }
 
         // ── Notifica cada paciente afetado pelo reagendamento ─────────────────
@@ -574,6 +741,7 @@ class SchedulesController extends Controller
             'message' => $message,
             'updated' => $result['updated'],
             'skipped' => $result['skipped'],
+            'blocked' => $result['blocked'],
         ]);
     }
 
@@ -597,6 +765,7 @@ class SchedulesController extends Controller
             $entityId,
             $entityUserId,
             $notes,
+            $this->doctorScopeForBulk(),
         );
 
         // Contrato de bulk = sucesso parcial (200): linha barrada pela trava
@@ -681,6 +850,11 @@ class SchedulesController extends Controller
         $doctorId  = $request->input('doctor_id');
         $excludeId = $request->input('schedule_id');
 
+        // Perfil médico só consulta os PRÓPRIOS horários (sem cadastro: nada).
+        if (! CurrentDoctor::canAccessDoctorId($doctorId)) {
+            return response()->json(['has_schedule' => false, 'interval' => 15, 'slots' => []]);
+        }
+
         $doctor = Doctor::query()
             ->with('entityUser.entity')
             ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
@@ -704,64 +878,144 @@ class SchedulesController extends Controller
             'has_schedule' => $hasSchedule,
             'interval'     => $doctor->effectiveInterval(),
             'slots'        => $slots,
+            // Encaixes usados × teto por turno no dia ("1 de 2 na manhã").
+            'fit_in' => $this->service->fitInUsage($doctor, $date, $excludeId),
         ]);
     }
 
-    private function buildScheduleItems(string $entityId, Carbon $date, string $doctor, int $bout, string $search, ?Doctor $loggedDoctor): array
+    /**
+     * Vagas do mês para o calendário lateral (médico escolhido ou todos).
+     * Perfil médico: só as dele; sem cadastro de médico, nada.
+     */
+    public function availability(Request $request, ScheduleAvailabilityService $availability): JsonResponse
     {
-        $query = Schedule::query()
-            ->with(['doctor.entityUser.user', 'covenant', 'patient', 'visitType'])
-            ->leftJoin('patients', 'patients.id', '=', 'schedules.patient_id')
-            ->leftJoin('people', 'people.id', '=', 'patients.person_id')
-            ->where('schedules.entity_id', $entityId)
-            ->whereDate('schedules.date_time', $date)
-            ->select('schedules.*');
+        $request->validate([
+            'month'  => ['required', 'date_format:Y-m'],
+            'doctor' => ['nullable', 'string', 'max:36'],
+        ]);
 
-        if ($loggedDoctor) {
-            $query->where('schedules.doctor_id', $loggedDoctor->id);
-        } elseif ($doctor !== 'tudo') {
-            $query->where('schedules.doctor_id', $doctor);
+        abort_if(CurrentDoctor::isMissing(), 403, CurrentDoctor::missingMessage());
+
+        $entityId = (string) session('selected_entity_id');
+        $doctorId = CurrentDoctor::isDoctorProfile()
+            ? (string) CurrentDoctor::doctor()->id
+            : (Str::isUuid((string) $request->input('doctor')) ? (string) $request->input('doctor') : null);
+
+        if ($doctorId !== null && ! $this->doctorBelongsToEntity($doctorId, $entityId)) {
+            abort(404);
         }
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->whereLikeUnaccent('schedules.full_name', $search)
-                    ->orWhereLikeUnaccent('people.full_name', $search);
-            });
+        return response()->json($availability->month($entityId, Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth(), $doctorId));
+    }
+
+    /**
+     * Prévia da série de sessões: as datas geradas (semanal, mensal ou dias
+     * da semana; N sessões ou até a data) e o conflito de cada uma — antes de
+     * salvar, para a recepção remover as que não servem.
+     */
+    public function seriesPreview(Request $request, ScheduleSeriesService $series): JsonResponse
+    {
+        $entityId  = (string) session('selected_entity_id');
+        $validated = $request->validate([
+            'doctor_id' => ['required', 'uuid', function ($attribute, $value, $fail) use ($entityId) {
+                if (CurrentDoctor::isMissing()) {
+                    $fail(CurrentDoctor::missingMessage());
+                } elseif (! CurrentDoctor::canAccessDoctorId((string) $value)) {
+                    $fail(__('schedules.doctor_only_own'));
+                } elseif (! $this->doctorBelongsToEntity((string) $value, $entityId)) {
+                    $fail(__('validation.custom.schedule.doctor_not_found'));
+                }
+            }],
+            'date_time'      => ['required', 'date'],
+            'frequency'      => ['required', Rule::in(ScheduleSeriesService::FREQUENCIES)],
+            'weekdays'       => ['nullable', 'array', 'required_if:frequency,weekdays'],
+            'weekdays.*'     => ['integer', 'between:0,6'],
+            'end'            => ['required', Rule::in(['count', 'until'])],
+            'count'          => ['nullable', 'required_if:end,count', 'integer', 'min:2', 'max:' . ScheduleSeriesService::MAX_SESSIONS],
+            'until'          => ['nullable', 'required_if:end,until', 'date', 'after_or_equal:' . Carbon::parse((string) $request->input('date_time', 'now'))->toDateString()],
+            'is_fit_in'      => ['nullable', 'boolean'],
+            'resource_ids'   => ['nullable', 'array'],
+            'resource_ids.*' => [
+                'uuid',
+                Rule::exists('clinic_resources', 'id')->where(fn ($q) => $q->where('entity_id', $entityId)->where('active', true)->whereNull('deleted_at')),
+            ],
+        ]);
+
+        $dates = $series->generate(
+            Carbon::parse($validated['date_time']),
+            $validated['frequency'],
+            array_map('intval', (array) ($validated['weekdays'] ?? [])),
+            $validated['end'] === 'count' ? (int) $validated['count'] : null,
+            $validated['end'] === 'until' ? Carbon::parse($validated['until']) : null,
+        );
+
+        $truncated = count($dates) > ScheduleSeriesService::MAX_SESSIONS;
+        $dates     = array_slice($dates, 0, ScheduleSeriesService::MAX_SESSIONS);
+
+        return response()->json([
+            'sessions'  => $series->preview($validated['doctor_id'], $dates, array_map('strval', (array) ($validated['resource_ids'] ?? [])), (bool) ($validated['is_fit_in'] ?? false)),
+            'truncated' => $truncated,
+            'max'       => ScheduleSeriesService::MAX_SESSIONS,
+        ]);
+    }
+
+    /**
+     * "Cancelar as futuras" da série do agendamento, com motivo: só sessões a
+     * partir de agora que ainda não começaram (Agendado/Confirmado). Passadas,
+     * atendidas e em andamento ficam intactas. Perfil médico: só as dele.
+     */
+    public function cancelSeriesFuture(Request $request, Schedule $schedule, ScheduleSeriesService $series): JsonResponse
+    {
+        $this->authorizeSchedule($schedule);
+        abort_unless($schedule->series_id, 404);
+
+        $reason = $request->validate(['reason' => ['required', 'string', 'max:2000']])['reason'];
+
+        $cancelled = $series->cancelFuture(
+            $schedule,
+            trim($reason),
+            session('selected_entity_user_id'),
+            CurrentDoctor::isDoctorProfile() ? (string) CurrentDoctor::doctor()?->id : null,
+        );
+
+        // Mesmo aviso do cancelamento pela agenda: um por sessão cancelada.
+        foreach ($cancelled as $id) {
+            NotifyScheduleChangeJob::dispatch($id, ScheduleNotification::EVENT_CANCELLED, trim($reason));
         }
 
-        match ($bout) {
-            2       => $query->whereTime('date_time', '<', '13:00:00'),
-            3       => $query->whereTime('date_time', '>=', '13:00:00')->whereTime('date_time', '<', '18:00:00'),
-            4       => $query->whereTime('date_time', '>=', '18:00:00'),
-            default => null,
-        };
+        return response()->json([
+            'message'   => trans_choice('schedules.series_cancelled', count($cancelled), ['count' => count($cancelled)]),
+            'cancelled' => count($cancelled),
+        ]);
+    }
 
-        $schedules = $query->orderBy('schedules.date_time')->get();
+    /**
+     * Linhas da Agenda: agendamentos (filtrados pelo chip/busca), compromissos
+     * e — no chip "Bloqueados" — os bloqueios. Período "dia" (lista e
+     * calendário do dia) leva a linha completa; semana/mês, a linha compacta
+     * do calendário (o payload do mês não carrega URLs/caixa de cada linha).
+     */
+    private function buildScheduleItems(AgendaQueryService $agenda, AgendaFilters $filters, bool $canSeePatients): array
+    {
+        $entityId  = $filters->entityId;
+        $schedules = $agenda->schedules($filters);
+        $events    = $agenda->events($filters);
+        $blocks    = $filters->status === 'blocked' ? $agenda->blocks($filters) : collect();
 
-        $eventQuery = ScheduleEvent::with('doctor.entityUser.user')
-            ->where('entity_id', $entityId)
-            ->whereDate('starts_at', $date)
-            ->whereNull('deleted_at');
+        $eventRows = $events->map(fn ($e) => array_merge(
+            ['sort_time' => $e->starts_at->toISOString(), 'type' => 'event'],
+            $this->toEventRow($e),
+        ));
 
-        if ($loggedDoctor) {
-            $eventQuery->where(function ($q) use ($loggedDoctor) {
-                $q->where('doctor_id', $loggedDoctor->id)->orWhereNull('doctor_id');
-            });
-        } elseif ($doctor !== 'tudo') {
-            $eventQuery->where(function ($q) use ($doctor) {
-                $q->where('doctor_id', $doctor)->orWhereNull('doctor_id');
-            });
+        if ($filters->range !== 'day') {
+            return $schedules->map(fn (Schedule $s) => $this->toCompactRow($s))
+                ->toBase()
+                ->merge($eventRows->toBase())
+                ->merge($blocks)
+                ->sortBy('sort_time')
+                ->values()
+                ->toArray();
         }
-
-        match ($bout) {
-            2       => $eventQuery->whereTime('starts_at', '<', '13:00:00'),
-            3       => $eventQuery->whereTime('starts_at', '>=', '13:00:00')->whereTime('starts_at', '<', '18:00:00'),
-            4       => $eventQuery->whereTime('starts_at', '>=', '18:00:00'),
-            default => null,
-        };
-
-        $events = $eventQuery->orderBy('starts_at')->get();
 
         // IDs de agendamentos que já possuem lançamento de caixa ativo
         // (1 query, evita N+1 ao montar has_cash_entry por linha). Filtro
@@ -782,17 +1036,84 @@ class SchedulesController extends Controller
         // chegada não auto-abre nem pré-preenche o valor cheio.
         $chargingCovenantIds = app(ProcedurePriceService::class)->chargingCovenantIds($entityId);
 
+        // WhatsApp da linha: celular do agendamento (ou do cadastro) e quem
+        // respondeu SAIR — uma consulta para a página inteira.
+        $optedOut = $canSeePatients
+            ? WhatsAppService::optedOutPhones($entityId, $schedules->map(fn (Schedule $s) => $this->cellphoneOf($s))->all())
+            : [];
+
         $scheduleRows = $schedules->map(fn ($s) => array_merge(
             ['sort_time' => $s->date_time->toISOString(), 'type' => 'schedule'],
             $this->toScheduleRow($s, $cashEntryScheduleIds, $chargingCovenantIds),
+            $canSeePatients ? $this->whatsAppFields($s, $optedOut) : [],
         ));
 
-        $eventRows = $events->map(fn ($e) => array_merge(
-            ['sort_time' => $e->starts_at->toISOString(), 'type' => 'event'],
-            $this->toEventRow($e),
-        ));
+        return $scheduleRows->toBase()
+            ->merge($eventRows->toBase())
+            ->merge($blocks)
+            ->sortBy('sort_time')
+            ->values()
+            ->toArray();
+    }
 
-        return $scheduleRows->merge($eventRows)->sortBy('sort_time')->values()->toArray();
+    /** Celular para contato: o do agendamento, senão o do cadastro do paciente. */
+    private function cellphoneOf(Schedule $s): ?string
+    {
+        return $s->cellphone ?: $s->patient?->person?->cellphone;
+    }
+
+    /**
+     * Conversa no WhatsApp pela linha da agenda (só perfis com acesso a
+     * Pacientes): `ok` com o link wa.me; `opted_out` quando o celular
+     * respondeu SAIR ao número da clínica; `no_number` sem celular válido.
+     *
+     * @param array<string, true> $optedOut celulares normalizados que saíram
+     *
+     * @return array{whatsapp_state: string, whatsapp_url: ?string}
+     */
+    private function whatsAppFields(Schedule $s, array $optedOut): array
+    {
+        $raw = $this->cellphoneOf($s);
+        $url = WhatsAppService::chatUrl($raw);
+
+        if ($url === null) {
+            return ['whatsapp_state' => 'no_number', 'whatsapp_url' => null];
+        }
+
+        if (isset($optedOut[(string) WhatsAppService::normalizePhone($raw)])) {
+            return ['whatsapp_state' => 'opted_out', 'whatsapp_url' => null];
+        }
+
+        return ['whatsapp_state' => 'ok', 'whatsapp_url' => $url];
+    }
+
+    /**
+     * Linha do calendário de semana/mês: o necessário para o bloco do evento
+     * (cor por situação, encaixe, sessão) e para abrir o detalhe.
+     */
+    private function toCompactRow(Schedule $s): array
+    {
+        $sit = $s->situation instanceof ScheduleSituation ? $s->situation : ScheduleSituation::tryFrom((int) $s->situation);
+
+        return [
+            'type'           => 'schedule',
+            'sort_time'      => $s->date_time->toISOString(),
+            'id'             => $s->id,
+            'date'           => $s->date_time->format('Y-m-d'),
+            'time'           => $s->date_time->format('H:i'),
+            'name'           => $s->full_name ?? '—',
+            'doctor_id'      => $s->doctor_id,
+            'doctor_name'    => $s->doctor?->entityUser?->user?->name ?? '—',
+            'doctor_color'   => $s->doctor?->color ?: '#6c757d',
+            'situation'      => $sit?->value,
+            'label'          => $sit?->label() ?? '—',
+            'badge'          => $sit?->badgeClass() ?? 'bg-secondary',
+            'is_terminal'    => $sit?->isTerminal() ?? false,
+            'is_fit_in'      => (bool) $s->is_fit_in,
+            'is_urgent_care' => $s->isUrgentCare(),
+            'session_number' => $s->session_number,
+            'session_total'  => $s->session_total,
+        ];
     }
 
     private function toScheduleRow(Schedule $s, array $cashEntryScheduleIds = [], array $chargingCovenantIds = []): array
@@ -807,6 +1128,7 @@ class SchedulesController extends Controller
 
         return [
             'id'           => $s->id,
+            'date'         => $s->date_time->format('Y-m-d'),
             'time'         => $s->date_time->format('H:i'),
             'name'         => $s->full_name ?? '—',
             'code'         => $s->patient?->code ?? null,
@@ -851,7 +1173,16 @@ class SchedulesController extends Controller
             'attendance_type_name' => $s->attendance_type?->label(),
             'specialty_area'       => $s->specialty_area?->value,
             'specialty_area_name'  => $s->specialty_area?->label(),
-            'patient_mood'         => $mood ? [
+            // Encaixe (paciente a mais no turno), atendimento do pronto
+            // atendimento (fora da grade) e sessão da série ("3/10").
+            'is_fit_in'      => (bool) $s->is_fit_in,
+            'is_urgent_care' => $s->isUrgentCare(),
+            'series_id'      => $s->series_id,
+            'session_number' => $s->session_number,
+            'session_total'  => $s->session_total,
+            // Sala/equipamento reservado (nome curto na linha).
+            'resource_names' => $s->relationLoaded('resources') ? $s->resources->pluck('name')->values()->all() : [],
+            'patient_mood'   => $mood ? [
                 'value'      => $mood->value,
                 'label'      => $mood->label(),
                 'icon'       => $mood->icon(),
@@ -859,6 +1190,72 @@ class SchedulesController extends Controller
                 'text_class' => $mood->textClass(),
             ] : null,
         ];
+    }
+
+    /**
+     * Sessões da série do agendamento (drawer): todas, na ordem — as
+     * canceladas/remarcadas aparecem marcadas. Perfil médico: só as dele.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function seriesRows(Schedule $schedule): array
+    {
+        if (! $schedule->series_id) {
+            return [];
+        }
+
+        $doctorScope = CurrentDoctor::isDoctorProfile() ? (string) CurrentDoctor::doctor()?->id : null;
+        $locale      = app()->getLocale();
+
+        return Schedule::query()
+            ->where('entity_id', $schedule->entity_id)
+            ->where('series_id', $schedule->series_id)
+            ->when($doctorScope, fn ($q) => $q->where('doctor_id', $doctorScope))
+            ->orderBy('date_time')
+            ->orderBy('session_number')
+            ->get()
+            ->map(function (Schedule $session) use ($schedule, $locale) {
+                $sit = $session->situation;
+
+                return [
+                    'id'             => $session->id,
+                    'code'           => $session->code,
+                    'number'         => $session->session_number,
+                    'total'          => $session->session_total,
+                    'date_label'     => $session->date_time->copy()->locale($locale)->isoFormat('ddd, L') . ' ' . $session->date_time->format('H:i'),
+                    'date_time_iso'  => $session->date_time->format('Y-m-d\TH:i'),
+                    'time'           => $session->date_time->format('H:i'),
+                    'name'           => $session->full_name,
+                    'doctor_id'      => $session->doctor_id,
+                    'is_fit_in'      => (bool) $session->is_fit_in,
+                    'label'          => $sit->label(),
+                    'badge'          => $sit->badgeClass(),
+                    'is_terminal'    => $sit->isTerminal(),
+                    'is_past'        => $session->date_time->lt(now()),
+                    'is_current'     => (string) $session->id === (string) $schedule->id,
+                    'reschedule_url' => route('panel.schedules.reschedule', $session->id),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /** Quantas sessões "Cancelar as futuras" alcançaria agora (0 = esconde a ação). */
+    private function seriesCancellableCount(Schedule $schedule): int
+    {
+        if (! $schedule->series_id) {
+            return 0;
+        }
+
+        $doctorScope = CurrentDoctor::isDoctorProfile() ? (string) CurrentDoctor::doctor()?->id : null;
+
+        return Schedule::query()
+            ->where('entity_id', $schedule->entity_id)
+            ->where('series_id', $schedule->series_id)
+            ->where('date_time', '>=', now())
+            ->whereIn('situation', array_map(fn (ScheduleSituation $s) => $s->value, ScheduleSeriesService::CANCELLABLE_SITUATIONS))
+            ->when($doctorScope, fn ($q) => $q->where('doctor_id', $doctorScope))
+            ->count();
     }
 
     private function toEventRow(ScheduleEvent $e): array
@@ -875,13 +1272,36 @@ class SchedulesController extends Controller
         ];
     }
 
-    private function buildDoctorList(string $entityId, ?Doctor $loggedDoctor): array
+    /**
+     * Relatórios do dropdown da Agenda que o perfil abre (null = nenhum, o
+     * botão nem aparece): produção/absenteísmo com o Gate financeiro;
+     * primeira consulta também para o médico com cadastro.
+     *
+     * @return array<string, string>|null
+     */
+    private function reportsUrls(string $entityId, bool $isDoctor): ?array
     {
-        if ($loggedDoctor) {
-            return [];
+        $urls = [];
+
+        if (Gate::allows(EntityGate::ViewFinancial->value, Entity::find($entityId))) {
+            $urls['production']  = route('panel.schedules.reports.production');
+            $urls['absenteeism'] = route('panel.schedules.reports.absenteeism');
         }
 
-        return $this->doctorsByEntity($entityId)->map(function ($doc) {
+        if ($urls !== [] || ($isDoctor && ! CurrentDoctor::isMissing())) {
+            $urls['first_consultations'] = route('panel.schedules.reports.first-consultations');
+        }
+
+        return $urls === [] ? null : $urls;
+    }
+
+    private function buildDoctorList(string $entityId, ?Doctor $loggedDoctor): array
+    {
+        // Médico: só ele mesmo — o formulário pré-seleciona (antes a lista
+        // vinha vazia e o seletor de médico do "Novo" ficava sem opções).
+        $doctors = $loggedDoctor ? collect([$loggedDoctor]) : $this->doctorsByEntity($entityId);
+
+        return $doctors->map(function ($doc) {
             $photoPath = 'system/images/users/' . $doc->user_id . '.jpg';
 
             return [
@@ -895,47 +1315,52 @@ class SchedulesController extends Controller
     }
 
     /**
-     * Generates recurring occurrences for a schedule.
-     * Skips slots that fail validation (conflicts, outside work schedule, etc.).
+     * Recorrência antiga (semanal/mensal até a data, inclusive): datas 2..N
+     * que o médico atende (as demais são puladas, como sempre). Sala/
+     * equipamento indisponível numa data atendível recusa o pedido inteiro —
+     * devolve a mensagem com a data, a sala e o motivo.
+     *
+     * @param string[] $resourceIds
+     *
+     * @return array{0: list<Carbon>, 1: ?string} datas válidas e o erro de sala
      */
-    private function createRecurringOccurrences(Schedule $base, string $type, string $until, string $entityId): void
+    private function legacyRecurrenceDates(string $doctorId, Carbon $first, string $type, string $until, array $resourceIds, bool $isFitIn): array
     {
-        $current = Carbon::parse($base->date_time);
-        $endDate = Carbon::parse($until);
+        $dates   = [];
+        $current = $first->copy();
+        $endDate = Carbon::parse($until)->endOfDay(); // "até o dia X" inclui o dia X
 
-        while (true) {
-            $current = $type === 'weekly'
-                ? $current->copy()->addWeek()
-                : $current->copy()->addMonth();
+        while (count($dates) < ScheduleSeriesService::MAX_SESSIONS - 1) {
+            $current = $type === 'weekly' ? $current->copy()->addWeek() : $current->copy()->addMonth();
 
             if ($current->gt($endDate)) {
                 break;
             }
 
-            $errors = $this->service->validateSlot($base->doctor_id, $current);
-
-            if (! empty($errors)) {
+            if (! empty($this->service->validateFor($isFitIn, $doctorId, $current))) {
                 continue;
             }
 
-            $this->model->create([
-                'entity_id'           => $entityId,
-                'doctor_id'           => $base->doctor_id,
-                'patient_id'          => $base->patient_id,
-                'covenant_id'         => $base->covenant_id,
-                'visit_id'            => $base->visit_id,
-                'full_name'           => $base->full_name,
-                'date_time'           => $current,
-                'telephone'           => $base->telephone,
-                'cellphone'           => $base->cellphone,
-                'cellphone_whatsapp'  => $base->cellphone_whatsapp,
-                'notes'               => $base->notes,
-                'situation'           => ScheduleSituation::Scheduled->value,
-                'recurrence_group_id' => $base->recurrence_group_id,
-                'recurrence_type'     => $type,
-                'recurrence_until'    => $until,
-            ]);
+            if ($errors = $this->service->resourceErrors($resourceIds, $current)) {
+                return [[], __('schedules.recurrence_resource_unavailable', [
+                    'date'   => $current->format('d/m/Y H:i'),
+                    'reason' => $errors[0],
+                ])];
+            }
+
+            $dates[] = $current->copy();
         }
+
+        return [$dates, null];
+    }
+
+    /** 422 de horário recusado dentro da transação (teto de encaixe, sessão da série). */
+    private function slotUnavailableResponse(ScheduleSlotUnavailableException $e): JsonResponse
+    {
+        return response()->json([
+            'message' => $e->getMessage(),
+            'errors'  => [$e->field => [$e->getMessage()]],
+        ], 422);
     }
 
     /**
@@ -1004,22 +1429,38 @@ class SchedulesController extends Controller
             403,
             __('schedules.unauthorized'),
         );
+
+        // Perfil médico: só os PRÓPRIOS agendamentos (a lista já era só dele;
+        // por id dava para ver/alterar o de qualquer colega). Sem cadastro de
+        // médico, nenhum — com o aviso de vínculo ausente.
+        abort_if(CurrentDoctor::isMissing(), 403, CurrentDoctor::missingMessage());
+        abort_unless(CurrentDoctor::canAccessDoctorId($schedule->doctor_id), 403, __('schedules.unauthorized'));
     }
 
-    private function loggedDoctor(): ?Doctor
+    /**
+     * Operações em lote do perfil médico ficam restritas aos agendamentos
+     * dele (os demais ids entram como ignorados); sem cadastro, 403.
+     */
+    private function doctorScopeForBulk(): ?string
     {
-        if (session('user_rule') !== ClientRule::Doctor->value) {
+        if (! CurrentDoctor::isDoctorProfile()) {
             return null;
         }
 
-        $entityUserId = session('selected_entity_user_id');
+        $doctor = CurrentDoctor::doctor();
+        abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
 
-        return Doctor::query()
-            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-            ->join('users', 'entity_users.user_id', '=', 'users.id')
-            ->where('doctors.entity_user_id', $entityUserId)
-            ->select('doctors.*', 'users.name as user_name', 'users.id as user_id')
-            ->first();
+        return (string) $doctor->id;
+    }
+
+    private function doctorBelongsToEntity(string $doctorId, string $entityId): bool
+    {
+        return DB::table('doctors')
+            ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+            ->where('doctors.id', $doctorId)
+            ->where('entity_users.entity_id', $entityId)
+            ->whereNull('doctors.deleted_at')
+            ->exists();
     }
 
     private function doctorsByEntity(string $entityId)

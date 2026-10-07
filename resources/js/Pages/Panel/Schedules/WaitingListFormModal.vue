@@ -1,5 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed, onBeforeUnmount } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
@@ -45,6 +46,7 @@ watch(
             patientResults.value = [];
             showQuickReg.value = false;
             quickName.value = '';
+            resetQuick();
         }
     },
 );
@@ -66,11 +68,16 @@ function onPatientInput() {
 }
 
 async function searchPatients() {
-    const res = await fetch(`/panel/patients/search?q=${encodeURIComponent(patientSearch.value)}`, {
-        headers: { Accept: 'application/json' },
-    });
-    patientResults.value = res.ok ? await res.json() : [];
+    try {
+        const res = await fetch(`/panel/patients/search?q=${encodeURIComponent(patientSearch.value)}`, {
+            headers: { Accept: 'application/json' },
+        });
+        patientResults.value = res.ok ? await res.json() : [];
+    } catch {
+        patientResults.value = [];
+    }
 }
+onBeforeUnmount(() => clearTimeout(searchDebounce));
 
 function selectPatient(p) {
     form.value.patient_id = p.id;
@@ -88,22 +95,65 @@ function clearPatient() {
     patientResults.value = [];
 }
 
+// Cadastro rápido (PatientsController::quickStore): nome + celular. Mesma
+// regra de duplicidade do cadastro completo — homônimo só com a confirmação
+// "é outra pessoa" (erro em confirm_homonym até reenviar confirmado).
+const ui = computed(() => usePage()?.props?.t_ui?.patient_form ?? {});
+const quickCellphone = ref('');
+const quickConfirmHomonym = ref(false);
+const quickErrors = ref({});
+const quickSaving = ref(false);
+
+function resetQuick() {
+    quickCellphone.value = '';
+    quickConfirmHomonym.value = false;
+    quickErrors.value = {};
+}
+
+watch(quickName, () => {
+    quickConfirmHomonym.value = false;
+});
+
 async function quickRegister() {
-    if (!quickName.value.trim()) return;
-    const res = await fetch('/panel/patients/quick', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-        },
-        body: JSON.stringify({ full_name: quickName.value.trim() }),
-    });
-    if (res.ok) {
-        const json = await res.json();
-        selectPatient({ id: json.id, full_name: json.full_name, cellphone: '', telephone: '' });
-        showQuickReg.value = false;
-        quickName.value = '';
+    if (!quickName.value.trim() || quickSaving.value) return;
+    quickSaving.value = true;
+    quickErrors.value = {};
+    try {
+        const res = await fetch(route('panel.patients.quick'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify({
+                name: quickName.value.trim(),
+                cellphone: quickCellphone.value,
+                confirm_homonym: quickConfirmHomonym.value,
+            }),
+        });
+        const json = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+            const p = json.patient ?? {};
+            selectPatient({
+                id: p.id,
+                full_name: p.full_name,
+                cellphone: p.cellphone ?? '',
+                telephone: p.telephone ?? '',
+            });
+            showQuickReg.value = false;
+            quickName.value = '';
+            resetQuick();
+        } else if (res.status === 422) {
+            quickErrors.value = json.errors ?? {};
+        } else if (window.showErrorToast) {
+            window.showErrorToast(json.message ?? props.t.wl_conn_error);
+        }
+    } catch {
+        if (window.showErrorToast) window.showErrorToast(props.t.wl_conn_error);
+    } finally {
+        quickSaving.value = false;
     }
 }
 
@@ -236,18 +286,62 @@ async function onSubmit() {
                 <div v-if="showQuickReg" class="card card-body bg-light mt-2 p-3">
                     <p class="mb-2 fw-semibold small">{{ t.wl_quick_register }}</p>
                     <div class="row g-2">
-                        <div class="col-8">
+                        <div class="col-12 col-sm-7">
                             <input
                                 v-model="quickName"
                                 type="text"
                                 class="form-control form-control-sm"
+                                :class="{ 'is-invalid': quickErrors.name }"
                                 :placeholder="t.wl_full_name + ' *'"
+                                :aria-label="t.wl_full_name"
+                                data-testid="wl-quick-name"
                                 @keyup.enter="quickRegister"
                             />
+                            <div v-if="quickErrors.name" class="invalid-feedback">{{ quickErrors.name[0] }}</div>
+                        </div>
+                        <div class="col-12 col-sm-5">
+                            <input
+                                v-model="quickCellphone"
+                                v-mask="'phone'"
+                                type="tel"
+                                class="form-control form-control-sm"
+                                :class="{ 'is-invalid': quickErrors.cellphone }"
+                                :placeholder="t.wl_cellphone + ' *'"
+                                :aria-label="t.wl_cellphone"
+                                data-testid="wl-quick-cellphone"
+                            />
+                            <div v-if="quickErrors.cellphone" class="invalid-feedback">
+                                {{ quickErrors.cellphone[0] }}
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        v-if="quickErrors.confirm_homonym"
+                        class="alert alert-warning py-2 px-3 mt-2 mb-0 small"
+                        role="alert"
+                        data-testid="wl-quick-homonym"
+                    >
+                        <p class="mb-1">{{ quickErrors.confirm_homonym[0] }}</p>
+                        <div class="form-check mb-0">
+                            <input
+                                id="wl-quick-homonym-confirm"
+                                v-model="quickConfirmHomonym"
+                                type="checkbox"
+                                class="form-check-input"
+                            />
+                            <label class="form-check-label fw-semibold" for="wl-quick-homonym-confirm">
+                                {{ ui.homonym_confirm ?? 'Confirmo que é outro paciente' }}
+                            </label>
                         </div>
                     </div>
                     <div class="d-flex gap-2 mt-2">
-                        <button type="button" class="btn btn-sm btn-primary" @click="quickRegister">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-primary"
+                            :disabled="quickSaving"
+                            data-testid="wl-quick-save"
+                            @click="quickRegister"
+                        >
                             {{ t.wl_save_link }}
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-secondary" @click="showQuickReg = false">

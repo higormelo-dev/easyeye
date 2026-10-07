@@ -55,6 +55,8 @@ class Entity extends Model
         'active',
         'locale',
         'schedule_interval',
+        // "Poucas vagas" no calendário da Agenda: % de horários livres do dia.
+        'few_slots_percent',
         'requires_cash_to_complete',
         // 2FA por entity (decisão da empresa)
         'requires_two_factor',
@@ -128,6 +130,7 @@ class Entity extends Model
             'is_client'                 => 'boolean',
             'active'                    => 'boolean',
             'schedule_interval'         => 'integer',
+            'few_slots_percent'         => 'integer',
             'requires_cash_to_complete' => 'boolean',
             'requires_two_factor'       => 'boolean',
             'doctor_payouts_visible'    => 'boolean',
@@ -220,6 +223,7 @@ class Entity extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'entity_users', 'entity_id', 'user_id')
+            ->using(EntityUserPivot::class)
             ->withPivot(['id', 'code', 'rule', 'is_owner', 'active', 'invited_by', 'joined_at'])
             ->withTimestamps()
             ->wherePivotNull('deleted_at');

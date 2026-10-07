@@ -34,7 +34,7 @@ return [
         'optional_columns'   => 'Opcionais',
         'col_name'           => 'Nome completo do paciente',
         'or'                 => 'ou',
-        'dedup_hint'         => 'Pacientes existentes (mesmo CPF ou nome+telefone) são pulados automaticamente, sem sobrescrever dados.',
+        'dedup_hint'         => 'Pacientes existentes (mesmo CPF ou nome+telefone) são pulados automaticamente, sem sobrescrever dados. Mesmo nome e mesma data de nascimento de um paciente já cadastrado vira erro da linha (duplicado); mesmo nome com nascimento diferente ou vazio é importado com aviso. Convênio inativo vira erro da linha.',
 
         'history_title' => 'Histórico de Importações',
         'rows'          => 'linhas',
@@ -176,7 +176,7 @@ return [
         'optional_columns'   => 'Opcionais',
         'col_name'           => 'Nome do paciente e data/hora do agendamento',
         'or'                 => 'ou',
-        'dedup_hint'         => 'Médico é resolvido por código de importação ou CRM (obrigatório). Paciente é resolvido por código de importação ou CPF (opcional — sem correspondência, o agendamento é criado só com o nome informado).',
+        'dedup_hint'         => 'Médico é resolvido por código de importação ou CRM (obrigatório). Paciente é resolvido por código de importação ou CPF (opcional — sem correspondência, o agendamento é criado só com o nome informado). Convênio inativo vira erro da linha.',
 
         'history_title' => 'Histórico de Importações',
         'rows'          => 'linhas',

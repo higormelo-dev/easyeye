@@ -46,18 +46,22 @@ use App\Http\Controllers\{
     ResourceWorkScheduleController,
     ScheduleEventsController,
     ScheduleImportsController,
+    SchedulePrintController,
     SchedulesController,
+    UrgentCareController,
     UserInvitationsController,
     UsersController,
     WaitingListController
 };
 use App\Http\Controllers\{
     MedicalRecordDocumentationsController,
+    MedicalRecordDraftsController,
     MedicalRecordEvolutionsController,
     MedicalRecordFilesController,
     MedicalRecordProceduresController,
     MedicalRecordQuickActionsController,
     MedicalRecordsController,
+    MedicalRecordsSearchController,
     SiteController,
     SiteLegalController,
     SubscriptionExpiredController,
@@ -81,7 +85,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     SurgeryTypesController,
     VisitTypesController,
     VisualAcuityTypesController};
-use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController};
+use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController, ScheduleSettingsController};
 use App\Http\Controllers\Setting\{ReportSettingsController, SecurityController};
 use App\Http\Controllers\Stock\{IolLensesController, ProcedureProductsController, ProductCategoriesController, ProductImportsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockCountsController, StockMovementsController, StockReportsController, SuppliersController};
 use App\Http\Middleware\SetLocale;
@@ -389,6 +393,9 @@ Route::group(
             // controller (route model binding de {patient} sozinho não é
             // filtrado por entidade — ver comentário em editData() acima).
             Route::put('patients/{patient}/priority', [PatientsController::class, 'updatePriority'])->name('patients.priority.update');
+            // Restaurar paciente excluído (a listagem mostra "Restaurar") —
+            // mesmo grupo de permissão da exclusão.
+            Route::patch('patients/{patient}/restore', [PatientsController::class, 'restore'])->name('patients.restore');
             Route::resource('patients', PatientsController::class);
 
             // Portal do Paciente (Fase 1): convite disparado pelo staff. O
@@ -468,6 +475,19 @@ Route::group(
                     'patients/{patient}/medicalrecords/{medicalrecord}/restore',
                     [MedicalRecordsController::class, 'restore'],
                 )->name('patients.medicalrecords.restore');
+
+                // Autosave (rascunho do autor, separado do prontuário): grava
+                // a cada ~30 s/ao ocultar a aba, recupera e descarta. Contexto
+                // (?medical_record_id= | ?schedule_id=) — ver
+                // MedicalRecordDraftsController.
+                Route::middleware('throttle:medical-record-drafts')->group(function () {
+                    Route::get('patients/{patient}/medicalrecord-draft', [MedicalRecordDraftsController::class, 'show'])
+                        ->name('patients.medicalrecord-draft.show');
+                    Route::put('patients/{patient}/medicalrecord-draft', [MedicalRecordDraftsController::class, 'save'])
+                        ->name('patients.medicalrecord-draft.save');
+                    Route::delete('patients/{patient}/medicalrecord-draft', [MedicalRecordDraftsController::class, 'destroy'])
+                        ->name('patients.medicalrecord-draft.destroy');
+                });
             });
 
             // Leitura aberta para admin/doctor/secretary — útil para admin/secretária
@@ -594,6 +614,11 @@ Route::group(
                 [MedicalRecordQuickActionsController::class, 'dayExtensionPreview'],
             )->name('medical-records.day-extension-preview');
 
+            // "Prontuários" no menu: busca geral dos prontuários da clínica
+            // (escopo de médico por CurrentDoctor — ver MedicalRecordsSearchController).
+            Route::get('medical-records', [MedicalRecordsSearchController::class, 'index'])
+                ->name('medical-records.index');
+
             // F9 — regras de validação client-safe do FormRequest do prontuário
             Route::get(
                 'medical-records/validation-rules',
@@ -632,7 +657,6 @@ Route::group(
             Route::delete('schedules/import/{scheduleImport}/cancel', [ScheduleImportsController::class, 'cancel'])->name('schedules.import.cancel');
             Route::get('schedules/import/{scheduleImport}/errors', [ScheduleImportsController::class, 'errors'])->name('schedules.import.errors');
 
-            Route::post('schedules/ajaxlist', [SchedulesController::class, 'ajaxList'])->name('schedules.ajaxlist');
             Route::post('schedules/bulk-update', [SchedulesController::class, 'bulkUpdate'])->name('schedules.bulk-update');
             Route::post('schedules/bulk-reschedule', [SchedulesController::class, 'bulkReschedule'])->name('schedules.bulk-reschedule');
             Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
@@ -645,7 +669,25 @@ Route::group(
             Route::post('schedules/{schedule}/cash-entry', [SchedulesController::class, 'storeCashEntry'])->name('schedules.cash-entry.store');
             Route::get('schedules/slots', [SchedulesController::class, 'slots'])->name('schedules.slots');
             Route::get('schedules/resources', [SchedulesController::class, 'resources'])->name('schedules.resources');
+            // Vagas do mês (calendário lateral), prévia da série de sessões e
+            // "Cancelar as futuras" da série.
+            Route::get('schedules/availability', [SchedulesController::class, 'availability'])->name('schedules.availability');
+            Route::get('schedules/series/preview', [SchedulesController::class, 'seriesPreview'])->name('schedules.series.preview');
+            Route::post('schedules/{schedule}/series/cancel-future', [SchedulesController::class, 'cancelSeriesFuture'])->name('schedules.series.cancel-future');
+            // Impressão: agenda do dia (com os filtros da tela) e ficha do
+            // paciente a partir do agendamento — ambas com log de acesso.
+            Route::get('schedules/print', [SchedulePrintController::class, 'agenda'])->name('schedules.print');
+            Route::get('schedules/{schedule}/patient-sheet', [SchedulePrintController::class, 'patientSheet'])->name('schedules.patient-sheet');
             Route::resource('schedules', SchedulesController::class);
+
+            // Pronto atendimento: fila de demanda espontânea do dia (chamar,
+            // atender → agendamento de urgência + prontuário, desistiu/removido).
+            Route::get('urgent-care', [UrgentCareController::class, 'index'])->name('urgent-care.index');
+            Route::post('urgent-care', [UrgentCareController::class, 'store'])->name('urgent-care.store');
+            Route::put('urgent-care/{urgentCareEntry}', [UrgentCareController::class, 'update'])->name('urgent-care.update');
+            Route::post('urgent-care/{urgentCareEntry}/call', [UrgentCareController::class, 'call'])->name('urgent-care.call');
+            Route::post('urgent-care/{urgentCareEntry}/attend', [UrgentCareController::class, 'attend'])->name('urgent-care.attend');
+            Route::post('urgent-care/{urgentCareEntry}/close', [UrgentCareController::class, 'close'])->name('urgent-care.close');
 
             Route::patch('waiting-list/reorder', [WaitingListController::class, 'reorder'])->name('waiting-list.reorder');
             Route::get('waiting-list', [WaitingListController::class, 'index'])->name('waiting-list.index');
@@ -657,7 +699,9 @@ Route::group(
             Route::put('schedule-events/{scheduleEvent}', [ScheduleEventsController::class, 'update'])->name('schedule-events.update');
             Route::delete('schedule-events/{scheduleEvent}', [ScheduleEventsController::class, 'destroy'])->name('schedule-events.destroy');
 
-            // Agenda de recursos (salas, equipamentos)
+            // Agenda de recursos (salas, equipamentos) — página "Escala e
+            // bloqueios" aberta por Configurações › Recursos (ação da linha).
+            Route::get('resources/{resource}/work-schedule', [ResourceWorkScheduleController::class, 'index'])->name('resources.work-schedule.index');
             Route::get('resources/{resource}/work-schedule/data', [ResourceWorkScheduleController::class, 'data'])->name('resources.work-schedule.data');
             Route::put('resources/{resource}/work-schedule', [ResourceWorkScheduleController::class, 'sync'])->name('resources.work-schedule.sync');
             Route::post('resources/{resource}/blocks', [ResourceWorkScheduleController::class, 'storeBlock'])->name('resources.blocks.store');
@@ -689,6 +733,16 @@ Route::group(
         // pedido explícito: URL precisa refletir o dono do dado, não só o
         // menu). Controller/métodos (ReportsController::schedules()/
         // absenteeism()) continuam os mesmos, só o registro de rota mudou.
+        // Relatório de primeira consulta (Fase 1 / B3): gestão (admin/financeiro,
+        // mesmo Gate dos demais relatórios de agenda) e o médico — este só com
+        // as primeiras consultas dele (ReportsController::firstConsultations).
+        Route::middleware('permission:financial.manage,admin,financial,doctor')->group(function () {
+            Route::get('schedules/reports/first-consultations', [ReportsController::class, 'firstConsultations'])
+                ->name('schedules.reports.first-consultations');
+            Route::get('schedules/reports/first-consultations/export', [ReportsController::class, 'exportFirstConsultations'])
+                ->name('schedules.reports.first-consultations.export');
+        });
+
         Route::middleware('permission:financial.manage,admin,financial')->group(function () {
             Route::get('schedules/reports/production', [ReportsController::class, 'schedules'])->name('schedules.reports.production');
             Route::get('schedules/reports/absenteeism', [ReportsController::class, 'absenteeism'])->name('schedules.reports.absenteeism');
@@ -904,6 +958,10 @@ Route::group(
                 // Painel de chamadas da sala de espera (TV) — opcional por clínica
                 Route::get('call-panel', [CallPanelController::class, 'index'])->name('call-panel.index');
                 Route::patch('call-panel', [CallPanelController::class, 'update'])->name('call-panel.update');
+
+                // Agenda: limiar de "poucas vagas" do calendário lateral.
+                Route::get('schedule', [ScheduleSettingsController::class, 'index'])->name('schedule.index');
+                Route::patch('schedule', [ScheduleSettingsController::class, 'update'])->name('schedule.update');
 
                 Route::get('covenants/cards', [CovenantsController::class, 'cards'])->name('covenants.cards');
                 Route::resource('covenants', CovenantsController::class);

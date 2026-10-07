@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import DoctorMissingAlert from '@/Components/Panel/DoctorMissingAlert.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
@@ -31,6 +32,9 @@ const props = defineProps({
     urls: { type: Object, required: true },
     ai: { type: Object, default: () => ({}) },
     isDoctor: { type: Boolean, default: false },
+    // Perfil médico sem cadastro de médico ativo (CurrentDoctor): laudo/diagnóstico barrados.
+    doctorMissing: { type: Boolean, default: false },
+    doctorMissingText: { type: String, default: '' },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -1788,6 +1792,7 @@ const printEntity = computed(() => props.entity ?? {});
         </template>
 
         <PageHeader title="Imagens oftálmicas" :subtitle="`${examsTotal} exames`" />
+        <DoctorMissingAlert v-if="doctorMissing" :text="doctorMissingText" />
         <p class="text-muted small" data-testid="clinical-state-notice">
             Arquivo disponível e análise automática aprovada não confirmam revisão clínica nem a conclusão dos exames
             solicitados. Revisão clínica e completude: não informadas.

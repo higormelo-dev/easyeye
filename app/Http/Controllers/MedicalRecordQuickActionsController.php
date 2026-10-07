@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\{DataAccessPurpose, EntityGate, ExamReportRegistry};
 use App\Models\{Doctor, Entity, MedicalRecord, Patient};
 use App\Services\{DayExtensionService, MedicalRecordDocumentationService, MedicalRecordQuickActionService, SurgerySchedulingDocService};
+use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Gate;
@@ -29,22 +30,9 @@ class MedicalRecordQuickActionsController extends Controller
 
         $payload = $this->validatePayload($request, $action);
         $entity  = Entity::findOrFail(session('selected_entity_id'));
-        $doctor  = $medicalrecord->doctor;
-
-        // Fallback: usuário logado é médico → resolve automaticamente.
-        if (! $doctor) {
-            $doctor = Doctor::with('person')
-                ->whereHas('entityUser', fn ($q) => $q
-                    ->where('entity_id', $entity->id)
-                    ->where('user_id', auth()->id()))
-                ->first();
-        }
-
-        if (! $doctor) {
-            return response()->json([
-                'message' => 'Selecione o médico responsável antes de emitir o documento.',
-            ], 422);
-        }
+        // Documento sai no nome de QUEM EMITE (médico logado, cadastro ativo —
+        // o Gate IssueReport acima já exige), nunca no do prontuário/exame.
+        $doctor = $this->issuer();
 
         try {
             $documentation = $this->service->issue(
@@ -139,17 +127,8 @@ class MedicalRecordQuickActionsController extends Controller
         }
 
         $entity = Entity::findOrFail(session('selected_entity_id'));
-        $doctor = $medicalrecord->doctor ?? Doctor::with('person')
-            ->whereHas('entityUser', fn ($q) => $q
-                ->where('entity_id', $entity->id)
-                ->where('user_id', auth()->id()))
-            ->first();
-
-        if (! $doctor) {
-            return response()->json([
-                'message' => 'Selecione o médico responsável antes de carregar o template.',
-            ], 422);
-        }
+        // Prévia com o médico que vai emitir (o mesmo de issue()).
+        $doctor = $this->issuer();
 
         // F4e — subtype opcional para exames multi-variante (Pentacam).
         $subtypeRaw = $request->query('subtype');
@@ -227,6 +206,15 @@ class MedicalRecordQuickActionsController extends Controller
             'spelt'   => $this->dayExtension->spell($validated['days']),
             'display' => $this->dayExtension->format($validated['days']),
         ]);
+    }
+
+    /** Médico emissor (logado, cadastro ativo) — 403 traduzido se não houver. */
+    private function issuer(): Doctor
+    {
+        $doctor = CurrentDoctor::issuer();
+        abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
+
+        return $doctor->loadMissing('person');
     }
 
     private function authorizeIssueReport(): void

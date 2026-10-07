@@ -24,18 +24,28 @@ const props = defineProps({
     modelValue: { type: String, default: '' },
     doctorId: { type: String, default: '' },
     scheduleId: { type: String, default: null },
+    // Encaixe: horários ocupados também podem ser escolhidos (paciente a
+    // mais) e o horário fora da grade (manual) não é descartado.
+    allowOccupied: { type: Boolean, default: false },
     t: { type: Object, required: true },
 });
 
 const emit = defineEmits(['update:modelValue', 'slot-selected']);
 
 // ── Internal state ─────────────────────────────────────────────────────────────
-const selectedDate = ref(new Date().toISOString().substring(0, 10));
+// Edição: já nasce na data do horário salvo (senão a 1ª busca era a de hoje).
+const selectedDate = ref(
+    props.modelValue && props.modelValue.length >= 10
+        ? props.modelValue.substring(0, 10)
+        : new Date().toISOString().substring(0, 10),
+);
 const slots = ref([]);
 const slotsLoading = ref(false);
 const hasSchedule = ref(false);
 const slotInterval = ref(15);
 const showManualTime = ref(false);
+// Encaixes do dia por turno (servidor): { morning: { limit, used }, ... }
+const fitInUsage = ref(null);
 
 // ── CSRF ───────────────────────────────────────────────────────────────────────
 const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -62,8 +72,9 @@ async function fetchSlots() {
     }
 
     slotsLoading.value = true;
+    const date = selectedDate.value;
     try {
-        const qs = new URLSearchParams({ doctor_id: props.doctorId, date: selectedDate.value });
+        const qs = new URLSearchParams({ doctor_id: props.doctorId, date });
         if (props.scheduleId) qs.set('schedule_id', props.scheduleId);
 
         const res = await fetch(`/panel/schedules/slots?${qs}`, {
@@ -73,15 +84,25 @@ async function fetchSlots() {
         if (!res.ok) throw new Error('slots-fetch-error');
 
         const json = await res.json();
+        // Resposta de uma data que já não é a exibida (navegou no meio): ignora.
+        if (date !== selectedDate.value) return;
         slotInterval.value = json.interval ?? 15;
         hasSchedule.value = json.has_schedule ?? false;
+        fitInUsage.value = json.fit_in ?? null;
 
         slots.value = json.has_schedule
             ? (json.slots ?? [])
             : generateFallback(selectedDate.value, json.interval ?? 15);
 
         // Slot selecionado deixou de existir (outro usuário agendou no meio-tempo)
-        if (props.modelValue && !slots.value.some((s) => s.datetime === props.modelValue)) {
+        // — só vale para horário DESTA data (o de edição de outro dia não some).
+        // Encaixe: horário ocupado/fora da grade é justamente o caso — fica.
+        if (
+            !props.allowOccupied &&
+            props.modelValue &&
+            props.modelValue.startsWith(date) &&
+            !slots.value.some((s) => s.datetime === props.modelValue)
+        ) {
             emit('update:modelValue', '');
         }
     } catch {
@@ -92,8 +113,12 @@ async function fetchSlots() {
 }
 
 // ── Seleção de slot ────────────────────────────────────────────────────────────
+function selectable(slot) {
+    return slot.available || props.allowOccupied || props.modelValue === slot.datetime;
+}
+
 function selectSlot(slot) {
-    if (!slot.available && props.modelValue !== slot.datetime) return;
+    if (!selectable(slot)) return;
     showManualTime.value = false;
     emit('update:modelValue', slot.datetime);
     emit('slot-selected', { datetime: slot.datetime });
@@ -120,9 +145,33 @@ function addDays(n) {
 // ── Classe do botão de slot ────────────────────────────────────────────────────
 function slotBtnClass(slot) {
     if (props.modelValue === slot.datetime) return 'btn-primary';
+    if (!slot.available && props.allowOccupied) return 'btn-outline-warning slot-occupied-fit';
     if (!slot.available) return 'btn-secondary opacity-50';
     return 'btn-outline-primary';
 }
+
+function slotTitle(slot) {
+    if (slot.available) return slot.time;
+    if (props.allowOccupied)
+        return `${slot.time} — ${props.t.form_slot_occupied_fit_in ?? 'ocupado: entra como encaixe'}`;
+    return props.modelValue === slot.datetime ? slot.time : props.t.form_slot_occupied;
+}
+
+// "Encaixes: manhã 1 de 2 · tarde 0 de 2" (turno sem encaixe: "não aceita").
+const fitInSummary = computed(() => {
+    if (!props.allowOccupied || !fitInUsage.value) return [];
+    return ['morning', 'afternoon', 'evening'].map((shift) => {
+        const usage = fitInUsage.value[shift] ?? { limit: 0, used: 0 };
+        const label = props.t[`shift_${shift}`] ?? shift;
+        const text =
+            usage.limit > 0
+                ? (props.t.fit_in_usage ?? ':used de :limit')
+                      .replace(':used', usage.used)
+                      .replace(':limit', usage.limit)
+                : (props.t.fit_in_usage_none ?? 'não aceita');
+        return { shift, label, text, full: usage.limit > 0 && usage.used >= usage.limit, none: usage.limit <= 0 };
+    });
+});
 
 // ── Label do horário selecionado ───────────────────────────────────────────────
 const selectedLabel = computed(() => {
@@ -149,8 +198,17 @@ watch(
     },
 );
 
+// Troca de data vinda do próprio v-model (modo edição: o agendamento é de
+// outro dia) NÃO limpa o horário — antes limpava, e "Editar" só salvava se a
+// recepção escolhesse o horário de novo (422 "data e hora obrigatória").
+let keepSlotOnDateChange = false;
+
 watch(selectedDate, () => {
-    clearSlot();
+    if (keepSlotOnDateChange) {
+        keepSlotOnDateChange = false;
+    } else {
+        clearSlot();
+    }
     fetchSlots();
 });
 
@@ -163,6 +221,7 @@ watch(
             const date = val.substring(0, 10);
             if (date !== selectedDate.value) {
                 // Atualiza data sem disparar clearSlot (o valor já está definido)
+                keepSlotOnDateChange = true;
                 selectedDate.value = date;
             }
         }
@@ -196,6 +255,7 @@ defineExpose({
     /** Navega para uma data específica sem limpar o valor selecionado (modo edição). */
     setDate(date) {
         if (date && date !== selectedDate.value) {
+            keepSlotOnDateChange = true;
             selectedDate.value = date;
         }
     },
@@ -242,8 +302,8 @@ defineExpose({
                     class="btn btn-sm px-2 py-1"
                     style="font-size: 0.78rem; min-width: 52px"
                     :class="slotBtnClass(slot)"
-                    :disabled="!slot.available && modelValue !== slot.datetime"
-                    :title="!slot.available && modelValue !== slot.datetime ? t.form_slot_occupied : slot.time"
+                    :disabled="!selectable(slot)"
+                    :title="slotTitle(slot)"
                     @click="selectSlot(slot)"
                 >
                     {{ slot.time }}
@@ -256,6 +316,23 @@ defineExpose({
                 <span v-if="!hasSchedule"> — {{ t.form_no_scale }}</span>
             </small>
         </template>
+
+        <!-- ── Encaixes do dia por turno (modo encaixe) ───────────────────── -->
+        <div v-if="fitInSummary.length" class="small mt-2 d-flex flex-wrap gap-2" data-test="fit-in-usage">
+            <span class="text-muted">{{ t.fit_in_usage_title ?? 'Encaixes no dia:' }}</span>
+            <span
+                v-for="row in fitInSummary"
+                :key="row.shift"
+                class="badge rounded-pill border fit-in-usage-pill"
+                :class="
+                    row.full || row.none
+                        ? 'text-danger border-danger-subtle bg-danger-subtle'
+                        : 'text-body bg-body-tertiary'
+                "
+            >
+                {{ row.label }}: {{ row.text }}
+            </span>
+        </div>
 
         <!-- ── Sem slots disponíveis ───────────────────────────────────────── -->
         <p v-else class="text-muted small mb-1"><i class="fas fa-clock me-1"></i>{{ t.form_no_slots }}</p>
@@ -298,3 +375,14 @@ defineExpose({
         </div>
     </div>
 </template>
+
+<style scoped>
+.slot-occupied-fit {
+    border-style: dashed;
+}
+
+.fit-in-usage-pill {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+</style>

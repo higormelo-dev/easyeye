@@ -140,6 +140,20 @@ function createDoctorForEntity(Entity $entity): Doctor
 }
 
 /**
+ * Cadastro de médico (Doctor) para um vínculo JÁ existente — perfil médico só
+ * emite documento/aprova laudo com cadastro de médico ativo (Gate IssueReport,
+ * App\Support\CurrentDoctor).
+ */
+function doctorRecordForEntityUser(EntityUser $entityUser, bool $active = true): Doctor
+{
+    return Doctor::create([
+        'entity_user_id' => $entityUser->id,
+        'person_id'      => People::factory()->create()->id,
+        'active'         => $active,
+    ]);
+}
+
+/**
  * Cria um Schedule vinculado a uma Entity para uso em testes.
  * Retorna ['schedule' => Schedule, 'doctor' => Doctor].
  */

@@ -15,8 +15,10 @@ const typeKeyMap = {
 
 <template>
     <div
-        class="card mb-2 border-0 shadow-sm"
-        :style="{ borderLeft: `4px solid ${item.color} !important`, background: '#f8f9fa' }"
+        class="card mb-2 border-0 shadow-sm event-card"
+        :class="{ 'event-card--block': item.type === 'block' }"
+        :style="{ borderLeft: `4px solid ${item.color} !important` }"
+        :data-row-type="item.type"
     >
         <div class="card-body py-2 px-3">
             <div class="d-flex align-items-center gap-3">
@@ -30,7 +32,12 @@ const typeKeyMap = {
 
                 <!-- Icon -->
                 <div class="flex-shrink-0 text-center" style="width: 36px">
-                    <i class="fas fa-calendar-check fa-lg" :style="{ color: item.color, opacity: '.7' }"></i>
+                    <i
+                        class="fa-lg"
+                        :class="item.type === 'block' ? 'ti ti-lock fs-4' : 'fas fa-calendar-check'"
+                        :style="{ color: item.color, opacity: '.7' }"
+                        aria-hidden="true"
+                    ></i>
                 </div>
 
                 <!-- Content -->
@@ -41,11 +48,14 @@ const typeKeyMap = {
                             class="badge rounded-pill"
                             :style="{ background: item.color, fontSize: '.68rem', opacity: '.85' }"
                         >
-                            {{ t[typeKeyMap[item.event_type]] ?? item.event_type }}
+                            {{ item.type_label ?? t[typeKeyMap[item.event_type]] ?? item.event_type }}
                         </span>
                     </div>
                     <div v-if="item.doctor_name" class="text-muted" style="font-size: 0.78rem">
                         <i class="fas fa-user-md me-1"></i>{{ item.doctor_name }}
+                    </div>
+                    <div v-if="item.resource_name" class="text-muted" style="font-size: 0.78rem">
+                        <i class="ti ti-door me-1"></i>{{ item.resource_name }}
                     </div>
                     <div v-if="item.notes" class="text-muted fst-italic text-truncate" style="font-size: 0.75rem">
                         {{ item.notes }}
@@ -54,9 +64,27 @@ const typeKeyMap = {
 
                 <!-- Badge -->
                 <div class="flex-shrink-0">
-                    <span class="badge bg-secondary" style="font-size: 0.68rem">{{ t.event_badge }}</span>
+                    <span class="badge bg-secondary" style="font-size: 0.68rem">{{
+                        item.type === 'block' ? (t.block_badge ?? 'Bloqueio') : t.event_badge
+                    }}</span>
                 </div>
             </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+.event-card {
+    background: var(--bs-tertiary-bg, #f8f9fa);
+}
+
+.event-card--block {
+    background-image: repeating-linear-gradient(
+        135deg,
+        transparent 0,
+        transparent 10px,
+        rgba(108, 117, 125, 0.07) 10px,
+        rgba(108, 117, 125, 0.07) 20px
+    );
+}
+</style>

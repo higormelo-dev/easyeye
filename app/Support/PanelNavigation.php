@@ -73,6 +73,15 @@ class PanelNavigation
 
         if ($canSeeSchedules) {
             $nav[] = $schedulesItem;
+            // Pronto atendimento (fila de demanda espontânea do dia) — mesmo
+            // grupo de rota da Agenda (entity.role:admin,doctor,secretary).
+            $nav[] = [
+                'key'   => 'urgent-care',
+                'route' => 'panel.urgent-care.index',
+                'icon'  => 'ti ti-urgent',
+                'label' => __('actions.sidemenu.urgent_care'),
+                'match' => ['panel.urgent-care.*'],
+            ];
         }
 
         if ($canSeePatients) {
@@ -82,6 +91,18 @@ class PanelNavigation
                 'icon'  => 'ti ti-users',
                 'label' => __('actions.sidemenu.patients'),
                 'match' => ['panel.patients.*'],
+            ];
+        }
+
+        // Prontuários (busca geral) — mesmo acesso de leitura de hoje aos
+        // prontuários (entity.role:admin,doctor,secretary); o médico vê os dele.
+        if ($canSeeSchedules) {
+            $nav[] = [
+                'key'   => 'medical-records',
+                'route' => 'panel.medical-records.index',
+                'icon'  => 'ti ti-report-medical',
+                'label' => __('actions.sidemenu.medical_records'),
+                'match' => ['panel.medical-records.index'],
             ];
         }
 
@@ -251,12 +272,14 @@ class PanelNavigation
             $clinicalChildren = [
                 // Rota/controller continuam "resources" — só o label do menu
                 // muda para "Unidades / salas" (ClinicResource não é renomeado).
-                ['route' => 'panel.setting.resources.index', 'label' => __('actions.sidemenu.clinic_resources'), 'match' => ['panel.setting.resources.*']],
+                ['route' => 'panel.setting.resources.index', 'label' => __('actions.sidemenu.clinic_resources'), 'match' => ['panel.setting.resources.*', 'panel.resources.work-schedule.*']],
                 ['route' => 'panel.setting.call-panel.index', 'label' => __('schedules.call_panel_title'), 'match' => ['panel.setting.call-panel.*']],
             ];
 
             // Atendimento: catálogos ligados ao fluxo de agendamento/atendimento.
             $attendanceChildren = [
+                // Agenda: limiar de "poucas vagas" do calendário lateral.
+                ['route' => 'panel.setting.schedule.index', 'label' => __('schedules.settings_title'), 'match' => ['panel.setting.schedule.*']],
                 ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants'), 'match' => ['panel.setting.covenants.*', 'panel.setting.covenant-plans.*']],
                 ['route' => 'panel.setting.visittypes.index', 'label' => __('actions.sidemenu.visittypes'), 'match' => ['panel.setting.visittypes.*']],
                 // 'Tipos de cirurgia' MOVIDO pra virar 9ª aba dentro de

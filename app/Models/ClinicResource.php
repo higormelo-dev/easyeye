@@ -82,6 +82,8 @@ class ClinicResource extends Model
 
     public function schedules(): BelongsToMany
     {
-        return $this->belongsToMany(Schedule::class, 'schedule_resources');
+        return $this->belongsToMany(Schedule::class, 'schedule_resources', 'resource_id', 'schedule_id')
+            ->using(ScheduleResource::class)
+            ->withTimestamps();
     }
 }

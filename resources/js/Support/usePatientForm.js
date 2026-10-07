@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
 /**
@@ -14,6 +14,9 @@ export function usePatientForm(catalogs) {
     // Plano já salvo (nome/registro) — o seletor busca no servidor e precisa
     // do rótulo da opção escolhida antes de qualquer busca.
     const planOption = ref(null);
+    // Convênio já salvo (id/nome/ativo): o seletor só lista ativos; o inativo
+    // que o paciente já tem aparece marcado em vez de o campo parecer vazio.
+    const covenantOption = ref(null);
 
     const form = useForm({
         // Clínico
@@ -52,7 +55,19 @@ export function usePatientForm(catalogs) {
         city: '',
         state: '',
         country: 'Brasil',
+        // "É outra pessoa": só vai true depois que o servidor avisar de homônimo
+        // (mesmo nome de outro paciente da clínica) e a recepção confirmar.
+        confirm_homonym: false,
     });
+
+    // Confirmação de homônimo vale para o nome/nascimento confirmados: mudou
+    // um dos dois, o servidor reavalia e a recepção confirma de novo.
+    watch(
+        () => [form.name, form.birth_date],
+        () => {
+            if (form.confirm_homonym) form.confirm_homonym = false;
+        },
+    );
 
     function resetForm() {
         // defaults() pode ter sido movido por loadEditData — restaura o
@@ -89,10 +104,12 @@ export function usePatientForm(catalogs) {
             city: '',
             state: '',
             country: 'Brasil',
+            confirm_homonym: false,
         });
         form.reset();
         form.clearErrors();
         planOption.value = null;
+        covenantOption.value = null;
     }
 
     async function loadEditData(id) {
@@ -105,6 +122,7 @@ export function usePatientForm(catalogs) {
                 if (key in d) form[key] = d[key] ?? form[key];
             });
             planOption.value = d.covenant_plan ?? null;
+            covenantOption.value = d.covenant_option ?? null;
             // Baseline = dado carregado: isDirty passa a refletir só edição
             // REAL do usuário (decide se o save do agendamento faz PUT).
             form.defaults(form.data());
@@ -198,6 +216,7 @@ export function usePatientForm(catalogs) {
         personal: Object.keys(form.errors).some((k) =>
             [
                 'name',
+                'confirm_homonym',
                 'nickname',
                 'national_registry',
                 'birth_date',
@@ -235,6 +254,7 @@ export function usePatientForm(catalogs) {
         form,
         loading,
         planOption,
+        covenantOption,
         resetForm,
         loadEditData,
         savePatient,

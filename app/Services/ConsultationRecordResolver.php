@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\{Doctor, MedicalRecord, PatientExam, Schedule};
+use App\Models\{MedicalRecord, PatientExam, Schedule, User};
+use App\Support\CurrentDoctor;
 use Illuminate\Support\Carbon;
 
 /**
@@ -69,19 +70,16 @@ class ConsultationRecordResolver
     }
 
     /**
-     * Resolve o Doctor.id associado ao usuário autenticado dentro da entity
-     * ativa. Retorna null se o usuário for admin/secretary sem perfil
-     * médico vinculado — o caller decide o fallback (doctor do prontuário,
-     * doctor do exame, ou 422 exigindo médico).
+     * Doctor.id ATIVO do usuário autenticado na entity — o médico que emite
+     * (App\Support\CurrentDoctor::activeFor, a mesma regra do Gate
+     * IssueReport). null para quem não tem cadastro de médico ativo; os
+     * fluxos de emissão não caem mais no médico do exame/prontuário.
      */
     public function resolveDoctorIdForCurrentUser(string $entityId): ?string
     {
-        $userId = (string) auth()->id();
+        $user = auth()->user();
+        $id   = CurrentDoctor::activeFor($user instanceof User ? $user : null, $entityId)?->id;
 
-        return Doctor::query()
-            ->whereHas('entityUser', function ($query) use ($entityId, $userId): void {
-                $query->where('entity_id', $entityId)->where('user_id', $userId);
-            })
-            ->value('id');
+        return $id !== null ? (string) $id : null;
     }
 }

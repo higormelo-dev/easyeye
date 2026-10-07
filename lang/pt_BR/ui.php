@@ -51,5 +51,10 @@ return [
         'plan_none'            => 'Nenhum plano cadastrado para este convênio. A clínica pode cadastrar em Configurações › Convênios › Planos.',
         'plan_unavailable'     => 'Este plano não está mais disponível (cancelado na ANS ou desativado). Escolha outro ao atualizar o cadastro.',
         'plan_hint'            => 'Opcional. O registro do produto na ANS vem impresso na carteirinha.',
+        // Convênio do paciente inativado depois do cadastro (mantido, marcado).
+        'covenant_inactive_suffix' => '(inativo)',
+        // Homônimo: mesmo nome de outro paciente da clínica (PatientDuplicateFinder).
+        'homonym_title'   => 'Paciente com o mesmo nome',
+        'homonym_confirm' => 'Confirmo que é outro paciente',
     ],
 ];

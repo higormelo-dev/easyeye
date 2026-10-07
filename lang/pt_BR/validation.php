@@ -327,6 +327,10 @@ return [
         'doctor_id'                                   => 'médico',
         'date_time'                                   => 'data e hora',
         'patient_id'                                  => 'paciente',
+        'series_dates'                                => 'datas da série',
+        'series_dates.*'                              => 'data da sessão',
+        'few_slots_percent'                           => 'percentual de poucas vagas',
+        'is_fit_in'                                   => 'encaixe',
 
         // ── Cobertura completa de campos (29/08/2026) ─────────────────────
         'abbreviation'                              => 'abreviação',
@@ -604,6 +608,21 @@ return [
         ],
         'entity' => [
             'not_selected' => 'Nenhuma empresa selecionada.',
+        ],
+        'covenant' => [
+            'inactive'            => 'O convênio selecionado está inativo. Escolha um convênio ativo.',
+            'inactive_named'      => 'O convênio ":name" está inativo — escolha um convênio ativo.',
+            'reschedule_inactive' => 'O convênio deste agendamento (":name") está inativo. Edite o agendamento e escolha um convênio ativo antes de remarcar.',
+        ],
+        'patient' => [
+            'duplicate'        => 'Já existe um paciente com este nome e esta data de nascimento nesta clínica (:codes). Abra o cadastro existente em vez de criar outro.',
+            'homonym'          => 'Já existe paciente com este nome nesta clínica (:codes). Se for outra pessoa, confirme abaixo para salvar.',
+            'duplicate_cpf'    => 'Já existe paciente ativo com este CPF nesta clínica (:codes) — restaure ou edite o cadastro existente.',
+            'duplicate_import' => 'Duplicado: já existe paciente com o mesmo nome e data de nascimento (:codes) — linha não importada.',
+            'homonym_import'   => 'Aviso: já existe paciente com o mesmo nome (:codes), com data de nascimento diferente ou não informada — importado como outra pessoa; confira se não é duplicado.',
+        ],
+        'visit_type' => [
+            'inactive' => 'O tipo de consulta selecionado está inativo. Escolha um tipo ativo.',
         ],
         'schedule' => [
             'doctor_not_found'       => 'O médico selecionado não é válido ou não pertence a esta empresa.',

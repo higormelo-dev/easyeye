@@ -2,11 +2,13 @@
 import { ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import DoctorMissingAlert from '@/Components/Panel/DoctorMissingAlert.vue';
 import PatientInfoSidebar from './Components/PatientInfoSidebar.vue';
 import PreviousRecordsCard from './Components/PreviousRecordsCard.vue';
 import MedicalRecordViewModal from './Components/MedicalRecordViewModal.vue';
 import MedicalRecordForm from './Components/MedicalRecordForm.vue';
 import ScheduleFlowGuard from './Components/ScheduleFlowGuard.vue';
+import AttendanceTimer from './Components/AttendanceTimer.vue';
 
 defineProps({
     breadcrumbs: { type: Array, default: () => [] },
@@ -17,6 +19,9 @@ defineProps({
     currentDoctorId: { type: String, default: null },
     canChooseDoctor: { type: Boolean, default: false },
     isDoctor: { type: Boolean, default: false },
+    // Perfil médico sem cadastro de médico ativo (CurrentDoctor): aviso + ações escondidas.
+    doctorMissing: { type: Boolean, default: false },
+    doctorMissingText: { type: String, default: '' },
     isEdit: { type: Boolean, default: false },
     // Fluxo Agenda ↔ Prontuário (ver ScheduleFlowGuard.vue) — no create chega
     // via ?schedule_id= quando o atendimento é aberto a partir da Agenda.
@@ -24,6 +29,8 @@ defineProps({
     catalogs: { type: Object, required: true },
     urls: { type: Object, required: true },
     storage: { type: Object, default: () => ({}) },
+    // Autosave: rascunho do autor mais novo que o prontuário (só a data).
+    draft: { type: Object, default: null },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -47,9 +54,10 @@ function closeView() {
 
     <AppLayout :title="t.create ?? 'Novo Prontuário'" :breadcrumbs="breadcrumbs">
         <div class="pmr-screen">
+            <DoctorMissingAlert v-if="doctorMissing" :text="doctorMissingText" />
             <!-- Subnav -->
             <div class="row mb-3 align-items-center">
-                <div class="col-12 col-auto">
+                <div class="col-auto">
                     <div class="btn-group" role="group">
                         <!-- Com fluxo de agendamento ativo, sair passa pelo
                              ScheduleFlowGuard (Finalizar/Dilatar/Exame/Continuar). -->
@@ -68,6 +76,10 @@ function closeView() {
                             <i class="fas fa-plus me-1"></i>{{ t.new ?? 'Novo' }}
                         </Link>
                     </div>
+                </div>
+                <!-- Cronômetro do atendimento (desde o "Atender"; sem agendamento, desde a abertura) -->
+                <div class="col-auto ms-auto">
+                    <AttendanceTimer :flow="scheduleFlow" :t="t" />
                 </div>
             </div>
 
@@ -94,6 +106,7 @@ function closeView() {
                             :urls="urls"
                             :schedule-flow="scheduleFlow"
                             :storage="storage"
+                            :draft="draft"
                             :t="t"
                         />
                     </div>

@@ -265,6 +265,10 @@ return [
     'summary_missed_note_one'   => ':count falta/cancelamento fora da conta.',
     'summary_missed_note_other' => ':count faltas/cancelamentos fora da conta.',
     'summary_all_missed'        => 'Todas as consultas de hoje foram canceladas ou tiveram falta.',
+    'summary_urgent_care'       => 'Pronto atendimento',
+    'summary_urgent_care_one'   => ':count na fila',
+    'summary_urgent_care_other' => ':count na fila',
+    'summary_urgent_care_hint'  => 'Quem chegou sem hora marcada e espera agora — abre a fila',
 
     // Agenda de hoje
     'arrived_at' => 'chegou às :time',

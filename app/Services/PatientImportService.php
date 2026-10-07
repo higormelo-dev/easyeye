@@ -155,6 +155,9 @@ class PatientImportService
     /** Chave normalizada (normalizeKey) do convênio usado quando a coluna vem vazia. */
     private const PARTICULAR_KEY = 'particular';
 
+    /** @var array<string, true> convênios inativos do mapa (loadCovenantsMap) */
+    private array $inactiveCovenantIds = [];
+
     /** Cabeçalhos que nomeiam o convênio de fato. */
     private const COVENANT_HEADERS = ['convenio', 'convenio_nome'];
 
@@ -164,6 +167,7 @@ class PatientImportService
     public function __construct(
         private readonly FeatureGateService $featureGate,
         private readonly PatientService $patientService,
+        private readonly PatientDuplicateFinder $duplicateFinder,
     ) {
     }
 
@@ -552,6 +556,8 @@ class PatientImportService
             }
 
             // Pessoa existe, cria apenas o Patient
+            $homonymWarning = $this->guardDuplicate($entityId, (string) ($person->full_name ?: $name), $person->birth_date?->toDateString(), $person->id);
+
             $patient = Patient::create([
                 'entity_id' => $entityId,
                 'person_id' => $person->id,
@@ -559,9 +565,15 @@ class PatientImportService
                 'active' => true,
             ]);
             $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
+            $warning = $this->joinWarnings($homonymWarning, $warning);
 
             return 'imported';
         }
+
+        // Paciente novo: duplicado real (mesmo nome + nascimento) vira erro da
+        // linha; homônimo (nascimento diferente/vazio) importa como outra
+        // pessoa — comportamento de sempre da importação — com aviso na linha.
+        $homonymWarning = $this->guardDuplicate($entityId, $name, $data['birth_date'] ?? null);
 
         // 3. Cria People + Patient
         $personData = array_filter([
@@ -599,8 +611,34 @@ class PatientImportService
             'active' => true,
         ]);
         $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
+        $warning = $this->joinWarnings($homonymWarning, $warning);
 
         return 'imported';
+    }
+
+    /**
+     * Regra única de duplicidade (App\Services\PatientDuplicateFinder):
+     * duplicado real lança (a linha vira erro, nada é gravado); homônimo
+     * devolve o aviso da linha.
+     */
+    private function guardDuplicate(string $entityId, string $name, ?string $birthDate, ?string $ignorePersonId = null): ?string
+    {
+        $found = $this->duplicateFinder->find($entityId, $name, $birthDate, $ignorePersonId);
+
+        if ($found['duplicates'] !== []) {
+            throw new RuntimeException(__('validation.custom.patient.duplicate_import', ['codes' => implode(', ', $found['duplicates'])]));
+        }
+
+        return $found['homonyms'] !== []
+            ? __('validation.custom.patient.homonym_import', ['codes' => implode(', ', $found['homonyms'])])
+            : null;
+    }
+
+    private function joinWarnings(?string ...$warnings): ?string
+    {
+        $text = implode(' ', array_filter($warnings, fn ($w) => $w !== null && $w !== ''));
+
+        return $text === '' ? null : $text;
     }
 
     /**
@@ -794,8 +832,16 @@ class PatientImportService
                 ?? throw new RuntimeException('Convênio não informado e nenhum convênio "Particular" cadastrado.');
         }
 
-        return $covenantsMap[$key]
+        $covenantId = $covenantsMap[$key]
             ?? throw new RuntimeException("Convênio \"{$name}\" não encontrado. Cadastre-o em Configurações › Convênios ou corrija a planilha.");
+
+        // Vínculo novo só com convênio ativo (mesma regra do cadastro manual,
+        // App\Rules\ActiveCovenant): a linha vira erro, sem gravar.
+        if (isset($this->inactiveCovenantIds[$covenantId])) {
+            throw new RuntimeException(__('validation.custom.covenant.inactive_named', ['name' => trim((string) $name)]));
+        }
+
+        return $covenantId;
     }
 
     /**
@@ -880,15 +926,23 @@ class PatientImportService
     /** Retorna mapa nome-em-minúsculo → UUID para lookup eficiente, escopado à entidade. */
     private function loadCovenantsMap(string $entityId): array
     {
-        // Globais primeiro, da clínica por último: se a clínica cadastrou o
-        // próprio "Particular"/"Unimed", ele sobrescreve o global no mapa.
-        return Covenant::where(function ($query) use ($entityId) {
+        // Inativos primeiro, depois globais, da clínica por último: o último
+        // sobrescreve — "Unimed" ativo ganha do inativo de mesmo nome e, entre
+        // ativos, o da clínica ganha do global.
+        $covenants = Covenant::where(function ($query) use ($entityId) {
             $query->where('entity_id', $entityId)
                 ->orWhere('entity_id', null);
         })
             ->whereNull('deleted_at')
+            ->orderBy('active')
             ->orderByRaw('entity_id IS NOT NULL')
-            ->get(['id', 'name'])
+            ->get(['id', 'name', 'active']);
+
+        $this->inactiveCovenantIds = $covenants->reject(fn (Covenant $c) => (bool) $c->active)
+            ->mapWithKeys(fn (Covenant $c) => [(string) $c->id => true])
+            ->all();
+
+        return $covenants
             ->mapWithKeys(fn (Covenant $c) => [$this->normalizeKey((string) $c->name) => (string) $c->id])
             ->toArray();
     }

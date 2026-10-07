@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
@@ -8,6 +8,9 @@ const props = defineProps({
     days: { type: Array, required: true },
     interval: { type: [Number, String], default: null },
     entityInterval: { type: Number, default: 15 },
+    // Teto de encaixes por turno ({ morning, afternoon, evening }; 0 = não aceita).
+    fitInLimits: { type: Object, default: () => ({ morning: 2, afternoon: 2, evening: 2 }) },
+    maxFitInLimit: { type: Number, default: 20 },
     blocks: { type: Array, default: () => [] },
     urls: { type: Object, required: true },
     t: { type: Object, default: () => ({}) },
@@ -20,6 +23,12 @@ const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 // ─────────────────────────────────────────────────────────────────────────────
 const localDays = ref(JSON.parse(JSON.stringify(props.days)));
 const localInterval = ref(props.interval ?? null);
+const localFitIn = ref({ ...props.fitInLimits });
+const fitInShifts = [
+    { key: 'morning', icon: 'fas fa-sun' },
+    { key: 'afternoon', icon: 'fas fa-cloud-sun' },
+    { key: 'evening', icon: 'fas fa-moon' },
+];
 const localBlocks = ref([...props.blocks]);
 
 // ── Horários ────────────────────────────────────────────────────────────────
@@ -36,6 +45,11 @@ function addRange(dayIndex) {
 function removeRange(dayIndex, rangeIndex) {
     localDays.value[dayIndex].ranges.splice(rangeIndex, 1);
 }
+
+// Aviso "salvo" some sozinho — o timer morre com a tela (sem re-render depois
+// de sair dela).
+let saveSuccessTimer = null;
+onBeforeUnmount(() => clearTimeout(saveSuccessTimer));
 
 async function saveSchedule() {
     saving.value = true;
@@ -54,6 +68,9 @@ async function saveSchedule() {
             body: JSON.stringify({
                 schedule_interval: localInterval.value || null,
                 days: localDays.value,
+                fit_in_limits: Object.fromEntries(
+                    Object.entries(localFitIn.value).map(([shift, value]) => [shift, Number(value) || 0]),
+                ),
             }),
         });
 
@@ -66,7 +83,8 @@ async function saveSchedule() {
 
         saveSuccess.value = true;
         if (window.showSuccessToast) window.showSuccessToast(data.message);
-        setTimeout(() => {
+        clearTimeout(saveSuccessTimer);
+        saveSuccessTimer = setTimeout(() => {
             saveSuccess.value = false;
         }, 3000);
     } catch (e) {
@@ -252,6 +270,41 @@ const breadcrumbs = [
                             </div>
                             <small class="text-muted d-block mt-1">
                                 {{ t.clinic_default ?? 'Padrão da clínica' }}: {{ entityInterval }} min.
+                            </small>
+                        </div>
+
+                        <!-- Encaixes por turno (teto por dia; 0 = não aceita) -->
+                        <div class="mb-4 p-3 bg-light rounded fit-in-limits" data-testid="fit-in-limits">
+                            <div class="form-label fw-semibold mb-1">
+                                <i class="ti ti-arrow-autofit-height me-1 text-secondary" aria-hidden="true"></i>
+                                {{ t.fit_in_limits_title ?? 'Encaixes por turno' }}
+                            </div>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div
+                                    v-for="shift in fitInShifts"
+                                    :key="shift.key"
+                                    class="d-flex align-items-center gap-2"
+                                >
+                                    <label class="small text-muted mb-0" :for="`fit-in-${shift.key}`">
+                                        <i :class="shift.icon" class="me-1" aria-hidden="true"></i
+                                        >{{ t[`fit_in_shift_${shift.key}`] ?? shift.key }}
+                                    </label>
+                                    <input
+                                        :id="`fit-in-${shift.key}`"
+                                        v-model.number="localFitIn[shift.key]"
+                                        type="number"
+                                        min="0"
+                                        :max="maxFitInLimit"
+                                        class="form-control form-control-sm"
+                                        style="width: 4.5rem"
+                                    />
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-1">
+                                {{
+                                    t.fit_in_limits_hint ??
+                                    'Quantos encaixes por dia em cada turno. 0 = não aceita encaixe.'
+                                }}
                             </small>
                         </div>
 

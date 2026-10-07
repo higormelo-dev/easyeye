@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Exceptions\LockedMedicalRecordException;
 use App\Models\{EntityUser, MedicalRecord};
+use App\Services\MedicalRecords\MedicalRecordDraftService;
 use Illuminate\Database\Eloquent\Collection;
 use InvalidArgumentException;
 
@@ -31,6 +32,9 @@ class MedicalRecordSignatureService
         }
 
         $record->sign($entityUser);
+
+        // Assinado = imutável: nenhum rascunho (autosave) dele sobrevive.
+        app(MedicalRecordDraftService::class)->purgeForRecord($record);
 
         return $record->fresh();
     }

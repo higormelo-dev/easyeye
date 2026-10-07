@@ -8,10 +8,10 @@ use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService};
 use App\DTOs\EyeImageFilters;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
-use App\Enums\{ClientRule, FeatureKey};
+use App\Enums\FeatureKey;
 use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, Patient, PatientDocumentShare, PatientExam};
 use App\Services\FeatureGateService;
-use App\Support\BrazilianFormat;
+use App\Support\{BrazilianFormat, CurrentDoctor};
 use App\Traits\LogsDataAccess;
 use Closure;
 use Illuminate\Database\Eloquent\{Builder, Collection};
@@ -93,8 +93,12 @@ class EyeImagesController extends Controller
             // do médico (CFM Res. 2.227/2018 — mesmo Gate IssueReport checado
             // no EyeImageReportController). A UI usa isso pra esconder os
             // botões; o backend valida de novo, não depende só disto.
-            'isDoctor' => session('selected_entity_user_rule') === ClientRule::Doctor->value,
-            'urls'     => [
+            // Perfil médico SEM cadastro de médico ativo: o Gate barra — a tela
+            // esconde as ações e mostra o aviso (App\Support\CurrentDoctor).
+            'isDoctor'          => CurrentDoctor::canIssue(),
+            'doctorMissing'     => CurrentDoctor::issuerMissing(),
+            'doctorMissingText' => CurrentDoctor::missingMessage(),
+            'urls'              => [
                 'search'       => route('panel.eye-images.search'),
                 'patient_urls' => route('panel.eye-images.patient-urls', ['patient' => '__ID__']),
                 'image_url'    => route('panel.eye-images.image-url', ['exam' => '__ID__']),

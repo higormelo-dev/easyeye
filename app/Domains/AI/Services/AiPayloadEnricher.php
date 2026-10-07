@@ -8,7 +8,9 @@ use App\Domains\AI\Models\AiRun;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, EntityGate, FeatureKey};
 use App\Models\{Entity, MedicalRecord, Patient, PatientExam};
+use App\Models\User;
 use App\Services\FeatureGateService;
+use App\Support\CurrentDoctor;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -46,6 +48,12 @@ class AiPayloadEnricher
      */
     private const PLATFORM_FINANCE_WORKFLOWS = ['platform_finance_digest', 'platform_finance_chat'];
 
+    /**
+     * Runs de plataforma do manager (SaaS, sem clínica nem paciente): ficam
+     * fora da trava de cadastro de médico dos runs clínicos.
+     */
+    private const PLATFORM_WORKFLOWS = [...self::PLATFORM_FINANCE_WORKFLOWS, 'medicine_posology'];
+
     public function __construct(
         private readonly AiMedicalContextBuilder $contextBuilder,
         private readonly AiPromptGuardrailService $promptGuardrails,
@@ -62,6 +70,10 @@ class AiPayloadEnricher
      */
     public function enrich(array $payload, string $entityId, bool $canConsensus): array
     {
+        // Antes de qualquer outra coisa (defaults, contexto, crédito): perfil
+        // médico sem cadastro de médico ativo não abre run clínico.
+        $this->assertClinicalRequesterHasDoctorRecord((string) ($payload['workflow'] ?? ''), $entityId);
+
         $payload = $this->applyWorkflowDefaults($payload, $entityId);
         $payload = $this->resolveModeAndAuthorize($payload, $canConsensus);
 
@@ -218,6 +230,9 @@ class AiPayloadEnricher
     // inteiro do run pai (o que causaria drift de contexto/paciente).
     public function validateFeatureByWorkflow(string $workflow, string $entityId): void
     {
+        // escalate() chega aqui sem passar por enrich(): mesma trava.
+        $this->assertClinicalRequesterHasDoctorRecord($workflow, $entityId);
+
         if (in_array($workflow, ['exam_assistant', 'record_assist'], true)
             && ! $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant)) {
             abort(403, __('ai.feature_exam_unavailable'));
@@ -264,6 +279,26 @@ class AiPayloadEnricher
             if (! Gate::forUser(auth()->user())->allows(EntityGate::SaasOwnerFinancial->value, $entity)) {
                 abort(403, __('ai.feature_platform_finance_unavailable'));
             }
+        }
+    }
+
+    /**
+     * Run de IA CLÍNICO (todo workflow que não é o P&L interno do SaaS) pedido
+     * por perfil médico SEM cadastro de médico ativo nesta clínica: barrado
+     * antes de criar o AiRun, reservar crédito ou chamar provedor — a resposta
+     * nunca poderia ser aprovada (Gate IssueReport, App\Support\CurrentDoctor).
+     * Admin/secretária seguem a regra de cada workflow.
+     */
+    private function assertClinicalRequesterHasDoctorRecord(string $workflow, string $entityId): void
+    {
+        if (in_array($workflow, self::PLATFORM_WORKFLOWS, true) || ! CurrentDoctor::isDoctorProfile()) {
+            return;
+        }
+
+        $user = auth()->user();
+
+        if (CurrentDoctor::activeFor($user instanceof User ? $user : null, $entityId) === null) {
+            abort(403, CurrentDoctor::missingMessage());
         }
     }
 

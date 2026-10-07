@@ -11,6 +11,10 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     schedules: { type: Array, default: () => [] },
     summary: { type: Object, default: null },
+    // Perfil médico sem cadastro de médico: relatório vazio + aviso
+    // (ReportsController / App\Support\CurrentDoctor).
+    doctorMissing: { type: Boolean, default: false },
+    doctorMissingText: { type: String, default: '' },
 });
 
 const form = ref({
@@ -30,6 +34,11 @@ const hasResults = computed(() => props.summary !== null);
     <AppLayout title="Relatório de Absenteísmo" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
             <PageHeader title="Relatório de Absenteísmo" />
+
+            <div v-if="doctorMissing" class="alert alert-warning d-flex align-items-start gap-2" role="alert">
+                <i class="ti ti-user-exclamation fs-4 flex-shrink-0" aria-hidden="true"></i>
+                <div>{{ doctorMissingText }}</div>
+            </div>
 
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-body py-3">

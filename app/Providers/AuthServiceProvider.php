@@ -6,6 +6,8 @@ namespace App\Providers;
 
 use App\Enums\{ClientRule, EntityGate, SaasRule};
 use App\Models\{Entity, User};
+use App\Support\CurrentDoctor;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -174,12 +176,20 @@ class AuthServiceProvider extends ServiceProvider
          * Emitir laudos médicos e registrar prontuários.
          * Exclusivo para médicos (CFM Res. 2.227/2018) — admin não pode assinar.
          */
-        Gate::define(EntityGate::IssueReport->value, function (User $user, Entity $entity): bool {
+        Gate::define(EntityGate::IssueReport->value, function (User $user, Entity $entity): bool|Response {
             if (! $entity->isClient()) {
                 return false;
             }
 
-            return $user->hasRoleInEntity($entity, ClientRule::Doctor);
+            if (! $user->hasRoleInEntity($entity, ClientRule::Doctor)) {
+                return false;
+            }
+
+            // Perfil médico SEM cadastro de médico ativo nesta clínica não
+            // emite: o documento sairia com nome/CRM de outro médico.
+            return CurrentDoctor::activeFor($user, (string) $entity->id) !== null
+                ? Response::allow()
+                : Response::deny(CurrentDoctor::missingMessage());
         });
 
         /**

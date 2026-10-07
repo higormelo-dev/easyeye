@@ -330,7 +330,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                             Separador: ponto-e-vírgula (;). Encoding UTF-8. Colunas: codigo_importacao_medico ou
                             crm_medico, nome_paciente, data_hora (obrigatórias) — codigo_importacao_paciente,
                             cpf_paciente, situacao, tipo_atendimento, especialidade, convenio, telefone, celular,
-                            observacoes, codigo_importacao (opcionais). Veja o
+                            observacoes, codigo_importacao, encaixe (sim/não) (opcionais). Veja o
                             <a :href="urls.template">modelo</a>.
                         </small>
                     </form>

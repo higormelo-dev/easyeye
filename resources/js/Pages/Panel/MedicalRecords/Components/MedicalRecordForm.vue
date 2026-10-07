@@ -13,6 +13,8 @@ import ContactLensCalculatorModal from './ContactLensCalculatorModal.vue';
 import { contactLensSummary, isLegacyContactLens, omitUnchangedContactLens } from './contactLens.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
 import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard.js';
+import { useRecordAutosave } from '@/composables/useRecordAutosave.js';
+import { useAttendanceClock, formatDuration } from '@/composables/useAttendanceClock.js';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
 import { recordColumnOrder } from './recordLayout.js';
@@ -56,6 +58,9 @@ const props = defineProps({
         }),
     },
     ai: { type: Object, default: () => ({ enabled: false }) },
+    // Autosave: rascunho do autor mais novo que o prontuário ({ updated_at,
+    // updated_at_label } | null) — a tela oferece recuperar.
+    draft: { type: Object, default: null },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -454,7 +459,9 @@ watch(
 );
 
 // ── Assistente de IA ────────────────────────────────────────────────────────
-const aiEnabled = computed(() => Boolean(props.ai?.enabled) && props.isEdit);
+// isDoctor = perfil médico COM cadastro ativo (servidor): sem cadastro, a IA
+// não aparece — o laudo nunca poderia ser aprovado (Gate IssueReport).
+const aiEnabled = computed(() => Boolean(props.ai?.enabled) && props.isEdit && props.isDoctor);
 const aiPanelOpen = ref(false);
 const aiContext = computed(() => ({
     workflow_default: props.ai?.default_workflow ?? 'record_assist',
@@ -752,6 +759,112 @@ function markSaved(snapshot) {
     // form ATUAL — o que foi digitado durante o envio continua pendente.
     form.defaults(snapshot);
     form.isDirty = JSON.stringify(snapshotOf(form.data())) !== JSON.stringify(snapshot);
+    // Salvou: o servidor apagou o rascunho desta tela.
+    autosave.markSaved();
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Autosave — rascunho do autor no servidor (nunca no navegador), a cada ~30 s
+// com mudança e ao ocultar a aba. Só os campos do prontuário (médico,
+// agendamento e intenções de fluxo vêm da tela). Prontuário assinado ou quem
+// não pode salvar: desligado. Ao abrir, oferece recuperar o rascunho mais
+// novo que o prontuário (props.draft).
+// ──────────────────────────────────────────────────────────────────────────
+const DRAFT_EXCLUDED = ['doctor_id', 'schedule_id', 'flow_action', 'post_save_action'];
+const draftShape = (data) =>
+    Object.fromEntries(Object.entries(snapshotOf(data)).filter(([key]) => !DRAFT_EXCLUDED.includes(key)));
+
+const autosaveEnabled = computed(() => Boolean(props.urls.draft) && props.isDoctor && !isLocked.value);
+
+const autosave = useRecordAutosave({
+    url: () => props.urls.draft ?? null,
+    enabled: () => autosaveEnabled.value,
+    payload: () => draftShape(form.data()),
+    saved: () => draftShape(savedSnapshot),
+    context: () => (r?.id ? { medical_record_id: r.id } : form.schedule_id ? { schedule_id: form.schedule_id } : {}),
+});
+
+const autosaveLabel = computed(() => {
+    switch (autosave.status.value) {
+        case 'saving':
+            return tt('draft_saving', 'Salvando rascunho…');
+        case 'saved':
+            return tt('draft_saved_at', 'Rascunho salvo às :time').replace(':time', autosave.savedAtLabel.value);
+        case 'error':
+            return tt('draft_failed', 'Rascunho não salvo agora — nova tentativa em instantes.');
+        default:
+            return '';
+    }
+});
+
+const draftOffer = ref(autosaveEnabled.value ? props.draft : null);
+const draftBusy = ref(false);
+
+function applyDraft(payload) {
+    const current = form.data();
+    Object.entries(payload ?? {}).forEach(([key, value]) => {
+        if (key in current && !DRAFT_EXCLUDED.includes(key)) form[key] = value;
+    });
+    if (Array.isArray(payload?.diagnosis_cids)) selectedCids.value = [...payload.diagnosis_cids];
+    if (payload?.others_history) showOthersHistory.value = true;
+}
+
+async function recoverDraft() {
+    if (draftBusy.value) return;
+    draftBusy.value = true;
+    const payload = await autosave.recover();
+    draftBusy.value = false;
+    draftOffer.value = null;
+    if (!payload) return;
+    applyDraft(payload);
+    window.showSuccessToast?.(tt('draft_recovered', 'Rascunho recuperado. Confira e clique em Salvar.'));
+}
+
+async function discardDraft() {
+    if (draftBusy.value) return;
+    draftBusy.value = true;
+    await autosave.discard();
+    draftBusy.value = false;
+    draftOffer.value = null;
+    window.showSuccessToast?.(tt('draft_discarded', 'Rascunho descartado.'));
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// "Finalizar consulta" sempre confirma num modal com o que vai acontecer
+// (salvar, Atendido na Agenda — ou a trava de caixa —, volta pra Agenda,
+// rascunhos fora do form descartados, duração do atendimento). Vale para o
+// botão da barra e para o "Finalizar" do guard de saída (os dois passam por
+// submit('finish')).
+// ──────────────────────────────────────────────────────────────────────────
+const showFinishModal = ref(false);
+const finishHasDrafts = ref(false);
+const finishConfirmButton = ref(null);
+const finishClock = useAttendanceClock({
+    startedAt: () => props.scheduleFlow?.started_at ?? null,
+    finishedAt: () => null,
+    running: () => false,
+});
+const finishDuration = computed(() =>
+    formatDuration(finishClock.elapsedMs.value, {
+        minutes: tt('timer_minutes', ':m min'),
+        hours: tt('timer_hours', ':h h :m min'),
+        underMinute: tt('timer_under_minute', 'menos de 1 min'),
+    }),
+);
+const finishPatientName = computed(
+    () => props.scheduleFlow?.patient_name || props.patient?.full_name || props.patient?.code || '',
+);
+
+function requestFinish() {
+    finishHasDrafts.value = hasPendingDrafts();
+    finishClock.refresh();
+    showFinishModal.value = true;
+    nextTick(() => finishConfirmButton.value?.focus());
+}
+
+function confirmFinish() {
+    showFinishModal.value = false;
+    submit('finish', { confirmed: true });
 }
 
 // Fluxos que levam pra Agenda (saem do prontuário) — ver redirectAfterSave.
@@ -771,7 +884,7 @@ const { bypass } = useUnsavedChangesGuard({
  * `afterSave` (opcional): o que fazer depois de salvo, no lugar da pergunta
  * de destino — usado pelo "Continuar atendimento" (saveAndLeave).
  */
-function submit(flowAction = null, { afterSave = null } = {}) {
+function submit(flowAction = null, { afterSave = null, confirmed = false } = {}) {
     // Sem request não há onFinish: desarma a intenção da barra pra um
     // "Salvar" posterior não emitir um documento que o médico não pediu.
     if (isLocked.value || !validateBeforeSubmit()) {
@@ -781,6 +894,12 @@ function submit(flowAction = null, { afterSave = null } = {}) {
 
     const normalizedFlowAction = typeof flowAction === 'string' ? flowAction : null;
 
+    // Finalizar: primeiro o modal de confirmação (ele já avisa dos rascunhos).
+    if (normalizedFlowAction === 'finish' && !confirmed) {
+        requestFinish();
+        return;
+    }
+
     // Finalizar/Dilatar/Exame (vão pra Agenda) e "Continuar atendimento"
     // saem do prontuário: rascunho fora do form (evolução, receita,
     // solicitação — outros registros, com botão próprio) se perderia. O
@@ -788,6 +907,7 @@ function submit(flowAction = null, { afterSave = null } = {}) {
     const leavesScreen = Boolean(afterSave) || LEAVING_FLOW_ACTIONS.includes(normalizedFlowAction);
     if (
         leavesScreen &&
+        !confirmed &&
         hasPendingDrafts() &&
         !window.confirm(
             tt(
@@ -914,6 +1034,7 @@ const POST_SAVE_ACTIONS = {
     retinal_mapping: () => issueQuickAction('retinal-mapping', {}, { preview: true }),
     attendance_certificate: () => openAttendanceCertificate(),
     medical_certificate: () => openMedicalCertificate(),
+    medical_declaration: () => issueMedicalDeclaration(),
     exam_hub: () => {
         showExamHubModal.value = true;
     },
@@ -1224,7 +1345,7 @@ async function openNewDocByType(type) {
  * Paridade com Alpine `issueMedicalDeclaration`.
  */
 function issueMedicalDeclaration() {
-    return issueQuickAction('medical-declaration', { content: '' });
+    return issueQuickAction('medical-declaration', { content: '' }, { preview: true });
 }
 
 function resetDocForm() {
@@ -1931,6 +2052,46 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                 <strong>{{ tt('flow_save', 'Salvar') }}</strong>
                 {{ tt('create_hint_after', 'para começar a editar o prontuário.') }}
             </span>
+        </div>
+
+        <!-- Autosave: rascunho não salvo mais novo que o prontuário -->
+        <div
+            v-if="draftOffer"
+            class="alert alert-warning d-flex flex-wrap align-items-center gap-2 m-3 mb-0"
+            role="alert"
+            data-testid="pmr-draft-offer"
+        >
+            <i class="fas fa-file-pen flex-shrink-0" aria-hidden="true"></i>
+            <div class="flex-grow-1 small">
+                <strong class="d-block">{{ tt('draft_found_title', 'Rascunho não salvo') }}</strong>
+                {{
+                    tt(
+                        'draft_found_text',
+                        'Há um rascunho deste atendimento de :date, mais recente que o prontuário salvo.',
+                    ).replace(':date', draftOffer.updated_at_label ?? '')
+                }}
+            </div>
+            <div class="d-flex gap-2">
+                <button
+                    type="button"
+                    class="btn btn-sm btn-warning"
+                    :disabled="draftBusy"
+                    data-testid="pmr-draft-recover"
+                    @click="recoverDraft"
+                >
+                    <i class="fas fa-rotate-left me-1" aria-hidden="true"></i
+                    >{{ tt('draft_recover', 'Recuperar rascunho') }}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    :disabled="draftBusy"
+                    data-testid="pmr-draft-discard"
+                    @click="discardDraft"
+                >
+                    {{ tt('draft_discard', 'Descartar') }}
+                </button>
+            </div>
         </div>
 
         <!-- Médico (select se admin ou sem currentDoctor) -->
@@ -3226,6 +3387,30 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             >Atestado<br />Médico</span
                         >
                     </button>
+                    <!-- Declaração médica (modelo `declaracao_medica` do RELATÓRIO
+                         OFTALMOLÓGICO): sai em branco para o médico completar. -->
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        data-testid="medical-declaration-btn"
+                        :title="
+                            isEdit
+                                ? tt('medical_declaration', 'Declaração médica')
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :aria-label="tt('medical_declaration', 'Declaração médica')"
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('medical_declaration')"
+                    >
+                        <i
+                            class="fas fa-file-signature"
+                            style="font-size: 1.6rem; color: #795548"
+                            aria-hidden="true"
+                        ></i>
+                        <span class="pmr-doc-img-btn-label visually-hidden">{{
+                            tt('medical_declaration', 'Declaração médica')
+                        }}</span>
+                    </button>
                 </template>
 
                 <button
@@ -3328,8 +3513,27 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                        Dilatar / Realizar exame: grava, status na Agenda vira
                          Dilatando / Em exame, prontuário segue editável.
                        Finalizar consulta: grava, Atendido, volta pra Agenda. -->
+                <span
+                    v-if="autosaveEnabled"
+                    class="pmr-autosave ms-auto"
+                    :class="{ 'pmr-autosave--error': autosave.status.value === 'error' }"
+                    role="status"
+                    aria-live="polite"
+                    :title="tt('draft_hint', 'Rascunho automático: só você vê, até salvar o prontuário.')"
+                    data-testid="pmr-autosave-status"
+                >
+                    <template v-if="autosaveLabel">
+                        <i
+                            class="fas me-1"
+                            :class="autosave.status.value === 'error' ? 'fa-cloud-arrow-up' : 'fa-cloud'"
+                            aria-hidden="true"
+                        ></i
+                        >{{ autosaveLabel }}
+                    </template>
+                </span>
                 <div
-                    class="pmr-flow-group ms-auto"
+                    class="pmr-flow-group"
+                    :class="{ 'ms-auto': !autosaveEnabled }"
                     role="group"
                     :aria-label="tt('flow_bar_label', 'Andamento do atendimento')"
                 >
@@ -4679,6 +4883,121 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         @uploaded="onFileUploaded"
         @storage-updated="onStorageUpdated"
     />
+
+    <!-- "Finalizar consulta": confirmação com o que vai acontecer. -->
+    <Teleport to="body">
+        <div
+            v-if="showFinishModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pmr-finish-title"
+            style="background: rgba(0, 0, 0, 0.5); z-index: 1085"
+            data-testid="pmr-finish-modal"
+            @click.self="showFinishModal = false"
+            @keydown.escape="showFinishModal = false"
+        >
+            <div class="modal-dialog modal-dialog-centered pmr-save-modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 id="pmr-finish-title" class="modal-title">
+                            <i class="fas fa-check-double me-2 text-success" aria-hidden="true"></i
+                            >{{
+                                tt('finish_confirm_title', 'Finalizar a consulta de :name?').replace(
+                                    ':name',
+                                    finishPatientName,
+                                )
+                            }}
+                        </h6>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            :aria-label="tt('finish_confirm_cancel', 'Voltar ao prontuário')"
+                            @click="showFinishModal = false"
+                        ></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted mb-2">{{ tt('finish_confirm_intro', 'Ao finalizar:') }}</p>
+                        <ul class="pmr-finish-list small mb-3">
+                            <li>
+                                <i class="fas fa-save text-primary" aria-hidden="true"></i
+                                >{{ tt('finish_confirm_save', 'O prontuário é salvo com o que está na tela.') }}
+                            </li>
+                            <li
+                                v-if="scheduleFlow?.cash_blocked"
+                                class="text-warning-emphasis"
+                                data-testid="pmr-finish-cash"
+                            >
+                                <i class="fas fa-cash-register" aria-hidden="true"></i
+                                >{{
+                                    tt(
+                                        'finish_confirm_cash',
+                                        'Esta clínica exige lançamento no caixa para "Atendido": sem ele, o prontuário é salvo e a consulta continua em andamento.',
+                                    )
+                                }}
+                            </li>
+                            <li v-else>
+                                <i class="fas fa-check-double text-success" aria-hidden="true"></i
+                                >{{
+                                    tt(
+                                        'finish_confirm_status',
+                                        'A consulta passa para "Atendido" na Agenda (o horário fica no histórico).',
+                                    )
+                                }}
+                            </li>
+                            <li>
+                                <i class="fas fa-calendar-alt text-primary" aria-hidden="true"></i
+                                >{{
+                                    tt(
+                                        'finish_confirm_agenda',
+                                        'Você volta para a Agenda para chamar o próximo paciente.',
+                                    )
+                                }}
+                            </li>
+                            <li>
+                                <i class="fas fa-pen-to-square text-secondary" aria-hidden="true"></i
+                                >{{ tt('finish_confirm_editable', 'O prontuário continua editável até ser assinado.') }}
+                            </li>
+                            <li v-if="finishHasDrafts" class="text-danger" data-testid="pmr-finish-drafts">
+                                <i class="fas fa-triangle-exclamation" aria-hidden="true"></i
+                                >{{
+                                    tt(
+                                        'finish_confirm_drafts',
+                                        'Texto ainda não registrado (evolução, receita ou solicitação de procedimentos) será descartado.',
+                                    )
+                                }}
+                            </li>
+                        </ul>
+                        <p class="small mb-0 fw-semibold" data-testid="pmr-finish-duration">
+                            <i class="fas fa-stopwatch me-1" aria-hidden="true"></i
+                            >{{
+                                tt('finish_confirm_duration', 'Duração do atendimento: :time').replace(
+                                    ':time',
+                                    finishDuration,
+                                )
+                            }}
+                        </p>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-light" @click="showFinishModal = false">
+                            {{ tt('finish_confirm_cancel', 'Voltar ao prontuário') }}
+                        </button>
+                        <button
+                            ref="finishConfirmButton"
+                            type="button"
+                            class="btn btn-success"
+                            data-testid="pmr-finish-confirm"
+                            @click="confirmFinish"
+                        >
+                            <i class="fas fa-check-double me-1" aria-hidden="true"></i
+                            >{{ tt('finish_confirm_ok', 'Finalizar consulta') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 
     <!-- Destino pós-"Salvar": mesmo padrão de cartão (ícone + rótulo + hint)
          do modal de saída do ScheduleFlowGuard — consistência visual entre

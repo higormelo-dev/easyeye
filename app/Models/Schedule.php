@@ -56,10 +56,22 @@ class Schedule extends Model
         'recurrence_group_id',
         'recurrence_type',
         'recurrence_until',
+        'is_fit_in',
+        'origin',
+        'series_id',
+        'session_number',
+        'session_total',
     ];
 
     /** Prefixo do código sequencial por clínica (SDL-0000000042). */
     public const CODE_PREFIX = 'SDL';
+
+    /**
+     * `origin` do agendamento criado pelo "Atender" do pronto atendimento
+     * (App\Services\UrgentCare\UrgentCareService). null = agenda normal.
+     * Não ocupa horário da grade nem conta no teto de encaixes.
+     */
+    public const ORIGIN_URGENT_CARE = 'urgent_care';
 
     /**
      * Índice único parcial (doctor_id, date_time) de agendamentos ativos — ver
@@ -242,6 +254,9 @@ class Schedule extends Model
             'arrived_at'      => 'datetime',
             'confirmed_at'    => 'datetime',
             'date_time'       => 'datetime',
+            'is_fit_in'       => 'boolean',
+            'session_number'  => 'integer',
+            'session_total'   => 'integer',
             'created_at'      => 'datetime',
             'updated_at'      => 'datetime',
             'deleted_at'      => 'datetime',
@@ -262,6 +277,12 @@ class Schedule extends Model
         }
 
         return $query->firstOrFail();
+    }
+
+    /** Atendimento aberto pelo pronto atendimento (fora da grade). */
+    public function isUrgentCare(): bool
+    {
+        return $this->origin === self::ORIGIN_URGENT_CARE;
     }
 
     public function entity(): BelongsTo
@@ -322,7 +343,7 @@ class Schedule extends Model
             'schedule_resources',
             'schedule_id',
             'resource_id',
-        );
+        )->using(ScheduleResource::class)->withTimestamps();
     }
 
     protected function fullName(): Attribute

@@ -35,6 +35,7 @@ const {
     form,
     loading,
     planOption,
+    covenantOption,
     resetForm,
     loadEditData,
     savePatient,
@@ -135,6 +136,7 @@ const tabs = [
                 :is-edit="isEdit"
                 :lookup-cep="lookupCep"
                 :plan-option="planOption"
+                :covenant-option="covenantOption"
             />
         </form>
 

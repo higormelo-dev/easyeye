@@ -8,11 +8,13 @@ use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey, Sc
 use App\Exceptions\{AttendanceRequiresCashEntryException, LockedMedicalRecordException};
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
-    MedicalRecord, MedicalRecordDocumentation, NearPointConvergence, Patient, PatientDocumentShare, Schedule, VisualAcuityType};
+    MedicalRecord, MedicalRecordDocumentation, NearPointConvergence, Patient, PatientDocumentShare, Schedule, ScheduleSituationLog, User, VisualAcuityType};
 use App\Models\{ReportSetting, ReportSettingContent};
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, ScheduleService, UsageMeterService};
-use App\Support\BrazilianFormat;
+use App\Services\MedicalRecords\MedicalRecordDraftService;
+use App\Support\{BrazilianFormat, CurrentDoctor};
 use App\Traits\LogsDataAccess;
+use Carbon\Carbon;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
 use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -33,6 +35,7 @@ class MedicalRecordsController extends Controller
         private readonly AiQuotaService $aiQuotaService,
         private readonly ScheduleService $scheduleService,
         private readonly AiPaywallService $aiPaywall,
+        private readonly MedicalRecordDraftService $drafts,
     ) {
     }
 
@@ -79,8 +82,12 @@ class MedicalRecordsController extends Controller
             // Apenas médicos podem criar/editar/excluir prontuário (CFM Res. 2.227/2018).
             // A UI consome essa flag para esconder botões e o backend valida via
             // middleware `entity.role:doctor` nas rotas write.
-            'isDoctor' => session('selected_entity_user_rule') === ClientRule::Doctor->value,
-            't'        => trans('actions.medical_records'),
+            // Perfil médico SEM cadastro de médico ativo não cria/edita (o Gate
+            // IssueReport e o doctor_id barram) — a tela esconde e avisa.
+            'isDoctor'          => CurrentDoctor::canIssue(),
+            'doctorMissing'     => CurrentDoctor::issuerMissing(),
+            'doctorMissingText' => CurrentDoctor::missingMessage(),
+            't'                 => trans('actions.medical_records'),
         ]);
     }
 
@@ -173,6 +180,9 @@ class MedicalRecordsController extends Controller
         unset($validated['flow_action'], $validated['post_save_action']);
 
         $record = $this->service->store($validated, $patient);
+
+        // Salvou: o rascunho (autosave) desta tela não serve mais.
+        $this->clearDrafts($record, created: true);
 
         return $this->redirectAfterSave(
             $patient,
@@ -349,6 +359,8 @@ class MedicalRecordsController extends Controller
         } catch (LockedMedicalRecordException) {
             return back()->with('error', __('actions.medical_records.locked'));
         }
+
+        $this->clearDrafts($medicalrecord, created: false);
 
         return $this->redirectAfterSave(
             $patient,
@@ -697,20 +709,26 @@ class MedicalRecordsController extends Controller
         // (Finalizar/Dilatar/Exame/Continuar). Situação atual vai junto pra
         // guarda no front: estados terminais nunca são rebaixados.
         $flowScheduleId = $record?->schedule_id ?? request('schedule_id');
-        $flowSchedule   = $flowScheduleId
-            ? Schedule::query()->where('entity_id', $entityId)->find($flowScheduleId)
+        // Agendamento DESTE paciente (mesma regra do schedule_id ao salvar):
+        // ?schedule_id= de outro paciente não liga o fluxo, o cronômetro nem o
+        // rascunho a esta tela.
+        $flowSchedule = $flowScheduleId && Str::isUuid((string) $flowScheduleId)
+            ? Schedule::query()->where('entity_id', $entityId)->where('patient_id', $patient->id)->find($flowScheduleId)
             : null;
 
-        $doctors = Doctor::with(['person', 'entityUser'])
-            ->whereHas('entityUser', fn ($q) => $q->where('entity_id', $entityId))
-            ->get();
-
-        $currentDoctor = $doctors->first(
-            fn (Doctor $d) => $d->entityUser?->user_id === auth()->id(),
-        );
+        // Prontuário sempre no nome do médico que registra: perfil médico vê só
+        // ele mesmo (cadastro ativo); os demais perfis, só médicos ATIVOS da
+        // clínica (mesma regra do doctor_id em Store/UpdateMedicalRecordRequest).
+        $currentDoctor = CurrentDoctor::issuer();
+        $doctors       = CurrentDoctor::isDoctorProfile()
+            ? collect($currentDoctor ? [$currentDoctor->loadMissing(['person', 'entityUser'])] : [])
+            : Doctor::with(['person', 'entityUser'])
+                ->whereHas('entityUser', fn ($q) => $q->where('entity_id', $entityId))
+                ->where('active', true)
+                ->get();
 
         $canChooseDoctor = $entity && auth()->user()?->hasRoleInEntity($entity, ClientRule::Admin);
-        $isDoctor        = session('selected_entity_user_rule') === ClientRule::Doctor->value;
+        $isDoctor        = CurrentDoctor::canIssue();
 
         return [
             'breadcrumbs' => [
@@ -726,15 +744,28 @@ class MedicalRecordsController extends Controller
                 'id'   => (string) $d->id,
                 'name' => $d->person?->full_name,
             ]),
-            'currentDoctorId' => $currentDoctor ? (string) $currentDoctor->id : null,
-            'canChooseDoctor' => (bool) $canChooseDoctor,
-            'isDoctor'        => $isDoctor,
-            'isEdit'          => $isEdit,
-            'scheduleFlow'    => $flowSchedule ? [
+            'currentDoctorId'   => $currentDoctor ? (string) $currentDoctor->id : null,
+            'canChooseDoctor'   => (bool) $canChooseDoctor,
+            'isDoctor'          => $isDoctor,
+            'doctorMissing'     => CurrentDoctor::issuerMissing(),
+            'doctorMissingText' => CurrentDoctor::missingMessage(),
+            'isEdit'            => $isEdit,
+            'scheduleFlow'      => $flowSchedule ? [
                 'id'         => (string) $flowSchedule->id,
                 'situation'  => $flowSchedule->situation->value,
                 'update_url' => route('panel.schedules.situation', $flowSchedule),
+                // Modal de "Finalizar consulta": quem, e se a trava de caixa
+                // da clínica vai segurar o "Atendido".
+                'patient_name' => $flowSchedule->full_name ?: ($patient->person?->full_name ?? $patient->code),
+                'cash_blocked' => ! $flowSchedule->situation->isTerminal()
+                    && $this->scheduleService->attendedBlockedByCash($flowSchedule),
+                // Cronômetro do cabeçalho: início do atendimento (1ª vez "Em
+                // consulta") e, se já atendido, o fim.
+                ...$this->attendanceTimes($flowSchedule),
             ] : null,
+            // Autosave: rascunho do autor mais novo que o prontuário (só a
+            // data — o conteúdo vem no "Recuperar", GET do rascunho).
+            'draft' => $this->draftMeta($patient, $record, $flowSchedule),
             // BUGFIX (tenant isolation): estas queries não filtravam entity_id —
             // tipos CUSTOMIZADOS cadastrados por uma clínica em panel/setting/*
             // apareciam nos dropdowns do prontuário de TODAS as outras clínicas
@@ -911,6 +942,9 @@ class MedicalRecordsController extends Controller
             // do CATÁLOGO, disponível assim que o médico escolhe um.
             'medicalrecordprocedures_index' => route('panel.patients.medicalrecord-procedures.index', $patient),
             'procedure_bom_template'        => route('panel.procedures.bom', '__PROCEDURE_ID__'),
+            // Autosave (rascunho do autor): GET recupera, PUT grava, DELETE
+            // descarta — só para quem pode salvar o prontuário.
+            'draft' => CurrentDoctor::canIssue() ? route('panel.patients.medicalrecord-draft.save', $patient) : null,
         ];
 
         if ($isEdit && $record) {
@@ -1115,6 +1149,76 @@ class MedicalRecordsController extends Controller
                 ),
             ])->all(),
         ];
+    }
+
+    /**
+     * Início (1ª transição para "Em consulta") e fim ("Atendido") do
+     * atendimento do agendamento, pelo histórico de situações.
+     *
+     * @return array{started_at: ?string, finished_at: ?string}
+     */
+    private function attendanceTimes(Schedule $schedule): array
+    {
+        $started = ScheduleSituationLog::query()
+            ->where('schedule_id', $schedule->id)
+            ->where('to_situation', ScheduleSituation::InProgress->value)
+            ->min('created_at');
+
+        $finished = $schedule->situation === ScheduleSituation::Attended
+            ? ScheduleSituationLog::query()
+                ->where('schedule_id', $schedule->id)
+                ->where('to_situation', ScheduleSituation::Attended->value)
+                ->max('created_at')
+            : null;
+
+        return [
+            'started_at'  => $started ? Carbon::parse($started)->toIso8601String() : null,
+            'finished_at' => $finished ? Carbon::parse($finished)->toIso8601String() : null,
+        ];
+    }
+
+    /**
+     * Rascunho do autor para esta tela (edição: prontuário; novo: agendamento
+     * ou "novo") — só a data, e só se for mais novo que o prontuário. Quem não
+     * pode salvar o prontuário, ou prontuário assinado: nada.
+     *
+     * @return array{updated_at: string, updated_at_label: string}|null
+     */
+    private function draftMeta(Patient $patient, ?MedicalRecord $record, ?Schedule $flowSchedule): ?array
+    {
+        $user = auth()->user();
+
+        // Assinado = imutável: rascunho dele não serve para mais nada.
+        if ($record?->isLocked()) {
+            $this->drafts->purgeForRecord($record);
+
+            return null;
+        }
+
+        if (! $user instanceof User || ! CurrentDoctor::canIssue()) {
+            return null;
+        }
+
+        $draft = $this->drafts->find($user, (string) session('selected_entity_id'), $patient, $record, $record ? null : $flowSchedule);
+
+        if ($draft === null) {
+            return null;
+        }
+
+        return [
+            'updated_at'       => $draft->updated_at->toIso8601String(),
+            'updated_at_label' => $draft->updated_at->locale(app()->getLocale())->isoFormat('L LT'),
+        ];
+    }
+
+    /** Rascunho do autor para a tela que acabou de salvar (autosave). */
+    private function clearDrafts(MedicalRecord $record, bool $created): void
+    {
+        $user = auth()->user();
+
+        if ($user instanceof User) {
+            $this->drafts->clearAfterSave($user, (string) session('selected_entity_id'), $record, $created, $record->schedule_id ? (string) $record->schedule_id : null);
+        }
     }
 
     private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void

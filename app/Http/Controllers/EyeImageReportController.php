@@ -9,6 +9,7 @@ use App\Http\Controllers\Concerns\AuthorizesEyeImageExams;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, ReportSettingContent};
 use App\Services\{ConsultationRecordResolver, MedicalRecordDocumentationService};
 use App\Services\EyeImages\PdfTextExtractionService;
+use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\{DB, Gate};
@@ -276,8 +277,12 @@ class EyeImageReportController extends Controller
      */
     private function resolveDoctorId(string $entityId, array $examIds): ?string
     {
-        return $this->recordResolver->resolveDoctorIdForCurrentUser($entityId)
-            ?? ($examIds !== [] ? PatientExam::query()->whereIn('id', $examIds)->value('doctor_id') : null);
+        // Laudo no nome de quem emite (cadastro de médico ativo — o Gate
+        // IssueReport exige); o médico do exame não assina mais por ele.
+        $doctorId = $this->recordResolver->resolveDoctorIdForCurrentUser($entityId);
+        abort_if($doctorId === null, 403, CurrentDoctor::missingMessage());
+
+        return $doctorId;
     }
 
     private function authorizeIssueReport(string $entityId): void

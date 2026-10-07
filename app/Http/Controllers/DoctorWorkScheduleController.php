@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\ClientRule;
 use App\Models\{Doctor, DoctorWorkSchedule, ScheduleBlock};
+use App\Services\Schedules\ScheduleAvailabilityService;
+use App\Support\{CurrentDoctor, ScheduleShift};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\{DB, Storage, Vite};
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -74,6 +75,7 @@ class DoctorWorkScheduleController extends Controller
             'days'               => $days,
             'interval'           => $doctor->schedule_interval,
             'entity_interval'    => $doctor->entityUser->entity->schedule_interval ?? 15,
+            'fit_in_limits'      => $doctor->fitInLimits(),
             'blocks'             => $blocks,
             'sync_url'           => url("panel/doctors/{$doctor->id}/work-schedule"),
             'store_block_url'    => url("panel/doctors/{$doctor->id}/blocks"),
@@ -146,8 +148,11 @@ class DoctorWorkScheduleController extends Controller
             'days'           => $days,
             'interval'       => $doctor->schedule_interval,
             'entityInterval' => $doctor->entityUser->entity->schedule_interval ?? 15,
-            'blocks'         => $blocks,
-            'urls'           => [
+            // Teto de encaixes por turno (0 = não aceita encaixe).
+            'fitInLimits'   => $doctor->fitInLimits(),
+            'maxFitInLimit' => Doctor::MAX_FIT_IN_LIMIT,
+            'blocks'        => $blocks,
+            'urls'          => [
                 'sync'          => route('panel.doctors.work-schedule.sync', $doctor->id),
                 'store_block'   => route('panel.doctors.blocks.store', $doctor->id),
                 'destroy_block' => url("panel/doctors/{$doctor->id}/blocks"),
@@ -174,6 +179,11 @@ class DoctorWorkScheduleController extends Controller
             'days.*.ranges'             => ['required', 'array'],
             'days.*.ranges.*.starts_at' => ['required', 'date_format:H:i'],
             'days.*.ranges.*.ends_at'   => ['required', 'date_format:H:i'],
+            // Encaixes por turno — opcional (quem não manda mantém o atual).
+            'fit_in_limits'           => ['nullable', 'array'],
+            'fit_in_limits.morning'   => ['nullable', 'integer', 'min:0', 'max:' . Doctor::MAX_FIT_IN_LIMIT],
+            'fit_in_limits.afternoon' => ['nullable', 'integer', 'min:0', 'max:' . Doctor::MAX_FIT_IN_LIMIT],
+            'fit_in_limits.evening'   => ['nullable', 'integer', 'min:0', 'max:' . Doctor::MAX_FIT_IN_LIMIT],
         ]);
 
         // Faixas duplicadas/sobrepostas no MESMO dia violariam o índice único
@@ -200,7 +210,13 @@ class DoctorWorkScheduleController extends Controller
         }
 
         DB::transaction(function () use ($doctor, $request) {
-            $doctor->update(['schedule_interval' => $request->input('schedule_interval')]);
+            $doctor->update([
+                'schedule_interval' => $request->input('schedule_interval'),
+                ...collect(ScheduleShift::ALL)
+                    ->filter(fn (string $shift) => $request->input("fit_in_limits.{$shift}") !== null)
+                    ->mapWithKeys(fn (string $shift) => ["fit_in_limit_{$shift}" => (int) $request->input("fit_in_limits.{$shift}")])
+                    ->all(),
+            ]);
 
             DoctorWorkSchedule::where('doctor_id', $doctor->id)->delete();
 
@@ -223,6 +239,10 @@ class DoctorWorkScheduleController extends Controller
                 }
             }
         });
+
+        // A exclusão das faixas antigas é em massa (sem evento de modelo):
+        // invalida as vagas do calendário da Agenda explicitamente.
+        ScheduleAvailabilityService::bumpVersion((string) session('selected_entity_id'));
 
         return response()->json(['message' => __('actions.work_schedule_saved')]);
     }
@@ -285,14 +305,11 @@ class DoctorWorkScheduleController extends Controller
      */
     private function assertCanManageDoctorSchedule(Doctor $doctor): void
     {
-        if (session('user_rule') !== ClientRule::Doctor->value) {
-            return;
-        }
-
-        abort_unless(
-            (string) $doctor->entity_user_id === (string) session('selected_entity_user_id'),
-            403,
-        );
+        // Regra única do "médico logado" (perfil pela chave
+        // selected_entity_user_rule — a antiga `user_rule` deixava passar
+        // sessão sem ela). Sem cadastro de médico: nenhuma escala.
+        abort_if(CurrentDoctor::isMissing(), 403, CurrentDoctor::missingMessage());
+        abort_unless(CurrentDoctor::canAccessDoctorId((string) $doctor->id), 403);
     }
 
     /**

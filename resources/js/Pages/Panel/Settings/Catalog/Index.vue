@@ -40,6 +40,8 @@ const props = defineProps({
     // quando o catálogo não participa de nenhum grupo — tab-bar fica oculta.
     // Cada aba é um <a href> de navegação real (full-reload), não estado JS.
     tabsGroup: { type: Array, default: () => null },
+    // Ações extras por linha (links) — ver BaseSettingController::getRowLinks().
+    rowLinks: { type: Array, default: () => [] },
 });
 
 // ── Alternância tabela/cards (preferência por catálogo, no navegador) ────────
@@ -230,6 +232,7 @@ const total = computed(() => props.items?.total ?? props.items?.data?.length ?? 
                 :filters="filters"
                 :t="t"
                 :storage-key="storageKey"
+                :row-links="rowLinks"
                 @sort="onSort"
                 @view="openDetail"
                 @edit="openEdit"
@@ -244,6 +247,7 @@ const total = computed(() => props.items?.total ?? props.items?.data?.length ?? 
                 :search="filters.search ?? ''"
                 :columns="columns"
                 :t="t"
+                :row-links="rowLinks"
                 @view="openDetail"
                 @edit="openEdit"
                 @toggle-active="toggleActive"

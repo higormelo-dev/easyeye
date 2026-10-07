@@ -114,6 +114,12 @@ class ScheduleImportService
         'arrived_at'          => 'arrived_at',
         'confirmado_em'       => 'confirmed_at',
         'confirmed_at'        => 'confirmed_at',
+        // Encaixe (paciente a mais, por cima da grade): sim/não. Histórico não
+        // passa pelo teto do turno (a importação não valida a grade atual) —
+        // mas sem a coluna, dois pacientes no mesmo horário do mesmo médico
+        // seriam recusados como "horário ocupado".
+        'encaixe' => '_fit_in',
+        'fit_in'  => '_fit_in',
         // schedules.import_code (código do sistema anterior desta própria linha)
         'codigo_importacao'       => '_import_code',
         'codigo_sistema_anterior' => '_import_code',
@@ -142,6 +148,7 @@ class ScheduleImportService
         'arrived_at'           => 'Chegada',
         'confirmed_at'         => 'Confirmado em',
         '_import_code'         => 'Código de importação (agendamento)',
+        '_fit_in'              => 'Encaixe (sim/não)',
     ];
 
     /** Colunas de valor único (não par de alternativas como médico) exigidas por linha. */
@@ -531,6 +538,7 @@ class ScheduleImportService
             'arrived_at'          => ! empty($data['arrived_at']) ? $this->parseDateTime((string) $data['arrived_at']) : null,
             'confirmed_at'        => ! empty($data['confirmed_at']) ? $this->parseDateTime((string) $data['confirmed_at']) : null,
             'patient_mood'        => $this->resolveMood($data['_patient_mood'] ?? null),
+            'is_fit_in'           => $this->isYes($data['_fit_in'] ?? null),
             'active'              => true,
         ];
 
@@ -646,13 +654,28 @@ class ScheduleImportService
         return null;
     }
 
+    /**
+     * Convênio inativo não entra em agendamento novo (mesma regra do
+     * cadastro manual, App\Rules\ActiveCovenant): a linha vira erro, sem
+     * gravar. Nome desconhecido segue como antes (sem convênio).
+     */
     private function resolveCovenantId(?string $name, array $covenantsMap): ?string
     {
         if (empty($name)) {
             return null;
         }
 
-        return $covenantsMap[mb_strtolower(trim($name), 'UTF-8')] ?? null;
+        $covenant = $covenantsMap[mb_strtolower(trim($name), 'UTF-8')] ?? null;
+
+        if ($covenant === null) {
+            return null;
+        }
+
+        if (! $covenant['active']) {
+            throw new RuntimeException(__('validation.custom.covenant.inactive_named', ['name' => trim($name)]));
+        }
+
+        return $covenant['id'];
     }
 
     private function resolveVisitId(?string $name, array $visitTypesMap): ?string
@@ -730,6 +753,14 @@ class ScheduleImportService
     }
 
     /** Enriquecimento opcional — valor não reconhecido é ignorado (null), não rejeita a linha. */
+    /** "sim", "s", "x", "1", "true", "yes" (sem acento/caixa) = verdadeiro; o resto, falso. */
+    private function isYes(mixed $raw): bool
+    {
+        $value = mb_strtolower(trim((string) $raw));
+
+        return in_array(strtr($value, ['ã' => 'a']), ['sim', 's', 'x', '1', 'true', 'yes', 'y'], true);
+    }
+
     private function resolveMood(?string $raw): ?int
     {
         if ($raw === null || trim($raw) === '') {
@@ -745,7 +776,13 @@ class ScheduleImportService
 
     // ── Convênios / Tipos de visita ──────────────────────────────────────────
 
-    /** Mapa nome-em-minúsculo → UUID, escopado à entidade (ou global). */
+    /**
+     * Mapa nome-em-minúsculo → {id, active}, escopado à entidade (ou global).
+     * Nome repetido: vale o ativo e, entre ativos, o da clínica (ordem
+     * crescente de preferência — o último sobrescreve).
+     *
+     * @return array<string, array{id: string, active: bool}>
+     */
     private function loadCovenantsMap(string $entityId): array
     {
         return Covenant::where(function ($query) use ($entityId) {
@@ -753,8 +790,10 @@ class ScheduleImportService
                 ->orWhere('entity_id', null);
         })
             ->whereNull('deleted_at')
-            ->pluck('id', 'name')
-            ->mapWithKeys(fn ($id, $name) => [mb_strtolower($name, 'UTF-8') => (string) $id])
+            ->orderBy('active')
+            ->orderByRaw('entity_id IS NOT NULL')
+            ->get(['id', 'name', 'active'])
+            ->mapWithKeys(fn (Covenant $c) => [mb_strtolower((string) $c->name, 'UTF-8') => ['id' => (string) $c->id, 'active' => (bool) $c->active]])
             ->toArray();
     }
 

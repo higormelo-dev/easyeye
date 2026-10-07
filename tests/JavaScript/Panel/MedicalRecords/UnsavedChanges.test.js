@@ -210,7 +210,12 @@ describe('Prontuário — sair com alterações não salvas', () => {
         await flushPromises();
         await typeComplaint(wrapper);
 
+        // Finalizar passa pelo modal de confirmação (Fase 1 / B2) antes de enviar.
         wrapper.vm.submitFlow('finish');
+        await flushPromises();
+        expect(inertia.submits).toHaveLength(0);
+        await wrapper.find('[data-testid="pmr-finish-confirm"]').trigger('click');
+
         expect(inertia.submits[0].data.flow_action).toBe('finish');
         await completeSubmit(wrapper, record({ main_complaint: 'Dor ocular' }));
 
@@ -292,9 +297,27 @@ describe('Prontuário — sair com alterações não salvas', () => {
         await typeEvolutionDraft(wrapper);
 
         wrapper.vm.submitFlow('finish');
+        await flushPromises();
 
-        expect(window.confirm).toHaveBeenCalledWith(T.drafts_leave_confirm);
+        // O aviso vem no modal de "Finalizar" (não no confirm nativo) e
+        // "Voltar ao prontuário" não envia nada.
+        expect(wrapper.find('[data-testid="pmr-finish-drafts"]').exists()).toBe(true);
+        expect(window.confirm).not.toHaveBeenCalled();
+        await wrapper
+            .findAll('[data-testid="pmr-finish-modal"] button')
+            .find((b) => b.text().includes('Voltar ao prontuário'))
+            .trigger('click');
+        expect(wrapper.find('[data-testid="pmr-finish-modal"]').exists()).toBe(false);
         expect(inertia.submits).toHaveLength(0);
+
+        // Confirmado no modal (que já avisou do descarte): envia sem perguntar
+        // de novo no confirm nativo.
+        wrapper.vm.submitFlow('finish');
+        await flushPromises();
+        await wrapper.find('[data-testid="pmr-finish-confirm"]').trigger('click');
+        expect(window.confirm).not.toHaveBeenCalled();
+        expect(inertia.submits).toHaveLength(1);
+        expect(inertia.submits[0].data.flow_action).toBe('finish');
     });
 
     it('receita alterada e não emitida conta como alteração; depois de emitida, não', async () => {

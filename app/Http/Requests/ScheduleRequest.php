@@ -3,9 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Enums\{MedicalSpecialty, ScheduleAttendanceType, ScheduleSituation};
-use App\Models\Schedule;
-use App\Services\ScheduleService;
-use App\Support\BrazilianFormat;
+use App\Models\{Schedule, VisitType};
+use App\Rules\{ActiveCatalogItem, ActiveCovenant};
+use App\Services\{ScheduleSeriesService, ScheduleService};
+use App\Support\{BrazilianFormat, CurrentDoctor};
 use Carbon\Carbon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -30,6 +31,20 @@ class ScheduleRequest extends FormRequest
                 'required',
                 'uuid',
                 function ($attribute, $value, $fail) {
+                    // Perfil médico: sem cadastro de médico não agenda; com
+                    // cadastro, só para si (App\Support\CurrentDoctor).
+                    if (CurrentDoctor::isMissing()) {
+                        $fail(CurrentDoctor::missingMessage());
+
+                        return;
+                    }
+
+                    if (! CurrentDoctor::canAccessDoctorId((string) $value)) {
+                        $fail(__('schedules.doctor_only_own'));
+
+                        return;
+                    }
+
                     $exists = DB::table('doctors')
                         ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
                         ->where('doctors.id', $value)
@@ -61,6 +76,9 @@ class ScheduleRequest extends FormRequest
                             ->orWhere('entity_id', null);
                     })->whereNull('deleted_at');
                 }),
+                // Agendamento novo / troca de convênio: só ativo. O convênio que
+                // o agendamento em edição já tem passa (não trava a recepção).
+                new ActiveCovenant($this->routeSchedule()?->covenant_id),
             ],
             'visit_id' => [
                 'nullable',
@@ -71,6 +89,9 @@ class ScheduleRequest extends FormRequest
                             ->orWhere('entity_id', null);
                     })->whereNull('deleted_at');
                 }),
+                // Mesma regra do convênio: tipo de consulta inativo (a tela
+                // esconde) só passa se já era o do agendamento em edição.
+                new ActiveCatalogItem(VisitType::class, $this->routeSchedule()?->visit_id, 'validation.custom.visit_type.inactive'),
             ],
             'full_name' => ['required', 'string', 'max:255'],
             'date_time' => [
@@ -87,7 +108,22 @@ class ScheduleRequest extends FormRequest
                         ? $this->routeScheduleId()
                         : null;
 
-                    $errors = app(ScheduleService::class)->validateSlot(
+                    // Atendimento do pronto atendimento (fora da grade): a
+                    // recepção completa convênio/observações sem mexer no
+                    // médico/horário — isso não passa pela regra da grade
+                    // (o horário é o do "Atender", fora do intervalo/escala).
+                    $current = $this->routeSchedule();
+
+                    if ($current?->isUrgentCare()
+                        && (string) $current->doctor_id === (string) $doctorId
+                        && $current->date_time->equalTo(Carbon::parse($value))) {
+                        return;
+                    }
+
+                    // Encaixe: pode cair em horário ocupado/fora do intervalo,
+                    // mas respeita expediente, bloqueio, sala e o teto do turno.
+                    $errors = app(ScheduleService::class)->validateFor(
+                        $this->boolean('is_fit_in'),
                         $doctorId,
                         Carbon::parse($value),
                         $excludeId,
@@ -110,8 +146,16 @@ class ScheduleRequest extends FormRequest
             'waiting_list_id'     => ['nullable', 'uuid', 'exists:waiting_list,id'],
             'recurrence_type'     => ['nullable', 'string', 'in:weekly,monthly'],
             'recurrence_until'    => ['nullable', 'date', 'after:date_time'],
-            'resource_ids'        => ['nullable', 'array'],
-            'resource_ids.*'      => [
+            'is_fit_in'           => ['nullable', 'boolean'],
+            // Série de sessões (só no cadastro): as datas 2..N escolhidas na
+            // prévia (a 1ª é o próprio date_time). Cada uma é validada como o
+            // horário principal em ScheduleSeriesService — tudo ou nada.
+            'series_dates' => $this->isMethod('POST')
+                ? ['nullable', 'array', 'max:' . (ScheduleSeriesService::MAX_SESSIONS - 1)]
+                : ['prohibited'],
+            'series_dates.*' => ['required', 'date', 'distinct', 'after:date_time'],
+            'resource_ids'   => ['nullable', 'array'],
+            'resource_ids.*' => [
                 'uuid',
                 Rule::exists('clinic_resources', 'id')->where(function ($query) {
                     $query->where('entity_id', session()->get('selected_entity_id'))
@@ -132,7 +176,7 @@ class ScheduleRequest extends FormRequest
      */
     public function scheduleAttributes(): array
     {
-        return $this->safe()->except(['situation']);
+        return $this->safe()->except(['situation', 'series_dates']);
     }
 
     /** Situação pedida no formulário, a aplicar pelo fluxo (null = não mexe). */
@@ -160,8 +204,36 @@ class ScheduleRequest extends FormRequest
         return is_string($schedule) ? $schedule : null;
     }
 
+    /** Agendamento em edição (PUT/PATCH); null no cadastro. */
+    private function routeSchedule(): ?Schedule
+    {
+        if (! $this->isMethod('PUT') && ! $this->isMethod('PATCH')) {
+            return null;
+        }
+
+        $schedule = $this->route('schedule');
+
+        if ($schedule instanceof Schedule) {
+            return $schedule;
+        }
+
+        return is_string($schedule) && Str::isUuid($schedule) ? Schedule::query()->find($schedule) : null;
+    }
+
     protected function prepareForValidation(): void
     {
+        // Encaixe: na edição sem o campo, vale o que o agendamento já é (um
+        // PUT parcial não transforma encaixe em horário normal por omissão).
+        if (! $this->has('is_fit_in') || $this->input('is_fit_in') === null) {
+            $this->merge(['is_fit_in' => (bool) $this->routeSchedule()?->is_fit_in]);
+        }
+
+        // Atendimento do pronto atendimento nunca vira encaixe (não entra no
+        // teto do turno).
+        if ($this->routeSchedule()?->isUrgentCare()) {
+            $this->merge(['is_fit_in' => false]);
+        }
+
         foreach (['telephone', 'cellphone'] as $field) {
             if ($this->has($field) && $this->input($field) !== null) {
                 $this->merge([$field => BrazilianFormat::canonicalPhone((string) $this->input($field))]);

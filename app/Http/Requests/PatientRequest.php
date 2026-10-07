@@ -3,12 +3,14 @@
 namespace App\Http\Requests;
 
 use App\Models\{CovenantPlan, Patient};
+use App\Rules\ActiveCovenant;
+use App\Services\PatientDuplicateFinder;
 use App\Support\BrazilianFormat;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\{Rule, Validator};
 use Illuminate\Validation\Rules\Unique;
 
 class PatientRequest extends FormRequest
@@ -41,6 +43,9 @@ class PatientRequest extends FormRequest
                             ->orWhere('entity_id', null);
                     })->whereNull('deleted_at');
                 }),
+                // Vínculo novo só com convênio ativo; o que o paciente já tem
+                // passa mesmo inativado (reabrir e salvar não pode travar).
+                new ActiveCovenant($this->currentPatient()?->covenant_id),
             ],
             'skin_id' => [
                 'nullable',
@@ -64,13 +69,16 @@ class PatientRequest extends FormRequest
             ],
             'card_number'      => 'nullable|string|max:255',
             'covenant_plan_id' => ['nullable', 'uuid', $this->covenantPlanRule()],
-            'name'             => [
+            // Nome NÃO é mais único: homônimo legítimo existe. Duplicado
+            // (nome + nascimento) e homônimo (pede confirm_homonym) saem do
+            // PatientDuplicateFinder, em after().
+            'name' => [
                 'required_without:type_method',
                 'string',
                 'max:255',
-                $this->uniqueInClinic('full_name'),
             ],
-            'nickname' => [
+            'confirm_homonym' => ['nullable', 'boolean'],
+            'nickname'        => [
                 'nullable',
                 'string',
                 'max:255',
@@ -202,6 +210,52 @@ class PatientRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * Duplicado × homônimo na clínica (App\Services\PatientDuplicateFinder):
+     *  - mesmo nome + mesmo nascimento → erro em `name` com o(s) código(s);
+     *  - mesmo nome, nascimento diferente/vazio → erro em `confirm_homonym`
+     *    até a tela reenviar com confirm_homonym=1 ("é outra pessoa").
+     * Edição que não muda nome nem nascimento não reabre a checagem.
+     *
+     * @return list<callable>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if ($validator->errors()->hasAny(['name', 'birth_date']) || ! $this->filled('name')) {
+                return;
+            }
+
+            $current = $this->currentPatient()?->loadMissing('person');
+
+            if ($current?->person && ! PatientDuplicateFinder::identityChanged(
+                $current->person->full_name,
+                $current->person->birth_date,
+                (string) $this->input('name'),
+                $this->input('birth_date'),
+            )) {
+                return;
+            }
+
+            $found = app(PatientDuplicateFinder::class)->find(
+                (string) session()->get('selected_entity_id'),
+                (string) $this->input('name'),
+                $this->input('birth_date'),
+                $current?->person_id,
+            );
+
+            if ($found['duplicates'] !== []) {
+                $validator->errors()->add('name', __('validation.custom.patient.duplicate', ['codes' => implode(', ', $found['duplicates'])]));
+
+                return;
+            }
+
+            if ($found['homonyms'] !== [] && ! $this->boolean('confirm_homonym')) {
+                $validator->errors()->add('confirm_homonym', __('validation.custom.patient.homonym', ['codes' => implode(', ', $found['homonyms'])]));
+            }
+        }];
     }
 
     /**

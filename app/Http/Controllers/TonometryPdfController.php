@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Doctor, Entity, Patient, ReportSetting};
-use App\Support\BrazilianFormat;
+use App\Enums\EntityGate;
+use App\Models\{Entity, Patient, ReportSetting};
+use App\Support\{BrazilianFormat, CurrentDoctor};
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\{Request, Response};
+use Illuminate\Support\Facades\Gate;
 
 class TonometryPdfController extends Controller
 {
@@ -16,6 +18,10 @@ class TonometryPdfController extends Controller
         // nesse momento e $patient podia ser de qualquer entity. Mesmo padrão já
         // corrigido em PatientsController::editData().
         abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
+        // Laudo de tonometria é documento clínico: só médico com cadastro ativo
+        // emite, e no nome dele (antes qualquer perfil escolhia o médico).
+        Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail((string) session('selected_entity_id')));
 
         $validated = $request->validate([
             'od'        => ['nullable', 'numeric', 'min:0', 'max:999'],
@@ -40,20 +46,10 @@ class TonometryPdfController extends Controller
         //   Escopo pela clínica via entity_users (Doctor::ofEntity): `doctors` não
         //   tem entity_id — o where('entity_id') anterior era erro SQL (HTTP 500)
         //   sempre que doctor_id vinha no request.
-        $entityId = (string) session('selected_entity_id');
-        $doctor   = isset($validated['doctor_id'])
-            ? Doctor::with('person')->ofEntity($entityId)->find($validated['doctor_id'])
-            : null;
-
-        if (! $doctor) {
-            $doctor = Doctor::with('person')
-                ->whereHas('entityUser', fn ($q) => $q
-                    ->where('entity_id', $entityId)
-                    ->where('user_id', auth()->id()))
-                ->first();
-        }
-
-        abort_if(! $doctor, 422, __('actions.medical_records.doctor_required_for_print'));
+        // doctor_id do request não escolhe mais o autor (aceito por
+        // compatibilidade e ignorado): o laudo sai no nome de quem emite.
+        $doctor = CurrentDoctor::issuer()?->loadMissing('person');
+        abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
 
         $time = $validated['time'] ?? now()->format('H:i');
         $od   = $validated['od'] ?? null;

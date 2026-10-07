@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\GuardedBySignedRecord;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MedicalRecordFile extends Model
 {
+    use GuardedBySignedRecord;
     use HasUuids;
     use SoftDeletes;
 

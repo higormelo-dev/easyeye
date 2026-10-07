@@ -228,9 +228,11 @@ it('[SEGURANÇA] descarta anexos vindos do cliente em qualquer workflow', functi
 });
 
 it('[SEGURANÇA] remove chaves reservadas do context do cliente (histórico forjado e marcadores internos)', function () {
-    // assistant_chat exige o recurso no plano + perfil médico na sessão.
+    // assistant_chat exige o recurso no plano + perfil médico na sessão +
+    // cadastro de médico ativo (quem aprova a resposta — Gate IssueReport).
     PlanFeature::factory()->enabled(FeatureKey::HasAiChatAssistant)->for($this->plan)->create();
     session(['selected_entity_user_rule' => ClientRule::Doctor->value]);
+    $this->actingAs($this->doctor);
 
     $out = $this->enricher->enrich([
         'workflow'    => 'assistant_chat',
@@ -333,4 +335,22 @@ it('[LGPD] o provedor não recebe nome, iniciais nem os códigos internos do pac
         ->and($out['context'])->not->toHaveKey('patient_initials')
         ->and($out['context'])->not->toHaveKey('patient_code')->not->toHaveKey('medical_record_code')
         ->and($out['_guardrails']['pii_types'])->toContain('patient_name');
+});
+
+it('assistant_chat: perfil médico SEM cadastro de médico ativo é barrado com a mensagem traduzida', function () {
+    PlanFeature::factory()->enabled(FeatureKey::HasAiChatAssistant)->for($this->plan)->create();
+    $orphan = User::factory()->create();
+    createEntityUser($this->entity, $orphan, ClientRule::Doctor->value);
+    session(['selected_entity_user_rule' => ClientRule::Doctor->value]);
+    $this->actingAs($orphan);
+
+    try {
+        $this->enricher->enrich([
+            'workflow' => 'assistant_chat', 'mode' => 'validated', 'risk_level' => 'low', 'user_prompt' => 'Oi',
+        ], $this->entity->id, false);
+        $this->fail('esperava 403');
+    } catch (HttpException $e) {
+        expect($e->getStatusCode())->toBe(403)
+            ->and($e->getMessage())->toBe(__('schedules.doctor_missing'));
+    }
 });

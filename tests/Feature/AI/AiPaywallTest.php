@@ -33,6 +33,7 @@ beforeEach(function () {
     $this->adminEU  = createEntityUser($this->entity, $this->admin, ClientRule::Admin->value);
     $this->doctor   = User::factory()->create();
     $this->doctorEU = createEntityUser($this->entity, $this->doctor, ClientRule::Doctor->value);
+    doctorRecordForEntityUser($this->doctorEU);
 });
 
 afterEach(fn () => Carbon::setTestNow());
@@ -247,6 +248,8 @@ test('assistente flutuante (médico) recebe medidor da carteira e paywall sem co
     paywallSubscription($this->entity, $this->plan, ['last_payment_at' => now()]);
     app(AiCreditWalletService::class)->reserve($this->entity->id, 30);
 
+    // Widget só aparece para médico com cadastro ativo (resposta precisa ser aprovável).
+    $this->actingAs($this->doctor)->withSession(panelSession($this->doctorEU));
     $props = app(AiAssistantWidgetPropsBuilder::class)->build($this->entity->id, ClientRule::Doctor->value);
 
     expect($props['enabled'])->toBeTrue()
@@ -268,4 +271,15 @@ test('compra de créditos aceita plano só com recurso de IA de imagem ou chat (
 
     // Mesma regra no checkout do pacote (a compra é por Minha assinatura).
     expect(app(AiCreditPackCheckoutService::class)->ineligibility($this->entity))->toBeNull();
+});
+
+test('assistente flutuante não aparece para perfil médico sem cadastro de médico ativo', function () {
+    paywallSubscription($this->entity, $this->plan, ['last_payment_at' => now()]);
+    $orphan   = User::factory()->create();
+    $orphanEU = createEntityUser($this->entity, $orphan, ClientRule::Doctor->value);
+
+    $this->actingAs($orphan)->withSession(panelSession($orphanEU));
+
+    expect(app(AiAssistantWidgetPropsBuilder::class)->build($this->entity->id, ClientRule::Doctor->value))
+        ->toBe(['enabled' => false]);
 });

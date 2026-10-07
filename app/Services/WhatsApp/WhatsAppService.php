@@ -147,6 +147,62 @@ class WhatsAppService
         return $sender !== null && WhatsAppOptOut::isSuppressed($sender, $phone);
     }
 
+    /**
+     * Mesma pergunta de optedOutFor() para vários celulares de uma vez (linhas
+     * da Agenda) — uma consulta só. Devolve os números NORMALIZADOS que
+     * responderam SAIR.
+     *
+     * @param list<?string> $rawPhones
+     *
+     * @return array<string, true>
+     */
+    public static function optedOutPhones(?string $entityId, array $rawPhones): array
+    {
+        $phones = array_values(array_unique(array_filter(array_map(
+            fn (?string $raw) => self::normalizePhone($raw),
+            $rawPhones,
+        ))));
+
+        if ($entityId === null || $phones === []) {
+            return [];
+        }
+
+        $sender = WhatsAppSetting::query()->where('entity_id', $entityId)->first()?->sendingSetting()
+            ?? WhatsAppSetting::globalSetting();
+
+        if ($sender === null) {
+            return [];
+        }
+
+        return WhatsAppOptOut::query()
+            ->where('whatsapp_setting_id', $sender->id)
+            ->whereIn('phone', $phones)
+            ->pluck('phone')
+            ->mapWithKeys(fn (string $phone) => [$phone => true])
+            ->all();
+    }
+
+    /**
+     * Link "abrir conversa" (https://wa.me/<DDI+número>) — só para celular:
+     * número brasileiro precisa ser móvel (DDD + 9 + 8 dígitos); estrangeiro
+     * (com "+") segue como veio. Fixo ou inválido: null.
+     */
+    public static function chatUrl(?string $raw): ?string
+    {
+        $phone = self::normalizePhone($raw);
+
+        if ($phone === null) {
+            return null;
+        }
+
+        // Brasil (DDI 55 após a normalização): só celular — DDD + 9 + 8 dígitos.
+        if (str_starts_with($phone, '55') && (strlen($phone) !== 13 || $phone[4] !== '9')) {
+            return null;
+        }
+
+        return 'https://wa.me/' . $phone;
+    }
+
     /** 'out' (SAIR/PARAR/STOP), 'in' (VOLTAR/ATIVAR) ou null. */
     public static function keyword(string $text): ?string
     {

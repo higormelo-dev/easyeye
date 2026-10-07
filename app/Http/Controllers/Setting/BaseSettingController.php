@@ -159,8 +159,20 @@ abstract class BaseSettingController extends Controller
             // Colunas que o backend aceita ordenar (mesma whitelist de
             // resolveSort) — a UI só mostra cabeçalho clicável nessas.
             'sortable' => $this->sortableKeys(),
+            'rowLinks' => $this->getRowLinks(),
             't'        => trans('catalog_setting'),
         ]);
+    }
+
+    /**
+     * Ações extras por linha (links do menu "Mais ações" de registro da
+     * clínica). `url` traz __ID__ no lugar do id — o Vue substitui.
+     *
+     * @return list<array{key: string, label: string, icon: string, url: string}>
+     */
+    protected function getRowLinks(): array
+    {
+        return [];
     }
 
     /**

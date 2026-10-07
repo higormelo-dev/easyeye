@@ -29,11 +29,13 @@ class ResourceBlock extends Model
 
     public static function typeLabels(): array
     {
+        // Traduzido (lang/*/resource_schedule.php) — a tela "Escala e
+        // bloqueios" do recurso lista e exibe estes rótulos.
         return [
-            'absence' => 'Indisponível',
-            'holiday' => 'Feriado',
-            'meeting' => 'Manutenção',
-            'other'   => 'Outro',
+            'absence' => __('resource_schedule.block_types.absence'),
+            'holiday' => __('resource_schedule.block_types.holiday'),
+            'meeting' => __('resource_schedule.block_types.meeting'),
+            'other'   => __('resource_schedule.block_types.other'),
         ];
     }
 

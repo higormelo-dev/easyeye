@@ -47,6 +47,17 @@ class ResourcesController extends BaseSettingController
         ];
     }
 
+    /** "Escala e bloqueios" da sala/equipamento (ResourceWorkScheduleController::index). */
+    protected function getRowLinks(): array
+    {
+        return [[
+            'key'   => 'work_schedule',
+            'label' => __('resource_schedule.action'),
+            'icon'  => 'ti ti-calendar-time',
+            'url'   => route('panel.resources.work-schedule.index', ['__ID__']),
+        ]];
+    }
+
     public function store(ClinicResourceRequest $request)
     {
         return $this->genericStore($request);

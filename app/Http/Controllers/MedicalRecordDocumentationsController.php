@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\{DataAccessPurpose, DocumentationType, EntityGate};
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSetting, ReportSettingContent};
 use App\Services\{MedicalRecordDocumentationService, MedicalRecordPdfService};
+use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response};
 use Illuminate\Support\Facades\{DB, Gate};
@@ -42,11 +43,14 @@ class MedicalRecordDocumentationsController extends Controller
         // `medical` autoriza formatação clínica (listas, tabelas, headings).
         $sanitized = Purifier::clean($validated['content'], 'medical');
 
+        // Autoria = médico que emite (cadastro ativo; o Gate acima exige). A
+        // chamada antes não passava o médico e estourava ArgumentCountError (500).
         $documentation = $this->service->store(
             $medicalrecord,
             $content,
             $sanitized,
             $validated['title'] ?? null,
+            (string) $this->issuer()->id,
         );
 
         return response()->json([
@@ -123,19 +127,10 @@ class MedicalRecordDocumentationsController extends Controller
             }],
         ]);
 
-        $entityId = session('selected_entity_id');
-
-        // Resolve doctor: explicit request → record's doctor → logged-in user's doctor profile.
-        $doctorId = $validated['doctor_id'] ?? $medicalrecord->doctor_id;
-
-        if (! $doctorId) {
-            $doctorId = Doctor::whereHas('entityUser', fn ($q) => $q
-                ->where('entity_id', $entityId)
-                ->where('user_id', auth()->id()))
-                ->value('id');
-        }
-
-        abort_if(! $doctorId, 422, __('actions.medical_records.doctor_required_for_print'));
+        // Laudo emitido no nome de quem emite (médico logado, cadastro ativo) —
+        // doctor_id do request (antes aceito: laudo no nome de um colega) e o
+        // médico do prontuário não decidem mais a autoria.
+        $doctorId = (string) $this->issuer()->id;
 
         $doc = MedicalRecordDocumentation::create([
             'medical_record_id' => $medicalrecord->id,
@@ -165,9 +160,24 @@ class MedicalRecordDocumentationsController extends Controller
         $this->assertDocumentationBelongsToRecord($medicalrecord, $documentation);
         $this->authorizeIssueReport();
 
+        // Prontuário assinado é imutável (CFM 2.227/2018, trait Signable): a
+        // documentação emitida faz parte dele e não pode sumir depois.
+        if ($medicalrecord->isLocked()) {
+            return response()->json(['message' => __('actions.medical_records.documentation_locked')], 403);
+        }
+
         $documentation->delete();
 
         return response()->json(['message' => __('actions.medical_records.documentation_deleted')]);
+    }
+
+    /** Médico emissor (logado, cadastro ativo) — 403 traduzido se não houver. */
+    private function issuer(): Doctor
+    {
+        $doctor = CurrentDoctor::issuer();
+        abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
+
+        return $doctor;
     }
 
     private function authorizeIssueReport(): void

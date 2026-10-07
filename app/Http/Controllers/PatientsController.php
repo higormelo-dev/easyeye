@@ -6,14 +6,16 @@ use App\DTOs\ActionPolicy;
 use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\PatientResource;
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
-use App\Services\PatientService;
+use App\Services\{PatientDuplicateFinder, PatientService};
 use App\Services\WhatsApp\WhatsAppService;
 use App\Support\BrazilianFormat;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\{DB, Storage, Vite};
+use Illuminate\Validation\ValidationException;
 use Inertia\{Inertia, Response};
 
 class PatientsController extends Controller
@@ -78,9 +80,13 @@ class PatientsController extends Controller
         $patients = $query->paginate(15)->withQueryString();
 
         return Inertia::render('Panel/Patients/Index', [
-            'patients'        => $patients->through(fn ($p) => $this->toTableRow($p, $entityId)),
-            'totalPatients'   => fn () => Patient::where('entity_id', $entityId)->count(),
-            'covenants'       => fn () => Covenant::all()->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()->toArray(),
+            'patients'      => $patients->through(fn ($p) => $this->toTableRow($p, $entityId)),
+            'totalPatients' => fn () => Patient::where('entity_id', $entityId)->count(),
+            // Só ativos, como na Agenda: vínculo novo com convênio inativo é
+            // recusado (App\Rules\ActiveCovenant). O inativo que o paciente
+            // já tem chega pelo editData (covenant_option) e aparece marcado.
+            'covenants' => fn () => Covenant::query()->where('active', true)->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()->toArray(),
             'skinTypes'       => fn () => SkinType::all()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()->toArray(),
             'irisTypes'       => fn () => IrisType::all()->map(fn ($i) => ['id' => $i->id, 'name' => $i->name])->values()->toArray(),
             'genders'         => People::$genders,
@@ -310,19 +316,23 @@ class PatientsController extends Controller
                         ->orWhereLikeUnaccent('people.telephone', $digits)
                         ->orWhereLikeUnaccent('people.national_registry', $digits));
             })
-            ->select('patients.id', 'patients.code', 'people.full_name', 'people.cellphone', 'people.telephone')
+            ->select('patients.id', 'patients.code', 'patients.covenant_id', 'people.full_name', 'people.cellphone', 'people.telephone', 'people.birth_date')
             ->orderBy('people.full_name')
             ->limit(10)
             ->get();
 
         // Telefones formatados para o dropdown; quem preenche form com eles
         // (agenda/lista de espera) tem v-mask e o FormRequest volta pra dígitos.
+        // Idade (não a data) e convênio do cadastro: o pronto atendimento
+        // sugere a prioridade por lei (60+) e pré-seleciona o convênio.
         return response()->json($patients->map(fn (Patient $p) => [
-            'id'        => $p->id,
-            'code'      => $p->code,
-            'full_name' => $p->full_name,
-            'cellphone' => BrazilianFormat::phone($p->cellphone),
-            'telephone' => BrazilianFormat::phone($p->telephone),
+            'id'          => $p->id,
+            'code'        => $p->code,
+            'full_name'   => $p->full_name,
+            'cellphone'   => BrazilianFormat::phone($p->cellphone),
+            'telephone'   => BrazilianFormat::phone($p->telephone),
+            'age'         => $p->birth_date ? Carbon::parse($p->birth_date)->age : null,
+            'covenant_id' => $p->covenant_id,
         ])->values());
     }
 
@@ -344,16 +354,33 @@ class PatientsController extends Controller
     {
         $entityId = session()->get('selected_entity_id');
 
-        $patient = DB::transaction(function () use ($request, $entityId) {
+        // patients.covenant_id é NOT NULL: o cadastro rápido (lista de espera)
+        // nasce "Particular" — mesma semântica da importação de pacientes —, o
+        // da clínica antes do global. Antes criava sem convênio e estourava.
+        $particularId = Covenant::query()
+            ->where('active', true)
+            ->whereRaw("upper(btrim(name)) = 'PARTICULAR'")
+            ->orderByRaw('entity_id IS NULL')
+            ->value('id');
+
+        if (! $particularId) {
+            throw ValidationException::withMessages(['name' => [__('schedules.wl_quick_no_particular')]]);
+        }
+
+        $patient = DB::transaction(function () use ($request, $entityId, $particularId) {
+            Patient::lockRegistrations((string) $entityId);
+
             $person = People::create([
-                'full_name' => $request->input('name'),
-                'cellphone' => $request->input('cellphone'),
+                'full_name'  => $request->input('name'),
+                'cellphone'  => $request->input('cellphone'),
+                'birth_date' => $request->input('birth_date') ?: null,
             ]);
 
             return Patient::create([
-                'entity_id' => $entityId,
-                'person_id' => $person->id,
-                'active'    => true,
+                'entity_id'   => $entityId,
+                'person_id'   => $person->id,
+                'covenant_id' => $particularId,
+                'active'      => true,
             ]);
         });
 
@@ -361,11 +388,13 @@ class PatientsController extends Controller
 
         return response()->json([
             'patient' => [
-                'id'        => $patient->id,
-                'code'      => $patient->code,
-                'full_name' => $patient->person->full_name,
-                'cellphone' => $patient->person->cellphone ?? '',
-                'telephone' => $patient->person->telephone ?? '',
+                'id'          => $patient->id,
+                'code'        => $patient->code,
+                'full_name'   => $patient->person->full_name,
+                'cellphone'   => $patient->person->cellphone ?? '',
+                'telephone'   => $patient->person->telephone ?? '',
+                'age'         => $patient->person->birth_date?->age,
+                'covenant_id' => $patient->covenant_id,
             ],
         ], 201);
     }
@@ -387,12 +416,18 @@ class PatientsController extends Controller
             404,
         );
 
-        $patient->load(['person', 'covenantPlan']);
+        $patient->load(['person', 'covenantPlan', 'covenant']);
         $person = $patient->person;
 
         return response()->json([
             'data' => [
-                'covenant_id'      => $patient->covenant_id,
+                'covenant_id' => $patient->covenant_id,
+                // Convênio atual (rótulo + ativo) — o seletor só lista ativos.
+                'covenant_option' => $patient->covenant ? [
+                    'id'     => $patient->covenant->id,
+                    'name'   => $patient->covenant->name,
+                    'active' => (bool) $patient->covenant->active,
+                ] : null,
                 'covenant_plan_id' => $patient->covenant_plan_id,
                 // Opção já escolhida (o seletor de plano busca no servidor).
                 'covenant_plan'          => $patient->covenantPlan?->toOption(),
@@ -486,6 +521,75 @@ class PatientsController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $this->getDeleteMessage());
         });
+    }
+
+    /**
+     * Restaura paciente excluído (soft delete) — a listagem já mostrava
+     * "Restaurar" para eles, mas a rota não existia. Mesmo grupo de permissão
+     * da exclusão, só da clínica da sessão (findByIdOrCode), com auditoria
+     * (Auditable registra "restored") e sem reabrir duplicado: outro paciente
+     * ATIVO com o mesmo nome + nascimento (PatientDuplicateFinder) ou o mesmo
+     * CPF nesta clínica barra a restauração.
+     */
+    public function restore(string $id, PatientDuplicateFinder $duplicates): JsonResponse|RedirectResponse
+    {
+        $record = $this->service->findByIdOrCode($id);
+
+        if ($record->trashed()) {
+            $person = People::query()->withTrashed()->find($record->person_id);
+            $error  = $person ? $this->restoreConflict($record, $person, $duplicates) : null;
+
+            if ($error !== null) {
+                if (request()->wantsJson()) {
+                    return response()->json(['message' => $error, 'errors' => ['name' => [$error]]], 422);
+                }
+
+                return back()->with('error', $error);
+            }
+
+            DB::transaction(function () use ($record, $person): void {
+                if ($person?->trashed()) {
+                    $person->deleted_by = null;
+                    $person->restore();
+                }
+
+                $record->deleted_by = null;
+                $record->restore();
+            });
+        }
+
+        if (request()->wantsJson()) {
+            return response()->json(['message' => $this->getRestoreMessage()]);
+        }
+
+        return back()->with('success', $this->getRestoreMessage());
+    }
+
+    /** Motivo que impede restaurar (duplicado ativo por nome+nascimento ou CPF), ou null. */
+    private function restoreConflict(Patient $record, People $person, PatientDuplicateFinder $duplicates): ?string
+    {
+        $entityId = (string) $record->entity_id;
+        $found    = $duplicates->find($entityId, (string) $person->full_name, $person->birth_date?->toDateString(), (string) $person->id);
+
+        if ($found['duplicates'] !== []) {
+            return __('validation.custom.patient.duplicate', ['codes' => implode(', ', $found['duplicates'])]);
+        }
+
+        if (blank($person->national_registry)) {
+            return null;
+        }
+
+        $sameCpf = Patient::query()
+            ->where('entity_id', $entityId)
+            ->whereKeyNot($record->id)
+            ->whereHas('person', fn ($q) => $q->where('national_registry', $person->national_registry)->whereKeyNot($person->id))
+            ->orderBy('code')
+            ->pluck('code')
+            ->all();
+
+        return $sameCpf !== []
+            ? __('validation.custom.patient.duplicate_cpf', ['codes' => implode(', ', $sameCpf)])
+            : null;
     }
 
     /**

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 
 const props = defineProps({
@@ -8,10 +8,60 @@ const props = defineProps({
     t: { type: Object, default: () => ({}) },
 });
 
-defineEmits(['close']);
+const emit = defineEmits(['close', 'reschedule', 'changed']);
 
 const loading = ref(false);
 const schedule = ref(null);
+
+// ── Série de sessões: cancelar as futuras (com motivo) ──────────────────────
+const cancelSeriesOpen = ref(false);
+const cancelReason = ref('');
+const cancelSaving = ref(false);
+const cancelError = ref('');
+
+const sessionLabel = computed(() =>
+    schedule.value?.session_total ? `${schedule.value.session_number}/${schedule.value.session_total}` : null,
+);
+
+function rescheduleSession(session) {
+    emit('reschedule', {
+        id: session.id,
+        name: session.name,
+        time: session.time,
+        doctor_id: session.doctor_id,
+        is_fit_in: session.is_fit_in,
+        reschedule_url: session.reschedule_url,
+    });
+}
+
+async function cancelFutureSessions() {
+    if (cancelSaving.value || !cancelReason.value.trim()) return;
+    cancelSaving.value = true;
+    cancelError.value = '';
+    try {
+        const res = await fetch(schedule.value.cancel_series_url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify({ reason: cancelReason.value.trim() }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            cancelError.value = json.errors?.reason?.[0] ?? json.message ?? props.t.series_cancel_error ?? 'Erro.';
+            return;
+        }
+        cancelSeriesOpen.value = false;
+        cancelReason.value = '';
+        if (window.showSuccessToast) window.showSuccessToast(json.message);
+        emit('changed', json);
+        await loadDetail(schedule.value.id);
+    } finally {
+        cancelSaving.value = false;
+    }
+}
 
 async function loadDetail(id) {
     loading.value = true;
@@ -31,7 +81,12 @@ watch(
     () => props.open,
     (val) => {
         if (val && props.scheduleId) loadDetail(props.scheduleId);
-        if (!val) schedule.value = null;
+        if (!val) {
+            schedule.value = null;
+            cancelSeriesOpen.value = false;
+            cancelReason.value = '';
+            cancelError.value = '';
+        }
     },
 );
 
@@ -66,24 +121,33 @@ function numericCode(code) {
     return m ? m[2] : String(code ?? '').replace(/\D/g, '');
 }
 
+// "Copiado" some em 2 s; sem área de transferência (permissão negada,
+// contexto inseguro) só não marca — nada de promessa rejeitada solta.
+let copiedTimer = null;
+onBeforeUnmount(() => clearTimeout(copiedTimer));
+
+function markCopied(field) {
+    copiedField.value = field;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+        if (copiedField.value === field) copiedField.value = null;
+    }, 2000);
+}
+
 function copyCode(field, code) {
     if (!code) return;
-    navigator.clipboard.writeText(shortCode(code)).then(() => {
-        copiedField.value = field;
-        setTimeout(() => {
-            if (copiedField.value === field) copiedField.value = null;
-        }, 2000);
-    });
+    navigator.clipboard
+        ?.writeText(shortCode(code))
+        .then(() => markCopied(field))
+        .catch(() => {});
 }
 
 function copyNumericCode(field, code) {
     if (!code) return;
-    navigator.clipboard.writeText(numericCode(code)).then(() => {
-        copiedField.value = field;
-        setTimeout(() => {
-            if (copiedField.value === field) copiedField.value = null;
-        }, 2000);
-    });
+    navigator.clipboard
+        ?.writeText(numericCode(code))
+        .then(() => markCopied(field))
+        .catch(() => {});
 }
 </script>
 
@@ -125,6 +189,69 @@ function copyNumericCode(field, code) {
                         >
                             {{ t.drawer_unregistered ?? 'Sem cadastro' }}
                         </span>
+                        <span
+                            v-if="schedule.is_fit_in"
+                            class="badge rounded-pill drawer-fit-in"
+                            data-test="drawer-fit-in"
+                        >
+                            <i class="ti ti-arrow-autofit-height me-1" aria-hidden="true"></i
+                            >{{ t.fit_in_badge ?? 'Encaixe' }}
+                        </span>
+                        <span
+                            v-if="schedule.is_urgent_care"
+                            class="badge rounded-pill drawer-urgent"
+                            :title="t.urgent_care_hint ?? ''"
+                            data-test="drawer-urgent-care"
+                        >
+                            <i class="ti ti-urgent me-1" aria-hidden="true"></i
+                            >{{ t.urgent_care_badge ?? 'Pronto atendimento' }}
+                        </span>
+                        <span v-if="sessionLabel" class="badge rounded-pill drawer-session" data-test="drawer-session">
+                            <i class="ti ti-repeat me-1" aria-hidden="true"></i
+                            >{{ (t.session_label ?? 'Sessão :session').replace(':session', sessionLabel) }}
+                        </span>
+                    </div>
+                    <div
+                        v-if="schedule && (schedule.patient_sheet_url || schedule.whatsapp_state)"
+                        class="d-flex gap-2 mt-2 flex-wrap"
+                    >
+                        <a
+                            v-if="schedule.patient_sheet_url"
+                            :href="schedule.patient_sheet_url"
+                            target="_blank"
+                            rel="noopener"
+                            class="btn btn-sm btn-outline-secondary"
+                            data-test="drawer-patient-sheet"
+                        >
+                            <i class="ti ti-printer me-1" aria-hidden="true"></i
+                            >{{ t.print_patient_sheet ?? 'Ficha do paciente' }}
+                        </a>
+                        <a
+                            v-if="schedule.whatsapp_state === 'ok'"
+                            :href="schedule.whatsapp_url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn btn-sm btn-outline-success"
+                            data-test="drawer-whatsapp"
+                        >
+                            <i class="ti ti-brand-whatsapp me-1" aria-hidden="true"></i
+                            >{{ t.whatsapp_open ?? 'WhatsApp' }}
+                        </a>
+                        <button
+                            v-else-if="schedule.whatsapp_state"
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            disabled
+                            :title="
+                                schedule.whatsapp_state === 'opted_out'
+                                    ? t.whatsapp_opted_out_hint
+                                    : t.whatsapp_no_number
+                            "
+                            data-test="drawer-whatsapp-disabled"
+                        >
+                            <i class="ti ti-brand-whatsapp me-1" aria-hidden="true"></i
+                            >{{ t.whatsapp_open ?? 'WhatsApp' }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -367,6 +494,92 @@ function copyNumericCode(field, code) {
                 </ul>
             </div>
 
+            <!-- Série de sessões -->
+            <div v-if="schedule.series && schedule.series.length" class="detail-section" data-test="drawer-series">
+                <div class="detail-section__title d-flex align-items-center justify-content-between gap-2">
+                    <span><i class="ti ti-repeat me-1"></i> {{ t.series_title ?? 'Série de sessões' }}</span>
+                    <button
+                        v-if="schedule.series_cancellable > 0 && !cancelSeriesOpen"
+                        type="button"
+                        class="btn btn-xs btn-outline-danger"
+                        data-test="series-cancel-open"
+                        @click="cancelSeriesOpen = true"
+                    >
+                        <i class="ti ti-calendar-x me-1"></i
+                        >{{
+                            (t.series_cancel_future ?? 'Cancelar as futuras (:count)').replace(
+                                ':count',
+                                schedule.series_cancellable,
+                            )
+                        }}
+                    </button>
+                </div>
+
+                <div v-if="cancelSeriesOpen" class="border rounded p-2 mb-2 series-cancel-box">
+                    <label for="series-cancel-reason" class="form-label small fw-semibold mb-1">
+                        {{ t.series_cancel_reason ?? 'Motivo do cancelamento' }} <span class="text-danger">*</span>
+                    </label>
+                    <textarea
+                        id="series-cancel-reason"
+                        v-model="cancelReason"
+                        class="form-control form-control-sm"
+                        rows="2"
+                        :class="{ 'is-invalid': cancelError }"
+                        :placeholder="t.series_cancel_reason_ph ?? 'Ex.: tratamento encerrado'"
+                    ></textarea>
+                    <div v-if="cancelError" class="invalid-feedback d-block">{{ cancelError }}</div>
+                    <p class="text-muted small mb-2 mt-1">
+                        {{
+                            t.series_cancel_hint ??
+                            'Cancela só as sessões que ainda não aconteceram; passadas e atendidas ficam como estão.'
+                        }}
+                    </p>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-sm btn-light" @click="cancelSeriesOpen = false">
+                            {{ t.series_cancel_back ?? 'Voltar' }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-danger"
+                            :disabled="cancelSaving || !cancelReason.trim()"
+                            data-test="series-cancel-confirm"
+                            @click="cancelFutureSessions"
+                        >
+                            <span v-if="cancelSaving" class="spinner-border spinner-border-sm me-1"></span>
+                            {{ t.series_cancel_confirm ?? 'Cancelar sessões futuras' }}
+                        </button>
+                    </div>
+                </div>
+
+                <ul class="list-unstyled mb-0 series-list">
+                    <li
+                        v-for="session in schedule.series"
+                        :key="session.id"
+                        class="d-flex align-items-center gap-2 py-1 series-item"
+                        :class="{ 'is-current': session.is_current, 'is-terminal': session.is_terminal }"
+                    >
+                        <span class="series-number">{{ session.number }}/{{ session.total }}</span>
+                        <span class="flex-grow-1 small">
+                            {{ session.date_label }}
+                            <span v-if="session.is_current" class="text-primary fw-semibold ms-1"
+                                >· {{ t.series_current ?? 'esta' }}</span
+                            >
+                        </span>
+                        <span class="badge" :class="session.badge" style="font-size: 0.65rem">{{ session.label }}</span>
+                        <button
+                            v-if="!session.is_terminal && !session.is_past"
+                            type="button"
+                            class="btn btn-xs btn-outline-secondary"
+                            :title="t.btn_reschedule ?? 'Reagendar'"
+                            :aria-label="`${t.btn_reschedule ?? 'Reagendar'} ${session.number}/${session.total}`"
+                            @click="rescheduleSession(session)"
+                        >
+                            <i class="fas fa-calendar-alt"></i>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
             <!-- Histórico -->
             <div class="detail-section">
                 <div class="detail-section__title">
@@ -465,5 +678,58 @@ function copyNumericCode(field, code) {
 .detail-value {
     color: var(--bs-secondary-color);
     word-break: break-word;
+}
+.drawer-fit-in {
+    background: #ede9fe;
+    color: #5b21b6;
+    border: 1px solid #c4b5fd;
+    font-size: 0.7rem;
+}
+.drawer-urgent {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    font-size: 0.7rem;
+}
+.drawer-session {
+    background: #e0f2fe;
+    color: #075985;
+    border: 1px solid #bae6fd;
+    font-size: 0.7rem;
+}
+.series-number {
+    min-width: 3rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.series-item {
+    border-bottom: 1px dashed var(--bs-border-color);
+}
+.series-item.is-current {
+    background: rgba(var(--bs-primary-rgb), 0.06);
+}
+.series-item.is-terminal .small {
+    color: var(--bs-secondary-color);
+}
+[data-bs-theme='dark'] .drawer-fit-in {
+    background: rgba(139, 92, 246, 0.2);
+    color: #ddd6fe;
+    border-color: rgba(167, 139, 250, 0.5);
+}
+[data-bs-theme='dark'] .drawer-urgent {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fecaca;
+    border-color: rgba(248, 113, 113, 0.5);
+}
+[data-bs-theme='dark'] .drawer-session {
+    background: rgba(14, 165, 233, 0.18);
+    color: #bae6fd;
+    border-color: rgba(56, 189, 248, 0.45);
+}
+@media (max-width: 575.98px) {
+    .detail-row {
+        grid-template-columns: 1fr;
+        gap: 0.1rem;
+    }
 }
 </style>

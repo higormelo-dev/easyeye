@@ -6,6 +6,7 @@ use App\Enums\ImportStatus;
 use App\Jobs\ProcessScheduleImportJob;
 use App\Models\ScheduleImport;
 use App\Services\ScheduleImportService;
+use App\Support\CurrentDoctor;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -19,8 +20,19 @@ class ScheduleImportsController extends Controller
     ) {
     }
 
+    /**
+     * Importar cria agendamentos de QUALQUER médico da planilha: perfil médico
+     * sem cadastro de médico não usa (App\Support\CurrentDoctor).
+     */
+    private function abortIfDoctorMissing(): void
+    {
+        abort_if(CurrentDoctor::isMissing(), 403, CurrentDoctor::missingMessage());
+    }
+
     public function index(): InertiaResponse
     {
+        $this->abortIfDoctorMissing();
+
         $entityId = (string) session('selected_entity_id');
 
         $imports = ScheduleImport::where('entity_id', $entityId)
@@ -89,6 +101,8 @@ class ScheduleImportsController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->abortIfDoctorMissing();
+
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:20480'],
         ], [
@@ -134,6 +148,8 @@ class ScheduleImportsController extends Controller
      */
     public function confirm(ScheduleImport $scheduleImport): RedirectResponse
     {
+        $this->abortIfDoctorMissing();
+
         abort_if((string) $scheduleImport->entity_id !== session('selected_entity_id'), 403);
         abort_if($scheduleImport->status !== ImportStatus::Pending, 409);
 
@@ -158,6 +174,8 @@ class ScheduleImportsController extends Controller
      */
     public function cancel(ScheduleImport $scheduleImport): RedirectResponse
     {
+        $this->abortIfDoctorMissing();
+
         abort_if((string) $scheduleImport->entity_id !== session('selected_entity_id'), 403);
         abort_if($scheduleImport->status->isDone(), 409);
 
@@ -186,6 +204,8 @@ class ScheduleImportsController extends Controller
      */
     public function errors(ScheduleImport $scheduleImport): StreamedResponse|RedirectResponse
     {
+        $this->abortIfDoctorMissing();
+
         abort_if((string) $scheduleImport->entity_id !== session('selected_entity_id'), 404);
         abort_if(! $scheduleImport->errors_file_path, 404);
 
@@ -210,13 +230,13 @@ class ScheduleImportsController extends Controller
         $headers = [
             'codigo_importacao_medico', 'crm_medico', 'codigo_importacao_paciente', 'cpf_paciente',
             'nome_paciente', 'data_hora', 'situacao', 'tipo_atendimento', 'especialidade', 'convenio',
-            'telefone', 'celular', 'observacoes', 'codigo_importacao',
+            'telefone', 'celular', 'observacoes', 'codigo_importacao', 'encaixe',
         ];
 
         $example = [
             '00042', '123456', '00099', '12345678901',
             'Maria da Silva', '15/06/2026 14:30', 'Atendido', 'Consulta', 'Catarata', 'Unimed',
-            '1133334444', '11987654321', 'Paciente veio acompanhado', 'LEGACY-SCH-1',
+            '1133334444', '11987654321', 'Paciente veio acompanhado', 'LEGACY-SCH-1', 'não',
         ];
 
         return response()->streamDownload(function () use ($headers, $example) {

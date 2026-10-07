@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Domains\AI\Models\AiRun;
 use App\Enums\DocumentationType;
-use App\Traits\{Auditable, HasAuditColumns};
+use App\Traits\{Auditable, GuardedBySignedRecord, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany};
@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany};
 class MedicalRecordDocumentation extends Model
 {
     use Auditable;
+    use GuardedBySignedRecord;
     use HasAuditColumns;
     use HasUuids;
     use SoftDeletes;

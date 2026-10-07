@@ -2,10 +2,11 @@
 
 namespace App\Http\Requests;
 
-use App\Models\{Doctor, MedicalRecord, Patient};
+use App\Models\{MedicalRecord, Patient};
+use App\Rules\RecordDoctor;
 use App\Services\ContactLensCalculator;
+use App\Support\CurrentDoctor;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class UpdateMedicalRecordRequest extends FormRequest
@@ -33,16 +34,10 @@ class UpdateMedicalRecordRequest extends FormRequest
             }
         }
 
-        if (! $this->filled('doctor_id')) {
-            $entityId = session('selected_entity_id');
-            $doctor   = Doctor::whereHas('entityUser', fn ($q) => $q
-                ->where('entity_id', $entityId)
-                ->where('user_id', auth()->id()))
-                ->first();
-
-            if ($doctor) {
-                $payload['doctor_id'] = $doctor->id;
-            }
+        // Perfil médico: o prontuário sai no nome dele (cadastro ativo) —
+        // RecordDoctor recusa colega; aqui só preenche quando não veio.
+        if (! $this->filled('doctor_id') && ($doctor = CurrentDoctor::issuer())) {
+            $payload['doctor_id'] = $doctor->id;
         }
 
         // diagnosis_cids chega serializado como JSON (input hidden do
@@ -77,18 +72,7 @@ class UpdateMedicalRecordRequest extends FormRequest
             // Identificacao — doctor obrigatório (auto-preenchido se user é médico).
             // Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via
             // request body) — ver mesmo comentário em StoreMedicalRecordRequest.
-            'doctor_id' => ['required', 'uuid', function ($attribute, $value, $fail) {
-                $exists = DB::table('doctors')
-                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-                    ->where('doctors.id', $value)
-                    ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                    ->whereNull('doctors.deleted_at')
-                    ->exists();
-
-                if (! $exists) {
-                    $fail(__('actions.medical_records.doctor_exists_validation'));
-                }
-            }],
+            'doctor_id' => ['required', 'uuid', new RecordDoctor($this->currentRecordDoctorId())],
             // Vínculo com a agenda escopado por tenant E pelo paciente da rota
             // (ver StoreMedicalRecordRequest). O vínculo que o prontuário JÁ tem
             // continua aceito: o form de edit reenvia o schedule_id hidratado e
@@ -110,7 +94,7 @@ class UpdateMedicalRecordRequest extends FormRequest
             // Ação da barra inferior a abrir automaticamente após o 1º save
             // (create → edit?action=): emitir receita/atestado sem "salvar
             // primeiro" manual. Não é persistido no registro.
-            'post_save_action' => ['nullable', 'string', 'in:medication,procedures,pterygium,cataract,test_eye,retinal_mapping,attendance_certificate,medical_certificate,exam_hub,documentations,upload'],
+            'post_save_action' => ['nullable', 'string', 'in:medication,procedures,pterygium,cataract,test_eye,retinal_mapping,attendance_certificate,medical_certificate,medical_declaration,exam_hub,documentations,upload'],
             // Exame fisico — selecoes
             // Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via
             // request body) — ver mesmo comentário em StoreMedicalRecordRequest.
@@ -313,7 +297,11 @@ class UpdateMedicalRecordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'doctor_id.required' => __('actions.medical_records.doctor_required_validation'),
+            // Perfil médico sem cadastro ativo: o doctor_id não é preenchido —
+            // a mensagem é a de cadastro ausente, não "selecione o médico".
+            'doctor_id.required' => CurrentDoctor::issuerMissing()
+                ? CurrentDoctor::missingMessage()
+                : __('actions.medical_records.doctor_required_validation'),
             'doctor_id.exists'   => __('actions.medical_records.doctor_exists_validation'),
             'schedule_id.exists' => __('actions.medical_records.schedule_exists_validation'),
             // Tela aberta antes da v2 da calculadora (envia version 1).
@@ -327,6 +315,14 @@ class UpdateMedicalRecordRequest extends FormRequest
         $patient = $this->route('patient');
 
         return (string) ($patient instanceof Patient ? $patient->getKey() : $patient);
+    }
+
+    /** Médico que o prontuário da rota já tem (perfil médico não altera o de colega). */
+    private function currentRecordDoctorId(): ?string
+    {
+        $record = $this->route('medicalrecord');
+
+        return $record instanceof MedicalRecord && filled($record->doctor_id) ? (string) $record->doctor_id : null;
     }
 
     /** Agendamento que o prontuário da rota já tem (vínculo existente continua aceito). */

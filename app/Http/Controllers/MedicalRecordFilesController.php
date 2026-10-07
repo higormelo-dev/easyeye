@@ -32,6 +32,7 @@ class MedicalRecordFilesController extends Controller
     {
         $this->assertRecordBelongsToPatient($patient, $medicalrecord);
         $this->authorizeIssueReport();
+        $this->assertRecordNotSigned($medicalrecord);
 
         $request->validate([
             'files'   => ['required', 'array', 'min:1', 'max:10'],
@@ -107,10 +108,21 @@ class MedicalRecordFilesController extends Controller
         $this->assertRecordBelongsToPatient($patient, $medicalrecord);
         $this->assertFileBelongsToRecord($medicalrecord, $file);
         $this->authorizeIssueReport();
+        $this->assertRecordNotSigned($medicalrecord);
 
         $file->delete();
 
         return response()->json(['message' => __('actions.medical_records.file_deleted')]);
+    }
+
+    /**
+     * Prontuário assinado não recebe nem perde anexo (antes só a tela
+     * desabilitava; o model também barra — GuardedBySignedRecord). Checado
+     * antes da cota para a mensagem certa.
+     */
+    private function assertRecordNotSigned(MedicalRecord $medicalrecord): void
+    {
+        abort_if($medicalrecord->isLocked(), 403, __('actions.medical_records.documentation_locked'));
     }
 
     private function authorizeIssueReport(): void

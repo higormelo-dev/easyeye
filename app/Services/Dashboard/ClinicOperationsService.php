@@ -7,7 +7,8 @@ namespace App\Services\Dashboard;
 use App\Enums\ScheduleSituation;
 use App\Models\{Patient, Schedule, WaitingList};
 use App\Models\WhatsApp\WhatsAppMessage;
-use App\Support\BrazilianFormat;
+use App\Services\UrgentCare\UrgentCareService;
+use App\Support\{BrazilianFormat, ScheduleShift};
 use Carbon\{Carbon, CarbonInterface};
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -68,6 +69,30 @@ class ClinicOperationsService
 
     /** Fora da agenda do dia (não contam como consulta a confirmar/atender). */
     public const CLOSED_SITUATIONS = [ScheduleSituation::NoShow, ScheduleSituation::Cancelled];
+
+    /** "Na espera": chegou e espera o médico ou está em preparo (dilatação/exame). */
+    public const WAITING_SITUATIONS = [...self::READY_SITUATIONS, ...self::PREPARING_SITUATIONS];
+
+    /** "Não chegou": ainda Agendado/Confirmado, sem chegada, e o horário já passou. */
+    public const NOT_ARRIVED_SITUATIONS = [ScheduleSituation::Scheduled, ScheduleSituation::Confirmed];
+
+    /**
+     * Contadores do dia — os MESMOS na Agenda (topo + chips de filtro) e no
+     * Dashboard (resumo do dia, recepção). Não são uma partição: "não chegou"
+     * também está em confirmados/não confirmados, encaixe em qualquer situação.
+     */
+    public const DAY_COUNTERS = [
+        'total',
+        'confirmed',
+        'unconfirmed',
+        'not_arrived',
+        'waiting',
+        'in_care',
+        'attended',
+        'no_show',
+        'cancelled',
+        'fit_in',
+    ];
 
     /**
      * Status da confirmação por WhatsApp (whatsapp_messages.status) → grupo do
@@ -283,6 +308,86 @@ class ClinicOperationsService
         ];
     }
 
+    /**
+     * Contadores do dia (DAY_COUNTERS) numa consulta agregada só. `$query` é
+     * o recorte já filtrado (clínica, período, médico, turno…), SEM select —
+     * a Agenda e o Dashboard passam o mesmo tipo de recorte, então os números
+     * batem por construção.
+     *
+     * @param Builder<Schedule> $query
+     *
+     * @return array<string, int>
+     */
+    public function dayCounters(Builder $query, ?CarbonInterface $now = null): array
+    {
+        $now ??= now();
+        $sql = clone $query;
+
+        foreach (self::DAY_COUNTERS as $key) {
+            [$condition, $bindings] = self::counterCondition($key, $now);
+            $sql->selectRaw("SUM(CASE WHEN {$condition} THEN 1 ELSE 0 END) AS {$key}", $bindings);
+        }
+
+        $row = $sql->toBase()->first();
+
+        return collect(self::DAY_COUNTERS)
+            ->mapWithKeys(fn (string $key) => [$key => (int) ($row->{$key} ?? 0)])
+            ->all();
+    }
+
+    /**
+     * Filtro (chip) da Agenda pelo contador — o MESMO SQL da contagem, então o
+     * chip mostra exatamente as linhas que ele conta. Chave desconhecida ou
+     * `total` não filtram.
+     *
+     * @param Builder<Schedule> $query
+     *
+     * @return Builder<Schedule>
+     */
+    public static function applyCounterFilter(Builder $query, ?string $key, ?CarbonInterface $now = null): Builder
+    {
+        if ($key === null || $key === 'total' || ! in_array($key, self::DAY_COUNTERS, true)) {
+            return $query;
+        }
+
+        [$condition, $bindings] = self::counterCondition($key, $now ?? now());
+
+        return $query->whereRaw("({$condition})", $bindings);
+    }
+
+    /**
+     * SQL de cada contador (só constantes do enum + o "agora" como binding).
+     *
+     * @return array{0: string, 1: list<mixed>}
+     */
+    public static function counterCondition(string $key, CarbonInterface $now): array
+    {
+        $in = fn (array $situations): string => 'schedules.situation IN (' . implode(',', self::values($situations)) . ')';
+
+        return match ($key) {
+            'total'       => ['1 = 1', []],
+            'confirmed'   => [$in(self::CONFIRMED_SITUATIONS), []],
+            'unconfirmed' => ['NOT ' . $in([...self::CONFIRMED_SITUATIONS, ...self::CLOSED_SITUATIONS]), []],
+            'not_arrived' => [$in(self::NOT_ARRIVED_SITUATIONS) . ' AND schedules.arrived_at IS NULL AND schedules.date_time < ?', [$now->format('Y-m-d H:i:s')]],
+            'waiting'     => [$in(self::WAITING_SITUATIONS) . ' AND schedules.arrived_at IS NOT NULL', []],
+            'in_care'     => [$in([ScheduleSituation::InProgress]), []],
+            'attended'    => [$in([ScheduleSituation::Attended]), []],
+            'no_show'     => [$in([ScheduleSituation::NoShow]), []],
+            'cancelled'   => [$in([ScheduleSituation::Cancelled]), []],
+            'fit_in'      => ['schedules.is_fit_in = true AND NOT ' . $in([ScheduleSituation::Cancelled]), []],
+        };
+    }
+
+    /**
+     * Pronto atendimento: pessoas na fila agora (aguardando + chamado, chegada
+     * hoje) — o MESMO número no contador da Agenda e no Dashboard. Com médico,
+     * os dele + os sem médico preferido (o que a tela da fila mostra a ele).
+     */
+    public function urgentCareQueued(string $entityId, ?string $doctorId = null): int
+    {
+        return app(UrgentCareService::class)->queuedCount($entityId, $doctorId);
+    }
+
     // ── internos ─────────────────────────────────────────────────────────────
 
     /**
@@ -477,11 +582,7 @@ class ClinicOperationsService
     /** Mesmos turnos da Agenda (PanelDashboardController::shiftOf). */
     private static function shiftOf(int $hour): string
     {
-        return match (true) {
-            $hour < 13 => 'morning',
-            $hour < 18 => 'afternoon',
-            default    => 'evening',
-        };
+        return ScheduleShift::of($hour);
     }
 
     /**

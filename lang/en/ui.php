@@ -51,5 +51,10 @@ return [
         'plan_none'            => 'No plans registered for this insurer. The clinic can add them in Settings › Insurers › Plans.',
         'plan_unavailable'     => 'This plan is no longer available (cancelled at ANS or deactivated). Choose another one when updating the record.',
         'plan_hint'            => 'Optional. The ANS product registry is printed on the member card.',
+        // Patient's insurer deactivated after registration (kept, marked).
+        'covenant_inactive_suffix' => '(inactive)',
+        // Same name as another patient of the clinic (PatientDuplicateFinder).
+        'homonym_title'   => 'Patient with the same name',
+        'homonym_confirm' => 'I confirm this is a different patient',
     ],
 ];

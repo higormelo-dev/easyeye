@@ -120,6 +120,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function entities(): BelongsToMany
     {
         return $this->belongsToMany(Entity::class, 'entity_users', 'user_id', 'entity_id')
+            ->using(EntityUserPivot::class)
             ->withPivot(['id', 'code', 'rule', 'is_owner', 'active', 'invited_by', 'joined_at'])
             ->withTimestamps()
             ->wherePivotNull('deleted_at');

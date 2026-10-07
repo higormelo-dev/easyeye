@@ -2,10 +2,11 @@
 
 namespace App\Http\Requests;
 
-use App\Models\{Doctor, Patient};
+use App\Models\Patient;
+use App\Rules\RecordDoctor;
 use App\Services\ContactLensCalculator;
+use App\Support\CurrentDoctor;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class StoreMedicalRecordRequest extends FormRequest
@@ -37,16 +38,10 @@ class StoreMedicalRecordRequest extends FormRequest
             }
         }
 
-        if (! $this->filled('doctor_id')) {
-            $entityId = session('selected_entity_id');
-            $doctor   = Doctor::whereHas('entityUser', fn ($q) => $q
-                ->where('entity_id', $entityId)
-                ->where('user_id', auth()->id()))
-                ->first();
-
-            if ($doctor) {
-                $payload['doctor_id'] = $doctor->id;
-            }
+        // Perfil médico: o prontuário sai no nome dele (cadastro ativo) —
+        // RecordDoctor recusa colega; aqui só preenche quando não veio.
+        if (! $this->filled('doctor_id') && ($doctor = CurrentDoctor::issuer())) {
+            $payload['doctor_id'] = $doctor->id;
         }
 
         // diagnosis_cids chega serializado como JSON (input hidden do
@@ -73,18 +68,7 @@ class StoreMedicalRecordRequest extends FormRequest
             // entity_user_id -> entity_users.entity_id), então 'exists:doctors,id'
             // sozinho aceitava médico de OUTRA clínica. Mesmo padrão de closure
             // já usado em ScheduleRequest::rules() para doctor_id.
-            'doctor_id' => ['required', 'uuid', function ($attribute, $value, $fail) {
-                $exists = DB::table('doctors')
-                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-                    ->where('doctors.id', $value)
-                    ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                    ->whereNull('doctors.deleted_at')
-                    ->exists();
-
-                if (! $exists) {
-                    $fail(__('actions.medical_records.doctor_exists_validation'));
-                }
-            }],
+            'doctor_id' => ['required', 'uuid', new RecordDoctor()],
             // Vínculo com a agenda escopado por tenant E pelo paciente da rota:
             // um schedule_id de outra clínica — ou de OUTRO paciente da mesma
             // clínica — não pode ser gravado no prontuário (Finalizar/Dilatar/
@@ -101,7 +85,7 @@ class StoreMedicalRecordRequest extends FormRequest
             // Ação da barra inferior a abrir automaticamente após o 1º save
             // (create → edit?action=): emitir receita/atestado sem "salvar
             // primeiro" manual. Não é persistido no registro.
-            'post_save_action' => ['nullable', 'string', 'in:medication,procedures,pterygium,cataract,test_eye,retinal_mapping,attendance_certificate,medical_certificate,exam_hub,documentations,upload'],
+            'post_save_action' => ['nullable', 'string', 'in:medication,procedures,pterygium,cataract,test_eye,retinal_mapping,attendance_certificate,medical_certificate,medical_declaration,exam_hub,documentations,upload'],
             // Exame físico — seleções
             // Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via
             // request body): estes catálogos clínicos têm entity_id NULLABLE
@@ -301,7 +285,11 @@ class StoreMedicalRecordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'doctor_id.required' => __('actions.medical_records.doctor_required_validation'),
+            // Perfil médico sem cadastro ativo: o doctor_id não é preenchido —
+            // a mensagem é a de cadastro ausente, não "selecione o médico".
+            'doctor_id.required' => CurrentDoctor::issuerMissing()
+                ? CurrentDoctor::missingMessage()
+                : __('actions.medical_records.doctor_required_validation'),
             'doctor_id.exists'   => __('actions.medical_records.doctor_exists_validation'),
             'schedule_id.exists' => __('actions.medical_records.schedule_exists_validation'),
             // Tela aberta antes da v2 da calculadora (envia version 1).

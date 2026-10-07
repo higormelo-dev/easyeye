@@ -117,6 +117,7 @@ class TissGuide extends Model
     public function batches(): BelongsToMany
     {
         return $this->belongsToMany(TissBatch::class, 'tiss_batch_guides', 'guide_id', 'batch_id')
+            ->using(TissBatchGuidePivot::class)
             ->withPivot(['id', 'entity_id', 'attached_at'])
             ->withTimestamps();
     }

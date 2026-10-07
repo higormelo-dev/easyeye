@@ -8,11 +8,12 @@ use App\Domains\AI\Providers\Fakes\{AnthropicFakeProvider, CompatibleFakeProvide
 use App\Domains\AI\Repositories\{EloquentAiModelPriceRepository, EloquentAiRunProviderCallStore, EloquentAiRunRepository};
 use App\Domains\AI\Services\{AiCircuitBreakerService, AiProviderManager, AiProviderSettings};
 use App\Enums\AI\AiProvider;
-use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
+use App\Models\{Doctor, DoctorWorkSchedule, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, ScheduleBlock, Subscription};
 use App\Models\WhatsApp\WhatsAppSetting;
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
 use App\Services\Billing\{GatewayRegistry, WebhookIngestionService};
+use App\Services\Schedules\ScheduleAvailabilityService;
 use App\Services\WhatsApp\Contracts\WhatsAppProvider;
 use App\Services\WhatsApp\Providers\{GupshupProvider, MockWhatsAppProvider};
 use App\Support\Database\AccentInsensitiveSearch;
@@ -21,7 +22,7 @@ use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
-use Illuminate\Support\Facades\{Auth, Blade, Gate, RateLimiter, URL};
+use Illuminate\Support\Facades\{Auth, Blade, DB, Gate, RateLimiter, URL};
 use Illuminate\Support\{ServiceProvider, Str};
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\{PersonalAccessToken, Sanctum};
@@ -170,6 +171,31 @@ class AppServiceProvider extends ServiceProvider
         EntityUser::created(fn ($m) => $activationObserver->entityUserCreated($m));
         EntityIntegrator::created(fn ($m) => $activationObserver->entityIntegratorCreated($m));
         Entity::updated(fn ($m) => $activationObserver->entityUpdated($m));
+
+        // -------------------------------------------------------------------------
+        // Agenda: vagas do mês em cache (ScheduleAvailabilityService) — qualquer
+        // mudança de agendamento, escala, bloqueio ou intervalo troca a versão
+        // do cache da clínica (todos os caminhos: tela, lote, importação, API).
+        // -------------------------------------------------------------------------
+        $bumpAvailability = fn (?string $entityId) => ScheduleAvailabilityService::bumpVersion($entityId);
+        $doctorEntity     = fn (?string $doctorId) => $doctorId === null ? null : DB::table('doctors')
+            ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+            ->where('doctors.id', $doctorId)
+            ->value('entity_users.entity_id');
+
+        Schedule::saved(fn (Schedule $s) => $bumpAvailability($s->entity_id));
+        Schedule::deleted(fn (Schedule $s) => $bumpAvailability($s->entity_id));
+        DoctorWorkSchedule::saved(fn (DoctorWorkSchedule $w) => $bumpAvailability($doctorEntity($w->doctor_id)));
+        DoctorWorkSchedule::deleted(fn (DoctorWorkSchedule $w) => $bumpAvailability($doctorEntity($w->doctor_id)));
+        ScheduleBlock::saved(fn (ScheduleBlock $b) => $bumpAvailability($doctorEntity($b->doctor_id)));
+        ScheduleBlock::deleted(fn (ScheduleBlock $b) => $bumpAvailability($doctorEntity($b->doctor_id)));
+        Doctor::saved(fn (Doctor $d) => $bumpAvailability($doctorEntity((string) $d->id)));
+        Doctor::deleted(fn (Doctor $d) => $bumpAvailability($doctorEntity((string) $d->id)));
+        Entity::saved(function (Entity $e) use ($bumpAvailability): void {
+            if ($e->wasChanged(['schedule_interval', 'few_slots_percent'])) {
+                $bumpAvailability((string) $e->id);
+            }
+        });
 
         // -------------------------------------------------------------------------
         // CAC: Subscription events — comissão de parceiro + reward de indicação
@@ -403,6 +429,12 @@ class AppServiceProvider extends ServiceProvider
             $key = 'patient-invitation|' . (Auth::guard('patient')->id() ?? $r->ip());
 
             return Limit::perMinute(6)->by($key);
+        });
+
+        // Autosave do prontuário: ~2/min por aba no uso normal (a cada 30 s +
+        // ao ocultar a aba) — folga para várias abas, teto contra laço.
+        RateLimiter::for('medical-record-drafts', static function (Request $r) {
+            return Limit::perMinute(60)->by('medical-record-drafts|' . ($r->user()?->id ?? $r->ip()));
         });
     }
 }

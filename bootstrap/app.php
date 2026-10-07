@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Middleware\{
     ApiAuthenticateWithIntegrator,
     ApiCheckPlanAccess,
@@ -144,6 +145,19 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Token/cartão criptografado do checkout nunca volta para a sessão.
         $exceptions->dontFlash(['card_token']);
+
+        // Prontuário assinado (Signable / GuardedBySignedRecord): ação sobre o
+        // prontuário ou seus documentos que o caller não tratou vira 403
+        // traduzido — nunca 500.
+        $exceptions->render(function (LockedMedicalRecordException $e, $request) {
+            $message = $e->getMessage() !== '' ? $e->getMessage() : __('actions.medical_records.documentation_locked');
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], HttpResponse::HTTP_FORBIDDEN);
+            }
+
+            return back()->with('error', $message);
+        });
 
         $exceptions->render(function (AuthenticationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {

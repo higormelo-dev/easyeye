@@ -55,10 +55,6 @@ class AuthenticatedEntityController extends Controller
             'user_rule'                 => $entityUser->rule,
         ]);
 
-        if ($entityUser->rule === 'doctor') {
-            session(['selected_entity_doctor_id' => $entityUser->doctor?->id]);
-        }
-
         // Usuários SaaS (non-client) não devem ser redirecionados para URLs que
         // ficaram salvas como url.intended durante uma sessão de impersonação expirada.
         if (! session('selected_entity_is_client', true)) {

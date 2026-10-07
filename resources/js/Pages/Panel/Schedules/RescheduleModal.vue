@@ -13,6 +13,9 @@ const emit = defineEmits(['close', 'rescheduled']);
 
 const dateTime = ref('');
 const doctorId = ref('');
+// Encaixe: começa como o agendamento é (a recepção desmarca se o novo
+// horário for normal) — o servidor confere o teto do turno de destino.
+const isFitIn = ref(false);
 const saving = ref(false);
 const errorMsg = ref('');
 const modalOpen = ref(false);
@@ -25,6 +28,7 @@ watch(
         if (val) {
             dateTime.value = '';
             doctorId.value = val.doctor_id ?? '';
+            isFitIn.value = Boolean(val.is_fit_in);
             errorMsg.value = '';
             saving.value = false;
             modalOpen.value = true;
@@ -52,7 +56,11 @@ async function onConfirm() {
             Accept: 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
         },
-        body: JSON.stringify({ date_time: dateTime.value, doctor_id: doctorId.value || null }),
+        body: JSON.stringify({
+            date_time: dateTime.value,
+            doctor_id: doctorId.value || null,
+            is_fit_in: isFitIn.value,
+        }),
     });
     const json = await res.json();
     saving.value = false;
@@ -91,12 +99,20 @@ function onHidden() {
                             <label class="form-label fw-semibold">{{ t.reschedule_doctor }}</label>
                             <SearchSelect v-model="doctorId" :options="doctors" :placeholder="t.form_select" />
                         </div>
+                        <div class="form-check mb-2">
+                            <input id="reschedule-fit-in" v-model="isFitIn" type="checkbox" class="form-check-input" />
+                            <label for="reschedule-fit-in" class="form-check-label small fw-semibold">
+                                {{ t.form_fit_in ?? 'Encaixe' }}
+                            </label>
+                            <div class="form-text small mt-0">{{ t.form_fit_in_hint }}</div>
+                        </div>
                         <SlotPicker
                             v-if="modalOpen"
                             ref="slotPickerRef"
                             v-model="dateTime"
                             :doctor-id="doctorId"
                             :schedule-id="item?.id ?? null"
+                            :allow-occupied="isFitIn"
                             :t="t"
                         />
                     </div>

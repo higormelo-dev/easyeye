@@ -265,6 +265,10 @@ return [
     'summary_missed_note_one'   => ':count no-show/cancellation not counted.',
     'summary_missed_note_other' => ':count no-shows/cancellations not counted.',
     'summary_all_missed'        => "All of today's appointments were cancelled or missed.",
+    'summary_urgent_care'       => 'Urgent care',
+    'summary_urgent_care_one'   => ':count in queue',
+    'summary_urgent_care_other' => ':count in queue',
+    'summary_urgent_care_hint'  => 'Walk-in patients waiting now — opens the queue',
 
     // Today's schedule
     'arrived_at' => 'arrived at :time',

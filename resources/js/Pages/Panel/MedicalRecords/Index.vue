@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import DoctorMissingAlert from '@/Components/Panel/DoctorMissingAlert.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
@@ -17,6 +18,9 @@ const props = defineProps({
     t: { type: Object, default: () => ({}) },
     /** Apenas médicos podem criar/editar prontuário (CFM Res. 2.227/2018). */
     isDoctor: { type: Boolean, default: false },
+    // Perfil médico sem cadastro de médico ativo (CurrentDoctor): aviso + ações escondidas.
+    doctorMissing: { type: Boolean, default: false },
+    doctorMissingText: { type: String, default: '' },
 });
 
 // ── Timeline: paginação infinita ────────────────────────────────────────────
@@ -136,6 +140,8 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
                     </div>
                 </template>
             </PageHeader>
+
+            <DoctorMissingAlert v-if="doctorMissing" :text="doctorMissingText" />
 
             <div class="row g-3">
                 <!-- Coluna lateral: info do paciente (componente padrão do prontuário) -->

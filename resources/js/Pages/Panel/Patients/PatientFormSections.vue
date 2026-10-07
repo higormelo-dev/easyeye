@@ -26,12 +26,32 @@ const props = defineProps({
     lookupCep: { type: Function, default: () => {} },
     // Plano já salvo (opção completa vinda do editData) — rótulo do seletor.
     planOption: { type: Object, default: null },
+    // Convênio já salvo ({ id, name, active } do editData): `covenants` só traz
+    // ativos; o inativo que o paciente já tem entra marcado "(inativo)".
+    covenantOption: { type: Object, default: null },
 });
+
+// Textos compartilhados (lang/<locale>/ui.php → patient_form) — o mesmo
+// componente serve Pacientes e Agenda, cada um com o seu `t` de página.
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
+
+const covenantOptions = computed(() => {
+    const current = props.covenantOption;
+    if (!current?.id || props.covenants.some((c) => c.id === current.id)) return props.covenants;
+
+    const label = current.active ? current.name : `${current.name} ${ui.value.covenant_inactive_suffix ?? '(inativo)'}`;
+    return [...props.covenants, { id: current.id, name: label }];
+});
+
+// Homônimo: o servidor avisa (erro em confirm_homonym) e a recepção confirma
+// que é outra pessoa (trocar nome/nascimento desfaz — ver usePatientForm).
+const homonymId = `homonym-confirm-${Math.random().toString(36).slice(2, 8)}`;
 
 // Particular não tem carteirinha — o backend já descarta o valor
 // (PatientService::isParticular); aqui só evita o usuário digitar à toa.
 const isParticular = computed(() => {
-    const selected = props.covenants.find((c) => c.id === props.form.covenant_id);
+    const selected = covenantOptions.value.find((c) => c.id === props.form.covenant_id);
     return (selected?.name ?? '').trim().toUpperCase() === 'PARTICULAR';
 });
 
@@ -41,11 +61,6 @@ watch(isParticular, (particular) => {
         props.form.covenant_plan_id = '';
     }
 });
-
-// Textos compartilhados (lang/<locale>/ui.php → patient_form) — o mesmo
-// componente serve Pacientes e Agenda, cada um com o seu `t` de página.
-const page = usePage();
-const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
 
 // ── Plano do convênio ─────────────────────────────────────────────────────
 // Lista inicial (primeiros planos do convênio) + busca no servidor ao
@@ -132,6 +147,32 @@ const showNoPlans = computed(
             <label class="form-label">Nome completo <span class="text-danger">*</span></label>
             <input v-model="form.name" type="text" class="form-control" :class="{ 'is-invalid': form.errors.name }" />
             <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
+        </div>
+
+        <!-- Homônimo: mesmo nome de outro paciente desta clínica (com outra data
+             de nascimento ou sem ela). Salva só com a confirmação explícita. -->
+        <div
+            v-if="form.errors.confirm_homonym"
+            class="alert alert-warning py-2 mb-3"
+            role="alert"
+            data-testid="homonym-alert"
+        >
+            <strong class="d-block mb-1">
+                <i class="ti ti-users me-1" aria-hidden="true"></i>{{ ui.homonym_title ?? 'Paciente com o mesmo nome' }}
+            </strong>
+            <p class="mb-2 small">{{ form.errors.confirm_homonym }}</p>
+            <div class="form-check mb-0">
+                <input
+                    :id="homonymId"
+                    v-model="form.confirm_homonym"
+                    type="checkbox"
+                    class="form-check-input"
+                    data-testid="homonym-confirm"
+                />
+                <label class="form-check-label fw-semibold" :for="homonymId">
+                    {{ ui.homonym_confirm ?? 'Confirmo que é outro paciente' }}
+                </label>
+            </div>
         </div>
 
         <div class="mb-3">
@@ -253,7 +294,7 @@ const showNoPlans = computed(
             <label class="form-label">Convênio <span class="text-danger">*</span></label>
             <SearchSelect
                 v-model="form.covenant_id"
-                :options="covenants"
+                :options="covenantOptions"
                 :placeholder="'Selecione'"
                 :invalid="!!form.errors.covenant_id"
                 @change="onCovenantChange"

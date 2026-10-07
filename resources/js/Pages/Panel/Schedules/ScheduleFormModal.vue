@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed, nextTick } from 'vue';
+import { ref, watch, computed, nextTick, onBeforeUnmount } from 'vue';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import SlotPicker from '@/Components/Panel/SlotPicker.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
@@ -30,11 +30,27 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'saved']);
 
-// ── Opções de recorrência (rótulos vindos das traduções) ──────────────────────
+// ── Série de sessões (rótulos vindos das traduções) ───────────────────────────
 const recurrenceTypeOptions = computed(() => [
     { value: 'weekly', label: props.t.form_weekly },
     { value: 'monthly', label: props.t.form_monthly },
+    { value: 'weekdays', label: props.t.form_weekdays ?? 'Dias da semana' },
 ]);
+
+const sessionLocale = typeof window !== 'undefined' && window.sessionLocale ? window.sessionLocale : 'pt-BR';
+
+// Seg..Sáb (domingo fora: clínica não atende tratamento seriado no domingo).
+const weekdayOptions = computed(() =>
+    [1, 2, 3, 4, 5, 6].map((day) => ({
+        day,
+        label: new Date(2023, 0, 1 + day)
+            .toLocaleDateString(sessionLocale, { weekday: 'short' })
+            .replace(/\.$/, '')
+            .replace(/^\w/, (c) => c.toUpperCase()),
+    })),
+);
+
+const SERIES_MAX = 60;
 
 // ── Estado do formulário ───────────────────────────────────────────────────────
 const saving = ref(false);
@@ -57,7 +73,109 @@ const form = ref({
     use_recurrence: false,
     recurrence_type: 'weekly',
     recurrence_until: '',
+    recurrence_weekdays: [],
+    recurrence_end: 'count',
+    recurrence_count: 4,
+    is_fit_in: false,
 });
+
+// ── Prévia da série: datas + conflitos (servidor), datas removidas à mão ──────
+const seriesPreview = ref([]);
+const seriesLoading = ref(false);
+const seriesError = ref('');
+const seriesTruncated = ref(false);
+const seriesRemoved = ref([]); // date_time das sessões que a recepção tirou
+let seriesDebounce = null;
+let seriesRequest = 0;
+
+const seriesSelected = computed(() =>
+    seriesPreview.value.filter((session, index) => index === 0 || !seriesRemoved.value.includes(session.date_time)),
+);
+const seriesConflicts = computed(() => seriesSelected.value.filter((session) => session.errors.length > 0));
+
+function seriesParams() {
+    const f = form.value;
+    const params = new URLSearchParams({
+        doctor_id: f.doctor_id,
+        date_time: f.date_time,
+        frequency: f.recurrence_type,
+        end: f.recurrence_end,
+        is_fit_in: f.is_fit_in ? '1' : '0',
+    });
+    if (f.recurrence_end === 'count') params.set('count', String(f.recurrence_count || ''));
+    else params.set('until', f.recurrence_until || '');
+    if (f.recurrence_type === 'weekdays') f.recurrence_weekdays.forEach((d) => params.append('weekdays[]', String(d)));
+    (f.resource_ids ?? []).forEach((id) => params.append('resource_ids[]', id));
+    return params;
+}
+
+function seriesReady() {
+    const f = form.value;
+    if (!f.use_recurrence || !f.doctor_id || !f.date_time) return false;
+    if (f.recurrence_type === 'weekdays' && f.recurrence_weekdays.length === 0) return false;
+    if (f.recurrence_end === 'count') return Number(f.recurrence_count) >= 2;
+    return Boolean(f.recurrence_until);
+}
+
+async function loadSeriesPreview() {
+    if (!seriesReady()) {
+        seriesPreview.value = [];
+        return;
+    }
+    const ticket = ++seriesRequest;
+    seriesLoading.value = true;
+    seriesError.value = '';
+    try {
+        const res = await fetch(`${route('panel.schedules.series.preview')}?${seriesParams()}`, {
+            headers: { Accept: 'application/json' },
+        });
+        const json = await res.json().catch(() => ({}));
+        if (ticket !== seriesRequest) return;
+        if (!res.ok) {
+            seriesPreview.value = [];
+            seriesError.value = Object.values(json.errors ?? {})[0]?.[0] ?? json.message ?? '';
+            return;
+        }
+        seriesPreview.value = json.sessions ?? [];
+        seriesTruncated.value = Boolean(json.truncated);
+    } catch {
+        // Falha de rede: sem prévia (o salvar valida tudo de novo no servidor).
+        if (ticket === seriesRequest) seriesPreview.value = [];
+    } finally {
+        if (ticket === seriesRequest) seriesLoading.value = false;
+    }
+}
+
+function scheduleSeriesPreview() {
+    clearTimeout(seriesDebounce);
+    seriesDebounce = setTimeout(loadSeriesPreview, 400);
+}
+
+function toggleSession(session) {
+    const idx = seriesRemoved.value.indexOf(session.date_time);
+    if (idx === -1) seriesRemoved.value.push(session.date_time);
+    else seriesRemoved.value.splice(idx, 1);
+}
+
+function toggleWeekday(day) {
+    const list = form.value.recurrence_weekdays;
+    const idx = list.indexOf(day);
+    if (idx === -1) list.push(day);
+    else list.splice(idx, 1);
+}
+
+function sessionDateLabel(iso) {
+    const dt = new Date(`${iso}:00`);
+    if (Number.isNaN(dt.getTime())) return iso;
+    const date = dt.toLocaleDateString(sessionLocale, {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    });
+    const time = dt.toLocaleTimeString(sessionLocale, { hour: '2-digit', minute: '2-digit' });
+    return `${date} · ${time}`;
+}
 
 // ── Abas (Agendamento + cadastro do paciente) ─────────────────────────────────
 // Primeira aba = fluxo rápido atual da Agenda; as demais reaproveitam os
@@ -77,6 +195,7 @@ const {
     form: patientForm,
     loading: patientLoading,
     planOption,
+    covenantOption,
     resetForm: resetPatientForm,
     loadEditData,
     savePatient,
@@ -125,11 +244,22 @@ function onPatientInput() {
 }
 
 async function searchPatients() {
-    const res = await fetch(`/panel/patients/search?q=${encodeURIComponent(patientSearch.value)}`, {
-        headers: { Accept: 'application/json' },
-    });
-    patientResults.value = res.ok ? await res.json() : [];
+    try {
+        const res = await fetch(`/panel/patients/search?q=${encodeURIComponent(patientSearch.value)}`, {
+            headers: { Accept: 'application/json' },
+        });
+        patientResults.value = res.ok ? await res.json() : [];
+    } catch {
+        patientResults.value = [];
+    }
 }
+
+// Debounces (prévia da série, busca de paciente) morrem com o modal: nada de
+// fetch/re-render depois de sair da tela.
+onBeforeUnmount(() => {
+    clearTimeout(seriesDebounce);
+    clearTimeout(patientDebounce.value);
+});
 
 function selectPatient(p) {
     form.value.patient_id = p.id;
@@ -190,6 +320,25 @@ watch(
     },
 );
 
+// Prévia acompanha o que muda (data/horário, médico, frequência, fim, sala, encaixe).
+watch(
+    () => [
+        form.value.use_recurrence,
+        form.value.doctor_id,
+        form.value.date_time,
+        form.value.recurrence_type,
+        form.value.recurrence_weekdays.join(','),
+        form.value.recurrence_end,
+        form.value.recurrence_count,
+        form.value.recurrence_until,
+        (form.value.resource_ids ?? []).join(','),
+        form.value.is_fit_in,
+    ],
+    () => {
+        if (!isEdit.value) scheduleSeriesPreview();
+    },
+);
+
 // ── Abertura / fechamento do modal ─────────────────────────────────────────────
 watch(
     () => props.open,
@@ -198,6 +347,10 @@ watch(
 
         // Reset campos auxiliares
         errors.value = {};
+        seriesPreview.value = [];
+        seriesRemoved.value = [];
+        seriesError.value = '';
+        seriesTruncated.value = false;
         saving.value = false;
         patientResults.value = [];
         resources.value = [];
@@ -207,13 +360,16 @@ watch(
 
         if (props.editSchedule) {
             const s = props.editSchedule;
-            const dt = s.date_time ? s.date_time.substring(0, 16) : '';
+            // show() manda date_time formatado (d/m/Y H:i, para o drawer) e
+            // date_time_iso para o formulário.
+            const iso = s.date_time_iso ?? s.date_time ?? '';
+            const dt = iso ? iso.substring(0, 16) : '';
             const date = dt.substring(0, 10);
 
             form.value = {
                 doctor_id: s.doctor_id ?? '',
                 patient_id: s.patient_id ?? '',
-                full_name: s.full_name ?? '',
+                full_name: s.full_name ?? s.patient_name ?? '',
                 date_time: dt,
                 telephone: s.telephone ?? '',
                 cellphone: s.cellphone ?? '',
@@ -227,8 +383,12 @@ watch(
                 use_recurrence: false,
                 recurrence_type: 'weekly',
                 recurrence_until: '',
+                recurrence_weekdays: [],
+                recurrence_end: 'count',
+                recurrence_count: 4,
+                is_fit_in: Boolean(s.is_fit_in),
             };
-            patientSearch.value = s.full_name ?? '';
+            patientSearch.value = s.full_name ?? s.patient_name ?? '';
 
             // Paciente vinculado: abas já abrem com o cadastro completo.
             if (s.patient_id) loadEditData(s.patient_id);
@@ -259,6 +419,10 @@ watch(
                 use_recurrence: false,
                 recurrence_type: 'weekly',
                 recurrence_until: '',
+                recurrence_weekdays: [],
+                recurrence_end: 'count',
+                recurrence_count: 4,
+                is_fit_in: false,
             };
             patientSearch.value = p?.full_name ?? '';
 
@@ -272,6 +436,20 @@ watch(
     },
 );
 
+// ── Convênio ───────────────────────────────────────────────────────────────────
+// A lista (props.covenants) só tem ativos. Agendamento antigo cujo convênio foi
+// inativado depois mantém o dele (o servidor aceita o mesmo id) — a opção
+// aparece marcada "(inativo)" em vez de o campo parecer vazio. Vindo da lista
+// de espera, o inativo também aparece marcado (o servidor recusa e a recepção
+// troca por um ativo).
+const covenantOptions = computed(() => {
+    const s = props.editSchedule ?? props.prefillData;
+    if (!s?.covenant_id || props.covenants.some((c) => c.id === s.covenant_id)) return props.covenants;
+
+    const suffix = props.t.covenant_inactive_suffix ?? '(inativo)';
+    return [...props.covenants, { id: s.covenant_id, name: `${s.covenant_name ?? ''} ${suffix}`.trim() }];
+});
+
 // ── Envio do formulário ────────────────────────────────────────────────────────
 const isEdit = computed(() => !!props.editSchedule);
 const submitUrl = computed(() =>
@@ -284,6 +462,20 @@ function firstPatientTabWithError() {
 
 async function onSubmit() {
     if (saving.value) return;
+
+    // Série: precisa da prévia carregada e sem data com conflito marcada.
+    if (!isEdit.value && form.value.use_recurrence) {
+        if (seriesLoading.value) return;
+        if (seriesSelected.value.length < 2) {
+            seriesError.value = props.t.series_need_two ?? 'A série precisa de pelo menos 2 sessões.';
+            return;
+        }
+        if (seriesConflicts.value.length > 0) {
+            seriesError.value = props.t.series_remove_conflicts ?? 'Desmarque as datas com conflito para salvar.';
+            return;
+        }
+    }
+
     saving.value = true;
     errors.value = {};
 
@@ -306,12 +498,25 @@ async function onSubmit() {
         patientSearch.value = result.patient.full_name || patientSearch.value;
     }
 
-    // 2) Agendamento (fluxo original)
+    // 2) Agendamento (fluxo original) — série: datas 2..N que ficaram na prévia
+    // (o servidor revalida tudo e grava tudo ou nada).
+    const useSeries = !isEdit.value && form.value.use_recurrence;
     const body = {
-        ...form.value,
+        doctor_id: form.value.doctor_id,
+        patient_id: form.value.patient_id,
+        full_name: form.value.full_name,
         date_time: form.value.date_time || null,
-        recurrence_type: form.value.use_recurrence ? form.value.recurrence_type : null,
-        recurrence_until: form.value.use_recurrence ? form.value.recurrence_until : null,
+        telephone: form.value.telephone,
+        cellphone: form.value.cellphone,
+        cellphone_whatsapp: form.value.cellphone_whatsapp,
+        notes: form.value.notes,
+        covenant_id: form.value.covenant_id,
+        visit_id: form.value.visit_id,
+        specialty_area: form.value.specialty_area,
+        resource_ids: form.value.resource_ids,
+        waiting_list_id: form.value.waiting_list_id,
+        is_fit_in: form.value.is_fit_in,
+        ...(useSeries ? { series_dates: seriesSelected.value.slice(1).map((session) => session.date_time) } : {}),
     };
 
     const res = await fetch(submitUrl.value, {
@@ -413,12 +618,30 @@ async function onSubmit() {
                         <i class="fas fa-exclamation-circle me-1"></i>{{ errors.date_time[0] }}
                     </div>
 
+                    <!-- Encaixe: paciente a mais no turno (pode cair em horário
+                         ocupado/fora do intervalo; teto por médico e turno). -->
+                    <div class="form-check mb-2">
+                        <input
+                            id="schedule-fit-in"
+                            v-model="form.is_fit_in"
+                            type="checkbox"
+                            class="form-check-input"
+                            data-test="fit-in-toggle"
+                        />
+                        <label for="schedule-fit-in" class="form-check-label fw-semibold">
+                            <i class="ti ti-arrow-autofit-height me-1 text-purple" aria-hidden="true"></i
+                            >{{ t.form_fit_in ?? 'Encaixe' }}
+                        </label>
+                        <div class="form-text small mt-0">{{ t.form_fit_in_hint }}</div>
+                    </div>
+
                     <SlotPicker
                         v-if="open"
                         ref="slotPickerRef"
                         v-model="form.date_time"
                         :doctor-id="form.doctor_id"
                         :schedule-id="editSchedule?.id ?? null"
+                        :allow-occupied="form.is_fit_in"
                         :t="t"
                     />
                 </div>
@@ -533,7 +756,15 @@ async function onSubmit() {
                 <div class="row g-2 mb-3">
                     <div class="col-12 col-md-4">
                         <label class="form-label fw-semibold">{{ t.form_covenant }}</label>
-                        <SearchSelect v-model="form.covenant_id" :options="covenants" :placeholder="t.form_none" />
+                        <SearchSelect
+                            v-model="form.covenant_id"
+                            :options="covenantOptions"
+                            :placeholder="t.form_none"
+                            :invalid="!!errors.covenant_id"
+                        />
+                        <div v-if="errors.covenant_id" class="invalid-feedback d-block">
+                            {{ errors.covenant_id[0] }}
+                        </div>
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label fw-semibold">{{ t.form_visit_type }}</label>
@@ -611,8 +842,11 @@ async function onSubmit() {
                     ></textarea>
                 </div>
 
-                <!-- ── Recorrência (somente ao criar) ───────────────────────── -->
-                <div v-if="!isEdit" class="mb-3">
+                <!-- ── Série de sessões (somente ao criar) ──────────────────────
+                     Semanal, mensal ou dias da semana; N sessões ou até a data.
+                     Prévia com os conflitos de cada data (médico, intervalo,
+                     bloqueio, sala) — a recepção desmarca o que não serve. -->
+                <div v-if="!isEdit" class="mb-3" data-test="series-section">
                     <div class="form-check">
                         <input
                             id="use-recurrence"
@@ -623,9 +857,10 @@ async function onSubmit() {
                         <label for="use-recurrence" class="form-check-label fw-semibold">
                             {{ t.form_recurrence }}
                         </label>
+                        <div class="form-text small mt-0">{{ t.form_series_hint }}</div>
                     </div>
                     <div v-if="form.use_recurrence" class="mt-2 row g-2">
-                        <div class="col-6">
+                        <div class="col-12 col-sm-6">
                             <label class="form-label small">{{ t.form_rec_freq }}</label>
                             <SearchSelect
                                 v-model="form.recurrence_type"
@@ -636,14 +871,152 @@ async function onSubmit() {
                                 :searchable="false"
                             />
                         </div>
-                        <div class="col-6">
-                            <label class="form-label small">{{ t.form_rec_until }}</label>
-                            <input v-model="form.recurrence_until" type="date" class="form-control form-control-sm" />
+                        <div class="col-12 col-sm-6">
+                            <span class="form-label small d-block">{{ t.form_rec_end ?? 'Termina' }}</span>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <div class="form-check form-check-inline me-0">
+                                    <input
+                                        id="rec-end-count"
+                                        v-model="form.recurrence_end"
+                                        class="form-check-input"
+                                        type="radio"
+                                        value="count"
+                                    />
+                                    <label class="form-check-label small" for="rec-end-count">{{
+                                        t.form_rec_after ?? 'Após'
+                                    }}</label>
+                                </div>
+                                <input
+                                    v-model.number="form.recurrence_count"
+                                    type="number"
+                                    min="2"
+                                    :max="SERIES_MAX"
+                                    class="form-control form-control-sm rec-count-input"
+                                    :disabled="form.recurrence_end !== 'count'"
+                                    :aria-label="t.form_rec_sessions ?? 'sessões'"
+                                />
+                                <span class="small text-muted">{{ t.form_rec_sessions ?? 'sessões' }}</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
+                                <div class="form-check form-check-inline me-0">
+                                    <input
+                                        id="rec-end-until"
+                                        v-model="form.recurrence_end"
+                                        class="form-check-input"
+                                        type="radio"
+                                        value="until"
+                                    />
+                                    <label class="form-check-label small" for="rec-end-until">{{
+                                        t.form_rec_until
+                                    }}</label>
+                                </div>
+                                <input
+                                    v-model="form.recurrence_until"
+                                    type="date"
+                                    class="form-control form-control-sm rec-until-input"
+                                    :disabled="form.recurrence_end !== 'until'"
+                                    :aria-label="t.form_rec_until"
+                                />
+                            </div>
                         </div>
-                        <div class="col-12">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>{{ t.form_rec_hint }}
-                            </small>
+
+                        <div v-if="form.recurrence_type === 'weekdays'" class="col-12">
+                            <span class="form-label small d-block">{{ t.form_rec_weekdays ?? 'Dias da semana' }}</span>
+                            <div class="d-flex flex-wrap gap-1" role="group" :aria-label="t.form_rec_weekdays">
+                                <button
+                                    v-for="option in weekdayOptions"
+                                    :key="option.day"
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="
+                                        form.recurrence_weekdays.includes(option.day)
+                                            ? 'btn-primary'
+                                            : 'btn-outline-secondary'
+                                    "
+                                    :aria-pressed="form.recurrence_weekdays.includes(option.day) ? 'true' : 'false'"
+                                    :data-weekday="option.day"
+                                    @click="toggleWeekday(option.day)"
+                                >
+                                    {{ option.label }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Prévia -->
+                        <div class="col-12" data-test="series-preview">
+                            <div v-if="!form.date_time" class="text-muted small">
+                                <i class="fas fa-info-circle me-1"></i
+                                >{{ t.series_pick_time ?? 'Escolha o horário da 1ª sessão.' }}
+                            </div>
+                            <div v-else-if="seriesLoading" class="small text-muted d-flex align-items-center gap-2">
+                                <span class="spinner-border spinner-border-sm"></span
+                                >{{ t.series_loading ?? 'Calculando datas…' }}
+                            </div>
+                            <template v-else-if="seriesPreview.length">
+                                <div class="d-flex justify-content-between align-items-baseline small mb-1">
+                                    <strong>{{
+                                        (t.series_summary ?? ':count sessões').replace(':count', seriesSelected.length)
+                                    }}</strong>
+                                    <span v-if="seriesConflicts.length" class="text-danger">
+                                        <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                                        >{{
+                                            (t.series_conflicts_count ?? ':count com conflito').replace(
+                                                ':count',
+                                                seriesConflicts.length,
+                                            )
+                                        }}
+                                    </span>
+                                </div>
+                                <ul class="list-group list-group-flush series-preview-list border rounded">
+                                    <li
+                                        v-for="(session, index) in seriesPreview"
+                                        :key="session.date_time"
+                                        class="list-group-item d-flex align-items-start gap-2 py-1 px-2"
+                                        :class="{
+                                            'series-removed': index > 0 && seriesRemoved.includes(session.date_time),
+                                            'series-conflict': session.errors.length > 0,
+                                        }"
+                                        :data-session="session.number"
+                                    >
+                                        <input
+                                            :id="`series-${index}`"
+                                            type="checkbox"
+                                            class="form-check-input mt-1 flex-shrink-0"
+                                            :checked="index === 0 || !seriesRemoved.includes(session.date_time)"
+                                            :disabled="index === 0"
+                                            :title="index === 0 ? t.series_first_fixed : undefined"
+                                            @change="toggleSession(session)"
+                                        />
+                                        <label :for="`series-${index}`" class="small flex-grow-1 mb-0">
+                                            <span class="fw-semibold">{{ session.number }}.</span>
+                                            {{ sessionDateLabel(session.date_time) }}
+                                            <span v-if="session.errors.length" class="d-block text-danger">
+                                                <i class="ti ti-alert-circle me-1" aria-hidden="true"></i
+                                                >{{ session.errors[0] }}
+                                            </span>
+                                        </label>
+                                        <i
+                                            v-if="!session.errors.length"
+                                            class="ti ti-circle-check text-success mt-1"
+                                            :title="t.series_ok ?? 'Livre'"
+                                            aria-hidden="true"
+                                        ></i>
+                                    </li>
+                                </ul>
+                                <p v-if="seriesTruncated" class="small text-warning-emphasis mt-1 mb-0">
+                                    <i class="ti ti-info-circle me-1"></i
+                                    >{{
+                                        (t.series_truncated ?? 'Limite de :max sessões por série.').replace(
+                                            ':max',
+                                            SERIES_MAX,
+                                        )
+                                    }}
+                                </p>
+                            </template>
+                            <div v-if="seriesError || errors.series_dates" class="text-danger small mt-1" role="alert">
+                                <i class="fas fa-exclamation-circle me-1"></i
+                                >{{ seriesError || errors.series_dates?.[0] }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -683,6 +1056,7 @@ async function onSubmit() {
                         :is-edit="!!form.patient_id"
                         :lookup-cep="lookupCep"
                         :plan-option="planOption"
+                        :covenant-option="covenantOption"
                     />
                 </div>
             </div>
@@ -710,5 +1084,35 @@ async function onSubmit() {
    modal ficaria "pulando" a cada troca de aba. */
 .schedule-patient-tabs {
     min-height: 480px;
+}
+
+.rec-count-input {
+    width: 4.5rem;
+}
+
+.rec-until-input {
+    width: 10rem;
+}
+
+.series-preview-list {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.series-preview-list .series-removed label {
+    text-decoration: line-through;
+    color: var(--bs-secondary-color);
+}
+
+.series-preview-list .series-conflict:not(.series-removed) {
+    background: rgba(220, 53, 69, 0.06);
+}
+
+.text-purple {
+    color: #7c3aed;
+}
+
+[data-bs-theme='dark'] .series-preview-list .series-conflict:not(.series-removed) {
+    background: rgba(248, 113, 113, 0.12);
 }
 </style>

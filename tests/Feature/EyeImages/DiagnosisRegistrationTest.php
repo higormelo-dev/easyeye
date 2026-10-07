@@ -17,6 +17,8 @@ beforeEach(function () {
 
     $this->doctor           = User::factory()->create();
     $this->doctorEntityUser = createEntityUser($this->entity, $this->doctor, ClientRule::Doctor->value);
+    // Diagnóstico é ato médico: perfil + cadastro de médico ativo (Gate IssueReport).
+    doctorRecordForEntityUser($this->doctorEntityUser);
 
     $this->secretary           = User::factory()->create();
     $this->secretaryEntityUser = createEntityUser($this->entity, $this->secretary, ClientRule::Secretary->value);

@@ -127,7 +127,7 @@ function onToggleActive(id, currentActive) {
 }
 
 function onRestore(id) {
-    router.get(route('panel.patients.restore', id), {}, { preserveScroll: true });
+    router.patch(route('panel.patients.restore', id), {}, { preserveScroll: true });
 }
 
 const breadcrumbs = [

@@ -71,9 +71,9 @@ function signedLaudoFixture($test): MedicalRecordDocumentation
         'doctor_id'      => $test->doctorA->id,
         'main_complaint' => 'Consulta',
     ]);
-    $record->sign($test->entityUserA);
-
-    return MedicalRecordDocumentation::create([
+    // Documento emitido ANTES da assinatura: com o prontuário assinado, nada
+    // mais é emitido nele (GuardedBySignedRecord).
+    $documentation = MedicalRecordDocumentation::create([
         'medical_record_id' => $record->id,
         'patient_id'        => $test->patientA->id,
         'doctor_id'         => $test->doctorA->id,
@@ -81,6 +81,9 @@ function signedLaudoFixture($test): MedicalRecordDocumentation
         'title'             => 'Receituário',
         'content'           => '<p>x</p>',
     ]);
+    $record->sign($test->entityUserA);
+
+    return $documentation;
 }
 
 test('staff concede grant e ele fica ativo', function () {

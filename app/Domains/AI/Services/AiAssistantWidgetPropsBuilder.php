@@ -7,6 +7,7 @@ namespace App\Domains\AI\Services;
 use App\Enums\AI\AiRunMode;
 use App\Enums\{ClientRule, FeatureKey};
 use App\Services\FeatureGateService;
+use App\Support\CurrentDoctor;
 
 /**
  * Constrói o prop `aiAssistant` compartilhado globalmente via Inertia
@@ -40,6 +41,12 @@ class AiAssistantWidgetPropsBuilder
         // recorte de "isDoctor" já usado no prontuário e no AiAssistantPanel
         // inline. Outros perfis (secretária/financeiro/admin) não veem o widget.
         if ($userRule !== ClientRule::Doctor->value) {
+            return ['enabled' => false];
+        }
+
+        // Sem cadastro de médico ativo a resposta nunca seria aprovada (Gate
+        // IssueReport): o widget não aparece.
+        if (CurrentDoctor::issuer() === null) {
             return ['enabled' => false];
         }
 

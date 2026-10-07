@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\{DataAccessPurpose, EntityGate};
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordEvolution, Patient};
+use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Gate;
@@ -71,19 +72,10 @@ class MedicalRecordEvolutionsController extends Controller
             'content' => ['required', 'string', 'max:20000'],
         ]);
 
-        // Médico do prontuário; fallback: usuário logado é médico → resolve
-        // automaticamente (mesmo padrão de MedicalRecordQuickActionsController).
-        $doctor = $medicalrecord->doctor ?? Doctor::with('person')
-            ->whereHas('entityUser', fn ($q) => $q
-                ->where('entity_id', $entity->id)
-                ->where('user_id', auth()->id()))
-            ->first();
-
-        if (! $doctor) {
-            return response()->json([
-                'message' => 'Selecione o médico responsável antes de registrar a evolução.',
-            ], 422);
-        }
+        // Autoria = médico que registra (logado, cadastro ativo — o Gate acima
+        // exige), nunca o médico do prontuário (seria no nome de um colega).
+        $doctor = CurrentDoctor::issuer()?->loadMissing('person');
+        abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
 
         $evolution = MedicalRecordEvolution::create([
             'entity_id'         => $entity->id,

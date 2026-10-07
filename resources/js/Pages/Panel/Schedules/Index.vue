@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, defineAsyncComponent, onMounted } from 'vue';
+import { ref, computed, watch, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ScheduleCard from './ScheduleCard.vue';
@@ -19,6 +19,8 @@ import ScheduleDetailDrawer from './ScheduleDetailDrawer.vue';
 import CashEntryModal from './CashEntryModal.vue';
 import { useDashboardPolling } from '@/composables/useDashboardPolling.js';
 import MiniCalendar from '@/Components/Panel/MiniCalendar.vue';
+import AgendaCounters from './AgendaCounters.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 
 const props = defineProps({
     scheduleItems: { type: Array, default: () => [] },
@@ -39,6 +41,10 @@ const props = defineProps({
     moods: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
     isDoctor: { type: Boolean, default: false },
+    // Perfil médico sem cadastro de médico: o servidor não manda nada da
+    // clínica (SchedulesController::index / App\Support\CurrentDoctor) — a
+    // tela só mostra o aviso e esconde as ações de criar/importar.
+    doctorMissing: { type: Boolean, default: false },
     isStaff: { type: Boolean, default: false },
     canRegisterCash: { type: Boolean, default: false },
     // Dropdown "Relatórios" ao lado de "Novo" (GAP fechado — antes página-
@@ -47,47 +53,176 @@ const props = defineProps({
     reportsUrls: { type: Object, default: null },
     // Painel de chamadas (TV) habilitado nesta clínica — mostra o "Chamar paciente"
     callPanelEnabled: { type: Boolean, default: false },
+    // Contadores do topo (mesma conta do Dashboard) — também são os chips de filtro.
+    counters: { type: Object, default: () => ({}) },
+    // Salas/equipamentos ativos (filtro).
+    resourceOptions: { type: Array, default: () => [] },
+    // Telefone/WhatsApp/ficha do paciente só para quem tem acesso a Pacientes.
+    canSeePatients: { type: Boolean, default: false },
+    urls: { type: Object, default: () => ({}) },
     t: { type: Object, default: () => ({}) },
 });
 
 // ── Polling ────────────────────────────────────────────────────────────────────
-useDashboardPolling(['scheduleItems'], 30_000);
+useDashboardPolling(['scheduleItems', 'counters'], 30_000);
 
 // ── View mode (list | calendar) — persistido no localStorage ──────────────────
-const viewMode = ref(localStorage.getItem('schedules_view_mode') ?? 'list');
+function readViewMode() {
+    try {
+        return localStorage.getItem('schedules_view_mode') ?? 'list';
+    } catch {
+        return 'list';
+    }
+}
+
+const viewMode = ref(readViewMode());
 
 watch(viewMode, (mode) => {
-    localStorage.setItem('schedules_view_mode', mode);
+    try {
+        localStorage.setItem('schedules_view_mode', mode);
+    } catch {
+        /* armazenamento indisponível: só não lembra a escolha */
+    }
     if (mode === 'calendar') {
         selectionMode.value = false;
         selectedIds.value = [];
+    } else if (range.value !== 'day') {
+        // A lista é sempre do dia: volta o período para "dia".
+        range.value = 'day';
+        applyFilters(true);
     }
 });
 
 // ── Filters ────────────────────────────────────────────────────────────────────
-const date = ref(props.filters.date ?? new Date().toISOString().substring(0, 10));
+function localToday() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+const date = ref(props.filters.date ?? localToday());
 const doctor = ref(props.filters.doctor ?? 'tudo');
 const bout = ref(props.filters.bout ?? 1);
 const search = ref(props.filters.search ?? '');
+// Chip de situação (contador), especialidade, sala e período do calendário.
+const status = ref(props.filters.status ?? null);
+const specialty = ref(props.filters.specialty ?? '');
+const resource = ref(props.filters.resource ?? '');
+const range = ref(viewMode.value === 'calendar' ? (props.filters.range ?? 'day') : 'day');
 
 let searchDebounce = null;
 
-function applyFilters(partial = false) {
-    router.get(
-        route('panel.schedules.index'),
-        { date: date.value, doctor: doctor.value, bout: bout.value, search: search.value },
-        { preserveState: true, replace: true, only: partial ? ['scheduleItems', 'filters'] : undefined },
+function filterParams() {
+    return Object.fromEntries(
+        Object.entries({
+            date: date.value,
+            doctor: doctor.value,
+            bout: bout.value,
+            search: search.value,
+            status: status.value,
+            specialty: specialty.value,
+            resource: resource.value,
+            range: range.value,
+        }).filter(([, value]) => value !== null && value !== '' && value !== undefined),
     );
 }
+
+function applyFilters(partial = false) {
+    router.get(route('panel.schedules.index'), filterParams(), {
+        preserveState: true,
+        replace: true,
+        only: partial ? ['scheduleItems', 'filters', 'counters'] : undefined,
+    });
+}
+
+function setStatus(key) {
+    status.value = key;
+    applyFilters(true);
+}
+
+function onScopeFilterChange() {
+    applyFilters(true);
+}
+
+// "Contagem do período: 11/10/2026 a 17/10/2026" (semana/mês do calendário).
+const { date: formatDate } = useLocaleFormat();
+const periodLabel = computed(() =>
+    (props.t.counters_period ?? ':from — :to')
+        .replace(':from', formatDate(props.filters.from))
+        .replace(':to', formatDate(props.filters.to)),
+);
+
+// "Total" do título = linhas que a lista mostra (agendamentos; no chip
+// "Bloqueados", os bloqueios/compromissos) — bate com o contador ativo.
+const listedTotal = computed(() =>
+    status.value === 'blocked'
+        ? props.scheduleItems.length
+        : props.scheduleItems.filter((item) => item.type === 'schedule').length,
+);
+
+const hasExtraFilters = computed(() => Boolean(status.value || specialty.value || resource.value || search.value));
+
+function clearFilters() {
+    status.value = null;
+    specialty.value = '';
+    resource.value = '';
+    search.value = '';
+    applyFilters(true);
+}
+
+// Impressão da agenda do dia com os mesmos filtros (abre o PDF em outra aba).
+const printUrl = computed(() => {
+    // A impressão é sempre do dia: o período do calendário não vai junto.
+    const params = filterParams();
+    delete params.range;
+    return `${props.urls.print ?? route('panel.schedules.print')}?${new URLSearchParams(params)}`;
+});
+
+// ── Vagas do mês (calendário lateral) ─────────────────────────────────────────
+const availability = ref(null);
+const availabilityLoading = ref(false);
+const availabilityMonth = ref(null);
+let availabilityTicket = 0;
+
+async function loadAvailability() {
+    if (!availabilityMonth.value || props.doctorMissing) return;
+    const ticket = ++availabilityTicket;
+    availabilityLoading.value = true;
+    try {
+        const qs = new URLSearchParams({ month: availabilityMonth.value });
+        if (!props.isDoctor && doctor.value && doctor.value !== 'tudo') qs.set('doctor', doctor.value);
+        const res = await fetch(`${props.urls.availability ?? route('panel.schedules.availability')}?${qs}`, {
+            headers: { Accept: 'application/json' },
+        });
+        if (ticket !== availabilityTicket) return;
+        availability.value = res.ok ? ((await res.json()).days ?? null) : null;
+    } catch {
+        if (ticket === availabilityTicket) availability.value = null;
+    } finally {
+        if (ticket === availabilityTicket) availabilityLoading.value = false;
+    }
+}
+
+function onMonthChange(month) {
+    availabilityMonth.value = month;
+    loadAvailability();
+}
+
+// Lista mudou (polling, salvar, remarcar…): as vagas podem ter mudado.
+watch(
+    () => props.scheduleItems,
+    () => loadAvailability(),
+);
 
 function onSearchInput() {
     clearTimeout(searchDebounce);
     searchDebounce = setTimeout(() => applyFilters(true), 400);
 }
+onBeforeUnmount(() => clearTimeout(searchDebounce));
 
 function setDoctor(id) {
     doctor.value = id;
     applyFilters(true);
+    loadAvailability();
 }
 function setBout(b) {
     bout.value = b;
@@ -158,7 +293,7 @@ async function bulkUpdate(situation) {
     if (res.ok) {
         selectedIds.value = [];
         selectionMode.value = false;
-        router.reload({ only: ['scheduleItems'] });
+        router.reload({ only: ['scheduleItems', 'counters'] });
     }
 }
 
@@ -170,7 +305,7 @@ function onBulkCancelled(json) {
     showToast(json.message, 'success');
     selectedIds.value = [];
     selectionMode.value = false;
-    router.reload({ only: ['scheduleItems'] });
+    router.reload({ only: ['scheduleItems', 'counters'] });
 }
 
 // ── Bulk reschedule ────────────────────────────────────────────────────────────
@@ -181,7 +316,7 @@ function onBulkRescheduled(json) {
     showToast(json.message, 'success');
     selectedIds.value = [];
     selectionMode.value = false;
-    router.reload({ only: ['scheduleItems'] });
+    router.reload({ only: ['scheduleItems', 'counters'] });
 }
 
 // ── Schedule form modal ────────────────────────────────────────────────────────
@@ -190,6 +325,7 @@ const editSchedule = ref(null);
 const prefillData = ref(null);
 
 function openCreate() {
+    if (props.doctorMissing) return;
     editSchedule.value = null;
     prefillData.value = null;
     formOpen.value = true;
@@ -199,6 +335,9 @@ function openCreate() {
 // volta limpa com uma visita leve (replace + preserveState, como em
 // Pacientes) para recarregar a página não reabrir o formulário.
 onMounted(() => {
+    // Link com período de calendário aberto em modo lista: a lista é do dia.
+    if (viewMode.value === 'list' && (props.filters.range ?? 'day') !== 'day') applyFilters(true);
+
     const params = new URLSearchParams(window.location.search);
     if (params.get('new') !== '1') return;
 
@@ -239,16 +378,39 @@ function onSaved() {
     formOpen.value = false;
     editSchedule.value = null;
     prefillData.value = null;
-    router.reload({ only: ['scheduleItems'] });
+    router.reload({ only: ['scheduleItems', 'counters'] });
 }
 
 // ── Interação com CalendarView ─────────────────────────────────────────────────
-async function onCalendarEventClick(item) {
+// Clique num agendamento abre o detalhe (drawer), em qualquer período.
+function onCalendarEventClick(item) {
     if (item.type !== 'schedule') return;
-    await openEdit(item);
+    onView(item);
+}
+
+function onCalendarRangeChange(next) {
+    range.value = next;
+    applyFilters(true);
+}
+
+// Número do dia (semana/mês): abre aquele dia.
+function onCalendarDateClick(day) {
+    date.value = day;
+    range.value = 'day';
+    applyFilters(true);
+}
+
+// Drawer: remarcar uma sessão da série / série alterada.
+function onDrawerReschedule(item) {
+    openReschedule(item);
+}
+
+function onDrawerChanged() {
+    router.reload({ only: ['scheduleItems', 'counters'] });
 }
 
 function onCalendarSlotClick({ datetime }) {
+    if (props.doctorMissing) return;
     editSchedule.value = null;
     prefillData.value = { date_time: datetime };
     formOpen.value = true;
@@ -264,7 +426,7 @@ function openReschedule(item) {
 function onRescheduled(json) {
     rescheduleItem.value = null;
     showToast(json.message, 'success');
-    router.reload({ only: ['scheduleItems'] });
+    router.reload({ only: ['scheduleItems', 'counters'] });
 }
 
 // ── Cancel modal ───────────────────────────────────────────────────────────────
@@ -277,7 +439,7 @@ function openCancel(item) {
 function onCancelled(json) {
     cancelItem.value = null;
     showToast(json.message, 'success');
-    router.reload({ only: ['scheduleItems'] });
+    router.reload({ only: ['scheduleItems', 'counters'] });
 }
 
 // ── Caixa: entrada vinculada ao agendamento ─────────────────────────────────────
@@ -304,7 +466,7 @@ async function onCashSaved() {
         return;
     }
 
-    router.reload({ only: ['scheduleItems'] });
+    router.reload({ only: ['scheduleItems', 'counters'] });
 }
 
 // ── Chamar paciente (painel/TV da sala de espera) ─────────────────────────────
@@ -356,7 +518,7 @@ async function onChangeSituation({ item, to }) {
         if (to === 3 && props.canRegisterCash && !item.has_cash_entry && !item.bills_covenant) {
             openCashEntry(item);
         }
-        router.reload({ only: ['scheduleItems'] });
+        router.reload({ only: ['scheduleItems', 'counters'] });
     };
 
     // Sucesso da mudança de situação: modal (em vez de toast).
@@ -384,7 +546,7 @@ async function onChangeMood({ item, mood }) {
     });
     const json = await res.json();
     showToast(json.message, res.ok ? 'success' : 'error');
-    if (res.ok) router.reload({ only: ['scheduleItems'] });
+    if (res.ok) router.reload({ only: ['scheduleItems', 'counters'] });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -422,7 +584,7 @@ const breadcrumbs = [
                             white-space: nowrap;
                             line-height: 1.6;
                         "
-                        >Total: {{ scheduleItems.length }}</span
+                        >Total: {{ listedTotal }}</span
                     >
                 </div>
 
@@ -448,7 +610,7 @@ const breadcrumbs = [
                     </button>
                 </div>
 
-                <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
+                <button v-if="!doctorMissing" type="button" class="btn btn-primary btn-sm" @click="openCreate">
                     <i class="ti ti-plus me-1"></i>{{ t.btn_new }}
                 </button>
 
@@ -468,23 +630,122 @@ const breadcrumbs = [
                         <i class="ti ti-report-analytics me-1"></i>{{ t.btn_reports }}
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
+                        <li v-if="reportsUrls.production">
                             <a class="dropdown-item" :href="reportsUrls.production"
                                 ><i class="ti ti-report-analytics me-2"></i>{{ t.report_production }}</a
                             >
                         </li>
-                        <li>
+                        <li v-if="reportsUrls.absenteeism">
                             <a class="dropdown-item" :href="reportsUrls.absenteeism"
                                 ><i class="ti ti-user-x me-2"></i>{{ t.report_absenteeism }}</a
+                            >
+                        </li>
+                        <li v-if="reportsUrls.first_consultations">
+                            <a
+                                class="dropdown-item"
+                                :href="reportsUrls.first_consultations"
+                                data-testid="report-first-consultations"
+                                ><i class="ti ti-user-plus me-2"></i>{{ t.report_first_consultations }}</a
                             >
                         </li>
                     </ul>
                 </div>
 
                 <!-- Importação em lote de agendamentos (dados históricos via CSV) -->
-                <a :href="route('panel.schedules.import.index')" class="btn btn-outline-secondary btn-sm">
+                <a
+                    v-if="!doctorMissing"
+                    :href="route('panel.schedules.import.index')"
+                    class="btn btn-outline-secondary btn-sm"
+                >
                     <i class="ti ti-file-import me-1"></i>Importar
                 </a>
+            </div>
+
+            <div
+                v-if="doctorMissing"
+                class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0"
+                role="alert"
+                data-testid="doctor-missing-alert"
+            >
+                <i class="ti ti-user-exclamation fs-4 flex-shrink-0" aria-hidden="true"></i>
+                <div>
+                    <strong class="d-block">{{ t.doctor_missing_title }}</strong>
+                    {{ t.doctor_missing }}
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════════════════════════════
+                 Contadores do dia (também são os filtros por situação) +
+                 especialidade, sala/equipamento e impressão
+                 ════════════════════════════════════════════════════════════ -->
+            <div v-if="!doctorMissing" class="agenda-filters py-2 border-bottom" data-testid="agenda-filters">
+                <AgendaCounters
+                    :counters="counters"
+                    :active="status"
+                    :urgent-care-url="urls.urgentCare ?? null"
+                    :t="t"
+                    @select="setStatus"
+                />
+                <p
+                    v-if="range !== 'day' && viewMode === 'calendar' && filters.from"
+                    class="small text-muted mt-1 mb-0"
+                    data-testid="counters-period"
+                >
+                    {{ periodLabel }}
+                </p>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
+                    <label class="visually-hidden" for="agenda-specialty">{{ t.filter_specialty }}</label>
+                    <select
+                        id="agenda-specialty"
+                        v-model="specialty"
+                        class="form-select form-select-sm agenda-filter-select"
+                        data-testid="filter-specialty"
+                        @change="onScopeFilterChange"
+                    >
+                        <option value="">{{ t.filter_specialty_all ?? 'Todas as especialidades' }}</option>
+                        <option v-for="option in specialties" :key="option.id" :value="option.id">
+                            {{ option.name }}
+                        </option>
+                    </select>
+
+                    <template v-if="resourceOptions.length">
+                        <label class="visually-hidden" for="agenda-resource">{{ t.filter_resource }}</label>
+                        <select
+                            id="agenda-resource"
+                            v-model="resource"
+                            class="form-select form-select-sm agenda-filter-select"
+                            data-testid="filter-resource"
+                            @change="onScopeFilterChange"
+                        >
+                            <option value="">{{ t.filter_resource_all ?? 'Todas as salas e equipamentos' }}</option>
+                            <option v-for="option in resourceOptions" :key="option.id" :value="option.id">
+                                {{ option.name }}
+                            </option>
+                        </select>
+                    </template>
+
+                    <button
+                        v-if="hasExtraFilters"
+                        type="button"
+                        class="btn btn-sm btn-link text-decoration-none px-1"
+                        data-testid="filter-clear"
+                        @click="clearFilters"
+                    >
+                        <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear ?? 'Limpar filtros' }}
+                    </button>
+
+                    <a
+                        :href="printUrl"
+                        target="_blank"
+                        rel="noopener"
+                        class="btn btn-sm btn-outline-secondary ms-auto"
+                        data-testid="print-agenda"
+                        :title="t.print_agenda_hint ?? 'Imprimir a agenda do dia com os filtros aplicados'"
+                    >
+                        <i class="ti ti-printer me-1" aria-hidden="true"></i>{{ t.print_agenda ?? 'Imprimir' }}
+                    </a>
+                </div>
             </div>
 
             <!-- ════════════════════════════════════════════════════════════
@@ -646,7 +907,15 @@ const breadcrumbs = [
                     <div class="card">
                         <div class="card-body">
                             <!-- Mini calendário mensal -->
-                            <MiniCalendar :model-value="date" :locale="sessionLocale" @update:model-value="goToDate" />
+                            <MiniCalendar
+                                :model-value="date"
+                                :locale="sessionLocale"
+                                :availability="doctorMissing ? null : availability"
+                                :loading="availabilityLoading"
+                                :t="t"
+                                @update:model-value="goToDate"
+                                @month-change="onMonthChange"
+                            />
 
                             <!-- Médicos — só para quem vê vários médicos -->
                             <template v-if="!isDoctor && doctors.length > 0">
@@ -758,9 +1027,12 @@ const breadcrumbs = [
                         v-if="viewMode === 'calendar'"
                         :schedule-items="scheduleItems"
                         :date="date"
+                        :range="range"
                         :t="t"
                         @event-click="onCalendarEventClick"
                         @slot-click="onCalendarSlotClick"
+                        @range-change="onCalendarRangeChange"
+                        @date-click="onCalendarDateClick"
                     />
 
                     <!-- ── Vista lista ────────────────────────────────────── -->
@@ -768,8 +1040,21 @@ const breadcrumbs = [
                         <!-- Estado vazio -->
                         <div v-if="scheduleItems.length === 0" class="text-center py-5 text-muted">
                             <i class="fas fa-calendar-times fa-3x mb-3 opacity-25"></i>
-                            <p>{{ t.empty }}</p>
-                            <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
+                            <p>{{ hasExtraFilters ? (t.empty_filtered ?? t.empty) : t.empty }}</p>
+                            <button
+                                v-if="hasExtraFilters"
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm me-2"
+                                @click="clearFilters"
+                            >
+                                <i class="ti ti-filter-off me-1"></i>{{ t.filter_clear ?? 'Limpar filtros' }}
+                            </button>
+                            <button
+                                v-if="!doctorMissing"
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                @click="openCreate"
+                            >
                                 <i class="fas fa-plus me-1"></i>{{ t.btn_new }}
                             </button>
                         </div>
@@ -788,6 +1073,7 @@ const breadcrumbs = [
                                     :moods="moods"
                                     :selection-mode="selectionMode"
                                     :selected="isSelected(item.id)"
+                                    :can-see-patients="canSeePatients"
                                     :t="t"
                                     @toggle-select="toggleSelect"
                                     @view="onView"
@@ -870,7 +1156,14 @@ const breadcrumbs = [
         />
 
         <!-- ── Schedule Detail Drawer ─────────────────────────────────────── -->
-        <ScheduleDetailDrawer :open="detailOpen" :schedule-id="viewScheduleId" :t="t" @close="closeDetail" />
+        <ScheduleDetailDrawer
+            :open="detailOpen"
+            :schedule-id="viewScheduleId"
+            :t="t"
+            @close="closeDetail"
+            @reschedule="onDrawerReschedule"
+            @changed="onDrawerChanged"
+        />
 
         <!-- ── Entrada no caixa (fluxo "Chegou -> caixa") ──────────────────── -->
         <CashEntryModal
@@ -891,3 +1184,19 @@ const breadcrumbs = [
         />
     </AppLayout>
 </template>
+
+<style scoped>
+.agenda-filter-select {
+    width: auto;
+    min-width: 12rem;
+    max-width: 100%;
+}
+
+/* Celular: especialidade e sala lado a lado. */
+@media (max-width: 575.98px) {
+    .agenda-filter-select {
+        flex: 1 1 calc(50% - 0.5rem);
+        min-width: 0;
+    }
+}
+</style>

@@ -14,10 +14,20 @@
  */
 
 use App\Enums\EntityGate;
-use App\Models\{Entity, User};
+use App\Models\{Doctor, Entity, EntityUser, People, User};
 use Illuminate\Support\Facades\Gate;
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
+
+/** Cadastro de médico (Doctor) ligado ao vínculo — exigido pelo Gate IssueReport. */
+function egDoctorRecord(EntityUser $entityUser, bool $active = true): Doctor
+{
+    return Doctor::create([
+        'entity_user_id' => $entityUser->id,
+        'person_id'      => People::factory()->create()->id,
+        'active'         => $active,
+    ]);
+}
 
 beforeEach(function () {
     $this->saasEntity   = Entity::factory()->create(['is_client' => false]);
@@ -265,10 +275,24 @@ test('entity.edit-schedule nega financial da entity cliente', function () {
 // ── entity.issue-report ───────────────────────────────────────────────────────
 
 test('entity.issue-report permite somente doctor da entity cliente', function () {
-    createEntityUser($this->clientEntity, $this->user, 'doctor');
+    $eu = createEntityUser($this->clientEntity, $this->user, 'doctor');
+    // Fase 0: além do perfil, exige cadastro de médico ATIVO nesta clínica.
+    egDoctorRecord($eu);
 
     expect(Gate::forUser($this->user)->check(EntityGate::IssueReport->value, $this->clientEntity))
         ->toBeTrue();
+});
+
+test('entity.issue-report nega perfil médico SEM cadastro de médico ativo, com a mensagem traduzida', function () {
+    $eu = createEntityUser($this->clientEntity, $this->user, 'doctor');
+
+    $response = Gate::forUser($this->user)->inspect(EntityGate::IssueReport->value, $this->clientEntity);
+    expect($response->allowed())->toBeFalse()
+        ->and($response->message())->toBe(__('schedules.doctor_missing'));
+
+    // Cadastro inativo também não emite.
+    egDoctorRecord($eu, active: false);
+    expect(Gate::forUser($this->user)->check(EntityGate::IssueReport->value, $this->clientEntity))->toBeFalse();
 });
 
 test('entity.issue-report nega admin da entity cliente', function () {
@@ -316,7 +340,7 @@ test('entity.manage-settings nega doctor da entity cliente', function () {
 test('[cenário 6] mesmo usuário é doctor em entity cliente e admin em outra', function () {
     $otherClient = Entity::factory()->create(['is_client' => true]);
 
-    createEntityUser($this->clientEntity, $this->user, 'doctor');
+    egDoctorRecord(createEntityUser($this->clientEntity, $this->user, 'doctor'));
     createEntityUser($otherClient, $this->user, 'admin');
 
     // Na entity principal: pode emitir laudo, não pode ver financeiro

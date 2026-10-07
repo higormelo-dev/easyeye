@@ -2,11 +2,13 @@
 import { ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import DoctorMissingAlert from '@/Components/Panel/DoctorMissingAlert.vue';
 import PatientInfoSidebar from './Components/PatientInfoSidebar.vue';
 import PreviousRecordsCard from './Components/PreviousRecordsCard.vue';
 import MedicalRecordViewModal from './Components/MedicalRecordViewModal.vue';
 import MedicalRecordForm from './Components/MedicalRecordForm.vue';
 import ScheduleFlowGuard from './Components/ScheduleFlowGuard.vue';
+import AttendanceTimer from './Components/AttendanceTimer.vue';
 
 const props = defineProps({
     breadcrumbs: { type: Array, default: () => [] },
@@ -17,12 +19,17 @@ const props = defineProps({
     currentDoctorId: { type: String, default: null },
     canChooseDoctor: { type: Boolean, default: false },
     isDoctor: { type: Boolean, default: false },
+    // Perfil médico sem cadastro de médico ativo (CurrentDoctor): aviso + ações escondidas.
+    doctorMissing: { type: Boolean, default: false },
+    doctorMissingText: { type: String, default: '' },
     isEdit: { type: Boolean, default: true },
     // Fluxo Agenda ↔ Prontuário (ver ScheduleFlowGuard.vue)
     scheduleFlow: { type: Object, default: null },
     catalogs: { type: Object, required: true },
     urls: { type: Object, required: true },
     storage: { type: Object, default: () => ({}) },
+    // Autosave: rascunho do autor mais novo que o prontuário (só a data).
+    draft: { type: Object, default: null },
     ai: { type: Object, default: () => ({ enabled: false }) },
     t: { type: Object, default: () => ({}) },
 });
@@ -47,6 +54,7 @@ function closeView() {
 
     <AppLayout :title="t.edit ?? 'Editar Prontuário'" :breadcrumbs="breadcrumbs">
         <div class="pmr-screen">
+            <DoctorMissingAlert v-if="doctorMissing" :text="doctorMissingText" />
             <!-- Subnav -->
             <div class="row mb-3 align-items-center">
                 <div class="col-12 col-md-auto d-flex gap-2 flex-wrap align-items-center">
@@ -64,13 +72,17 @@ function closeView() {
                         <Link v-else :href="urls.list" class="btn btn-outline-white btn-sm">
                             <i class="fas fa-arrow-left me-1"></i>{{ t.title ?? 'Prontuários' }}
                         </Link>
-                        <Link :href="urls.create" class="btn btn-primary btn-sm">
+                        <Link v-if="!doctorMissing" :href="urls.create" class="btn btn-primary btn-sm">
                             <i class="fas fa-plus me-1"></i>{{ t.new ?? 'Novo' }}
                         </Link>
                         <a :href="urls.pdf" target="_blank" class="btn btn-outline-white btn-sm">
                             <i class="fas fa-file-pdf me-1"></i>PDF
                         </a>
                     </div>
+                </div>
+                <!-- Cronômetro do atendimento (desde o "Atender"; sem agendamento, desde a abertura) -->
+                <div class="col-12 col-md-auto ms-md-auto mt-2 mt-md-0">
+                    <AttendanceTimer :flow="scheduleFlow" :locked="medicalrecord.is_locked ?? false" :t="t" />
                 </div>
             </div>
 
@@ -108,6 +120,7 @@ function closeView() {
                             :urls="urls"
                             :schedule-flow="scheduleFlow"
                             :storage="storage"
+                            :draft="draft"
                             :ai="ai"
                             :t="t"
                         />

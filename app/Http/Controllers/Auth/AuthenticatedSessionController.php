@@ -57,10 +57,6 @@ class AuthenticatedSessionController extends Controller
                 'selected_entity_is_client' => $entityUser->entity->is_client,
                 'user_rule'                 => $entityUser->rule,
             ]);
-
-            if ($entityUser->rule === 'doctor') {
-                session(['selected_entity_doctor_id' => $entityUser->doctor?->id]);
-            }
         }
 
         // Usuários SaaS (non-client) não devem ser redirecionados para URLs que

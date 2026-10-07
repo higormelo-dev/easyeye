@@ -8,7 +8,7 @@ use App\Enums\{ClientRule, EntityGate, FeatureKey, Permission, ScheduleSituation
 use App\Models\{Doctor, Entity, EntityProduct, MedicalRecord, Patient, PatientExam, Schedule};
 use App\Services\{ActivationService, FeatureGateService};
 use App\Services\Dashboard\{ClinicOperationsService, DashboardInsightsService};
-use App\Support\BrazilianFormat;
+use App\Support\{BrazilianFormat, CurrentDoctor, PatientAccess, ScheduleShift};
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -95,9 +95,10 @@ class PanelDashboardController extends Controller
         $isDoctor = $profile === ClientRule::Doctor;
 
         // Médico logado = Doctor com doctors.entity_user_id = vínculo da sessão
-        // NESTA clínica (mesma regra de SchedulesController::loggedDoctor). Sem
-        // cadastro de médico, nada da clínica é enviado — painel vazio com aviso.
-        $doctor = $isDoctor ? $this->loggedDoctor($entityId) : null;
+        // NESTA clínica (regra única de App\Support\CurrentDoctor, a mesma da
+        // Agenda e dos Relatórios). Sem cadastro de médico, nada da clínica é
+        // enviado — painel vazio com aviso.
+        $doctor = $isDoctor ? CurrentDoctor::doctor() : null;
 
         $sections      = $this->sectionsFor($profile);
         $has           = fn (string $section): bool => in_array($section, $sections, true);
@@ -241,22 +242,6 @@ class PanelDashboardController extends Controller
         ];
     }
 
-    private function loggedDoctor(string $entityId): ?Doctor
-    {
-        $entityUserId = session('selected_entity_user_id');
-
-        if (! $entityUserId) {
-            return null;
-        }
-
-        return Doctor::query()
-            ->select('doctors.*')
-            ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-            ->where('doctors.entity_user_id', $entityUserId)
-            ->where('entity_users.entity_id', $entityId)
-            ->first();
-    }
-
     /**
      * Espelha o middleware de cada rota de destino:
      *  - agenda: entity.role:admin,doctor,secretary;
@@ -301,7 +286,7 @@ class PanelDashboardController extends Controller
 
             return match ($what) {
                 'schedules' => $user->hasAnyRoleInEntity($entity, [ClientRule::Admin, ClientRule::Doctor, ClientRule::Secretary]),
-                'patients'  => $byPermission(Permission::PatientsManage, [ClientRule::Admin, ClientRule::Financial, ClientRule::Doctor, ClientRule::Secretary]),
+                'patients'  => app(PatientAccess::class)->allows($user, $entity),
                 'doctors'   => $byPermission(Permission::PatientsManage, [ClientRule::Admin, ClientRule::Financial, ClientRule::Secretary]),
                 'financial' => Gate::forUser($user)->allows(EntityGate::ViewFinancial->value, $entity),
                 default     => false,
@@ -370,6 +355,12 @@ class PanelDashboardController extends Controller
                 ->count();
         }
 
+        // Pronto atendimento: fila agora — mesma conta do contador da Agenda
+        // (ClinicOperationsService::urgentCareQueued). Só para quem abre a Agenda.
+        if ($this->can('schedules', $entityId)) {
+            $stats['urgent_queue'] = $this->operations->urgentCareQueued($entityId);
+        }
+
         if ($profile !== ClientRule::Financial) {
             // Exames do Gerenciador de Imagens dos últimos 30 dias ainda sem
             // laudo (manual, conjunto ou IA aprovada). Janela e critério iguais
@@ -413,6 +404,8 @@ class PanelDashboardController extends Controller
             'exams_pending' => $this->pendingExamsQuery($entityId)
                 ->where('patient_exams.doctor_id', $doctor->id)
                 ->count(),
+            // Fila do pronto atendimento que ele vê (dele + sem médico).
+            'urgent_queue' => $this->operations->urgentCareQueued($entityId, (string) $doctor->id),
         ];
     }
 
@@ -420,37 +413,24 @@ class PanelDashboardController extends Controller
      * Contagens do dia numa consulta só (o Dashboard faz polling a cada 30s):
      * total, atendidos, em andamento/aguardando, faltas+cancelados e quem
      * chegou e espera agora (Aguardando, Retornando, Dilatando, Em exame).
+     * Mesma conta dos contadores da Agenda (ClinicOperationsService::dayCounters).
      *
      * @return array{today_count: int, attended_today: int, pending_today: int, cancelled_today: int, waiting_now: int}
      */
     private function todayCounts(Builder $query): array
     {
-        $attended = ScheduleSituation::Attended->value;
-        $closed   = implode(',', [ScheduleSituation::NoShow->value, ScheduleSituation::Cancelled->value]);
-        $waiting  = implode(',', array_map(
-            fn (ScheduleSituation $s) => $s->value,
-            [...self::READY_SITUATIONS, ...self::PREPARING_SITUATIONS],
-        ));
+        $counts = $this->operations->dayCounters(
+            $query->whereBetween('schedules.date_time', [now()->startOfDay(), now()->endOfDay()]),
+        );
 
-        $row = $query
-            ->whereBetween('schedules.date_time', [now()->startOfDay(), now()->endOfDay()])
-            ->selectRaw('COUNT(*) AS total')
-            ->selectRaw("SUM(CASE WHEN schedules.situation = {$attended} THEN 1 ELSE 0 END) AS attended")
-            ->selectRaw("SUM(CASE WHEN schedules.situation IN ({$closed}) THEN 1 ELSE 0 END) AS closed")
-            ->selectRaw("SUM(CASE WHEN schedules.situation IN ({$waiting}) AND schedules.arrived_at IS NOT NULL THEN 1 ELSE 0 END) AS waiting")
-            ->toBase()
-            ->first();
-
-        $total     = (int) ($row->total ?? 0);
-        $attended  = (int) ($row->attended ?? 0);
-        $cancelled = (int) ($row->closed ?? 0);
+        $closed = $counts['no_show'] + $counts['cancelled'];
 
         return [
-            'today_count'     => $total,
-            'attended_today'  => $attended,
-            'pending_today'   => $total - $attended - $cancelled,
-            'cancelled_today' => $cancelled,
-            'waiting_now'     => (int) ($row->waiting ?? 0),
+            'today_count'     => $counts['total'],
+            'attended_today'  => $counts['attended'],
+            'pending_today'   => $counts['total'] - $counts['attended'] - $closed,
+            'cancelled_today' => $closed,
+            'waiting_now'     => $counts['waiting'],
         ];
     }
 
@@ -799,11 +779,7 @@ class PanelDashboardController extends Controller
      */
     public static function shiftOf(int $hour): string
     {
-        return match (true) {
-            $hour < 13 => 'morning',
-            $hour < 18 => 'afternoon',
-            default    => 'evening',
-        };
+        return ScheduleShift::of($hour);
     }
 
     private function localTime(mixed $value): ?string

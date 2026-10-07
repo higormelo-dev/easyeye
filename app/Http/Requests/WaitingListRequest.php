@@ -2,16 +2,25 @@
 
 namespace App\Http\Requests;
 
-use App\Support\BrazilianFormat;
+use App\Models\VisitType;
+use App\Rules\{ActiveCatalogItem, ActiveCovenant};
+use App\Support\{BrazilianFormat, CurrentDoctor};
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class WaitingListRequest extends FormRequest
 {
+    /** Perfil médico sem cadastro de médico não mexe na lista de espera. */
     public function authorize(): bool
     {
-        return true;
+        return ! CurrentDoctor::isMissing();
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new AuthorizationException(CurrentDoctor::missingMessage());
     }
 
     public function rules(): array
@@ -21,6 +30,12 @@ class WaitingListRequest extends FormRequest
                 'required',
                 'uuid',
                 function ($attribute, $value, $fail) {
+                    if (! CurrentDoctor::canAccessDoctorId((string) $value)) {
+                        $fail(__('schedules.doctor_only_own'));
+
+                        return;
+                    }
+
                     $exists = DB::table('doctors')
                         ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
                         ->where('doctors.id', $value)
@@ -56,6 +71,8 @@ class WaitingListRequest extends FormRequest
                             ->orWhereNull('entity_id');
                     })->whereNull('deleted_at');
                 }),
+                // Entrada nova na fila (vira agendamento): só convênio ativo.
+                new ActiveCovenant(),
             ],
             'visit_id' => [
                 'nullable',
@@ -66,6 +83,7 @@ class WaitingListRequest extends FormRequest
                             ->orWhereNull('entity_id');
                     })->whereNull('deleted_at');
                 }),
+                new ActiveCatalogItem(VisitType::class, null, 'validation.custom.visit_type.inactive'),
             ],
             'notes'                => ['nullable', 'string', 'max:2000'],
             'preferred_date_from'  => ['nullable', 'date'],

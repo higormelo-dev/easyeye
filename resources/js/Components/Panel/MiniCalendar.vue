@@ -1,14 +1,35 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 
+/**
+ * Calendário mensal compacto (barra lateral da Agenda).
+ *
+ * Vagas por dia (opcional, prop `availability`): marcador sob o número com
+ * FORMA própria por estado (não só cor) + aria-label/tooltip "N livres de M".
+ * Estados: available | few | full | off | blocked (past/none = sem marcador).
+ * A legenda usa os mesmos marcadores. `month-change` avisa o mês exibido
+ * (o pai busca as vagas dele).
+ */
 const props = defineProps({
     modelValue: { type: String, default: '' }, // YYYY-MM-DD
     locale: { type: String, default: 'pt-BR' },
+    // { 'YYYY-MM-DD': { state, free, capacity } }
+    availability: { type: Object, default: null },
+    loading: { type: Boolean, default: false },
+    // Textos (lang schedules): avail_* e legenda.
+    t: { type: Object, default: () => ({}) },
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'month-change']);
 
-const today = new Date().toISOString().substring(0, 10);
+const MARKED_STATES = ['available', 'few', 'full', 'off', 'blocked'];
+
+function todayIso() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+const today = todayIso();
 
 function parseDate(str) {
     if (!str) return new Date();
@@ -17,6 +38,8 @@ function parseDate(str) {
 
 const viewYear = ref(parseDate(props.modelValue).getFullYear());
 const viewMonth = ref(parseDate(props.modelValue).getMonth()); // 0-based
+
+const monthKey = computed(() => `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}`);
 
 watch(
     () => props.modelValue,
@@ -27,6 +50,8 @@ watch(
         viewMonth.value = d.getMonth();
     },
 );
+
+watch(monthKey, (key) => emit('month-change', key), { immediate: true });
 
 function prevMonth() {
     if (viewMonth.value === 0) {
@@ -76,6 +101,38 @@ const cells = computed(() => {
     return grid;
 });
 
+const fmt = (text, params) =>
+    Object.entries(params).reduce((acc, [key, value]) => acc.replace(`:${key}`, String(value)), text ?? '');
+
+function stateOf(cell) {
+    const state = cell && props.availability?.[cell]?.state;
+    return MARKED_STATES.includes(state) ? state : null;
+}
+
+/** "15 de outubro: 3 livres de 20 (poucas vagas)" — leitor de tela e tooltip. */
+function cellLabel(cell) {
+    const date = parseDate(cell).toLocaleDateString(props.locale, { day: 'numeric', month: 'long' });
+    const info = props.availability?.[cell];
+    const state = stateOf(cell);
+    if (!state) return date;
+
+    const stateText = props.t[`avail_${state}`] ?? state;
+    if (state === 'off' || state === 'blocked') return `${date}: ${stateText}`;
+
+    const counts = fmt(props.t.avail_free_of ?? ':free livres de :capacity', {
+        free: info.free,
+        capacity: info.capacity,
+    });
+
+    return `${date}: ${counts} (${stateText})`;
+}
+
+const legend = computed(() =>
+    MARKED_STATES.map((state) => ({ state, label: props.t[`avail_${state}`] ?? state })).filter(
+        () => props.availability,
+    ),
+);
+
 function select(dateStr) {
     if (!dateStr) return;
     emit('update:modelValue', dateStr);
@@ -83,33 +140,65 @@ function select(dateStr) {
 </script>
 
 <template>
-    <div class="mini-cal">
+    <div class="mini-cal" :aria-busy="loading ? 'true' : 'false'">
         <!-- Header -->
         <div class="mini-cal-header">
-            <button type="button" class="mini-cal-nav" @click="prevMonth">&#8249;</button>
-            <span class="mini-cal-title">{{ monthLabel }} {{ viewYear }}</span>
-            <button type="button" class="mini-cal-nav" @click="nextMonth">&#8250;</button>
+            <button
+                type="button"
+                class="mini-cal-nav"
+                :aria-label="t.avail_prev_month ?? 'Mês anterior'"
+                :title="t.avail_prev_month ?? 'Mês anterior'"
+                @click="prevMonth"
+            >
+                &#8249;
+            </button>
+            <span class="mini-cal-title" aria-live="polite">{{ monthLabel }} {{ viewYear }}</span>
+            <button
+                type="button"
+                class="mini-cal-nav"
+                :aria-label="t.avail_next_month ?? 'Próximo mês'"
+                :title="t.avail_next_month ?? 'Próximo mês'"
+                @click="nextMonth"
+            >
+                &#8250;
+            </button>
         </div>
 
         <!-- Day abbreviation row -->
         <div class="mini-cal-grid">
-            <div v-for="abbr in dayAbbrevs" :key="abbr" class="mini-cal-dow">{{ abbr }}</div>
+            <div v-for="abbr in dayAbbrevs" :key="abbr" class="mini-cal-dow" aria-hidden="true">{{ abbr }}</div>
 
             <!-- Day cells -->
-            <div
-                v-for="(cell, i) in cells"
-                :key="i"
-                class="mini-cal-cell"
-                :class="{
-                    'is-today': cell === today,
-                    'is-selected': cell === modelValue && cell !== today,
-                    'is-empty': cell === null,
-                }"
-                @click="select(cell)"
-            >
-                <span v-if="cell">{{ Number(cell.substring(8)) }}</span>
-            </div>
+            <template v-for="(cell, i) in cells" :key="i">
+                <button
+                    v-if="cell"
+                    type="button"
+                    class="mini-cal-cell"
+                    :class="{
+                        'is-today': cell === today,
+                        'is-selected': cell === modelValue && cell !== today,
+                        [`avail-${stateOf(cell)}`]: !!stateOf(cell),
+                    }"
+                    :data-date="cell"
+                    :data-avail="stateOf(cell) ?? undefined"
+                    :aria-label="cellLabel(cell)"
+                    :aria-current="cell === modelValue ? 'date' : undefined"
+                    :title="stateOf(cell) ? cellLabel(cell) : undefined"
+                    @click="select(cell)"
+                >
+                    <span class="mini-cal-num">{{ Number(cell.substring(8)) }}</span>
+                    <span v-if="stateOf(cell)" class="mini-cal-mark" aria-hidden="true"></span>
+                </button>
+                <div v-else class="mini-cal-cell is-empty" aria-hidden="true"></div>
+            </template>
         </div>
+
+        <!-- Legenda das vagas (mesmos marcadores) -->
+        <ul v-if="legend.length" class="mini-cal-legend" data-testid="availability-legend">
+            <li v-for="item in legend" :key="item.state" :class="`avail-${item.state}`">
+                <span class="mini-cal-mark" aria-hidden="true"></span>{{ item.label }}
+            </li>
+        </ul>
     </div>
 </template>
 
@@ -135,14 +224,14 @@ function select(dateStr) {
 .mini-cal-nav {
     background: none;
     border: none;
-    padding: 0 0.3rem;
+    padding: 0 0.5rem;
     font-size: 1.2rem;
     line-height: 1;
     cursor: pointer;
-    color: #555;
+    color: var(--bs-secondary-color, #555);
 }
 .mini-cal-nav:hover {
-    color: #000;
+    color: var(--bs-body-color, #000);
 }
 
 .mini-cal-grid {
@@ -155,23 +244,33 @@ function select(dateStr) {
     text-align: center;
     font-size: 0.68rem;
     font-weight: 700;
-    color: #888;
+    color: var(--bs-secondary-color, #888);
     padding: 0.15rem 0 0.3rem;
 }
 
 .mini-cal-cell {
+    position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 1px;
     aspect-ratio: 1;
+    border: 0;
     border-radius: 50%;
+    background: transparent;
+    padding: 0;
     cursor: pointer;
     font-size: 0.78rem;
-    color: #333;
+    color: var(--bs-body-color, #333);
     transition: background 0.15s;
 }
 .mini-cal-cell:not(.is-empty):hover {
-    background: #e9ecef;
+    background: var(--bs-tertiary-bg, #e9ecef);
+}
+.mini-cal-cell:focus-visible {
+    outline: 2px solid var(--bs-primary, #0d6efd);
+    outline-offset: 1px;
 }
 .mini-cal-cell.is-empty {
     cursor: default;
@@ -185,11 +284,106 @@ function select(dateStr) {
     background: #bb2d3b;
 }
 .mini-cal-cell.is-selected {
-    background: #adb5bd;
+    background: #6c757d;
     color: #fff;
     font-weight: 600;
 }
 .mini-cal-cell.is-selected:hover {
-    background: #6c757d;
+    background: #565e64;
+}
+
+.mini-cal-num {
+    line-height: 1;
+}
+
+/* ── Marcadores de vagas: forma diferente por estado (não só cor) ───────── */
+.mini-cal-mark {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+}
+/* com vagas: bolinha cheia */
+.avail-available .mini-cal-mark {
+    border-radius: 50%;
+    background: #198754;
+}
+/* poucas vagas: triângulo */
+.avail-few .mini-cal-mark {
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 6px solid #d97706;
+}
+/* sem vagas: anel */
+.avail-full .mini-cal-mark {
+    border-radius: 50%;
+    border: 1.5px solid #dc3545;
+    background: transparent;
+}
+/* sem expediente: traço */
+.avail-off .mini-cal-mark {
+    width: 7px;
+    height: 2px;
+    border-radius: 1px;
+    background: #9ca3af;
+}
+/* bloqueado: quadrado */
+.avail-blocked .mini-cal-mark {
+    width: 6px;
+    height: 6px;
+    background: #6b7280;
+    border-radius: 1px;
+}
+.mini-cal-cell.avail-off .mini-cal-num,
+.mini-cal-cell.avail-blocked .mini-cal-num {
+    opacity: 0.6;
+}
+/* Dia de hoje/selecionado (fundo escuro): mesmo formato, em branco. */
+.mini-cal .is-today.avail-available .mini-cal-mark,
+.mini-cal .is-selected.avail-available .mini-cal-mark,
+.mini-cal .is-today.avail-off .mini-cal-mark,
+.mini-cal .is-selected.avail-off .mini-cal-mark,
+.mini-cal .is-today.avail-blocked .mini-cal-mark,
+.mini-cal .is-selected.avail-blocked .mini-cal-mark {
+    background: #fff;
+}
+.mini-cal .is-today.avail-few .mini-cal-mark,
+.mini-cal .is-selected.avail-few .mini-cal-mark {
+    border-bottom-color: #fff;
+}
+.mini-cal .is-today.avail-full .mini-cal-mark,
+.mini-cal .is-selected.avail-full .mini-cal-mark {
+    border-color: #fff;
+}
+
+.mini-cal-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    font-size: 0.7rem;
+    color: var(--bs-secondary-color, #6c757d);
+}
+.mini-cal-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+[data-bs-theme='dark'] .avail-available .mini-cal-mark {
+    background: #4ade80;
+}
+[data-bs-theme='dark'] .avail-few .mini-cal-mark {
+    border-bottom-color: #fbbf24;
+}
+[data-bs-theme='dark'] .avail-full .mini-cal-mark {
+    border-color: #f87171;
+}
+[data-bs-theme='dark'] .avail-blocked .mini-cal-mark {
+    background: #9ca3af;
 }
 </style>

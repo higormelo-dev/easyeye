@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 
 /**
@@ -36,6 +37,21 @@ const tiles = computed(() => [
     { key: 'pending', value: Number(props.stats.pending_today ?? 0), label: props.t.summary_pending },
     { key: 'cancelled', value: missed.value, label: props.t.summary_cancelled },
 ]);
+
+// Pronto atendimento: fila agora (mesma conta do contador da Agenda). Só vem
+// para quem abre a Agenda — sem a chave, a linha não aparece.
+const urgentQueue = computed(() =>
+    props.stats.urgent_queue === undefined || props.stats.urgent_queue === null
+        ? null
+        : Number(props.stats.urgent_queue),
+);
+const urgentCareUrl = computed(() => {
+    try {
+        return route('panel.urgent-care.index');
+    } catch {
+        return null;
+    }
+});
 
 const pct = (value) => (expected.value > 0 ? (value / expected.value) * 100 : 0);
 const donePct = computed(() => Math.round(pct(attended.value)));
@@ -121,6 +137,25 @@ const shiftRows = computed(() => {
                 </div>
             </div>
 
+            <component
+                :is="urgentCareUrl ? Link : 'div'"
+                v-if="urgentQueue !== null"
+                :href="urgentCareUrl || undefined"
+                class="ds-urgent"
+                :class="{ 'ds-urgent--active': urgentQueue > 0 }"
+                data-summary="urgent-care"
+                :title="t.summary_urgent_care_hint"
+            >
+                <i class="ti ti-urgent" aria-hidden="true"></i>
+                <span class="ds-urgent-label">{{ t.summary_urgent_care }}</span>
+                <span class="ds-urgent-value">{{
+                    tx(urgentQueue === 1 ? 'summary_urgent_care_one' : 'summary_urgent_care_other', {
+                        count: number(urgentQueue),
+                    })
+                }}</span>
+                <i v-if="urgentCareUrl" class="ti ti-chevron-right ms-auto" aria-hidden="true"></i>
+            </component>
+
             <template v-if="expected > 0">
                 <div class="d-flex justify-content-between align-items-baseline mt-3 mb-1 gap-2">
                     <span class="ds-section-title">{{ t.summary_progress_label }}</span>
@@ -144,7 +179,11 @@ const shiftRows = computed(() => {
                     </li>
                 </ul>
                 <p v-if="missed > 0" class="ds-note" data-summary="missed-note">
-                    {{ tx(missed === 1 ? 'summary_missed_note_one' : 'summary_missed_note_other', { count: number(missed) }) }}
+                    {{
+                        tx(missed === 1 ? 'summary_missed_note_one' : 'summary_missed_note_other', {
+                            count: number(missed),
+                        })
+                    }}
                 </p>
             </template>
             <p v-else-if="total > 0" class="ds-note mt-3" data-summary="all-missed">{{ t.summary_all_missed }}</p>
@@ -187,6 +226,50 @@ const shiftRows = computed(() => {
 </template>
 
 <style scoped>
+.ds-urgent {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--bs-border-color);
+    border-left: 3px solid var(--bs-secondary-color);
+    border-radius: 0.5rem;
+    color: var(--bs-body-color);
+    font-size: 0.8125rem;
+    text-decoration: none;
+}
+
+a.ds-urgent:hover,
+a.ds-urgent:focus-visible {
+    background: var(--bs-tertiary-bg);
+}
+
+.ds-urgent--active {
+    border-left-color: #dc2626;
+}
+
+.ds-urgent--active .ti-urgent {
+    color: #dc2626;
+}
+
+.ds-urgent-label {
+    color: var(--bs-secondary-color);
+}
+
+.ds-urgent-value {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-bs-theme='dark'] .ds-urgent--active {
+    border-left-color: #f87171;
+}
+
+[data-bs-theme='dark'] .ds-urgent--active .ti-urgent {
+    color: #f87171;
+}
+
 .ds-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

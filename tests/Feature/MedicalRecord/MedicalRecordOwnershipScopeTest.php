@@ -228,25 +228,34 @@ describe('F7 — preview de template só resolve médico da clínica ativa', fun
 });
 
 describe('F8 — PDF de tonometria', function () {
-    it('admin informando médico da clínica gera o PDF com esse médico (antes: 500, coluna inexistente)', function () {
-        $captured = mrosCapturePdfDoctor();
+    // Fase 0: laudo de tonometria é documento clínico — só médico com
+    // cadastro ativo emite, e sempre no PRÓPRIO nome (o doctor_id do request
+    // não escolhe mais o autor; antes o admin gerava em nome de qualquer um).
+    it('médico gera o PDF no próprio nome, mesmo informando outro médico da clínica (antes: 500, coluna inexistente)', function () {
+        $captured  = mrosCapturePdfDoctor();
+        $colleague = mrosDoctor(createEntityUser($this->entity, User::factory()->create(), ClientRule::Doctor->value), '55555');
 
-        ($this->asAdmin)()
-            ->get(route('panel.patients.tonometry-pdf', [$this->patient, 'doctor_id' => $this->doctor->id]))
+        ($this->asDoctor)()
+            ->get(route('panel.patients.tonometry-pdf', [$this->patient, 'doctor_id' => $colleague->id]))
             ->assertOk();
 
         expect($captured->doctor?->id)->toBe($this->doctor->id);
     });
 
-    it('médico de OUTRA clínica é ignorado: sem médico próprio, 422 traduzido e nenhum PDF gerado', function () {
+    it('médico de OUTRA clínica informado é ignorado; admin não emite (403) e nenhum PDF sai', function () {
         $captured = mrosCapturePdfDoctor();
 
         ($this->asAdmin)()
             ->getJson(route('panel.patients.tonometry-pdf', [$this->patient, 'doctor_id' => $this->otherDoctor->id]))
-            ->assertStatus(422)
-            ->assertJsonPath('message', __('actions.medical_records.doctor_required_for_print'));
+            ->assertForbidden();
 
         expect($captured->rendered)->toBeFalse();
+
+        ($this->asDoctor)()
+            ->get(route('panel.patients.tonometry-pdf', [$this->patient, 'doctor_id' => $this->otherDoctor->id]))
+            ->assertOk();
+
+        expect($captured->doctor?->id)->toBe($this->doctor->id);
     });
 });
 

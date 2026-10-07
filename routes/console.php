@@ -118,6 +118,13 @@ Schedule::command('clinic-invitations:expire')
     ->name('clinic-invitations:expire')
     ->withoutOverlapping();
 
+// Autosave do prontuário: rascunhos parados há mais de 7 dias (dado de saúde
+// não salvo pelo médico) — LGPD, não guardar além do necessário.
+Schedule::command('medical-records:prune-drafts')
+    ->dailyAt('03:40')
+    ->name('medical-records:prune-drafts')
+    ->withoutOverlapping();
+
 // Onda 4, C6 — Purga feedbacks antigos para conformidade LGPD (>90 dias).
 Schedule::command('ai:purge-feedbacks')
     ->weeklyOn(0, '03:00')

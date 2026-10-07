@@ -15,6 +15,7 @@ use App\Jobs\AI\RunAiWorkflowJob;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, Subscription};
 use App\Services\Billing\SubscriptionNoticeService;
 use App\Services\FeatureGateService;
+use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
 use DomainException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -724,14 +725,12 @@ class AiRunsController extends Controller
             abort(422, __('ai.record_patient_missing'));
         }
 
-        // Abrir prontuário é ato médico: exige um Doctor (do aprovador ou do exame).
-        $doctorId = $this->documentationService->resolveDoctorIdForCurrentUser($entityId)
-            ?? PatientExam::query()
-                ->whereIn('id', (array) ($aiRun->input_summary['exam_ids'] ?? []))
-                ->value('doctor_id');
+        // Abrir prontuário é ato médico: no nome do aprovador (cadastro de
+        // médico ativo — o Gate IssueReport exige), nunca no do exame.
+        $doctorId = $this->documentationService->resolveDoctorIdForCurrentUser($entityId);
 
         if (! $doctorId) {
-            abort(422, __('ai.record_doctor_required'));
+            abort(403, CurrentDoctor::missingMessage());
         }
 
         // Vincula o novo prontuário ao agendamento da consulta, quando houver.

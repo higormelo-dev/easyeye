@@ -8,6 +8,7 @@ use App\Enums\{DataAccessPurpose, EntityGate, FeatureKey};
 use App\Http\Requests\{MarkMedicalRecordProcedureDoneRequest, MedicalRecordProcedureRequest};
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordProcedure, Patient, Procedure, StockLot};
 use App\Services\{FeatureGateService, MedicalRecordProcedureExecutionService};
+use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Gate;
@@ -74,17 +75,10 @@ class MedicalRecordProceduresController extends Controller
         // evoluções/quick actions de documento.
         Gate::authorize(EntityGate::IssueReport->value, $entity);
 
-        $doctor = $medicalrecord->doctor ?? Doctor::with('person')
-            ->whereHas('entityUser', fn ($q) => $q
-                ->where('entity_id', $entity->id)
-                ->where('user_id', auth()->id()))
-            ->first();
-
-        if (! $doctor) {
-            return response()->json([
-                'message' => 'Selecione o médico responsável antes de solicitar o procedimento.',
-            ], 422);
-        }
+        // Autoria = médico que registra (logado, cadastro ativo — o Gate acima
+        // exige), nunca o médico do prontuário (seria no nome de um colega).
+        $doctor = CurrentDoctor::issuer()?->loadMissing('person');
+        abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
 
         $procedure = MedicalRecordProcedure::create([
             'entity_id'         => $entity->id,

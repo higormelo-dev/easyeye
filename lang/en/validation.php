@@ -327,6 +327,10 @@ return [
         'doctor_id'                                   => 'doctor',
         'date_time'                                   => 'date and time',
         'patient_id'                                  => 'patient',
+        'series_dates'                                => 'series dates',
+        'series_dates.*'                              => 'session date',
+        'few_slots_percent'                           => 'few slots percentage',
+        'is_fit_in'                                   => 'fit-in',
 
         // ── Cobertura completa de campos (29/08/2026) ─────────────────────
         'abbreviation'                              => 'abbreviation',
@@ -595,6 +599,21 @@ return [
         ],
         'validation_unique' => [
             'name_combination' => 'An exam with this name already exists for the given combination of exam, doctor and schedule.',
+        ],
+        'covenant' => [
+            'inactive'            => 'The selected health plan is inactive. Choose an active one.',
+            'inactive_named'      => 'The health plan ":name" is inactive — choose an active one.',
+            'reschedule_inactive' => 'This appointment\'s health plan (":name") is inactive. Edit the appointment and choose an active one before rescheduling.',
+        ],
+        'patient' => [
+            'duplicate'        => 'There is already a patient with this name and date of birth in this clinic (:codes). Open the existing record instead of creating another one.',
+            'homonym'          => 'There is already a patient with this name in this clinic (:codes). If this is a different person, confirm below to save.',
+            'duplicate_cpf'    => 'There is already an active patient with this CPF in this clinic (:codes) — use the existing record instead.',
+            'duplicate_import' => 'Duplicate: there is already a patient with the same name and date of birth (:codes) — row not imported.',
+            'homonym_import'   => 'Warning: there is already a patient with the same name (:codes) and a different or missing date of birth — imported as a different person; check it is not a duplicate.',
+        ],
+        'visit_type' => [
+            'inactive' => 'The selected visit type is inactive. Choose an active one.',
         ],
         'schedule' => [
             'doctor_not_found'       => 'The selected doctor is invalid or does not belong to this company.',
