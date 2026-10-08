@@ -6,6 +6,7 @@ import PageHeader from '@/Components/Panel/PageHeader.vue';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import DoctorMissingAlert from '@/Components/Panel/DoctorMissingAlert.vue';
 import UrgentCareFormModal from './UrgentCareFormModal.vue';
+import AllergyBadge from '@/Components/Panel/ClinicalSafety/AllergyBadge.vue';
 import { useDashboardPolling } from '@/composables/useDashboardPolling.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 
@@ -283,6 +284,10 @@ function recordUrl(row) {
                                             · {{ tx('called_times', { count: row.call_count }) }}</template
                                         >
                                     </span>
+                                </div>
+                                <!-- Alergia do paciente (Fase 2): texto, não só cor. -->
+                                <div v-if="row.allergy" class="uc-allergy mt-1">
+                                    <AllergyBadge :allergy="row.allergy" />
                                 </div>
                                 <div class="uc-line2 small">
                                     <span class="fw-medium">{{ row.reason_label }}</span>

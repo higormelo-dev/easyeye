@@ -2,8 +2,14 @@
 
 namespace App\Services;
 
-use App\Enums\ExamReportRegistry;
-use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSettingContent};
+use App\Enums\{DocumentationType, ExamReportRegistry};
+use App\Exceptions\AllergyConflictException;
+use App\Models\{Doctor, DoctorDocumentTemplate, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSettingContent};
+use App\Services\Documents\CertificateBuilder;
+use App\Support\ClinicalSafety\PrescriptionAllergyGuard;
+use App\Support\Documents\DocumentDate;
+use Carbon\CarbonInterface;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Mews\Purifier\Facades\Purifier;
 
@@ -15,12 +21,20 @@ class MedicalRecordQuickActionService
     public function __construct(
         private readonly MedicalRecordDocumentationService $documentationService,
         private readonly SurgerySchedulingDocService $surgerySchedulingDoc,
-        private readonly DayExtensionService $dayExtension,
+        private readonly PrescriptionAllergyGuard $allergyGuard,
+        private readonly CertificateBuilder $certificates,
+        private readonly ProcedureSolicitationService $solicitation,
+        private readonly AuditService $audit,
     ) {
     }
 
+    /** Atestados com campos estruturados (Fase 2 / B1). */
+    public const CERTIFICATE_ACTIONS = ['medical-certificate', 'attendance-certificate', 'companion-certificate', 'visual-fitness-certificate'];
+
     /**
      * @param array<string, mixed> $payload
+     *
+     * @throws AllergyConflictException receita que bate com alergia ativa, sem motivo
      */
     public function issue(
         string $action,
@@ -38,24 +52,176 @@ class MedicalRecordQuickActionService
             $slug,
         );
 
-        $customReplacements = $this->buildCustomReplacements($action, $payload);
+        // Data alternativa (Fase 2 / B3): data impressa no documento; null =
+        // hoje. A emissão de fato fica em created_at + auditoria.
+        $documentDate = DocumentDate::alternative($payload['document_date'] ?? null);
+        $documentDay  = $documentDate ?? DocumentDate::today();
+
+        $parts              = $this->buildDocumentParts($action, $payload, $record, $entity, $documentDay);
+        $customReplacements = [...$this->buildCustomReplacements($action, $payload), ...$parts['replacements']];
 
         // Custom replacements precedem o resolver: caso contrário variáveis
         // tipadas (e.g. {{DATA_ATUAL}} source_type=date) sobrescrevem o
         // payload do médico (ex.: atestado retroativo com data específica).
         $contentForResolve = $this->applyTemplateOverrides($content, $customReplacements);
 
-        $resolved = $this->documentationService->loadTemplate($contentForResolve, $patient, $doctor, $entity, $record);
+        $resolved = $this->documentationService->loadTemplate($contentForResolve, $patient, $doctor, $entity, $record, $documentDate);
         $html     = $this->applyCustomReplacements($resolved['html'], []);
-        $html     = $this->appendObservations($action, $html, $payload);
+        // Modelo personalizado pela clínica sem a variável de um bloco (CID
+        // autorizado, dilatação, horário, AV): o bloco vai no fim.
+        $html = $this->appendFallbacks($html, (string) $content->content, $parts['fallbacks']);
+        $html = $this->appendObservations($action, $html, $payload);
 
-        return $this->documentationService->store(
+        $metadata = $parts['metadata'];
+
+        if (($template = $this->ownedTemplate($payload['template_id'] ?? null, $entity, $doctor, $action)) !== null) {
+            $metadata['personal_template'] = ['id' => (string) $template->id, 'name' => $template->name];
+        }
+
+        // Toda RECEITA (tipo do modelo — inclui modelos de receita da clínica
+        // e as de catarata/pterígio com medicamentos fixos) passa pela
+        // checagem de alergia sobre o texto FINAL + itens estruturados.
+        $override = $content->type === DocumentationType::Prescription
+            ? $this->allergyGuard->guard(
+                $patient,
+                $html,
+                is_array($payload['items'] ?? null) ? $payload['items'] : [],
+                isset($payload['allergy_override_reason']) ? (string) $payload['allergy_override_reason'] : null,
+            )
+            : null;
+
+        $documentation = $this->documentationService->store(
             $record,
             $content,
             $html,
             $title ?: null,
             (string) $doctor->id,
+            $override,
+            $documentDate,
+            $metadata,
         );
+
+        if ($override !== null) {
+            $this->allergyGuard->recordOverride($documentation, $override);
+        }
+
+        // CID no atestado só com a autorização do paciente (Res. CFM
+        // 1.658/2002, art. 5º): evento próprio na trilha de auditoria.
+        if (isset($metadata['cid'])) {
+            $this->audit->log(
+                event: 'cid_authorized',
+                model: $documentation,
+                old: null,
+                new: ['cid' => $metadata['cid']['code'], 'authorized' => true],
+            );
+        }
+
+        return $documentation;
+    }
+
+    /**
+     * Partes estruturadas por ação: atestados (B1) e pedido de exames
+     * estruturado (B2). Demais ações: nada.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return array{replacements: array<string, string>, fallbacks: array<string, string>, metadata: array<string, mixed>}
+     */
+    private function buildDocumentParts(string $action, array $payload, MedicalRecord $record, Entity $entity, CarbonInterface $documentDay): array
+    {
+        if (in_array($action, self::CERTIFICATE_ACTIONS, true)) {
+            return $this->certificates->build($action, $payload, $record, $documentDay);
+        }
+
+        // Pedido de exames com itens (kits, catálogo, avulsos): o corpo é
+        // montado no servidor a partir dos itens resolvidos. Sem itens
+        // (modelo só-de-corpo ou texto digitado direto), o texto do médico
+        // faz o papel da lista — mas caráter/indicação/CID/observações têm
+        // que ir pro documento e pros metadados igual ao pedido estruturado;
+        // antes isto era descartado em silêncio (16ª revisão Codex, P2).
+        if ($action === 'procedure-request') {
+            $items   = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+            $request = $items !== []
+                ? $this->solicitation->buildRequest((string) $entity->id, $payload)
+                : $this->solicitation->buildTextOnlyRequest((string) $entity->id, $payload, (string) ($payload['content'] ?? ''));
+
+            return [
+                'replacements' => ['{{PROCEDIMENTOS_SOLICITADOS}}' => $request['html']],
+                'fallbacks'    => [],
+                'metadata'     => $request['metadata'],
+            ];
+        }
+
+        // Receituário: os itens estruturados (catálogo/nome livre) ficam no
+        // documento — rastreio da checagem de alergia e exportação LGPD.
+        if ($action === 'medication-prescription' && is_array($payload['items'] ?? null) && $payload['items'] !== []) {
+            $items = $payload['items'];
+            ksort($items); // validated() devolve as chaves fora de ordem
+
+            return ['replacements' => [], 'fallbacks' => [], 'metadata' => [
+                'items' => array_values(array_map(fn (array $item) => [
+                    'medicine_id'       => $item['medicine_id'] ?? null,
+                    'name'              => $item['name'] ?? null,
+                    'active_ingredient' => $item['active_ingredient'] ?? null,
+                ], array_filter($items, 'is_array'))),
+            ]];
+        }
+
+        return ['replacements' => [], 'fallbacks' => [], 'metadata' => []];
+    }
+
+    /**
+     * @param array<string, string> $fallbacks
+     */
+    private function appendFallbacks(string $html, string $template, array $fallbacks): string
+    {
+        foreach ($fallbacks as $placeholder => $block) {
+            if ($block !== '' && ! str_contains($template, $placeholder)) {
+                $html .= $block;
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * Modelo pessoal usado (rastreio): só do médico que emite, nesta clínica,
+     * e no formato que o modal entende (texto + itens, do tipo da ação) — o
+     * HTML do editor de Documentações não serve aqui (revisão P2-6).
+     *
+     * @throws ValidationException modelo de outro médico/clínica ou de outro formato
+     */
+    private function ownedTemplate(mixed $id, Entity $entity, Doctor $doctor, string $action): ?DoctorDocumentTemplate
+    {
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        $template = DoctorDocumentTemplate::query()
+            ->withoutGlobalScopes()
+            ->whereNull('deleted_at')
+            ->ownedBy((string) $entity->id, (string) $doctor->id)
+            ->find($id);
+
+        if ($template === null) {
+            throw ValidationException::withMessages(['template_id' => __('clinical_documents.templates.not_found')]);
+        }
+
+        $kind = match ($action) {
+            'medication-prescription' => 'prescription',
+            'procedure-request'       => 'procedure',
+            default                   => null,
+        };
+
+        if ($template->body_format !== 'text') {
+            throw ValidationException::withMessages(['template_id' => __('clinical_documents.templates.wrong_consumer')]);
+        }
+
+        if ($kind !== null && $template->kind !== $kind) {
+            throw ValidationException::withMessages(['template_id' => __('clinical_documents.templates.base_mismatch')]);
+        }
+
+        return $template;
     }
 
     /**
@@ -90,7 +256,7 @@ class MedicalRecordQuickActionService
      */
     private function appendObservations(string $action, string $html, array $payload): string
     {
-        if (! in_array($action, ['attendance-certificate', 'medical-certificate'], true)) {
+        if (! in_array($action, self::CERTIFICATE_ACTIONS, true)) {
             return $html;
         }
 
@@ -127,17 +293,20 @@ class MedicalRecordQuickActionService
     private function resolveTemplateDefinition(string $action, array $payload): array
     {
         return match ($action) {
-            'pterygium-prescription'  => ['RECEITUÁRIO DE PTERÍGIO', 'pos_operatorio', 'Receituário de Pterígio'],
-            'test-eye'                => ['TESTE DO OLHINHO', 'padrao', 'Teste do Olhinho'],
-            'attendance-certificate'  => ['ATESTADO DE COMPARECIMENTO', 'comparecimento', 'Atestado de Comparecimento'],
-            'medical-certificate'     => ['ATESTADO MÉDICO', 'afastamento', 'Atestado Médico'],
-            'cataract-prescription'   => ['RECEITUÁRIO DE CATARATA', $this->resolveCataractSlug($payload), 'Receituário de Catarata'],
-            'retinal-mapping'         => ['MAPEAMENTO DE RETINA', 'padrao', 'Mapeamento de Retina'],
-            'ophthalmological-report' => ['LAUDO OFTALMOLÓGICO', 'completo', 'Laudo Oftalmológico'],
-            'medical-declaration'     => ['RELATÓRIO OFTALMOLÓGICO', 'declaracao_medica', 'Declaração Médica'],
-            'medication-prescription' => ['PRESCRIÇÃO DE MEDICAMENTOS', 'padrao', 'Prescrição de Medicamentos'],
-            'procedure-request'       => ['SOLICITAÇÃO DE PROCEDIMENTOS', 'padrao', 'Solicitação de Procedimentos'],
-            'lens-prescription'       => [
+            'pterygium-prescription' => ['RECEITUÁRIO DE PTERÍGIO', 'pos_operatorio', 'Receituário de Pterígio'],
+            'test-eye'               => ['TESTE DO OLHINHO', 'padrao', 'Teste do Olhinho'],
+            'attendance-certificate' => ['ATESTADO DE COMPARECIMENTO', 'comparecimento', 'Atestado de Comparecimento'],
+            'medical-certificate'    => ['ATESTADO MÉDICO', 'afastamento', 'Atestado Médico'],
+            // Fase 2 / B1 — atestados oftalmológicos.
+            'companion-certificate'      => ['ATESTADO DE ACOMPANHANTE', 'acompanhante', 'Atestado de Acompanhante'],
+            'visual-fitness-certificate' => ['ATESTADO DE APTIDÃO VISUAL', 'aptidao_visual', 'Atestado de Aptidão Visual'],
+            'cataract-prescription'      => ['RECEITUÁRIO DE CATARATA', $this->resolveCataractSlug($payload), 'Receituário de Catarata'],
+            'retinal-mapping'            => ['MAPEAMENTO DE RETINA', 'padrao', 'Mapeamento de Retina'],
+            'ophthalmological-report'    => ['LAUDO OFTALMOLÓGICO', 'completo', 'Laudo Oftalmológico'],
+            'medical-declaration'        => ['RELATÓRIO OFTALMOLÓGICO', 'declaracao_medica', 'Declaração Médica'],
+            'medication-prescription'    => ['PRESCRIÇÃO DE MEDICAMENTOS', 'padrao', 'Prescrição de Medicamentos'],
+            'procedure-request'          => ['SOLICITAÇÃO DE PROCEDIMENTOS', 'padrao', 'Solicitação de Procedimentos'],
+            'lens-prescription'          => [
                 'PRESCRIÇÃO DE LENTES',
                 $this->resolveLensPrescriptionSlug($payload),
                 $this->resolveLensPrescriptionTitle($payload),
@@ -228,7 +397,7 @@ class MedicalRecordQuickActionService
     private function buildCustomReplacements(string $action, array $payload): array
     {
         return match ($action) {
-            'medical-certificate'   => $this->buildMedicalCertificateReplacements($payload),
+            // Atestados (dias, CID, horários, AV): CertificateBuilder.
             'cataract-prescription' => $this->surgerySchedulingDoc->buildReplacements(
                 (string) ($payload['eye'] ?? ''),
                 isset($payload['date_surgery']) ? (string) $payload['date_surgery'] : null,
@@ -255,30 +424,25 @@ class MedicalRecordQuickActionService
 
     /**
      * @param array<string, mixed> $payload
-     *
-     * @return array<string, string>
-     */
-    private function buildMedicalCertificateReplacements(array $payload): array
-    {
-        $days = max(1, (int) ($payload['days'] ?? 1));
-        $date = (string) ($payload['date'] ?? '');
-        $date = $date !== '' ? $date : now()->format('d/m/Y');
-
-        return [
-            '{{DIAS_AFASTAMENTO}}'         => (string) $days,
-            '{{DIAS_AFASTAMENTO_EXTENSO}}' => $this->dayExtension->spell($days),
-            '{{DATA_ATUAL}}'               => $date,
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $payload
      */
     private function resolveCataractSlug(array $payload): string
     {
         return $this->surgerySchedulingDoc->resolveTemplateSlug(
             isset($payload['template']) ? (string) $payload['template'] : null,
         );
+    }
+
+    /**
+     * Modelo da clínica (ou global) que uma ação usa — base dos modelos
+     * pessoais salvos nos modais de receita e pedido (Fase 2 / B3).
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function templateForAction(string $entityId, string $action, array $payload = []): ReportSettingContent
+    {
+        [$settingTitle, $slug] = $this->resolveTemplateDefinition($action, $payload);
+
+        return $this->findTemplateContent($entityId, $settingTitle, $slug);
     }
 
     /**

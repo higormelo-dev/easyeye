@@ -3,6 +3,8 @@ import { ref, watch, computed, onBeforeUnmount } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import QuickAllergyFields from '@/Components/Panel/ClinicalSafety/QuickAllergyFields.vue';
+import { quickAllergyPayload } from '@/Support/clinicalSafety.js';
 
 const props = defineProps({
     open: { type: Boolean, required: true },
@@ -103,11 +105,17 @@ const quickCellphone = ref('');
 const quickConfirmHomonym = ref(false);
 const quickErrors = ref({});
 const quickSaving = ref(false);
+// Alergias informadas pelo paciente ou "nega alergias" (Fase 2 / G2) —
+// nenhum dos dois = "sem registro de alergias".
+const quickAllergies = ref('');
+const quickAllergiesDenied = ref(false);
 
 function resetQuick() {
     quickCellphone.value = '';
     quickConfirmHomonym.value = false;
     quickErrors.value = {};
+    quickAllergies.value = '';
+    quickAllergiesDenied.value = false;
 }
 
 watch(quickName, () => {
@@ -130,6 +138,7 @@ async function quickRegister() {
                 name: quickName.value.trim(),
                 cellphone: quickCellphone.value,
                 confirm_homonym: quickConfirmHomonym.value,
+                ...quickAllergyPayload(quickAllergies.value, quickAllergiesDenied.value),
             }),
         });
         const json = await res.json().catch(() => ({}));
@@ -274,6 +283,7 @@ async function onSubmit() {
                             @mousedown.prevent="
                                 showQuickReg = true;
                                 quickName = patientSearch;
+                                patientResults = [];
                             "
                         >
                             <i class="fas fa-plus-circle me-1"></i>
@@ -283,7 +293,7 @@ async function onSubmit() {
                 </div>
 
                 <!-- Quick registration -->
-                <div v-if="showQuickReg" class="card card-body bg-light mt-2 p-3">
+                <div v-if="showQuickReg" class="card card-body bg-body-tertiary mt-2 p-3" data-testid="wl-quick">
                     <p class="mb-2 fw-semibold small">{{ t.wl_quick_register }}</p>
                     <div class="row g-2">
                         <div class="col-12 col-sm-7">
@@ -315,6 +325,12 @@ async function onSubmit() {
                             </div>
                         </div>
                     </div>
+                    <QuickAllergyFields
+                        v-model:allergies="quickAllergies"
+                        v-model:denied="quickAllergiesDenied"
+                        :errors="quickErrors"
+                        class="mt-2"
+                    />
                     <div
                         v-if="quickErrors.confirm_homonym"
                         class="alert alert-warning py-2 px-3 mt-2 mb-0 small"

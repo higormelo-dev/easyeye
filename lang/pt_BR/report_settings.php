@@ -97,4 +97,20 @@ return [
     'flash_reimported' => 'Conteúdo reimportado com sucesso.',
     'error_reimport'   => 'Não foi possível reimportar: o modelo global de origem não está mais disponível.',
     'error_adopt'      => 'Este modelo não está disponível para adoção.',
+
+    // Atualização do modelo padrão em conteúdo personalizado pela clínica
+    'upstream_badge'       => 'Atualização disponível do modelo padrão',
+    'upstream_hint'        => 'Este texto foi personalizado pela clínica e o modelo padrão do EasyEye mudou depois. Nada foi alterado sem você decidir.',
+    'upstream_view'        => 'Ver modelo padrão',
+    'upstream_apply'       => 'Aplicar atualização',
+    'upstream_keep'        => 'Manter o meu',
+    'upstream_confirm'     => 'Substituir o texto de ":label" pelo do modelo padrão atual? O texto personalizado da clínica será trocado (a troca fica registrada).',
+    'upstream_title'       => 'Seu texto × modelo padrão atualizado',
+    'upstream_local'       => 'Seu texto (personalizado)',
+    'upstream_global'      => 'Modelo padrão atualizado',
+    'upstream_loading'     => 'Carregando…',
+    'upstream_error'       => 'Não foi possível carregar o modelo padrão.',
+    'upstream_unsaved'     => 'Salve ou descarte as alterações deste formulário antes de aplicar ou manter.',
+    'flash_update_applied' => 'Atualização do modelo padrão aplicada.',
+    'flash_update_kept'    => 'Texto da clínica mantido. O aviso volta se o modelo padrão mudar de novo.',
 ];

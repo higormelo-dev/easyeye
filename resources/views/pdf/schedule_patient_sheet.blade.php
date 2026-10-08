@@ -21,6 +21,9 @@
         .grid th { width: 26%; color: #6b7280; font-weight: 600; }
         .tag { display: inline-block; border: 1px solid #b45309; color: #92400e; border-radius: 3px; padding: 0 4px; font-size: 9px; font-weight: bold; }
         .notes { white-space: pre-wrap; }
+        /* Alergia (Fase 2): em destaque com texto, não só cor. */
+        .allergy { margin: 8px 0 4px; padding: 5px 8px; font-size: 11px; border: 1px solid #9ca3af; }
+        .allergy-has { border: 2px solid #b91c1c; color: #7f1d1d; }
         .footer { margin-top: 16px; font-size: 8px; color: #6b7280; }
     </style>
 </head>
@@ -29,6 +32,12 @@
         <div class="title">{{ $t('sheet_title') }} — {{ $patient['name'] }}</div>
         <div class="meta">{{ $entity->name }}</div>
     </div>
+
+    @if(isset($allergies))
+    <div class="allergy allergy-{{ $allergies['state'] }}">
+        @if($allergies['state'] === 'has')<strong>&#9888; {{ __('clinical_safety.banner.allergy_alert') }}:</strong> @endif{{ $allergies['text'] }}
+    </div>
+    @endif
 
     <h2>{{ $t('sheet_section_identification') }}</h2>
     <table class="grid">

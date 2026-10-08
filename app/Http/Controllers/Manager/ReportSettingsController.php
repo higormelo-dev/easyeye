@@ -130,7 +130,12 @@ class ReportSettingsController extends Controller
 
         $reportSetting->update($validated);
 
-        $this->service->syncContents($reportSetting, $request->input('contents', []));
+        // O formulário do manager edita só cabeçalho/layout (não manda
+        // `contents`): sincronizar com lista vazia APAGAVA todos os
+        // conteúdos do modelo padrão — quebrando a emissão em toda clínica.
+        if ($request->has('contents')) {
+            $this->service->syncContents($reportSetting, (array) $request->input('contents', []));
+        }
 
         if ($request->wantsJson()) {
             return response()->json(['message' => __('actions.report_settings.updated')]);

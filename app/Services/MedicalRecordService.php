@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Enums\EntityGate;
 use App\Exceptions\LockedMedicalRecordException;
 use App\Models\{Entity, MedicalRecord, Patient};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
+use App\Support\ContactLensUse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -14,6 +16,10 @@ use Illuminate\Support\Facades\Gate;
  */
 class MedicalRecordService
 {
+    public function __construct(private readonly PatientClinicalSafetyService $clinicalSafety)
+    {
+    }
+
     /**
      * Cria um novo prontuário e persiste no banco.
      */
@@ -22,7 +28,13 @@ class MedicalRecordService
         Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail(session('selected_entity_id')));
 
         return MedicalRecord::create(
-            array_merge($this->normalize($data), ['patient_id' => $patient->id]),
+            array_merge(
+                $this->normalize($data),
+                // Retrato das alergias e medicações ativas no momento da
+                // consulta (Fase 2 / A2) — sempre do servidor.
+                $this->clinicalSafety->snapshot($patient),
+                ['patient_id' => $patient->id],
+            ),
         );
     }
 
@@ -34,7 +46,11 @@ class MedicalRecordService
     public function update(MedicalRecord $record, array $data): MedicalRecord
     {
         // A trait Signable já lança LockedMedicalRecordException em updating se is_locked=true
-        $record->update($this->normalize($data));
+        $patient = Patient::query()->withoutGlobalScopes()->findOrFail($record->patient_id);
+
+        // Retrato refeito a cada salvar: o prontuário reflete o que estava
+        // ativo quando o médico salvou/finalizou a consulta (Fase 2 / A2).
+        $record->update(array_merge($this->normalize($data), $this->clinicalSafety->snapshot($patient)));
 
         return $record->fresh();
     }
@@ -128,6 +144,12 @@ class MedicalRecordService
             'hypertensive', 'hypertensive_family',
             'glaucomatous', 'glaucomatous_family',
         ];
+
+        // Uso de lente de contato (anamnese): só as chaves conhecidas; "não
+        // usa" descarta o resto; nada preenchido vira null.
+        if (array_key_exists('contact_lens_use', $data)) {
+            $data['contact_lens_use'] = ContactLensUse::normalize(is_array($data['contact_lens_use']) ? $data['contact_lens_use'] : null);
+        }
 
         // Cálculo de lentes de contato: grava só o que o SERVIDOR calcula a
         // partir das entradas (resultado vindo do navegador é ignorado).

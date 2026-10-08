@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Enums\{DataAccessPurpose, DocumentationType, EntityGate};
-use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSetting, ReportSettingContent};
+use App\Exceptions\AllergyConflictException;
+use App\Models\{Doctor, DoctorDocumentTemplate, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSetting, ReportSettingContent};
 use App\Services\{MedicalRecordDocumentationService, MedicalRecordPdfService};
+use App\Support\ClinicalSafety\{PrescriptionAllergyGuard, TermNormalizer};
 use App\Support\CurrentDoctor;
+use App\Support\Documents\DocumentDate;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response};
 use Illuminate\Support\Facades\{DB, Gate};
@@ -18,6 +21,7 @@ class MedicalRecordDocumentationsController extends Controller
     public function __construct(
         private readonly MedicalRecordDocumentationService $service,
         private readonly MedicalRecordPdfService $pdfService,
+        private readonly PrescriptionAllergyGuard $allergyGuard,
     ) {
     }
 
@@ -33,7 +37,12 @@ class MedicalRecordDocumentationsController extends Controller
             'report_setting_content_id' => ['required', 'uuid', 'exists:report_setting_contents,id'],
             'title'                     => ['nullable', 'string', 'max:255'],
             'content'                   => ['required', 'string'],
-        ]);
+            // Receita que bate com alergia ativa: motivo para seguir (Fase 2 / A4).
+            'allergy_override_reason' => ['nullable', 'string', 'max:1000'],
+            // Data alternativa impressa (Fase 2 / B3) e modelo pessoal usado.
+            'document_date' => DocumentDate::rules(),
+            'template_id'   => ['nullable', 'uuid'],
+        ], DocumentDate::messages());
 
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
         $this->assertContentBelongsToCurrentEntity($content);
@@ -45,13 +54,69 @@ class MedicalRecordDocumentationsController extends Controller
 
         // Autoria = médico que emite (cadastro ativo; o Gate acima exige). A
         // chamada antes não passava o médico e estourava ArgumentCountError (500).
+        $issuer   = $this->issuer();
+        $metadata = [];
+
+        // Modelo pessoal usado (Fase 2 / B3): só do médico que emite. Carregado
+        // ANTES da checagem de alergia (3ª revisão Codex, P1) — o editor de
+        // Documentações só tem texto livre (não existe campo `items` aqui); um
+        // modelo de RECEITA perde o vínculo com o catálogo ao virar HTML
+        // ("LACRIMA PLUS — solução oftálmica" sem a palavra "colírio"), e a
+        // checagem por texto não reconhece o conservante. Os itens
+        // estruturados (medicine_id/active_ingredient) ficam guardados no
+        // modelo mesmo — é lá que a checagem precisa buscá-los.
+        $template = null;
+
+        if (filled($validated['template_id'] ?? null)) {
+            $template = DoctorDocumentTemplate::query()
+                ->withoutGlobalScopes()
+                ->whereNull('deleted_at')
+                ->ownedBy((string) session('selected_entity_id'), (string) $issuer->id)
+                ->find($validated['template_id']);
+
+            if ($template === null) {
+                return response()->json([
+                    'message' => __('clinical_documents.templates.not_found'),
+                    'errors'  => ['template_id' => [__('clinical_documents.templates.not_found')]],
+                ], 422);
+            }
+
+            $metadata['personal_template'] = ['id' => (string) $template->id, 'name' => $template->name];
+        }
+
+        // Médico pode ter editado o texto depois de aplicar o modelo (tirou
+        // ou trocou um remédio) — os itens do modelo ORIGINAL não acompanham
+        // essa edição; sem reconciliar contra o texto final, a checagem
+        // continuava cobrando motivo pra remédio que não está mais na
+        // receita (13ª revisão Codex, P2).
+        $templateItems = $template?->kind === 'prescription'
+            ? $this->reconcileTemplateItems($template->payload['items'] ?? [], $sanitized)
+            : [];
+
+        // Modelo do tipo RECEITA (da clínica ou global) salvo pela
+        // Documentação: mesma checagem de alergia do receituário.
+        try {
+            $override = $content->type === DocumentationType::Prescription
+                ? $this->allergyGuard->guard($patient, $sanitized, $templateItems, $validated['allergy_override_reason'] ?? null)
+                : null;
+        } catch (AllergyConflictException $exception) {
+            return response()->json($exception->toResponsePayload(), 422);
+        }
+
         $documentation = $this->service->store(
             $medicalrecord,
             $content,
             $sanitized,
             $validated['title'] ?? null,
-            (string) $this->issuer()->id,
+            (string) $issuer->id,
+            $override,
+            DocumentDate::alternative($validated['document_date'] ?? null),
+            $metadata,
         );
+
+        if ($override !== null) {
+            $this->allergyGuard->recordOverride($documentation, $override);
+        }
 
         return response()->json([
             'id'         => $documentation->id,
@@ -59,7 +124,9 @@ class MedicalRecordDocumentationsController extends Controller
             'type_label' => $documentation->getTypeLabel(),
             'title'      => $documentation->title,
             'created_at' => $documentation->created_at?->format('d/m/Y H:i'),
-            'pdf_url'    => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $medicalrecord, $documentation]),
+            // Data alternativa impressa (Fase 2 / B3).
+            'document_date' => $documentation->document_date?->format('d/m/Y'),
+            'pdf_url'       => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $medicalrecord, $documentation]),
         ], 201);
     }
 
@@ -169,6 +236,53 @@ class MedicalRecordDocumentationsController extends Controller
         $documentation->delete();
 
         return response()->json(['message' => __('actions.medical_records.documentation_deleted')]);
+    }
+
+    /**
+     * Mantém só os itens do modelo que ainda aparecem no texto final — pelo
+     * NOME/marca ("Amoxil 500mg" → "amoxil") OU pelo princípio ativo, igual
+     * PatientClinicalSafetyService faz pra reconciliar texto livre. Item sem
+     * termo nenhum pra comparar fica (não dá pra provar que saiu).
+     *
+     * Checar só o princípio ativo quando ele existe (e nunca o nome) perdia
+     * marca que o médico manteve no texto só com o nome comercial ("Lacrima
+     * Plus"), sem citar "dextrana"/"hipromelose" — o item saía da checagem
+     * sem o remédio ter saído da receita. Se o catálogo desativar esse
+     * remédio depois, a busca por texto livre (que exige `active=true`)
+     * também para de achá-lo: ficava sem QUALQUER aviso (14ª revisão Codex,
+     * P1).
+     *
+     * @param array<int, array<string, mixed>> $items
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function reconcileTemplateItems(array $items, string $html): array
+    {
+        if ($items === []) {
+            return [];
+        }
+
+        $textCore = TermNormalizer::core($html);
+
+        return array_values(array_filter($items, function (array $item) use ($textCore) {
+            $name  = (string) ($item['name'] ?? '');
+            $terms = [
+                ...TermNormalizer::terms((string) preg_replace('/\s*\d.*$/u', '', $name) ?: $name),
+                ...TermNormalizer::terms((string) ($item['active_ingredient'] ?? '')),
+            ];
+
+            if ($terms === []) {
+                return true;
+            }
+
+            foreach ($terms as $term) {
+                if (TermNormalizer::contains($textCore, $term)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
     }
 
     /** Médico emissor (logado, cadastro ativo) — 403 traduzido se não houver. */

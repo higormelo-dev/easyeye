@@ -256,6 +256,8 @@ class ReportSettingVariableSeeder extends Seeder
                     // Preenchimento manual: médico informa o número de dias
                     ['placeholder' => '{{DIAS_AFASTAMENTO}}', 'source_type' => 'custom', 'source_field' => null],
                     ['placeholder' => '{{DIAS_AFASTAMENTO_EXTENSO}}', 'source_type' => 'custom', 'source_field' => null],
+                    // CID só com autorização do paciente (Fase 2 / B1)
+                    ['placeholder' => '{{CID_ATESTADO}}', 'source_type' => 'custom', 'source_field' => null],
                 ],
             ],
 
@@ -265,6 +267,31 @@ class ReportSettingVariableSeeder extends Seeder
                     // Resolvidos automaticamente pelo MedicalRecordDocumentationService
                     ['placeholder' => '{{PACIENTE_NOME}}', 'source_type' => 'patient', 'source_field' => 'person.full_name'],
                     ['placeholder' => '{{DATA_ATUAL}}', 'source_type' => 'date', 'source_field' => 'current'],
+                    // Preenchidos na emissão (Fase 2 / B1 — CertificateBuilder)
+                    ['placeholder' => '{{DATA_COMPARECIMENTO}}', 'source_type' => 'custom', 'source_field' => null],
+                    ['placeholder' => '{{HORARIO_COMPARECIMENTO}}', 'source_type' => 'custom', 'source_field' => null],
+                    ['placeholder' => '{{ORIENTACAO_DILATACAO}}', 'source_type' => 'custom', 'source_field' => null],
+                ],
+            ],
+
+            // ── ATESTADO DE ACOMPANHANTE (Fase 2 / B1) ───────────────────────
+            'ATESTADO DE ACOMPANHANTE' => [
+                'acompanhante' => [
+                    ['placeholder' => '{{PACIENTE_NOME}}', 'source_type' => 'patient', 'source_field' => 'person.full_name'],
+                    ['placeholder' => '{{ACOMPANHANTE_NOME}}', 'source_type' => 'custom', 'source_field' => null],
+                    ['placeholder' => '{{ACOMPANHANTE_DOCUMENTO}}', 'source_type' => 'custom', 'source_field' => null],
+                    ['placeholder' => '{{DATA_COMPARECIMENTO}}', 'source_type' => 'custom', 'source_field' => null],
+                    ['placeholder' => '{{HORARIO_COMPARECIMENTO}}', 'source_type' => 'custom', 'source_field' => null],
+                ],
+            ],
+
+            // ── ATESTADO DE APTIDÃO VISUAL (Fase 2 / B1) ─────────────────────
+            'ATESTADO DE APTIDÃO VISUAL' => [
+                'aptidao_visual' => [
+                    ['placeholder' => '{{PACIENTE_NOME}}', 'source_type' => 'patient', 'source_field' => 'person.full_name'],
+                    ['placeholder' => '{{FINALIDADE_APTIDAO}}', 'source_type' => 'custom', 'source_field' => null],
+                    ['placeholder' => '{{TABELA_ACUIDADE_VISUAL}}', 'source_type' => 'custom', 'source_field' => null],
+                    ['placeholder' => '{{CONCLUSAO_APTIDAO}}', 'source_type' => 'custom', 'source_field' => null],
                 ],
             ],
         ];

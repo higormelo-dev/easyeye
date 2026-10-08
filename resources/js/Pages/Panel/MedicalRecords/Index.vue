@@ -10,6 +10,7 @@ import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import MedicalRecordDetailDrawer from './MedicalRecordDetailDrawer.vue';
 import PatientInfoSidebar from './Components/PatientInfoSidebar.vue';
 import PdfPreviewModal from './Components/PdfPreviewModal.vue';
+import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
 
 const props = defineProps({
     breadcrumbs: { type: Array, default: () => [] },
@@ -21,6 +22,8 @@ const props = defineProps({
     // Perfil médico sem cadastro de médico ativo (CurrentDoctor): aviso + ações escondidas.
     doctorMissing: { type: Boolean, default: false },
     doctorMissingText: { type: String, default: '' },
+    // Alergias e alertas de risco do paciente (Fase 2) — todos que atendem veem.
+    clinicalSafety: { type: Object, default: null },
 });
 
 // ── Timeline: paginação infinita ────────────────────────────────────────────
@@ -142,6 +145,8 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
             </PageHeader>
 
             <DoctorMissingAlert v-if="doctorMissing" :text="doctorMissingText" />
+
+            <ClinicalAlertBanner v-if="clinicalSafety" :summary="clinicalSafety" class="mb-3" />
 
             <div class="row g-3">
                 <!-- Coluna lateral: info do paciente (componente padrão do prontuário) -->

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Http\Requests\PatientRequest;
 use App\Models\{Covenant, Doctor, Patient, People};
 use App\Models\Scopes\EntityScope;
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\{Collection, Str};
 use Illuminate\Support\Facades\DB;
@@ -20,9 +21,20 @@ class PatientService
         return DB::transaction(function () use ($request) {
             Patient::lockRegistrations((string) session()->get('selected_entity_id'));
 
-            $person = $this->findOrCreatePerson($request);
+            $person  = $this->findOrCreatePerson($request);
+            $patient = $this->findOrCreate($person->id, $request);
 
-            return $this->findOrCreate($person->id, $request);
+            // Alergias/"nega alergias"/medicações informadas na aba Clínico
+            // do cadastro novo (Fase 2 / A1-A2) — sempre como informadas.
+            $allergies   = array_values((array) $request->validated('allergies', []));
+            $medications = array_values((array) $request->validated('medications', []));
+            $denied      = (bool) $request->validated('allergies_denied', false);
+
+            if ($allergies !== [] || $medications !== [] || $denied) {
+                app(PatientClinicalSafetyService::class)->registerFromPatientForm($patient, $allergies, $denied, $medications);
+            }
+
+            return $patient;
         });
     }
 

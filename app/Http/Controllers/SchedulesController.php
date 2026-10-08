@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{CashEntryReferenceType, ClientRule, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleSituation};
+use App\Enums\{CashEntryReferenceType, ClientRule, DataAccessPurpose, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleSituation};
 use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleSlotUnavailableException};
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
@@ -12,9 +12,10 @@ use App\Models\{ClinicResource, Covenant, Doctor, Entity, FinancialCashEntry, Fi
 use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
 use App\Rules\ActiveCovenant;
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
+use App\Services\{DataAccessLogService, ScheduleSeriesService, ScheduleService};
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
 use App\Services\Schedules\{AgendaFilters, AgendaQueryService, ScheduleAvailabilityService};
-use App\Services\{ScheduleSeriesService, ScheduleService};
 use App\Services\WhatsApp\WhatsAppService;
 use App\Support\{BrazilianFormat, CurrentDoctor, PatientAccess};
 use Carbon\Carbon;
@@ -278,6 +279,9 @@ class SchedulesController extends Controller
             'patient_sheet_url' => $schedule->patient_id && app(PatientAccess::class)->current()
                 ? route('panel.schedules.patient-sheet', $schedule->id)
                 : null,
+            // Alergias do paciente (Fase 2 / A1) — alerta fixo no drawer; só
+            // para quem tem acesso a Pacientes.
+            'clinical_safety' => $this->clinicalSafetyForDrawer($schedule),
 
             // ── Contato ───────────────────────────────────────────────────
             // Formatado para o drawer; o form de edição (v-mask) aceita o valor
@@ -1042,10 +1046,17 @@ class SchedulesController extends Controller
             ? WhatsAppService::optedOutPhones($entityId, $schedules->map(fn (Schedule $s) => $this->cellphoneOf($s))->all())
             : [];
 
+        // Alergias por paciente (Fase 2 / A1) — uma consulta para a página;
+        // só para quem tem acesso a Pacientes.
+        $allergyFlags = $canSeePatients
+            ? app(PatientClinicalSafetyService::class)->compactFor($entityId, $schedules->pluck('patient_id')->filter()->all())
+            : [];
+
         $scheduleRows = $schedules->map(fn ($s) => array_merge(
             ['sort_time' => $s->date_time->toISOString(), 'type' => 'schedule'],
             $this->toScheduleRow($s, $cashEntryScheduleIds, $chargingCovenantIds),
             $canSeePatients ? $this->whatsAppFields($s, $optedOut) : [],
+            ['allergy' => $s->patient_id ? ($allergyFlags[(string) $s->patient_id] ?? null) : null],
         ));
 
         return $scheduleRows->toBase()
@@ -1054,6 +1065,37 @@ class SchedulesController extends Controller
             ->sortBy('sort_time')
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Alergias do paciente do agendamento para o drawer (Fase 2 / A1): só com
+     * acesso a Pacientes e paciente cadastrado; a leitura vai para o log de
+     * acesso (dado de saúde sensível).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function clinicalSafetyForDrawer(Schedule $schedule): ?array
+    {
+        $patient = $schedule->patient;
+
+        if ($patient === null || ! app(PatientAccess::class)->current()) {
+            return null;
+        }
+
+        app(DataAccessLogService::class)->log(
+            resource: $patient,
+            purpose: DataAccessPurpose::PatientCare,
+            justification: null,
+            patientId: (string) $patient->id,
+        );
+
+        $summary = app(PatientClinicalSafetyService::class)->summary($patient, withHistory: false);
+
+        return [
+            'allergy_state' => $summary['allergy_state'],
+            'denied'        => $summary['denied'],
+            'allergies'     => $summary['allergies'],
+        ];
     }
 
     /** Celular para contato: o do agendamento, senão o do cadastro do paciente. */

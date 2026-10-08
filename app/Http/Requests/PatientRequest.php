@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\ClinicalSafety\{PatientAllergyRequest, PatientMedicationRequest};
 use App\Models\{CovenantPlan, Patient};
 use App\Rules\ActiveCovenant;
 use App\Services\PatientDuplicateFinder;
@@ -207,6 +208,24 @@ class PatientRequest extends FormRequest
 
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
             $rules['active'] = ['required', 'boolean'];
+        }
+
+        // Paciente NOVO (Fase 2 / A1-A2): alergias, "nega alergias" e
+        // medicações informadas já no cadastro (aba Clínico) — gravadas como
+        // informadas pelo paciente. Na edição, a aba grava cada item na hora
+        // (PatientClinicalSafetyController); aqui são ignorados.
+        if ($this->isMethod('POST')) {
+            $allergy    = collect(PatientAllergyRequest::fieldRules('allergies.*.'))->except('allergies.*.status')->all();
+            $medication = PatientMedicationRequest::fieldRules('medications.*.');
+
+            $rules = [
+                ...$rules,
+                'allergies' => ['nullable', 'array', 'max:20'],
+                ...$allergy,
+                'allergies_denied' => ['nullable', 'boolean'],
+                'medications'      => ['nullable', 'array', 'max:30'],
+                ...$medication,
+            ];
         }
 
         return $rules;

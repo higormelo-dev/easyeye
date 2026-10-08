@@ -230,6 +230,9 @@ class PatientImportsController extends Controller
             'nome_mae', 'nome_pai',
             'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'pais',
             'convenio', 'plano', 'carteirinha', 'codigo_importacao',
+            // Alergias informadas pelo paciente (Fase 2 / G4): substâncias
+            // separadas por ";" e "nega alergias" (sim/não).
+            'alergias', 'nega_alergias',
         ];
 
         $example = [
@@ -239,6 +242,8 @@ class PatientImportsController extends Controller
             '01310100', 'Av. Paulista', '1000', 'Apto 1', 'Bela Vista', 'São Paulo', 'SP', 'Brasil',
             // "plano": nome do plano ou registro do produto na ANS (carteirinha).
             'Unimed', '', '123456789', '00042',
+            // fputcsv põe entre aspas (o ";" da lista não quebra a coluna).
+            'Dipirona; Penicilina', 'não',
         ];
 
         return response()->streamDownload(function () use ($headers, $example) {

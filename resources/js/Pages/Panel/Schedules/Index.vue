@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ScheduleCard from './ScheduleCard.vue';
@@ -179,13 +180,30 @@ const printUrl = computed(() => {
 
 // ── Vagas do mês (calendário lateral) ─────────────────────────────────────────
 const availability = ref(null);
+const availabilityDoctorDays = ref(null);
 const availabilityLoading = ref(false);
 const availabilityMonth = ref(null);
+let availabilityScope = null;
 let availabilityTicket = 0;
+const isAggregateAvailability = computed(() => !props.isDoctor && (!doctor.value || doctor.value === 'tudo'));
+const availabilityScopeLabel = computed(() =>
+    isAggregateAvailability.value
+        ? (props.t.avail_scope_all ?? 'Vagas — todos os médicos')
+        : (props.t.avail_scope_doctor ?? 'Vagas — :doctor').replace(
+              ':doctor',
+              props.doctors.find((d) => d.id === doctor.value)?.name ?? '',
+          ),
+);
 
 async function loadAvailability() {
     if (!availabilityMonth.value || props.doctorMissing) return;
     const ticket = ++availabilityTicket;
+    const scope = `${availabilityMonth.value}|${props.isDoctor ? 'own' : doctor.value}`;
+    if (scope !== availabilityScope) {
+        availability.value = null;
+        availabilityDoctorDays.value = null;
+        availabilityScope = scope;
+    }
     availabilityLoading.value = true;
     try {
         const qs = new URLSearchParams({ month: availabilityMonth.value });
@@ -193,14 +211,43 @@ async function loadAvailability() {
         const res = await fetch(`${props.urls.availability ?? route('panel.schedules.availability')}?${qs}`, {
             headers: { Accept: 'application/json' },
         });
+        const data = res.ok ? await res.json() : null;
         if (ticket !== availabilityTicket) return;
-        availability.value = res.ok ? ((await res.json()).days ?? null) : null;
+        availability.value = data?.days ?? null;
+        availabilityDoctorDays.value = data?.doctor_days ? Object.fromEntries(Object.entries(data.doctor_days)) : null;
     } catch {
-        if (ticket === availabilityTicket) availability.value = null;
+        if (ticket === availabilityTicket) {
+            availability.value = null;
+            availabilityDoctorDays.value = null;
+        }
     } finally {
         if (ticket === availabilityTicket) availabilityLoading.value = false;
     }
 }
+onBeforeUnmount(() => availabilityTicket++);
+
+// Vagas por médico — mesmo texto que o card "Vagas por médico" (removido)
+// mostrava, agora junto do nome na lista de médicos (sem repetir em dois
+// lugares). Só tem dado em modo agregado (ScheduleAvailabilityService só
+// detalha por médico quando `doctor` não é filtrado — ver availability()).
+function doctorAvailabilityText(doctorId) {
+    const day = availabilityDoctorDays.value?.[doctorId]?.[date.value];
+    if (!day) return null;
+    const label = props.t[`avail_${day.state}`] ?? day.state;
+    if (!['available', 'few', 'full'].includes(day.state)) return label;
+    const counts = (props.t.avail_free_of ?? ':free livres de :capacity')
+        .replace(':free', day.free)
+        .replace(':capacity', day.capacity);
+    return `${label} · ${counts}`;
+}
+
+const clinicTotalText = computed(() => {
+    const total = availability.value?.[date.value];
+    if (!total || !['available', 'few', 'full'].includes(total.state)) return null;
+    return (props.t.avail_clinic_total ?? 'Total da clínica: :free livres de :capacity')
+        .replace(':free', total.free)
+        .replace(':capacity', total.capacity);
+});
 
 function onMonthChange(month) {
     availabilityMonth.value = month;
@@ -350,12 +397,22 @@ onMounted(() => {
     });
 });
 
+// Clicou em editar A e logo em B: só o último clique abre (a resposta
+// atrasada do A não troca o formulário do B).
+const editReq = latestRequest();
+
 async function openEdit(item) {
-    const res = await fetch(item.show_url, { headers: { Accept: 'application/json' } });
-    if (res.ok) {
-        const json = await res.json();
-        editSchedule.value = json.data;
+    const req = editReq.begin();
+    let json;
+    try {
+        const res = await fetch(item.show_url, { headers: { Accept: 'application/json' }, signal: req.signal });
+        json = res.ok ? await res.json() : null;
+    } catch (error) {
+        if (isAbortError(error)) return;
+        throw error;
     }
+    if (!req.current()) return;
+    if (json) editSchedule.value = json.data;
     prefillData.value = null;
     formOpen.value = true;
 }
@@ -906,6 +963,15 @@ const breadcrumbs = [
                 <div class="col-12 col-md-3">
                     <div class="card">
                         <div class="card-body">
+                            <div v-if="!isDoctor && !doctorMissing" class="mb-2" data-testid="availability-scope">
+                                <div class="small fw-semibold">{{ availabilityScopeLabel }}</div>
+                                <p v-if="isAggregateAvailability" class="small text-muted mb-0">
+                                    {{
+                                        t.avail_aggregate_hint ??
+                                        'As cores somam as vagas dos médicos com escala. Confira abaixo cada médico no dia selecionado.'
+                                    }}
+                                </p>
+                            </div>
                             <!-- Mini calendário mensal -->
                             <MiniCalendar
                                 :model-value="date"
@@ -917,12 +983,23 @@ const breadcrumbs = [
                                 @month-change="onMonthChange"
                             />
 
-                            <!-- Médicos — só para quem vê vários médicos -->
+                            <!-- Médicos — só para quem vê vários médicos. Vagas de cada um
+                                 (antes num card duplicado "Vagas por médico" acima) ficam
+                                 junto do nome aqui, não repetidas em dois lugares. -->
                             <template v-if="!isDoctor && doctors.length > 0">
                                 <hr class="my-3" />
 
                                 <!-- Médicos -->
-                                <h6 class="fw-bold text-uppercase mb-2">{{ t.sidebar_doctors }}</h6>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <h6 class="fw-bold text-uppercase mb-0">{{ t.sidebar_doctors }}</h6>
+                                    <span
+                                        v-if="isAggregateAvailability && availabilityLoading"
+                                        class="small text-muted"
+                                        role="status"
+                                    >
+                                        {{ t.avail_loading ?? 'Atualizando vagas…' }}
+                                    </span>
+                                </div>
 
                                 <!-- Todos -->
                                 <div
@@ -939,8 +1016,12 @@ const breadcrumbs = [
                                     </div>
                                     <div>
                                         <div class="fw-bold small">{{ t.sidebar_all }}</div>
-                                        <div class="text-muted" style="font-size: 0.75rem">
-                                            {{ t.sidebar_select_all }}
+                                        <div
+                                            class="text-muted"
+                                            style="font-size: 0.75rem"
+                                            data-testid="availability-clinic-total"
+                                        >
+                                            {{ clinicTotalText ?? t.sidebar_select_all }}
                                         </div>
                                     </div>
                                 </div>
@@ -950,6 +1031,7 @@ const breadcrumbs = [
                                     :key="d.id"
                                     class="d-flex align-items-center mb-3 gap-2"
                                     style="cursor: pointer"
+                                    :data-doctor="d.id"
                                     @click="setDoctor(d.id)"
                                 >
                                     <div
@@ -970,6 +1052,13 @@ const breadcrumbs = [
                                     <div>
                                         <div class="fw-semibold small" :style="{ color: d.color }">{{ d.name }}</div>
                                         <div class="text-muted" style="font-size: 0.72rem">{{ d.record }}</div>
+                                        <div
+                                            v-if="doctorAvailabilityText(d.id)"
+                                            class="text-muted"
+                                            style="font-size: 0.72rem"
+                                        >
+                                            {{ doctorAvailabilityText(d.id) }}
+                                        </div>
                                     </div>
                                 </div>
                             </template>

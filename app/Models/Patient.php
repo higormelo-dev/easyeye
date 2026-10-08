@@ -44,6 +44,10 @@ class Patient extends Model
         'card_number',
         'active',
         'priority_rating',
+        // "Nega alergias" (Fase 2 / A1): quem e quando — diferente de "não
+        // perguntado". Some quando uma alergia ativa é registrada.
+        'allergies_denied_at',
+        'allergies_denied_by',
     ];
 
     private const CODE_PREFIX = 'PAC';
@@ -198,6 +202,8 @@ class Patient extends Model
             'updated_at'      => 'datetime',
             'deleted_at'      => 'datetime',
             'priority_rating' => 'integer',
+
+            'allergies_denied_at' => 'datetime',
         ];
     }
 
@@ -266,5 +272,22 @@ class Patient extends Model
     public function exams(): HasMany
     {
         return $this->hasMany(PatientExam::class, 'patient_id');
+    }
+
+    /** Alergias do paciente (Fase 2 / A1) — inclui descartadas (histórico). */
+    public function allergies(): HasMany
+    {
+        return $this->hasMany(PatientAllergy::class, 'patient_id');
+    }
+
+    /** Medicações em uso (Fase 2 / A2) — inclui suspensas/descartadas. */
+    public function medications(): HasMany
+    {
+        return $this->hasMany(PatientMedication::class, 'patient_id');
+    }
+
+    public function allergiesDeniedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'allergies_denied_by');
     }
 }

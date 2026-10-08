@@ -51,7 +51,7 @@ class MedicalRecordDraftService
         'static_cylindrical_right', 'static_cylindrical_left', 'static_axis_right', 'static_axis_left',
         'ocular_motility', 'tonometer_right', 'tonometer_left', 'tonometer_time', 'pachymetry_right', 'pachymetry_left',
         'gonioscopy_right', 'gonioscopy_left', 'biomicroscopy_right', 'biomicroscopy_left', 'fundoscopy_right',
-        'fundoscopy_left', 'observation_general', 'observation_of_lenses', 'contact_lens_calculation',
+        'fundoscopy_left', 'observation_general', 'observation_of_lenses', 'contact_lens_calculation', 'contact_lens_use',
         'diagnosis_cids', 'clinical_conduct', 'follow_up_days',
     ];
 

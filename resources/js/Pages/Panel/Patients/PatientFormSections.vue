@@ -3,6 +3,9 @@ import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import PatientAllergiesPanel from '@/Components/Panel/ClinicalSafety/PatientAllergiesPanel.vue';
+import PatientMedicationsPanel from '@/Components/Panel/ClinicalSafety/PatientMedicationsPanel.vue';
+import { useClinicalSafety } from '@/composables/useClinicalSafety.js';
 
 /**
  * PatientFormSections — corpo das abas do cadastro de paciente
@@ -29,6 +32,51 @@ const props = defineProps({
     // Convênio já salvo ({ id, name, active } do editData): `covenants` só traz
     // ativos; o inativo que o paciente já tem entra marcado "(inativo)".
     covenantOption: { type: Object, default: null },
+    // Paciente já cadastrado: alergias/medicações gravam na hora (Fase 2).
+    // Sem id (paciente novo): vão junto com o cadastro.
+    patientId: { type: String, default: null },
+});
+
+// ── Alergias e medicações em uso (Fase 2 / A1-A2) ─────────────────────────
+// Carrega só quando a aba Clínico é aberta (leitura de dado sensível fica
+// registrada no servidor).
+const safety = useClinicalSafety(computed(() => props.patientId));
+let safetyLoadedFor = null;
+watch(
+    () => [props.section, props.patientId],
+    ([section, id]) => {
+        // Outro paciente (ou nenhum): nada do anterior fica na tela, e a
+        // resposta dele, se ainda pendente, é descartada.
+        if (String(id ?? '') !== String(safetyLoadedFor ?? '')) {
+            safety.cancel();
+            safety.summary = null;
+            safetyLoadedFor = null;
+        }
+        if (!id) return;
+        if (section === 'clinical' && safetyLoadedFor !== id) {
+            safetyLoadedFor = id;
+            // Falhou: desmarca pra trocar de aba e voltar tentar de novo —
+            // sem isto, o bloco ficava vazio pra sempre pro mesmo paciente
+            // (18ª revisão Codex, P2). Só desmarca se ainda for ESTE
+            // paciente (senão pisa no carregamento de outro já em curso).
+            safety.load().then((ok) => {
+                if (!ok && safetyLoadedFor === id) safetyLoadedFor = null;
+            });
+        }
+    },
+    { immediate: true },
+);
+// Paciente novo: listas pendentes vão no próprio formulário (usePatientForm).
+function setPending(key, value) {
+    // eslint-disable-next-line vue/no-mutating-props -- `form` é o useForm compartilhado (ver topo do arquivo)
+    Object.assign(props.form, { [key]: value });
+}
+const medicineSearchUrl = computed(() => {
+    try {
+        return route('panel.medicines.search');
+    } catch {
+        return '';
+    }
 });
 
 // Textos compartilhados (lang/<locale>/ui.php → patient_form) — o mesmo
@@ -359,6 +407,45 @@ const showNoPlans = computed(
                 <label class="form-label">Tipo de íris</label>
                 <SearchSelect v-model="form.iris_id" :options="irisTypes" :placeholder="'Não informado'" />
             </div>
+        </div>
+
+        <!-- Alergias e medicações em uso (Fase 2): a recepção registra como
+             informado pelo paciente; o médico confirma no atendimento. -->
+        <div class="border rounded p-3 mb-3 patient-clinical-safety" data-testid="patient-clinical-safety">
+            <template v-if="patientId">
+                <div v-if="safety.loading" class="text-center py-2">
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                </div>
+                <template v-else-if="safety.summary">
+                    <PatientAllergiesPanel mode="live" :store="safety" :search-url="medicineSearchUrl" class="mb-3" />
+                    <PatientMedicationsPanel mode="live" :store="safety" :search-url="medicineSearchUrl" />
+                </template>
+                <div v-else-if="safety.error" class="text-danger small py-2" role="alert">
+                    {{
+                        ui.safety_load_error ??
+                        'Não foi possível carregar alergias e medicações. Troque de aba e volte para tentar de novo.'
+                    }}
+                </div>
+            </template>
+            <template v-else>
+                <PatientAllergiesPanel
+                    :allergies="form.allergies"
+                    :denied="form.allergies_denied"
+                    mode="pending"
+                    :search-url="medicineSearchUrl"
+                    :errors="form.errors"
+                    class="mb-3"
+                    @update:allergies="setPending('allergies', $event)"
+                    @update:denied="setPending('allergies_denied', $event)"
+                />
+                <PatientMedicationsPanel
+                    :medications="form.medications"
+                    mode="pending"
+                    :search-url="medicineSearchUrl"
+                    :errors="form.errors"
+                    @update:medications="setPending('medications', $event)"
+                />
+            </template>
         </div>
 
         <div class="card border-0 bg-light p-3 mt-2">

@@ -4,6 +4,7 @@ import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 import { formatPatientCode } from '@/utils/formatPatientCode.js';
+import AllergyBadge from '@/Components/Panel/ClinicalSafety/AllergyBadge.vue';
 
 const props = defineProps({
     item: { type: Object, required: true },
@@ -138,6 +139,8 @@ function onSituationClick(trans) {
                         <small v-if="item.code" class="text-muted" :title="item.code"
                             >({{ formatPatientCode(item.code) }})</small
                         >
+                        <!-- Alergia do paciente (Fase 2): texto, não só cor; só com acesso a Pacientes. -->
+                        <AllergyBadge v-if="item.allergy" :allergy="item.allergy" />
                     </div>
 
                     <!-- Row 2: metadata -->

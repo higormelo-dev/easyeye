@@ -126,9 +126,13 @@ class MedicationPresetsController extends Controller
             'duration'     => $m->duration,
             'instructions' => $m->instructions,
             'presentation' => $m->presentation?->name,
-            'my_posology'  => $preset->posology,
-            'is_favorite'  => $preset->is_favorite,
-            'usage_count'  => $preset->usage_count,
+            // Checagem de alergia na tela do receituário (Fase 2 / A4).
+            'active_ingredient' => $m->active_ingredient,
+            'concentration'     => $m->concentration,
+            'is_eye_drop'       => $m->isEyeDrop(),
+            'my_posology'       => $preset->posology,
+            'is_favorite'       => $preset->is_favorite,
+            'usage_count'       => $preset->usage_count,
         ];
     }
 }

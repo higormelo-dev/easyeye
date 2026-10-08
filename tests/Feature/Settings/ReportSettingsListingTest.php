@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\{ClientRule, ReportSettingStatus};
-use App\Models\{Entity, ReportCategory, ReportSetting, User};
+use App\Models\{DoctorDocumentTemplate, Entity, ReportCategory, ReportSetting, ReportSettingContent, User};
+use App\Services\Documents\DoctorDocumentTemplateService;
+use App\Services\ReportSettingService;
 use Illuminate\Support\{Arr, Str};
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -217,6 +219,70 @@ describe('ações voltam para a listagem com retorno', function (): void {
             ->assertSessionHas('message', 'Conteúdo reimportado com sucesso.');
 
         expect($local->fresh()->source_version)->toBe(2);
+    });
+
+    it('reimportar preserva o ID do conteúdo (mesmo slug) — modelo PESSOAL do médico não perde a base (3ª revisão Codex, P2)', function (): void {
+        $global        = rsTemplate(null, 'Global', ['status' => ReportSettingStatus::Published, 'version' => 1]);
+        $globalContent = ReportSettingContent::query()->create([
+            'report_setting_id' => $global->id, 'type' => 'report', 'slug' => 'corpo',
+            'label'             => 'Corpo', 'content' => '<p>Texto original</p>', 'active' => true, 'sort_order' => 0,
+        ]);
+
+        $local        = rsTemplate($this->entity->id, 'Local', ['source_setting_id' => $global->id, 'source_version' => 1]);
+        $localContent = ReportSettingContent::query()->create([
+            'report_setting_id'   => $local->id, 'type' => 'report', 'slug' => 'corpo',
+            'label'               => 'Corpo', 'content' => '<p>Texto original</p>', 'active' => true, 'sort_order' => 0,
+            'source_content_hash' => $globalContent->currentFingerprint(),
+        ]);
+
+        $doctor = doctorRecordForEntityUser(createEntityUser($this->entity, User::factory()->create(), ClientRule::Doctor->value));
+        $tpl    = DoctorDocumentTemplate::query()->create([
+            'entity_id'                 => $this->entity->id, 'doctor_id' => $doctor->id, 'kind' => 'report', 'body_format' => 'html',
+            'report_setting_content_id' => $localContent->id, 'name' => 'Meu laudo padrão', 'body' => '<p>Olá</p>',
+        ]);
+
+        // O padrão global muda — reimportar troca o texto pelo atual.
+        $global->update(['version' => 2]);
+        $globalContent->update(['content' => '<p>Texto NOVO do padrão</p>']);
+
+        $this->actingAs($this->admin)->withSession($this->session)
+            ->post(route('panel.setting.report-settings.reimport', $local))
+            ->assertSessionHas('message', 'Conteúdo reimportado com sucesso.');
+
+        // Antes: forceDelete() recriava com outro ID e a FK (nullOnDelete)
+        // zerava report_setting_content_id — o modelo pessoal desaparecia do
+        // seletor mesmo com a base (agora atualizada) ainda existindo.
+        expect($tpl->fresh()->report_setting_content_id)->toBe($localContent->id)
+            ->and(ReportSettingContent::query()->findOrFail($localContent->id)->content)->toContain('Texto NOVO do padrão');
+
+        $selector = app(DoctorDocumentTemplateService::class)->forSelector($this->entity->id, $doctor);
+        expect(collect($selector)->pluck('template_id')->all())->toContain((string) $tpl->id);
+    });
+
+    it('reimportar preserva TODAS as variantes sem slug (do gerenciador), não só a primeira (12ª revisão Codex, P2)', function (): void {
+        // syncContents() (tela de Modelos do gerenciador) não exige slug pra
+        // variante nova — mais de uma sem slug no mesmo padrão sempre casava
+        // com a MESMA cópia local antes (firstWhere nunca "consome" o que já
+        // achou), sobrescrevia ela de novo e apagava a outra.
+        $global  = rsTemplate(null, 'Global com variantes', ['status' => ReportSettingStatus::Published, 'version' => 1]);
+        $globalA = ReportSettingContent::query()->create(['report_setting_id' => $global->id, 'type' => 'report', 'label' => 'Variante A', 'content' => '<p>A</p>', 'active' => true, 'sort_order' => 0]);
+        $globalB = ReportSettingContent::query()->create(['report_setting_id' => $global->id, 'type' => 'report', 'label' => 'Variante B', 'content' => '<p>B</p>', 'active' => true, 'sort_order' => 1]);
+
+        $local  = rsTemplate($this->entity->id, 'Local com variantes', ['source_setting_id' => $global->id, 'source_version' => 1]);
+        $localA = ReportSettingContent::query()->create(['report_setting_id' => $local->id, 'type' => 'report', 'label' => 'Variante A', 'content' => '<p>A antiga</p>', 'active' => true, 'sort_order' => 0, 'source_content_hash' => $globalA->currentFingerprint()]);
+        $localB = ReportSettingContent::query()->create(['report_setting_id' => $local->id, 'type' => 'report', 'label' => 'Variante B', 'content' => '<p>B antiga</p>', 'active' => true, 'sort_order' => 1, 'source_content_hash' => $globalB->currentFingerprint()]);
+
+        $global->update(['version' => 2]);
+        $globalA->update(['content' => '<p>A nova</p>']);
+        $globalB->update(['content' => '<p>B nova</p>']);
+
+        app(ReportSettingService::class)->reimport($local->fresh());
+
+        expect($local->contents()->count())->toBe(2)
+            ->and($local->contents()->whereKey($localA->id)->exists())->toBeTrue()
+            ->and($local->contents()->whereKey($localB->id)->exists())->toBeTrue()
+            ->and($localA->fresh()->content)->toBe('<p>A nova</p>')
+            ->and($localB->fresh()->content)->toBe('<p>B nova</p>');
     });
 
     it('reimportar sem o global de origem avisa o erro (antes: 500)', function (): void {

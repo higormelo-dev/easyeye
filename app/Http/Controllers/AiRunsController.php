@@ -14,7 +14,7 @@ use App\Http\Requests\AI\{EstimateAiRunRequest, StoreAiRunRequest};
 use App\Jobs\AI\RunAiWorkflowJob;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, Subscription};
 use App\Services\Billing\SubscriptionNoticeService;
-use App\Services\FeatureGateService;
+use App\Services\{ConsultationRecordResolver, FeatureGateService};
 use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
 use DomainException;
@@ -747,13 +747,10 @@ class AiRunsController extends Controller
             // O prontuário da consulta pode ter sido aberto por outro fluxo
             // depois da aprovação (que só pediu confirmação porque não havia
             // nenhum): reaproveita em vez de abrir um segundo para a mesma consulta.
+            // Abre já com o retrato de alergias/medicações (Fase 2 / G3) — mesmo
+            // ponto do laudo manual de imagem (ConsultationRecordResolver).
             $record = $this->documentationService->findConsultationRecord($entityId, (string) $patientId, $scheduleId, $consultationDate)
-                ?? MedicalRecord::query()->create(array_filter([
-                    'entity_id'   => $entityId,
-                    'patient_id'  => $patientId,
-                    'doctor_id'   => (string) $doctorId,
-                    'schedule_id' => $scheduleId,
-                ]));
+                ?? app(ConsultationRecordResolver::class)->openRecord($entityId, (string) $patientId, (string) $doctorId, $scheduleId);
 
             $this->documentationService->writeRunDocumentation($aiRun, $record, (string) $aiRun->final_output);
         });

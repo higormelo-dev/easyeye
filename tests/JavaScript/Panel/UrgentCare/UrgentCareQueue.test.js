@@ -185,6 +185,26 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
+describe('Pronto atendimento — alergia na fila (Fase 2)', () => {
+    it('mostra o selo de alergia com texto em cada paciente; sem a informação, nada', () => {
+        const wrapper = mountIndex({
+            queue: [
+                row({
+                    id: 'a',
+                    allergy: { state: 'has', items: [{ substance: 'Látex', severe: false }], severe: false },
+                }),
+                row({ id: 'b', position: 2, allergy: { state: 'unknown', items: [] } }),
+                row({ id: 'c', position: 3, allergy: null }),
+            ],
+        });
+        const rows = wrapper.findAll('[data-testid="uc-row"]');
+
+        expect(rows[0].find('[data-testid="allergy-badge-has"]').text()).toBe('ALERGIA: Látex');
+        expect(rows[1].find('[data-testid="allergy-badge-unknown"]').exists()).toBe(true);
+        expect(rows[2].find('.cs-allergy-badge').exists()).toBe(false);
+    });
+});
+
 describe('Pronto atendimento — fila', () => {
     it('mostra a fila na ordem do servidor, prioridade com texto e a espera de cada um', () => {
         const wrapper = mountIndex({

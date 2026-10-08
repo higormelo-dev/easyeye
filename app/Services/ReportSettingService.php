@@ -223,23 +223,10 @@ class ReportSettingService
             $copy->version           = 1;
             $copy->save();
 
-            // 2. Clonar contents
+            // 2. Clonar contents (+ variables), cada um marcado com a versão
+            // do padrão de que veio.
             foreach ($globalSetting->contents as $content) {
-                $contentCopy = $content->replicate([
-                    'id', 'report_setting_id', 'created_at', 'updated_at',
-                    'deleted_at', 'created_by', 'updated_by', 'deleted_by',
-                ]);
-                $contentCopy->report_setting_id = $copy->id;
-                $contentCopy->save();
-
-                // 3. Clonar variables
-                foreach ($content->variables as $variable) {
-                    $varCopy = $variable->replicate([
-                        'id', 'report_setting_content_id', 'created_at', 'updated_at',
-                    ]);
-                    $varCopy->report_setting_content_id = $contentCopy->id;
-                    $varCopy->save();
-                }
+                $this->copyContent($content, (string) $copy->id);
             }
 
             return $copy->load('contents.variables');
@@ -309,28 +296,50 @@ class ReportSettingService
 
         return DB::transaction(function () use ($localSetting, $source) {
             $source->loadMissing('contents.variables');
+            $localSetting->loadMissing('contents');
 
-            // 1. Remover conteúdos e variáveis antigos
-            foreach ($localSetting->contents as $content) {
-                $content->variables()->delete();
-                $content->forceDelete();
+            $keptIds = [];
+
+            // Sem slug (variante do gerenciador, syncContents() não exige
+            // slug pra variante nova) não dá pra casar por chave — mais de
+            // uma variante sem slug no padrão sempre achava a MESMA cópia
+            // local (firstWhere nunca "consome" o que já casou), sobrescrevia
+            // ela de novo a cada variante e apagava as outras por nunca
+            // entrarem em keptIds (12ª revisão Codex, P2). Casa pela POSIÇÃO
+            // entre as sem-slug dos dois lados — é o único critério que resta.
+            $slugless  = $localSetting->contents->whereNull('slug')->values();
+            $slugIndex = 0;
+
+            // 1. Mesmo slug no padrão → atualiza NO MESMO registro, preservando
+            //    o ID (applyGlobalContent(), igual ao sync). Recriar do zero
+            //    (forceDelete + copyContent) desligava o modelo PESSOAL do
+            //    médico que aponta pra esse conteúdo (DoctorDocumentTemplate.
+            //    report_setting_content_id é nullOnDelete) — o médico perdia o
+            //    modelo do seletor mesmo com a base ainda existindo, só com
+            //    outro ID (3ª revisão Codex, P2).
+            foreach ($source->contents as $sourceContent) {
+                $localContent = $sourceContent->slug !== null
+                    ? $localSetting->contents->firstWhere('slug', $sourceContent->slug)
+                    : $slugless->get($slugIndex++);
+
+                if ($localContent) {
+                    $this->applyGlobalContent($sourceContent, $localContent);
+                    // applyGlobalContent() não toca type/active (o sync nunca
+                    // muda isso num slug existente); reimport SUBSTITUI tudo.
+                    $localContent->forceFill(['type' => $sourceContent->type, 'active' => $sourceContent->active])->save();
+                    $keptIds[] = $localContent->id;
+
+                    continue;
+                }
+
+                $keptIds[] = $this->copyContent($sourceContent, (string) $localSetting->id)->id;
             }
 
-            // 2. Copiar novos conteúdos do global
-            foreach ($source->contents as $content) {
-                $contentCopy = $content->replicate([
-                    'id', 'report_setting_id', 'created_at', 'updated_at',
-                    'deleted_at', 'created_by', 'updated_by', 'deleted_by',
-                ]);
-                $contentCopy->report_setting_id = $localSetting->id;
-                $contentCopy->save();
-
-                foreach ($content->variables as $variable) {
-                    $varCopy = $variable->replicate([
-                        'id', 'report_setting_content_id', 'created_at', 'updated_at',
-                    ]);
-                    $varCopy->report_setting_content_id = $contentCopy->id;
-                    $varCopy->save();
+            // 2. Slug que saiu do padrão → remove (nada pra preservar).
+            foreach ($localSetting->contents as $content) {
+                if (! in_array($content->id, $keptIds, true)) {
+                    $content->variables()->delete();
+                    $content->forceDelete();
                 }
             }
 
@@ -348,24 +357,26 @@ class ReportSettingService
     /**
      * Sincroniza contents/variables das cópias adoptadas com o template global.
      *
-     * Estratégia conservadora (F4d):
-     *   - Slug presente no global mas ausente na cópia → CRIA
-     *   - Slug presente em ambos:
-     *       • Se HTML diferente → ATUALIZA (preserva o ID, então
-     *         `MedicalRecordDocumentation.report_setting_content_id` continua
-     *         válido. Documentações já emitidas não são afetadas pois o
-     *         conteúdo final foi persistido em `MedicalRecordDocumentation.content`)
-     *       • Variables: substitui conjunto (delete + insert)
-     *   - Slug presente na cópia mas ausente no global → NÃO TOCA
-     *     (preserva customizações da clínica)
+     * Regra (sem apagar personalização da clínica):
+     *   - Slug presente no global mas ausente na cópia → CRIA (marcado com a
+     *     versão do padrão).
+     *   - Slug presente em ambos, global mudou desde a versão da cópia:
+     *       • cópia INTOCADA (texto ainda igual à versão de que veio —
+     *         `source_content_hash`) → ATUALIZA (preserva o ID; documentos já
+     *         emitidos guardam o próprio texto) e grava a nova versão;
+     *       • cópia PERSONALIZADA (sem versão ou editada depois) → NÃO TOCA:
+     *         fica com "atualização disponível" na tela de Modelos
+     *         (aplicar ou manter o meu) e conta em `contents_skipped_customized`;
+     *       • cópia já igual ao global → só religa a versão.
+     *   - Slug só na cópia → NÃO TOCA.
      *
-     * Idempotente. Pode ser executado em CI/deploy sem efeitos colaterais.
+     * Idempotente. Roda no deploy (seeders) e em `reports:sync-adopted`.
      *
-     * @return array{settings_synced:int,contents_created:int,contents_updated:int}
+     * @return array{settings_synced:int,contents_created:int,contents_updated:int,contents_skipped_customized:int}
      */
     public function syncAdoptedContentsWithGlobal(): array
     {
-        $stats = ['settings_synced' => 0, 'contents_created' => 0, 'contents_updated' => 0];
+        $stats = ['settings_synced' => 0, 'contents_created' => 0, 'contents_updated' => 0, 'contents_skipped_customized' => 0];
 
         $globals = ReportSetting::global()
             ->published()
@@ -375,6 +386,7 @@ class ReportSettingService
 
         foreach ($globals as $global) {
             $copies = ReportSetting::query()
+                ->withoutEntityScope()
                 ->where('source_setting_id', $global->id)
                 ->with('contents.variables')
                 ->get();
@@ -402,7 +414,7 @@ class ReportSettingService
     }
 
     /**
-     * @param array{settings_synced:int,contents_created:int,contents_updated:int} &$stats
+     * @param array{settings_synced:int,contents_created:int,contents_updated:int,contents_skipped_customized:int} &$stats
      */
     private function syncCopyContentsAgainstGlobal(ReportSetting $global, ReportSetting $copy, array &$stats): bool
     {
@@ -413,53 +425,212 @@ class ReportSettingService
                 $localContent = $copy->contents->firstWhere('slug', $globalContent->slug);
 
                 if (! $localContent) {
-                    // CRIA novo content + variables na cópia local
-                    $contentCopy = $globalContent->replicate([
-                        'id', 'report_setting_id', 'created_at', 'updated_at',
-                        'deleted_at', 'created_by', 'updated_by', 'deleted_by',
-                    ]);
-                    $contentCopy->report_setting_id = $copy->id;
-                    $contentCopy->save();
-
-                    foreach ($globalContent->variables as $variable) {
-                        $varCopy = $variable->replicate([
-                            'id', 'report_setting_content_id', 'created_at', 'updated_at',
-                        ]);
-                        $varCopy->report_setting_content_id = $contentCopy->id;
-                        $varCopy->save();
-                    }
-
+                    $this->copyContent($globalContent, (string) $copy->id);
                     $stats['contents_created']++;
                     $touched = true;
 
                     continue;
                 }
 
-                if ($localContent->content !== $globalContent->content || $localContent->label !== $globalContent->label) {
-                    $localContent->update([
-                        'content'    => $globalContent->content,
-                        'label'      => $globalContent->label,
-                        'sort_order' => $globalContent->sort_order,
-                    ]);
+                $globalHash = $globalContent->currentFingerprint();
 
-                    // Substitui variables (delete-then-insert) — ID do content é preservado.
-                    $localContent->variables()->delete();
+                // Cópia já está na versão atual do padrão (editada ou não).
+                if ($localContent->source_content_hash === $globalHash) {
+                    continue;
+                }
 
-                    foreach ($globalContent->variables as $variable) {
-                        $varCopy = $variable->replicate([
-                            'id', 'report_setting_content_id', 'created_at', 'updated_at',
-                        ]);
-                        $varCopy->report_setting_content_id = $localContent->id;
-                        $varCopy->save();
-                    }
+                // Texto da cópia já igual ao padrão: só religa a versão.
+                if ($localContent->currentFingerprint() === $globalHash) {
+                    $localContent->forceFill(['source_content_hash' => $globalHash, 'dismissed_source_hash' => null])->saveQuietly();
 
+                    continue;
+                }
+
+                if ($localContent->isUntouchedCopy()) {
+                    $this->applyGlobalContent($globalContent, $localContent);
                     $stats['contents_updated']++;
                     $touched = true;
+
+                    continue;
                 }
+
+                // Personalizada pela clínica: não sobrescreve (aviso na tela).
+                $stats['contents_skipped_customized']++;
             }
 
             return $touched;
         });
+    }
+
+    // ─── Atualização do modelo padrão (clínica decide) ─────────────────────
+
+    /**
+     * Conteúdos da cópia com atualização do modelo padrão esperando decisão
+     * da clínica (personalizados, padrão mudou, não dispensados).
+     *
+     * @return array<string, ReportSettingContent> id do conteúdo da cópia → conteúdo do padrão
+     */
+    public function pendingUpstreamUpdates(ReportSetting $copy): array
+    {
+        return $this->pendingUpstreamUpdatesFor(collect([$copy]))[(string) $copy->id] ?? [];
+    }
+
+    /**
+     * Mesmo cálculo para várias cópias (listagem) — duas consultas.
+     *
+     * @param \Illuminate\Support\Collection<int, ReportSetting> $copies
+     *
+     * @return array<string, array<string, ReportSettingContent>> id da cópia → (id do conteúdo → padrão)
+     */
+    public function pendingUpstreamUpdatesFor(\Illuminate\Support\Collection $copies): array
+    {
+        $copies = $copies->filter(fn (ReportSetting $c) => $c->source_setting_id !== null)->values();
+
+        if ($copies->isEmpty()) {
+            return [];
+        }
+
+        $globalContents = ReportSettingContent::query()
+            ->whereIn('report_setting_id', $copies->pluck('source_setting_id')->unique()->values())
+            ->whereNotNull('slug')
+            // `active` sozinho não basta: arquivar muda `status`, não `active`
+            // — um padrão arquivado e editado depois continuava oferecendo a
+            // "atualização" (adoção e a sincronização automática já exigem
+            // published(); isto tinha ficado de fora) (13ª revisão Codex, P2).
+            ->whereHas('reportSetting', fn ($q) => $q->withoutEntityScope()->whereNull('entity_id')->where('status', ReportSettingStatus::Published)->where('active', true))
+            ->get()
+            ->groupBy(fn (ReportSettingContent $c) => (string) $c->report_setting_id);
+
+        $localContents = ReportSettingContent::query()
+            ->whereIn('report_setting_id', $copies->pluck('id'))
+            ->whereNotNull('slug')
+            ->get()
+            ->groupBy(fn (ReportSettingContent $c) => (string) $c->report_setting_id);
+
+        $out = [];
+
+        foreach ($copies as $copy) {
+            $globals = ($globalContents->get((string) $copy->source_setting_id) ?? collect())->keyBy('slug');
+
+            foreach ($localContents->get((string) $copy->id) ?? [] as $local) {
+                $global = $globals->get($local->slug);
+
+                if ($global === null) {
+                    continue;
+                }
+
+                $globalHash = $global->currentFingerprint();
+
+                if ($local->source_content_hash === $globalHash
+                    || $local->dismissed_source_hash === $globalHash
+                    || $local->currentFingerprint() === $globalHash) {
+                    continue;
+                }
+
+                $out[(string) $copy->id][(string) $local->id] = $global;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * "Aplicar atualização": a clínica troca o texto dela pelo do padrão
+     * atual (com variáveis) — fica marcada com essa versão. Auditoria.
+     */
+    public function applyUpstreamUpdate(ReportSetting $copy, ReportSettingContent $local): ReportSettingContent
+    {
+        $global = $this->pendingUpstreamUpdates($copy)[(string) $local->id] ?? null;
+
+        if ($global === null) {
+            throw new InvalidArgumentException('Sem atualização do modelo padrão para este conteúdo.');
+        }
+
+        $old = $local->only(['label', 'content']);
+
+        DB::transaction(fn () => $this->applyGlobalContent($global, $local));
+
+        app(AuditService::class)->log(
+            event: 'template_update_applied',
+            model: $local,
+            old: $old,
+            new: [...$local->fresh()->only(['label', 'content']), 'source_content_hash' => $global->currentFingerprint()],
+        );
+
+        return $local->fresh();
+    }
+
+    /**
+     * "Manter o meu": dispensa ESTA versão do padrão — o aviso volta quando o
+     * padrão mudar de novo. O texto da clínica não muda. Auditoria.
+     */
+    public function keepLocalContent(ReportSetting $copy, ReportSettingContent $local): ReportSettingContent
+    {
+        $global = $this->pendingUpstreamUpdates($copy)[(string) $local->id] ?? null;
+
+        if ($global === null) {
+            throw new InvalidArgumentException('Sem atualização do modelo padrão para este conteúdo.');
+        }
+
+        $hash = $global->currentFingerprint();
+        $local->forceFill(['dismissed_source_hash' => $hash])->saveQuietly();
+
+        app(AuditService::class)->log(
+            event: 'template_update_kept',
+            model: $local,
+            old: null,
+            new: ['dismissed_source_hash' => $hash],
+        );
+
+        return $local->fresh();
+    }
+
+    /** Copia um conteúdo do padrão (com variáveis) para o modelo da clínica. */
+    private function copyContent(ReportSettingContent $globalContent, string $settingId): ReportSettingContent
+    {
+        $contentCopy = $globalContent->replicate([
+            'id', 'report_setting_id', 'created_at', 'updated_at',
+            'deleted_at', 'created_by', 'updated_by', 'deleted_by',
+            'source_content_hash', 'dismissed_source_hash',
+        ]);
+        $contentCopy->report_setting_id   = $settingId;
+        $contentCopy->source_content_hash = $globalContent->currentFingerprint();
+        $contentCopy->save();
+
+        foreach ($globalContent->variables as $variable) {
+            $varCopy = $variable->replicate([
+                'id', 'report_setting_content_id', 'created_at', 'updated_at',
+            ]);
+            $varCopy->report_setting_content_id = $contentCopy->id;
+            $varCopy->save();
+        }
+
+        return $contentCopy;
+    }
+
+    /** Texto + variáveis do padrão na cópia, preservando o ID do conteúdo. */
+    private function applyGlobalContent(ReportSettingContent $globalContent, ReportSettingContent $localContent): void
+    {
+        $globalContent->loadMissing('variables');
+
+        $localContent->forceFill([
+            'content'               => $globalContent->content,
+            'label'                 => $globalContent->label,
+            'sort_order'            => $globalContent->sort_order,
+            'source_content_hash'   => $globalContent->currentFingerprint(),
+            'dismissed_source_hash' => null,
+        ])->save();
+
+        // Substitui variables (delete-then-insert) — ID do content é preservado.
+        $localContent->variables()->delete();
+
+        foreach ($globalContent->variables as $variable) {
+            $varCopy = $variable->replicate([
+                'id', 'report_setting_content_id', 'created_at', 'updated_at',
+            ]);
+            $varCopy->report_setting_content_id = $localContent->id;
+            $varCopy->save();
+        }
     }
 
     // ─── Sync Contents ──────────────────────────────────────────────────────
@@ -486,6 +657,16 @@ class ReportSettingService
             ];
 
             if ($content) {
+                // Edição manual do texto: o fingerprint atual passa a diferir
+                // do `source_content_hash` (a versão do padrão de que veio),
+                // e isUntouchedCopy()/pendingUpstreamUpdatesFor() já leem essa
+                // diferença como "personalizada" — NÃO zerar o hash aqui
+                // (2ª revisão Codex, P2-4): zerado, a próxima checagem perdia
+                // a baseline e acusava "atualização disponível" na hora,
+                // mesmo com o padrão global intocado. O "Manter o meu"
+                // (dismissed_source_hash) FICA do mesmo jeito: é a versão do
+                // padrão que a clínica recusou — o aviso só volta quando o
+                // padrão mudar de novo, não a cada edição local.
                 $content->update($data);
             } else {
                 $content = $setting->contents()->create($data);

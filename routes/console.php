@@ -16,12 +16,13 @@ Artisan::command('reports:sync-adopted', function () {
     $stats = app(ReportSettingService::class)->syncAdoptedContentsWithGlobal();
 
     $this->info(sprintf(
-        'Sync concluído: %d settings com mudanças | %d contents criados | %d contents atualizados',
+        'Sync concluído: %d settings com mudanças | %d contents criados | %d contents atualizados | %d personalizados preservados (atualização disponível na tela de Modelos)',
         $stats['settings_synced'],
         $stats['contents_created'],
         $stats['contents_updated'],
+        $stats['contents_skipped_customized'],
     ));
-})->purpose('Sincroniza contents/variables das cópias adoptadas com os templates globais (F4d backfill)');
+})->purpose('Sincroniza com os modelos padrão as cópias adotadas que a clínica não personalizou (F4d backfill)');
 
 // Expira trials vencidos diariamente
 Schedule::call(function () {

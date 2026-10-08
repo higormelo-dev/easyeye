@@ -112,6 +112,20 @@ describe('Salvar mantém a consulta aberta', function () {
         expect($record->getAttributes())->not->toHaveKey('post_save_action');
     });
 
+    it('atestado de acompanhante e aptidão visual também valem como post_save_action (15ª revisão Codex, P2)', function () {
+        foreach (['companion_certificate', 'visual_fitness_certificate'] as $action) {
+            $response = $this->post(
+                route('panel.patients.medicalrecords.store', $this->patient),
+                ($this->payload)(['schedule_id' => $this->schedule->id, 'post_save_action' => $action]),
+            );
+
+            $record = MedicalRecord::query()->where('patient_id', $this->patient->id)->latest('id')->firstOrFail();
+
+            $response->assertRedirect(route('panel.patients.medicalrecords.edit', [$this->patient, $record]));
+            $response->assertSessionHas('post_save_action', $action);
+        }
+    });
+
     it('update com schedule_id VAZIO no payload não desvincula o agendamento (regressão: form de edit mandava "")', function () {
         $record = ($this->makeRecord)();
 

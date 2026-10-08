@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domains\AI\Models\AiRun;
 use App\Enums\DocumentationType;
 use App\Traits\{Auditable, GuardedBySignedRecord, HasAuditColumns};
+use Carbon\{CarbonImmutable, CarbonInterface};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany};
@@ -28,11 +29,51 @@ class MedicalRecordDocumentation extends Model
         'type',
         'title',
         'content',
+        // Receita emitida apesar de alergia ativa (Fase 2 / A4): conflitos,
+        // motivo, quem e quando — também na trilha de auditoria.
+        'safety_override',
+        // Data impressa escolhida pelo médico (data alternativa — Fase 2 / B3);
+        // a emissão de fato fica em created_at.
+        'document_date',
+        // Dados estruturados do documento (atestados, CID autorizado, itens
+        // do pedido de exames, modelo pessoal usado) — Fase 2 / B1-B3.
+        'metadata',
     ];
 
     protected function casts(): array
     {
-        return ['type' => DocumentationType::class];
+        return [
+            'type'            => DocumentationType::class,
+            'safety_override' => 'array',
+            'document_date'   => 'date',
+            'metadata'        => 'array',
+        ];
+    }
+
+    /**
+     * Data IMPRESSA no documento: a alternativa escolhida pelo médico ou a da
+     * emissão. Reimprimir um documento antigo mostra a data dele, não a de
+     * hoje (Fase 2 / B3).
+     */
+    public function printedDate(): CarbonInterface
+    {
+        $timezone = (string) config('app.timezone');
+
+        if ($this->document_date !== null) {
+            return CarbonImmutable::parse($this->document_date->toDateString(), $timezone);
+        }
+
+        return $this->created_at !== null
+            ? CarbonImmutable::instance($this->created_at)->setTimezone($timezone)
+            : CarbonImmutable::now($timezone);
+    }
+
+    /** Documento com data alternativa (impressa ≠ emissão). */
+    public function hasAlternativeDate(): bool
+    {
+        return $this->document_date !== null
+            && ($this->created_at === null
+                || $this->document_date->toDateString() !== CarbonImmutable::instance($this->created_at)->setTimezone((string) config('app.timezone'))->toDateString());
     }
 
     public function medicalRecord(): BelongsTo

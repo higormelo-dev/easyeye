@@ -140,7 +140,12 @@ const breadcrumbs = [
     <AppLayout title="Pacientes" :breadcrumbs="breadcrumbs">
         <div class="page-patients">
             <!-- ── Page Header ───────────────────────────────────────────── -->
-            <div class="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom">
+            <!-- flex-wrap (G5): no celular as ações descem para a linha de baixo —
+                 sem isso a linha passava de 390 px (rolagem lateral de 118 px). -->
+            <div
+                class="patients-header d-flex flex-wrap align-items-center gap-2 pb-3 mb-3 border-bottom"
+                data-testid="patients-header"
+            >
                 <div class="d-flex align-items-center gap-2 me-auto">
                     <h4 class="mb-0 fw-bold">Pacientes</h4>
                     <span
@@ -158,7 +163,7 @@ const breadcrumbs = [
                         >Total: {{ patients.total }}</span
                     >
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex flex-wrap align-items-center gap-2" data-testid="patients-header-actions">
                     <!-- View toggle -->
                     <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
                         <button

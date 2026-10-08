@@ -1097,3 +1097,39 @@
         min-height: calc(1.5em + .5rem + 2px);
     }
 }
+
+// ── Segurança clínica (Fase 2): alergia no receituário e uso de LC ─────────
+// Variáveis do Bootstrap 5.3 (*-bg-subtle / *-text-emphasis) já trocam no
+// tema escuro — o alerta segue legível sem regra própria.
+.pmr-rx-allergy {
+    padding: .45rem .65rem;
+    border: 2px solid var(--bs-danger);
+    border-left-width: 6px;
+    border-radius: .4rem;
+    background: var(--bs-danger-bg-subtle);
+    color: var(--bs-danger-text-emphasis);
+    font-size: .8rem;
+}
+
+.pmr-cl-use {
+    border-color: var(--bs-border-color) !important;
+
+    legend {
+        font-size: .72rem;
+    }
+}
+
+.pmr-med-list li {
+    padding: .1rem 0;
+}
+
+// O `background:` do .pmr-form apaga a seta dos <select> nativos — no bloco
+// de uso de LC eles precisam parecer lista suspensa (claro e escuro).
+.pmr-form .pmr-cl-use .form-select,
+:root[data-bs-theme=dark] .pmr-form .pmr-cl-use .form-select {
+    background-image: var(--bs-form-select-bg-img);
+    background-repeat: no-repeat;
+    background-position: right .5rem center;
+    background-size: 16px 12px;
+    padding-right: 2rem;
+}

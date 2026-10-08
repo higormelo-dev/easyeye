@@ -16,6 +16,7 @@ const t = {
     avail_off: 'Sem expediente',
     avail_blocked: 'Bloqueado',
     avail_free_of: ':free livres de :capacity',
+    avail_no_schedule: 'Sem escala de atendimento cadastrada. Configure a escala para visualizar as vagas.',
 };
 
 describe('MiniCalendar — vagas do mês', () => {
@@ -50,6 +51,22 @@ describe('MiniCalendar — vagas do mês', () => {
     it('legenda com os mesmos marcadores; sem vagas carregadas, sem legenda', () => {
         expect(mountCal().find('[data-testid="availability-legend"]').text()).toContain('Poucas vagas');
         expect(mountCal({ availability: null }).find('[data-testid="availability-legend"]').exists()).toBe(false);
+    });
+
+    it('explica a falta de escala sem apresentar uma legenda de vagas que não podem ser calculadas', async () => {
+        const wrapper = mountCal({
+            availability: { '2030-01-07': { state: 'none', free: 0, capacity: 0 } },
+        });
+
+        expect(wrapper.find('[data-testid="availability-legend"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="availability-no-schedule"]').text()).toBe(t.avail_no_schedule);
+        expect(wrapper.find('[data-date="2030-01-07"]').attributes('data-avail')).toBeUndefined();
+
+        await wrapper.setProps({ availability });
+
+        expect(wrapper.find('[data-testid="availability-no-schedule"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="availability-legend"]').exists()).toBe(true);
+        expect(wrapper.find('[data-date="2030-01-07"]').attributes('data-avail')).toBe('available');
     });
 
     it('avisa o mês exibido (ao abrir e ao navegar) e mantém a escolha do dia', async () => {

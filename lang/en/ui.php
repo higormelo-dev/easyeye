@@ -53,6 +53,8 @@ return [
         'plan_hint'            => 'Optional. The ANS product registry is printed on the member card.',
         // Patient's insurer deactivated after registration (kept, marked).
         'covenant_inactive_suffix' => '(inactive)',
+        // Loading allergies/medications failed — switching tabs away and back retries (Codex round 18, P2).
+        'safety_load_error' => 'Could not load allergies and medications. Switch tabs and come back to retry.',
         // Same name as another patient of the clinic (PatientDuplicateFinder).
         'homonym_title'   => 'Patient with the same name',
         'homonym_confirm' => 'I confirm this is a different patient',

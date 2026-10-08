@@ -36,10 +36,11 @@ class ReportSettingContentSeeder extends Seeder
 
             foreach ($entries as $entry) {
                 // updateOrCreate p/ que mudanças nos templates globais (ex: F4d)
-                // sejam aplicadas a cada execução do seeder. Customizações por
-                // entidade vivem nas cópias adotadas e NÃO são afetadas — o
-                // backfill (`reports:sync-adopted`) propaga por slug, preservando
-                // overrides locais que tenham slugs próprios.
+                // sejam aplicadas a cada execução do seeder. A sincronização das
+                // cópias adotadas (abaixo / `reports:sync-adopted`) só troca o
+                // texto que a clínica NÃO personalizou (source_content_hash); o
+                // personalizado fica com "atualização disponível" na tela de
+                // Modelos — a clínica aplica ou mantém o dela.
                 ReportSettingContent::updateOrCreate(
                     [
                         'report_setting_id' => $setting->id,
@@ -57,8 +58,8 @@ class ReportSettingContentSeeder extends Seeder
             }
         }
 
-        // Propaga mudanças de conteúdo dos templates globais para todas as
-        // cópias adotadas pelas clínicas (idempotente — preserva customizações).
+        // Propaga mudanças dos templates globais às cópias adotadas que a
+        // clínica não personalizou (idempotente; personalizadas preservadas).
         app(ReportSettingService::class)->syncAdoptedContentsWithGlobal();
     }
 
@@ -823,10 +824,13 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>Solicitação de Procedimentos</strong></p>'
+                    // Fase 2 / B2: o pedido estruturado (exames com código
+                    // TUSS, caráter, indicação, CID) entra como blocos —
+                    // <div> (não <p>) para não aninhar parágrafo/lista.
+                    'content' => '<p><strong>Solicitação de Procedimentos</strong></p>'
                         . '<p>Paciente: {{PACIENTE_NOME}}</p>'
                         . '<p>Data: {{DATA_ATUAL}}</p>'
-                        . '<p>{{PROCEDIMENTOS_SOLICITADOS}}</p>',
+                        . '<div>{{PROCEDIMENTOS_SOLICITADOS}}</div>',
                 ],
             ],
 
@@ -916,9 +920,12 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'afastamento',
                     'label'      => 'Afastamento',
                     'sort_order' => 1,
-                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                    // {{CID_ATESTADO}}: só com a autorização expressa do
+                    // paciente (Res. CFM 1.658/2002, art. 5º) — Fase 2 / B1.
+                    'content' => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
                         . '<p>&nbsp;</p>'
-                        . '<p>Atesto para os devidos fins de direito que {{PACIENTE_NOME}} está sob meus cuidados médicos, devendo o(a) mesmo(a) ser afastado(a) de suas atividades profissionais por um período de {{DIAS_AFASTAMENTO}} ({{DIAS_AFASTAMENTO_EXTENSO}}) dia(s), a partir de {{DATA_ATUAL}}, por motivo de tratamento oftalmológico.</p>',
+                        . '<p>Atesto para os devidos fins de direito que {{PACIENTE_NOME}} está sob meus cuidados médicos, devendo o(a) mesmo(a) ser afastado(a) de suas atividades profissionais por um período de {{DIAS_AFASTAMENTO}} ({{DIAS_AFASTAMENTO_EXTENSO}}) dia(s), a partir de {{DATA_ATUAL}}, por motivo de tratamento oftalmológico.</p>'
+                        . '{{CID_ATESTADO}}',
                 ],
             ],
 
@@ -928,9 +935,40 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'comparecimento',
                     'label'      => 'Comparecimento',
                     'sort_order' => 1,
+                    // Fase 2 / B1: horário de/até ou período e orientação
+                    // de dilatação pupilar (não dirigir por N horas).
+                    'content' => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '<p>Atesto para os devidos fins de direito que {{PACIENTE_NOME}} esteve nesta clínica sob meus cuidados médicos no dia {{DATA_COMPARECIMENTO}}{{HORARIO_COMPARECIMENTO}}, para procedimentos clínicos oftalmológicos.</p>'
+                        . '{{ORIENTACAO_DILATACAO}}',
+                ],
+            ],
+
+            'ATESTADO DE ACOMPANHANTE' => [
+                [
+                    'type'       => DocumentationType::Certificate,
+                    'slug'       => 'acompanhante',
+                    'label'      => 'Acompanhante',
+                    'sort_order' => 1,
                     'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
                         . '<p>&nbsp;</p>'
-                        . '<p>Atesto para os devidos fins de direito que {{PACIENTE_NOME}} esteve nesta clínica sob meus cuidados médicos no dia {{DATA_ATUAL}}, para procedimentos clínicos oftalmológicos.</p>',
+                        . '<p>Atesto para os devidos fins de direito que {{ACOMPANHANTE_NOME}}{{ACOMPANHANTE_DOCUMENTO}} esteve nesta clínica no dia {{DATA_COMPARECIMENTO}}{{HORARIO_COMPARECIMENTO}}, acompanhando o(a) paciente {{PACIENTE_NOME}} em atendimento oftalmológico.</p>',
+                ],
+            ],
+
+            'ATESTADO DE APTIDÃO VISUAL' => [
+                [
+                    'type'       => DocumentationType::Certificate,
+                    'slug'       => 'aptidao_visual',
+                    'label'      => 'Aptidão visual',
+                    'sort_order' => 1,
+                    // AV sem/com correção vem do prontuário (servidor); a data
+                    // do exame é a do prontuário ({{DATA_EXAME}}), não a do papel.
+                    'content' => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '<p>Atesto, para fins de {{FINALIDADE_APTIDAO}}, que {{PACIENTE_NOME}} foi submetido(a) a exame oftalmológico em {{DATA_EXAME}}, com a seguinte acuidade visual:</p>'
+                        . '{{TABELA_ACUIDADE_VISUAL}}'
+                        . '<p><strong>Conclusão:</strong> {{CONCLUSAO_APTIDAO}}.</p>',
                 ],
             ],
 

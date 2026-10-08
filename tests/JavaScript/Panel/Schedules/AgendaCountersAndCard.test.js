@@ -90,6 +90,20 @@ describe('ScheduleCard — encaixe, sessão, sala e WhatsApp', () => {
         expect(wrapper.text()).toContain('SALA 2');
     });
 
+    it('alergia do paciente (Fase 2): texto no card; sem a informação (perfil sem acesso), nada', () => {
+        const has = mountCard({
+            allergy: { state: 'has', items: [{ substance: 'Dipirona', severe: true }], severe: true },
+        });
+        expect(has.find('[data-testid="allergy-badge-has"]').text()).toBe('ALERGIA: Dipirona (grave)');
+
+        expect(
+            mountCard({ allergy: { state: 'unknown', items: [] } })
+                .find('[data-testid="allergy-badge-unknown"]')
+                .text(),
+        ).toBe('Sem registro de alergias');
+        expect(mountCard({ allergy: null }).find('.cs-allergy-badge').exists()).toBe(false);
+    });
+
     it('sem encaixe/série: nenhum selo', () => {
         const wrapper = mountCard({});
 

@@ -1,5 +1,6 @@
 import { ref, computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 
 /**
  * usePatientForm — estado + lógica do cadastro de paciente, compartilhado
@@ -11,6 +12,10 @@ import { useForm } from '@inertiajs/vue3';
  */
 export function usePatientForm(catalogs) {
     const loading = ref(false);
+    // Só a última carga vale: abrir o paciente B com a do A pendente (ou
+    // limpar o formulário) descarta a resposta do A — senão o cadastro do B
+    // abria com os dados do A (e o "Salvar" gravava no B).
+    const editLoad = latestRequest();
     // Plano já salvo (nome/registro) — o seletor busca no servidor e precisa
     // do rótulo da opção escolhida antes de qualquer busca.
     const planOption = ref(null);
@@ -58,6 +63,12 @@ export function usePatientForm(catalogs) {
         // "É outra pessoa": só vai true depois que o servidor avisar de homônimo
         // (mesmo nome de outro paciente da clínica) e a recepção confirmar.
         confirm_homonym: false,
+        // Paciente NOVO (Fase 2): alergias, "nega alergias" e medicações
+        // informadas na aba Clínico vão junto com o cadastro. Na edição a aba
+        // grava cada item na hora (o servidor ignora estes campos no PUT).
+        allergies: [],
+        allergies_denied: false,
+        medications: [],
     });
 
     // Confirmação de homônimo vale para o nome/nascimento confirmados: mudou
@@ -70,6 +81,8 @@ export function usePatientForm(catalogs) {
     );
 
     function resetForm() {
+        editLoad.cancel();
+        loading.value = false;
         // defaults() pode ter sido movido por loadEditData — restaura o
         // template vazio antes do reset pra não "resetar" pro último paciente.
         form.defaults({
@@ -105,6 +118,9 @@ export function usePatientForm(catalogs) {
             state: '',
             country: 'Brasil',
             confirm_homonym: false,
+            allergies: [],
+            allergies_denied: false,
+            medications: [],
         });
         form.reset();
         form.clearErrors();
@@ -113,10 +129,12 @@ export function usePatientForm(catalogs) {
     }
 
     async function loadEditData(id) {
+        const req = editLoad.begin();
         loading.value = true;
         try {
-            const res = await fetch(route('panel.patients.editData', id));
+            const res = await fetch(route('panel.patients.editData', id), { signal: req.signal });
             const json = await res.json();
+            if (!req.current()) return;
             const d = json.data;
             Object.keys(form.data()).forEach((key) => {
                 if (key in d) form[key] = d[key] ?? form[key];
@@ -126,8 +144,10 @@ export function usePatientForm(catalogs) {
             // Baseline = dado carregado: isDirty passa a refletir só edição
             // REAL do usuário (decide se o save do agendamento faz PUT).
             form.defaults(form.data());
+        } catch (error) {
+            if (!isAbortError(error) && req.current()) throw error;
         } finally {
-            loading.value = false;
+            if (req.current()) loading.value = false;
         }
     }
 
@@ -228,8 +248,13 @@ export function usePatientForm(catalogs) {
                 'occupation',
             ].includes(k),
         ),
-        clinical: Object.keys(form.errors).some((k) =>
-            ['covenant_id', 'covenant_plan_id', 'card_number', 'skin_id', 'iris_id'].includes(k),
+        clinical: Object.keys(form.errors).some(
+            (k) =>
+                ['covenant_id', 'covenant_plan_id', 'card_number', 'skin_id', 'iris_id', 'allergies_denied'].includes(
+                    k,
+                ) ||
+                k.startsWith('allergies.') ||
+                k.startsWith('medications.'),
         ),
         contact: Object.keys(form.errors).some((k) => ['telephone', 'cellphone', 'whatsapp'].includes(k)),
         address: Object.keys(form.errors).some((k) =>

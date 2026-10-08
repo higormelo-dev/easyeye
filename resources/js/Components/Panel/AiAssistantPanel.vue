@@ -19,6 +19,7 @@
  *   F7 — autofocus no textarea de resultado + Ctrl/Cmd+Enter aprova
  */
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { latestRequest } from '@/Support/latestRequest.js';
 import { diffWords } from 'diff';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
@@ -825,17 +826,25 @@ function insert(field) {
 }
 
 // ── F4 — Histórico ─────────────────────────────────────────────────────────
+// Só o último histórico vale (o assistente pode trocar de paciente com o
+// pedido do anterior pendente).
+const historyReq = latestRequest();
+
 async function fetchHistory() {
     history.value = [];
-    if (!patientId.value || !props.ai?.urls?.by_patient) return;
+    const req = historyReq.begin();
+    if (!patientId.value || !props.ai?.urls?.by_patient) {
+        historyLoading.value = false;
+        return;
+    }
     historyLoading.value = true;
     try {
-        const { data } = await window.axios.get(url('by_patient', patientId.value));
-        history.value = Array.isArray(data?.data) ? data.data : [];
+        const { data } = await window.axios.get(url('by_patient', patientId.value), { signal: req.signal });
+        if (req.current()) history.value = Array.isArray(data?.data) ? data.data : [];
     } catch {
         // silencioso: histórico é melhoria, não bloqueia análise
     } finally {
-        historyLoading.value = false;
+        if (req.current()) historyLoading.value = false;
     }
 }
 

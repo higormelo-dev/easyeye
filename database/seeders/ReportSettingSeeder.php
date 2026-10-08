@@ -90,6 +90,9 @@ class ReportSettingSeeder extends Seeder
             // ── Atestados ────────────────────────────────────────────────────
             ['title' => 'ATESTADO MÉDICO', 'category' => 'atestados'],
             ['title' => 'ATESTADO DE COMPARECIMENTO', 'category' => 'atestados'],
+            // Fase 2 / B1 — atestados oftalmológicos.
+            ['title' => 'ATESTADO DE ACOMPANHANTE', 'category' => 'atestados'],
+            ['title' => 'ATESTADO DE APTIDÃO VISUAL', 'category' => 'atestados'],
             // ── Relatórios ───────────────────────────────────────────────────
             ['title' => 'RELATÓRIO OFTALMOLÓGICO', 'category' => 'relatorios'],
             // ── Solicitações / Procedimentos ─────────────────────────────────

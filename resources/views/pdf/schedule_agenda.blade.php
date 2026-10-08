@@ -25,6 +25,7 @@
         .tag { display: inline-block; border: 1px solid #b45309; color: #92400e; border-radius: 3px; padding: 0 3px; font-size: 8px; font-weight: bold; }
         .tag-session { border-color: #1d4ed8; color: #1e40af; }
         .tag-urgent { border-color: #b91c1c; color: #991b1b; }
+        .tag-allergy { border: 2px solid #b91c1c; color: #7f1d1d; font-size: 9px; }
         tr.row-other td { background: #f9fafb; color: #4b5563; font-style: italic; }
         .footer { margin-top: 10px; font-size: 8px; color: #6b7280; }
     </style>
@@ -71,6 +72,7 @@
                         <td>
                             {{ $row['name'] }}
                             @if($row['urgent'] ?? false) <span class="tag tag-urgent">{{ $t('urgent_care_badge') }}</span>@endif
+                            @if($row['allergy'] ?? null)<br><span class="tag tag-allergy">&#9888; {{ $row['allergy'] }}</span>@endif
                             @if($row['code'])<br><span class="muted">{{ $row['code'] }}</span>@endif
                         </td>
                         <td class="nowrap">{{ $row['age'] !== null ? trans_choice('schedules.print_age', $row['age'], ['age' => $row['age']]) : '—' }}</td>

@@ -22,20 +22,24 @@ use App\Models\{
     MedicalRecordProcedure,
     NearPointConvergence,
     Patient,
+    PatientAllergy,
     PatientCall,
     PatientConsent,
     PatientDocumentShare,
     PatientExam,
+    PatientMedication,
     People,
     RecordVersion,
     Schedule,
     ScheduleSituationLog,
+    User,
     VisualAcuityType,
     WaitingList
 };
 use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppOptOut, WhatsAppSetting};
 use App\Services\ContactLensFormatter;
 use App\Services\WhatsApp\WhatsAppService;
+use App\Support\ContactLensUse;
 use BackedEnum;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
@@ -51,7 +55,7 @@ use Illuminate\Support\Collection;
  */
 final class PatientDataExporter
 {
-    public const FORMAT_VERSION = 3; // 3: plano do convênio no bloco da clínica
+    public const FORMAT_VERSION = 4; // 4: alergias, medicações em uso, retrato na consulta e uso de LC (Fase 2)
 
     /** @var array<class-string, array<string, ?string>> nomes de catálogo por id */
     private array $names = [];
@@ -70,6 +74,7 @@ final class PatientDataExporter
             'format_version'     => self::FORMAT_VERSION,
             'clinic'             => $this->clinic($patient),
             'personal_data'      => $this->personalData($patient->person),
+            'clinical_safety'    => $this->clinicalSafety($patient),
             'portal_account'     => $this->portalAccount($patient->person),
             'medical_records'    => $this->medicalRecords($patient),
             'exams'              => $this->exams($patient),
@@ -164,6 +169,67 @@ final class PatientDataExporter
         ] : null;
     }
 
+    /**
+     * Alergias (inclusive descartadas — histórico), "nega alergias" e
+     * medicações em uso (inclusive suspensas/descartadas) da clínica.
+     */
+    private function clinicalSafety(Patient $patient): array
+    {
+        $users = fn (array $ids) => User::query()->whereIn('id', array_filter($ids))->pluck('name', 'id');
+
+        $allergies = PatientAllergy::query()->withoutGlobalScopes()
+            ->where('entity_id', $patient->entity_id)->where('patient_id', $patient->id)
+            ->whereNull('deleted_at')->orderBy('created_at')->get();
+        $medications = PatientMedication::query()->withoutGlobalScopes()
+            ->where('entity_id', $patient->entity_id)->where('patient_id', $patient->id)
+            ->whereNull('deleted_at')->orderBy('created_at')->get();
+
+        $names = $users([
+            $patient->allergies_denied_by,
+            ...$allergies->flatMap(fn (PatientAllergy $a) => [$a->created_by, $a->confirmed_by, $a->discarded_by])->all(),
+            ...$medications->flatMap(fn (PatientMedication $m) => [$m->created_by, $m->confirmed_by, $m->discarded_by])->all(),
+        ]);
+        $who = fn (mixed $id) => filled($id) ? ($names[(string) $id] ?? null) : null;
+
+        return [
+            'allergies_denied' => $patient->allergies_denied_at ? [
+                'at' => $this->iso($patient->allergies_denied_at),
+                'by' => $who($patient->allergies_denied_by),
+            ] : null,
+            'allergies' => $allergies->map(fn (PatientAllergy $a) => [
+                'category'          => $this->label($a->category),
+                'substance'         => $a->substance,
+                'active_ingredient' => $a->active_ingredient,
+                'reaction'          => $a->reaction,
+                'severity'          => $this->label($a->severity),
+                'status'            => $this->label($a->status),
+                'notes'             => $a->notes,
+                'registered_at'     => $this->iso($a->created_at),
+                'registered_by'     => $who($a->created_by),
+                'confirmed_at'      => $this->iso($a->confirmed_at),
+                'confirmed_by'      => $who($a->confirmed_by),
+                'discarded_at'      => $this->iso($a->discarded_at),
+                'discarded_by'      => $who($a->discarded_by),
+                'discard_reason'    => $a->discard_reason,
+            ])->values()->all(),
+            'medications' => $medications->map(fn (PatientMedication $m) => [
+                'name'              => $m->name,
+                'active_ingredient' => $m->active_ingredient,
+                'posology'          => $m->posology,
+                'started_on'        => $m->started_on?->toDateString(),
+                'ended_on'          => $m->ended_on?->toDateString(),
+                'status'            => $this->label($m->status),
+                'source'            => $this->label($m->source),
+                'notes'             => $m->notes,
+                'registered_at'     => $this->iso($m->created_at),
+                'registered_by'     => $who($m->created_by),
+                'confirmed_at'      => $this->iso($m->confirmed_at),
+                'confirmed_by'      => $who($m->confirmed_by),
+                'discarded_at'      => $this->iso($m->discarded_at),
+            ])->values()->all(),
+        ];
+    }
+
     private function medicalRecords(Patient $patient): array
     {
         $records = MedicalRecord::query()
@@ -218,7 +284,17 @@ final class PatientDataExporter
                 'title'             => $d->title,
                 'content'           => $d->contentForRender(),
                 'generated_with_ai' => filled($d->ai_run_id),
-                'created_at'        => $this->iso($d->created_at),
+                // Receita emitida apesar de alergia ativa: motivo e conflitos.
+                'allergy_override' => is_array($d->safety_override) ? [
+                    'reason'    => $d->safety_override['reason'] ?? null,
+                    'conflicts' => $d->safety_override['conflicts'] ?? [],
+                    'at'        => $d->safety_override['at'] ?? null,
+                ] : null,
+                'created_at' => $this->iso($d->created_at),
+                // Fase 2 / Bloco B: data impressa (data alternativa) e dados
+                // estruturados (atestado, CID autorizado, itens do pedido).
+                'document_date' => $d->document_date?->toDateString(),
+                'details'       => is_array($d->metadata) ? $d->metadata : null,
             ])->values()->all(),
             'files' => ($files[$r->id] ?? collect())->map(fn (MedicalRecordFile $f) => [
                 'original_name' => $f->original_name,
@@ -300,9 +376,15 @@ final class PatientDataExporter
                 'fundoscopy'          => $eyes('fundoscopy_right', 'fundoscopy_left'),
                 'general_observation' => $v('observation_general'),
             ],
-            'diagnosis_cids'           => $this->list($v('diagnosis_cids')),
-            'clinical_conduct'         => $v('clinical_conduct'),
-            'follow_up_days'           => $v('follow_up_days'),
+            'diagnosis_cids'   => $this->list($v('diagnosis_cids')),
+            'clinical_conduct' => $v('clinical_conduct'),
+            'follow_up_days'   => $v('follow_up_days'),
+            // Retrato no momento da consulta (Fase 2): alergias e medicações
+            // ativas; uso de lente de contato da anamnese.
+            'allergies_snapshot'       => $this->list($v('allergies_snapshot')) ?: null,
+            'medications_snapshot'     => $v('medications_snapshot') === null ? null : $this->list($v('medications_snapshot')),
+            'contact_lens_use'         => $this->list($v('contact_lens_use')) ?: null,
+            'contact_lens_use_summary' => ContactLensUse::text($this->list($v('contact_lens_use')) ?: null),
             'contact_lens_calculation' => $this->list($v('contact_lens_calculation')) ?: null,
             // Em texto: v2 = potência de LC sugerida por olho (e o tipo); v1 = formato antigo.
             'contact_lens_summary' => app(ContactLensFormatter::class)->text($this->list($v('contact_lens_calculation')) ?: null),

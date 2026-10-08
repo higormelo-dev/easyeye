@@ -42,6 +42,8 @@ class DatabaseSeeder extends Seeder
         $this->call(Cid10CodesSeeder::class);
         $this->call(FinancialCategoriesSeeder::class);
         $this->call(TissReferenceSeeder::class);
+        // Kits de exames padrão (pedido de exames — Fase 2 / B2). Idempotente.
+        $this->call(ExamKitsSeeder::class);
         $this->call(ReportSettingSeeder::class);
         $this->call(ReportSettingContentSeeder::class);
         $this->call(ReportSettingVariableSeeder::class);

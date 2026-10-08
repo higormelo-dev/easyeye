@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Concerns\OpensImportFile;
 use App\Enums\{FeatureKey, ImportStatus};
 use App\Models\{Covenant, CovenantPlan, Patient, PatientImport, People};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
+use App\Support\{AuditContext, ClinicalSafety\TermNormalizer};
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\{DB, Log, Storage};
@@ -28,6 +30,14 @@ use Throwable;
  *   3. Se paciente já existe nesta entidade → pula (não sobrescreve)
  *   4. Se pessoa existe mas sem paciente aqui → cria só o Patient
  *   5. Se pessoa não existe → cria People + Patient
+ *
+ * Alergias (Fase 2 / G4, colunas opcionais): `alergias` (substâncias
+ * separadas por ";") viram alergias "informadas pelo paciente" — também no
+ * paciente que já existia (só acrescenta; nunca repete a que ele já tem,
+ * ativa ou descartada, sem acento/maiúsculas: reimportar a planilha não
+ * duplica nem ressuscita o que o médico descartou); `nega_alergias`
+ * (sim/não) só vale sem alergia na linha nem ativa no paciente. Registradas
+ * em nome de quem enviou a planilha (AuditContext).
  */
 class PatientImportService
 {
@@ -148,7 +158,31 @@ class PatientImportService
         'codigo_sistema_anterior' => '_import_code',
         'codigo_legado'           => '_import_code',
         'import_code'             => '_import_code',
+        // Alergias informadas pelo paciente (Fase 2 / G4)
+        'alergias'         => '_allergies',
+        'alergia'          => '_allergies',
+        'allergies'        => '_allergies',
+        'allergy'          => '_allergies',
+        'nega_alergias'    => '_allergies_denied',
+        'nega_alergia'     => '_allergies_denied',
+        'sem_alergias'     => '_allergies_denied',
+        'denies_allergies' => '_allergies_denied',
     ];
+
+    /** Valores de "nega alergias" aceitos (minúsculo, sem acento). */
+    private const YES_VALUES = ['sim', 's', 'yes', 'y', 'x', '1', 'true', 'verdadeiro', 'nega'];
+
+    private const NO_VALUES = ['nao', 'n', 'no', '0', 'false', 'falso'];
+
+    /** Teto de alergias por linha (mesmo limite do cadastro completo). */
+    private const MAX_ALLERGIES_PER_ROW = 20;
+
+    private const ALLERGY_MIN_LENGTH = 2;
+
+    private const ALLERGY_MAX_LENGTH = 160;
+
+    /** Quem enviou a planilha — autor das alergias registradas (job sem login). */
+    private ?string $importUserId = null;
 
     private const DATE_FORMATS = ['d/m/Y', 'd-m-Y', 'Y-m-d', 'd/m/Y H:i:s', 'd-m-Y H:i:s'];
 
@@ -197,6 +231,8 @@ class PatientImportService
         '_plan'             => 'Plano',
         '_card_number'      => 'Carteirinha',
         '_import_code'      => 'Código de importação',
+        '_allergies'        => 'Alergias',
+        '_allergies_denied' => 'Nega alergias',
     ];
 
     private const REQUIRED_FIELDS = ['full_name', 'cellphone'];
@@ -343,7 +379,8 @@ class PatientImportService
             throw new RuntimeException('CSV sem cabeçalho ou vazio.');
         }
 
-        $indexFieldMap = $this->buildIndexFieldMap($rawHeaders);
+        $indexFieldMap      = $this->buildIndexFieldMap($rawHeaders);
+        $this->importUserId = $import->user_id ? (string) $import->user_id : null;
 
         if (! in_array('full_name', $indexFieldMap, true)) {
             fclose($handle);
@@ -545,12 +582,17 @@ class PatientImportService
                 ->first();
 
             if ($existingPatient && ! $existingPatient->trashed()) {
+                // Paciente já existe: nada é sobrescrito — só as alergias novas
+                // da planilha são acrescentadas (sem repetir).
+                $warning = $this->joinWarnings($warning, $this->registerAllergies($existingPatient, $data));
+
                 return 'skipped';
             }
 
             if ($existingPatient && $existingPatient->trashed()) {
                 $existingPatient->restore();
                 $this->assignImportCode($existingPatient, $data['_import_code'] ?? null, $usedImportCodes);
+                $warning = $this->joinWarnings($warning, $this->registerAllergies($existingPatient, $data));
 
                 return 'imported';
             }
@@ -565,7 +607,7 @@ class PatientImportService
                 'active' => true,
             ]);
             $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
-            $warning = $this->joinWarnings($homonymWarning, $warning);
+            $warning = $this->joinWarnings($homonymWarning, $warning, $this->registerAllergies($patient, $data));
 
             return 'imported';
         }
@@ -611,9 +653,70 @@ class PatientImportService
             'active' => true,
         ]);
         $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
-        $warning = $this->joinWarnings($homonymWarning, $warning);
+        $warning = $this->joinWarnings($homonymWarning, $warning, $this->registerAllergies($patient, $data));
 
         return 'imported';
+    }
+
+    /**
+     * Alergias da linha (coluna `alergias`) e "nega alergias" — sempre como
+     * informadas pelo paciente, sem repetir (PatientClinicalSafetyService).
+     * Devolve o aviso da linha (item inválido, "nega" ignorado), se houver.
+     */
+    private function registerAllergies(Patient $patient, array $data): ?string
+    {
+        $warnings   = [];
+        $substances = [];
+
+        foreach (PatientClinicalSafetyService::splitSubstances($data['_allergies'] ?? null) as $substance) {
+            $length = mb_strlen($substance);
+
+            if ($length < self::ALLERGY_MIN_LENGTH || $length > self::ALLERGY_MAX_LENGTH) {
+                $warnings[] = __('imports.patients.allergy_item_invalid', [
+                    'item' => mb_strimwidth($substance, 0, 40, '…'),
+                    'min'  => self::ALLERGY_MIN_LENGTH,
+                    'max'  => self::ALLERGY_MAX_LENGTH,
+                ]);
+
+                continue;
+            }
+
+            $substances[] = $substance;
+        }
+
+        if (count($substances) > self::MAX_ALLERGIES_PER_ROW) {
+            $substances = array_slice($substances, 0, self::MAX_ALLERGIES_PER_ROW);
+            $warnings[] = __('imports.patients.allergies_too_many', ['max' => self::MAX_ALLERGIES_PER_ROW]);
+        }
+
+        $denied = $data['_allergies_denied'] ?? null;
+
+        if (is_string($denied)) {
+            $warnings[] = __('imports.patients.allergies_denied_invalid', ['value' => mb_strimwidth($denied, 0, 20, '…')]);
+            $denied     = null;
+        }
+
+        if ($denied === true && trim((string) ($data['_allergies'] ?? '')) !== '') {
+            $warnings[] = __('imports.patients.allergies_denied_ignored');
+        }
+
+        if ($substances !== [] || $denied === true) {
+            // Autor = quem enviou a planilha (o job roda sem usuário logado).
+            $previous = AuditContext::userId();
+            AuditContext::setUserId($this->importUserId);
+
+            try {
+                app(PatientClinicalSafetyService::class)->registerReportedSubstances(
+                    $patient,
+                    $substances,
+                    $denied === true && trim((string) ($data['_allergies'] ?? '')) === '',
+                );
+            } finally {
+                AuditContext::setUserId($previous);
+            }
+        }
+
+        return $warnings === [] ? null : implode(' ', $warnings);
     }
 
     /**
@@ -711,10 +814,11 @@ class PatientImportService
         foreach ($indexFieldMap as $i => $field) {
             $raw   = isset($row[$i]) ? trim((string) $row[$i]) : '';
             $value = match ($field) {
-                'birth_date'     => $this->parseDate($raw),
-                'gender'         => $raw !== '' ? $this->parseGender($raw) : null,
-                'marital_status' => $raw !== '' ? $this->parseMaritalStatus($raw) : null,
-                default          => $raw !== '' ? $raw : null,
+                'birth_date'        => $this->parseDate($raw),
+                'gender'            => $raw !== '' ? $this->parseGender($raw) : null,
+                'marital_status'    => $raw !== '' ? $this->parseMaritalStatus($raw) : null,
+                '_allergies_denied' => $this->parseYesNo($raw),
+                default             => $raw !== '' ? $raw : null,
             };
 
             $data[$field] = $value;
@@ -788,6 +892,18 @@ class PatientImportService
         }
 
         return null;
+    }
+
+    /** sim → true; não/vazio → false; outro texto volta como está (vira aviso). */
+    private function parseYesNo(string $value): bool|string
+    {
+        $plain = TermNormalizer::plain($value);
+
+        return match (true) {
+            $plain === '' || in_array($plain, self::NO_VALUES, true) => false,
+            in_array($plain, self::YES_VALUES, true)                 => true,
+            default                                                  => $value,
+        };
     }
 
     private function parseGender(string $value): ?int

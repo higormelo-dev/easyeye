@@ -8,6 +8,7 @@ use App\Models\{MedicalRecord, MedicalRecordDocumentation, ReportSetting};
 use App\Services\EyeImages\ReportExamSummary;
 use App\Support\BrazilianFormat;
 use Barryvdh\Snappy\Facades\SnappyPdf;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Response;
 
 /**
@@ -227,8 +228,11 @@ class MedicalRecordPdfService
         $entityId = $doc->medicalRecord?->schedule?->entity_id ?? session('selected_entity_id');
         $setting  = $this->resolveSettingForDoc($doc, $entityId);
 
-        $entity     = $doc->medicalRecord?->schedule?->entity ?? Entity::find($entityId);
-        $footerPath = $this->buildDocumentationFooterFile($setting, $entity);
+        $entity = $doc->medicalRecord?->schedule?->entity ?? Entity::find($entityId);
+        // Rodapé com o momento REAL da emissão (Fase 2 / B3): com data
+        // alternativa, o papel mostra a data escolhida no corpo e quando foi
+        // emitido de fato aqui; reimprimir não troca pela hora atual.
+        $footerPath = $this->buildDocumentationFooterFile($setting, $entity, $doc->created_at);
 
         // --footer-html exige margem-bottom mínima para renderizar no espaço reservado.
         $marginBottom = $footerPath
@@ -267,7 +271,7 @@ class MedicalRecordPdfService
      * Respeita as configurações granulares do ReportSetting (footer_text,
      * footer_show_address, footer_show_phone).
      */
-    private function buildDocumentationFooterFile(?ReportSetting $setting, ?Entity $entity): ?string
+    private function buildDocumentationFooterFile(?ReportSetting $setting, ?Entity $entity, ?CarbonInterface $issuedAt = null): ?string
     {
         if (! ($setting?->show_footer)) {
             return null;
@@ -286,7 +290,7 @@ class MedicalRecordPdfService
             $parts[] = htmlspecialchars((string) BrazilianFormat::phone($entity->telephone ?: $entity->cellphone), ENT_QUOTES);
         }
 
-        $parts[] = 'Emitido em ' . now()->isoFormat('L LT');
+        $parts[] = 'Emitido em ' . ($issuedAt?->copy()->setTimezone((string) config('app.timezone')) ?? now())->isoFormat('L LT');
 
         $body = implode(' &nbsp;·&nbsp; ', $parts);
 

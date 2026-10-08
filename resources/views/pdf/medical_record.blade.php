@@ -73,6 +73,10 @@
     .bool-grid { display: table; width: 100%; }
     .bool-item { display: table-cell; padding-right: 16px; font-size: 10pt; white-space: nowrap; }
     .bool-yes  { color: #c62828; font-weight: bold; }
+    /* Segurança clínica (Fase 2): alerta de alergia em destaque, não só cor. */
+    .safety-allergy { border: 2px solid #c62828; padding: 5px 8px; margin: 0 0 10px; font-size: 10.5pt; }
+    .safety-allergy strong { color: #c62828; }
+    .safety-neutral { border: 1px solid #999; padding: 4px 8px; margin: 0 0 10px; font-size: 10pt; color: #333; }
     .bool-no   { color: #888; }
 
     /* ── Assinatura ──────────────────────────────────────────────── */
@@ -193,6 +197,25 @@
 </div>
 </div>
 
+@php
+    // Fase 2 / A1-A3: alergias e medicações do retrato da consulta + uso de LC.
+    $safety = \App\Support\ClinicalSafety\RecordSafetyView::forPdf($record);
+@endphp
+<!-- ─── ALERGIAS (Fase 2 / A1) — logo após a identificação ───────────────── -->
+@if($safety['allergy_state'] === 'has')
+<div class="safety-allergy">
+    <strong>&#9888; {{ __('clinical_safety.banner.allergy_alert') }}:</strong>
+    {{ implode(' · ', $safety['allergies']) }}
+    @if($safety['allergies_current'])
+    <br><small>{{ __('clinical_safety.snapshot.allergies_current') }}</small>
+    @endif
+</div>
+@elseif($safety['allergy_state'] === 'denied')
+<div class="safety-neutral">{{ __('clinical_safety.banner.denied') }}@if($safety['allergies_current']) <small>({{ __('clinical_safety.snapshot.allergies_current') }})</small>@endif</div>
+@else
+<div class="safety-neutral">{{ __('clinical_safety.banner.no_record') }}</div>
+@endif
+
 <!-- ─── ANAMNESE ──────────────────────────────────────────────────────────── -->
 <div class="section">
 <div class="section-title">{{ __('pdf.section_anamnesis') }}</div>
@@ -228,10 +251,24 @@
     <span class="field-value">{{ $record->ocular_surgical_history }}</span>
 </div></div>
 @endif
+@if($safety['medications'] !== null)
+<div class="row"><div class="col col-12">
+    <span class="field-label">{{ __('clinical_safety.snapshot.medications') }}</span>
+    <span class="field-value">{{ $safety['medications'] === [] ? __('clinical_safety.snapshot.none_medications') : implode(' · ', $safety['medications']) }}</span>
+</div></div>
+@endif
 @if($record->medications_in_use)
 <div class="row"><div class="col col-12">
     <span class="field-label">{{ __('pdf.medications_in_use') }}</span>
     <span class="field-value">{{ $record->medications_in_use }}</span>
+</div></div>
+@endif
+@if($safety['contact_lens_use'] !== [])
+<div class="row"><div class="col col-12">
+    <span class="field-label">{{ __('actions.medical_records.contact_lens_use') }}</span>
+    <span class="field-value">
+        @foreach($safety['contact_lens_use'] as $row){{ $loop->first ? '' : ' · ' }}{{ $loop->first ? $row['value'] : $row['label'] . ': ' . $row['value'] }}@endforeach
+    </span>
 </div></div>
 @endif
 </div>

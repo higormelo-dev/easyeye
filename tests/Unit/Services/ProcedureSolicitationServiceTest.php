@@ -78,8 +78,11 @@ it('joinLines descarta linhas vazias', function () {
 });
 
 it('expoe MAX_PROCEDURES + MAX_INDICATIONS + typeKeys', function () {
-    expect(ProcedureSolicitationService::MAX_PROCEDURES)->toBe(10)
-        ->and(ProcedureSolicitationService::MAX_INDICATIONS)->toBe(10);
+    // Fase 2 / B2: teto de 20 exames (cabe kit + kit + avulsos); indicações
+    // e CIDs viraram campos do pedido, com limite próprio.
+    expect(ProcedureSolicitationService::MAX_PROCEDURES)->toBe(20)
+        ->and(ProcedureSolicitationService::MAX_INDICATIONS)->toBe(5)
+        ->and(ProcedureSolicitationService::MAX_CIDS)->toBe(4);
 
     expect(ProcedureSolicitationService::typeKeys())
         ->toEqualCanonicalizing(['rotina', 'urgencia', 'controle', 'comparativo']);

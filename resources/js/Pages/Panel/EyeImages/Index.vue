@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { latestRequest } from '@/Support/latestRequest.js';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DoctorMissingAlert from '@/Components/Panel/DoctorMissingAlert.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
@@ -442,7 +443,12 @@ async function toggleExamShare(exam) {
     }
 }
 
+// Só o último paciente escolhido vale: as imagens atrasadas do anterior não
+// aparecem sob o paciente atual.
+const patientUrlsReq = latestRequest();
+
 async function selectPatient(patient) {
+    const req = patientUrlsReq.begin();
     selectedPatient.value = patient;
     examUrls.value = {};
     examThumbUrls.value = {};
@@ -451,15 +457,20 @@ async function selectPatient(patient) {
     urlsLoading.value = true;
     try {
         const url = props.urls.patient_urls.replace('__ID__', patient.id);
-        const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
+        const res = await fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+            signal: req.signal,
+        });
         const data = await res.json();
+        if (!req.current()) return;
         examUrls.value = data.urls ?? {};
         examThumbUrls.value = data.thumb_urls ?? {};
     } catch {
+        if (!req.current()) return;
         examUrls.value = {};
         examThumbUrls.value = {};
     } finally {
-        urlsLoading.value = false;
+        if (req.current()) urlsLoading.value = false;
     }
 }
 

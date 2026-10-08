@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\{MedicalRecord, PatientExam, Schedule, User};
+use App\Models\{MedicalRecord, Patient, PatientExam, Schedule, User};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Support\CurrentDoctor;
 use Illuminate\Support\Carbon;
 
@@ -67,6 +68,31 @@ class ConsultationRecordResolver
         }
 
         return (clone $base)->whereDate('created_at', $consultationDate)->latest('created_at')->first();
+    }
+
+    /**
+     * Abre o prontuário da consulta (o caller já tem a confirmação do médico e
+     * o lock de abertura do paciente) com o RETRATO das alergias e medicações
+     * ativas do paciente no momento — mesma regra de MedicalRecordService::store
+     * (Fase 2 / A2). Ponto único dos prontuários abertos fora do salvar do
+     * formulário: laudo manual do Gerenciador de Imagens e laudo de IA aprovado.
+     */
+    public function openRecord(string $entityId, string $patientId, string $doctorId, ?string $scheduleId): MedicalRecord
+    {
+        $patient = Patient::query()
+            ->withoutGlobalScopes()
+            ->where('entity_id', $entityId)
+            ->findOrFail($patientId);
+
+        return MedicalRecord::query()->create([
+            ...array_filter([
+                'entity_id'   => $entityId,
+                'patient_id'  => $patientId,
+                'doctor_id'   => $doctorId,
+                'schedule_id' => $scheduleId,
+            ]),
+            ...app(PatientClinicalSafetyService::class)->snapshot($patient),
+        ]);
     }
 
     /**

@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\{DataAccessPurpose, MedicalSpecialty};
-use App\Models\{ClinicResource, Doctor, Entity, People, Schedule, ScheduleEvent};
+use App\Models\{ClinicResource, Doctor, Entity, Patient, People, Schedule, ScheduleEvent};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Services\DataAccessLogService;
 use App\Services\Schedules\{AgendaFilters, AgendaQueryService};
 use App\Support\{BrazilianFormat, CurrentDoctor, PatientAccess, ScheduleShift};
@@ -45,7 +46,16 @@ class SchedulePrintController extends Controller
         $events    = $agenda->events($filters);
         $blocks    = $filters->status === 'blocked' ? $agenda->blocks($filters) : collect();
 
-        $rows = $schedules->map(fn (Schedule $s) => $this->agendaRow($s, $phones))->toBase()
+        // Alergia ativa do paciente (Fase 2 / A1) — só para quem tem acesso a
+        // Pacientes; no papel, só quem TEM alergia (sem ruído).
+        $allergies = $phones
+            ? app(PatientClinicalSafetyService::class)->compactFor($entityId, $schedules->pluck('patient_id')->filter()->all())
+            : [];
+
+        $rows = $schedules->map(fn (Schedule $s) => [
+            ...$this->agendaRow($s, $phones),
+            'allergy' => $this->allergyTag($allergies[(string) $s->patient_id] ?? null),
+        ])->toBase()
             ->merge($events->map(fn (ScheduleEvent $e) => $this->eventRow($e))->toBase())
             ->merge($blocks->map(fn (array $b) => [
                 'kind'  => 'block',
@@ -137,6 +147,8 @@ class SchedulePrintController extends Controller
                 'phone'     => BrazilianFormat::phone($schedule->cellphone ?: $schedule->telephone),
                 'notes'     => $schedule->notes,
             ],
+            // Alergias ativas (Fase 2 / A1): a ficha impressa também alerta.
+            'allergies'   => $this->allergySheetLine($patient),
             'generatedAt' => now(),
             'printedBy'   => auth()->user()?->name,
         ];
@@ -150,6 +162,42 @@ class SchedulePrintController extends Controller
             ->setOption('margin-right', '1.2cm')
             ->setOption('encoding', 'UTF-8')
             ->inline('ficha-' . $patient->code . '.pdf');
+    }
+
+    /** "ALERGIA: Dipirona (grave), Penicilina" — null sem alergia ativa. */
+    private function allergyTag(?array $flag): ?string
+    {
+        if (($flag['state'] ?? null) !== 'has') {
+            return null;
+        }
+
+        $items = collect($flag['items'])->map(fn (array $i) => $i['substance'] . ($i['severe'] ? ' (' . __('clinical_safety.banner.severe') . ')' : ''));
+
+        return __('clinical_safety.banner.allergy_alert') . ': ' . $items->implode(', ');
+    }
+
+    /**
+     * Linha de alergia da ficha: estado + "Dipirona (Edema de glote; Grave),
+     * Penicilina (…)" — nunca em branco ("Sem registro de alergias").
+     *
+     * @return array{state: string, text: string}
+     */
+    private function allergySheetLine(Patient $patient): array
+    {
+        $summary = app(PatientClinicalSafetyService::class)->summary($patient, withHistory: false);
+        $state   = (string) $summary['allergy_state'];
+
+        $text = match ($state) {
+            'has' => collect($summary['allergies'])->map(function (array $a) {
+                $details = array_filter([$a['reaction'] ?? null, $a['severity_label'] ?? null, $a['status_label'] ?? null]);
+
+                return $a['substance'] . ($details !== [] ? ' (' . implode('; ', $details) . ')' : '');
+            })->implode(' · '),
+            'denied' => __('clinical_safety.banner.denied'),
+            default  => __('clinical_safety.banner.no_record'),
+        };
+
+        return ['state' => $state, 'text' => $text];
     }
 
     /** @return array<string, mixed> */

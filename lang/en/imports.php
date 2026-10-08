@@ -15,8 +15,14 @@ return [
         'plan_not_found' => 'Warning: plan ":plan" not found for the insurer — patient imported without a plan. Fix it in the patient record or register the plan in Settings › Insurers › Plans.',
         'plan_ambiguous' => 'Warning: more than one plan ":plan" for the insurer — patient imported without a plan. Use the ANS product registry (printed on the card) or pick it in the patient record.',
         'col_warnings'   => 'Warnings',
-        'title'          => 'Import Patients',
-        'subtitle'       => 'Import patients in bulk from a CSV spreadsheet.',
+        // Allergies (Phase 2 / G4) — optional columns `alergias` and `nega_alergias`.
+        'allergies_hint'           => 'Allergies (optional): column "alergias" with the substances separated by semicolons (;) — e.g. Dipyrone; Penicillin. They are saved as "reported by the patient" (the physician confirms them during the visit), also for patients who already existed, without repeating those already recorded — re-importing the same spreadsheet does not duplicate. Column "nega_alergias" (yes/no): only applies when the row has no allergies and the patient has no active allergy. Neither column = "no allergy record".',
+        'allergy_item_invalid'     => 'Warning: allergy ":item" ignored (it must have between :min and :max characters).',
+        'allergies_too_many'       => 'Warning: only the first :max allergies of the row were recorded.',
+        'allergies_denied_invalid' => 'Warning: value ":value" in "nega_alergias" not recognized (use yes or no) — ignored.',
+        'allergies_denied_ignored' => 'Warning: "nega_alergias" ignored — the row has allergies.',
+        'title'                    => 'Import Patients',
+        'subtitle'                 => 'Import patients in bulk from a CSV spreadsheet.',
 
         'upload_title'      => 'Upload CSV file',
         'upload_hint'       => 'Supports files exported from Feegow, Doctoralia, ProDoctor and any standard CSV spreadsheet.',

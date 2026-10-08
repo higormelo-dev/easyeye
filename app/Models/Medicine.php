@@ -134,6 +134,27 @@ class Medicine extends Model
         return $this->posology_source === MedicinePosologySource::Ai;
     }
 
+    /**
+     * Colírio (forma em gotas oftálmicas ou apresentação "Colírio") — com
+     * alergia ao conservante (cloreto de benzalcônio) todo colírio avisa.
+     */
+    public function isEyeDrop(): bool
+    {
+        if (in_array($this->pharmaceutical_form, CmedPresentationParser::EYE_DROP_FORMS, true)) {
+            return true;
+        }
+
+        $presentation = $this->relationLoaded('presentation') ? $this->presentation?->name : null;
+        $combined     = self::normalizeSearch($this->name . ' ' . $presentation);
+
+        // "oftalm" cobre "oftálmica"/"oftálmico" (suspensão, gel, pomada —
+        // OphthalmicMedicinesSeeder cadastra à mão, sem pharmaceutical_form,
+        // só com a apresentação) — mesmo risco de conservante que colírio
+        // líquido, não só quando a palavra é literalmente "colírio" (17ª
+        // revisão Codex, P1).
+        return str_contains($combined, 'colirio') || str_contains($combined, 'oftalm');
+    }
+
     /** Forma farmacêutica legível (código CMED traduzido). */
     public function formLabel(): ?string
     {

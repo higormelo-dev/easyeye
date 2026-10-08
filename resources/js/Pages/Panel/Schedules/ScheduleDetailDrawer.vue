@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
 
 const props = defineProps({
     open: { type: Boolean, required: true },
@@ -63,25 +65,35 @@ async function cancelFutureSessions() {
     }
 }
 
+// Só a última carga vale (agendamento traz paciente, alergias e medicações):
+// a resposta atrasada de outro agendamento não sobrescreve a gaveta aberta.
+const detailReq = latestRequest();
+
 async function loadDetail(id) {
+    const req = detailReq.begin();
     loading.value = true;
     schedule.value = null;
     try {
         const res = await fetch(route('panel.schedules.show', id), {
             headers: { Accept: 'application/json' },
+            signal: req.signal,
         });
         const json = await res.json();
-        schedule.value = json.data;
+        if (req.current()) schedule.value = json.data;
+    } catch (error) {
+        if (!isAbortError(error) && req.current()) throw error;
     } finally {
-        loading.value = false;
+        if (req.current()) loading.value = false;
     }
 }
 
 watch(
-    () => props.open,
-    (val) => {
-        if (val && props.scheduleId) loadDetail(props.scheduleId);
-        if (!val) {
+    () => [props.open, props.scheduleId],
+    ([open, id]) => {
+        if (open && id) loadDetail(id);
+        if (!open) {
+            detailReq.cancel();
+            loading.value = false;
             schedule.value = null;
             cancelSeriesOpen.value = false;
             cancelReason.value = '';
@@ -259,6 +271,14 @@ function copyNumericCode(field, code) {
 
         <!-- ── Body ───────────────────────────────────────────────────────── -->
         <template v-if="schedule">
+            <!-- Alergias do paciente (Fase 2): alerta fixo para quem atende. -->
+            <ClinicalAlertBanner
+                v-if="schedule.clinical_safety"
+                :summary="schedule.clinical_safety"
+                :show-risks="false"
+                compact
+                class="mb-3"
+            />
             <!-- Identificação -->
             <div class="detail-section">
                 <div class="detail-section__title">

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\DTOs\ActionPolicy;
+use App\Enums\ClinicalSafety\AllergyCategory;
 use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\PatientResource;
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Services\{PatientDuplicateFinder, PatientService};
 use App\Services\WhatsApp\WhatsAppService;
 use App\Support\BrazilianFormat;
@@ -376,12 +378,31 @@ class PatientsController extends Controller
                 'birth_date' => $request->input('birth_date') ?: null,
             ]);
 
-            return Patient::create([
+            $patient = Patient::create([
                 'entity_id'   => $entityId,
                 'person_id'   => $person->id,
                 'covenant_id' => $particularId,
                 'active'      => true,
             ]);
+
+            // Fase 2 (G2): alergias informadas pelo paciente (recepção — nunca
+            // confirmadas aqui) ou "nega alergias", na MESMA transação do
+            // cadastro. Nada informado = "sem registro de alergias".
+            $safety     = app(PatientClinicalSafetyService::class);
+            $substances = $request->allergySubstances();
+
+            foreach ($substances as $substance) {
+                // Categoria "outro": o texto curto não diz se é remédio, colírio,
+                // látex ou alimento; a checagem da receita usa a substância (não a
+                // categoria) e o médico reclassifica ao confirmar.
+                $safety->createAllergy($patient, ['category' => AllergyCategory::Other->value, 'substance' => $substance], asDoctor: false);
+            }
+
+            if ($substances === [] && $request->boolean('allergies_denied')) {
+                $safety->setDenied($patient, true);
+            }
+
+            return $patient;
         });
 
         $patient->load('person');

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\DocumentationType;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSetting, ReportSettingContent};
+use Carbon\CarbonInterface;
 
 /**
  * Gerencia a criação de documentações clínicas (receituários, solicitações,
@@ -13,6 +14,7 @@ class MedicalRecordDocumentationService
 {
     public function __construct(
         private readonly TemplateVariableResolver $variableResolver,
+        private readonly AuditService $audit,
     ) {
     }
 
@@ -81,8 +83,9 @@ class MedicalRecordDocumentationService
         Doctor $doctor,
         Entity $entity,
         ?MedicalRecord $medicalRecord = null,
+        ?CarbonInterface $documentDate = null,
     ): array {
-        return $this->variableResolver->resolve($content, $patient, $doctor, $entity, $medicalRecord);
+        return $this->variableResolver->resolve($content, $patient, $doctor, $entity, $medicalRecord, $documentDate);
     }
 
     /**
@@ -144,10 +147,13 @@ class MedicalRecordDocumentationService
         string $resolvedContent,
         ?string $title,
         string $doctorId,
+        ?array $safetyOverride = null,
+        ?CarbonInterface $documentDate = null,
+        ?array $metadata = null,
     ): MedicalRecordDocumentation {
         $setting = $content->reportSetting;
 
-        return MedicalRecordDocumentation::create([
+        $documentation = MedicalRecordDocumentation::create([
             'medical_record_id'         => $record->id,
             'patient_id'                => $record->patient_id,
             'doctor_id'                 => $doctorId,
@@ -157,6 +163,37 @@ class MedicalRecordDocumentationService
             'type'                      => $content->type,
             'title'                     => $title ?? ($content->display_label ?? ucfirst($content->type)),
             'content'                   => $resolvedContent,
+            // Receita emitida apesar de alergia ativa (Fase 2 / A4).
+            'safety_override' => $safetyOverride,
+            // Data alternativa impressa (Fase 2 / B3) + dados estruturados.
+            'document_date' => $documentDate?->toDateString(),
+            'metadata'      => $metadata !== [] ? $metadata : null,
         ]);
+
+        $this->recordAlternativeDate($documentation);
+
+        return $documentation;
+    }
+
+    /**
+     * Data alternativa (Fase 2 / B3): evento próprio na trilha de auditoria com
+     * a data impressa e o momento real da emissão — a data do papel nunca
+     * apaga quando o documento foi emitido de fato.
+     */
+    public function recordAlternativeDate(MedicalRecordDocumentation $documentation): void
+    {
+        if (! $documentation->hasAlternativeDate()) {
+            return;
+        }
+
+        $this->audit->log(
+            event: 'alternative_date',
+            model: $documentation,
+            old: null,
+            new: [
+                'document_date' => $documentation->document_date?->toDateString(),
+                'issued_at'     => $documentation->created_at?->toIso8601String(),
+            ],
+        );
     }
 }

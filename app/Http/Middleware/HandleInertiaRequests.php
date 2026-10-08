@@ -146,6 +146,13 @@ class HandleInertiaRequests extends Middleware
             // Textos dos componentes compartilhados (rótulo "Fechar" dos modais,
             // "Carregando..."), no idioma do usuário em qualquer página.
             't_ui' => fn () => trans('ui'),
+
+            // Segurança clínica (Fase 2): rótulos dos componentes de alergias,
+            // medicações em uso e alertas — usados por Pacientes, Agenda, Pronto
+            // atendimento e Prontuário. Só no painel da clínica.
+            't_clinical' => fn () => $request->routeIs('panel.*') && ! $request->routeIs('panel.manager.*')
+                ? trans('clinical_safety')
+                : null,
         ];
     }
 

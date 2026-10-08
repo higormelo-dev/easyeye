@@ -2,6 +2,9 @@
 import { computed, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
+import { clinicalTexts, tc, requestJson } from '@/Support/clinicalSafety.js';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 
 // Rótulo compartilhado (lang/<locale>/ui.php → patient_form).
 const page = usePage();
@@ -16,25 +19,59 @@ defineEmits(['close']);
 const loading = ref(false);
 const patient = ref(null);
 
+// Alergias, medicações em uso e alertas de risco ocular (Fase 2) — leitura
+// registrada no servidor (dado sensível).
+const clinicalT = clinicalTexts();
+const ctt = (path, fallback) => tc(clinicalT, path, fallback);
+const safety = ref(null);
+const activeMedications = computed(() => (safety.value?.medications ?? []).filter((m) => m.status === 'active'));
+
+// Resposta atrasada de OUTRO paciente (abriu A, fechou, abriu B) não pode
+// sobrescrever a gaveta do B: cada carga invalida a anterior; fechar invalida.
+const detailReq = latestRequest();
+const safetyReq = latestRequest();
+
+async function loadSafety(id) {
+    safety.value = null;
+    const req = safetyReq.begin();
+    try {
+        const res = await requestJson(route('panel.patients.clinical-safety.show', id), { signal: req.signal });
+        if (req.current()) safety.value = res.ok ? res.data.data : null;
+    } catch {
+        if (req.current()) safety.value = null;
+    }
+}
+
 async function loadDetail(id) {
+    const req = detailReq.begin();
     loading.value = true;
     patient.value = null;
+    loadSafety(id);
     try {
         const res = await fetch(route('panel.patients.show', id), {
             headers: { Accept: 'application/json' },
+            signal: req.signal,
         });
         const json = await res.json();
-        patient.value = json.data;
+        if (req.current()) patient.value = json.data;
+    } catch (error) {
+        if (!isAbortError(error) && req.current()) throw error;
     } finally {
-        loading.value = false;
+        if (req.current()) loading.value = false;
     }
 }
 
 watch(
-    () => props.open,
-    (val) => {
-        if (val && props.patientId) loadDetail(props.patientId);
-        if (!val) patient.value = null;
+    () => [props.open, props.patientId],
+    ([open, id]) => {
+        if (open && id) loadDetail(id);
+        if (!open) {
+            detailReq.cancel();
+            safetyReq.cancel();
+            loading.value = false;
+            patient.value = null;
+            safety.value = null;
+        }
     },
 );
 
@@ -112,6 +149,27 @@ function invitePortal() {
 
         <!-- ── Body ───────────────────────────────────────────────────────── -->
         <template v-if="patient">
+            <!-- Segurança clínica (Fase 2): alergias + alertas das medicações em uso -->
+            <div v-if="safety" class="detail-section" data-testid="patient-drawer-safety">
+                <ClinicalAlertBanner :summary="safety" class="mb-2" />
+                <div class="detail-section__title">
+                    <i class="ti ti-pill me-1" aria-hidden="true"></i>
+                    {{ ctt('medications.title', 'Medicações em uso') }}
+                </div>
+                <ul v-if="activeMedications.length" class="list-unstyled small mb-0">
+                    <li v-for="m in activeMedications" :key="m.id">
+                        <strong>{{ m.name }}</strong>
+                        <span v-if="m.posology" class="text-muted"> — {{ m.posology }}</span>
+                        <span v-if="!m.confirmed" class="badge bg-warning-subtle text-warning-emphasis ms-1">{{
+                            ctt('snapshot.unconfirmed', 'informada')
+                        }}</span>
+                    </li>
+                </ul>
+                <p v-else class="small text-muted mb-0">
+                    {{ ctt('medications.empty', 'Nenhuma medicação na lista.') }}
+                </p>
+            </div>
+
             <!-- Identificação -->
             <div class="detail-section">
                 <div class="detail-section__title"><i class="ti ti-id-badge me-1"></i> Identificação</div>

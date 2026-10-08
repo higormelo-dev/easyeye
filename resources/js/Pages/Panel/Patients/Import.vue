@@ -344,6 +344,10 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                             convênio com nome não cadastrado na clínica vira erro na linha. Veja o
                             <a :href="urls.template">modelo</a>.
                         </small>
+                        <small class="text-muted d-block mt-1" data-testid="import-allergies-hint">
+                            <i class="ti ti-alert-triangle me-1 text-danger" aria-hidden="true"></i
+                            >{{ t.allergies_hint }}
+                        </small>
                     </form>
                 </div>
             </div>

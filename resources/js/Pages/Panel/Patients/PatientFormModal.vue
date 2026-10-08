@@ -137,6 +137,7 @@ const tabs = [
                 :lookup-cep="lookupCep"
                 :plan-option="planOption"
                 :covenant-option="covenantOption"
+                :patient-id="patientId"
             />
         </form>
 

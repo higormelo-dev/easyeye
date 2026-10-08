@@ -59,10 +59,11 @@ class AdoptGlobalReportSettingsForEntitiesSeeder extends Seeder
             }
 
             $this->command->info(sprintf(
-                'Backfill F4d: %d settings com mudanças | %d contents criados | %d contents atualizados',
+                'Backfill F4d: %d settings com mudanças | %d contents criados | %d contents atualizados | %d personalizados preservados',
                 $syncStats['settings_synced'],
                 $syncStats['contents_created'],
                 $syncStats['contents_updated'],
+                $syncStats['contents_skipped_customized'],
             ));
         }
     }

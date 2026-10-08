@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\{DataAccessPurpose, DocumentationType, EntityGate};
+use App\Exceptions\AllergyConflictException;
 use App\Http\Controllers\Concerns\AuthorizesEyeImageExams;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, ReportSettingContent};
 use App\Services\{ConsultationRecordResolver, MedicalRecordDocumentationService};
 use App\Services\EyeImages\PdfTextExtractionService;
+use App\Support\ClinicalSafety\PrescriptionAllergyGuard;
 use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request};
@@ -161,6 +163,9 @@ class EyeImageReportController extends Controller
             'title'                     => ['nullable', 'string', 'max:255'],
             'content'                   => ['required', 'string'],
             'confirm_open_record'       => ['nullable', 'boolean'],
+            // Modelo do tipo receita (raro aqui): mesma checagem de alergia
+            // do receituário (Fase 2 / A4).
+            'allergy_override_reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $patient = Patient::query()->where('entity_id', $entityId)->findOrFail($validated['patient_id']);
@@ -193,13 +198,9 @@ class EyeImageReportController extends Controller
             $record = MedicalRecord::withRecordOpeningLock(
                 $entityId,
                 (string) $patient->id,
+                // Abre já com o retrato de alergias/medicações (Fase 2 / G3).
                 fn (): MedicalRecord => $this->recordResolver->findRecord($entityId, (string) $patient->id, $scheduleId, $consultationDate)
-                    ?? MedicalRecord::query()->create(array_filter([
-                        'entity_id'   => $entityId,
-                        'patient_id'  => $patient->id,
-                        'doctor_id'   => (string) $doctorId,
-                        'schedule_id' => $scheduleId,
-                    ])),
+                    ?? $this->recordResolver->openRecord($entityId, (string) $patient->id, (string) $doctorId, $scheduleId),
             );
         }
 
@@ -212,10 +213,18 @@ class EyeImageReportController extends Controller
             $this->documentationService->assertTemplateBelongsToEntity($reportContent, $entityId);
         }
 
+        try {
+            $override = $reportContent?->type === DocumentationType::Prescription
+                ? app(PrescriptionAllergyGuard::class)->guard($patient, $sanitized, [], $validated['allergy_override_reason'] ?? null)
+                : null;
+        } catch (AllergyConflictException $exception) {
+            return response()->json($exception->toResponsePayload(), 422);
+        }
+
         // Laudo + vínculo com os exames na mesma transação: nunca um laudo
         // salvo sem registro de quais exames ele cobre (o PDF lista esses
         // exames — ReportExamSummary; pode ser mais de um, laudo conjunto).
-        $documentation = DB::transaction(function () use ($reportContent, $record, $sanitized, $validated, $doctorId, $examIds, $entityId) {
+        $documentation = DB::transaction(function () use ($reportContent, $record, $sanitized, $validated, $doctorId, $examIds, $entityId, $override) {
             $documentation = $reportContent
                 ? $this->documentationService->store(
                     $record,
@@ -223,6 +232,7 @@ class EyeImageReportController extends Controller
                     $sanitized,
                     $validated['title'] ?? null,
                     (string) $doctorId,
+                    $override,
                 )
                 // Laudo em branco (sem modelo) — mesmo default de título do laudo de IA.
                 : MedicalRecordDocumentation::create([
@@ -235,6 +245,10 @@ class EyeImageReportController extends Controller
                 ]);
 
             $documentation->syncExams($examIds, $entityId);
+
+            if ($override !== null) {
+                app(PrescriptionAllergyGuard::class)->recordOverride($documentation, $override);
+            }
 
             return $documentation;
         });

@@ -15,8 +15,14 @@ return [
         'plan_not_found' => 'Aviso: plano ":plan" não encontrado no convênio — paciente importado sem plano. Ajuste no cadastro ou cadastre o plano em Configurações › Convênios › Planos.',
         'plan_ambiguous' => 'Aviso: mais de um plano ":plan" no convênio — paciente importado sem plano. Informe o registro do produto na ANS (impresso na carteirinha) ou escolha no cadastro.',
         'col_warnings'   => 'Avisos',
-        'title'          => 'Importar Pacientes',
-        'subtitle'       => 'Importe pacientes em lote a partir de uma planilha CSV.',
+        // Alergias (Fase 2 / G4) — colunas opcionais `alergias` e `nega_alergias`.
+        'allergies_hint'           => 'Alergias (opcional): coluna "alergias" com as substâncias separadas por ponto e vírgula (;) — ex.: Dipirona; Penicilina. Entram como "informadas pelo paciente" (o médico confirma no atendimento), inclusive no paciente que já existia, sem repetir as já registradas — reimportar a mesma planilha não duplica. Coluna "nega_alergias" (sim/não): só vale quando a linha não tem alergias e o paciente não tem alergia ativa. Sem as duas = "sem registro de alergias".',
+        'allergy_item_invalid'     => 'Aviso: alergia ":item" ignorada (precisa ter entre :min e :max caracteres).',
+        'allergies_too_many'       => 'Aviso: só as primeiras :max alergias da linha foram registradas.',
+        'allergies_denied_invalid' => 'Aviso: valor ":value" em "nega_alergias" não reconhecido (use sim ou não) — ignorado.',
+        'allergies_denied_ignored' => 'Aviso: "nega_alergias" ignorado — a linha tem alergias.',
+        'title'                    => 'Importar Pacientes',
+        'subtitle'                 => 'Importe pacientes em lote a partir de uma planilha CSV.',
 
         'upload_title'      => 'Enviar arquivo CSV',
         'upload_hint'       => 'Suporta arquivos exportados do Feegow, Doctoralia, ProDoctor e qualquer planilha CSV padrão.',

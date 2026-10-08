@@ -1,0 +1,163 @@
+/** Fixtures da Fase 2 (segurança clínica) — mesmo formato do servidor. */
+export const STOPWORDS = ['de', 'do', 'da', 'e', 'sodico', 'sodica', 'cloridrato', 'tri', 'hidratada', 'monoidratada'];
+
+export const CHECK = {
+    stopwords: STOPWORDS,
+    allergies: [
+        {
+            id: 'al-pen',
+            substance: 'Penicilina',
+            reaction: 'Urticária',
+            severity: 'moderate',
+            severity_label: 'Moderada',
+            status: 'reported',
+            status_label: 'Informada pelo paciente',
+            terms: ['penicilina'],
+            class_members: ['amoxicilina', 'cefalexina', 'ampicilina'],
+            class_labels: ['Penicilinas / beta-lactâmicos'],
+            eye_drops: false,
+        },
+        {
+            id: 'al-dip',
+            substance: 'Dipirona',
+            reaction: 'Edema de glote',
+            severity: 'severe',
+            severity_label: 'Grave / anafilaxia',
+            status: 'confirmed',
+            status_label: 'Confirmada pelo médico',
+            terms: ['dipirona'],
+            class_members: [],
+            class_labels: [],
+            eye_drops: false,
+        },
+        {
+            id: 'al-bak',
+            substance: 'Cloreto de benzalcônio',
+            reaction: null,
+            severity: null,
+            severity_label: null,
+            status: 'confirmed',
+            status_label: 'Confirmada pelo médico',
+            terms: ['cloreto benzalconio'],
+            class_members: ['benzalconio'],
+            class_labels: ['Conservante cloreto de benzalcônio'],
+            eye_drops: true,
+        },
+    ],
+};
+
+export function summary(overrides = {}) {
+    return {
+        allergy_state: 'has',
+        denied: null,
+        allergies: [
+            {
+                id: 'al-dip',
+                category: 'medication',
+                category_label: 'Medicamento',
+                substance: 'Dipirona',
+                reaction: 'Edema de glote',
+                severity: 'severe',
+                severity_label: 'Grave / anafilaxia',
+                status: 'confirmed',
+                status_label: 'Confirmada pelo médico',
+                active: true,
+                registered_by: 'DRA. ANA',
+                registered_at_label: '07/10/2026 09:00',
+                confirmed_by: 'DRA. ANA',
+                confirmed_at_label: '07/10/2026 09:00',
+            },
+            {
+                id: 'al-pen',
+                category: 'medication',
+                category_label: 'Medicamento',
+                substance: 'Penicilina',
+                reaction: 'Urticária',
+                severity: 'moderate',
+                severity_label: 'Moderada',
+                status: 'reported',
+                status_label: 'Informada pelo paciente',
+                active: true,
+                registered_by: 'SOFIA RECEPÇÃO',
+                registered_at_label: '07/10/2026 08:00',
+            },
+            {
+                id: 'al-old',
+                category: 'food',
+                substance: 'Camarão',
+                status: 'discarded',
+                status_label: 'Descartada',
+                active: false,
+                discarded_by: 'DRA. ANA',
+                discarded_at_label: '01/10/2026 10:00',
+                discard_reason: 'Teste negativo',
+            },
+        ],
+        medications: [
+            {
+                id: 'm-1',
+                medicine_id: 'med-sec',
+                name: 'SECOTEX 0,4 MG',
+                active_ingredient: 'CLORIDRATO DE TANSULOSINA',
+                posology: '1 cápsula à noite',
+                status: 'active',
+                status_label: 'Em uso',
+                source: 'clinic',
+                source_label: 'Registrada pelo médico',
+                confirmed: true,
+            },
+            {
+                id: 'm-2',
+                name: 'XARELTO 20 MG',
+                active_ingredient: 'RIVAROXABANA',
+                status: 'active',
+                status_label: 'Em uso',
+                source: 'patient',
+                source_label: 'Informada pelo paciente',
+                confirmed: false,
+            },
+            {
+                id: 'm-3',
+                name: 'Prednisona',
+                status: 'suspended',
+                status_label: 'Suspensa',
+                source: 'patient',
+                confirmed: false,
+            },
+        ],
+        risk_alerts: [
+            {
+                key: 'alpha1_blockers',
+                group: 'Alfa-1 bloqueadores',
+                alert: 'Risco de síndrome da íris flácida intraoperatória (IFIS) na cirurgia de catarata.',
+                source: 'Chang DF, Campbell JR. J Cataract Refract Surg. 2005.',
+                medications: ['SECOTEX 0,4 MG'],
+                origin: 'list',
+            },
+        ],
+        can_review: true,
+        check: CHECK,
+        ...overrides,
+    };
+}
+
+/** Store falso (mesma interface do useClinicalSafety). */
+export function fakeStore(sum, vi) {
+    const ok = () => vi.fn(() => Promise.resolve({ ok: true }));
+    return {
+        summary: sum,
+        busy: false,
+        loading: false,
+        error: '',
+        load: ok(),
+        addAllergy: ok(),
+        updateAllergy: ok(),
+        confirmAllergy: ok(),
+        discardAllergy: ok(),
+        setDenied: ok(),
+        addMedication: ok(),
+        updateMedication: ok(),
+        confirmMedication: ok(),
+        setMedicationStatus: ok(),
+    };
+}

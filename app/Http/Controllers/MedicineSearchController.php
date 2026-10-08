@@ -77,6 +77,8 @@ class MedicineSearchController extends Controller
                 'laboratory'          => $m->laboratory,
                 'category'            => $m->regulatory_category,
                 'is_ophthalmic'       => (bool) $m->is_ophthalmic,
+                // Colírio (conservante) — checagem de alergia na tela (Fase 2 / A4).
+                'is_eye_drop' => $m->isEyeDrop(),
             ]),
         );
     }

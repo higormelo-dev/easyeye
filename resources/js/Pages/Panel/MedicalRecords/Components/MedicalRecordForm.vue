@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 import { useForm, router, usePage } from '@inertiajs/vue3';
 import { validatePayload } from '@/utils/formRulesValidator.js';
 import PdfPreviewModal from './PdfPreviewModal.vue';
@@ -17,7 +18,24 @@ import { useRecordAutosave } from '@/composables/useRecordAutosave.js';
 import { useAttendanceClock, formatDuration } from '@/composables/useAttendanceClock.js';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
+import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
+import ClinicalSafetyModal from '@/Components/Panel/ClinicalSafety/ClinicalSafetyModal.vue';
+import AllergyOverrideModal from '@/Components/Panel/ClinicalSafety/AllergyOverrideModal.vue';
+import { useClinicalSafety } from '@/composables/useClinicalSafety.js';
+import {
+    itemConflicts,
+    textConflicts,
+    reconcileItems,
+    clinicalTexts,
+    tc,
+    matchLabel,
+} from '@/Support/clinicalSafety.js';
 import { recordColumnOrder } from './recordLayout.js';
+import CertificateModal from '@/Components/Panel/Documents/CertificateModal.vue';
+import ProcedureRequestModal from '@/Components/Panel/Documents/ProcedureRequestModal.vue';
+import DocumentDateField from '@/Components/Panel/Documents/DocumentDateField.vue';
+import PersonalTemplatesBar from '@/Components/Panel/Documents/PersonalTemplatesBar.vue';
+import { documentTexts, td, documentDatePayload } from '@/Support/clinicalDocuments.js';
 
 /**
  * MedicalRecordForm — Port fiel de _form.blade.php (1744 LOC) +
@@ -61,6 +79,14 @@ const props = defineProps({
     // Autosave: rascunho do autor mais novo que o prontuário ({ updated_at,
     // updated_at_label } | null) — a tela oferece recuperar.
     draft: { type: Object, default: null },
+    // Segurança clínica (Fase 2 / A1-A4): alergias, "nega alergias",
+    // medicações em uso, alertas de risco e termos da checagem do
+    // receituário. null = perfil sem acesso a Pacientes.
+    clinicalSafety: { type: Object, default: null },
+    // Uso de LC da última consulta ({ value, date } | null) — pré-preenche o novo.
+    contactLensUsePrevious: { type: Object, default: null },
+    // Estado compartilhado com a página (alerta móvel acima das colunas).
+    safetyStore: { type: Object, default: null },
     t: { type: Object, default: () => ({}) },
 });
 
@@ -91,6 +117,25 @@ const additionTypes = computed(() => props.catalogs.addition_types ?? []);
 const lenses = computed(() => props.catalogs.lenses ?? []);
 const examReports = computed(() => props.catalogs.exam_reports ?? []);
 const documentationTemplates = computed(() => normalizeDocTemplates(props.catalogs.available_templates ?? []));
+
+// Uso de LC (anamnese): forma fixa para os campos da tela; o servidor
+// normaliza (nada preenchido → null; "não usa" descarta o resto).
+function contactLensUseForm(value) {
+    const v = value && typeof value === 'object' ? value : {};
+    return {
+        uses: typeof v.uses === 'boolean' ? v.uses : null,
+        type: v.type ?? '',
+        wear: v.wear ?? '',
+        hours_per_day: v.hours_per_day ?? '',
+        replacement: v.replacement ?? '',
+        sleeps_with: typeof v.sleeps_with === 'boolean' ? v.sleeps_with : null,
+        complaints: v.complaints ?? '',
+    };
+}
+const contactLensUsePrefilled = Boolean(!r && props.contactLensUsePrevious?.value);
+const CL_TYPES = ['soft', 'rgp', 'scleral', 'ortho_k', 'cosmetic', 'therapeutic'];
+const CL_WEAR = ['daily_wear', 'extended_wear'];
+const CL_REPLACEMENTS = ['daily', 'biweekly', 'monthly', 'quarterly', 'yearly'];
 
 // ──────────────────────────────────────────────────────────────────────────
 // Form principal (Inertia useForm)
@@ -162,6 +207,9 @@ const form = useForm({
     // Cálculo de lentes de contato vinculado à consulta (entradas +
     // resultados; o servidor recalcula ao salvar). null = sem cálculo.
     contact_lens_calculation: r?.contact_lens_calculation ?? null,
+    // Uso de lente de contato na anamnese (Fase 2 / A3) — novo atendimento
+    // começa com o da última consulta (o médico confere).
+    contact_lens_use: contactLensUseForm(r ? r.contact_lens_use : props.contactLensUsePrevious?.value),
 
     // Diagnóstico & conduta
     diagnosis_cids: r?.diagnosis_cids ?? [],
@@ -178,6 +226,21 @@ const form = useForm({
     flow_action: null,
     post_save_action: null,
 });
+
+// Trocar pra "Não"/"Não informado" só escondia os campos de detalhe (v-if
+// uses === true) — o que tinha vindo pré-preenchido ou foi digitado antes de
+// voltar atrás continuava no form e ia no payload. O servidor via detalhe
+// preenchido com uses=null e normalizava de volta pra "usa" (3ª revisão
+// Codex, P2). Sem "Sim", os detalhes não têm sentido: limpa.
+watch(
+    () => form.contact_lens_use.uses,
+    (uses) => {
+        if (uses === true) return;
+        const blank = contactLensUseForm({});
+        delete blank.uses;
+        Object.assign(form.contact_lens_use, blank);
+    },
+);
 
 // ──────────────────────────────────────────────────────────────────────────
 // UI state (não-form)
@@ -501,12 +564,56 @@ const docForm = reactive({
     exam_type: '',
     exam_subtype: '',
     exam_label: '',
+    // Data alternativa e modelo pessoal usado (Fase 2 / B3).
+    document_date: '',
+    template_id: '',
 });
+// Opção do seletor: id do modelo da clínica ou `tpl:<id>` (modelo pessoal).
+const docSelection = ref('');
+// Último conteúdo vindo da prévia — se o médico não editou, trocar a data
+// refaz a prévia (as datas do texto acompanham).
+let docPreviewHtml = '';
+const docContentEdited = computed(() => Boolean(docForm.content) && docForm.content !== docPreviewHtml);
 const docTemplates = ref(documentationTemplates.value);
+// Itens do catálogo (medicine_id/princípio ativo) do modelo PESSOAL de
+// receita selecionado — "Salvar como modelo" a partir daqui carrega o
+// mesmo vínculo (3ª revisão Codex, P1): o texto final nunca tem "colírio"
+// escrito, só o nome comercial, e sem o catálogo a checagem de alergia
+// por conservante não reconhecia. Zera a cada troca de seleção.
+const docTemplateItems = ref([]);
 const docSaving = ref(false);
 const quickActionBusy = ref(false);
 
 // F5 — Medicamentos
+// ──────────────────────────────────────────────────────────────────────────
+// Segurança clínica (Fase 2): alergias/medicações do PACIENTE (gravadas na
+// hora), checagem de alergia no receituário e "seguir com motivo".
+// ──────────────────────────────────────────────────────────────────────────
+const safety = props.safetyStore ?? useClinicalSafety(props.patient.id, props.clinicalSafety);
+const clinicalT = clinicalTexts();
+const ctt = (path, fallback = '') => tc(clinicalT, path, fallback);
+const showSafetyModal = ref(false);
+const allergyCheck = computed(() => safety.summary?.check ?? null);
+const activeMedications = computed(() => (safety.summary?.medications ?? []).filter((m) => m.status === 'active'));
+
+// Modal "alergia na receita": promessa resolvida com o motivo (ou null).
+const allergyOverride = reactive({ open: false, conflicts: [], resolve: null });
+function askAllergyOverride(conflicts) {
+    return new Promise((resolve) => {
+        allergyOverride.conflicts = conflicts;
+        allergyOverride.resolve = resolve;
+        allergyOverride.open = true;
+    });
+}
+function resolveAllergyOverride(reason) {
+    allergyOverride.open = false;
+    const resolve = allergyOverride.resolve;
+    allergyOverride.resolve = null;
+    resolve?.(reason);
+}
+const joinReasons = (...reasons) =>
+    [...new Set(reasons.flat().filter((r) => typeof r === 'string' && r.trim()))].join(' | ').slice(0, 1000);
+
 const prescription = ref([]);
 const medicineLists = ref('');
 const medSearchQuery = ref('');
@@ -520,28 +627,41 @@ const maxMedicines = 5;
 const medTab = ref('search'); // search | recents | favorites
 const medPresets = ref({ recents: [], favorites: [] });
 const selectedMed = ref(null);
+// Alergia que bate com o item selecionado: motivo obrigatório para adicionar.
+const selectedOverrideReason = ref('');
+const acknowledgedAllergies = ref(new Map()); // allergy_id → motivo
+const selectedConflicts = computed(() =>
+    selectedMed.value ? itemConflicts(selectedMed.value, allergyCheck.value) : [],
+);
+const selectedNeedsReason = computed(
+    () =>
+        selectedConflicts.value.some((c) => !acknowledgedAllergies.value.has(c.allergy_id)) &&
+        selectedOverrideReason.value.trim().length < 5,
+);
 const posologyDraft = ref('');
 const posologySaving = ref(false);
 const posologySavedFlash = ref(false);
 
-// F6 — Procedimentos + Indicações
-const procSelected = ref([]);
-const indSelected = ref([]);
-const procedureLists = ref('');
-const procSearchQuery = ref('');
-const procSearchResults = ref([]);
-const procSearchOpen = ref(false);
-const procSearchLoading = ref(false);
-const procTypeSelected = ref('');
-const indSearchQuery = ref('');
-const indSearchResults = ref([]);
-const indSearchOpen = ref(false);
-const indSearchLoading = ref(false);
-const maxProcSolicitations = 10;
+// ──────────────────────────────────────────────────────────────────────────
+// Documentos do atendimento (Fase 2 / Bloco B): data alternativa (faixa do
+// servidor), atestados oftalmológicos, pedido de exames com kits por
+// convênio e modelos pessoais. Config e textos vêm da página (MedicalRecordsController).
+// ──────────────────────────────────────────────────────────────────────────
+const documentsConfig = computed(() => usePage().props.documents ?? {});
+const dateConfig = computed(() => documentsConfig.value.date ?? {});
+const docT = documentTexts();
+const dtt = (path, fallback = '') => td(docT, path, fallback);
 
-// F7 — Atestados
-const attendanceForm = reactive({ content: '' });
-const medicalForm = reactive({ days: 1, date: '', content: '', daysPreview: '' });
+// F6 — Pedido de exames (ProcedureRequestModal: kits, catálogo, CID, data)
+const procedureRequest = reactive({ open: false, busy: false, errors: {} });
+const procedureModal = ref(null);
+
+// F7 — Atestados (CertificateModal: comparecimento, médico, acompanhante, aptidão visual)
+const certificate = reactive({ open: false, kind: 'attendance', busy: false, errors: {}, acuityUnsaved: false });
+
+// Data alternativa e modelo pessoal do receituário (Fase 2 / B3)
+const medDocumentDate = ref('');
+const medTemplateId = ref('');
 
 // F8 — Catarata
 const cataractForm = reactive({
@@ -549,6 +669,7 @@ const cataractForm = reactive({
     template: 'pre_operatorio',
     date_surgery: '',
     hour_surgery: '',
+    document_date: '',
 });
 
 // Anexos — gerenciados pelo MedicalRecordFileUploadModal
@@ -565,10 +686,7 @@ const showPdfPreview = ref(false);
 const showDocumentationsModal = ref(false);
 const showDocModal = ref(false);
 const showMedicationModal = ref(false);
-const showProcedureModal = ref(false);
 const showCataractModal = ref(false);
-const showAttendanceCertModal = ref(false);
-const showMedicalCertModal = ref(false);
 const showExamHubModal = ref(false);
 const showImagingModal = ref(false);
 const showTonometryModal = ref(false);
@@ -738,7 +856,7 @@ function validateBeforeSubmit() {
 
 // Último conteúdo emitido (receita/solicitação ficam no modal depois de
 // emitidas, pra reemitir) — só o que mudou depois disso é rascunho.
-const issuedDrafts = reactive({ medication: '', procedure: '' });
+const issuedDrafts = reactive({ medication: '' });
 const changedSince = (text, issued) => {
     const value = (text || '').trim();
     return value !== '' && value !== issued;
@@ -746,7 +864,7 @@ const changedSince = (text, issued) => {
 const hasPendingDrafts = () =>
     evolutionText.value.trim() !== '' ||
     changedSince(medicineLists.value, issuedDrafts.medication) ||
-    changedSince(procedureLists.value, issuedDrafts.procedure);
+    Boolean(procedureModal.value?.hasDraft());
 
 // O que o servidor tem: dados enviados no último save bem-sucedido (ou os do
 // carregamento). Intenção de fluxo (flow_action/post_save_action) nunca é dado.
@@ -1032,8 +1150,10 @@ const POST_SAVE_ACTIONS = {
     cataract: () => openCataractPrescription(),
     test_eye: () => issueQuickAction('test-eye', {}, { preview: true }),
     retinal_mapping: () => issueQuickAction('retinal-mapping', {}, { preview: true }),
-    attendance_certificate: () => openAttendanceCertificate(),
-    medical_certificate: () => openMedicalCertificate(),
+    attendance_certificate: () => openCertificate('attendance'),
+    medical_certificate: () => openCertificate('medical'),
+    companion_certificate: () => openCertificate('companion'),
+    visual_fitness_certificate: () => openCertificate('visual'),
     medical_declaration: () => issueMedicalDeclaration(),
     exam_hub: () => {
         showExamHubModal.value = true;
@@ -1068,7 +1188,14 @@ function runPostSaveAction() {
 
 // Guard de saída ("←") reaproveita o mesmo submit — Finalizar/Dilatar/Exame
 // salvam o que foi digitado antes de transitar (nunca perde texto).
-defineExpose({ submitFlow: (action) => submit(action), saveAndLeave });
+defineExpose({
+    submitFlow: (action) => submit(action),
+    saveAndLeave,
+    // "Revisar alergias e medicações" do alerta móvel da página.
+    openSafetyReview: () => {
+        showSafetyModal.value = true;
+    },
+});
 
 // ──────────────────────────────────────────────────────────────────────────
 // Lens auto-format
@@ -1261,7 +1388,11 @@ function buildQuickActionUrl(action) {
     return props.urls.quick_action_template?.replace('__ACTION__', action) ?? '';
 }
 
-async function issueQuickAction(action, payload = {}, { openPdf = true, preview = false } = {}) {
+async function issueQuickAction(
+    action,
+    payload = {},
+    { openPdf = true, preview = false, onValidationError = null } = {},
+) {
     const url = buildQuickActionUrl(action);
     if (!url || quickActionBusy.value) return;
     const doctorIdVal = form.doctor_id || '';
@@ -1271,14 +1402,27 @@ async function issueQuickAction(action, payload = {}, { openPdf = true, preview 
     }
     quickActionBusy.value = true;
     try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
-            body: JSON.stringify(payload),
-        });
+        let body = { ...payload };
+        let res = await postQuickAction(url, body);
+        // Receita que bate com alergia ativa (Fase 2 / A4): o servidor manda
+        // os conflitos; seguir exige motivo — uma nova tentativa com ele.
+        if (res.status === 422) {
+            const err = await res.json().catch(() => ({}));
+            if (!Array.isArray(err.allergy_conflicts) || !err.allergy_conflicts.length) {
+                // Modais com campos (atestados, pedido) mostram o erro no campo.
+                if (onValidationError) onValidationError(err);
+                else alert(err.message ?? 'Não foi possível emitir o documento.');
+                return;
+            }
+            const reason = await askAllergyOverride(err.allergy_conflicts);
+            if (!reason) return;
+            body = { ...body, allergy_override_reason: joinReasons(body.allergy_override_reason, reason) };
+            res = await postQuickAction(url, body);
+        }
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            alert(err.message ?? 'Não foi possível emitir o documento.');
+            if (res.status === 422 && onValidationError) onValidationError(err);
+            else alert(err.message ?? 'Não foi possível emitir o documento.');
             return;
         }
         const doc = await res.json();
@@ -1291,6 +1435,14 @@ async function issueQuickAction(action, payload = {}, { openPdf = true, preview 
     } finally {
         quickActionBusy.value = false;
     }
+}
+
+function postQuickAction(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+        body: JSON.stringify(body),
+    });
 }
 
 function issueLensPrescription(mode) {
@@ -1307,16 +1459,7 @@ function openDocumentationsModal() {
 
 async function openNewDoc() {
     resetDocForm();
-    if (props.urls.templates) {
-        try {
-            const res = await fetch(props.urls.templates, {
-                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
-            });
-            if (res.ok) docTemplates.value = normalizeDocTemplates(await res.json());
-        } catch (e) {
-            console.error('Failed to load templates:', e);
-        }
-    }
+    await loadDocTemplates();
     showDocModal.value = true;
 }
 
@@ -1332,6 +1475,7 @@ async function openNewDocByType(type) {
     for (const group of docTemplates.value) {
         const tpl = (group.contents || []).find((c) => c.type === type);
         if (tpl) {
+            docSelection.value = tpl.id;
             docForm.report_setting_content_id = tpl.id;
             await previewTemplate();
             break;
@@ -1355,26 +1499,99 @@ function resetDocForm() {
     docForm.exam_type = '';
     docForm.exam_subtype = '';
     docForm.exam_label = '';
+    docForm.document_date = '';
+    docForm.template_id = '';
+    docSelection.value = '';
+    docPreviewHtml = '';
+    docTemplateItems.value = [];
 }
+
+async function loadDocTemplates() {
+    if (!props.urls.templates) return;
+    try {
+        const res = await fetch(props.urls.templates, {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        if (res.ok) docTemplates.value = normalizeDocTemplates(await res.json());
+    } catch (e) {
+        console.error('Failed to load templates:', e);
+    }
+}
+
+// Seletor do editor: modelo da clínica OU modelo pessoal (`tpl:` — vem do
+// mesmo endpoint, grupo "Meus modelos"); o pessoal guarda o modelo-base.
+function onDocSelection() {
+    const value = docSelection.value;
+    const option = docTemplates.value.flatMap((g) => g.contents || []).find((c) => String(c.id) === String(value));
+    docForm.template_id = option?.personal ? option.template_id : '';
+    docForm.report_setting_content_id = option?.personal ? option.base_id : value;
+    if (option?.personal) docForm.title = option.label;
+    docTemplateItems.value = Array.isArray(option?.items) ? option.items : [];
+    previewTemplate();
+}
+
+watch(
+    () => docForm.document_date,
+    () => {
+        if (showDocModal.value && docForm.report_setting_content_id && !docForm.exam_type && !docContentEdited.value)
+            previewTemplate();
+    },
+);
+
+// Prontuário de origem + data do documento: o servidor devolve os dados do
+// paciente às variáveis antes de gravar o modelo pessoal (LGPD).
+const docTemplateContext = computed(() => ({
+    ...(props.medicalrecord?.id ? { medical_record_id: props.medicalrecord.id } : {}),
+    ...documentDatePayload(docForm.document_date, dateConfig.value.today),
+}));
+const recordTemplateContext = computed(() =>
+    props.medicalrecord?.id ? { medical_record_id: props.medicalrecord.id } : {},
+);
+
+function buildDocTemplate() {
+    if (!docForm.report_setting_content_id || !(docForm.content || '').trim()) return null;
+    return {
+        body: docForm.content,
+        report_setting_content_id: docForm.report_setting_content_id,
+        // Só leva os itens se o texto não foi editado depois da prévia —
+        // texto alterado não garante que ainda é aquele remédio; afirmar um
+        // vínculo errado com o catálogo seria pior que nenhum.
+        ...(!docContentEdited.value && docTemplateItems.value.length
+            ? { payload: { items: docTemplateItems.value } }
+            : {}),
+    };
+}
+
+// Só a última prévia vale: trocar de modelo/data com a anterior pendente
+// não deixa o texto do modelo antigo (ou de outra data) cair no editor.
+const previewReq = latestRequest();
 
 async function previewTemplate() {
     if (!docForm.report_setting_content_id || !props.urls.template_preview) return;
+    const req = previewReq.begin();
     try {
         const res = await fetch(props.urls.template_preview, {
             method: 'POST',
+            signal: req.signal,
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
-            body: JSON.stringify({ report_setting_content_id: docForm.report_setting_content_id }),
+            body: JSON.stringify({
+                report_setting_content_id: docForm.report_setting_content_id,
+                ...(docForm.template_id ? { template_id: docForm.template_id } : {}),
+                ...documentDatePayload(docForm.document_date, dateConfig.value.today),
+            }),
         });
         if (res.ok) {
             const data = await res.json();
+            if (!req.current()) return;
             docForm.content = data.content ?? '';
+            docPreviewHtml = docForm.content;
             const tpl = docTemplates.value
                 .flatMap((g) => g.contents || [])
                 .find((c) => c.id === docForm.report_setting_content_id);
             if (tpl && !docForm.title) docForm.title = tpl.label;
         }
     } catch (e) {
-        console.error('Template preview error:', e);
+        if (!isAbortError(e)) console.error('Template preview error:', e);
     }
 }
 
@@ -1384,11 +1601,32 @@ async function saveDoc() {
     if (!props.urls.store_doc) return;
     docSaving.value = true;
     try {
-        const res = await fetch(props.urls.store_doc, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
-            body: JSON.stringify({ ...docForm }),
-        });
+        const { document_date: documentDate, template_id: templateId, ...fields } = docForm;
+        const send = (extra = {}) =>
+            fetch(props.urls.store_doc, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+                body: JSON.stringify({
+                    ...fields,
+                    ...documentDatePayload(documentDate, dateConfig.value.today),
+                    ...(templateId ? { template_id: templateId } : {}),
+                    ...extra,
+                }),
+            });
+        let res = await send();
+        // Modelo do tipo receita que bate com alergia ativa (Fase 2 / A4):
+        // seguir exige motivo — nova tentativa com ele.
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const conflicts = res.status === 422 && Array.isArray(err.allergy_conflicts) ? err.allergy_conflicts : [];
+            if (!conflicts.length) {
+                alert(err.message ?? 'Erro ao salvar documentação.');
+                return;
+            }
+            const reason = await askAllergyOverride(conflicts);
+            if (!reason) return;
+            res = await send({ allergy_override_reason: reason });
+        }
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             alert(err.message ?? 'Erro ao salvar documentação.');
@@ -1475,7 +1713,36 @@ function openMedicationPrescription() {
     selectedMed.value = null;
     posologyDraft.value = '';
     medTab.value = 'search';
+    medDocumentDate.value = '';
     loadMedPresets();
+}
+
+// Modelo pessoal do receituário (Fase 2 / B3): texto + itens estruturados
+// (a checagem de alergia volta a valer sobre eles).
+function buildMedicationTemplate() {
+    const body = (medicineLists.value || '').trim();
+    if (!body) return null;
+    return {
+        body,
+        payload: {
+            items: prescription.value.map((item) => ({
+                medicine_id: item.id ?? null,
+                name: item.name ?? null,
+                active_ingredient: item.active_ingredient ?? null,
+            })),
+        },
+    };
+}
+
+function applyMedicationTemplate(template) {
+    medicineLists.value = template.body ?? '';
+    prescription.value = (template.payload?.items ?? []).map((item) => ({
+        id: item.medicine_id ?? null,
+        name: item.name,
+        active_ingredient: item.active_ingredient ?? null,
+    }));
+    acknowledgedAllergies.value = new Map();
+    cancelSelection();
 }
 
 async function loadMedPresets() {
@@ -1506,17 +1773,25 @@ function selectMedicine(item) {
     posologyDraft.value = item.my_posology || genericPosology(item);
     posologySavedFlash.value = false;
     medSearchOpen.value = false;
+    selectedOverrideReason.value = '';
 }
 
 function cancelSelection() {
     selectedMed.value = null;
     posologyDraft.value = '';
+    selectedOverrideReason.value = '';
 }
 
 async function confirmAddMedicine() {
     const item = selectedMed.value;
     if (!item) return;
     if (prescription.value.length >= maxMedicines) return;
+    // Alergia: só entra com motivo (fica registrado na emissão).
+    if (selectedNeedsReason.value) return;
+    for (const c of selectedConflicts.value) {
+        if (!acknowledgedAllergies.value.has(c.allergy_id))
+            acknowledgedAllergies.value.set(c.allergy_id, selectedOverrideReason.value.trim());
+    }
     if (prescription.value.some((m) => m.id === item.id)) {
         cancelSelection();
         return;
@@ -1657,7 +1932,9 @@ function removeMedicine(idx) {
 }
 
 function clearMedicines() {
+    medTemplateId.value = '';
     prescription.value = [];
+    acknowledgedAllergies.value = new Map();
     medicineLists.value = '';
     medSearchQuery.value = '';
     medSearchResults.value = [];
@@ -1668,231 +1945,127 @@ function clearMedicines() {
 async function submitMedicationPrescription() {
     const content = (medicineLists.value || '').trim();
     if (!content) return;
+
+    // Texto pode ter sido editado depois de aplicar o modelo/escolher o item
+    // (tirou ou trocou um remédio) — reconcilia antes de checar e enviar,
+    // senão o item removido continuava pedindo motivo aqui E sendo recusado
+    // de novo pelo servidor (14ª revisão Codex, P2).
+    const reconciled = reconcileItems(prescription.value, content, allergyCheck.value?.stopwords ?? []);
+
+    // Itens estruturados (catálogo/nome livre) vão junto: o servidor refaz a
+    // checagem de alergia pelo princípio ativo E pelo texto (Fase 2 / A4).
+    const items = reconciled.map((item) => ({
+        medicine_id: item.id ?? null,
+        name: item.name ?? null,
+        active_ingredient: item.active_ingredient ?? null,
+    }));
+
+    // Alergia que aparece só no texto livre (ou ainda sem motivo): pergunta antes.
+    const conflicts = [
+        ...reconciled.flatMap((item) => itemConflicts(item, allergyCheck.value)),
+        ...textConflicts(content, allergyCheck.value),
+    ];
+    const pending = conflicts.filter((c) => !acknowledgedAllergies.value.has(c.allergy_id));
+    if (pending.length) {
+        const reason = await askAllergyOverride(pending);
+        if (!reason) return;
+        pending.forEach((c) => acknowledgedAllergies.value.set(c.allergy_id, reason));
+    }
+
+    const reason = joinReasons([...acknowledgedAllergies.value.values()]);
+    // Data alternativa e modelo usado seguem também no reenvio com motivo.
+    const payload = {
+        content,
+        items,
+        ...(reason ? { allergy_override_reason: reason } : {}),
+        ...documentDatePayload(medDocumentDate.value, dateConfig.value.today),
+        ...(medTemplateId.value ? { template_id: medTemplateId.value } : {}),
+    };
+
     showMedicationModal.value = false;
     // Emitida: deixa de ser rascunho (o texto fica no modal pra reemitir).
-    if (await issueQuickAction('medication-prescription', { content }, { preview: true })) {
+    if (await issueQuickAction('medication-prescription', payload, { preview: true })) {
         issuedDrafts.medication = content;
     }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// F6 — Procedimentos + Indicações
+// F6 — Pedido de exames (Fase 2 / B2): kits por convênio, itens do catálogo
+// ou avulsos, caráter, indicação, CIDs e data — ProcedureRequestModal.
 // ──────────────────────────────────────────────────────────────────────────
 function openProcedureSolicitation() {
-    showProcedureModal.value = true;
+    procedureRequest.errors = {};
+    procedureRequest.open = true;
 }
 
-async function searchProcedures() {
-    const q = (procSearchQuery.value || '').trim();
-    if (q.length < 2 || !props.urls.procedure_search) {
-        procSearchResults.value = [];
-        procSearchOpen.value = false;
-        return;
-    }
-    procSearchLoading.value = true;
+async function submitProcedureRequest(payload) {
+    procedureRequest.busy = true;
+    procedureRequest.errors = {};
     try {
-        const res = await fetch(`${props.urls.procedure_search}?q=${encodeURIComponent(q)}`, {
-            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        const doc = await issueQuickAction('procedure-request', payload, {
+            preview: true,
+            onValidationError: (err) => {
+                procedureRequest.errors = err.errors ?? { items: [err.message ?? ''] };
+            },
         });
-        if (!res.ok) {
-            procSearchResults.value = [];
-            procSearchOpen.value = false;
-            return;
+        if (doc) {
+            procedureModal.value?.markIssued();
+            procedureRequest.open = false;
         }
-        procSearchResults.value = await res.json();
-        procSearchOpen.value = procSearchResults.value.length > 0;
-    } catch (e) {
-        console.error('Procedure search error:', e);
-        procSearchResults.value = [];
-        procSearchOpen.value = false;
     } finally {
-        procSearchLoading.value = false;
-    }
-}
-
-async function searchIndications() {
-    const q = (indSearchQuery.value || '').trim();
-    if (q.length < 2 || !props.urls.indication_search) {
-        indSearchResults.value = [];
-        indSearchOpen.value = false;
-        return;
-    }
-    indSearchLoading.value = true;
-    try {
-        const res = await fetch(`${props.urls.indication_search}?q=${encodeURIComponent(q)}`, {
-            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
-        });
-        if (!res.ok) {
-            indSearchResults.value = [];
-            indSearchOpen.value = false;
-            return;
-        }
-        indSearchResults.value = await res.json();
-        indSearchOpen.value = indSearchResults.value.length > 0;
-    } catch (e) {
-        console.error('Indication search error:', e);
-        indSearchResults.value = [];
-        indSearchOpen.value = false;
-    } finally {
-        indSearchLoading.value = false;
-    }
-}
-
-const TYPE_LABEL = { rotina: 'Rotina', urgencia: 'Urgência', controle: 'Controle', comparativo: 'Comparativo' };
-
-async function addProcedure(item) {
-    if (procSelected.value.length + indSelected.value.length >= maxProcSolicitations) return;
-    const type = procTypeSelected.value || '';
-    const idx = procSelected.value.length;
-    procSelected.value.push({
-        id: item.id,
-        name: item.name,
-        code: item.code,
-        type,
-        type_label: type ? TYPE_LABEL[type] : '',
-    });
-    procSearchQuery.value = '';
-    procSearchResults.value = [];
-    procSearchOpen.value = false;
-    await _appendSolicitationLine({ kind: 'procedure', id: item.id, type: type || null }, () =>
-        procSelected.value.splice(idx, 1),
-    );
-}
-
-async function addIndication(item) {
-    if (procSelected.value.length + indSelected.value.length >= maxProcSolicitations) return;
-    const idx = indSelected.value.length;
-    indSelected.value.push({ id: item.id, description: item.description });
-    indSearchQuery.value = '';
-    indSearchResults.value = [];
-    indSearchOpen.value = false;
-    await _appendSolicitationLine({ kind: 'indication', id: item.id }, () => indSelected.value.splice(idx, 1));
-}
-
-async function _appendSolicitationLine(payload, onError) {
-    if (!props.urls.procedure_format) return;
-    try {
-        const res = await fetch(props.urls.procedure_format, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
-            body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-            onError?.();
-            return;
-        }
-        const { line } = await res.json();
-        if (!line) return;
-        procedureLists.value = procedureLists.value ? `${procedureLists.value.trimEnd()}\n${line}\n` : `${line}\n`;
-    } catch (e) {
-        console.error('Format solicitation line error:', e);
-        onError?.();
-    }
-}
-
-function removeProcedure(idx) {
-    procSelected.value.splice(idx, 1);
-}
-function removeIndication(idx) {
-    indSelected.value.splice(idx, 1);
-}
-
-function clearProcedureSolicitation() {
-    procSelected.value = [];
-    indSelected.value = [];
-    procedureLists.value = '';
-    procSearchQuery.value = '';
-    indSearchQuery.value = '';
-    procSearchResults.value = [];
-    indSearchResults.value = [];
-    procSearchOpen.value = false;
-    indSearchOpen.value = false;
-}
-
-async function submitProcedureSolicitation() {
-    const content = (procedureLists.value || '').trim();
-    if (!content) return;
-    showProcedureModal.value = false;
-    if (await issueQuickAction('procedure-request', { content }, { preview: true })) {
-        issuedDrafts.procedure = content;
+        procedureRequest.busy = false;
     }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// F7 — Atestados
+// F7 — Atestados (Fase 2 / B1): comparecimento (horário/período,
+// dilatação), médico (CID só com autorização), acompanhante e aptidão
+// visual (AV do prontuário salvo) — CertificateModal.
 // ──────────────────────────────────────────────────────────────────────────
-function openAttendanceCertificate() {
-    attendanceForm.content = '';
-    showAttendanceCertModal.value = true;
+const CERTIFICATE_ACTIONS = {
+    attendance: 'attendance-certificate',
+    medical: 'medical-certificate',
+    companion: 'companion-certificate',
+    visual: 'visual-fitness-certificate',
+};
+
+function openCertificate(kind) {
+    certificate.kind = kind;
+    certificate.errors = {};
+    certificate.acuityUnsaved = kind === 'visual' && isAcuityUnsaved();
+    certificate.open = true;
 }
 
-function submitAttendanceCertificate() {
-    const payload = {};
-    const content = (attendanceForm.content || '').trim();
-    if (content !== '') payload.content = content;
-    showAttendanceCertModal.value = false;
-    issueQuickAction('attendance-certificate', payload, { preview: true });
-}
-
-function openMedicalCertificate() {
-    medicalForm.days = 1;
-    medicalForm.date = '';
-    medicalForm.content = '';
-    medicalForm.daysPreview = '';
-    refreshDayExtension();
-    showMedicalCertModal.value = true;
-}
-
-function formatMedicalCertDate(event) {
-    const digits = (event.target.value || '').replace(/\D/g, '').slice(0, 8);
-    let formatted = digits;
-    if (digits.length > 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-    else if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    medicalForm.date = formatted;
-}
-
-let _dayExtensionTimer = null;
-function debouncedRefreshDayExtension() {
-    if (_dayExtensionTimer) clearTimeout(_dayExtensionTimer);
-    _dayExtensionTimer = setTimeout(refreshDayExtension, 350);
-}
-
-async function refreshDayExtension() {
-    const days = Number(medicalForm.days);
-    if (!Number.isInteger(days) || days < 1 || days > 365) {
-        medicalForm.daysPreview = '';
-        return;
-    }
-    if (!props.urls.day_extension_preview) return;
+async function submitCertificate(payload) {
+    certificate.busy = true;
+    certificate.errors = {};
     try {
-        const res = await fetch(props.urls.day_extension_preview, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
-            body: JSON.stringify({ days }),
+        const doc = await issueQuickAction(CERTIFICATE_ACTIONS[certificate.kind], payload, {
+            preview: true,
+            onValidationError: (err) => {
+                certificate.errors = err.errors ?? { document_date: [err.message ?? ''] };
+            },
         });
-        if (!res.ok) {
-            medicalForm.daysPreview = '';
-            return;
-        }
-        const data = await res.json();
-        medicalForm.daysPreview = data.display || '';
-    } catch (e) {
-        console.error('Day extension preview error:', e);
-        medicalForm.daysPreview = '';
+        if (doc) certificate.open = false;
+    } finally {
+        certificate.busy = false;
     }
 }
 
-function submitMedicalCertificate() {
-    const days = Number(medicalForm.days);
-    if (!Number.isInteger(days) || days < 1 || days > 365) return;
-    const payload = { days };
-    const date = (medicalForm.date || '').trim();
-    if (date) payload.date = date;
-    const content = (medicalForm.content || '').trim();
-    if (content) payload.content = content;
-    showMedicalCertModal.value = false;
-    issueQuickAction('medical-certificate', payload, { preview: true });
-}
+// Aptidão visual: a AV que vai no atestado é a SALVA no prontuário (o
+// servidor lê de lá) — a tela mostra a do formulário e avisa se mudou.
+const ACUITY_FIELDS = {
+    without: ['visual_acuity_without_correction_right_id', 'visual_acuity_without_correction_left_id'],
+    with: ['visual_acuity_with_correction_right_id', 'visual_acuity_with_correction_left_id'],
+};
+const acuityName = (id) => visualAcuityTypes.value.find((v) => String(v.id) === String(id))?.name ?? '';
+const acuityLabels = computed(() => ({
+    without: { right: acuityName(form[ACUITY_FIELDS.without[0]]), left: acuityName(form[ACUITY_FIELDS.without[1]]) },
+    with: { right: acuityName(form[ACUITY_FIELDS.with[0]]), left: acuityName(form[ACUITY_FIELDS.with[1]]) },
+}));
+// savedSnapshot não é reativo: medido ao abrir o modal (o form fica atrás dele).
+const isAcuityUnsaved = () =>
+    [...ACUITY_FIELDS.without, ...ACUITY_FIELDS.with].some((f) => (form[f] || '') !== (savedSnapshot[f] || ''));
 
 // ──────────────────────────────────────────────────────────────────────────
 // F8 — Catarata
@@ -1902,6 +2075,7 @@ function openCataractPrescription() {
     cataractForm.template = 'pre_operatorio';
     cataractForm.date_surgery = '';
     cataractForm.hour_surgery = '';
+    cataractForm.document_date = '';
     showCataractModal.value = true;
 }
 
@@ -1920,6 +2094,7 @@ function submitCataractPrescription() {
         template: cataractForm.template || 'pre_operatorio',
         date_surgery: (cataractForm.date_surgery || '').trim(),
         hour_surgery: (cataractForm.hour_surgery || '').trim(),
+        ...documentDatePayload(cataractForm.document_date, dateConfig.value.today),
     };
     showCataractModal.value = false;
     issueQuickAction('cataract-prescription', payload, { preview: true });
@@ -2019,6 +2194,17 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             @inserted="applyAiSuggestion"
             @approved="onAiApproved"
         />
+
+        <!-- Segurança clínica (Fase 2): alergias + alertas de risco das
+             medicações em uso, sempre visível no topo do atendimento. -->
+        <div
+            v-if="safety.summary"
+            class="px-3 pt-2"
+            :class="{ 'd-none d-lg-block': safetyStore }"
+            data-testid="pmr-safety-header"
+        >
+            <ClinicalAlertBanner :summary="safety.summary" :reviewable="isDoctor" @review="showSafetyModal = true" />
+        </div>
 
         <!-- F9 erros client -->
         <div v-if="hasClientErrors" class="alert alert-danger m-3 mb-0" role="alert">
@@ -3023,9 +3209,46 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 :disabled="isLocked"
                             ></textarea>
                         </div>
-                        <div class="col-12 col-md-6">
-                            <label class="pmr-label">{{ tt('medications_in_use', 'Medicações em uso') }}</label>
+                        <div class="col-12 col-md-6" data-testid="pmr-medications">
+                            <!-- Lista estruturada do PACIENTE (Fase 2 / A2): vale para
+                                 as próximas consultas; o prontuário grava um retrato
+                                 dela ao salvar. O texto livre fica como observação. -->
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="pmr-label mb-0">{{ tt('medications_in_use', 'Medicações em uso') }}</span>
+                                <button
+                                    v-if="safety.summary && isDoctor"
+                                    type="button"
+                                    class="btn btn-link btn-sm p-0 ms-auto"
+                                    data-testid="pmr-medications-edit"
+                                    @click="showSafetyModal = true"
+                                >
+                                    <i class="ti ti-pencil me-1" aria-hidden="true"></i
+                                    >{{ ctt('medications.manage', 'Editar lista') }}
+                                </button>
+                            </div>
+                            <ul v-if="activeMedications.length" class="list-unstyled small mb-1 pmr-med-list">
+                                <li v-for="m in activeMedications" :key="m.id">
+                                    <i class="ti ti-pill me-1 text-primary" aria-hidden="true"></i
+                                    ><strong>{{ m.name }}</strong>
+                                    <span v-if="m.posology" class="text-muted"> — {{ m.posology }}</span>
+                                    <span
+                                        v-if="!m.confirmed"
+                                        class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1"
+                                        >{{ ctt('snapshot.unconfirmed', 'informada') }}</span
+                                    >
+                                </li>
+                            </ul>
+                            <p v-else-if="safety.summary" class="small text-muted mb-1">
+                                {{ ctt('medications.empty', 'Nenhuma medicação na lista.') }}
+                            </p>
+                            <label class="pmr-label small text-muted fw-normal" for="pmr-medications-free">{{
+                                ctt(
+                                    'medications.free_text',
+                                    'Observações sobre medicações (texto livre desta consulta)',
+                                )
+                            }}</label>
                             <textarea
+                                id="pmr-medications-free"
                                 v-model="form.medications_in_use"
                                 name="medications_in_use"
                                 rows="2"
@@ -3034,6 +3257,167 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             ></textarea>
                         </div>
                     </div>
+
+                    <!-- Uso de lente de contato (Fase 2 / A3) — por consulta,
+                         pré-preenchido com o da última consulta. -->
+                    <fieldset class="pmr-cl-use border rounded px-2 pb-2 mb-2" data-testid="pmr-contact-lens-use">
+                        <legend class="pmr-label float-none w-auto px-1 mb-0">
+                            {{ tt('contact_lens_use', 'Uso de lente de contato') }}
+                        </legend>
+                        <small v-if="contactLensUsePrefilled" class="d-block text-info-emphasis mb-1">
+                            <i class="ti ti-history me-1" aria-hidden="true"></i
+                            >{{
+                                tt(
+                                    'contact_lens_use_prefilled',
+                                    'Pré-preenchido da consulta de :date — confira com o paciente.',
+                                ).replace(':date', contactLensUsePrevious?.date ?? '')
+                            }}
+                        </small>
+                        <div
+                            class="d-flex flex-wrap gap-3 align-items-center"
+                            role="radiogroup"
+                            :aria-label="tt('contact_lens_use_question', 'Usa lente de contato?')"
+                        >
+                            <span class="small">{{ tt('contact_lens_use_question', 'Usa lente de contato?') }}</span>
+                            <label class="form-check form-check-inline small mb-0">
+                                <input
+                                    v-model="form.contact_lens_use.uses"
+                                    class="form-check-input"
+                                    type="radio"
+                                    name="cl_use_uses"
+                                    :value="true"
+                                    :disabled="isLocked"
+                                    data-testid="cl-use-yes"
+                                />{{ tt('contact_lens_use_yes', 'Sim') }}
+                            </label>
+                            <label class="form-check form-check-inline small mb-0">
+                                <input
+                                    v-model="form.contact_lens_use.uses"
+                                    class="form-check-input"
+                                    type="radio"
+                                    name="cl_use_uses"
+                                    :value="false"
+                                    :disabled="isLocked"
+                                    data-testid="cl-use-no"
+                                />{{ tt('contact_lens_use_no', 'Não') }}
+                            </label>
+                            <label class="form-check form-check-inline small mb-0">
+                                <input
+                                    v-model="form.contact_lens_use.uses"
+                                    class="form-check-input"
+                                    type="radio"
+                                    name="cl_use_uses"
+                                    :value="null"
+                                    :disabled="isLocked"
+                                    data-testid="cl-use-unknown"
+                                />{{ tt('contact_lens_use_unknown', 'Não informado') }}
+                            </label>
+                        </div>
+                        <div v-if="form.contact_lens_use.uses === true" class="row g-2 mt-1">
+                            <div class="col-6 col-md-4">
+                                <label class="pmr-label" for="cl-use-type">{{
+                                    tt('contact_lens_use_type', 'Tipo')
+                                }}</label>
+                                <select
+                                    id="cl-use-type"
+                                    v-model="form.contact_lens_use.type"
+                                    class="form-select form-select-sm"
+                                    :disabled="isLocked"
+                                >
+                                    <option value="">—</option>
+                                    <option v-for="v in CL_TYPES" :key="v" :value="v">
+                                        {{ tt(`contact_lens_use_type_${v}`, v) }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="pmr-label" for="cl-use-wear">{{
+                                    tt('contact_lens_use_wear', 'Regime')
+                                }}</label>
+                                <select
+                                    id="cl-use-wear"
+                                    v-model="form.contact_lens_use.wear"
+                                    class="form-select form-select-sm"
+                                    :disabled="isLocked"
+                                >
+                                    <option value="">—</option>
+                                    <option v-for="v in CL_WEAR" :key="v" :value="v">
+                                        {{ tt(`contact_lens_use_wear_${v}`, v) }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="pmr-label" for="cl-use-hours">{{
+                                    tt('contact_lens_use_hours', 'Horas por dia')
+                                }}</label>
+                                <input
+                                    id="cl-use-hours"
+                                    v-model="form.contact_lens_use.hours_per_day"
+                                    type="number"
+                                    min="0"
+                                    max="24"
+                                    step="1"
+                                    class="form-control form-control-sm"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="pmr-label" for="cl-use-repl">{{
+                                    tt('contact_lens_use_replacement', 'Descarte')
+                                }}</label>
+                                <select
+                                    id="cl-use-repl"
+                                    v-model="form.contact_lens_use.replacement"
+                                    class="form-select form-select-sm"
+                                    :disabled="isLocked"
+                                >
+                                    <option value="">—</option>
+                                    <option v-for="v in CL_REPLACEMENTS" :key="v" :value="v">
+                                        {{ tt(`contact_lens_use_replacement_${v}`, v) }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-8">
+                                <span class="pmr-label d-block">{{
+                                    tt('contact_lens_use_sleeps', 'Dorme com a lente')
+                                }}</span>
+                                <label class="form-check form-check-inline small mb-0">
+                                    <input
+                                        v-model="form.contact_lens_use.sleeps_with"
+                                        class="form-check-input"
+                                        type="radio"
+                                        name="cl_use_sleeps"
+                                        :value="true"
+                                        :disabled="isLocked"
+                                    />{{ tt('contact_lens_use_yes', 'Sim') }}
+                                </label>
+                                <label class="form-check form-check-inline small mb-0">
+                                    <input
+                                        v-model="form.contact_lens_use.sleeps_with"
+                                        class="form-check-input"
+                                        type="radio"
+                                        name="cl_use_sleeps"
+                                        :value="false"
+                                        :disabled="isLocked"
+                                    />{{ tt('contact_lens_use_no', 'Não') }}
+                                </label>
+                            </div>
+                            <div class="col-12">
+                                <label class="pmr-label" for="cl-use-complaints">{{
+                                    tt('contact_lens_use_complaints', 'Queixas com a lente')
+                                }}</label>
+                                <input
+                                    id="cl-use-complaints"
+                                    v-model="form.contact_lens_use.complaints"
+                                    type="text"
+                                    maxlength="1000"
+                                    class="form-control form-control-sm"
+                                    :placeholder="tt('contact_lens_use_complaints_ph', 'Ex.: ardor, olho vermelho')"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                        </div>
+                    </fieldset>
 
                     <div class="row g-2 mb-2">
                         <div class="col-12 col-md-6">
@@ -3260,6 +3644,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
                         "
                         :disabled="quickActionBusy || isLocked || form.processing"
+                        data-testid="pmr-medication-btn"
                         @click="withRecord('medication')"
                     >
                         <i class="fas fa-pills" style="font-size: 1.6rem; color: #9c27b0"></i>
@@ -3386,6 +3771,44 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             style="white-space: normal; line-height: 1.1"
                             >Atestado<br />Médico</span
                         >
+                    </button>
+                    <!-- Atestados oftalmológicos (Fase 2 / B1): acompanhante e
+                         aptidão visual (AV do prontuário). -->
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        data-testid="companion-certificate-btn"
+                        :title="
+                            isEdit
+                                ? dtt('certificates.companion_title', 'Atestado de acompanhante')
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :aria-label="dtt('certificates.companion_title', 'Atestado de acompanhante')"
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('companion_certificate')"
+                    >
+                        <i class="fas fa-user-group" style="font-size: 1.6rem; color: #009688" aria-hidden="true"></i>
+                        <span class="pmr-doc-img-btn-label visually-hidden">{{
+                            dtt('certificates.companion_title', 'Atestado de acompanhante')
+                        }}</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        data-testid="visual-fitness-certificate-btn"
+                        :title="
+                            isEdit
+                                ? dtt('certificates.visual_title', 'Atestado de aptidão visual')
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :aria-label="dtt('certificates.visual_title', 'Atestado de aptidão visual')"
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('visual_fitness_certificate')"
+                    >
+                        <i class="fas fa-glasses" style="font-size: 1.6rem; color: #3f51b5" aria-hidden="true"></i>
+                        <span class="pmr-doc-img-btn-label visually-hidden">{{
+                            dtt('certificates.visual_title', 'Atestado de aptidão visual')
+                        }}</span>
                     </button>
                     <!-- Declaração médica (modelo `declaracao_medica` do RELATÓRIO
                          OFTALMOLÓGICO): sai em branco para o médico completar. -->
@@ -3644,7 +4067,20 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         </span>
                                     </td>
                                     <td>{{ doc.title }}</td>
-                                    <td>{{ doc.created_at }}</td>
+                                    <td>
+                                        {{ doc.created_at }}
+                                        <span
+                                            v-if="doc.document_date"
+                                            class="d-block small text-warning-emphasis"
+                                            data-testid="doc-printed-date"
+                                            >{{
+                                                dtt('date.printed', 'Data impressa: :date').replace(
+                                                    ':date',
+                                                    doc.document_date,
+                                                )
+                                            }}</span
+                                        >
+                                    </td>
                                     <td class="text-end">
                                         <a
                                             :href="doc.pdf_url"
@@ -3889,9 +4325,10 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 <div class="col-12 col-md-6">
                                     <label class="pmr-label">{{ tt('select_template', 'Modelo') }}</label>
                                     <select
-                                        v-model="docForm.report_setting_content_id"
+                                        v-model="docSelection"
                                         class="form-select form-select-sm"
-                                        @change="previewTemplate"
+                                        data-testid="doc-template-select"
+                                        @change="onDocSelection"
                                     >
                                         <option value="">{{ tt('select', 'Selecione') }}</option>
                                         <optgroup
@@ -3916,11 +4353,39 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             <!-- TinyMCE rich-text editor (paridade com docModalEditor.js do legado) -->
                             <TinyMceEditor
                                 v-if="showDocModal"
-                                :key="`doc-${docForm.report_setting_content_id || docForm.exam_type || 'new'}`"
+                                :key="`doc-${docSelection || docForm.report_setting_content_id || docForm.exam_type || 'new'}`"
                                 v-model="docForm.content"
                                 :height="360"
                                 :placeholder="tt('doc_content_ph', 'Conteúdo da documentação...')"
                             />
+                        </div>
+                        <!-- Data alternativa e "Salvar como modelo" (Fase 2 / B3) —
+                             laudos de exame ficam de fora (Fase 5). -->
+                        <div v-if="!docForm.exam_type" class="row g-2 mt-2">
+                            <div class="col-12 col-md-5">
+                                <DocumentDateField v-model="docForm.document_date" :config="dateConfig" />
+                                <small v-if="docForm.document_date && docContentEdited" class="form-text d-block">{{
+                                    dtt(
+                                        'date.text_dates_hint',
+                                        'As datas já escritas no texto não mudam sozinhas — confira o conteúdo.',
+                                    )
+                                }}</small>
+                            </div>
+                            <div
+                                v-if="urls.personal_templates && urls.personal_template_template"
+                                class="col-12 col-md-7"
+                            >
+                                <PersonalTemplatesBar
+                                    v-model="docForm.template_id"
+                                    :url="urls.personal_templates"
+                                    :item-url-template="urls.personal_template_template"
+                                    :show-select="false"
+                                    :context="docTemplateContext"
+                                    :build="buildDocTemplate"
+                                    :disabled="!docForm.report_setting_content_id"
+                                    @changed="loadDocTemplates"
+                                />
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer py-2">
@@ -3954,6 +4419,27 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <button type="button" class="btn-close" @click="showMedicationModal = false"></button>
                     </div>
                     <div class="modal-body">
+                        <!-- Alergias do paciente sempre à vista ao prescrever (Fase 2 / A4). -->
+                        <ClinicalAlertBanner
+                            v-if="safety.summary"
+                            :summary="safety.summary"
+                            :show-risks="false"
+                            compact
+                            class="mb-2"
+                        />
+                        <!-- Meus modelos de receita (Fase 2 / B3). -->
+                        <PersonalTemplatesBar
+                            v-if="urls.personal_templates && urls.personal_template_template"
+                            v-model="medTemplateId"
+                            kind="prescription"
+                            format="text"
+                            :context="recordTemplateContext"
+                            :url="urls.personal_templates"
+                            :item-url-template="urls.personal_template_template"
+                            :build="buildMedicationTemplate"
+                            class="mb-2 pb-2 border-bottom"
+                            @apply="applyMedicationTemplate"
+                        />
                         <!-- Abas: Buscar | Recentes | Favoritos -->
                         <ul class="nav nav-pills nav-sm mb-2 gap-1">
                             <li class="nav-item">
@@ -4138,6 +4624,45 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                     @click="cancelSelection"
                                 ></button>
                             </div>
+                            <!-- Item bate com alergia ativa: alerta + motivo para seguir. -->
+                            <div
+                                v-if="selectedConflicts.length"
+                                class="pmr-rx-allergy mb-2"
+                                role="alert"
+                                data-testid="rx-item-allergy"
+                            >
+                                <strong
+                                    ><i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                                    >{{ ctt('prescription.item_warning', 'Alergia registrada') }}:</strong
+                                >
+                                <ul class="mb-1 ps-3">
+                                    <li v-for="c in selectedConflicts" :key="`${c.allergy_id}-${c.match}`">
+                                        <strong>{{ c.substance }}</strong>
+                                        <span v-if="c.reaction">
+                                            — {{ ctt('prescription.reaction', 'Reação') }}: {{ c.reaction }}</span
+                                        >
+                                        <span v-if="c.severity_label"> ({{ c.severity_label }})</span>
+                                        · {{ matchLabel(c.match, clinicalT)
+                                        }}<span v-if="c.class">: {{ c.class }}</span>
+                                    </li>
+                                </ul>
+                                <template
+                                    v-if="selectedConflicts.some((c) => !acknowledgedAllergies.has(c.allergy_id))"
+                                >
+                                    <label class="form-label small mb-1" for="rx-item-reason">{{
+                                        ctt('prescription.item_reason', 'Motivo (obrigatório para adicionar)')
+                                    }}</label>
+                                    <input
+                                        id="rx-item-reason"
+                                        v-model="selectedOverrideReason"
+                                        type="text"
+                                        maxlength="500"
+                                        class="form-control form-control-sm"
+                                        :placeholder="ctt('prescription.reason_ph', 'Ex.: alergia descartada em teste')"
+                                        data-testid="rx-item-reason"
+                                    />
+                                </template>
+                            </div>
                             <label class="pmr-label mb-1" style="font-size: 0.72rem">
                                 Posologia sugerida — revise e edite antes de adicionar
                                 <span
@@ -4154,7 +4679,14 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 placeholder="Dose, frequência, duração e orientações…"
                             ></textarea>
                             <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                                <button type="button" class="btn btn-primary btn-sm" @click="confirmAddMedicine">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="selectedConflicts.length ? 'btn-outline-danger' : 'btn-primary'"
+                                    :disabled="selectedNeedsReason"
+                                    data-testid="rx-add"
+                                    @click="confirmAddMedicine"
+                                >
                                     <i class="fas fa-plus me-1"></i>Adicionar à receita
                                 </button>
                                 <button
@@ -4211,6 +4743,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             rows="10"
                             placeholder="Linhas formatadas aparecem aqui."
                         ></textarea>
+                        <DocumentDateField v-model="medDocumentDate" :config="dateConfig" class="mt-2" />
                     </div>
                     <div class="modal-footer py-2 d-flex justify-content-between">
                         <button
@@ -4229,6 +4762,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 type="button"
                                 class="btn btn-primary btn-sm"
                                 :disabled="quickActionBusy || !medicineLists.trim()"
+                                data-testid="rx-emit"
                                 @click="submitMedicationPrescription"
                             >
                                 <i class="fas fa-print me-1"></i>Emitir Receita
@@ -4240,203 +4774,25 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         </div>
     </Teleport>
 
-    <!-- Procedimentos modal -->
-    <Teleport to="body">
-        <div
-            v-if="showProcedureModal"
-            class="modal fade show d-block"
-            tabindex="-1"
-            style="background: rgba(0, 0, 0, 0.5)"
-            @click.self="showProcedureModal = false"
-        >
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header py-2">
-                        <h6 class="modal-title">
-                            <i class="fas fa-stethoscope me-2" style="color: #03a9f3"></i
-                            >{{ tt('procedure_title', 'Solicitação de Procedimentos') }}
-                        </h6>
-                        <button type="button" class="btn-close" @click="showProcedureModal = false"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row g-2 mb-2">
-                            <div class="col-12 col-md-7">
-                                <label class="pmr-label mb-1">{{ tt('procedure_search_label', 'Procedimento') }}</label>
-                                <div class="position-relative">
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                        <input
-                                            v-model="procSearchQuery"
-                                            type="text"
-                                            class="form-control form-control-sm"
-                                            :placeholder="tt('procedure_search_ph', 'Buscar procedimento...')"
-                                            :disabled="procSelected.length + indSelected.length >= maxProcSolicitations"
-                                            @input="searchProcedures"
-                                        />
-                                        <span v-if="procSearchLoading" class="input-group-text bg-transparent">
-                                            <span
-                                                class="spinner-border spinner-border-sm"
-                                                style="width: 0.8rem; height: 0.8rem"
-                                            ></span>
-                                        </span>
-                                    </div>
-                                    <ul
-                                        v-if="procSearchOpen && procSearchResults.length > 0"
-                                        class="list-group shadow-sm position-absolute w-100"
-                                        style="z-index: 1080; top: 100%; max-height: 240px; overflow-y: auto"
-                                    >
-                                        <li
-                                            v-for="item in procSearchResults"
-                                            :key="item.id"
-                                            class="list-group-item list-group-item-action py-1 px-2"
-                                            style="cursor: pointer; font-size: 0.82rem"
-                                            @mousedown.prevent="addProcedure(item)"
-                                        >
-                                            <span class="fw-semibold">{{ item.name }}</span>
-                                            <span v-if="item.code" class="text-muted ms-1 small"
-                                                >({{ item.code }})</span
-                                            >
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                            <div class="col-12 col-md-5">
-                                <label class="pmr-label mb-1">{{ tt('procedure_type_label', 'Tipo') }}</label>
-                                <SearchSelect
-                                    v-model="procTypeSelected"
-                                    :options="[
-                                        { value: 'rotina', label: tt('procedure_type_rotina', 'Rotina') },
-                                        { value: 'urgencia', label: tt('procedure_type_urgencia', 'Urgência') },
-                                        { value: 'controle', label: tt('procedure_type_controle', 'Controle') },
-                                        {
-                                            value: 'comparativo',
-                                            label: tt('procedure_type_comparativo', 'Comparativo'),
-                                        },
-                                    ]"
-                                    :value-key="'value'"
-                                    :label-key="'label'"
-                                    :placeholder="'—'"
-                                />
-                            </div>
-                        </div>
-
-                        <label class="pmr-label mb-1">{{ tt('procedure_indication_label', 'Indicação') }}</label>
-                        <div class="position-relative mb-2">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                <input
-                                    v-model="indSearchQuery"
-                                    type="text"
-                                    class="form-control form-control-sm"
-                                    :placeholder="tt('procedure_indication_ph', 'Buscar indicação...')"
-                                    :disabled="procSelected.length + indSelected.length >= maxProcSolicitations"
-                                    @input="searchIndications"
-                                />
-                                <span v-if="indSearchLoading" class="input-group-text bg-transparent">
-                                    <span
-                                        class="spinner-border spinner-border-sm"
-                                        style="width: 0.8rem; height: 0.8rem"
-                                    ></span>
-                                </span>
-                            </div>
-                            <ul
-                                v-if="indSearchOpen && indSearchResults.length > 0"
-                                class="list-group shadow-sm position-absolute w-100"
-                                style="z-index: 1080; top: 100%; max-height: 240px; overflow-y: auto"
-                            >
-                                <li
-                                    v-for="item in indSearchResults"
-                                    :key="item.id"
-                                    class="list-group-item list-group-item-action py-1 px-2"
-                                    style="cursor: pointer; font-size: 0.82rem"
-                                    @mousedown.prevent="addIndication(item)"
-                                >
-                                    {{ item.description }}
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div v-if="procSelected.length + indSelected.length > 0" class="mb-2">
-                            <label class="pmr-label mb-1"
-                                >{{ tt('procedure_selected', 'Selecionados') }} ({{
-                                    procSelected.length + indSelected.length
-                                }}/{{ maxProcSolicitations }})</label
-                            >
-                            <ul class="list-group">
-                                <li
-                                    v-for="(item, idx) in procSelected"
-                                    :key="`p-${item.id}-${idx}`"
-                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
-                                    style="font-size: 0.82rem"
-                                >
-                                    <span
-                                        ><span class="badge bg-info text-dark me-1">P</span
-                                        ><span class="fw-semibold">{{ item.name }}</span>
-                                        <span v-if="item.type" class="text-muted ms-1 small"
-                                            >— {{ item.type_label }}</span
-                                        ></span
-                                    >
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-link text-danger p-0"
-                                        @click="removeProcedure(idx)"
-                                    >
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </li>
-                                <li
-                                    v-for="(item, idx) in indSelected"
-                                    :key="`i-${item.id}-${idx}`"
-                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
-                                    style="font-size: 0.82rem"
-                                >
-                                    <span><span class="badge bg-secondary me-1">I</span>{{ item.description }}</span>
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-link text-danger p-0"
-                                        @click="removeIndication(idx)"
-                                    >
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <label class="pmr-label mb-1">{{ tt('procedure_content', 'Conteúdo') }}</label>
-                        <textarea
-                            v-model="procedureLists"
-                            class="form-control form-control-sm"
-                            rows="8"
-                            placeholder="Linhas formatadas aparecem aqui."
-                        ></textarea>
-                    </div>
-                    <div class="modal-footer py-2 d-flex justify-content-between">
-                        <button
-                            type="button"
-                            class="btn btn-outline-secondary btn-sm"
-                            :disabled="procSelected.length === 0 && indSelected.length === 0 && !procedureLists"
-                            @click="clearProcedureSolicitation"
-                        >
-                            <i class="fas fa-eraser me-1"></i>Limpar
-                        </button>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-secondary btn-sm" @click="showProcedureModal = false">
-                                {{ tt('cancel', 'Cancelar') }}
-                            </button>
-                            <button
-                                type="button"
-                                class="btn btn-primary btn-sm"
-                                :disabled="quickActionBusy || !procedureLists.trim()"
-                                @click="submitProcedureSolicitation"
-                            >
-                                <i class="fas fa-print me-1"></i>{{ tt('procedure_emit', 'Emitir Solicitação') }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </Teleport>
+    <!-- Pedido de exames (Fase 2 / B2) -->
+    <ProcedureRequestModal
+        ref="procedureModal"
+        :open="procedureRequest.open"
+        :kits-url="urls.exam_kits ?? ''"
+        :procedure-search-url="urls.procedure_search ?? ''"
+        :indication-search-url="urls.indication_search ?? ''"
+        :cid10-search-url="urls.cid10_search ?? ''"
+        :templates-url="urls.personal_templates ?? ''"
+        :template-item-url="urls.personal_template_template ?? ''"
+        :template-context="recordTemplateContext"
+        :date-config="dateConfig"
+        :limits="documentsConfig.request_limits ?? undefined"
+        :initial-cids="selectedCids"
+        :busy="procedureRequest.busy || quickActionBusy"
+        :server-errors="procedureRequest.errors"
+        @close="procedureRequest.open = false"
+        @submit="submitProcedureRequest"
+    />
 
     <!-- Catarata modal -->
     <Teleport to="body">
@@ -4530,6 +4886,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 />
                             </div>
                         </div>
+                        <DocumentDateField v-model="cataractForm.document_date" :config="dateConfig" class="mt-2" />
                     </div>
                     <div class="modal-footer py-2">
                         <button type="button" class="btn btn-secondary btn-sm" @click="showCataractModal = false">
@@ -4549,144 +4906,22 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         </div>
     </Teleport>
 
-    <!-- Atestado de comparecimento -->
-    <Teleport to="body">
-        <div
-            v-if="showAttendanceCertModal"
-            class="modal fade show d-block"
-            tabindex="-1"
-            style="background: rgba(0, 0, 0, 0.5)"
-            @click.self="showAttendanceCertModal = false"
-        >
-            <div class="modal-dialog modal-lg modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header py-2">
-                        <h6 class="modal-title">
-                            <i class="fas fa-file-signature me-2" style="color: #03a9f3"></i
-                            >{{ tt('attendance_certificate_title', 'Atestado de Comparecimento') }}
-                        </h6>
-                        <button type="button" class="btn-close" @click="showAttendanceCertModal = false"></button>
-                    </div>
-                    <div class="modal-body">
-                        <label class="pmr-label mb-1">{{ tt('certificate_obs_label', 'Observações') }}</label>
-                        <!--
-                            TinyMCE rich-text para o atestado: médico pode formatar
-                            o texto (negrito, listas, etc.) — o backend renderiza
-                            no PDF mantendo a formatação HTML.
-                            `v-if` no modal já desmonta/remonta o editor entre aberturas
-                            (limpa instâncias e evita memory leak).
-                        -->
-                        <TinyMceEditor
-                            v-model="attendanceForm.content"
-                            :height="280"
-                            :placeholder="tt('certificate_obs_ph', 'Observações...')"
-                        />
-                    </div>
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showAttendanceCertModal = false">
-                            {{ tt('cancel', 'Cancelar') }}
-                        </button>
-                        <button
-                            type="button"
-                            class="btn btn-primary btn-sm"
-                            :disabled="quickActionBusy"
-                            @click="submitAttendanceCertificate"
-                        >
-                            <i class="fas fa-print me-1"></i>{{ tt('certificate_emit', 'Emitir') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </Teleport>
-
-    <!-- Atestado médico (afastamento) -->
-    <Teleport to="body">
-        <div
-            v-if="showMedicalCertModal"
-            class="modal fade show d-block"
-            tabindex="-1"
-            style="background: rgba(0, 0, 0, 0.5)"
-            @click.self="showMedicalCertModal = false"
-        >
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header py-2">
-                        <h6 class="modal-title">
-                            <i class="fas fa-notes-medical me-2" style="color: #e91e8c"></i
-                            >{{ tt('medical_certificate_title', 'Atestado Médico') }}
-                        </h6>
-                        <button type="button" class="btn-close" @click="showMedicalCertModal = false"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row g-2 mb-2">
-                            <div class="col-7">
-                                <label class="pmr-label mb-1">{{
-                                    tt('medical_cert_days_label', 'Dias de afastamento')
-                                }}</label>
-                                <input
-                                    v-model.number="medicalForm.days"
-                                    type="number"
-                                    min="1"
-                                    max="365"
-                                    step="1"
-                                    class="form-control form-control-sm"
-                                    @input="debouncedRefreshDayExtension"
-                                />
-                            </div>
-                            <div class="col-5">
-                                <label class="pmr-label mb-1">{{ tt('medical_cert_date_label', 'Data') }}</label>
-                                <input
-                                    v-model="medicalForm.date"
-                                    type="text"
-                                    class="form-control form-control-sm"
-                                    placeholder="dd/mm/aaaa"
-                                    maxlength="10"
-                                    @input="formatMedicalCertDate"
-                                />
-                                <button
-                                    type="button"
-                                    class="btn btn-link btn-sm p-0 mt-1"
-                                    @click="medicalForm.date = ''"
-                                >
-                                    <small>{{ tt('medical_cert_date_today', 'Hoje') }}</small>
-                                </button>
-                            </div>
-                        </div>
-                        <div v-if="medicalForm.daysPreview" class="alert alert-info py-2 px-2 small mb-2">
-                            <i class="fas fa-eye me-1"></i>
-                            <strong>{{ tt('medical_cert_days_preview', 'Pré-visualização') }}:</strong>
-                            {{ medicalForm.daysPreview }}
-                        </div>
-                        <label class="pmr-label mb-1">{{ tt('certificate_obs_label', 'Observações') }}</label>
-                        <textarea
-                            v-model="medicalForm.content"
-                            class="form-control form-control-sm"
-                            rows="5"
-                            maxlength="5000"
-                            :placeholder="tt('certificate_obs_ph', 'Observações...')"
-                        ></textarea>
-                        <small class="text-muted d-block mt-1">{{ (medicalForm.content || '').length }}/5000</small>
-                    </div>
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="showMedicalCertModal = false">
-                            {{ tt('cancel', 'Cancelar') }}
-                        </button>
-                        <button
-                            type="button"
-                            class="btn btn-primary btn-sm"
-                            :disabled="
-                                quickActionBusy || !medicalForm.days || medicalForm.days < 1 || medicalForm.days > 365
-                            "
-                            @click="submitMedicalCertificate"
-                        >
-                            <i class="fas fa-print me-1"></i>{{ tt('certificate_emit', 'Emitir') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </Teleport>
+    <!-- Atestados (Fase 2 / B1): comparecimento, médico, acompanhante, aptidão visual -->
+    <CertificateModal
+        :open="certificate.open"
+        :kind="certificate.kind"
+        :date-config="dateConfig"
+        :arrived-at="documentsConfig.arrived_at ?? ''"
+        :dilation-hours="documentsConfig.dilation_hours ?? undefined"
+        :acuity="acuityLabels"
+        :acuity-unsaved="certificate.acuityUnsaved"
+        :cid10-search-url="urls.cid10_search ?? ''"
+        :day-extension-url="urls.day_extension_preview ?? ''"
+        :busy="certificate.busy || quickActionBusy"
+        :server-errors="certificate.errors"
+        @close="certificate.open = false"
+        @submit="submitCertificate"
+    />
 
     <!-- Exam Hub -->
     <Teleport to="body">
@@ -4849,6 +5084,21 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         @close="showContactLensCalc = false"
         @apply="applyContactLens"
         @remove="removeContactLens"
+    />
+
+    <!-- Segurança clínica: revisar alergias/medicações e "seguir com motivo" -->
+    <ClinicalSafetyModal
+        v-if="safety.summary"
+        :open="showSafetyModal"
+        :store="safety"
+        :search-url="urls.medicine_search ?? ''"
+        @close="showSafetyModal = false"
+    />
+    <AllergyOverrideModal
+        :open="allergyOverride.open"
+        :conflicts="allergyOverride.conflicts"
+        @confirm="resolveAllergyOverride"
+        @cancel="resolveAllergyOverride(null)"
     />
 
     <!-- PDF preview universal -->

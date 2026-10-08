@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\Unit\Services;
 
 use App\Enums\ExamReportRegistry;
-use App\Services\{DayExtensionService, SurgerySchedulingDocService};
+use App\Services\{AuditService, ProcedureSolicitationService, SurgerySchedulingDocService};
+use App\Services\Documents\CertificateBuilder;
 use App\Services\{MedicalRecordDocumentationService, MedicalRecordQuickActionService};
+use App\Support\ClinicalSafety\PrescriptionAllergyGuard;
 use InvalidArgumentException;
 use ReflectionMethod;
 use Tests\TestCase;
@@ -35,7 +37,10 @@ function makeService(): MedicalRecordQuickActionService
     return new MedicalRecordQuickActionService(
         $doc,
         new SurgerySchedulingDocService(),
-        new DayExtensionService(),
+        app(PrescriptionAllergyGuard::class),
+        app(CertificateBuilder::class),
+        app(ProcedureSolicitationService::class),
+        app(AuditService::class),
     );
 }
 

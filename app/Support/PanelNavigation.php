@@ -308,6 +308,8 @@ class PanelNavigation
             // laudos, atestados...) via DocumentationType — um único item.
             $documentsChildren = [
                 ['route' => 'panel.setting.report-settings.index', 'label' => __('actions.report_settings.title'), 'match' => ['panel.setting.report-settings.*']],
+                // Kits de exames por convênio do pedido de exames (Fase 2 / B2).
+                ['route' => 'panel.setting.exam-kits.index', 'label' => __('clinical_documents.kits.menu'), 'match' => ['panel.setting.exam-kits.*']],
             ];
 
             // Oftalmologia: os 9 sub-catálogos clínicos viram ABAS dentro de
@@ -559,6 +561,13 @@ class PanelNavigation
                 'icon'  => 'ti ti-stethoscope',
                 'label' => __('manager_cid10.menu'),
                 'match' => ['manager.cid10.*'],
+            ],
+            [
+                'key'   => 'exam-kits',
+                'route' => 'manager.exam-kits.index',
+                'icon'  => 'ti ti-list-check',
+                'label' => __('clinical_documents.kits.menu'),
+                'match' => ['manager.exam-kits.*'],
             ],
             [
                 'key'   => 'covenants',

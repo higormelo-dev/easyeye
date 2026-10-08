@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
+import QuickAllergyFields from '@/Components/Panel/ClinicalSafety/QuickAllergyFields.vue';
+import { quickAllergyPayload } from '@/Support/clinicalSafety.js';
 
 /**
  * Adicionar / editar item do pronto atendimento.
@@ -147,12 +149,22 @@ function changePatient() {
 
 // ── Cadastro rápido ───────────────────────────────────────────────────────
 const quickOpen = ref(false);
-const quick = ref({ name: '', cellphone: '', birth_date: '', confirm_homonym: false });
+// allergies/allergies_denied: alergias informadas pelo paciente ou "nega
+// alergias" (Fase 2 / G2) — nenhum dos dois = "sem registro de alergias".
+const blankQuick = () => ({
+    name: '',
+    cellphone: '',
+    birth_date: '',
+    confirm_homonym: false,
+    allergies: '',
+    allergies_denied: false,
+});
+const quick = ref(blankQuick());
 const quickErrors = ref({});
 const quickSaving = ref(false);
 
 function resetQuick() {
-    quick.value = { name: '', cellphone: '', birth_date: '', confirm_homonym: false };
+    quick.value = blankQuick();
     quickErrors.value = {};
 }
 
@@ -185,6 +197,7 @@ async function quickRegister() {
                 cellphone: quick.value.cellphone,
                 birth_date: quick.value.birth_date || null,
                 confirm_homonym: quick.value.confirm_homonym,
+                ...quickAllergyPayload(quick.value.allergies, quick.value.allergies_denied),
             }),
         });
         const json = await res.json().catch(() => ({}));
@@ -434,6 +447,12 @@ defineExpose({ selectPatient, chooseReason, choosePriority, form, quickRegister,
                                 </div>
                             </div>
                             <p class="form-text mb-2">{{ t.quick_birth_hint }}</p>
+                            <QuickAllergyFields
+                                v-model:allergies="quick.allergies"
+                                v-model:denied="quick.allergies_denied"
+                                :errors="quickErrors"
+                                class="mb-2"
+                            />
                             <div
                                 v-if="quickErrors.confirm_homonym"
                                 class="alert alert-warning py-2 small mb-2"

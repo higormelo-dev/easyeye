@@ -202,4 +202,12 @@ describe('Settings/ReportSettings/ReportSettingTable', () => {
                 .slice(0, 2),
         ).toEqual(['Atualizado em', 'Modelo']);
     });
+
+    it('a rolagem lateral contém os textos ocultos (sem estourar a página em 390px)', () => {
+        // Os .visually-hidden (position: absolute) dos cabeçalhos/ações escapavam
+        // do .table-responsive e alargavam a página no celular.
+        const box = mountTable().get('[data-testid="report-settings-table-wrapper"]');
+
+        expect(box.classes()).toEqual(expect.arrayContaining(['table-responsive', 'position-relative']));
+    });
 });

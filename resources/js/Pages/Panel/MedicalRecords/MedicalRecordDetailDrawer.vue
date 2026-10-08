@@ -1,4 +1,6 @@
 <script setup>
+import { clinicalTexts, recordSafetyRows } from '@/Support/clinicalSafety.js';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 import { ref, computed, watch } from 'vue';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
@@ -27,26 +29,38 @@ defineEmits(['close']);
 
 const loading = ref(false);
 const detail = ref(null);
+const clinicalT = clinicalTexts();
+const safetyRows = computed(() => recordSafetyRows(detail.value, clinicalT));
 const activeTab = ref('info');
+
+// Só a última carga vale: o prontuário atrasado de outro paciente não
+// sobrescreve a gaveta aberta.
+const detailReq = latestRequest();
 
 async function loadDetail() {
     if (!props.record?.show_url) return;
+    const req = detailReq.begin();
     loading.value = true;
     detail.value = null;
     activeTab.value = 'info';
     try {
-        const res = await fetch(props.record.show_url, { headers: { Accept: 'application/json' } });
-        detail.value = await res.json();
+        const res = await fetch(props.record.show_url, { headers: { Accept: 'application/json' }, signal: req.signal });
+        const json = await res.json();
+        if (req.current()) detail.value = json;
+    } catch (error) {
+        if (!isAbortError(error) && req.current()) throw error;
     } finally {
-        loading.value = false;
+        if (req.current()) loading.value = false;
     }
 }
 
 watch(
-    () => props.open,
-    (val) => {
-        if (val) loadDetail();
+    () => [props.open, props.record?.show_url],
+    ([open]) => {
+        if (open) loadDetail();
         else {
+            detailReq.cancel();
+            loading.value = false;
             detail.value = null;
             activeTab.value = 'info';
         }
@@ -247,6 +261,16 @@ function closePdfPreview() {
                     <div v-if="detail.medications_in_use" class="detail-row">
                         <span class="detail-label">{{ tt('medications_in_use', 'Medicamentos em uso') }}</span
                         ><span class="detail-value">{{ detail.medications_in_use }}</span>
+                    </div>
+                    <!-- Retrato da consulta (alergias, medicações) e uso de LC — Fase 2. -->
+                    <div
+                        v-for="[label, value] in safetyRows"
+                        :key="label"
+                        class="detail-row"
+                        data-testid="record-safety-row"
+                    >
+                        <span class="detail-label">{{ label }}</span
+                        ><span class="detail-value">{{ value }}</span>
                     </div>
                 </section>
 

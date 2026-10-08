@@ -8,6 +8,7 @@ use App\Enums\{UrgentCarePriority, UrgentCareReason, UrgentCareStatus};
 use App\Exceptions\UrgentCareUnavailableException;
 use App\Http\Requests\UrgentCareEntryRequest;
 use App\Models\{Covenant, Doctor, Entity, UrgentCareEntry};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Services\UrgentCare\UrgentCareService;
 use App\Support\{CurrentDoctor, PatientAccess};
 use Illuminate\Http\{RedirectResponse, Request};
@@ -44,13 +45,7 @@ class UrgentCareController extends Controller
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('urgent_care.title'), 'url' => '#', 'active' => true],
             ],
-            'queue' => fn () => $doctorMissing ? [] : $this->service->queue($entityId, $scope)
-                ->values()
-                ->map(fn (UrgentCareEntry $e, int $i) => [
-                    ...$this->service->toRow($e, $i + 1),
-                    'phone' => $phones ? UrgentCareService::phoneOf($e) : null,
-                ])
-                ->all(),
+            'queue'  => fn () => $doctorMissing ? [] : $this->queueRows($entityId, $scope, $phones),
             'closed' => fn () => $doctorMissing ? [] : $this->service->closedToday($entityId, $scope)
                 ->map(fn (UrgentCareEntry $e) => $this->service->toRow($e))
                 ->values()
@@ -79,6 +74,28 @@ class UrgentCareController extends Controller
             ],
             't' => trans('urgent_care'),
         ]);
+    }
+
+    /**
+     * Fila do dia com o alerta de alergia por paciente (Fase 2 / A1) — uma
+     * consulta para a fila inteira; só para quem tem acesso a Pacientes.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function queueRows(string $entityId, ?string $scope, bool $patientAccess): array
+    {
+        $queue = $this->service->queue($entityId, $scope)->values();
+        $flags = $patientAccess
+            ? app(PatientClinicalSafetyService::class)->compactFor($entityId, $queue->pluck('patient_id')->filter()->all())
+            : [];
+
+        return $queue
+            ->map(fn (UrgentCareEntry $e, int $i) => [
+                ...$this->service->toRow($e, $i + 1),
+                'phone'   => $patientAccess ? UrgentCareService::phoneOf($e) : null,
+                'allergy' => $flags[(string) $e->patient_id] ?? null,
+            ])
+            ->all();
     }
 
     public function store(UrgentCareEntryRequest $request): RedirectResponse

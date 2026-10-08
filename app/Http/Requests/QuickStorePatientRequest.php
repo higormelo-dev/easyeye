@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Services\PatientDuplicateFinder;
 use App\Support\BrazilianFormat;
 use Illuminate\Foundation\Http\FormRequest;
@@ -9,6 +10,14 @@ use Illuminate\Validation\Validator;
 
 class QuickStorePatientRequest extends FormRequest
 {
+    /** Alergias no cadastro rápido (as demais, no cadastro completo). */
+    public const MAX_ALLERGIES = 10;
+
+    /** Tamanho de cada substância (mesmo limite do cadastro de alergias). */
+    public const ALLERGY_MIN_LENGTH = 2;
+
+    public const ALLERGY_MAX_LENGTH = 160;
+
     public function authorize(): bool
     {
         return true;
@@ -23,7 +32,21 @@ class QuickStorePatientRequest extends FormRequest
             // iguais é duplicado real e bloqueia (PatientDuplicateFinder).
             'birth_date'      => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today', 'after:1900-01-01'],
             'confirm_homonym' => ['nullable', 'boolean'],
+            // Fase 2 (G2): alergias informadas pelo paciente (substâncias em
+            // texto curto) OU "nega alergias". Nenhum dos dois = sem registro.
+            'allergies'        => ['nullable', 'string', 'max:500'],
+            'allergies_denied' => ['nullable', 'boolean'],
         ];
+    }
+
+    /**
+     * Substâncias digitadas (sem vazias/repetidas).
+     *
+     * @return list<string>
+     */
+    public function allergySubstances(): array
+    {
+        return PatientClinicalSafetyService::splitSubstances((string) $this->input('allergies', ''));
     }
 
     /**
@@ -38,6 +61,8 @@ class QuickStorePatientRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $this->validateAllergies($validator);
+        }, function (Validator $validator): void {
             if ($validator->errors()->has('name') || $validator->errors()->has('birth_date')) {
                 return;
             }
@@ -60,12 +85,53 @@ class QuickStorePatientRequest extends FormRequest
         }];
     }
 
+    /**
+     * "Nega alergias" junto com alergias é contraditório (422); limite de
+     * itens e de tamanho de cada substância.
+     */
+    private function validateAllergies(Validator $validator): void
+    {
+        if ($validator->errors()->has('allergies') || $validator->errors()->has('allergies_denied')) {
+            return;
+        }
+
+        $substances = $this->allergySubstances();
+
+        if ($substances !== [] && $this->boolean('allergies_denied')) {
+            $validator->errors()->add('allergies_denied', __('clinical_safety.allergies.quick_conflict'));
+
+            return;
+        }
+
+        if (count($substances) > self::MAX_ALLERGIES) {
+            $validator->errors()->add('allergies', __('clinical_safety.allergies.quick_too_many', ['max' => self::MAX_ALLERGIES]));
+
+            return;
+        }
+
+        foreach ($substances as $substance) {
+            $length = mb_strlen($substance);
+
+            if ($length < self::ALLERGY_MIN_LENGTH || $length > self::ALLERGY_MAX_LENGTH) {
+                $validator->errors()->add('allergies', __('clinical_safety.allergies.quick_item_length', [
+                    'min'  => self::ALLERGY_MIN_LENGTH,
+                    'max'  => self::ALLERGY_MAX_LENGTH,
+                    'item' => mb_strimwidth($substance, 0, 40, '…'),
+                ]));
+
+                return;
+            }
+        }
+    }
+
     public function attributes(): array
     {
         return [
-            'name'       => 'nome completo',
-            'cellphone'  => 'celular',
-            'birth_date' => 'data de nascimento',
+            'name'             => 'nome completo',
+            'cellphone'        => 'celular',
+            'birth_date'       => 'data de nascimento',
+            'allergies'        => __('clinical_safety.allergies.quick_label'),
+            'allergies_denied' => __('clinical_safety.allergies.quick_deny'),
         ];
     }
 

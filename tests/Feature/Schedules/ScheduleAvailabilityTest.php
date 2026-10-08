@@ -146,19 +146,45 @@ describe('agregado e escopo', function () {
         savBook($bruno, '2026-10-05 08:00');
         savBook($bruno, '2026-10-05 09:00');
 
-        $days = savMonth($this, $this->secretary)['days'];
+        $month = savMonth($this, $this->secretary);
+        $days  = $month['days'];
 
         expect($days['2026-10-05'])->toBe(['state' => 'available', 'free' => 3, 'capacity' => 6])
             ->and($days['2026-10-07'])->toBe(['state' => 'available', 'free' => 4, 'capacity' => 4])
             ->and($days['2026-10-06']['state'])->toBe('off');
+        expect($month['doctor_days'][$this->ana->id]['2026-10-05'])->toBe(['state' => 'available', 'free' => 3, 'capacity' => 4])
+            ->and($month['doctor_days'][$bruno->id]['2026-10-05'])->toBe(['state' => 'full', 'free' => 0, 'capacity' => 2])
+            ->and($month['doctor_days'][$bruno->id]['2026-10-07']['state'])->toBe('off')
+            ->and($month['doctor_days'])->not->toHaveKey($inativo->id);
+    });
+
+    it('detalha os estados diferentes dos médicos sem alterar a soma da clínica', function () {
+        $bruno     = savDoctor($this->entity, 'DR. BRUNO', 60, [1], '08:00', '10:00');
+        $semEscala = savDoctor($this->entity, 'DR. SEM ESCALA', 15, [], '08:00', '09:00');
+        $alheio    = savDoctor(Entity::factory()->create(), 'DR. OUTRA CLÍNICA', 30, [1], '08:00', '10:00');
+        $this->entity->update(['few_slots_percent' => 25]);
+
+        foreach (['08:00', '08:30', '09:00'] as $time) {
+            savBook($this->ana, "2026-10-05 {$time}");
+        }
+        ScheduleBlock::create(['doctor_id' => $bruno->id, 'starts_at' => '2026-10-05 08:00', 'ends_at' => '2026-10-05 10:00', 'type' => 'meeting']);
+
+        $month = savMonth($this, $this->secretary);
+        expect($month['days']['2026-10-05'])->toBe(['state' => 'few', 'free' => 1, 'capacity' => 4])
+            ->and($month['doctor_days'][$this->ana->id]['2026-10-05'])->toBe(['state' => 'few', 'free' => 1, 'capacity' => 4])
+            ->and($month['doctor_days'][$bruno->id]['2026-10-05'])->toBe(['state' => 'blocked', 'free' => 0, 'capacity' => 0])
+            ->and($month['doctor_days'][$semEscala->id]['2026-10-05']['state'])->toBe('none')
+            ->and($month['doctor_days'])->not->toHaveKey($alheio->id);
     });
 
     it('médico vê só as vagas dele (a URL não troca o médico); sem cadastro de médico: 403', function () {
         $bruno = savDoctor($this->entity, 'DR. BRUNO', 60, [2], '08:00', '10:00');
 
-        $anaDays = savMonth($this, $this->ana->entityUser, ['doctor' => $bruno->id])['days'];
+        $month   = savMonth($this, $this->ana->entityUser, ['doctor' => $bruno->id]);
+        $anaDays = $month['days'];
         expect($anaDays['2026-10-05']['capacity'])->toBe(4)
             ->and($anaDays['2026-10-06']['state'])->toBe('off');
+        expect(array_keys($month['doctor_days']))->toBe([(string) $this->ana->id]);
 
         $missing = createEntityUser($this->entity, User::factory()->create(), ClientRule::Doctor->value);
         $this->actingAs($missing->user)->withSession(panelSession($missing))

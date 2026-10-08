@@ -288,6 +288,14 @@ function clv2SignRaw(MedicalRecord $record, string $signerId, array $withoutColu
         $record->getAttributes(),
         array_flip(['signed_by', 'signed_at', 'signature_hash', 'is_locked', ...$withoutColumns]),
     );
+
+    // Como o Signable: colunas opcionais vazias (criadas depois — ex.: as da
+    // Fase 2) ficam fora do hash.
+    foreach ((fn () => $this->signatureOptionalAttributes())->call($record) as $column) {
+        if (array_key_exists($column, $content) && $content[$column] === null) {
+            unset($content[$column]);
+        }
+    }
     $hash = hash('sha256', implode('|', [
         $record->getKey(), $signerId, $signedAt->toIso8601String(), hash('sha256', serialize($content)),
     ]));

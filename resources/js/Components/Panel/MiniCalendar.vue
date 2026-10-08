@@ -4,7 +4,7 @@ import { ref, computed, watch } from 'vue';
 /**
  * Calendário mensal compacto (barra lateral da Agenda).
  *
- * Vagas por dia (opcional, prop `availability`): marcador sob o número com
+ * Vagas por dia (opcional, prop `availability`): número colorido e marcador com
  * FORMA própria por estado (não só cor) + aria-label/tooltip "N livres de M".
  * Estados: available | few | full | off | blocked (past/none = sem marcador).
  * A legenda usa os mesmos marcadores. `month-change` avisa o mês exibido
@@ -23,6 +23,10 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'month-change']);
 
 const MARKED_STATES = ['available', 'few', 'full', 'off', 'blocked'];
+const noWorkSchedule = computed(() => {
+    const days = Object.values(props.availability ?? {});
+    return days.length > 0 && days.every((day) => day.state === 'none');
+});
 
 function todayIso() {
     const now = new Date();
@@ -129,7 +133,7 @@ function cellLabel(cell) {
 
 const legend = computed(() =>
     MARKED_STATES.map((state) => ({ state, label: props.t[`avail_${state}`] ?? state })).filter(
-        () => props.availability,
+        () => props.availability && !noWorkSchedule.value,
     ),
 );
 
@@ -199,6 +203,12 @@ function select(dateStr) {
                 <span class="mini-cal-mark" aria-hidden="true"></span>{{ item.label }}
             </li>
         </ul>
+        <p v-else-if="noWorkSchedule" class="mini-cal-note" role="status" data-testid="availability-no-schedule">
+            {{
+                t.avail_no_schedule ??
+                'Sem escala de atendimento cadastrada. Configure a escala para visualizar as vagas.'
+            }}
+        </p>
     </div>
 </template>
 
@@ -276,20 +286,16 @@ function select(dateStr) {
     cursor: default;
 }
 .mini-cal-cell.is-today {
-    background: #dc3545;
-    color: #fff;
+    box-shadow: inset 0 0 0 2px var(--bs-primary, #0d6efd);
     font-weight: 700;
 }
-.mini-cal-cell.is-today:hover {
-    background: #bb2d3b;
-}
 .mini-cal-cell.is-selected {
-    background: #6c757d;
-    color: #fff;
+    background: var(--bs-tertiary-bg, #e9ecef);
+    box-shadow: inset 0 0 0 1px var(--bs-secondary-color, #6c757d);
     font-weight: 600;
 }
 .mini-cal-cell.is-selected:hover {
-    background: #565e64;
+    background: var(--bs-secondary-bg, #dee2e6);
 }
 
 .mini-cal-num {
@@ -297,6 +303,25 @@ function select(dateStr) {
 }
 
 /* ── Marcadores de vagas: forma diferente por estado (não só cor) ───────── */
+.avail-available {
+    --mini-cal-state-color: #198754;
+}
+.avail-few {
+    --mini-cal-state-color: #b45309;
+}
+.avail-full {
+    --mini-cal-state-color: #dc3545;
+}
+.avail-off {
+    --mini-cal-state-color: #6b7280;
+}
+.avail-blocked {
+    --mini-cal-state-color: #4b5563;
+}
+.mini-cal-cell[data-avail] .mini-cal-num {
+    color: var(--mini-cal-state-color);
+    font-weight: 600;
+}
 .mini-cal-mark {
     display: inline-block;
     width: 6px;
@@ -306,7 +331,7 @@ function select(dateStr) {
 /* com vagas: bolinha cheia */
 .avail-available .mini-cal-mark {
     border-radius: 50%;
-    background: #198754;
+    background: var(--mini-cal-state-color);
 }
 /* poucas vagas: triângulo */
 .avail-few .mini-cal-mark {
@@ -314,12 +339,12 @@ function select(dateStr) {
     height: 0;
     border-left: 4px solid transparent;
     border-right: 4px solid transparent;
-    border-bottom: 6px solid #d97706;
+    border-bottom: 6px solid var(--mini-cal-state-color);
 }
 /* sem vagas: anel */
 .avail-full .mini-cal-mark {
     border-radius: 50%;
-    border: 1.5px solid #dc3545;
+    border: 1.5px solid var(--mini-cal-state-color);
     background: transparent;
 }
 /* sem expediente: traço */
@@ -327,35 +352,14 @@ function select(dateStr) {
     width: 7px;
     height: 2px;
     border-radius: 1px;
-    background: #9ca3af;
+    background: var(--mini-cal-state-color);
 }
 /* bloqueado: quadrado */
 .avail-blocked .mini-cal-mark {
     width: 6px;
     height: 6px;
-    background: #6b7280;
+    background: var(--mini-cal-state-color);
     border-radius: 1px;
-}
-.mini-cal-cell.avail-off .mini-cal-num,
-.mini-cal-cell.avail-blocked .mini-cal-num {
-    opacity: 0.6;
-}
-/* Dia de hoje/selecionado (fundo escuro): mesmo formato, em branco. */
-.mini-cal .is-today.avail-available .mini-cal-mark,
-.mini-cal .is-selected.avail-available .mini-cal-mark,
-.mini-cal .is-today.avail-off .mini-cal-mark,
-.mini-cal .is-selected.avail-off .mini-cal-mark,
-.mini-cal .is-today.avail-blocked .mini-cal-mark,
-.mini-cal .is-selected.avail-blocked .mini-cal-mark {
-    background: #fff;
-}
-.mini-cal .is-today.avail-few .mini-cal-mark,
-.mini-cal .is-selected.avail-few .mini-cal-mark {
-    border-bottom-color: #fff;
-}
-.mini-cal .is-today.avail-full .mini-cal-mark,
-.mini-cal .is-selected.avail-full .mini-cal-mark {
-    border-color: #fff;
 }
 
 .mini-cal-legend {
@@ -373,17 +377,25 @@ function select(dateStr) {
     align-items: center;
     gap: 0.3rem;
 }
+.mini-cal-note {
+    margin: 0.6rem 0 0;
+    font-size: 0.72rem;
+    color: var(--bs-secondary-color, #6c757d);
+}
 
-[data-bs-theme='dark'] .avail-available .mini-cal-mark {
-    background: #4ade80;
+[data-bs-theme='dark'] .avail-available {
+    --mini-cal-state-color: #4ade80;
 }
-[data-bs-theme='dark'] .avail-few .mini-cal-mark {
-    border-bottom-color: #fbbf24;
+[data-bs-theme='dark'] .avail-few {
+    --mini-cal-state-color: #fbbf24;
 }
-[data-bs-theme='dark'] .avail-full .mini-cal-mark {
-    border-color: #f87171;
+[data-bs-theme='dark'] .avail-full {
+    --mini-cal-state-color: #f87171;
 }
-[data-bs-theme='dark'] .avail-blocked .mini-cal-mark {
-    background: #9ca3af;
+[data-bs-theme='dark'] .avail-off {
+    --mini-cal-state-color: #9ca3af;
+}
+[data-bs-theme='dark'] .avail-blocked {
+    --mini-cal-state-color: #cbd5e1;
 }
 </style>

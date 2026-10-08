@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Cache;
  * `full` (sem vagas), `off` (sem expediente), `blocked` (expediente todo
  * bloqueado), `past`, `none` (ninguém no recorte tem escala — a agenda não
  * tem grade para contar). Médico sem escala nenhuma não entra na conta.
+ * `doctor_days` detalha cada médico no mesmo cálculo, para explicar a soma.
  *
  * Cache curto por clínica/médico/mês com chave versionada: qualquer mudança
  * de agendamento, escala, bloqueio ou intervalo troca a versão da clínica
@@ -37,12 +38,17 @@ class ScheduleAvailabilityService
     public const STATES = ['available', 'few', 'full', 'off', 'blocked', 'past', 'none'];
 
     /**
-     * @return array{month: string, threshold: int, days: array<string, array{state: string, free: int, capacity: int}>}
+     * @return array{
+     *     month: string,
+     *     threshold: int,
+     *     days: array<string, array{state: string, free: int, capacity: int}>,
+     *     doctor_days: array<string, array<string, array{state: string, free: int, capacity: int}>>
+     * }
      */
     public function month(string $entityId, Carbon $month, ?string $doctorId): array
     {
         $key = sprintf(
-            'schedules.availability.%s.%s.%s.%s',
+            'schedules.availability.v2.%s.%s.%s.%s',
             self::version($entityId),
             $entityId,
             $doctorId ?? 'all',
@@ -73,7 +79,12 @@ class ScheduleAvailabilityService
     }
 
     /**
-     * @return array{month: string, threshold: int, days: array<string, array{state: string, free: int, capacity: int}>}
+     * @return array{
+     *     month: string,
+     *     threshold: int,
+     *     days: array<string, array{state: string, free: int, capacity: int}>,
+     *     doctor_days: array<string, array<string, array{state: string, free: int, capacity: int}>>
+     * }
      */
     private function compute(string $entityId, Carbon $start, ?string $doctorId): array
     {
@@ -118,16 +129,21 @@ class ScheduleAvailabilityService
             ->get(['doctor_id', 'date_time'])
             ->mapWithKeys(fn (Schedule $s) => [$s->doctor_id . '|' . $s->date_time->format('Y-m-d H:i') => true]);
 
-        $now     = now();
-        $today   = $now->copy()->startOfDay();
-        $hasGrid = $ranges->isNotEmpty();
-        $days    = [];
+        $now        = now();
+        $today      = $now->copy()->startOfDay();
+        $hasGrid    = $ranges->isNotEmpty();
+        $days       = [];
+        $doctorDays = [];
 
         for ($day = $start->copy(); $day->lt($end); $day->addDay()) {
             $date = $day->toDateString();
 
             if ($day->lt($today) || ! $hasGrid) {
                 $days[$date] = ['state' => $hasGrid ? 'past' : 'none', 'free' => 0, 'capacity' => 0];
+
+                foreach ($ids as $id) {
+                    $doctorDays[$id][$date] = ['state' => $ranges->has($id) ? 'past' : 'none', 'free' => 0, 'capacity' => 0];
+                }
 
                 continue;
             }
@@ -141,17 +157,24 @@ class ScheduleAvailabilityService
                 $doctorRanges = $ranges->get($id);
 
                 if ($doctorRanges === null) {
+                    $doctorDays[$id][$date] = ['state' => 'none', 'free' => 0, 'capacity' => 0];
+
                     continue; // sem escala nenhuma: agenda sem grade, fora da conta
                 }
 
                 $dayRanges = $doctorRanges->get($day->dayOfWeek);
 
                 if ($dayRanges === null || $dayRanges->isEmpty()) {
+                    $doctorDays[$id][$date] = ['state' => 'off', 'free' => 0, 'capacity' => 0];
+
                     continue;
                 }
 
                 $working++;
-                $doctorBlocks = $blocks->get($id, collect());
+                $doctorBlocks   = $blocks->get($id, collect());
+                $doctorRaw      = 0;
+                $doctorCapacity = 0;
+                $doctorFree     = 0;
 
                 foreach ($dayRanges as $range) {
                     $slot  = Carbon::parse($date . ' ' . $range->starts_at);
@@ -163,18 +186,26 @@ class ScheduleAvailabilityService
                         }
 
                         $raw++;
+                        $doctorRaw++;
 
                         if ($doctorBlocks->contains(fn (ScheduleBlock $b) => $slot->gte($b->starts_at) && $slot->lt($b->ends_at))) {
                             continue;
                         }
 
                         $capacity++;
+                        $doctorCapacity++;
 
                         if (! isset($occupied[$id . '|' . $slot->format('Y-m-d H:i')])) {
                             $free++;
+                            $doctorFree++;
                         }
                     }
                 }
+                $doctorDays[$id][$date] = [
+                    'state'    => $this->state(1, $doctorRaw, $doctorCapacity, $doctorFree, $threshold),
+                    'free'     => $doctorFree,
+                    'capacity' => $doctorCapacity,
+                ];
             }
 
             $days[$date] = [
@@ -184,7 +215,7 @@ class ScheduleAvailabilityService
             ];
         }
 
-        return ['month' => $start->format('Y-m'), 'threshold' => $threshold, 'days' => $days];
+        return ['month' => $start->format('Y-m'), 'threshold' => $threshold, 'days' => $days, 'doctor_days' => $doctorDays];
     }
 
     private function state(int $working, int $raw, int $capacity, int $free, int $threshold): string

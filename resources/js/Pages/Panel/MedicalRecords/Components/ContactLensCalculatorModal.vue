@@ -52,6 +52,26 @@ function tt(key, fallback = '') {
     return props.t?.[key] ?? fallback;
 }
 
+// Uso de LC informado na anamnese desta consulta (Fase 2 / A3) — só exibe;
+// não entra no cálculo (lógica v2 inalterada).
+const contactLensUseText = computed(() => {
+    const use = props.record?.contact_lens_use;
+    if (!use || use.uses === null || use.uses === undefined) return '';
+    if (use.uses === false) return tt('contact_lens_use_no', 'Não');
+    const parts = [tt('contact_lens_use_yes', 'Sim')];
+    if (use.type) parts.push(tt(`contact_lens_use_type_${use.type}`, use.type));
+    if (use.wear) parts.push(tt(`contact_lens_use_wear_${use.wear}`, use.wear));
+    if (use.hours_per_day !== '' && use.hours_per_day !== null && use.hours_per_day !== undefined)
+        parts.push(tt('contact_lens_use_hours_value', ':hours h/dia').replace(':hours', use.hours_per_day));
+    if (use.replacement)
+        parts.push(
+            `${tt('contact_lens_use_replacement', 'Descarte')}: ${tt(`contact_lens_use_replacement_${use.replacement}`, use.replacement)}`,
+        );
+    if (use.sleeps_with === true) parts.push(tt('contact_lens_use_sleeps', 'Dorme com a lente'));
+    if (use.complaints) parts.push(`${tt('contact_lens_use_complaints', 'Queixas com a lente')}: ${use.complaints}`);
+    return parts.join(' · ');
+});
+
 const EYES = ['od', 'oe'];
 const FIELDS = ['sphere', 'cylinder', 'axis'];
 
@@ -284,6 +304,14 @@ function remove() {
                         <div v-if="readonly" class="alert alert-warning py-2 px-3 mb-3 small" role="status">
                             <i class="ti ti-lock me-1" aria-hidden="true"></i>
                             {{ tt('contact_lens_locked', 'Prontuário assinado: cálculo somente para consulta.') }}
+                        </div>
+
+                        <div v-if="contactLensUseText" class="small mb-3 clc-use" data-contact-lens-use>
+                            <i class="ti ti-eye me-1" aria-hidden="true"></i>
+                            <strong
+                                >{{ tt('contact_lens_use_in_calculator', 'Uso atual informado na anamnese') }}:</strong
+                            >
+                            {{ contactLensUseText }}
                         </div>
 
                         <!-- Cálculo da versão 1: mostrado como está (formato antigo). -->

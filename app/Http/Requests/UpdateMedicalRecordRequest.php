@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use App\Models\{MedicalRecord, Patient};
 use App\Rules\RecordDoctor;
 use App\Services\ContactLensCalculator;
-use App\Support\CurrentDoctor;
+use App\Support\{ContactLensUse, CurrentDoctor};
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -94,7 +94,7 @@ class UpdateMedicalRecordRequest extends FormRequest
             // Ação da barra inferior a abrir automaticamente após o 1º save
             // (create → edit?action=): emitir receita/atestado sem "salvar
             // primeiro" manual. Não é persistido no registro.
-            'post_save_action' => ['nullable', 'string', 'in:medication,procedures,pterygium,cataract,test_eye,retinal_mapping,attendance_certificate,medical_certificate,medical_declaration,exam_hub,documentations,upload'],
+            'post_save_action' => ['nullable', 'string', 'in:medication,procedures,pterygium,cataract,test_eye,retinal_mapping,attendance_certificate,medical_certificate,companion_certificate,visual_fitness_certificate,medical_declaration,exam_hub,documentations,upload'],
             // Exame fisico — selecoes
             // Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via
             // request body) — ver mesmo comentário em StoreMedicalRecordRequest.
@@ -284,6 +284,8 @@ class UpdateMedicalRecordRequest extends FormRequest
             // define as faixas e a versão aceita).
             'contact_lens_calculation' => ['sometimes', 'nullable', 'array'],
             ...ContactLensCalculator::validationRules(),
+            // Uso de lente de contato na anamnese (Fase 2 / A3).
+            ...ContactLensUse::validationRules(sometimes: true),
             // Diagnóstico — CBO obrigatório (array de {code, description})
             'diagnosis_cids'               => ['sometimes', 'nullable', 'array', 'max:20'],
             'diagnosis_cids.*.code'        => ['required_with:diagnosis_cids', 'string', 'max:10'],

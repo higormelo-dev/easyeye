@@ -9,8 +9,10 @@ import MedicalRecordViewModal from './Components/MedicalRecordViewModal.vue';
 import MedicalRecordForm from './Components/MedicalRecordForm.vue';
 import ScheduleFlowGuard from './Components/ScheduleFlowGuard.vue';
 import AttendanceTimer from './Components/AttendanceTimer.vue';
+import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
+import { useClinicalSafety } from '@/composables/useClinicalSafety.js';
 
-defineProps({
+const props = defineProps({
     breadcrumbs: { type: Array, default: () => [] },
     patient: { type: Object, required: true },
     medicalrecord: { type: Object, default: null },
@@ -31,11 +33,18 @@ defineProps({
     storage: { type: Object, default: () => ({}) },
     // Autosave: rascunho do autor mais novo que o prontuário (só a data).
     draft: { type: Object, default: null },
+    // Segurança clínica (Fase 2): alergias/medicações/alertas + uso de LC da última consulta.
+    clinicalSafety: { type: Object, default: null },
+    contactLensUsePrevious: { type: Object, default: null },
     t: { type: Object, default: () => ({}) },
 });
 
 const flowGuard = ref(null);
 const recordForm = ref(null);
+
+// Alergias/medicações (Fase 2): um estado só para a página e o formulário — no
+// celular o alerta sobe para cima das colunas (a do paciente vem antes).
+const safety = useClinicalSafety(props.patient.id, props.clinicalSafety);
 
 const viewOpen = ref(false);
 const viewRecord = ref(null);
@@ -83,6 +92,15 @@ function closeView() {
                 </div>
             </div>
 
+            <ClinicalAlertBanner
+                v-if="safety.summary"
+                :summary="safety.summary"
+                :reviewable="isDoctor"
+                class="d-lg-none mb-2"
+                data-testid="pmr-safety-mobile"
+                @review="recordForm?.openSafetyReview()"
+            />
+
             <div class="row g-2">
                 <div class="col-12 col-lg-3 col-xl-2">
                     <div class="patient-info-sticky">
@@ -107,6 +125,9 @@ function closeView() {
                             :schedule-flow="scheduleFlow"
                             :storage="storage"
                             :draft="draft"
+                            :clinical-safety="clinicalSafety"
+                            :safety-store="safety"
+                            :contact-lens-use-previous="contactLensUsePrevious"
                             :t="t"
                         />
                     </div>

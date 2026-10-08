@@ -211,5 +211,14 @@ defineExpose({ insertContent, getSelectionHtml });
 </script>
 
 <template>
-    <textarea ref="textareaRef"></textarea>
+    <!--
+        Raiz própria: o TinyMCE esconde o <textarea> e insere o editor como
+        IRMÃO dele. Com o <textarea> na raiz, o Vue usava esse irmão (que o
+        TinyMCE remove no unmount) como âncora ao trocar o editor por :key —
+        "insertBefore ... not a child" e o seletor de modelos das
+        Documentações quebrava na 1ª troca. Dentro da div, a âncora é do Vue.
+    -->
+    <div class="ee-tinymce">
+        <textarea ref="textareaRef"></textarea>
+    </div>
 </template>

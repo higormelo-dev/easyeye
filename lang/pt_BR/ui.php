@@ -53,6 +53,8 @@ return [
         'plan_hint'            => 'Opcional. O registro do produto na ANS vem impresso na carteirinha.',
         // Convênio do paciente inativado depois do cadastro (mantido, marcado).
         'covenant_inactive_suffix' => '(inativo)',
+        // Carregar alergias/medicações falhou — trocar de aba e voltar tenta de novo (18ª revisão Codex, P2).
+        'safety_load_error' => 'Não foi possível carregar alergias e medicações. Troque de aba e volte para tentar de novo.',
         // Homônimo: mesmo nome de outro paciente da clínica (PatientDuplicateFinder).
         'homonym_title'   => 'Paciente com o mesmo nome',
         'homonym_confirm' => 'Confirmo que é outro paciente',

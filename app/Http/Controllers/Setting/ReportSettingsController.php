@@ -6,7 +6,7 @@ use App\DTOs\ActionPolicy;
 use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
 use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Controllers\Controller;
-use App\Models\{ReportCategory, ReportSetting};
+use App\Models\{ReportCategory, ReportSetting, ReportSettingContent};
 use App\Services\ReportSettingService;
 use BackedEnum;
 use Illuminate\Contracts\View\View;
@@ -102,9 +102,13 @@ class ReportSettingsController extends Controller
             // `id` desempata — ordem entre páginas determinística no PostgreSQL.
             ->orderBy('report_settings.id');
 
-        $items = $this->paginateClamped($query, self::PER_PAGE)
-            ->withQueryString()
-            ->through(fn (ReportSetting $r) => $this->toRow($r, $entityId));
+        $page = $this->paginateClamped($query, self::PER_PAGE)->withQueryString();
+
+        // Atualizações do modelo padrão esperando decisão da clínica
+        // (conteúdos personalizados) — uma conta para a página inteira.
+        $pending = $this->service->pendingUpstreamUpdatesFor($page->getCollection());
+
+        $items = $page->through(fn (ReportSetting $r) => $this->toRow($r, $entityId, count($pending[(string) $r->id] ?? [])));
 
         return Inertia::render('Panel/Settings/ReportSettings/Index', [
             'breadcrumbs' => [
@@ -130,7 +134,7 @@ class ReportSettingsController extends Controller
     }
 
     /** Linha da tabela/card (mesmo formato nos dois modos). */
-    private function toRow(ReportSetting $r, string $entityId): array
+    private function toRow(ReportSetting $r, string $entityId, int $pendingUpdates = 0): array
     {
         return [
             'id'             => (string) $r->id,
@@ -142,9 +146,11 @@ class ReportSettingsController extends Controller
             'show_footer'    => (bool) $r->show_footer,
             'active'         => (bool) $r->active,
             'is_adopted'     => $r->isAdopted(),
-            'has_update'     => $r->hasUpdateAvailable(),
-            'source_version' => $r->source_version,
-            'category'       => $r->category?->name,
+            'has_update'     => $r->hasUpdateAvailable() || $pendingUpdates > 0,
+            // Conteúdos personalizados com atualização do modelo padrão.
+            'pending_updates' => $pendingUpdates,
+            'source_version'  => $r->source_version,
+            'category'        => $r->category?->name,
             // ISO 8601: a tela formata no idioma do usuário (useLocaleFormat).
             'updated_at'   => $r->updated_at?->toIso8601String(),
             'preview_url'  => route('panel.setting.report-settings.preview', $r),
@@ -170,6 +176,7 @@ class ReportSettingsController extends Controller
                 'store' => route('panel.setting.report-settings.store'),
                 'index' => route('panel.setting.report-settings.index'),
             ],
+            't' => trans('report_settings'),
         ]);
     }
 
@@ -245,6 +252,7 @@ class ReportSettingsController extends Controller
 
         $reportSetting->load('contents.variables');
         $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
+        $upstream   = $this->service->pendingUpstreamUpdates($reportSetting);
 
         return Inertia::render('Panel/Settings/ReportSettings/Form', [
             'breadcrumbs'   => $this->buildBreadcrumbs(__('report_settings.form_title_edit')),
@@ -282,8 +290,16 @@ class ReportSettingsController extends Controller
                     'label'   => $c->label,
                     'content' => $c->content,
                     'active'  => (bool) $c->active,
+                    // Atualização do modelo padrão esperando a clínica decidir.
+                    'upstream' => isset($upstream[(string) $c->id]) ? [
+                        'label'     => $upstream[(string) $c->id]->label,
+                        'apply_url' => route('panel.setting.report-settings.contents.apply-update', [$reportSetting, $c->id]),
+                        'keep_url'  => route('panel.setting.report-settings.contents.keep', [$reportSetting, $c->id]),
+                        'show_url'  => route('panel.setting.report-settings.contents.upstream', [$reportSetting, $c->id]),
+                    ] : null,
                 ])->values(),
             ],
+            't'                   => trans('report_settings'),
             'categories'          => $categories,
             'paper_sizes'         => array_map(fn (string $v) => ['value' => $v, 'label' => $v], PaperSize::values()),
             'documentation_types' => array_map(fn (string $v) => ['value' => $v, 'label' => $v], DocumentationType::values()),
@@ -305,7 +321,11 @@ class ReportSettingsController extends Controller
 
         $reportSetting->update($validated);
 
-        $this->service->syncContents($reportSetting, $request->input('contents', []));
+        // Sem `contents` no envio, os conteúdos ficam como estão (lista
+        // vazia apagaria todos).
+        if ($request->has('contents')) {
+            $this->service->syncContents($reportSetting, (array) $request->input('contents', []));
+        }
 
         return $this->backToListing('message', __('report_settings.flash_updated'));
     }
@@ -356,6 +376,56 @@ class ReportSettingsController extends Controller
         }
 
         return $this->backToListing('message', __('report_settings.flash_reimported'));
+    }
+
+    // ─── Atualização do modelo padrão (conteúdo personalizado) ─────────────
+
+    /** "Ver modelo padrão": o texto da clínica e o do padrão atual, lado a lado. */
+    public function upstream(ReportSetting $reportSetting, string $content): JsonResponse
+    {
+        [$local, $global] = $this->pendingPair($reportSetting, $content);
+
+        return response()->json([
+            'local'  => ['label' => $local->display_label, 'content' => $local->content],
+            'global' => ['label' => $global->display_label, 'content' => $global->content],
+        ]);
+    }
+
+    /** "Aplicar atualização": troca o texto da clínica pelo do padrão (auditado). */
+    public function applyUpdate(ReportSetting $reportSetting, string $content): RedirectResponse
+    {
+        [$local] = $this->pendingPair($reportSetting, $content);
+        $this->service->applyUpstreamUpdate($reportSetting, $local);
+
+        return back()->with('success', __('report_settings.flash_update_applied'));
+    }
+
+    /** "Manter o meu": dispensa esta versão do padrão (auditado). */
+    public function keepMine(ReportSetting $reportSetting, string $content): RedirectResponse
+    {
+        [$local] = $this->pendingPair($reportSetting, $content);
+        $this->service->keepLocalContent($reportSetting, $local);
+
+        return back()->with('success', __('report_settings.flash_update_kept'));
+    }
+
+    /**
+     * Conteúdo DESTE modelo da clínica com atualização pendente → [local,
+     * padrão]. Modelo de outra clínica, conteúdo de outro modelo ou sem
+     * atualização → 404.
+     *
+     * @return array{0: ReportSettingContent, 1: ReportSettingContent}
+     */
+    private function pendingPair(ReportSetting $reportSetting, string $content): array
+    {
+        $this->assertOwnsReportSetting($reportSetting);
+
+        $local  = $reportSetting->contents()->whereKey($content)->firstOrFail();
+        $global = $this->service->pendingUpstreamUpdates($reportSetting)[(string) $local->id] ?? null;
+
+        abort_if($global === null, 404);
+
+        return [$local, $global];
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

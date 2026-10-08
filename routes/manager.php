@@ -19,6 +19,7 @@ use App\Http\Controllers\Manager\{
     EntityIntegratorsController,
     EntityUserIntegratorsController,
     EntityUsersController,
+    ExamKitsController,
     FinanceController,
     GatewaysController,
     ImpersonateController,
@@ -437,6 +438,20 @@ Route::group([
             ->whereUuid('batch')
             ->middleware('throttle:manager-destructive')
             ->name('medicines.posology-batches.cancel');
+    });
+
+    // ── Kits de exames PADRÃO do EasyEye (pedido de exames — Fase 2 / B2) —
+    // admin only. As clínicas copiam e ajustam os delas.
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('exam-kits', [ExamKitsController::class, 'index'])->name('exam-kits.index');
+        Route::post('exam-kits', [ExamKitsController::class, 'store'])->name('exam-kits.store');
+        Route::put('exam-kits/{kit}', [ExamKitsController::class, 'update'])
+            ->whereUuid('kit')
+            ->name('exam-kits.update');
+        Route::delete('exam-kits/{kit}', [ExamKitsController::class, 'destroy'])
+            ->whereUuid('kit')
+            ->middleware('throttle:manager-destructive')
+            ->name('exam-kits.destroy');
     });
 
     // ── Catálogo global da CID-10 (diagnóstico de todas as clínicas) — admin only

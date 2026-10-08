@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useForm, Link } from '@inertiajs/vue3';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { useForm, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 
 /**
  * Formulário de modelo de documentação clínica.
@@ -14,6 +15,8 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
  * Contents é array dinâmico (textareas editáveis); pode adicionar/remover
  * variantes do mesmo template (Receita simples, Receita controlada, etc.).
  */
+defineOptions({ name: 'ReportSettingForm' });
+
 const props = defineProps({
     breadcrumbs: { type: Array, default: () => [] },
     mode: { type: String, default: 'create' }, // 'create' | 'edit'
@@ -22,7 +25,11 @@ const props = defineProps({
     paper_sizes: { type: Array, default: () => [] },
     documentation_types: { type: Array, default: () => [] },
     urls: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
 });
+
+const tx = (key, fallback, replacements = {}) =>
+    Object.entries(replacements).reduce((acc, [k, v]) => acc.replaceAll(`:${k}`, v ?? ''), props.t?.[key] ?? fallback);
 
 const isEdit = computed(() => props.mode === 'edit');
 
@@ -52,7 +59,10 @@ const form = useForm({
     footer_show_address: props.reportSetting?.footer_show_address ?? false,
     footer_show_phone: props.reportSetting?.footer_show_phone ?? false,
     active: props.reportSetting?.active ?? true,
+    // `id` mantém o conteúdo (e o vínculo com o modelo padrão) — sem ele,
+    // salvar recriava todos os conteúdos e soltava o slug.
     contents: props.reportSetting?.contents?.map((c) => ({
+        id: c.id,
         type: c.type,
         label: c.label,
         content: c.content,
@@ -81,6 +91,114 @@ function submit() {
 }
 
 const activeTab = ref('general');
+
+// ── Atualização do modelo padrão em conteúdo personalizado ───────────────
+// O servidor só lista o que a clínica personalizou e o padrão mudou depois;
+// nada é trocado sem a decisão dela (aplicar ou manter o meu).
+const upstreamById = computed(() =>
+    Object.fromEntries(
+        (props.reportSetting?.contents ?? []).filter((c) => c.upstream).map((c) => [String(c.id), c.upstream]),
+    ),
+);
+const upstreamFor = (content) => (content?.id ? (upstreamById.value[String(content.id)] ?? null) : null);
+const upstreamMessage = ref('');
+const compare = ref({ open: false, loading: false, error: '', local: null, global: null });
+
+/* Esc fecha a comparação (o CenteredModal não trata teclado). */
+function onCompareKeydown(event) {
+    if (event.key === 'Escape') compare.value.open = false;
+}
+
+watch(
+    () => compare.value.open,
+    (isOpen) => {
+        if (typeof document === 'undefined') return;
+        if (isOpen) document.addEventListener('keydown', onCompareKeydown);
+        else document.removeEventListener('keydown', onCompareKeydown);
+    },
+);
+
+onBeforeUnmount(() => {
+    if (typeof document !== 'undefined') document.removeEventListener('keydown', onCompareKeydown);
+});
+
+async function viewUpstream(content) {
+    const info = upstreamFor(content);
+    if (!info) return;
+    compare.value = { open: true, loading: true, error: '', local: null, global: null };
+    try {
+        const res = await fetch(info.show_url, { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        compare.value = { open: true, loading: false, error: '', local: data.local, global: data.global };
+    } catch {
+        compare.value = {
+            ...compare.value,
+            loading: false,
+            error: tx('upstream_error', 'Não foi possível carregar o modelo padrão.'),
+        };
+    }
+}
+
+function decideUpstream(content, action) {
+    const info = upstreamFor(content);
+    if (!info) return;
+    // Aplicar/manter recarrega a página: alterações não salvas se perderiam.
+    if (form.isDirty) {
+        upstreamMessage.value = tx(
+            'upstream_unsaved',
+            'Salve ou descarte as alterações deste formulário antes de aplicar ou manter.',
+        );
+        return;
+    }
+    if (
+        action === 'apply' &&
+        !window.confirm(
+            tx(
+                'upstream_confirm',
+                'Substituir o texto de ":label" pelo do modelo padrão atual? O texto personalizado da clínica será trocado (a troca fica registrada).',
+                { label: content.label },
+            ),
+        )
+    )
+        return;
+    upstreamMessage.value = '';
+    // Retrato de ANTES de mandar — a tela fica editável durante a espera do
+    // Aplicar/Manter; se o médico mexer nesta mesma linha nesse meio-tempo, a
+    // sincronização abaixo não pisa em cima do que ele digitou (15ª revisão
+    // Codex, P2).
+    const snapshot = { type: content.type, label: content.label, content: content.content, active: content.active };
+    router.post(
+        action === 'apply' ? info.apply_url : info.keep_url,
+        {},
+        {
+            preserveScroll: true,
+            // O componente fica (aba aberta, rolagem); o formulário não: sem isto
+            // o editor seguia com o texto antigo e um Salvar desfazia a atualização.
+            onSuccess: () => syncContentFromServer(content.id, snapshot),
+        },
+    );
+}
+
+/**
+ * Traz o conteúdo salvo no servidor pra este item do formulário — só os
+ * campos que o médico NÃO tocou enquanto o Aplicar/Manter estava pendente (a
+ * edição dele vence) — e marca como salvo só ESSES campos deste item, nunca
+ * o formulário inteiro: outra aba ou outro conteúdo editado durante a espera
+ * não pode virar "sem alteração" (15ª revisão Codex, P2).
+ */
+function syncContentFromServer(id, snapshot) {
+    const fresh = (props.reportSetting?.contents ?? []).find((c) => String(c.id) === String(id));
+    const idx = form.contents.findIndex((c) => String(c.id) === String(id));
+    if (!fresh || idx === -1) return;
+
+    const local = form.contents[idx];
+    for (const field of ['type', 'label', 'content', 'active']) {
+        if (snapshot && local[field] !== snapshot[field]) continue;
+        local[field] = fresh[field];
+        form.defaults(`contents.${idx}.${field}`, fresh[field]);
+    }
+}
 </script>
 
 <template>
@@ -424,8 +542,65 @@ const activeTab = ref('general');
                             Nenhum conteúdo. Clique em "Adicionar variante" para criar.
                         </div>
 
+                        <div v-if="upstreamMessage" class="alert alert-warning py-2 small" role="alert">
+                            {{ upstreamMessage }}
+                        </div>
+
                         <div v-for="(content, idx) in form.contents" :key="idx" class="card border mb-3">
                             <div class="card-body">
+                                <!-- Modelo padrão mudou depois que a clínica personalizou este texto -->
+                                <div
+                                    v-if="upstreamFor(content)"
+                                    class="ee-upstream mb-2"
+                                    role="status"
+                                    :data-testid="`upstream-${content.id}`"
+                                >
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span
+                                            class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"
+                                        >
+                                            <i class="ti ti-refresh-alert me-1" aria-hidden="true"></i
+                                            >{{ tx('upstream_badge', 'Atualização disponível do modelo padrão') }}
+                                        </span>
+                                        <div class="d-flex gap-1 flex-wrap ms-auto">
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                data-testid="upstream-view"
+                                                @click="viewUpstream(content)"
+                                            >
+                                                <i class="ti ti-eye me-1" aria-hidden="true"></i
+                                                >{{ tx('upstream_view', 'Ver modelo padrão') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-primary"
+                                                data-testid="upstream-apply"
+                                                @click="decideUpstream(content, 'apply')"
+                                            >
+                                                <i class="ti ti-download me-1" aria-hidden="true"></i
+                                                >{{ tx('upstream_apply', 'Aplicar atualização') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                data-testid="upstream-keep"
+                                                @click="decideUpstream(content, 'keep')"
+                                            >
+                                                <i class="ti ti-check me-1" aria-hidden="true"></i
+                                                >{{ tx('upstream_keep', 'Manter o meu') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="small text-body-secondary mb-0 mt-1">
+                                        {{
+                                            tx(
+                                                'upstream_hint',
+                                                'Este texto foi personalizado pela clínica e o modelo padrão do EasyEye mudou depois. Nada foi alterado sem você decidir.',
+                                            )
+                                        }}
+                                    </p>
+                                </div>
                                 <div class="row g-2 mb-2">
                                     <div class="col-md-4">
                                         <label class="form-label small">Tipo</label>
@@ -492,5 +667,54 @@ const activeTab = ref('general');
                 </div>
             </form>
         </div>
+
+        <!-- Seu texto × modelo padrão atualizado -->
+        <CenteredModal :open="compare.open" size="xl" @close="compare.open = false">
+            <template #header>
+                <h5 class="mb-0 fw-semibold">
+                    <i class="ti ti-arrows-diff me-2 text-primary" aria-hidden="true"></i
+                    >{{ tx('upstream_title', 'Seu texto × modelo padrão atualizado') }}
+                </h5>
+            </template>
+            <p v-if="compare.loading" class="text-body-secondary small mb-0">
+                {{ tx('upstream_loading', 'Carregando…') }}
+            </p>
+            <div v-else-if="compare.error" class="alert alert-danger py-2 small mb-0" role="alert">
+                {{ compare.error }}
+            </div>
+            <div v-else class="row g-3" data-testid="upstream-compare">
+                <div class="col-12 col-lg-6">
+                    <h6 class="small fw-semibold mb-1">{{ tx('upstream_local', 'Seu texto (personalizado)') }}</h6>
+                    <pre class="ee-upstream__text">{{ compare.local?.content }}</pre>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <h6 class="small fw-semibold mb-1">{{ tx('upstream_global', 'Modelo padrão atualizado') }}</h6>
+                    <pre class="ee-upstream__text">{{ compare.global?.content }}</pre>
+                </div>
+            </div>
+        </CenteredModal>
     </AppLayout>
 </template>
+
+<style scoped>
+.ee-upstream {
+    border: 1px solid var(--bs-warning-border-subtle);
+    border-left: 4px solid var(--bs-warning);
+    border-radius: 0.4rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--bs-warning-bg-subtle);
+}
+.ee-upstream__text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 50vh;
+    overflow: auto;
+    font-size: 0.8rem;
+    padding: 0.5rem;
+    margin: 0;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.3rem;
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-body-color);
+}
+</style>

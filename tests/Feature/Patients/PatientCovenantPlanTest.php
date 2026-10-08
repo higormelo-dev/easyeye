@@ -177,7 +177,8 @@ it('[LGPD] exportação dos dados do paciente inclui o plano', function (): void
     $export = app(PatientDataExporter::class)->export(($this->patient)());
 
     expect($export['clinic']['covenant_plan'])->toBe(['name' => 'AMIL ONE S6500', 'ans_registration' => '471234567'])
-        ->and($export['format_version'])->toBe(3);
+        // 3 = plano do convênio no bloco da clínica (versões seguintes mantêm).
+        ->and($export['format_version'])->toBeGreaterThanOrEqual(3);
 });
 
 it('guia TISS leva o plano do paciente quando é do convênio faturado', function (): void {

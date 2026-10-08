@@ -84,7 +84,10 @@ const columnMenuLabels = computed(() => ({
         </ActionDropdown>
     </div>
 
-    <div class="table-responsive">
+    <!-- position-relative: os rótulos .visually-hidden (position: absolute)
+         dos blocos ficavam fora da rolagem da tabela e empurravam a página
+         para o lado no celular (33–192 px em 390 px). -->
+    <div class="table-responsive position-relative" data-testid="report-settings-table-wrapper">
         <table class="table table-nowrap table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>

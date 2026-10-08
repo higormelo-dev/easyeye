@@ -1057,6 +1057,7 @@ async function onSubmit() {
                         :lookup-cep="lookupCep"
                         :plan-option="planOption"
                         :covenant-option="covenantOption"
+                        :patient-id="form.patient_id || null"
                     />
                 </div>
             </div>

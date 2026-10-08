@@ -5,14 +5,18 @@ namespace App\Http\Controllers;
 use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService};
 use App\Enums\AI\AiRunMode;
 use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey, ScheduleSituation};
+use App\Enums\ClinicalSafety\{AllergyCategory, AllergySeverity, AllergyStatus, MedicationSource};
 use App\Exceptions\{AttendanceRequiresCashEntryException, LockedMedicalRecordException};
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
     MedicalRecord, MedicalRecordDocumentation, NearPointConvergence, Patient, PatientDocumentShare, Schedule, ScheduleSituationLog, User, VisualAcuityType};
 use App\Models\{ReportSetting, ReportSettingContent};
-use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, ScheduleService, UsageMeterService};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
+use App\Services\Documents\DoctorDocumentTemplateService;
+use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, ProcedureSolicitationService, ScheduleService, UsageMeterService};
 use App\Services\MedicalRecords\MedicalRecordDraftService;
-use App\Support\{BrazilianFormat, CurrentDoctor};
+use App\Support\{BrazilianFormat, ContactLensUse, CurrentDoctor, PatientAccess};
+use App\Support\Documents\DocumentDate;
 use App\Traits\LogsDataAccess;
 use Carbon\Carbon;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
@@ -36,6 +40,7 @@ class MedicalRecordsController extends Controller
         private readonly ScheduleService $scheduleService,
         private readonly AiPaywallService $aiPaywall,
         private readonly MedicalRecordDraftService $drafts,
+        private readonly PatientClinicalSafetyService $clinicalSafety,
     ) {
     }
 
@@ -87,7 +92,9 @@ class MedicalRecordsController extends Controller
             'isDoctor'          => CurrentDoctor::canIssue(),
             'doctorMissing'     => CurrentDoctor::issuerMissing(),
             'doctorMissingText' => CurrentDoctor::missingMessage(),
-            't'                 => trans('actions.medical_records'),
+            // Alergias + alertas de risco (Fase 2 / A1-A2): todos que atendem veem.
+            'clinicalSafety' => $this->clinicalSafetyProps($patient, withCheck: false),
+            't'              => trans('actions.medical_records'),
         ]);
     }
 
@@ -246,6 +253,9 @@ class MedicalRecordsController extends Controller
             'glaucomatous_family'     => $medicalrecord->glaucomatous_family,
             'ocular_surgical_history' => $medicalrecord->ocular_surgical_history,
             'medications_in_use'      => $medicalrecord->medications_in_use,
+            // Retrato do momento da consulta (Fase 2 / A2) e uso de LC (A3).
+            ...$this->snapshotForView($medicalrecord),
+            'contact_lens_use_rows' => ContactLensUse::rows($medicalrecord->contact_lens_use),
             // Exame físico
             'visual_acuity_type'     => $medicalrecord->visualAcuityType?->name,
             'near_point_convergence' => $medicalrecord->nearPointConvergence?->name,
@@ -294,12 +304,17 @@ class MedicalRecordsController extends Controller
             'signed_by_name'      => $medicalrecord->signedBy?->user?->name,
             // Documentações
             'documentations' => $medicalrecord->documentations->map(fn ($d) => [
-                'id'                => $d->id,
-                'type'              => $d->type,
-                'type_label'        => $d->getTypeLabel(),
-                'title'             => $d->title,
-                'doctor_name'       => $d->doctor?->person?->full_name ?? '',
-                'created_at'        => $d->created_at?->format('d/m/Y H:i'),
+                'id'          => $d->id,
+                'type'        => $d->type,
+                'type_label'  => $d->getTypeLabel(),
+                'title'       => $d->title,
+                'doctor_name' => $d->doctor?->person?->full_name ?? '',
+                'created_at'  => $d->created_at?->format('d/m/Y H:i'),
+                // Data alternativa impressa (Fase 2 / B3) — null = a da emissão.
+                'document_date'       => $d->hasAlternativeDate() ? $d->document_date?->format('d/m/Y') : null,
+                'document_date_label' => $d->hasAlternativeDate()
+                    ? __('clinical_documents.date.printed', ['date' => $d->document_date?->copy()->locale(app()->getLocale())->isoFormat('L')])
+                    : null,
                 'is_ai'             => $d->ai_run_id !== null,
                 'ai_workflow_label' => $d->ai_run_id && $d->aiRun ? __('ai.workflow_' . $d->aiRun->workflow) : null,
                 'pdf_url'           => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $medicalrecord, $d]),
@@ -491,6 +506,19 @@ class MedicalRecordsController extends Controller
         $entityId  = session('selected_entity_id');
         $templates = $this->documentationService->getActiveTemplates($entityId);
 
+        // Modelos PESSOAIS do médico que emite (Fase 2 / B3), listados junto
+        // dos modelos da clínica no mesmo seletor.
+        $personal = app(DoctorDocumentTemplateService::class)->forSelector((string) $entityId, CurrentDoctor::issuer());
+
+        if ($personal !== []) {
+            array_unshift($templates, [
+                'report_setting_id'    => 'personal',
+                'report_setting_title' => __('clinical_documents.templates.mine'),
+                'personal'             => true,
+                'contents'             => $personal,
+            ]);
+        }
+
         return response()->json($templates);
     }
 
@@ -503,7 +531,11 @@ class MedicalRecordsController extends Controller
         $validated = $request->validate([
             'report_setting_content_id' => ['required', 'uuid', 'exists:report_setting_contents,id'],
             'doctor_id'                 => ['nullable', 'uuid'],
-        ]);
+            // Data alternativa (Fase 2 / B3): as datas do texto do modelo saem
+            // com ela; modelo pessoal do médico (B3) usado como conteúdo.
+            'document_date' => DocumentDate::rules(),
+            'template_id'   => ['nullable', 'uuid'],
+        ], DocumentDate::messages());
 
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
         $this->assertTemplateBelongsToCurrentEntity($content);
@@ -523,7 +555,62 @@ class MedicalRecordsController extends Controller
             return response()->json(['message' => __('actions.medical_records.doctor_required_for_template')], 422);
         }
 
-        $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $medicalrecord);
+        $documentDate = DocumentDate::alternative($validated['document_date'] ?? null);
+        $personalHtml = false;
+
+        if (filled($validated['template_id'] ?? null)) {
+            $template = app(DoctorDocumentTemplateService::class)->ownedOrFail((string) $entity->id, CurrentDoctor::issuer(), (string) $validated['template_id']);
+            abort_if((string) $template->report_setting_content_id !== (string) $content->id, 422, __('clinical_documents.templates.base_mismatch'));
+
+            $content = clone $content;
+
+            // HTML salvo pelo editor (já sanitizado e com as variáveis no
+            // lugar dos dados do paciente de origem) é resolvido para ESTE
+            // paciente; texto salvo nos modais de receita/pedido vai no lugar
+            // da lista, como HTML.
+            if ($template->body_format === 'html') {
+                $content->content = (string) $template->body;
+                $personalHtml     = true;
+            } elseif ($template->kind === 'procedure') {
+                // `body` do modelo de pedido é só a lista de exames — caráter,
+                // indicação e observações ficam no payload e a prévia os
+                // perdia (3ª revisão Codex, P2). renderRequestHtml() usa o que
+                // já foi validado contra o catálogo ao SALVAR o modelo (sem
+                // bater no banco de novo aqui: isto é prévia, não emissão).
+                $payload = is_array($template->payload) ? $template->payload : [];
+                $items   = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+
+                $procedures     = app(ProcedureSolicitationService::class);
+                $indicationText = implode('; ', array_filter([
+                    implode('; ', array_column(is_array($payload['indications'] ?? null) ? $payload['indications'] : [], 'description')),
+                    trim((string) ($payload['indication_text'] ?? '')),
+                ]));
+                $typeLabel = $procedures->resolveTypeLabel(is_string($payload['type'] ?? null) ? $payload['type'] : null);
+                $cids      = is_array($payload['cids'] ?? null) ? $payload['cids'] : [];
+                $notes     = trim((string) ($payload['notes'] ?? ''));
+
+                // Modelo de pedido SEM payload.items (só corpo) é combinação
+                // válida (API aceita; PersonalTemplatesTest cobre) — mas
+                // caráter/indicação/CID/observações do payload têm que ir pra
+                // prévia igual na emissão real, senão ficava só a lista de
+                // exames vazia OU (11ª revisão Codex, P2) só o corpo, sem o
+                // resto do payload (16ª revisão Codex, P2 — mesmo gap da
+                // emissão, aqui na prévia).
+                $html = $items === []
+                    ? $procedures->renderTextOnlyRequestHtml((string) $template->body, $typeLabel, $indicationText, $cids, $notes)
+                    : $procedures->renderRequestHtml($items, $typeLabel, $indicationText, $cids, $notes);
+
+                $content->content = str_replace('{{PROCEDIMENTOS_SOLICITADOS}}', $html, (string) $content->content);
+            } else {
+                $content->content = str_replace(
+                    ['{{LISTA_MEDICAMENTOS}}', '{{PROCEDIMENTOS_SOLICITADOS}}', '{{CONTEUDO_LIVRE}}'],
+                    nl2br(e(trim($template->body))),
+                    (string) $content->content,
+                );
+            }
+        }
+
+        $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $medicalrecord, $documentDate);
 
         // Strip placeholders restantes ({{CONTEUDO_LIVRE}}, {{LISTA_MEDICAMENTOS}}, etc.)
         // que não são resolvidos pelo TemplateVariableResolver (são preenchidos
@@ -536,7 +623,11 @@ class MedicalRecordsController extends Controller
         // o `<p>&nbsp;</p>` espaçador que segue). Motivo: a data e localização
         // já aparecem no bloco de assinatura do PDF (`_signature.blade.php`) —
         // mostrar no topo do editor duplica visualmente e polui o textarea.
-        $html = $this->stripResolvedDateHeader($html);
+        // Modelo pessoal do editor: o cabeçalho de data já saiu ao salvar — o
+        // 1º parágrafo à direita é do médico.
+        if (! $personalHtml) {
+            $html = $this->stripResolvedDateHeader($html);
+        }
 
         return response()->json(['content' => $html, 'unresolved' => $resolved['unresolved']]);
     }
@@ -737,10 +828,15 @@ class MedicalRecordsController extends Controller
                 ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#', 'active' => false],
                 ['label' => __('actions.medical_records.title'), 'url' => route('panel.patients.medicalrecords.index', $patient), 'active' => false],
             ],
-            'patient'         => $this->serializePatient($patient),
-            'medicalrecord'   => $record ? $this->serializeRecord($record) : null,
-            'previousRecords' => $this->serializePreviousRecords($patient, $record),
-            'doctors'         => $this->serializeCatalog($doctors, fn (Doctor $d) => [
+            'patient'       => $this->serializePatient($patient),
+            'medicalrecord' => $record ? $this->serializeRecord($record) : null,
+            // Alergias, "nega alergias", medicações em uso e alertas de risco
+            // ocular (Fase 2 / A1-A2) — cabeçalho, anamnese e receituário.
+            'clinicalSafety' => $this->clinicalSafetyProps($patient, withCheck: CurrentDoctor::canIssue()),
+            // Uso de LC da última consulta (Fase 2 / A3) — pré-preenche o novo.
+            'contactLensUsePrevious' => $this->previousContactLensUse($patient, $record),
+            'previousRecords'        => $this->serializePreviousRecords($patient, $record),
+            'doctors'                => $this->serializeCatalog($doctors, fn (Doctor $d) => [
                 'id'   => (string) $d->id,
                 'name' => $d->person?->full_name,
             ]),
@@ -802,7 +898,36 @@ class MedicalRecordsController extends Controller
             'storage' => $this->buildStorageQuota($entityId),
             'ai'      => $this->buildAiProps($entityId),
             't'       => trans('actions.medical_records'),
+            // Documentos do atendimento (Fase 2 / Bloco B): faixa da data
+            // alternativa, chegada do paciente (atestado de comparecimento),
+            // convênio do pedido de exames e limites — o servidor revalida.
+            'documents' => [
+                'date'           => DocumentDate::clientConfig(),
+                'arrived_at'     => $flowSchedule?->arrived_at?->copy()->setTimezone((string) config('app.timezone'))->format('H:i'),
+                'covenant'       => $this->requestCovenant($patient, $flowSchedule),
+                'dilation_hours' => config('clinical_documents.dilation_hours'),
+                'request_limits' => [
+                    'items'       => ProcedureSolicitationService::MAX_PROCEDURES,
+                    'indications' => ProcedureSolicitationService::MAX_INDICATIONS,
+                    'cids'        => ProcedureSolicitationService::MAX_CIDS,
+                    'kits'        => ProcedureSolicitationService::MAX_KITS,
+                ],
+            ],
+            't_documents' => trans('clinical_documents'),
         ];
+    }
+
+    /**
+     * Convênio do pedido de exames (Fase 2 / B2): o do atendimento
+     * (agendamento) e, sem ele, o do cadastro do paciente.
+     *
+     * @return array{id: string, name: string}|null
+     */
+    private function requestCovenant(Patient $patient, ?Schedule $schedule): ?array
+    {
+        $covenant = ($schedule?->covenant_id ? $schedule->covenant : null) ?? $patient->covenant;
+
+        return $covenant ? ['id' => (string) $covenant->id, 'name' => (string) $covenant->name] : null;
     }
 
     /**
@@ -981,6 +1106,15 @@ class MedicalRecordsController extends Controller
                 [$patient, $record, '__EXAM__'],
             );
             $urls['day_extension_preview'] = route('panel.medical-records.day-extension-preview');
+            // Kits de exames do pedido (Fase 2 / B2), filtrados pelo convênio
+            // do atendimento no servidor.
+            $urls['exam_kits'] = route('panel.patients.medicalrecords.exam-kits', [$patient, $record]);
+        }
+
+        // Modelos pessoais do médico (Fase 2 / B3) — só quem emite.
+        if (CurrentDoctor::canIssue()) {
+            $urls['personal_templates']         = route('panel.doctor-document-templates.index');
+            $urls['personal_template_template'] = route('panel.doctor-document-templates.update', ['template' => '__ID__']);
         }
 
         return $urls;
@@ -1105,6 +1239,8 @@ class MedicalRecordsController extends Controller
             'observation_general'      => $r->observation_general,
             'observation_of_lenses'    => $r->observation_of_lenses,
             'contact_lens_calculation' => $r->contact_lens_calculation,
+            // Uso de lente de contato na anamnese (Fase 2 / A3).
+            'contact_lens_use' => $r->contact_lens_use,
 
             // Vínculo com a agenda (hidrata o form no edit — sem isso o
             // update mandava '' e desvinculava o agendamento).
@@ -1122,12 +1258,17 @@ class MedicalRecordsController extends Controller
 
             // Documentações já anexadas
             'documentations' => $r->documentations->map(fn ($d) => [
-                'id'                => (string) $d->id,
-                'type'              => $d->type,
-                'type_label'        => $d->getTypeLabel(),
-                'title'             => $d->title,
-                'doctor_name'       => $d->doctor?->person?->full_name ?? '',
-                'created_at'        => $d->created_at?->format('d/m/Y H:i'),
+                'id'          => (string) $d->id,
+                'type'        => $d->type,
+                'type_label'  => $d->getTypeLabel(),
+                'title'       => $d->title,
+                'doctor_name' => $d->doctor?->person?->full_name ?? '',
+                'created_at'  => $d->created_at?->format('d/m/Y H:i'),
+                // Data alternativa impressa (Fase 2 / B3) — null = a da emissão.
+                'document_date'       => $d->hasAlternativeDate() ? $d->document_date?->format('d/m/Y') : null,
+                'document_date_label' => $d->hasAlternativeDate()
+                    ? __('clinical_documents.date.printed', ['date' => $d->document_date?->copy()->locale(app()->getLocale())->isoFormat('L')])
+                    : null,
                 'is_ai'             => $d->ai_run_id !== null,
                 'ai_workflow_label' => $d->ai_run_id && $d->aiRun ? __('ai.workflow_' . $d->aiRun->workflow) : null,
                 'pdf_url'           => route(
@@ -1219,6 +1360,86 @@ class MedicalRecordsController extends Controller
         if ($user instanceof User) {
             $this->drafts->clearAfterSave($user, (string) session('selected_entity_id'), $record, $created, $record->schedule_id ? (string) $record->schedule_id : null);
         }
+    }
+
+    /**
+     * Alergias, medicações e alertas de risco para a tela (Fase 2 / A1-A2).
+     * Perfil sem acesso a Pacientes não recebe a lista (PatientAccess).
+     * `check`: termos da checagem de alergia do receituário (só quem emite).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function clinicalSafetyProps(Patient $patient, bool $withCheck): ?array
+    {
+        if (! app(PatientAccess::class)->current()) {
+            return null;
+        }
+
+        return [
+            ...$this->clinicalSafety->summary($patient),
+            'patient_id' => (string) $patient->id,
+            'can_review' => CurrentDoctor::canIssue(),
+            'check'      => $withCheck ? $this->clinicalSafety->clientCheck($patient) : null,
+        ];
+    }
+
+    /**
+     * Uso de LC da consulta anterior mais recente que o registrou — o novo
+     * atendimento começa com ele (o médico confere). Edição: a consulta
+     * anterior a esta.
+     *
+     * @return array{value: array<string, mixed>, date: ?string}|null
+     */
+    private function previousContactLensUse(Patient $patient, ?MedicalRecord $record): ?array
+    {
+        $previous = MedicalRecord::query()
+            ->where('patient_id', $patient->id)
+            ->whereNotNull('contact_lens_use')
+            ->when($record, fn ($q) => $q->where('id', '!=', $record->id)->where('created_at', '<', $record->created_at))
+            ->orderByDesc('created_at')
+            ->first(['id', 'contact_lens_use', 'created_at']);
+
+        if ($previous === null || ! is_array($previous->contact_lens_use)) {
+            return null;
+        }
+
+        return [
+            'value' => $previous->contact_lens_use,
+            'date'  => $previous->created_at?->locale(app()->getLocale())->isoFormat('L'),
+        ];
+    }
+
+    /**
+     * Retrato da consulta (alergias e medicações) com rótulos no idioma da
+     * tela — histórico da consulta (modal/drawer).
+     *
+     * @return array{allergies_snapshot: ?array<string, mixed>, medications_snapshot: ?list<array<string, mixed>>}
+     */
+    private function snapshotForView(MedicalRecord $record): array
+    {
+        $allergies = is_array($record->allergies_snapshot) ? $record->allergies_snapshot : null;
+
+        return [
+            'allergies_snapshot' => $allergies === null ? null : [
+                'state' => $allergies['state'] ?? 'unknown',
+                'items' => collect($allergies['items'] ?? [])->map(fn (array $a) => [
+                    'substance'      => $a['substance'] ?? '',
+                    'category_label' => AllergyCategory::tryFrom((string) ($a['category'] ?? ''))?->label(),
+                    'reaction'       => $a['reaction'] ?? null,
+                    'severity_label' => AllergySeverity::tryFrom((string) ($a['severity'] ?? ''))?->label(),
+                    'status_label'   => AllergyStatus::tryFrom((string) ($a['status'] ?? ''))?->label(),
+                ])->values()->all(),
+            ],
+            'medications_snapshot' => is_array($record->medications_snapshot)
+                ? collect($record->medications_snapshot)->map(fn (array $m) => [
+                    'name'              => $m['name'] ?? '',
+                    'active_ingredient' => $m['active_ingredient'] ?? null,
+                    'posology'          => $m['posology'] ?? null,
+                    'source_label'      => MedicationSource::tryFrom((string) ($m['source'] ?? ''))?->label(),
+                    'confirmed'         => (bool) ($m['confirmed'] ?? false),
+                ])->values()->all()
+                : null,
+        ];
     }
 
     private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void

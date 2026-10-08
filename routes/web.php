@@ -37,6 +37,7 @@ use App\Http\Controllers\{
     LocaleController,
     MyPayoutsController,
     NoticesController,
+    PatientClinicalSafetyController,
     PatientDocumentSharesController,
     PatientImportsController,
     PatientPortalInvitationsController,
@@ -67,7 +68,7 @@ use App\Http\Controllers\{
     SubscriptionExpiredController,
 };
 use App\Http\Controllers\Billing\CheckoutController;
-use App\Http\Controllers\{CallPanelDisplayController, MedicationPresetsController};
+use App\Http\Controllers\{CallPanelDisplayController, DoctorDocumentTemplatesController, MedicalRecordExamKitsController, MedicationPresetsController};
 use App\Http\Controllers\{Cid10SearchController, CovenantPlanSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
 use App\Http\Controllers\{PanelDashboardController, PreferencesController};
@@ -86,7 +87,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     VisitTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController, ScheduleSettingsController};
-use App\Http\Controllers\Setting\{ReportSettingsController, SecurityController};
+use App\Http\Controllers\Setting\{ExamKitsController, ReportSettingsController, SecurityController};
 use App\Http\Controllers\Stock\{IolLensesController, ProcedureProductsController, ProductCategoriesController, ProductImportsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockCountsController, StockMovementsController, StockReportsController, SuppliersController};
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
@@ -396,6 +397,20 @@ Route::group(
             // Restaurar paciente excluído (a listagem mostra "Restaurar") —
             // mesmo grupo de permissão da exclusão.
             Route::patch('patients/{patient}/restore', [PatientsController::class, 'restore'])->name('patients.restore');
+            // Segurança clínica (Fase 2 / A1-A2): alergias, "nega alergias" e
+            // medicações em uso. Mesma regra de acesso a Pacientes (recepção
+            // registra como informado); confirmar/descartar/suspender exige o
+            // médico com cadastro ativo — checado no controller.
+            Route::get('patients/{patient}/clinical-safety', [PatientClinicalSafetyController::class, 'show'])->name('patients.clinical-safety.show');
+            Route::post('patients/{patient}/allergies', [PatientClinicalSafetyController::class, 'storeAllergy'])->name('patients.allergies.store');
+            Route::put('patients/{patient}/allergies/{allergy}', [PatientClinicalSafetyController::class, 'updateAllergy'])->name('patients.allergies.update');
+            Route::post('patients/{patient}/allergies/{allergy}/confirm', [PatientClinicalSafetyController::class, 'confirmAllergy'])->name('patients.allergies.confirm');
+            Route::post('patients/{patient}/allergies/{allergy}/discard', [PatientClinicalSafetyController::class, 'discardAllergy'])->name('patients.allergies.discard');
+            Route::put('patients/{patient}/allergy-status', [PatientClinicalSafetyController::class, 'updateAllergyStatus'])->name('patients.allergy-status.update');
+            Route::post('patients/{patient}/medications', [PatientClinicalSafetyController::class, 'storeMedication'])->name('patients.medications.store');
+            Route::put('patients/{patient}/medications/{medication}', [PatientClinicalSafetyController::class, 'updateMedication'])->name('patients.medications.update');
+            Route::post('patients/{patient}/medications/{medication}/confirm', [PatientClinicalSafetyController::class, 'confirmMedication'])->name('patients.medications.confirm');
+            Route::post('patients/{patient}/medications/{medication}/status', [PatientClinicalSafetyController::class, 'updateMedicationStatus'])->name('patients.medications.status');
             Route::resource('patients', PatientsController::class);
 
             // Portal do Paciente (Fase 1): convite disparado pelo staff. O
@@ -431,6 +446,20 @@ Route::group(
                     ->name('medication-presets.posology');
                 Route::post('medication-presets/favorite', [MedicationPresetsController::class, 'toggleFavorite'])
                     ->name('medication-presets.favorite');
+
+                // Modelos PESSOAIS do médico (Fase 2 / B3 — "Salvar como
+                // modelo" na receita, no pedido e no editor de documentos).
+                // Só o dono (médico com cadastro ativo) — conferido no controller.
+                Route::get('doctor-document-templates', [DoctorDocumentTemplatesController::class, 'index'])
+                    ->name('doctor-document-templates.index');
+                Route::post('doctor-document-templates', [DoctorDocumentTemplatesController::class, 'store'])
+                    ->name('doctor-document-templates.store');
+                Route::put('doctor-document-templates/{template}', [DoctorDocumentTemplatesController::class, 'update'])
+                    ->whereUuid('template')
+                    ->name('doctor-document-templates.update');
+                Route::delete('doctor-document-templates/{template}', [DoctorDocumentTemplatesController::class, 'destroy'])
+                    ->whereUuid('template')
+                    ->name('doctor-document-templates.destroy');
             });
 
             // F6 — Solicitação de procedimentos (autocomplete + format-line)
@@ -514,6 +543,11 @@ Route::group(
                 'patients/{patient}/medicalrecords/{medicalrecord}/quick-actions/{action}',
                 [MedicalRecordQuickActionsController::class, 'issue'],
             )->name('patients.medicalrecords.quick-actions.issue');
+            // Kits do pedido de exames (Fase 2 / B2), pelo convênio do atendimento.
+            Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/exam-kits',
+                MedicalRecordExamKitsController::class,
+            )->name('patients.medicalrecords.exam-kits');
             // Evoluções clínicas (texto livre, append-only). Leitura no grupo
             // admin/doctor/secretary; escrita restringida a médico DENTRO do
             // controller via Gate IssueReport (mesmo padrão das quick actions).
@@ -1022,7 +1056,23 @@ Route::group(
                 Route::get('report-settings/{report_setting}/preview', [ReportSettingsController::class, 'preview'])->name('report-settings.preview');
                 Route::post('report-settings/{report_setting}/adopt', [ReportSettingsController::class, 'adopt'])->name('report-settings.adopt');
                 Route::post('report-settings/{report_setting}/reimport', [ReportSettingsController::class, 'reimport'])->name('report-settings.reimport');
+                // Atualização do modelo padrão em conteúdo PERSONALIZADO pela
+                // clínica: ver, aplicar ou manter o da clínica (auditado).
+                Route::get('report-settings/{report_setting}/contents/{content}/upstream', [ReportSettingsController::class, 'upstream'])
+                    ->whereUuid('content')->name('report-settings.contents.upstream');
+                Route::post('report-settings/{report_setting}/contents/{content}/apply-update', [ReportSettingsController::class, 'applyUpdate'])
+                    ->whereUuid('content')->name('report-settings.contents.apply-update');
+                Route::post('report-settings/{report_setting}/contents/{content}/keep', [ReportSettingsController::class, 'keepMine'])
+                    ->whereUuid('content')->name('report-settings.contents.keep');
                 Route::resource('report-settings', ReportSettingsController::class);
+
+                // Kits de exames da clínica (Fase 2 / B2): CRUD, cópia do
+                // padrão do EasyEye e vínculo com convênios.
+                Route::get('exam-kits', [ExamKitsController::class, 'index'])->name('exam-kits.index');
+                Route::post('exam-kits', [ExamKitsController::class, 'store'])->name('exam-kits.store');
+                Route::put('exam-kits/{kit}', [ExamKitsController::class, 'update'])->whereUuid('kit')->name('exam-kits.update');
+                Route::delete('exam-kits/{kit}', [ExamKitsController::class, 'destroy'])->whereUuid('kit')->name('exam-kits.destroy');
+                Route::post('exam-kits/{kit}/copy', [ExamKitsController::class, 'copy'])->whereUuid('kit')->name('exam-kits.copy');
             });
         });
 

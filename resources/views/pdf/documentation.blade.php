@@ -85,6 +85,11 @@
         line-height: 1.6;
     }
     .content-body p  { margin-bottom: 0.6em; }
+    /* Listas (pedido de exames — Fase 2 / B2 —, receitas de pterígio e
+       catarata): o reset global (* { padding: 0 }) escondia o marcador. */
+    .content-body ul,
+    .content-body ol { padding-left: 1.5em; margin-bottom: 0.6em; }
+    .content-body li { margin-bottom: 0.2em; }
     .content-body br { display: block; margin-bottom: 0; }
 
     /*
@@ -173,7 +178,9 @@
     @if($setting->patient_address && $patient->person->address_full)
      &nbsp;|&nbsp; {{ $patient->person->address_full }}
     @endif
-    &nbsp;|&nbsp; <strong>{{ __('pdf.date') }}:</strong> {{ \Illuminate\Support\Carbon::now()->isoFormat('L') }}
+    {{-- Data IMPRESSA: a alternativa escolhida pelo médico ou a da emissão
+         (Fase 2 / B3) — reimprimir não troca pela data de hoje. --}}
+    &nbsp;|&nbsp; <strong>{{ __('pdf.date') }}:</strong> {{ $documentation->printedDate()->isoFormat('L') }}
 </div>
 
 <!-- ─── EXAMES DO LAUDO ──────────────────────────────────────────────────────
@@ -213,7 +220,7 @@
     fazendo conteúdo aparecer DEPOIS do bloco de assinatura.
     Em fluxo normal, a assinatura sempre vem após o conteúdo completo.
 -->
-@include('pdf._signature', ['fixedPosition' => false])
+@include('pdf._signature', ['fixedPosition' => false, 'documentDate' => $documentation->printedDate()])
 
 {{-- Rodapé renderizado via --footer-html no MedicalRecordPdfService::buildDocumentationFooterFile() --}}
 

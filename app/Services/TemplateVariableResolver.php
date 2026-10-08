@@ -3,14 +3,15 @@
 namespace App\Services;
 
 use App\Models\{Doctor, Entity, MedicalRecord, Patient, ReportSettingContent, ReportSettingVariable};
-use Carbon\Carbon;
+use App\Support\BrazilianFormat;
+use Carbon\{Carbon, CarbonInterface};
 use DateTimeInterface;
 
 /**
  * Resolve variáveis dinâmicas em templates de documentação clínica.
  *
  * Fontes suportadas:
- *   - patient      → Person do paciente (full_name, cpf, birth_date, age)
+ *   - patient      → Person do paciente (full_name, CPF em national_registry, birth_date, age)
  *   - doctor       → Person do médico (full_name, record, record_specialty)
  *   - entity       → Dados da clínica (name, address, phone)
  *   - medical_record → Campos clínicos do prontuário (tonometria, refração, etc.)
@@ -19,8 +20,16 @@ use DateTimeInterface;
  */
 class TemplateVariableResolver
 {
+    /** Data dos documentos desta resolução (data alternativa — Fase 2 / B3). */
+    private ?CarbonInterface $documentDate = null;
+
     /**
      * Resolve o conteúdo de um template substituindo todas as variáveis.
+     *
+     * @param CarbonInterface|null $documentDate data impressa no documento
+     *                                           (data alternativa — Fase 2 / B3); null = hoje. Vale para
+     *                                           toda variável de data ({{DATA_ATUAL}}, {{DATA_EXTENSO}},
+     *                                           {{LOCAL_DATA}} e as do tipo `date`), nunca para {{DATA_EXAME}}.
      *
      * @return array{html: string, unresolved: array<string, string>}
      */
@@ -30,9 +39,11 @@ class TemplateVariableResolver
         Doctor $doctor,
         Entity $entity,
         ?MedicalRecord $medicalRecord = null,
+        ?CarbonInterface $documentDate = null,
     ): array {
         $patient->loadMissing('person');
         $doctor->loadMissing('person');
+        $this->documentDate = $documentDate;
 
         // 1. Coletar variáveis definidas na tabela
         $variables = $content->activeVariables()->orderBy('sort_order')->get();
@@ -71,6 +82,46 @@ class TemplateVariableResolver
     }
 
     /**
+     * Valores que o resolver colocaria no texto deste modelo para ESTE
+     * paciente/médico/clínica/consulta — só as fontes que identificam o
+     * atendimento (paciente, médico, clínica, data, prontuário); `custom` e
+     * defaults estáticos ficam fora. Usado para devolver o texto de um modelo
+     * pessoal às variáveis antes de salvar (Fase 2 / B3 — modelo reutilizável
+     * não guarda dado de paciente).
+     *
+     * @return array<string, string> placeholder => valor resolvido
+     */
+    public function identityReplacements(
+        ReportSettingContent $content,
+        Patient $patient,
+        Doctor $doctor,
+        Entity $entity,
+        ?MedicalRecord $medicalRecord = null,
+        ?CarbonInterface $documentDate = null,
+    ): array {
+        $patient->loadMissing('person');
+        $doctor->loadMissing('person');
+        $this->documentDate = $documentDate;
+
+        $map = $this->buildSystemReplacements($patient, $doctor, $entity, $medicalRecord);
+
+        foreach ($content->activeVariables()->orderBy('sort_order')->get() as $variable) {
+            if (! in_array($variable->source_type, ['patient', 'doctor', 'entity', 'date', 'medical_record'], true)) {
+                continue;
+            }
+
+            $value = $this->resolveVariable($variable, $patient, $doctor, $entity, $medicalRecord);
+
+            if ($value !== null && $value !== '') {
+                // Mesma prioridade do resolve(): a variável da tabela vence o padrão.
+                $map[$variable->placeholder] = $value;
+            }
+        }
+
+        return array_filter($map, fn ($value) => is_string($value) && trim($value) !== '');
+    }
+
+    /**
      * Retorna todas as variáveis disponíveis agrupadas, para uso no editor de templates.
      *
      * @return array<string, array<int, array{placeholder: string, label: string, description: string|null}>>
@@ -102,6 +153,22 @@ class TemplateVariableResolver
             ],
             'auxiliares' => [
                 ['placeholder' => '{{CABECALHO_PACIENTE}}', 'label' => 'Cabeçalho do Paciente', 'description' => 'Bloco com nome, idade e data do exame (HTML)'],
+            ],
+            // Fase 2 / B1-B2: preenchidas na emissão (CertificateBuilder e
+            // ProcedureSolicitationService::buildRequest), não pelo resolver.
+            'atestados' => [
+                ['placeholder' => '{{DATA_COMPARECIMENTO}}', 'label' => 'Dia do comparecimento', 'description' => 'Formato dd/mm/aaaa (em branco = data do documento)'],
+                ['placeholder' => '{{HORARIO_COMPARECIMENTO}}', 'label' => 'Horário ou período', 'description' => 'Ex.: ", das 08:10 às 09:30" ou ", no período da manhã"'],
+                ['placeholder' => '{{ORIENTACAO_DILATACAO}}', 'label' => 'Orientação de dilatação pupilar', 'description' => 'Parágrafo: não dirigir/operar máquinas por N horas'],
+                ['placeholder' => '{{ACOMPANHANTE_NOME}}', 'label' => 'Nome do acompanhante', 'description' => 'Atestado de acompanhante'],
+                ['placeholder' => '{{ACOMPANHANTE_DOCUMENTO}}', 'label' => 'Documento do acompanhante', 'description' => 'Ex.: ", portador(a) do documento RG 123," (opcional)'],
+                ['placeholder' => '{{CID_ATESTADO}}', 'label' => 'CID autorizado pelo paciente', 'description' => 'Parágrafo com o CID-10 — só sai com a autorização (Res. CFM 1.658/2002, art. 5º)'],
+                ['placeholder' => '{{TABELA_ACUIDADE_VISUAL}}', 'label' => 'Tabela de acuidade visual', 'description' => 'AV sem/com correção do prontuário'],
+                ['placeholder' => '{{CONCLUSAO_APTIDAO}}', 'label' => 'Conclusão da aptidão visual', 'description' => 'Apto / apto com correção / inapto'],
+                ['placeholder' => '{{FINALIDADE_APTIDAO}}', 'label' => 'Finalidade da aptidão visual', 'description' => 'Trabalho, esporte, concurso ou outra'],
+            ],
+            'pedido_exames' => [
+                ['placeholder' => '{{PROCEDIMENTOS_SOLICITADOS}}', 'label' => 'Exames do pedido', 'description' => 'Lista com código, caráter, indicação, CID-10 e observações'],
             ],
         ];
     }
@@ -135,13 +202,23 @@ class TemplateVariableResolver
     {
         return match ($variable->source_field) {
             'person.full_name'  => $patient->person?->full_name ?? '',
-            'person.cpf'        => $patient->person?->cpf ?? '',
+            'person.cpf'        => $this->patientCpf($patient),
             'person.birth_date' => $patient->person?->birth_date?->format('d/m/Y') ?? '',
             'age'               => $patient->person?->birth_date
                 ? Carbon::parse($patient->person->birth_date)->age . ' anos'
                 : '',
             default => $this->resolveNestedField($patient, $variable->source_field),
         };
+    }
+
+    /**
+     * CPF formatado (000.000.000-00). O CPF da pessoa fica em
+     * `people.national_registry` — `person->cpf` não existe e deixava a
+     * variável sempre vazia. Sem CPF (ou valor fora do formato), vazio.
+     */
+    private function patientCpf(Patient $patient): string
+    {
+        return BrazilianFormat::cpf($patient->person?->national_registry) ?? '';
     }
 
     private function resolveDoctor(ReportSettingVariable $variable, Doctor $doctor): ?string
@@ -166,11 +243,19 @@ class TemplateVariableResolver
 
     private function resolveDate(ReportSettingVariable $variable): string
     {
+        $date = $this->documentDay();
+
         return match ($variable->source_field) {
-            'current' => now()->format('d/m/Y'),
-            'long'    => now()->isoFormat('dddd, D [de] MMMM [de] YYYY'),
-            default   => now()->format('d/m/Y'),
+            'current' => $date->format('d/m/Y'),
+            'long'    => $date->isoFormat('dddd, D [de] MMMM [de] YYYY'),
+            default   => $date->format('d/m/Y'),
         };
+    }
+
+    /** Data do documento: a alternativa escolhida pelo médico ou hoje. */
+    private function documentDay(): CarbonInterface
+    {
+        return $this->documentDate ?? now();
     }
 
     private function resolveMedicalRecord(ReportSettingVariable $variable, ?MedicalRecord $record): ?string
@@ -197,7 +282,7 @@ class TemplateVariableResolver
     {
         $parts = array_filter([(string) ($entity->city ?? ''), (string) ($entity->state ?? '')]);
         $local = implode('/', $parts);
-        $date  = now()->isoFormat('D [de] MMMM [de] YYYY');
+        $date  = $this->documentDay()->isoFormat('D [de] MMMM [de] YYYY');
 
         return $local !== '' ? "{$local}, {$date}" : $date;
     }
@@ -232,7 +317,7 @@ class TemplateVariableResolver
 
         return [
             '{{PACIENTE_NOME}}'            => $patientName,
-            '{{PACIENTE_CPF}}'             => $patient->person?->cpf ?? '',
+            '{{PACIENTE_CPF}}'             => $this->patientCpf($patient),
             '{{PACIENTE_DATA_NASCIMENTO}}' => $patientBirth,
             '{{PACIENTE_IDADE}}'           => $patientAge,
             '{{MEDICO_NOME}}'              => $doctor->person?->full_name ?? '',
@@ -241,8 +326,8 @@ class TemplateVariableResolver
             '{{CLINICA_NOME}}'             => $entity->name ?? '',
             '{{CLINICA_ENDERECO}}'         => $entity->address ?? '',
             '{{CLINICA_TELEFONE}}'         => $entity->phone ?? '',
-            '{{DATA_ATUAL}}'               => now()->format('d/m/Y'),
-            '{{DATA_EXTENSO}}'             => now()->isoFormat('dddd, D [de] MMMM [de] YYYY'),
+            '{{DATA_ATUAL}}'               => $this->documentDay()->format('d/m/Y'),
+            '{{DATA_EXTENSO}}'             => $this->documentDay()->isoFormat('dddd, D [de] MMMM [de] YYYY'),
             '{{DATA_EXAME}}'               => $examDate,
             '{{LOCAL_DATA}}'               => $this->buildLocalDate($entity),
             // {{CABECALHO_PACIENTE}} resolvido como vazio: o PDF blade

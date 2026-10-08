@@ -123,3 +123,67 @@ describe('ScheduleDetailDrawer — copiar código', () => {
         expect(hasPatientCodeRow).toBe(false);
     });
 });
+
+describe('ScheduleDetailDrawer — alergias do paciente (Fase 2)', () => {
+    function mockWith(clinical) {
+        globalThis.fetch = vi.fn(() =>
+            Promise.resolve({
+                ok: true,
+                json: () =>
+                    Promise.resolve({
+                        data: {
+                            id: 'sched-1',
+                            code: 'SDL-1',
+                            patient_name: 'Maria',
+                            situation_label: 'Confirmado',
+                            resources: [],
+                            situation_logs: [],
+                            clinical_safety: clinical,
+                        },
+                    }),
+            }),
+        );
+    }
+
+    async function open() {
+        const wrapper = mount(ScheduleDetailDrawer, {
+            props: { open: false, scheduleId: 'sched-1', t: {} },
+            global: { stubs: { teleport: true } },
+        });
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+        return wrapper;
+    }
+
+    it('alerta fixo com a alergia e a reação; sem alertas de risco (são do atendimento médico)', async () => {
+        mockWith({
+            allergy_state: 'has',
+            allergies: [
+                {
+                    id: 'a',
+                    substance: 'Dipirona',
+                    reaction: 'Edema de glote',
+                    severity_label: 'Grave / anafilaxia',
+                    status: 'confirmed',
+                    active: true,
+                },
+            ],
+            risk_alerts: [
+                { key: 'x', group: 'Alfa-1 bloqueadores', alert: 'IFIS', medications: ['SECOTEX'], source: 's' },
+            ],
+        });
+        const wrapper = await open();
+        const banner = wrapper.find('[data-testid="clinical-alert-banner"]');
+
+        expect(banner.text()).toContain('ALERGIA:');
+        expect(banner.text()).toContain('Edema de glote');
+        expect(banner.find('[data-testid="cs-risk-alerts"]').exists()).toBe(false);
+    });
+
+    it('sem acesso a Pacientes (clinical_safety null): nada', async () => {
+        mockWith(null);
+        const wrapper = await open();
+
+        expect(wrapper.find('[data-testid="clinical-alert-banner"]').exists()).toBe(false);
+    });
+});

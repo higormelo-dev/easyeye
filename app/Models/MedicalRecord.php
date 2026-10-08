@@ -94,6 +94,13 @@ class MedicalRecord extends Model
         // Cálculo de lentes de contato (entradas + resultados recalculados
         // no servidor — App\Services\ContactLensCalculator)
         'contact_lens_calculation',
+        // Uso de lente de contato na anamnese (Fase 2 / A3) — por consulta.
+        'contact_lens_use',
+        // Retrato das medicações ativas e das alergias do paciente no momento
+        // da consulta (Fase 2 / A2) — gravado pelo servidor a cada salvar
+        // (MedicalRecordService), nunca vindo do navegador.
+        'medications_snapshot',
+        'allergies_snapshot',
         // Diagnóstico — CBO obrigatório (múltiplos CIDs como JSON [{code, description}])
         'diagnosis_cids',
         // Conduta — CBO obrigatório
@@ -281,6 +288,9 @@ class MedicalRecord extends Model
             'lens_near_ids'  => 'array',
             // Cálculo de lentes de contato vinculado à consulta.
             'contact_lens_calculation' => 'array',
+            'contact_lens_use'         => 'array',
+            'medications_snapshot'     => 'array',
+            'allergies_snapshot'       => 'array',
         ];
     }
 
@@ -294,7 +304,7 @@ class MedicalRecord extends Model
      */
     protected function signatureOptionalAttributes(): array
     {
-        return ['contact_lens_calculation'];
+        return ['contact_lens_calculation', 'contact_lens_use', 'medications_snapshot', 'allergies_snapshot'];
     }
 
     /**

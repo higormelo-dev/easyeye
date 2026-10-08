@@ -97,4 +97,20 @@ return [
     'flash_reimported' => 'Content re-imported successfully.',
     'error_reimport'   => 'Could not re-import: the source global template is no longer available.',
     'error_adopt'      => 'This template is not available for adoption.',
+
+    // Default template update on content customized by the clinic
+    'upstream_badge'       => 'Default template update available',
+    'upstream_hint'        => 'The clinic customized this text and the EasyEye default template changed afterwards. Nothing was changed without your decision.',
+    'upstream_view'        => 'View default template',
+    'upstream_apply'       => 'Apply update',
+    'upstream_keep'        => 'Keep mine',
+    'upstream_confirm'     => 'Replace the ":label" text with the current default template? The clinic\'s customized text will be replaced (the change is logged).',
+    'upstream_title'       => 'Your text × updated default template',
+    'upstream_local'       => 'Your text (customized)',
+    'upstream_global'      => 'Updated default template',
+    'upstream_loading'     => 'Loading…',
+    'upstream_error'       => 'Could not load the default template.',
+    'upstream_unsaved'     => 'Save or discard the changes in this form before applying or keeping.',
+    'flash_update_applied' => 'Default template update applied.',
+    'flash_update_kept'    => 'Clinic text kept. The notice comes back if the default template changes again.',
 ];

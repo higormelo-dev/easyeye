@@ -6,6 +6,7 @@
       $entity        — App\Models\Entity (p/ localização — opcional)
       $setting       — App\Models\ReportSetting
       $fixedPosition — bool (default: true). false = fluxo normal (ex: tonometria com layout flex)
+      $documentDate  — data impressa (data alternativa — Fase 2 / B3); default: hoje
 
     Posicionamento:
       true  → position: fixed; bottom: 30px (ancora ao rodapé da página).
@@ -16,6 +17,7 @@
     $entity        = $entity        ?? null;
     $setting       = $setting       ?? null;
     $fixedPosition = $fixedPosition ?? true;
+    $documentDate  = $documentDate  ?? null;
 
     if (!($setting?->show_signature ?? true)) return;
 
@@ -35,7 +37,7 @@
         /** @var \App\Services\LocationFormatter $formatter */
         $formatter = app(\App\Services\LocationFormatter::class);
         $loc       = $formatter->format($entity);
-        $datePart  = \Illuminate\Support\Carbon::now()->isoFormat('LL');
+        $datePart  = ($documentDate ?? \Illuminate\Support\Carbon::now())->isoFormat('LL');
         $locLine   = trim($loc ? "{$loc}, {$datePart}" : $datePart) . '.';
     }
 @endphp

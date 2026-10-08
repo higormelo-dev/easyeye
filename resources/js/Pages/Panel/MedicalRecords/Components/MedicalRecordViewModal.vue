@@ -1,7 +1,10 @@
 <script setup>
+import { clinicalTexts, recordSafetyRows } from '@/Support/clinicalSafety.js';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 import { ref, watch, computed, onMounted } from 'vue';
 import { contactLensSummary } from './contactLens.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
+import { documentTexts, td, fill } from '@/Support/clinicalDocuments.js';
 
 /**
  * Modal somente-leitura de um prontuário anterior. Busca o JSON completo via
@@ -20,11 +23,17 @@ const data = ref(null);
 const loading = ref(false);
 const errorMsg = ref('');
 
+// Só a última carga vale: o prontuário atrasado de outro paciente não
+// sobrescreve o que está aberto; fechar descarta o pendente.
+const viewReq = latestRequest();
+
 watch(
-    () => props.open,
-    (val) => {
-        if (val) load();
+    () => [props.open, props.record?.show_url],
+    ([open]) => {
+        if (open) load();
         else {
+            viewReq.cancel();
+            loading.value = false;
             data.value = null;
             errorMsg.value = '';
         }
@@ -38,6 +47,7 @@ onMounted(() => {
 async function load() {
     const url = props.record?.show_url;
     if (!url) return;
+    const req = viewReq.begin();
     loading.value = true;
     errorMsg.value = '';
     data.value = null;
@@ -45,15 +55,18 @@ async function load() {
         const res = await fetch(url, {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
+            signal: req.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        data.value = await res.json();
+        const json = await res.json();
+        if (req.current()) data.value = json;
     } catch (e) {
+        if (isAbortError(e) || !req.current()) return;
         errorMsg.value = tt('view_error', 'Não foi possível carregar o prontuário.');
         // eslint-disable-next-line no-console
         console.error('[MedicalRecordView] falha ao carregar prontuário:', e);
     } finally {
-        loading.value = false;
+        if (req.current()) loading.value = false;
     }
 }
 
@@ -63,6 +76,9 @@ function close() {
 
 // ── Montagem das seções (apenas campos preenchidos) ────────────────────────
 const tt = (key, fallback) => props.t[key] ?? fallback;
+// Data alternativa impressa (Fase 2 / B3) — texto de t_documents da página.
+const docTexts = documentTexts();
+const printedLabel = (date) => fill(td(docTexts, 'date.printed', 'Data impressa: :date'), { date });
 const pair = (r, l) => {
     const parts = [];
     if (r !== null && r !== undefined && r !== '') parts.push(`${tt('od', 'OD')}: ${r}`);
@@ -76,6 +92,7 @@ const risk = (self, family) =>
 const followUp = (days) => (days ? `${days} ${tt('days', 'dias')}` : '');
 
 const { locale } = useLocaleFormat();
+const clinicalT = clinicalTexts();
 
 const sections = computed(() => {
     const d = data.value;
@@ -93,6 +110,8 @@ const sections = computed(() => {
         [tt('hda_short', 'HDA'), d.hda],
         [tt('ocular_surgical_history', 'Histórico cirúrgico ocular'), d.ocular_surgical_history],
         [tt('medications_in_use', 'Medicamentos em uso'), d.medications_in_use],
+        // Retrato da consulta (alergias, medicações) e uso de LC — Fase 2.
+        ...recordSafetyRows(d, clinicalT),
         [tt('diabetic', 'Diabético'), risk(d.diabetic, d.diabetic_family)],
         [tt('hypertensive', 'Hipertenso'), risk(d.hypertensive, d.hypertensive_family)],
         [tt('glaucomatous', 'Glaucomatoso'), risk(d.glaucomatous, d.glaucomatous_family)],
@@ -310,6 +329,13 @@ const documentations = computed(() => data.value?.documentations ?? []);
                                             </div>
                                             <div class="text-muted" style="font-size: 0.72rem">
                                                 {{ doc.type_label }} · {{ doc.doctor_name }} · {{ doc.created_at }}
+                                            </div>
+                                            <div
+                                                v-if="doc.document_date"
+                                                class="small text-warning-emphasis"
+                                                data-testid="doc-printed-date"
+                                            >
+                                                {{ doc.document_date_label || printedLabel(doc.document_date) }}
                                             </div>
                                         </div>
                                         <a
