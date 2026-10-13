@@ -12,12 +12,15 @@ enum ExamSource: string
 {
     case Integrator     = 'integrator';
     case ExternalImport = 'external_import';
+    /** Foto/vídeo curto capturado ao vivo pela câmera do navegador (Fase 5). */
+    case BrowserCapture = 'browser_capture';
 
     public function label(): string
     {
         return match ($this) {
             self::Integrator     => 'Integrador',
             self::ExternalImport => 'Importação Externa',
+            self::BrowserCapture => 'Captura pelo Navegador',
         };
     }
 }

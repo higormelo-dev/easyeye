@@ -1,6 +1,9 @@
 <script setup>
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { latestRequest } from '@/Support/latestRequest.js';
+import { fill } from '@/Support/clinicalDocuments.js';
+import { useUserPreferences } from '@/composables/useUserPreferences.js';
+import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DoctorMissingAlert from '@/Components/Panel/DoctorMissingAlert.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
@@ -9,6 +12,7 @@ import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import DiagnosisManagerModal from '@/Components/Panel/DiagnosisManagerModal.vue';
 import ImportExternalExamModal from '@/Components/Panel/ImportExternalExamModal.vue';
 import EyeImageReportModal from './EyeImageReportModal.vue';
+import EyeImageReportDraftsModal from './EyeImageReportDraftsModal.vue';
 import EyeImageCompareModal from './EyeImageCompareModal.vue';
 import EyeImageContextMenu from './EyeImageContextMenu.vue';
 
@@ -36,8 +40,59 @@ const props = defineProps({
     // Perfil médico sem cadastro de médico ativo (CurrentDoctor): laudo/diagnóstico barrados.
     doctorMissing: { type: Boolean, default: false },
     doctorMissingText: { type: String, default: '' },
+    // Data alternativa do laudo manual (Fase 5) — DocumentDate::clientConfig().
+    document_date_config: { type: Object, default: () => ({}) },
+    // Rascunho de laudo (Fase 5) — ver EyeImageReportDraftController.
+    canDraftReports: { type: Boolean, default: false },
+    draftReportsPendingCount: { type: Number, default: 0 },
+    // Captura pela câmera (Fase 5 / 6a) — ver ImportExternalExamModal.vue.
+    max_video_seconds: { type: Number, default: 20 },
+    // Pedal USB (Fase 5 / 7a/7b) — allowlist + default da tecla "avançar"
+    // (ver ImportExternalExamModal.vue pra tecla "capturar", só relevante na
+    // aba de câmera). Valor de fato ativo vem de useUserPreferences(), com
+    // fallback nesta config quando o usuário nunca configurou nada.
+    pedal_shortcuts_config: {
+        type: Object,
+        default: () => ({ allowed_keys: ['Enter', ' ', 'PageDown', 'PageUp'], default_advance_key: ' ' }),
+    },
     t: { type: Object, default: () => ({}) },
 });
+
+const { getPreference: getPedalPreference } = useUserPreferences();
+const { date, dateTime } = useLocaleFormat();
+
+// Pedal USB (Fase 5 / 7b) — mesma tecla "avançar" configurada na captura
+// (ImportExternalExamModal) também passa pra próxima imagem aqui no
+// visualizador: o pedal fica "um só botão" entre os dois momentos do
+// fluxo (capturar x revisar), que nunca ficam abertos ao mesmo tempo.
+// Preferência AUSENTE (nunca configurada) cai no default; preferência
+// PRESENTE mas null (usuário desligou esta tecla de propósito — ver
+// ImportExternalExamModal.vue/PreferencesTest.php) fica null mesmo —
+// nenhum KeyboardEvent.key é null de verdade, então a comparação em
+// onKeyDown() nunca casa (desliga o atalho sem precisar de valor
+// sentinela). `?? default` sozinho tratava "nunca configurado" e
+// "desligado de propósito" como a MESMA coisa (achado via revisão Codex).
+const pedalAdvanceKey = computed(() => {
+    const saved = getPedalPreference('eye_images_pedal_shortcuts', {});
+
+    return 'advance_key' in saved ? saved.advance_key : (props.pedal_shortcuts_config?.default_advance_key ?? ' ');
+});
+
+function isTypingTarget(el) {
+    const tag = el?.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!el?.isContentEditable;
+}
+
+// Enter/Espaço com foco num <button> (ou link) disparam o click NATIVO do
+// navegador (ativação por teclado, acessibilidade) — isso vale pra ESSAS
+// DUAS teclas especificamente, nunca depende de qual tecla o pedal está
+// configurado. Interceptar com preventDefault() cancelava esse click
+// nativo — com o default Espaço, um botão do visualizador focado (Ajustar,
+// OD|OE, Fechar) ficava morto pro teclado e avançava de exame no lugar.
+// Mesmo guard de ImportExternalExamModal.vue (achado via revisão Codex).
+function isNativeActivationTarget(el, key) {
+    return (key === 'Enter' || key === ' ') && (el?.tagName === 'BUTTON' || el?.tagName === 'A');
+}
 
 // ── Estado principal ──────────────────────────────────────────────────────
 const patients = ref(props.patients || []);
@@ -116,6 +171,13 @@ const showPrintModal = ref(false);
 const printExams = ref([]);
 const printCols = ref(2);
 const printOrientation = ref('portrait');
+// Agrupar OD/OE (Fase 5): reordena por grupo (examGroupKey — mesma fonte da
+// verdade da galeria) com OD antes de OE antes de AO dentro do grupo. Some
+// as setas de reordenar manual enquanto ativo (a ordem some de ser manual).
+const printGroupOdOe = ref(false);
+// Legenda ad hoc por imagem (Fase 5) — só nesta impressão, nunca persistida
+// (reseta a cada abertura do modal, ver openPrintModal()).
+const printCaptions = reactive({});
 
 // ── Computed ──────────────────────────────────────────────────────────────
 /**
@@ -300,17 +362,6 @@ function formatDateFull(ymd) {
     return `${d}/${m}/${y}`;
 }
 
-function formatDateTime(dt) {
-    if (!dt) return '—';
-    const d = new Date(dt);
-    if (isNaN(d.getTime())) return String(dt);
-    return (
-        d.toLocaleDateString('pt-BR') +
-        ' ' +
-        d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    );
-}
-
 /**
  * Alt descritivo (tipo + lateralidade + data) pra imagem médica — reaproveitado
  * em todas as ocorrências de <img> do módulo (miniatura, viewer, tira, modo
@@ -323,6 +374,19 @@ function examAlt(exam) {
     const rawDate = exam.exam_performed_at ?? exam.created_at;
     const date = rawDate ? formatDateFull(String(rawDate).substring(0, 10)) : '—';
     return `${type} — ${latLabel(exam.laterality)}` + (date !== '—' ? ` — ${date}` : '');
+}
+
+// Vídeo capturado pela câmera do navegador (Fase 5 / 6c) — sem derivado JPEG
+// (GenerateExamDerivatives deliberadamente não gera um pra webm/mp4 ainda:
+// poster-frame é follow-up), então examUrls[] aponta pro arquivo de vídeo
+// original. Painel principal troca <img> por <video controls>; miniatura,
+// impressão e colagem excluem (ver printableExams/printExamsDisplay).
+const VIDEO_EXTENSIONS = ['webm', 'mp4'];
+
+function isVideoExam(exam) {
+    const path = exam?.archive ?? '';
+    const extension = path.split('.').pop()?.toLowerCase();
+    return VIDEO_EXTENSIONS.includes(extension);
 }
 
 // ── Seleção ───────────────────────────────────────────────────────────────
@@ -803,6 +867,7 @@ const viewerPanelGroups = computed(() => {
 // Botão Laudo do painel: abre o laudo com o exame daquele painel marcado;
 // os outros exames dos painéis aparecem na lista do laudo pra marcar junto.
 function openPanelReport(pi) {
+    reportSessionId += 1; // invalida um openDraftInReportModal() ainda em voo
     const group = panelGroup(pi);
     if (!group || reportModalOpen.value) return;
     const examIds = activeExamIdsOf([group]);
@@ -991,7 +1056,11 @@ function onAllEnter(exam) {
 
 // ── Impressão ─────────────────────────────────────────────────────────────
 function openPrintModal(exams, autoPrint = false) {
-    printExams.value = exams ?? [];
+    // Cópia própria (Fase 5): reordenar aqui não pode mutar o array de
+    // exames do paciente/galeria — mesma referência seria afetada sem isso.
+    printExams.value = [...(exams ?? [])];
+    printGroupOdOe.value = false;
+    for (const key of Object.keys(printCaptions)) delete printCaptions[key];
     showPrintModal.value = true;
     if (autoPrint) {
         nextTick(() => setTimeout(printReport, 300));
@@ -1000,6 +1069,49 @@ function openPrintModal(exams, autoPrint = false) {
 
 function printReport() {
     window.print();
+}
+
+// Ordem exibida/impressa: manual (setas, ordem crua de printExams) ou
+// agrupada por OD/OE (examGroupKey — mesma fonte da verdade da galeria,
+// nunca duplicar essa lógica) quando o toggle está ativo.
+const printEyeOrder = { 1: 0, 2: 1 };
+
+// Vídeo nunca entra na grade impressa (Fase 5 / 6c) — window.print() não
+// imprime um player de vídeo de forma útil, e o <video> nem está nesta
+// grade (ver template: filtra antes do v-for). Contagem exposta pra nota
+// textual avisar o médico, não some em silêncio.
+const printPrintableExams = computed(() => printExams.value.filter((e) => !isVideoExam(e)));
+const printExcludedVideoCount = computed(() => printExams.value.length - printPrintableExams.value.length);
+
+const printExamsDisplay = computed(() => {
+    if (!printGroupOdOe.value) return printPrintableExams.value;
+
+    const groups = new Map();
+    for (const exam of printPrintableExams.value) {
+        const { key } = examGroupKey(exam);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(exam);
+    }
+
+    return [...groups.values()]
+        .map((g) => g.slice().sort((a, b) => (printEyeOrder[a.laterality] ?? 2) - (printEyeOrder[b.laterality] ?? 2)))
+        .flat();
+});
+
+// Pula vídeo(s) escondido(s) na busca do vizinho pra trocar — sem isso, um
+// vídeo entre duas fotos "absorve" o clique: o array cru muda, mas a
+// ordem exibida/impressa (printPrintableExams filtra vídeo antes) fica
+// igual, e a seta parece não fazer nada (achado via revisão Codex).
+function movePrintExam(exam, direction) {
+    const list = printExams.value;
+    const from = list.indexOf(exam);
+    if (from === -1) return;
+    let to = from + direction;
+    while (to >= 0 && to < list.length && isVideoExam(list[to])) {
+        to += direction;
+    }
+    if (to < 0 || to >= list.length) return;
+    [list[from], list[to]] = [list[to], list[from]];
 }
 
 // Montage (benchmark 18/09/2026) — gerado no backend com Imagick (decisão
@@ -1011,16 +1123,40 @@ const montageBusy = ref(false);
 
 async function downloadMontage() {
     if (selectedExamIds.value.length < 2 || montageBusy.value || !props.urls.montage) return;
+
+    // Vídeo nunca entra na colagem (Fase 5 / 6c) — Imagick não lê bytes de
+    // vídeo como imagem (MontageService já pula silenciosamente); aqui
+    // filtra ANTES de mandar, pra avisar com nota em vez de só "sobrar
+    // menos tile que o esperado" sem explicação.
+    const examsById = new Map(groupedExams.value.flatMap((g) => g.exams).map((e) => [e.id, e]));
+    const examIds = selectedExamIds.value.filter((id) => !isVideoExam(examsById.get(id)));
+    const excludedVideos = selectedExamIds.value.length - examIds.length;
+
+    if (examIds.length < 2) {
+        if (window.showErrorToast) {
+            window.showErrorToast(tt('montage_select_two', 'Selecione 2 ou mais imagens para montar a colagem.'));
+        }
+        return;
+    }
+
     montageBusy.value = true;
     try {
         const res = await window.axios.post(
             props.urls.montage,
             {
-                exam_ids: selectedExamIds.value,
+                exam_ids: examIds,
                 columns: printCols.value,
             },
             { responseType: 'blob' },
         );
+
+        if (excludedVideos > 0 && window.showSuccessToast) {
+            window.showSuccessToast(
+                fill(tt('montage_video_excluded', ':count vídeo(s) não entraram na colagem.'), {
+                    count: excludedVideos,
+                }),
+            );
+        }
 
         const url = URL.createObjectURL(res.data);
         const a = document.createElement('a');
@@ -1060,6 +1196,24 @@ function onKeyDown(e) {
         viewerPrev();
     }
     if (e.key === 'ArrowRight') {
+        viewerNext();
+    }
+    // Pedal USB (Fase 5 / 7b) — tecla "avançar" configurável troca pra
+    // próxima imagem, mesmo efeito do ArrowRight. Nunca pode SER Escape/
+    // ArrowLeft/ArrowRight (allowlist em config/eye_image_capture.php +
+    // Rule::in em PreferencesController garantem isso no servidor) e nunca
+    // dispara com foco em campo de texto (ex.: busca de paciente) OU no
+    // <video controls> do exame em exibição — tecla padrão é Espaço, a
+    // mesma que o player nativo usa pra play/pause; sem este guard, dar
+    // play no vídeo focado avançava pro próximo exame em vez de tocar
+    // (achado via revisão Codex).
+    if (
+        e.key === pedalAdvanceKey.value &&
+        !isTypingTarget(e.target) &&
+        e.target?.tagName !== 'VIDEO' &&
+        !isNativeActivationTarget(e.target, e.key)
+    ) {
+        e.preventDefault();
         viewerNext();
     }
 }
@@ -1433,7 +1587,9 @@ const reportExamIds = ref([]);
 // à direita, já com os exames selecionados na galeria marcados. Nada
 // selecionado: abre os exames mais recentes, sem nenhum marcado.
 function openReportModal() {
+    reportSessionId += 1; // idem openPanelReport() — invalida um rascunho ainda carregando
     if (!selectedPatient.value) return;
+    activeDraft.value = null; // sempre um laudo/rascunho NOVO, nunca continuação (Fase 5)
     reportExamIds.value = [...selectedExamIds.value];
     openViewerForReport(
         reportExamIds.value.length
@@ -1480,8 +1636,14 @@ const reportExamGroups = computed(() => {
                     label: lat === 1 ? tt('eye_od', 'OD') : lat === 2 ? tt('eye_oe', 'OE') : tt('eye_ao', 'AO'),
                     examIds: active.map((e) => e.id),
                     // "Inserir imagem do exame" no editor — URLs já resolvidas
-                    // pelo pai (examUrls), sem round-trip novo.
+                    // pelo pai (examUrls), sem round-trip novo. Vídeo nunca
+                    // entra aqui: tem archive/URL preenchidos como qualquer
+                    // exame, mas "Inserir imagem"/"Imagens no laudo" rendem
+                    // um <img> — preview quebrado, e o vídeo podia acabar
+                    // embutido no corpo do laudo como se fosse foto (achado
+                    // via revisão Codex).
                     images: active
+                        .filter((e) => !isVideoExam(e))
                         .map((e) => ({
                             id: e.id,
                             url: examUrls.value[e.id] ?? '',
@@ -1535,24 +1697,173 @@ const reportUrls = computed(() => ({
     preview: props.urls?.report_preview ?? '',
     store: props.urls?.report_store ?? '',
     extractPdfText: props.urls?.report_extract_pdf_text ?? '',
+    // Reenvio ao médico solicitante (Fase 5) — ver EyeImageReportResendController.
+    reportResend: props.urls?.report_resend ?? '', // template __ID__
     // Frases rápidas do médico (benchmark 18/09/2026) — ver
     // DoctorReportPhrasesController.
     phrasesIndex: props.urls?.report_phrases_index ?? '',
     phrasesStore: props.urls?.report_phrases_store ?? '',
     phrasesUpdate: props.urls?.report_phrases_update ?? '', // template __ID__
     phrasesDestroy: props.urls?.report_phrases_destroy ?? '', // template __ID__
+    // Rascunho de laudo (Fase 5) — ver EyeImageReportDraftController.
+    draftStore: props.urls?.report_drafts_store ?? '',
+    draftUpdate: props.urls?.report_drafts_update ?? '', // template __ID__
+    draftSubmit: props.urls?.report_drafts_submit ?? '', // template __ID__
+    draftDestroy: props.urls?.report_drafts_destroy ?? '', // template __ID__
+    draftShow: props.urls?.report_drafts_show ?? '', // template __ID__
+    patientExams: props.urls?.patient_exams ?? '', // template __ID__
+}));
+
+const draftsModalUrls = computed(() => ({
+    index: props.urls?.report_drafts_index ?? '',
+    destroy: props.urls?.report_drafts_destroy ?? '',
 }));
 
 // Refetch só ao FECHAR o laudo: atualiza badge/histórico de laudos do
 // paciente uma vez, no fim.
 const reportAnySaved = ref(false);
 
+// Incrementado no início de TODA função que abre o laudo (openPanelReport,
+// openReportModal, openDraftInReportModal) — invalida um
+// openDraftInReportModal() ainda em voo (2 GETs em sequência: draftShow,
+// depois patientExams). Sem isto, abrir o rascunho A e, ANTES da resposta
+// chegar, abrir o laudo (novo) do paciente B, a resposta tardia de A
+// sobrescrevia activeDraft/reportModalOpen com os dados do paciente A
+// enquanto o formulário do modal já estava com o conteúdo do paciente B
+// (reset() só dispara quando reportModalOpen passa de false→true, nunca só
+// por activeDraft mudar) — salvar gravava o texto do paciente B com o
+// patient_id do paciente A (achado via revisão Codex). Mesmo princípio do
+// captureSessionId em ImportExternalExamModal.vue/draftSaveSessionId em
+// EyeImageReportModal.vue.
+let reportSessionId = 0;
+
+// Rascunho sendo revisado/continuado (Fase 5), aberto a partir da lista
+// (EyeImageReportDraftsModal) — sem viewer: EyeImageReportModal já suporta
+// "uso fora do visualizador" via examIds plano (sem examGroups).
+const activeDraft = ref(null);
+const draftsModalOpen = ref(false);
+// Cópia local do prop (carregado 1x no load da página) — decrementada na
+// hora quando o médico emite/descarta um rascunho, sem precisar reload.
+const pendingDraftsCount = ref(props.draftReportsPendingCount);
+
+function openDraftsModal() {
+    draftsModalOpen.value = true;
+}
+
+// A lista de rascunhos (EyeImageReportDraftsModal) devolve o item "resumido"
+// (sem content/clinical_indication/observations/document_date/requesting_doctor_*/
+// image_report_payload — ver EyeImageReportDraftController::serialize()). Abrir
+// direto com esse objeto zerava o formulário (e salvar sobrescrevia o rascunho
+// de verdade com campos vazios) — busca o rascunho completo antes de abrir
+// (achado via revisão Codex).
+// Candidatos pro botão "Inserir imagem"/bloco "Imagens no laudo" (examImages
+// do EyeImageReportModal — "sem examGroups", exatamente o modo rascunho). O
+// paciente do rascunho pode não ser o selecionado na tela (sem exams/URLs já
+// em memória) — busca dedicada, igual ao painel de exames do prontuário
+// (mesmo endpoint), sem tocar em selectedPatient/examUrls da página.
+const draftExamImages = ref([]);
+
+async function openDraftInReportModal(draft) {
+    reportSessionId += 1;
+    const sessionId = reportSessionId; // esta própria chamada não pode se autoinvalidar
+    draftsModalOpen.value = false;
+    draftExamImages.value = [];
+    if (!reportUrls.value.draftShow) return;
+
+    try {
+        const { data } = await window.axios.get(reportUrls.value.draftShow.replace('__ID__', draft.id));
+        if (sessionId !== reportSessionId) return; // outro laudo abriu enquanto isso carregava — resposta obsoleta
+
+        // Busca os candidatos de imagem ANTES de abrir o modal — se o laudo
+        // já tem metadata.image_report salvo, hydrateImageReport() roda logo
+        // que o modal abre e filtra cada item contra examImages; aberto antes
+        // dessa busca terminar, o filtro vê uma lista vazia e descarta as
+        // imagens já salvas (mesmo bug, só que por corrida em vez de omissão).
+        let examImages = [];
+        // Modo rascunho nunca manda examGroups (sem checkbox "Exames neste
+        // laudo" — ver template), então exam_ids do rascunho vai direto pro
+        // laudo sem nenhuma UI pra tirar um exame. Exame excluído ou
+        // desativado (active=false) DEPOIS que o rascunho foi criado ficava
+        // morto ali pra sempre: emitir sempre travava em 422/403, sem
+        // nenhuma forma de corrigir (achado via revisão Codex) — revalida
+        // aqui e já tira os indisponíveis antes de abrir o modal.
+        let examIds = data.exam_ids ?? [];
+        if (reportUrls.value.patientExams && data.patient?.id) {
+            const requestedIds = new Set(examIds);
+            const res = await window.axios.get(reportUrls.value.patientExams.replace('__ID__', data.patient.id));
+            if (sessionId !== reportSessionId) return; // idem — nunca aplica dado de paciente já obsoleto
+            const available = (res.data?.exams ?? []).filter((e) => e.active !== false);
+            const availableIds = new Set(available.map((e) => e.id));
+
+            const unavailableCount = examIds.filter((id) => !availableIds.has(id)).length;
+            if (unavailableCount > 0) {
+                examIds = examIds.filter((id) => availableIds.has(id));
+                if (window.showErrorToast) {
+                    window.showErrorToast(
+                        tt(
+                            'draft_unavailable_exams_removed',
+                            'Este rascunho tinha exame(s) que não estão mais disponíveis (removido(s) ou desativado(s)) — foram retirados automaticamente deste laudo.',
+                        ),
+                    );
+                }
+            }
+
+            // is_video (Fase 5 / 6a, revisão Codex): vídeo capturado pela
+            // câmera tem display_url/original_url preenchidos como qualquer
+            // exame, mas não é candidato pra "Inserir imagem"/"Imagens no
+            // laudo" — preview quebrado e risco de virar <img> no corpo do
+            // laudo. Rascunho não tem isVideoExam()/archive cru disponível
+            // aqui (vem de patientExamsForRecord(), não de groupedExams) —
+            // por isso o backend expõe o flag já calculado.
+            examImages = available
+                .filter((e) => requestedIds.has(e.id) && !e.is_video)
+                .map((e) => ({
+                    id: e.id,
+                    url: e.display_url ?? e.thumb_url ?? e.original_url ?? '',
+                    label:
+                        [e.exam_type, e.laterality].filter(Boolean).join(' — ') || tt('exam_fallback_label', 'Imagem'),
+                }))
+                .filter((img) => img.url);
+        }
+
+        draftExamImages.value = examImages;
+        activeDraft.value = { ...data, exam_ids: examIds };
+        reportModalOpen.value = true;
+    } catch {
+        if (sessionId !== reportSessionId) return; // idem — outro laudo já aberto, erro de uma chamada obsoleta nunca aparece por cima
+        if (window.showErrorToast) {
+            window.showErrorToast(tt('draft_load_failed', 'Não foi possível carregar o rascunho. Tente de novo.'));
+        }
+    }
+}
+
+// Rascunho emitido/descartado: sai da contagem de pendentes do médico (só
+// decrementa se ele estava Submitted — Draft nunca contou pro badge).
+function onDraftRemovedFromPending(status) {
+    if (status === 'submitted' && pendingDraftsCount.value > 0) {
+        pendingDraftsCount.value -= 1;
+    }
+}
+
 function onReportSaved() {
     reportAnySaved.value = true;
+    // Emitido a partir de um rascunho (store() com draft_id): some do pendente.
+    if (activeDraft.value) onDraftRemovedFromPending(activeDraft.value.status);
+}
+
+function onDraftSaved({ submitted }) {
+    reportAnySaved.value = true;
+    if (submitted) pendingDraftsCount.value += 1;
+}
+
+function onDraftDiscarded({ status }) {
+    onDraftRemovedFromPending(status);
 }
 
 function onReportModalClosed() {
     reportModalOpen.value = false;
+    activeDraft.value = null;
+    draftExamImages.value = [];
     if (closeViewerAfterReport.value) {
         closeViewerAfterReport.value = false;
         showViewerModal.value = false;
@@ -1566,13 +1877,25 @@ function onReportModalClosed() {
 // ── Comparar / Alinhar (evolução entre exames) ───────────────────────────
 const compareModalOpen = ref(false);
 
+// Vídeo nunca entra em Comparar (Fase 5 / 6c, revisão Codex) — mesmo
+// princípio já aplicado a impressão/colagem: EyeImageCompareModal.vue
+// renderiza os dois lados como <img>, e vídeo tem URL preenchida como
+// qualquer exame (preview quebrado, sem jeito de "comparar" um vídeo com
+// uma foto mesmo). Precisa de EXATAMENTE 2 pra comparar — diferente de
+// impressão/colagem, que toleram "sobrar menos", aqui sobrar 1 só não é
+// uma comparação válida, então o botão fica desabilitado (nunca comparar
+// com só 1 item).
+const compareEligibleExamIds = computed(() =>
+    selectedExamIds.value.filter((id) => !isVideoExam(selectedPatient.value?.exams?.find((e) => e.id === id))),
+);
+
 const compareImages = computed(() =>
-    selectedExamIds.value.slice(0, 2).map((id) => {
+    compareEligibleExamIds.value.slice(0, 2).map((id) => {
         const exam = selectedPatient.value?.exams?.find((e) => e.id === id);
         return {
             id,
             url: examUrls.value[id] ?? '',
-            label: [exam?.exam_type?.name, latLabel(exam?.laterality), formatDateTime(exam?.created_at)]
+            label: [exam?.exam_type?.name, latLabel(exam?.laterality), dateTime(exam?.created_at)]
                 .filter(Boolean)
                 .join(' — '),
         };
@@ -1580,7 +1903,7 @@ const compareImages = computed(() =>
 );
 
 function openCompareModal() {
-    if (selectedExamIds.value.length !== 2) return;
+    if (compareEligibleExamIds.value.length !== 2) return;
     compareModalOpen.value = true;
 }
 
@@ -1777,6 +2100,20 @@ const printEntity = computed(() => props.entity ?? {});
 <template>
     <AppLayout title="Imagens oftálmicas" :breadcrumbs="breadcrumbs">
         <template #top-actions>
+            <div v-if="canDraftReports" class="header-item d-none d-sm-flex me-2">
+                <button
+                    class="btn btn-outline-primary d-inline-flex align-items-center gap-1"
+                    type="button"
+                    data-testid="drafts-button"
+                    @click="openDraftsModal"
+                >
+                    <i class="ti ti-file-text fs-16"></i>
+                    <span class="fw-medium">{{ tt('drafts_button', 'Rascunhos') }}</span>
+                    <span v-if="isDoctor && pendingDraftsCount > 0" class="badge bg-danger rounded-pill ms-1">
+                        {{ pendingDraftsCount }}
+                    </span>
+                </button>
+            </div>
             <div v-if="focusedExam" class="header-item d-none d-sm-flex me-2">
                 <button
                     class="btn btn-outline-info d-inline-flex align-items-center gap-1"
@@ -1817,10 +2154,10 @@ const printEntity = computed(() => props.entity ?? {});
                         <div class="input-group">
                             <span class="input-group-text bg-white"><i class="fa fa-search"></i></span>
                             <input
+                                v-model="search"
                                 type="text"
                                 class="form-control border-start-0"
                                 placeholder="Buscar paciente..."
-                                v-model="search"
                                 @keydown.escape="search = ''"
                             />
                             <button
@@ -1856,17 +2193,17 @@ const printEntity = computed(() => props.entity ?? {});
                         class="col-12 col-sm-auto order-last order-sm-0 d-flex align-items-center gap-1"
                     >
                         <input
+                            v-model="customDateFrom"
                             type="date"
                             class="form-control form-control-sm ei-date-input"
-                            v-model="customDateFrom"
                             :max="customDateTo || undefined"
                             aria-label="Data inicial"
                         />
                         <span class="text-muted small">até</span>
                         <input
+                            v-model="customDateTo"
                             type="date"
                             class="form-control form-control-sm ei-date-input"
-                            v-model="customDateTo"
                             :min="customDateFrom || undefined"
                             aria-label="Data final"
                         />
@@ -1881,8 +2218,8 @@ const printEntity = computed(() => props.entity ?? {});
                             @click="showFilters = !showFilters"
                         >
                             <i class="fa fa-filter me-1"></i>Filtros
-                            <i class="fa fa-chevron-down ms-1" v-if="!showFilters"></i>
-                            <i class="fa fa-chevron-up ms-1" v-else></i>
+                            <i v-if="!showFilters" class="fa fa-chevron-down ms-1"></i>
+                            <i v-else class="fa fa-chevron-up ms-1"></i>
                         </button>
                     </div>
 
@@ -1901,42 +2238,42 @@ const printEntity = computed(() => props.entity ?? {});
                             <span class="text-muted small fw-semibold" style="white-space: nowrap">Olho</span>
                             <div class="btn-group btn-group-sm ei-lat-group" role="group" aria-label="Olho">
                                 <input
+                                    id="f-lat-all"
+                                    v-model="laterality"
                                     type="radio"
                                     class="btn-check"
                                     name="f-lat"
-                                    id="f-lat-all"
                                     value=""
-                                    v-model="laterality"
                                 />
                                 <label class="btn btn-outline-secondary" for="f-lat-all">Todos</label>
 
                                 <input
+                                    id="f-lat-od"
+                                    v-model="laterality"
                                     type="radio"
                                     class="btn-check"
                                     name="f-lat"
-                                    id="f-lat-od"
                                     value="od"
-                                    v-model="laterality"
                                 />
                                 <label class="btn btn-outline-primary" for="f-lat-od">OD</label>
 
                                 <input
+                                    id="f-lat-oe"
+                                    v-model="laterality"
                                     type="radio"
                                     class="btn-check"
                                     name="f-lat"
-                                    id="f-lat-oe"
                                     value="oe"
-                                    v-model="laterality"
                                 />
                                 <label class="btn btn-outline-danger" for="f-lat-oe">OE</label>
 
                                 <input
+                                    id="f-lat-ao"
+                                    v-model="laterality"
                                     type="radio"
                                     class="btn-check"
                                     name="f-lat"
-                                    id="f-lat-ao"
                                     value="ao"
-                                    v-model="laterality"
                                 />
                                 <label class="btn btn-outline-dark" for="f-lat-ao">AO</label>
                             </div>
@@ -2208,7 +2545,7 @@ const printEntity = computed(() => props.entity ?? {});
                             @click="openViewerModal(selectedExamsData, 0, selectedExamIds.length)"
                         >
                             <i class="fa fa-images me-1"></i>Visualizar selecionados
-                            <span class="badge bg-primary ms-1" v-if="selectedExamIds.length > 0">
+                            <span v-if="selectedExamIds.length > 0" class="badge bg-primary ms-1">
                                 {{ selectedExamIds.length }}
                             </span>
                         </button>
@@ -2222,7 +2559,7 @@ const printEntity = computed(() => props.entity ?? {});
                         <button
                             type="button"
                             class="btn btn-sm btn-outline-info"
-                            :disabled="selectedExamIds.length !== 2"
+                            :disabled="compareEligibleExamIds.length !== 2"
                             :title="tt('compare_select_two', 'Selecione exatamente 2 imagens para comparar.')"
                             @click="openCompareModal"
                         >
@@ -2297,6 +2634,20 @@ const printEntity = computed(() => props.entity ?? {});
                                     selectedExamGroups.length
                                 }})</template
                             ><template v-else>{{ tt('report_new', 'Novo laudo') }}</template>
+                        </button>
+                        <!-- Secretária/admin: só preparam o rascunho, médico emite depois (Fase 5) -->
+                        <button
+                            v-else-if="canDraftReports"
+                            type="button"
+                            class="btn btn-sm btn-outline-primary"
+                            @click="openReportModal"
+                        >
+                            <i class="ti ti-file-text me-1"></i
+                            ><template v-if="selectedExamGroups.length > 1"
+                                >{{ tt('draft_selected', 'Preparar rascunho dos selecionados') }} ({{
+                                    selectedExamGroups.length
+                                }})</template
+                            ><template v-else>{{ tt('draft_new', 'Preparar rascunho') }}</template>
                         </button>
                         <div class="flex-grow-1"></div>
                         <span v-if="selectedExamIds.length > 0" class="text-muted" style="font-size: 0.7rem">
@@ -2681,9 +3032,15 @@ const printEntity = computed(() => props.entity ?? {});
                                                         ></i>
                                                     </span>
 
-                                                    <!-- Thumbnail com imagem (miniatura gerada; fallback: exibição/original) -->
+                                                    <!-- Thumbnail com imagem (miniatura gerada; fallback: exibição/original) —
+                                                         vídeo (Fase 5 / 6c) nunca tenta <img>: sem derivado JPEG, cairia
+                                                         sempre no @error. Ícone dedicado em vez do genérico "sem foto". -->
                                                     <img
-                                                        v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
+                                                        v-if="
+                                                            examUrls[exam.id] &&
+                                                            !brokenUrls[exam.id] &&
+                                                            !isVideoExam(exam)
+                                                        "
                                                         :src="examThumbUrls[exam.id] ?? examUrls[exam.id]"
                                                         :alt="examAlt(exam)"
                                                         width="100"
@@ -2698,7 +3055,9 @@ const printEntity = computed(() => props.entity ?? {});
                                                         :style="`width:100px;height:76px;background:#3a3c42;border-radius:4px;outline:${isSelected(exam.id) ? '2px solid var(--primary)' : '2px solid transparent'};box-shadow:${isSelected(exam.id) ? '0 0 0 3px rgba(var(--primary-rgb),.35)' : 'none'};transition:outline .1s,box-shadow .1s;`"
                                                     >
                                                         <i
-                                                            class="ti ti-photo-off"
+                                                            :class="
+                                                                isVideoExam(exam) ? 'ti ti-video' : 'ti ti-photo-off'
+                                                            "
                                                             style="font-size: 1.4rem; color: #555"
                                                         ></i>
                                                     </div>
@@ -2811,8 +3170,8 @@ const printEntity = computed(() => props.entity ?? {});
                         class="btn btn-sm fw-semibold"
                         :class="viewerFitMode ? 'btn-light text-dark' : 'btn-outline-secondary'"
                         style="font-size: 0.72rem"
-                        @click="viewerFitMode = !viewerFitMode"
                         title="Ajustar à área de visualização"
+                        @click="viewerFitMode = !viewerFitMode"
                     >
                         <i class="fa fa-compress-arrows-alt me-1"></i>Fit
                     </button>
@@ -2832,8 +3191,8 @@ const printEntity = computed(() => props.entity ?? {});
                         class="btn btn-sm fw-semibold"
                         :class="viewerLaserMode ? 'btn-success' : 'btn-outline-secondary'"
                         style="font-size: 0.72rem"
-                        @click="toggleAllFlip"
                         title="Inverter imagem verticalmente"
+                        @click="toggleAllFlip"
                     >
                         <i class="fa fa-undo me-1"></i>Laser
                     </button>
@@ -2950,7 +3309,10 @@ const printEntity = computed(() => props.entity ?? {});
                                 (viewerFitMode
                                     ? 'height:84vh;min-height:0;overflow-y:auto;overflow-x:hidden;'
                                     : 'min-height:0;overflow:hidden;') +
-                                (viewerLensActive && viewerPanelUrls[pi - 1] && !viewerPanelBroken[pi - 1]
+                                (viewerLensActive &&
+                                viewerPanelUrls[pi - 1] &&
+                                !viewerPanelBroken[pi - 1] &&
+                                !isVideoExam(viewerPanelExams[pi - 1])
                                     ? 'cursor:none;'
                                     : '')
                             "
@@ -2993,7 +3355,27 @@ const printEntity = computed(() => props.entity ?? {});
                                 <p class="mt-1 mb-0" style="font-size: 0.65rem">Arquivo não encontrado</p>
                             </div>
 
+                            <!-- Vídeo capturado pela câmera (Fase 5 / 6c) — controles nativos,
+                                 nunca o flip do modo laser nem a lupa (sem sentido pra vídeo).
+                                 v-if/v-else (não v-show): os dois elementos SEMPRE carregam o
+                                 :src quando montados, mesmo escondidos — com v-show, o <video>
+                                 tentava decodificar um JPEG (e vice-versa) e o @error de um
+                                 marcava o exame como "arquivo não encontrado" mesmo o outro
+                                 tendo carregado certinho (achado via revisão Codex). -->
+                            <video
+                                v-if="isVideoExam(viewerPanelExams[pi - 1])"
+                                v-show="
+                                    viewerPanelUrls[pi - 1] && !viewerPanelLoading[pi - 1] && !viewerPanelBroken[pi - 1]
+                                "
+                                :src="viewerPanelUrls[pi - 1] ?? ''"
+                                controls
+                                style="width: 100%; max-height: 84vh; display: block; background: #000"
+                                @loadeddata="setPanelLoaded(pi - 1)"
+                                @error="setPanelError(pi - 1)"
+                            ></video>
+
                             <img
+                                v-else
                                 v-show="
                                     viewerPanelUrls[pi - 1] && !viewerPanelLoading[pi - 1] && !viewerPanelBroken[pi - 1]
                                 "
@@ -3079,7 +3461,7 @@ const printEntity = computed(() => props.entity ?? {});
                                         {{ latLabel(exam.laterality) }}
                                     </span>
                                     <img
-                                        v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
+                                        v-if="examUrls[exam.id] && !brokenUrls[exam.id] && !isVideoExam(exam)"
                                         :src="examThumbUrls[exam.id] ?? examUrls[exam.id]"
                                         :alt="examAlt(exam)"
                                         style="width: 64px; height: 64px; object-fit: cover; display: block"
@@ -3090,7 +3472,10 @@ const printEntity = computed(() => props.entity ?? {});
                                         class="w-100 h-100 d-flex align-items-center justify-content-center"
                                         style="background: #1a1a1a"
                                     >
-                                        <i class="ti ti-photo-off" style="color: #444; font-size: 0.9rem"></i>
+                                        <i
+                                            :class="isVideoExam(exam) ? 'ti ti-video' : 'ti ti-photo-off'"
+                                            style="color: #444; font-size: 0.9rem"
+                                        ></i>
                                     </div>
                                 </div>
                             </div>
@@ -3147,21 +3532,30 @@ const printEntity = computed(() => props.entity ?? {});
                                 </span>
                                 <span class="text-secondary text-truncate">{{ exam.exam_type?.name ?? '—' }}</span>
                                 <span class="text-secondary opacity-50 flex-shrink-0 ms-auto">
-                                    {{ formatDateTime(exam.created_at) }}
+                                    {{ dateTime(exam.created_at) }}
                                 </span>
                             </div>
                             <div
                                 class="position-relative"
                                 :style="
-                                    viewerLensActive && examUrls[exam.id] && !brokenUrls[exam.id] ? 'cursor:none;' : ''
+                                    viewerLensActive && examUrls[exam.id] && !brokenUrls[exam.id] && !isVideoExam(exam)
+                                        ? 'cursor:none;'
+                                        : ''
                                 "
                                 @mousemove.stop="onAllLensMove($event, exam)"
                                 @mouseleave.stop="viewerLensVisible = false"
                                 @mouseenter.stop="onAllEnter(exam)"
                                 @wheel="onAllWheel($event)"
                             >
+                                <video
+                                    v-if="examUrls[exam.id] && !brokenUrls[exam.id] && isVideoExam(exam)"
+                                    :src="examUrls[exam.id]"
+                                    controls
+                                    style="width: 100%; display: block; background: #000"
+                                    @error="brokenUrls = { ...brokenUrls, [exam.id]: true }"
+                                ></video>
                                 <img
-                                    v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
+                                    v-else-if="examUrls[exam.id] && !brokenUrls[exam.id]"
                                     :src="examUrls[exam.id]"
                                     :alt="examAlt(exam)"
                                     :style="
@@ -3236,6 +3630,24 @@ const printEntity = computed(() => props.entity ?? {});
 
                     <button
                         type="button"
+                        class="btn btn-sm"
+                        :class="printGroupOdOe ? 'btn-light' : 'btn-outline-secondary'"
+                        style="font-size: 0.72rem"
+                        :title="
+                            tt(
+                                'print_group_od_oe_hint',
+                                'Agrupa cada exame com OD antes de OE; some a reordenação manual',
+                            )
+                        "
+                        @click="printGroupOdOe = !printGroupOdOe"
+                    >
+                        <i class="ti ti-arrows-sort me-1"></i>{{ tt('print_group_od_oe', 'Agrupar OD/OE') }}
+                    </button>
+
+                    <div class="vr opacity-25 mx-1"></div>
+
+                    <button
+                        type="button"
                         class="btn btn-sm btn-warning text-dark fw-semibold"
                         style="font-size: 0.72rem"
                         @click="printReport"
@@ -3284,7 +3696,7 @@ const printEntity = computed(() => props.entity ?? {});
                             <div class="text-end">
                                 <div style="font-size: 0.72rem; color: #555">Data do relatório</div>
                                 <div style="font-size: 0.85rem; font-weight: 600">
-                                    {{ new Date().toLocaleDateString('pt-BR') }}
+                                    {{ date(new Date()) }}
                                 </div>
                             </div>
                         </div>
@@ -3299,15 +3711,88 @@ const printEntity = computed(() => props.entity ?? {});
                             <span class="ms-2 text-muted">{{ selectedPatient.code }}</span>
                         </div>
 
+                        <!-- Vídeo nunca entra na impressão (Fase 5 / 6c) — nota textual, nunca
+                             some em silêncio. d-print-none: não aparece no papel impresso. -->
+                        <div
+                            v-if="printExcludedVideoCount > 0"
+                            class="alert alert-warning d-print-none py-2 px-3 small mb-3"
+                        >
+                            {{
+                                fill(
+                                    tt(
+                                        'print_video_excluded',
+                                        ':count vídeo(s) não entram na impressão (abra no painel principal pra assistir).',
+                                    ),
+                                    { count: printExcludedVideoCount },
+                                )
+                            }}
+                        </div>
+
                         <!-- Grade de imagens -->
                         <div :style="`display:grid;grid-template-columns:repeat(${printCols},1fr);gap:8px;`">
-                            <div v-for="exam in printExams" :key="exam.id" style="break-inside: avoid">
+                            <div v-for="(exam, idx) in printExamsDisplay" :key="exam.id" style="break-inside: avoid">
+                                <!-- Reordenar manual (Fase 5) — some do papel impresso (d-print-none) e
+                                     some também quando "Agrupar OD/OE" decide a ordem. -->
+                                <div
+                                    v-if="!printGroupOdOe"
+                                    class="d-print-none d-flex justify-content-center gap-1 mb-1"
+                                >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                        style="font-size: 0.65rem"
+                                        :disabled="idx === 0"
+                                        :title="tt('print_move_up', 'Mover para cima')"
+                                        @click="movePrintExam(exam, -1)"
+                                    >
+                                        <i class="ti ti-arrow-up"></i>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                        style="font-size: 0.65rem"
+                                        :disabled="idx === printExamsDisplay.length - 1"
+                                        :title="tt('print_move_down', 'Mover para baixo')"
+                                        @click="movePrintExam(exam, 1)"
+                                    >
+                                        <i class="ti ti-arrow-down"></i>
+                                    </button>
+                                </div>
                                 <div class="text-center mb-1" style="font-size: 0.65rem; color: #333; font-weight: 600">
                                     {{ exam.exam_type?.name ?? 'Exame' }} - {{ latLabel(exam.laterality) }} -
-                                    {{ formatDateTime(exam.exam_performed_at ?? exam.created_at) }}
+                                    {{ dateTime(exam.exam_performed_at ?? exam.created_at) }}
                                     <div v-if="exam.observation" style="font-weight: 400; white-space: pre-line">
                                         {{ exam.observation }}
                                     </div>
+                                </div>
+                                <!-- Legenda ad hoc (Fase 5) — só nesta impressão, nunca persistida.
+                                     rows="1" + resize:none trava a altura: legenda longa ou com
+                                     quebra de linha ficava cortada no PAPEL impresso (na tela ainda
+                                     dava pra rolar dentro do campo, mas impressão captura só a
+                                     altura fixa visível — achado via revisão Codex). d-print-none
+                                     esconde o campo editável no papel; o <div> abaixo (d-print-block,
+                                     some na tela) mostra o texto INTEIRO, com quebra de linha
+                                     natural (pre-wrap), só na hora de imprimir. -->
+                                <textarea
+                                    v-model="printCaptions[exam.id]"
+                                    rows="1"
+                                    :placeholder="tt('print_caption_placeholder', 'Adicionar legenda (opcional)')"
+                                    class="d-block d-print-none w-100 text-center mb-1"
+                                    style="
+                                        font-size: 0.65rem;
+                                        color: #333;
+                                        border: none;
+                                        background: transparent;
+                                        resize: none;
+                                        font-family: inherit;
+                                    "
+                                ></textarea>
+                                <div
+                                    v-if="printCaptions[exam.id]"
+                                    class="d-none d-print-block text-center mb-1"
+                                    style="font-size: 0.65rem; color: #333; white-space: pre-wrap"
+                                >
+                                    {{ printCaptions[exam.id] }}
                                 </div>
                                 <img
                                     v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
@@ -3589,6 +4074,9 @@ const printEntity = computed(() => props.entity ?? {});
                 diagnosis_search: urls.diagnoses_search,
                 diagnosis_store: urls.diagnoses_store,
             }"
+            :t="t"
+            :max-video-seconds="max_video_seconds"
+            :pedal-shortcuts-config="pedal_shortcuts_config"
             @close="showImportModal = false"
             @imported="onExternalExamImported"
         />
@@ -3597,14 +4085,31 @@ const printEntity = computed(() => props.entity ?? {});
         <EyeImageReportModal
             ref="reportModalRef"
             :open="reportModalOpen"
-            :patient="reportPatientPayload"
-            :exam-ids="reportExamIds"
+            :patient="activeDraft ? activeDraft.patient : reportPatientPayload"
+            :exam-ids="activeDraft ? activeDraft.exam_ids : reportExamIds"
             :urls="reportUrls"
             :t="t"
-            :exam-groups="reportExamGroups"
-            docked
+            :exam-groups="activeDraft ? [] : reportExamGroups"
+            :exam-images="activeDraft ? draftExamImages : []"
+            :date-config="document_date_config"
+            :draft="activeDraft"
+            :is-doctor="isDoctor"
+            :docked="!activeDraft"
             @close="onReportModalClosed"
             @saved="onReportSaved"
+            @draft-saved="onDraftSaved"
+            @draft-discarded="onDraftDiscarded"
+        />
+
+        <!-- Rascunhos de laudo (Fase 5) -->
+        <EyeImageReportDraftsModal
+            :open="draftsModalOpen"
+            :urls="draftsModalUrls"
+            :is-doctor="isDoctor"
+            :t="t"
+            @close="draftsModalOpen = false"
+            @open-draft="openDraftInReportModal"
+            @draft-discarded="onDraftDiscarded"
         />
 
         <!-- Comparar / Alinhar exames -->

@@ -53,6 +53,7 @@ function onIframeLoad() {
                         class="rs-preview-iframe"
                         :class="{ 'd-none': loading }"
                         frameborder="0"
+                        sandbox=""
                         @load="onIframeLoad"
                     ></iframe>
                 </div>

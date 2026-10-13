@@ -551,6 +551,19 @@
     $_dateLine     = $record->isSigned()
         ? \Illuminate\Support\Carbon::parse($record->signed_at)->isoFormat('LL')
         : \Illuminate\Support\Carbon::now()->isoFormat('LL');
+
+    // A assinatura é de QUEM assinou, com nome, CRM e RQE da MESMA pessoa
+    // (EntityUser → Doctor). Antes o nome vinha do assinante e o CRM/RQE do
+    // médico do atendimento: o médico B assinando o prontuário da médica A
+    // saía com o nome de B e as credenciais de A. Assinante sem cadastro de
+    // médico: só o nome, nunca o CRM/RQE de outro. Sem assinante conhecido
+    // (registro removido) ou antes de assinar: o médico do atendimento, com
+    // as credenciais DELE.
+    $_signer    = $record->isSigned() ? $record->signedBy : null;
+    $_sigDoctor = $_signer ? $_signer->doctor : $record->doctor;
+    $_sigName   = $_signer
+        ? ($_signer->user?->name ?? $_sigDoctor?->person?->full_name)
+        : $record->doctor?->person?->full_name;
 @endphp
 <div class="pmr-signature-fixed" style="
     position: fixed;
@@ -566,16 +579,12 @@
     </div>
     <div class="signature-block" style="display:inline-block; min-width:240px;">
         <div class="signature-line" style="border-top:1px solid #333; width:240px; margin:0 auto 4px;"></div>
+        {{ $_sigName }}
+        @if($_sigDoctor?->record)<br>CRM {{ $_sigDoctor->record }}@endif
+        @if($_sigDoctor?->record_specialty)<br>RQE {{ $_sigDoctor->record_specialty }}@endif
         @if($record->isSigned())
-            {{ $record->signedBy?->user?->name ?? $record->doctor?->person?->full_name }}
-            @if($record->doctor?->record)<br>CRM {{ $record->doctor->record }}@endif
-            @if($record->doctor?->record_specialty)<br>RQE {{ $record->doctor->record_specialty }}@endif
             <br>{{ __('pdf.signed_at') }} {{ $record->signed_at->isoFormat('L LT') }}<br>
             <small style="color:#999;">{{ __('pdf.signature_hash') }}: {{ $record->signature_hash }}</small>
-        @else
-            {{ $record->doctor?->person?->full_name ?? '' }}
-            @if($record->doctor?->record)<br>CRM {{ $record->doctor->record }}@endif
-            @if($record->doctor?->record_specialty)<br>RQE {{ $record->doctor->record_specialty }}@endif
         @endif
     </div>
 </div>

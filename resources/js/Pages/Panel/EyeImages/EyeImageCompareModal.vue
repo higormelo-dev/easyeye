@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
+import { useEscapeToClose } from '@/Support/useEscapeToClose.js';
 
 /**
  * Comparar/Alinhar — compara 2 imagens (mesmo olho, datas diferentes) pra
@@ -96,6 +97,8 @@ function close() {
     onDragEnd();
     emit('close');
 }
+
+useEscapeToClose(() => props.open, close);
 </script>
 
 <template>
@@ -109,7 +112,6 @@ function close() {
             aria-modal="true"
             aria-labelledby="eyeCompareModalTitle"
             @click.self="close"
-            @keydown.escape.window="close"
         >
             <div class="modal-dialog modal-xl modal-dialog-centered">
                 <div class="modal-content bg-dark text-light">
@@ -145,7 +147,7 @@ function close() {
                             <div class="vr opacity-25 d-none d-sm-block"></div>
                             <label class="small text-light-emphasis mb-0 d-flex align-items-center gap-2">
                                 {{ tt('compare_opacity', 'Opacidade') }}
-                                <input type="range" min="0" max="100" v-model.number="opacity" style="width: 120px" />
+                                <input v-model.number="opacity" type="range" min="0" max="100" style="width: 120px" />
                                 <span style="min-width: 2.5em">{{ opacity }}%</span>
                             </label>
                             <button type="button" class="btn btn-outline-light btn-sm" @click="resetOffset">

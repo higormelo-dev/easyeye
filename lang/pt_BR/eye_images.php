@@ -79,10 +79,16 @@ return [
     'phrase_limit_reached'       => 'Limite de frases rápidas atingido.',
 
     // Extração de texto do PDF nativo do equipamento — benchmark 18/09/2026.
-    'pdf_no_text_found'          => 'Não foi possível extrair texto de nenhum PDF selecionado.',
-    'pdf_extract_text'           => 'Extrair texto do PDF',
-    'pdf_extracting'             => 'Extraindo texto do PDF…',
-    'pdf_extract_failed'         => 'Não foi possível extrair o texto do PDF.',
+    'pdf_no_text_found'  => 'Não foi possível extrair texto de nenhum PDF selecionado.',
+    'pdf_extract_text'   => 'Extrair texto do PDF',
+    'pdf_extracting'     => 'Extraindo texto do PDF…',
+    'pdf_extract_failed' => 'Não foi possível extrair o texto do PDF.',
+    // Indicação clínica, observações e data alternativa (Fase 5).
+    'report_clinical_indication_label'       => 'Indicação clínica',
+    'report_clinical_indication_placeholder' => 'Motivo do exame/laudo…',
+    'report_observations_label'              => 'Observações',
+    'report_observations_placeholder'        => 'Observações adicionais…',
+
     'report_title_placeholder'   => 'Título do laudo (opcional)',
     'report_save'                => 'Salvar laudo',
     'report_saved'               => 'Laudo salvo com sucesso.',
@@ -106,11 +112,60 @@ return [
     'group_by_exam'      => 'Agrupar por Exame',
 
     // Montage (colagem de imagens) — benchmark 18/09/2026.
-    'montage_action'      => 'Montage',
-    'montage_select_two'  => 'Selecione 2 ou mais imagens para montar a colagem.',
-    'montage_unavailable' => 'Recurso indisponível neste ambiente (extensão Imagick não instalada no servidor).',
-    'montage_no_images'   => 'Nenhuma das imagens selecionadas pôde ser lida para montar a colagem.',
-    'montage_failed'      => 'Não foi possível gerar a colagem.',
+    'montage_action'         => 'Montage',
+    'montage_select_two'     => 'Selecione 2 ou mais imagens para montar a colagem.',
+    'montage_unavailable'    => 'Recurso indisponível neste ambiente (extensão Imagick não instalada no servidor).',
+    'montage_no_images'      => 'Nenhuma das imagens selecionadas pôde ser lida para montar a colagem.',
+    'montage_failed'         => 'Não foi possível gerar a colagem.',
+    'montage_video_excluded' => ':count vídeo(s) não entraram na colagem.',
+
+    // Impressão: reordenar/agrupar OD-OE/legenda ad hoc (Fase 5).
+    'print_group_od_oe'         => 'Agrupar OD/OE',
+    'print_group_od_oe_hint'    => 'Agrupa cada exame com OD antes de OE; some a reordenação manual',
+    'print_move_up'             => 'Mover para cima',
+    'print_move_down'           => 'Mover para baixo',
+    'print_caption_placeholder' => 'Adicionar legenda (opcional)',
+    'print_video_excluded'      => ':count vídeo(s) não entram na impressão (abra no painel principal pra assistir).',
+
+    // Imagens no laudo: bloco embutido no PDF assinado (Fase 5 / 5b).
+    'image_report_enabled_label'       => 'Incluir galeria de imagens no laudo',
+    'image_report_columns_label'       => 'Colunas:',
+    'image_report_pair_od_oe'          => 'Agrupar OD/OE',
+    'image_report_add'                 => 'Adicionar imagem',
+    'image_report_empty'               => 'Nenhuma imagem adicionada.',
+    'image_report_caption_placeholder' => 'Legenda (opcional)',
+    'image_report_remove'              => 'Remover',
+    'report_image_block_title'         => 'Imagens',
+
+    // Importar exame externo: foto/vídeo maior que o permitido (Fase 5 / 6b).
+    'import_file_too_large' => 'O arquivo excede o tamanho máximo permitido (:max_mb MB).',
+
+    // Importar exame externo: formulário antigo mandando a origem do lote inteiro (13ª rodada de revisão).
+    'import_source_outdated' => 'A página de importação está desatualizada. Recarregue a página e tente importar de novo.',
+
+    // Trocar o paciente na busca interna com arquivo/captura pendente (Fase 5
+    // / revisão adversarial Codex, 6ª rodada).
+    'import_patient_change_discards_files' => 'Trocar de paciente agora descarta os arquivos e capturas já adicionados a este lote. Continuar?',
+    'import_patient_change_confirm'        => 'Trocar de paciente',
+
+    // Captura pela câmera do navegador (Fase 5 / 6a).
+    'capture_tab_upload'             => 'Enviar arquivo',
+    'capture_tab_camera'             => 'Capturar da câmera',
+    'capture_device_label'           => 'Câmera',
+    'capture_start_button'           => 'Ativar câmera',
+    'capture_photo_button'           => 'Foto',
+    'capture_record_button'          => 'Gravar vídeo',
+    'capture_stop_button'            => 'Parar gravação',
+    'capture_recording_label'        => 'Gravando… :seconds s',
+    'capture_photo_taken'            => 'Foto capturada.',
+    'capture_video_recorded'         => 'Vídeo capturado.',
+    'capture_permission_denied'      => 'Permissão da câmera negada. Libere o acesso à câmera nas configurações do navegador e tente de novo.',
+    'capture_not_found'              => 'Nenhuma câmera encontrada neste dispositivo.',
+    'capture_not_supported'          => 'Captura pela câmera requer conexão segura (HTTPS) e não é suportada neste navegador.',
+    'capture_generic_error'          => 'Não foi possível acessar a câmera.',
+    'capture_recording_in_progress'  => 'Pare a gravação antes de importar.',
+    'capture_finalizing_in_progress' => 'Aguarde a captura terminar antes de importar.',
+    'capture_item_laterality_fix'    => 'Clique para corrigir o olho deste arquivo',
 
     // Comparar / Alinhar (evolução entre exames)
     'compare_title'             => 'Comparar exames',
@@ -163,4 +218,103 @@ return [
     'viewer_patient_id'       => 'ID',
     'age_years'               => ':years anos',
     'close'                   => 'Fechar',
+
+    // Rascunho de laudo (fluxo secretária-rascunha / médico-emite — Fase 5).
+    'draft_status_draft'                => 'Rascunho',
+    'draft_status_submitted'            => 'Enviado para o médico',
+    'draft_status_issued'               => 'Emitido',
+    'draft_status_discarded'            => 'Descartado',
+    'draft_not_editable'                => 'Este rascunho já foi emitido ou descartado e não pode mais ser alterado.',
+    'draft_revision_conflict'           => 'Este rascunho foi alterado por outra pessoa enquanto você revisava. Feche e abra de novo para ver a versão mais recente antes de salvar ou emitir.',
+    'draft_new'                         => 'Preparar rascunho',
+    'draft_selected'                    => 'Preparar rascunho dos selecionados',
+    'draft_save'                        => 'Salvar rascunho',
+    'draft_saved'                       => 'Rascunho salvo.',
+    'draft_submit'                      => 'Enviar para o médico',
+    'draft_submitted'                   => 'Rascunho enviado para o médico.',
+    'draft_submitted_with_pending_edit' => 'Rascunho enviado, mas há uma edição mais recente ainda não salva. Salve novamente antes de fechar.',
+    'draft_review_issue'                => 'Revisar e emitir',
+    'draft_discard'                     => 'Descartar rascunho',
+    'draft_discard_title'               => 'Descartar este rascunho?',
+    'draft_discard_text'                => 'O rascunho será descartado e não poderá mais ser editado ou emitido.',
+    'draft_discard_confirm'             => 'Descartar rascunho',
+    'draft_discarded'                   => 'Rascunho descartado.',
+    'drafts_button'                     => 'Rascunhos',
+    'drafts_modal_title'                => 'Rascunhos de laudo',
+    'drafts_empty'                      => 'Nenhum rascunho por aqui.',
+    'drafts_load_more'                  => 'Carregar mais',
+    'drafts_filter_all'                 => 'Todos',
+    'drafts_load_failed'                => 'Não foi possível carregar os rascunhos.',
+    'draft_review_issue_open'           => 'Abrir',
+
+    // Aviso não-bloqueante: médico que previu o laudo (rascunho) é
+    // diferente de quem está emitindo agora (Fase 5 / revisão Codex).
+    'report_physician_mismatch_warning'        => 'O texto deste laudo foi gerado com base nos dados de :doctor. Revise se o nome do médico citado no texto está correto antes de assinar.',
+    'report_physician_mismatch_unknown_doctor' => 'outro médico',
+    'report_physician_mismatch_confirm'        => 'Emitir mesmo assim',
+
+    // Aviso não-bloqueante: imagem selecionada pro laudo não pôde ser
+    // incluída agora (exame desabilitado/excluído, arquivo indisponível no
+    // S3 ou orçamento de bytes esgotado) — achado na 2ª rodada de revisão
+    // adversarial Codex.
+    'report_image_incomplete_warning' => '{1} 1 das imagens selecionadas não pôde ser incluída no laudo (exame desabilitado, arquivo indisponível ou excluído) e será omitida. Revise antes de emitir.|[2,*] :count das imagens selecionadas não puderam ser incluídas no laudo (exame desabilitado, arquivo indisponível ou excluído) e serão omitidas. Revise antes de emitir.',
+    'report_image_incomplete_confirm' => 'Emitir mesmo assim',
+    // Imagem do bloco embutido referenciando um exame fora da seleção
+    // principal (exam_ids) — nunca descartada em silêncio (achado via
+    // revisão adversarial Codex).
+    'report_image_not_selected' => 'Uma das imagens do laudo pertence a um exame que não está mais selecionado. Atualize a seleção de imagens e tente de novo.',
+    // Aviso não-bloqueante: referência inline <img> (botão "Inserir
+    // imagem", distinto do bloco acima) não pôde ser resolvida agora
+    // (exame desabilitado/excluído, arquivo indisponível) — achado via
+    // revisão adversarial Codex.
+    'report_inline_image_incomplete_warning' => '{1} 1 das imagens inseridas no texto não pôde ser incluída no laudo (exame desabilitado, arquivo indisponível ou excluído) e será removida. Revise antes de emitir.|[2,*] :count das imagens inseridas no texto não puderam ser incluídas no laudo (exame desabilitado, arquivo indisponível ou excluído) e serão removidas. Revise antes de emitir.',
+    // Bloqueio definitivo (nunca "emitir mesmo assim" — achado via revisão
+    // adversarial Codex): a mesma imagem inserida várias vezes no texto
+    // multiplica o peso esperado sempre que o laudo for aberto/impresso de
+    // novo, mesmo pagando o orçamento de resolução só 1 vez por exame.
+    'report_inline_images_too_large' => 'As imagens inseridas no texto do laudo excedem o limite de tamanho (a mesma imagem repetida várias vezes soma o peso a cada repetição). Remova as repetições antes de salvar.',
+
+    // Médico solicitante + envio por e-mail (Fase 5).
+    'requesting_doctor_label'             => 'Médico solicitante',
+    'requesting_doctor_name_label'        => 'Nome do médico solicitante',
+    'requesting_doctor_name_placeholder'  => 'Nome do médico (opcional)',
+    'requesting_doctor_email_label'       => 'E-mail do médico solicitante',
+    'requesting_doctor_email_placeholder' => 'Para enviar o laudo por e-mail',
+    'requesting_doctor_default_name'      => 'Doutor(a)',
+    'requesting_doctor_sent_at'           => 'Enviado em :date',
+    'requesting_doctor_not_sent'          => 'Ainda não enviado',
+    'requesting_doctor_resend'            => 'Reenviar',
+    'requesting_doctor_resent'            => 'Laudo reenviado ao médico solicitante.',
+    'requesting_doctor_resend_failed'     => 'Não foi possível reenviar o laudo.',
+    'report_resend_no_email'              => 'Este laudo não tem e-mail de médico solicitante cadastrado.',
+    // O laudo só sai da clínica com o prontuário ASSINADO (imutável) — 15ª rodada de revisão adversarial.
+    'report_resend_record_not_signed'      => 'O envio ao médico solicitante só é liberado depois que o prontuário for assinado: o laudo precisa estar finalizado (imutável) antes de sair da clínica.',
+    'external_report_not_final'            => 'Este laudo ainda não foi finalizado pela clínica. Tente novamente mais tarde.',
+    'requesting_doctor_awaiting_signature' => 'Destinatário salvo. O envio ao médico solicitante é liberado depois que o prontuário for assinado — faça o envio na lista de Documentações do prontuário.',
+    'requesting_doctor_email_hint'         => 'O envio por e-mail só é liberado depois que o prontuário for assinado.',
+    'requesting_doctor_mail_subject'       => '[:clinic] Laudo de exame disponível',
+    'requesting_doctor_mail_greeting'      => 'Olá, :doctor!',
+    'requesting_doctor_mail_line1'         => 'A clínica **:clinic** disponibilizou o laudo de exame de imagem do(a) paciente **:patient** solicitado por você.',
+    'requesting_doctor_mail_action'        => 'Ver laudo',
+    'requesting_doctor_mail_expires'       => 'Este link expira em :days dias.',
+    'requesting_doctor_mail_disclaimer'    => 'Se você não esperava este e-mail, pode ignorá-lo com segurança.',
+    'requesting_doctor_mail_salutation'    => 'Atenciosamente — :clinic',
+
+    // Pedal USB (Fase 5 / 7a/7b) — mapeamento de tecla (o pedal "age como
+    // teclado"). Mesma tecla de "avançar" vale pra trocar olho (captura) e
+    // pra próxima imagem (visualizador).
+    'pedal_keys_must_differ'  => 'A tecla de capturar e a de avançar do pedal precisam ser diferentes.',
+    'pedal_shortcuts_help'    => 'Se você usa um pedal USB (ele funciona como um teclado), escolha aqui quais teclas ele envia.',
+    'pedal_capture_key_label' => 'Pedal — capturar',
+    'pedal_advance_key_label' => 'Pedal — avançar (olho na captura, próxima imagem no visualizador)',
+    'pedal_key_enter'         => 'Enter',
+    'pedal_key_space'         => 'Espaço',
+    'pedal_key_pagedown'      => 'Page Down',
+    'pedal_key_pageup'        => 'Page Up',
+
+    // Abrir rascunho a partir da lista (Fase 5 / revisão Codex) — a lista só
+    // devolve um resumo; abrir precisa buscar o rascunho completo antes.
+    'draft_load_failed'               => 'Não foi possível carregar o rascunho. Tente de novo.',
+    'exam_fallback_label'             => 'Imagem',
+    'draft_unavailable_exams_removed' => 'Este rascunho tinha exame(s) que não estão mais disponíveis (removido(s) ou desativado(s)) — foram retirados automaticamente deste laudo.',
 ];

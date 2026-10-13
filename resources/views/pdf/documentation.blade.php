@@ -10,8 +10,8 @@
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-        font-family: {{ $setting->font_family ?? 'Arial' }}, Helvetica, sans-serif;
-        font-size: {{ $setting->font_size ?? 11 }}pt;
+        font-family: {{ $setting?->font_family ?? 'Arial' }}, Helvetica, sans-serif;
+        font-size: {{ $setting?->font_size ?? 11 }}pt;
         color: #1a1a1a;
         line-height: 1.55;
         /*
@@ -20,8 +20,8 @@
            cobre o espaço necessário; o --footer-html (wkhtmltopdf option)
            renderiza no espaço de margem inferior reservado pelo PDF engine.
         */
-        padding: {{ $setting->margin_top ?? 20 }}mm {{ $setting->margin_right ?? 15 }}mm
-                 {{ $setting->margin_bottom ?? 20 }}mm {{ $setting->margin_left ?? 15 }}mm;
+        padding: {{ $setting?->margin_top ?? 20 }}mm {{ $setting?->margin_right ?? 15 }}mm
+                 {{ $setting?->margin_bottom ?? 20 }}mm {{ $setting?->margin_left ?? 15 }}mm;
     }
 
     /* ── Header ─────────────────────────────────────────────────── */
@@ -81,7 +81,7 @@
     .content-body {
         min-height: 240px;
         word-break: break-word;
-        font-size: {{ $setting->font_size ?? 11 }}pt;
+        font-size: {{ $setting?->font_size ?? 11 }}pt;
         line-height: 1.6;
     }
     .content-body p  { margin-bottom: 0.6em; }
@@ -109,6 +109,22 @@
     .pmr-observations ol { padding-left: 1.5em; margin-bottom: 0.5em; }
     .pmr-observations li { margin-bottom: 0.25em; }
 
+    /*
+       Imagens embutidas no laudo (Fase 5 / 5c) — <table>, não CSS grid: o
+       QtWebKit do wkhtmltopdf 0.12.6 não suporta display:grid de forma
+       confiável (motor congelado ~2013). <table> é a única garantia de
+       grid funcionando em qualquer build do wkhtmltopdf.
+    */
+    .pmr-image-report {
+        margin-top: 1.5em;
+        padding-top: 0.8em;
+        border-top: 1px solid #999;
+    }
+    .pmr-image-report-table { width: 100%; border-collapse: collapse; margin-top: 0.5em; }
+    .pmr-image-report-table td { padding: 4px; vertical-align: top; text-align: center; }
+    .pmr-image-report-table img { width: 100%; height: auto; display: block; border: 1px solid #ddd; }
+    .pmr-image-report-caption { font-size: 8pt; color: #333; margin-top: 2px; }
+
     /* ── Signature ───────────────────────────────────────────────── */
     .signature-block { margin-top: 40px; text-align: center; font-size: 9.5pt; }
     .signature-line  { border-top: 1px solid #333; display: inline-block; width: 200px; margin-bottom: 4px; }
@@ -121,7 +137,16 @@
     // $documentation já aliasado no topo do arquivo. Aqui derivamos o resto.
     $patient = $doc->patient ?? null;
     $doctor  = $doc->doctor  ?? null;
+    // patient->entity ANTES da sessão: documento sem schedule (ex.: laudo de
+    // imagem de exame importado manualmente) é visto também por quem não tem
+    // clínica selecionada (link público pro médico solicitante) — sessão
+    // vazia ou de OUTRA clínica perdia logo/nome/endereço do cabeçalho, ou
+    // pior, vazava o de outra clínica (achado via revisão Codex; mesmo
+    // ajuste do $entityId em MedicalRecordPdfService::generateDocumentation(),
+    // que NÃO passa $entity pra esta view — o rodapé usa o dele, o cabeçalho
+    // usa este, resolvidos de forma independente).
     $entity  = $doc->medicalRecord?->schedule?->entity
+            ?? $patient?->entity
             ?? \App\Models\Entity::find(session('selected_entity_id'));
 @endphp
 
@@ -129,11 +154,11 @@
 @php
     // Usa show_header (campo novo do formulário). Fallback para show_logo (campo
     // legado) para compatibilidade com registros gerados antes da migração de campos.
-    $showHeader = $setting->show_header ?? $setting->show_logo ?? false;
+    $showHeader = $setting?->show_header ?? $setting?->show_logo ?? false;
 @endphp
 @if($showHeader)
 <div class="header">
-    @if($setting->header_show_logo ?? true)
+    @if($setting?->header_show_logo ?? true)
     <div class="header-logo">
         @if($entity?->logo_path)
         <img src="{{ public_path('storage/' . $entity->logo_path) }}" alt="">
@@ -141,13 +166,13 @@
     </div>
     @endif
     <div class="header-info">
-        @if($setting->header_show_name ?? true)
+        @if($setting?->header_show_name ?? true)
         <h1>{{ $entity?->name }}</h1>
         @endif
-        @if(($setting->header_show_address ?? false) && $entity?->address_full)
+        @if(($setting?->header_show_address ?? false) && $entity?->address_full)
         <p>{{ $entity->address_full }}</p>
         @endif
-        @if(($setting->header_show_phone ?? false) && ($entity?->telephone || $entity?->cellphone))
+        @if(($setting?->header_show_phone ?? false) && ($entity?->telephone || $entity?->cellphone))
         <p>{{ \App\Support\BrazilianFormat::phone($entity->telephone ?: $entity->cellphone) }}</p>
         @endif
     </div>
@@ -172,16 +197,24 @@
     @if($patient->person->age !== null)
      &nbsp;|&nbsp; <strong>{{ __('pdf.age') }}:</strong> {{ __('pdf.age_years', ['years' => $patient->person->age]) }}
     @endif
-    @if($setting->patient_birth && $patient->person->birth_date)
+    @if($setting?->patient_birth && $patient->person->birth_date)
      &nbsp;|&nbsp; <strong>{{ __('pdf.birth') }}:</strong> {{ $patient->person->birth_date->isoFormat('L') }}
     @endif
-    @if($setting->patient_address && $patient->person->address_full)
+    @if($setting?->patient_address && $patient->person->address_full)
      &nbsp;|&nbsp; {{ $patient->person->address_full }}
     @endif
     {{-- Data IMPRESSA: a alternativa escolhida pelo médico ou a da emissão
          (Fase 2 / B3) — reimprimir não troca pela data de hoje. --}}
     &nbsp;|&nbsp; <strong>{{ __('pdf.date') }}:</strong> {{ $documentation->printedDate()->isoFormat('L') }}
 </div>
+
+<!-- ─── INDICAÇÃO CLÍNICA (laudo de imagem — Fase 5) ─────────────────────── -->
+@if($documentation->imageReportClinicalIndication())
+<div class="patient-block">
+    <strong>{{ __('eye_images.report_clinical_indication_label') }}:</strong>
+    {{ $documentation->imageReportClinicalIndication() }}
+</div>
+@endif
 
 <!-- ─── EXAMES DO LAUDO ──────────────────────────────────────────────────────
      Laudo do Gerenciador de Imagens: registra quais exames fizeram parte
@@ -210,6 +243,41 @@
      evita duplicação visual e mantém o banco intocado (auditoria preservada).
 -->
 <div class="content-body">{!! $documentation->contentForRender() !!}</div>
+
+<!-- ─── OBSERVAÇÕES (laudo de imagem — Fase 5) ───────────────────────────── -->
+@if($documentation->imageReportObservations())
+<div class="pmr-observations">
+    <strong>{{ __('eye_images.report_observations_label') }}:</strong>
+    <p>{{ $documentation->imageReportObservations() }}</p>
+</div>
+@endif
+
+<!-- ─── IMAGENS NO LAUDO (Fase 5 / 5c) ─────────────────────────────────────
+     Resolvido de novo a cada render (ReportImageBlockBuilder, chamado por
+     MedicalRecordPdfService) — nunca um bloco "congelado": exame excluído/
+     desabilitado desde a emissão simplesmente não aparece na reimpressão. -->
+@if(! empty($imageBlock))
+<div class="pmr-image-report">
+    <strong>{{ __('eye_images.report_image_block_title') }}</strong>
+    <table class="pmr-image-report-table">
+        @foreach(array_chunk($imageBlock['images'], $imageBlock['columns']) as $row)
+        <tr>
+            @foreach($row as $image)
+            <td>
+                <img src="{{ $image['data_uri'] }}" alt="">
+                @if($image['caption'])
+                <div class="pmr-image-report-caption">{{ $image['caption'] }}</div>
+                @endif
+            </td>
+            @endforeach
+            @for($i = count($row); $i < $imageBlock['columns']; $i++)
+            <td></td>
+            @endfor
+        </tr>
+        @endforeach
+    </table>
+</div>
+@endif
 
 <!--
     ─── ASSINATURA ─────────────────────────────────────────────────────────────

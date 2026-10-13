@@ -48,6 +48,34 @@ return [
             'Attr.AllowedFrameTargets' => ['_blank'],
             'URI.AllowedSchemes'       => ['http' => true, 'https' => true, 'mailto' => true],
         ],
+        // Mesmo perfil de 'medical', mas permite <img> com alt/style/
+        // data-exam-image-id/src. src é REQUIRED pro HTMLPurifier (HTML4):
+        // sem ele no HTML.Allowed, o elemento <img> inteiro é descartado —
+        // por isso src precisa estar aqui, mas NUNCA é confiável: quem usa
+        // este profile (InlineExamImageSanitizer::sanitize()) sempre
+        // reescreve/remove src de novo DEPOIS da limpeza, a partir de
+        // data-exam-image-id revalidado contra os exames do laudo — nunca o
+        // valor crú que sobreviveu à purificação (mesmo motivo de
+        // ReportImageBlockBuilder nunca confiar em URL: assinada expira/
+        // troca depois). Escopado só pra laudo de imagem
+        // (EyeImageReportController, EyeImageReportDraftController): o
+        // perfil 'medical' compartilhado por atestado/receita/documentação
+        // comum continua sem <img>.
+        'eye_image_report' => [
+            'HTML.Doctype' => 'HTML 4.01 Transitional',
+            'HTML.Allowed' => 'p[style],br,span[style],strong,b,em,i,u,s,sub,sup,'
+                . 'h1,h2,h3,h4,h5,h6,blockquote,pre,code,'
+                . 'ul,ol,li,'
+                . 'table[border|cellpadding|cellspacing|style],'
+                . 'thead,tbody,tfoot,tr[style],th[style|colspan|rowspan],td[style|colspan|rowspan],'
+                . 'a[href|title|target],hr,'
+                . 'img[alt|style|data-exam-image-id|src]',
+            'CSS.AllowedProperties'    => 'font-weight,font-style,text-decoration,text-align,color,background-color,padding,margin,border,border-collapse,width,height,max-width',
+            'AutoFormat.AutoParagraph' => false,
+            'AutoFormat.RemoveEmpty'   => true,
+            'Attr.AllowedFrameTargets' => ['_blank'],
+            'URI.AllowedSchemes'       => ['http' => true, 'https' => true, 'mailto' => true],
+        ],
         'test' => [
             'Attr.EnableID' => 'true',
         ],
@@ -111,6 +139,11 @@ return [
                 ['tr', 'width', 'Text'],
                 ['tr', 'height', 'Text'],
                 ['tr', 'border', 'Text'],
+                // Referência estável de imagem de exame inserida no laudo (Fase 5) —
+                // ver perfil 'eye_image_report' acima. Registro aqui é só pra
+                // HTMLPurifier reconhecer o atributo (não-padrão); QUEM libera
+                // de fato é o HTML.Allowed de cada profile.
+                ['img', 'data-exam-image-id', 'Text'],
             ],
         ],
         'custom_attributes' => [

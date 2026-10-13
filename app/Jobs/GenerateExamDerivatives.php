@@ -78,6 +78,20 @@ class GenerateExamDerivatives implements ShouldQueue
             return;
         }
 
+        // Vídeo (Fase 5 / 6a) nunca tem derivado — aceito pela importação
+        // com teto PRÓPRIO (config('eye_image_capture.capture.max_video_kb'),
+        // até 20 MB por padrão), bem maior que o teto de leitura padrão de
+        // BoundedExamArchive::read() (10 MB). Checar ANTES de ler os bytes
+        // evita que um vídeo válido de 10-20 MB estoure archive_size_limit e
+        // vire job falho (status 'failed', não 'unsupported') — o match
+        // abaixo já cairia no default (sem derivado) mesmo que a leitura
+        // funcionasse (achado via revisão Codex).
+        if ($exam->isVideo()) {
+            PatientExam::whereKey($exam->id)->where('archive', $exam->archive)->update(['derivative_status' => 'unsupported', 'derivative_error_code' => 'format_no_derivative']);
+
+            return;
+        }
+
         $raw = app(BoundedExamArchive::class)->read($exam->archive);
 
         $extension = strtolower(pathinfo($exam->archive, PATHINFO_EXTENSION));

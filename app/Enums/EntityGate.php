@@ -73,6 +73,16 @@ enum EntityGate: string
      */
     case ShareLaudoWithPatient = 'entity.share-laudo-with-patient';
 
+    /**
+     * Preparar RASCUNHO de laudo de imagem e pré-visualizar/extrair texto de
+     * modelo (admin, doctor, secretary) — Fase 5. Ato preparatório, não
+     * emissão: quem rascunha nunca assina (continua só IssueReport).
+     */
+    case DraftImageReport = 'entity.draft-image-report';
+
+    /** Enviar/reenviar laudo ao médico solicitante por e-mail (admin, doctor — Fase 5). */
+    case SendReportToExternalDoctor = 'entity.send-report-to-external-doctor';
+
     /** Gerenciar configurações da entity (admin). */
     case ManageSettings = 'entity.manage-settings';
 

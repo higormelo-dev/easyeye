@@ -55,10 +55,15 @@ return [
     'follow_up'        => 'Follow-up in',
 
     // ── Footer / Signature ───────────────────────────────────────────────
-    'issued_at'      => 'Issued on',
-    'generated_at'   => 'Generated on',
-    'signed_at'      => 'Electronically signed on',
-    'signature_hash' => 'Hash',
+    'issued_at'          => 'Issued on',
+    'generated_at'       => 'Generated on',
+    'signed_at'          => 'Electronically signed on',
+    'signature_hash'     => 'Hash',
+    'page_x_of_y'        => 'Page :current of :total',
+    'page_short'         => 'p. :current/:total',
+    'page_footer_native' => 'Page [page] of [topage]',
+    'phone_label'        => 'Phone',
+    'cellphone_label'    => 'Mobile',
 
     // ── Sections (medical_record) ────────────────────────────────────────
     'section_patient_data'      => 'Patient Data',

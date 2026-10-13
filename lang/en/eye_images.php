@@ -79,10 +79,16 @@ return [
     'phrase_limit_reached'       => 'Quick phrase limit reached.',
 
     // Native equipment PDF text extraction — 09/18/2026 benchmark.
-    'pdf_no_text_found'          => 'Could not extract text from any selected PDF.',
-    'pdf_extract_text'           => 'Extract text from PDF',
-    'pdf_extracting'             => 'Extracting text from PDF…',
-    'pdf_extract_failed'         => 'Could not extract text from the PDF.',
+    'pdf_no_text_found'  => 'Could not extract text from any selected PDF.',
+    'pdf_extract_text'   => 'Extract text from PDF',
+    'pdf_extracting'     => 'Extracting text from PDF…',
+    'pdf_extract_failed' => 'Could not extract text from the PDF.',
+    // Clinical indication, observations and alternative date (Phase 5).
+    'report_clinical_indication_label'       => 'Clinical indication',
+    'report_clinical_indication_placeholder' => 'Reason for the exam/report…',
+    'report_observations_label'              => 'Observations',
+    'report_observations_placeholder'        => 'Additional observations…',
+
     'report_title_placeholder'   => 'Report title (optional)',
     'report_save'                => 'Save report',
     'report_saved'               => 'Report saved successfully.',
@@ -106,11 +112,60 @@ return [
     'group_by_exam'      => 'Group by Exam',
 
     // Montage (image collage) — 09/18/2026 benchmark.
-    'montage_action'      => 'Montage',
-    'montage_select_two'  => 'Select 2 or more images to build the montage.',
-    'montage_unavailable' => 'Feature unavailable in this environment (Imagick extension not installed on the server).',
-    'montage_no_images'   => 'None of the selected images could be read to build the montage.',
-    'montage_failed'      => 'Could not build the montage.',
+    'montage_action'         => 'Montage',
+    'montage_select_two'     => 'Select 2 or more images to build the montage.',
+    'montage_unavailable'    => 'Feature unavailable in this environment (Imagick extension not installed on the server).',
+    'montage_no_images'      => 'None of the selected images could be read to build the montage.',
+    'montage_failed'         => 'Could not build the montage.',
+    'montage_video_excluded' => ':count video(s) were not included in the montage.',
+
+    // Printing: reorder/group OD-OE/ad hoc caption (Phase 5).
+    'print_group_od_oe'         => 'Group OD/OE',
+    'print_group_od_oe_hint'    => 'Groups each exam with OD before OE; removes manual reordering',
+    'print_move_up'             => 'Move up',
+    'print_move_down'           => 'Move down',
+    'print_caption_placeholder' => 'Add caption (optional)',
+    'print_video_excluded'      => ":count video(s) aren't included in print (open them in the main panel to watch).",
+
+    // Images in the report: block embedded in the signed PDF (Phase 5 / 5b).
+    'image_report_enabled_label'       => 'Include image gallery in the report',
+    'image_report_columns_label'       => 'Columns:',
+    'image_report_pair_od_oe'          => 'Group OD/OE',
+    'image_report_add'                 => 'Add image',
+    'image_report_empty'               => 'No image added yet.',
+    'image_report_caption_placeholder' => 'Caption (optional)',
+    'image_report_remove'              => 'Remove',
+    'report_image_block_title'         => 'Images',
+
+    // External exam import: file larger than allowed (Phase 5 / 6b).
+    'import_file_too_large' => 'The file exceeds the maximum allowed size (:max_mb MB).',
+
+    // External exam import: outdated form sending one source for the whole batch (review round 13).
+    'import_source_outdated' => 'The import page is out of date. Reload the page and try importing again.',
+
+    // Changing patient in the inline search with a pending file/capture
+    // (Phase 5 / adversarial Codex review, round 6).
+    'import_patient_change_discards_files' => 'Switching patients now will discard the files and captures already added to this batch. Continue?',
+    'import_patient_change_confirm'        => 'Switch patient',
+
+    // Browser camera capture (Phase 5 / 6a).
+    'capture_tab_upload'             => 'Upload file',
+    'capture_tab_camera'             => 'Capture from camera',
+    'capture_device_label'           => 'Camera',
+    'capture_start_button'           => 'Turn on camera',
+    'capture_photo_button'           => 'Photo',
+    'capture_record_button'          => 'Record video',
+    'capture_stop_button'            => 'Stop recording',
+    'capture_recording_label'        => 'Recording… :seconds s',
+    'capture_photo_taken'            => 'Photo captured.',
+    'capture_video_recorded'         => 'Video captured.',
+    'capture_permission_denied'      => 'Camera permission denied. Allow camera access in your browser settings and try again.',
+    'capture_not_found'              => 'No camera found on this device.',
+    'capture_not_supported'          => 'Camera capture requires a secure connection (HTTPS) and is not supported in this browser.',
+    'capture_generic_error'          => 'Could not access the camera.',
+    'capture_recording_in_progress'  => 'Stop the recording before importing.',
+    'capture_finalizing_in_progress' => 'Wait for the capture to finish before importing.',
+    'capture_item_laterality_fix'    => 'Click to correct this file\'s eye',
 
     // Compare / Align (progression across exams)
     'compare_title'             => 'Compare exams',
@@ -163,4 +218,102 @@ return [
     'viewer_patient_id'       => 'ID',
     'age_years'               => ':years years',
     'close'                   => 'Close',
+
+    // Report draft (secretary-drafts / doctor-issues flow — Phase 5).
+    'draft_status_draft'                => 'Draft',
+    'draft_status_submitted'            => 'Sent to doctor',
+    'draft_status_issued'               => 'Issued',
+    'draft_status_discarded'            => 'Discarded',
+    'draft_not_editable'                => 'This draft has already been issued or discarded and can no longer be changed.',
+    'draft_revision_conflict'           => 'This draft was changed by someone else while you were reviewing it. Close and reopen it to see the latest version before saving or issuing.',
+    'draft_new'                         => 'Prepare draft',
+    'draft_selected'                    => 'Prepare draft for selected',
+    'draft_save'                        => 'Save draft',
+    'draft_saved'                       => 'Draft saved.',
+    'draft_submit'                      => 'Send to doctor',
+    'draft_submitted'                   => 'Draft sent to the doctor.',
+    'draft_submitted_with_pending_edit' => 'Draft sent, but there is a more recent edit that has not been saved yet. Save again before closing.',
+    'draft_review_issue'                => 'Review and issue',
+    'draft_discard'                     => 'Discard draft',
+    'draft_discard_title'               => 'Discard this draft?',
+    'draft_discard_text'                => 'The draft will be discarded and can no longer be edited or issued.',
+    'draft_discard_confirm'             => 'Discard draft',
+    'draft_discarded'                   => 'Draft discarded.',
+    'drafts_button'                     => 'Drafts',
+    'drafts_modal_title'                => 'Report drafts',
+    'drafts_empty'                      => 'No drafts here yet.',
+    'drafts_load_more'                  => 'Load more',
+    'drafts_filter_all'                 => 'All',
+    'drafts_load_failed'                => 'Could not load the drafts.',
+    'draft_review_issue_open'           => 'Open',
+
+    // Non-blocking warning: the doctor who previewed the report (draft) is
+    // different from whoever is issuing it now (Phase 5 / Codex review).
+    'report_physician_mismatch_warning'        => "This report's text was generated based on :doctor's data. Review whether the physician named in the text is correct before signing.",
+    'report_physician_mismatch_unknown_doctor' => 'another physician',
+    'report_physician_mismatch_confirm'        => 'Issue anyway',
+
+    // Non-blocking warning: a selected image for the report could not be
+    // included now (exam disabled/deleted, file unavailable in S3, or byte
+    // budget exhausted) — found in the 2nd round of adversarial Codex review.
+    'report_image_incomplete_warning' => '{1} 1 of the selected images could not be included in the report (exam disabled, file unavailable, or deleted) and will be omitted. Review before issuing.|[2,*] :count of the selected images could not be included in the report (exam disabled, file unavailable, or deleted) and will be omitted. Review before issuing.',
+    'report_image_incomplete_confirm' => 'Issue anyway',
+    // Image in the embedded block referencing an exam outside the main
+    // selection (exam_ids) — never silently dropped (found via adversarial
+    // Codex review).
+    'report_image_not_selected' => 'One of the report images belongs to an exam that is no longer selected. Refresh the image selection and try again.',
+    // Non-blocking warning: inline <img> reference ("Insert image" button,
+    // distinct from the block above) could not be resolved now (exam
+    // disabled/deleted, file unavailable) — found via Codex adversarial
+    // review.
+    'report_inline_image_incomplete_warning' => '{1} 1 of the images inserted in the text could not be included in the report (exam disabled, file unavailable, or deleted) and will be removed. Review before issuing.|[2,*] :count of the images inserted in the text could not be included in the report (exam disabled, file unavailable, or deleted) and will be removed. Review before issuing.',
+    // Hard block (never "issue anyway" — found via Codex adversarial
+    // review): the same image inserted multiple times in the text
+    // multiplies the expected weight every time the report is reopened or
+    // printed again, even though resolution is only charged once per exam.
+    'report_inline_images_too_large' => 'The images inserted in the report text exceed the size limit (the same image repeated several times adds its weight each time). Remove the repetitions before saving.',
+
+    // Requesting doctor + email delivery (Phase 5).
+    'requesting_doctor_label'             => 'Requesting doctor',
+    'requesting_doctor_name_label'        => 'Requesting doctor name',
+    'requesting_doctor_name_placeholder'  => "Doctor's name (optional)",
+    'requesting_doctor_email_label'       => 'Requesting doctor email',
+    'requesting_doctor_email_placeholder' => 'To send the report by email',
+    'requesting_doctor_default_name'      => 'Doctor',
+    'requesting_doctor_sent_at'           => 'Sent on :date',
+    'requesting_doctor_not_sent'          => 'Not sent yet',
+    'requesting_doctor_resend'            => 'Resend',
+    'requesting_doctor_resent'            => 'Report resent to the requesting doctor.',
+    'requesting_doctor_resend_failed'     => 'Could not resend the report.',
+    'report_resend_no_email'              => 'This report has no requesting doctor email on file.',
+    // The report only leaves the clinic once the record is SIGNED (immutable) — adversarial review round 15.
+    'report_resend_record_not_signed'      => 'Sending to the requesting doctor is only released after the medical record is signed: the report must be finalized (immutable) before it leaves the clinic.',
+    'external_report_not_final'            => 'This report has not been finalized by the clinic yet. Please try again later.',
+    'requesting_doctor_awaiting_signature' => 'Recipient saved. Sending to the requesting doctor is released after the medical record is signed — send it from the record\'s Documents list.',
+    'requesting_doctor_email_hint'         => 'Email delivery is only released after the medical record is signed.',
+    'requesting_doctor_mail_subject'       => '[:clinic] Exam report available',
+    'requesting_doctor_mail_greeting'      => 'Hello, :doctor!',
+    'requesting_doctor_mail_line1'         => 'Clinic **:clinic** has made the imaging exam report for patient **:patient**, which you requested, available.',
+    'requesting_doctor_mail_action'        => 'View report',
+    'requesting_doctor_mail_expires'       => 'This link expires in :days days.',
+    'requesting_doctor_mail_disclaimer'    => "If you weren't expecting this email, you can safely ignore it.",
+    'requesting_doctor_mail_salutation'    => 'Best regards — :clinic',
+
+    // USB pedal (Phase 5 / 7a/7b) — key mapping (the pedal "acts like a
+    // keyboard"). The same "advance" key switches eye (capture) and moves
+    // to the next image (viewer).
+    'pedal_keys_must_differ'  => 'The capture key and the advance key for the pedal must be different.',
+    'pedal_shortcuts_help'    => 'If you use a USB pedal (it works like a keyboard), choose here which keys it sends.',
+    'pedal_capture_key_label' => 'Pedal — capture',
+    'pedal_advance_key_label' => 'Pedal — advance (eye while capturing, next image in the viewer)',
+    'pedal_key_enter'         => 'Enter',
+    'pedal_key_space'         => 'Space',
+    'pedal_key_pagedown'      => 'Page Down',
+    'pedal_key_pageup'        => 'Page Up',
+
+    // Opening a draft from the list (Phase 5 / Codex review) — the list only
+    // returns a summary; opening needs the full draft fetched first.
+    'draft_load_failed'               => 'Could not load the draft. Please try again.',
+    'exam_fallback_label'             => 'Image',
+    'draft_unavailable_exams_removed' => 'This draft had exam(s) that are no longer available (removed or deactivated) — they were automatically dropped from this report.',
 ];

@@ -59,6 +59,14 @@ return [
     'generated_at'   => 'Gerado em',
     'signed_at'      => 'Assinado eletronicamente em',
     'signature_hash' => 'Hash',
+    'page_x_of_y'    => 'Página :current de :total',
+    'page_short'     => 'Pág. :current/:total',
+    // [page]/[topage] são placeholders NATIVOS do wkhtmltopdf (--footer-right),
+    // substituídos por ele mesmo depois da paginação — não são :params do
+    // Laravel, preservar literal na tradução.
+    'page_footer_native' => 'Pág. [page] de [topage]',
+    'phone_label'        => 'Tel',
+    'cellphone_label'    => 'Cel',
 
     // ── Seções (medical_record) ──────────────────────────────────────────
     'section_patient_data'      => 'Dados do Paciente',

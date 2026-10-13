@@ -7,6 +7,7 @@ use App\Traits\HasAuditColumns;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
+use Mews\Purifier\Facades\Purifier;
 
 class ReportSettingContent extends Model
 {
@@ -82,6 +83,21 @@ class ReportSettingContent extends Model
     public function isUntouchedCopy(): bool
     {
         return $this->source_content_hash !== null && $this->source_content_hash === $this->currentFingerprint();
+    }
+
+    /**
+     * content seguro pra emitir como HTML (prévia, impressão) — nunca o
+     * atributo cru. ReportSettingService::syncContents() já sanitiza no
+     * salvar, mas uma linha gravada ANTES dessa correção (ou qualquer
+     * caminho futuro que grave direto) continua tendo HTML executável
+     * persistido; aqui protege na hora de RENDERIZAR também, sem precisar
+     * de migração reescrevendo content (que mudaria o fingerprint de
+     * cópias já adotadas pelas clínicas) — achado via auditoria de
+     * encerramento (EE-01).
+     */
+    public function sanitizedContent(): string
+    {
+        return Purifier::clean((string) $this->content, 'medical');
     }
 
     public function reportSetting(): BelongsTo

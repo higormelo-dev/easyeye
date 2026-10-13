@@ -146,6 +146,16 @@ return [
     // (layout do equipamento reconhecido); senão fica fora da IA.
     'eye_image_some_not_sent' => '{1} 1 imagem não foi enviada à IA: o sistema não reconheceu o layout do equipamento para tarjar os dados do paciente (proteção LGPD). Peça ao suporte o modelo desse equipamento.|[2,*] :count imagens não foram enviadas à IA: o sistema não reconheceu o layout do equipamento para tarjar os dados do paciente (proteção LGPD). Peça ao suporte o modelo desse equipamento.',
     'eye_image_none_sent'     => '{1} A imagem não foi enviada à IA: o sistema não reconheceu o layout do equipamento para tarjar os dados do paciente (proteção LGPD). Nada foi cobrado. Peça ao suporte o modelo desse equipamento.|[2,*] Nenhuma das :count imagens foi enviada à IA: o sistema não reconheceu o layout do equipamento para tarjar os dados do paciente (proteção LGPD). Nada foi cobrado. Peça ao suporte o modelo desse equipamento.',
+    // Nenhuma imagem pôde ser enviada por um motivo DIFERENTE de layout não
+    // reconhecido (ex.: vídeo selecionado — a IA só analisa foto; arquivo
+    // ausente; formato ilegível) — mensagem genérica de propósito, não cita
+    // LGPD/tarja, que não é a causa aqui.
+    'eye_image_none_available' => '{1} A imagem selecionada não pôde ser enviada à IA (ex.: é um vídeo, o arquivo está ausente, ou o formato não é suportado). Nada foi cobrado.|[2,*] Nenhuma das :count imagens selecionadas pôde ser enviada à IA (ex.: são vídeos, os arquivos estão ausentes, ou o formato não é suportado). Nada foi cobrado.',
+    // Diferente de eye_image_some_not_sent (layout LGPD não reconhecido) —
+    // aqui é um exame que nem chegou a ser tentado (ex.: vídeo, que a IA só
+    // analisa foto). Continua PENDENTE de laudo — nunca é coberto por este
+    // laudo de IA, mesmo tendo sido selecionado junto com imagens que foram.
+    'eye_image_some_unsupported' => '{1} 1 exame selecionado não pôde ser analisado pela IA (formato não suportado, ex.: vídeo) e continua pendente de laudo.|[2,*] :count exames selecionados não puderam ser analisados pela IA (formato não suportado, ex.: vídeo) e continuam pendentes de laudo.',
 
     // Preâmbulo de segurança (server-side) — prependido a TODO system prompt
     // de IA pelo AiPayloadEnricher (nunca pulado, nunca alterável pelo

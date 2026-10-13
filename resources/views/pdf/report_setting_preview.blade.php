@@ -190,7 +190,7 @@
     {{-- ── Faixa informativa de preview ─────────────────────────────────────── --}}
     <div class="meta-strip">
         PREVIEW — {{ $s->title }}
-        &nbsp;·&nbsp; Página {{ $loop->iteration }} de {{ $totalPages }}
+        &nbsp;·&nbsp; {{ __('pdf.page_x_of_y', ['current' => $loop->iteration, 'total' => $totalPages]) }}
         &nbsp;·&nbsp; Tipo: {{ $content->display_label ?? $content->label }}
         @if($s->paper_size)&nbsp;·&nbsp; Papel: {{ $s->paper_size?->value ?? $s->paper_size }}@endif
     </div>
@@ -317,7 +317,7 @@
         {{ $s->footer_text ?: $mockClinic }}
         @if($s->footer_show_address)&nbsp;·&nbsp; {{ $mockAddress }}@endif
         @if($s->footer_show_phone)&nbsp;·&nbsp; {{ $mockPhone }}@endif
-        &nbsp;·&nbsp; Emitido em {{ \Illuminate\Support\Carbon::now()->isoFormat('L LT') }}
+        &nbsp;·&nbsp; {{ __('pdf.issued_at') }} {{ \Illuminate\Support\Carbon::now()->isoFormat('L LT') }}
     </div>
     @endif
 @endif

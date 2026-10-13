@@ -56,7 +56,13 @@ function approvedEyeRunFor($test, PatientExam $exam): AiRun
         'ai_run_id'       => $run->id,
         'patient_exam_id' => $exam->id,
         'entity_id'       => $test->entity->id,
-        'created_at'      => now(),
+        // Exame DE FATO analisado (não só selecionado) — reportedConstraint()
+        // só considera "laudado via IA" quando este outcome está preenchido
+        // e não é SKIPPED_UNRECOGNIZED_LAYOUT (Fase 5 / revisão adversarial
+        // Codex). Produção preenche via AiRunExecutionService::
+        // resolveImages(); aqui é direto, sem decodificar imagem de verdade.
+        'image_deidentification' => 'oculus_pentacam_panel_a_pt',
+        'created_at'             => now(),
     ]);
 
     return $run;

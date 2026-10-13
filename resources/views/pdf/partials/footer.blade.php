@@ -13,8 +13,8 @@
     // BrazilianFormat em vez de função declarada no Blade: `function` aqui dá
     // "Cannot redeclare" quando o rodapé é renderizado 2x no mesmo processo.
     $contacts = array_filter([
-        ($telephone ?? null) ? 'Tel: ' . \App\Support\BrazilianFormat::phone($telephone) : null,
-        ($cellphone ?? null) ? 'Cel: ' . \App\Support\BrazilianFormat::phone($cellphone) : null,
+        ($telephone ?? null) ? __('pdf.phone_label') . ': ' . \App\Support\BrazilianFormat::phone($telephone) : null,
+        ($cellphone ?? null) ? __('pdf.cellphone_label') . ': ' . \App\Support\BrazilianFormat::phone($cellphone) : null,
         $email ?? null,
     ]);
 @endphp

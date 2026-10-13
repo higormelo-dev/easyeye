@@ -227,6 +227,42 @@ class AuthServiceProvider extends ServiceProvider
         });
 
         /**
+         * Preparar rascunho de laudo de imagem, pré-visualizar modelo e
+         * extrair texto de PDF (admin, doctor, secretary) — Fase 5. Mesmo
+         * allowlist de ImportExternalExam: ato preparatório, não clínico.
+         * A emissão em si continua travada em IssueReport (doctor-only),
+         * inalterado.
+         */
+        Gate::define(EntityGate::DraftImageReport->value, function (User $user, Entity $entity): bool {
+            if (! $entity->isClient()) {
+                return false;
+            }
+
+            return $user->hasAnyRoleInEntity($entity, [
+                ClientRule::Admin,
+                ClientRule::Doctor,
+                ClientRule::Secretary,
+            ]);
+        });
+
+        /**
+         * Enviar/reenviar o laudo de imagem ao médico solicitante por
+         * e-mail (admin, doctor — Fase 5). Mesmo allowlist de
+         * ShareLaudoWithPatient: decisão de expor conteúdo clínico
+         * assinado pra fora não é da secretária.
+         */
+        Gate::define(EntityGate::SendReportToExternalDoctor->value, function (User $user, Entity $entity): bool {
+            if (! $entity->isClient()) {
+                return false;
+            }
+
+            return $user->hasAnyRoleInEntity($entity, [
+                ClientRule::Admin,
+                ClientRule::Doctor,
+            ]);
+        });
+
+        /**
          * Gerenciar configurações da entity: dados cadastrais, convênios,
          * tipos de consulta, integrações.
          * Somente admin da entity cliente.

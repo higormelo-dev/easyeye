@@ -280,10 +280,10 @@ function syncContentFromServer(id, snapshot) {
                             <div class="col-md-4">
                                 <div class="form-check form-switch mt-4">
                                     <input
+                                        id="field_active"
                                         v-model="form.active"
                                         type="checkbox"
                                         class="form-check-input"
-                                        id="field_active"
                                         role="switch"
                                     />
                                     <label class="form-check-label" for="field_active">Ativo</label>
@@ -382,10 +382,10 @@ function syncContentFromServer(id, snapshot) {
                         <h6 class="fw-semibold mb-3"><i class="ti ti-layout-navbar me-1"></i>Cabeçalho</h6>
                         <div class="form-check form-switch mb-2">
                             <input
+                                id="show_header"
                                 v-model="form.show_header"
                                 type="checkbox"
                                 class="form-check-input"
-                                id="show_header"
                                 role="switch"
                             />
                             <label class="form-check-label" for="show_header">Exibir cabeçalho</label>
@@ -394,40 +394,40 @@ function syncContentFromServer(id, snapshot) {
                             <div class="col-md-3">
                                 <div class="form-check">
                                     <input
+                                        id="h_logo"
                                         v-model="form.header_show_logo"
                                         type="checkbox"
                                         class="form-check-input"
-                                        id="h_logo"
                                     /><label class="form-check-label" for="h_logo">Logo</label>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-check">
                                     <input
+                                        id="h_name"
                                         v-model="form.header_show_name"
                                         type="checkbox"
                                         class="form-check-input"
-                                        id="h_name"
                                     /><label class="form-check-label" for="h_name">Nome</label>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-check">
                                     <input
+                                        id="h_addr"
                                         v-model="form.header_show_address"
                                         type="checkbox"
                                         class="form-check-input"
-                                        id="h_addr"
                                     /><label class="form-check-label" for="h_addr">Endereço</label>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-check">
                                     <input
+                                        id="h_phone"
                                         v-model="form.header_show_phone"
                                         type="checkbox"
                                         class="form-check-input"
-                                        id="h_phone"
                                     /><label class="form-check-label" for="h_phone">Telefone</label>
                                 </div>
                             </div>
@@ -438,10 +438,10 @@ function syncContentFromServer(id, snapshot) {
                         <h6 class="fw-semibold mb-3"><i class="ti ti-signature me-1"></i>Assinatura</h6>
                         <div class="form-check form-switch mb-2">
                             <input
+                                id="show_sig"
                                 v-model="form.show_signature"
                                 type="checkbox"
                                 class="form-check-input"
-                                id="show_sig"
                                 role="switch"
                             />
                             <label class="form-check-label" for="show_sig">Exibir assinatura</label>
@@ -450,30 +450,30 @@ function syncContentFromServer(id, snapshot) {
                             <div class="col-md-3">
                                 <div class="form-check">
                                     <input
+                                        id="s_name"
                                         v-model="form.signature_show_name"
                                         type="checkbox"
                                         class="form-check-input"
-                                        id="s_name"
                                     /><label class="form-check-label" for="s_name">Nome</label>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-check">
                                     <input
+                                        id="s_crm"
                                         v-model="form.signature_show_crm"
                                         type="checkbox"
                                         class="form-check-input"
-                                        id="s_crm"
                                     /><label class="form-check-label" for="s_crm">CRM</label>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="form-check">
                                     <input
+                                        id="s_rqe"
                                         v-model="form.signature_show_rqe"
                                         type="checkbox"
                                         class="form-check-input"
-                                        id="s_rqe"
                                     /><label class="form-check-label" for="s_rqe">RQE</label>
                                 </div>
                             </div>
@@ -484,10 +484,10 @@ function syncContentFromServer(id, snapshot) {
                         <h6 class="fw-semibold mb-3"><i class="ti ti-layout-bottombar me-1"></i>Rodapé</h6>
                         <div class="form-check form-switch mb-2">
                             <input
+                                id="show_footer"
                                 v-model="form.show_footer"
                                 type="checkbox"
                                 class="form-check-input"
-                                id="show_footer"
                                 role="switch"
                             />
                             <label class="form-check-label" for="show_footer">Exibir rodapé</label>
@@ -506,20 +506,20 @@ function syncContentFromServer(id, snapshot) {
                                 <div class="col-md-4">
                                     <div class="form-check">
                                         <input
+                                            id="f_addr"
                                             v-model="form.footer_show_address"
                                             type="checkbox"
                                             class="form-check-input"
-                                            id="f_addr"
                                         /><label class="form-check-label" for="f_addr">Endereço</label>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-check">
                                         <input
+                                            id="f_phone"
                                             v-model="form.footer_show_phone"
                                             type="checkbox"
                                             class="form-check-input"
-                                            id="f_phone"
                                         /><label class="form-check-label" for="f_phone">Telefone</label>
                                     </div>
                                 </div>
@@ -625,10 +625,10 @@ function syncContentFromServer(id, snapshot) {
                                     <div class="col-md-2 d-flex align-items-end gap-2">
                                         <div class="form-check form-switch mb-1">
                                             <input
+                                                :id="`active_${idx}`"
                                                 v-model="content.active"
                                                 type="checkbox"
                                                 class="form-check-input"
-                                                :id="`active_${idx}`"
                                                 role="switch"
                                             />
                                             <label class="form-check-label small" :for="`active_${idx}`">Ativo</label>
@@ -636,8 +636,8 @@ function syncContentFromServer(id, snapshot) {
                                         <button
                                             type="button"
                                             class="btn btn-sm btn-outline-danger ms-auto"
-                                            @click="removeContent(idx)"
                                             title="Remover"
+                                            @click="removeContent(idx)"
                                         >
                                             <i class="ti ti-trash"></i>
                                         </button>

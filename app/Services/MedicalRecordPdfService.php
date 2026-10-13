@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Enums\{DocumentationType, PaperSize};
 use App\Models\Entity;
 use App\Models\{MedicalRecord, MedicalRecordDocumentation, ReportSetting};
-use App\Services\EyeImages\ReportExamSummary;
+use App\Services\EyeImages\{ReportExamSummary, ReportImageBlockBuilder};
 use App\Support\BrazilianFormat;
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Carbon\CarbonInterface;
@@ -44,6 +44,7 @@ class MedicalRecordPdfService
             'visualAcuityTypeWitCorrectionRight',
             'visualAcuityTypeWitCorrectionLeft',
             'signedBy.user',
+            'signedBy.doctor',
         ]);
 
         $setting = $this->resolveEntitySetting(
@@ -60,7 +61,7 @@ class MedicalRecordPdfService
             ->setOption('margin-bottom', ($setting?->margin_bottom ?? 2.0) . 'cm')
             ->setOption('margin-left', ($setting?->margin_left ?? 2.5) . 'cm')
             ->setOption('footer-font-size', '8')
-            ->setOption('footer-right', 'Pág. [page] de [topage]')
+            ->setOption('footer-right', __('pdf.page_footer_native'))
             ->setOption('encoding', 'UTF-8')
             ->inline($filename);
     }
@@ -144,10 +145,7 @@ class MedicalRecordPdfService
             'fontFamily' => $setting?->font_family ?? 'Arial',
         ])->render();
 
-        $path = tempnam(sys_get_temp_dir(), 'eeye_ftr_') . '.html';
-        file_put_contents($path, $html);
-
-        return $path;
+        return $this->writeTempHtmlFile('eeye_ftr_', $html);
     }
 
     /**
@@ -167,21 +165,25 @@ class MedicalRecordPdfService
         $filename   = 'TONOMETRIA-' . $record->code . '.pdf';
         $footerPath = $this->buildFooterFile($entity, $setting);
 
-        $pdf = SnappyPdf::loadView('pdf.tonometry', compact('record', 'setting', 'time'))
-            ->setPaper($setting?->paper_size?->value ?? PaperSize::A4->value)
-            ->setOption('margin-top', ($setting?->margin_top ?? 2.0) . 'cm')
-            ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')
-            ->setOption('margin-bottom', max((float) ($setting?->margin_bottom ?? 2.0), 2.0) . 'cm')
-            ->setOption('margin-left', ($setting?->margin_left ?? 2.5) . 'cm')
-            ->setOption('encoding', 'UTF-8')
-            ->setOption('footer-html', $footerPath)
-            ->inline($filename);
-
-        if ($footerPath) {
-            @unlink($footerPath);
+        try {
+            return SnappyPdf::loadView('pdf.tonometry', compact('record', 'setting', 'time'))
+                ->setPaper($setting?->paper_size?->value ?? PaperSize::A4->value)
+                ->setOption('margin-top', ($setting?->margin_top ?? 2.0) . 'cm')
+                ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')
+                ->setOption('margin-bottom', max((float) ($setting?->margin_bottom ?? 2.0), 2.0) . 'cm')
+                ->setOption('margin-left', ($setting?->margin_left ?? 2.5) . 'cm')
+                ->setOption('encoding', 'UTF-8')
+                ->setOption('footer-html', $footerPath)
+                ->inline($filename);
+        } finally {
+            // finally (não só depois do sucesso): renderização travada/com
+            // erro antes não chegava a limpar o rodapé temporário — que
+            // carrega endereço/telefone da clínica (achado via auditoria de
+            // encerramento, EE-10).
+            if ($footerPath) {
+                @unlink($footerPath);
+            }
         }
-
-        return $pdf;
     }
 
     /**
@@ -207,25 +209,33 @@ class MedicalRecordPdfService
 
             $footerPath = $this->buildFooterFile($entity, $setting);
 
-            $pdf = SnappyPdf::loadView('pdf.tonometry', compact('patient', 'doctor', 'entity', 'setting', 'od', 'oe', 'time'))
-                ->setPaper('A5', 'portrait')
-                ->setOption('margin-top', '1.5cm')
-                ->setOption('margin-right', '1.5cm')
-                ->setOption('margin-bottom', '2cm')
-                ->setOption('margin-left', '1.5cm')
-                ->setOption('encoding', 'UTF-8')
-                ->setOption('footer-html', $footerPath)
-                ->inline($filename);
-
-            if ($footerPath) {
-                @unlink($footerPath);
+            try {
+                return SnappyPdf::loadView('pdf.tonometry', compact('patient', 'doctor', 'entity', 'setting', 'od', 'oe', 'time'))
+                    ->setPaper('A5', 'portrait')
+                    ->setOption('margin-top', '1.5cm')
+                    ->setOption('margin-right', '1.5cm')
+                    ->setOption('margin-bottom', '2cm')
+                    ->setOption('margin-left', '1.5cm')
+                    ->setOption('encoding', 'UTF-8')
+                    ->setOption('footer-html', $footerPath)
+                    ->inline($filename);
+            } finally {
+                if ($footerPath) {
+                    @unlink($footerPath);
+                }
             }
-
-            return $pdf;
         }
 
         // reportSetting pode ser null se o content veio de um template global ou o setting foi removido.
-        $entityId = $doc->medicalRecord?->schedule?->entity_id ?? session('selected_entity_id');
+        // patient->entity_id ANTES da sessão: documento sem schedule (ex.:
+        // laudo de imagem de exame importado manualmente) é visto também por
+        // quem não tem clínica selecionada (link público pro médico
+        // solicitante, ExternalMedicalReportController) — sessão vazia ou de
+        // OUTRA clínica (visitante autenticado noutra aba) perdia o
+        // letterhead/configuração certos, ou pior, vazava o de outra clínica
+        // (achado via revisão Codex). patient_id é coluna direta e sempre
+        // confiável, nunca derivada de sessão.
+        $entityId = $doc->medicalRecord?->schedule?->entity_id ?? $doc->patient?->entity_id ?? session('selected_entity_id');
         $setting  = $this->resolveSettingForDoc($doc, $entityId);
 
         $entity = $doc->medicalRecord?->schedule?->entity ?? Entity::find($entityId);
@@ -245,7 +255,14 @@ class MedicalRecordPdfService
             ? app(ReportExamSummary::class)->forDocumentation($doc)
             : [];
 
-        $pdf = SnappyPdf::loadView('pdf.documentation', compact('doc', 'setting', 'examSummary'))
+        // Imagens embutidas no laudo (Fase 5 / 5c) — null quando o médico não
+        // habilitou ou o documento não é de imagem; resolvido de novo a cada
+        // render (reimpressão nunca usa um bloco "congelado").
+        $imageBlock = $doc->type === DocumentationType::Report
+            ? app(ReportImageBlockBuilder::class)->build($doc)
+            : null;
+
+        $pdf = SnappyPdf::loadView('pdf.documentation', compact('doc', 'setting', 'examSummary', 'imageBlock'))
             ->setPaper($setting?->paper_size?->value ?? PaperSize::A4->value)
             ->setOption('margin-top', ($setting?->margin_top ?? 0) . 'cm')
             ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')
@@ -257,13 +274,13 @@ class MedicalRecordPdfService
             $pdf->setOption('footer-html', $footerPath);
         }
 
-        $result = $pdf->inline($filename);
-
-        if ($footerPath) {
-            @unlink($footerPath);
+        try {
+            return $pdf->inline($filename);
+        } finally {
+            if ($footerPath) {
+                @unlink($footerPath);
+            }
         }
-
-        return $result;
     }
 
     /**
@@ -302,8 +319,26 @@ class MedicalRecordPdfService
             </body></html>
             HTML;
 
-        $path = tempnam(sys_get_temp_dir(), 'eeye_doc_ftr_') . '.html';
+        return $this->writeTempHtmlFile('eeye_doc_ftr_', $html);
+    }
+
+    /**
+     * Cria um arquivo .html temporário com nome único e permissões
+     * restritas (0600 — rodapé carrega endereço/telefone da clínica).
+     *
+     * NUNCA usar tempnam() + concatenar ".html" no resultado: tempnam() já
+     * CRIA o arquivo (vazio) no nome que devolve; concatenar ".html" depois
+     * gera um nome DIFERENTE pra escrever o conteúdo, e o arquivo vazio
+     * original do tempnam() fica pra sempre sem nenhuma referência pra
+     * limpar — um temporário órfão por PDF gerado, sempre (achado via
+     * auditoria de encerramento, EE-10).
+     */
+    private function writeTempHtmlFile(string $prefix, string $html): string
+    {
+        $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $prefix . bin2hex(random_bytes(8)) . '.html';
+
         file_put_contents($path, $html);
+        chmod($path, 0600);
 
         return $path;
     }

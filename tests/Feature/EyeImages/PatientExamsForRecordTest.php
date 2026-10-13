@@ -37,7 +37,56 @@ it('devolve exames com metadados e urls para o paciente', function () {
     $exams = $res->json('exams');
     expect($exams)->toHaveCount(1)
         ->and($exams[0]['laterality'])->toBe('OD')
-        ->and($exams[0])->toHaveKeys(['exam_type', 'performed_at', 'diagnosis', 'is_pdf', 'thumb_url', 'display_url', 'original_url']);
+        ->and($exams[0])->toHaveKeys(['exam_type', 'performed_at', 'diagnosis', 'is_pdf', 'thumb_url', 'display_url', 'original_url', 'active']);
+});
+
+it('[GAP] expõe active=false pra exame desabilitado — rascunho de laudo (Fase 5) usa isto pra revalidar exam_ids ao reabrir', function () {
+    $activeExam = PatientExam::factory()->create([
+        'patient_id' => $this->patient->id,
+        'archive'    => 'exams/ativo.jpg',
+        'active'     => true,
+    ]);
+    $inactiveExam = PatientExam::factory()->create([
+        'patient_id' => $this->patient->id,
+        'archive'    => 'exams/inativo.jpg',
+        'active'     => false,
+    ]);
+
+    $res = $this->actingAs($this->doctor)
+        ->withSession(panelSession($this->doctorEntityUser))
+        ->getJson(route('panel.eye-images.patient-exams', $this->patient));
+
+    $res->assertOk();
+    $exams = collect($res->json('exams'))->keyBy('id');
+
+    expect($exams[(string) $activeExam->id]['active'])->toBeTrue()
+        ->and($exams[(string) $inactiveExam->id]['active'])->toBeFalse();
+});
+
+it('[GAP] expõe is_video=true pra vídeo capturado (.webm/.mp4) — laudo de imagem usa isto pra nunca oferecer vídeo como candidato de "imagem"', function () {
+    $photo = PatientExam::factory()->create([
+        'patient_id' => $this->patient->id,
+        'archive'    => 'exams/foto.jpg',
+    ]);
+    $video = PatientExam::factory()->create([
+        'patient_id' => $this->patient->id,
+        'archive'    => 'exams/captura.webm',
+    ]);
+    $videoUpperExt = PatientExam::factory()->create([
+        'patient_id' => $this->patient->id,
+        'archive'    => 'exams/captura.MP4',
+    ]);
+
+    $res = $this->actingAs($this->doctor)
+        ->withSession(panelSession($this->doctorEntityUser))
+        ->getJson(route('panel.eye-images.patient-exams', $this->patient));
+
+    $res->assertOk();
+    $exams = collect($res->json('exams'))->keyBy('id');
+
+    expect($exams[(string) $photo->id]['is_video'])->toBeFalse()
+        ->and($exams[(string) $video->id]['is_video'])->toBeTrue()
+        ->and($exams[(string) $videoUpperExt->id]['is_video'])->toBeTrue();
 });
 
 it('registra o acesso de leitura (LGPD art. 37)', function () {

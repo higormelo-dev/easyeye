@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\UserPreference;
 use App\Support\PanelTour;
+use Closure;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Validation\{Rule, ValidationException};
 
@@ -37,6 +38,9 @@ class PreferencesController extends Controller
         // Tour guiado do painel (App\Support\PanelTour): {id: {version, status}}
         // — só o que mudou; o servidor mescla com os demais e grava a data.
         'tours',
+        // Pedal USB do Gerenciador de Imagens (Fase 5 / 7a): {capture_key,
+        // advance_key} — ver ImportExternalExamModal.vue / EyeImages/Index.vue.
+        'eye_images_pedal_shortcuts',
     ];
 
     /**
@@ -79,6 +83,26 @@ class PreferencesController extends Controller
             'tours.*'                               => ['array'],
             'tours.*.version'                       => ['required', 'integer', 'min:1', 'max:1000'],
             'tours.*.status'                        => ['required', Rule::in(PanelTour::STATUSES)],
+            // Pedal USB (Fase 5 / 7a): o pedal "age como teclado" — só 4
+            // teclas plausíveis de pedal são aceitas (config/eye_image_capture.php),
+            // NUNCA Escape/setas (colidem com os atalhos do visualizador). As
+            // duas teclas sempre chegam juntas (front sempre manda o par
+            // completo) — permite checar "são diferentes" sem comparar contra
+            // um valor antigo já salvo que esta request nem enviou.
+            'eye_images_pedal_shortcuts'             => ['sometimes', 'array'],
+            'eye_images_pedal_shortcuts.capture_key' => ['sometimes', 'nullable', Rule::in(config('eye_image_capture.pedal.allowed_keys'))],
+            'eye_images_pedal_shortcuts.advance_key' => [
+                'sometimes',
+                'nullable',
+                Rule::in(config('eye_image_capture.pedal.allowed_keys')),
+                function (string $attribute, mixed $value, Closure $fail) use ($request): void {
+                    $captureKey = $request->input('eye_images_pedal_shortcuts.capture_key');
+
+                    if ($value !== null && $captureKey !== null && $value === $captureKey) {
+                        $fail(__('eye_images.pedal_keys_must_differ'));
+                    }
+                },
+            ],
         ]);
 
         // Request::only() já filtra pra só as chaves permitidas — qualquer

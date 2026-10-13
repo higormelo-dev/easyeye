@@ -293,18 +293,65 @@ class AiRunExecutionService
 
         $prepared = $this->eyeImageAttachments->prepare($exams);
 
-        foreach ($prepared['outcomes'] as $examId => $outcome) {
+        // Zera TODA a seleção antes de escrever os outcomes desta tentativa
+        // — nunca um update seletivo só pelas chaves de $prepared['outcomes'].
+        // RunAiWorkflowJob tenta de novo em falha transitória (config
+        // ai.jobs.tries, default 3) chamando execute() outra vez no MESMO
+        // $run — sem isto, um exame que teve sucesso numa tentativa ANTERIOR
+        // e passa a falhar nesta (arquivo some do S3, orçamento de bytes
+        // muda de ordem) nunca tinha a linha atualizada: ficava com o
+        // outcome de sucesso ANTIGO, de uma tentativa que não é a que
+        // de fato prosseguiu/foi aprovada, fazendo um exame nunca enviado
+        // NESTA tentativa contar como laudado (achado na 6ª rodada de
+        // revisão adversarial Codex). PatientExam::reportedConstraint() e
+        // AiRunDocumentationService::writeRunDocumentation() já leem esta
+        // coluna sem confiar em mais nada — mantê-la sempre fiel à ÚLTIMA
+        // tentativa basta, sem precisar mudar nenhum dos dois.
+        // As duas operações (zerar, depois escrever os outcomes) sempre
+        // comitavam separadas — cada update() sua própria autocommit. A
+        // migration de backfill de legado (ai_run_patient_exam_backfill)
+        // trava as linhas candidatas (FOR UPDATE) antes de classificar,
+        // mas isso só serializa contra OUTRA transação — nunca protege
+        // contra observar um run NO MEIO desta sequência: zerado (sem
+        // outcome real, sem dispatch_audit ainda — grava DEPOIS desta
+        // função retornar) mas ainda sem o outcome real escrito. Se a
+        // migration travar exatamente nesse intervalo, o vídeo (que nunca
+        // ganha outcome no laço abaixo) fica com o sentinela de legado
+        // pra sempre — o laço nunca o sobrescreve, só a foto é reescrita
+        // (achado na 12ª rodada de revisão adversarial Codex). Uma única
+        // transação torna as duas operações atômicas: de fora, o run ou
+        // está no estado ANTERIOR a esta tentativa (zero, ou outcome de
+        // uma tentativa anterior) ou no estado FINAL completo — nunca o
+        // intervalo no meio.
+        DB::transaction(function () use ($run, $examIds, $prepared) {
             DB::table('ai_run_patient_exam')
                 ->where('ai_run_id', $run->id)
-                ->where('patient_exam_id', $examId)
-                ->update(['image_deidentification' => $outcome]);
-        }
+                ->whereIn('patient_exam_id', $examIds)
+                ->update(['image_deidentification' => null]);
+
+            foreach ($prepared['outcomes'] as $examId => $outcome) {
+                DB::table('ai_run_patient_exam')
+                    ->where('ai_run_id', $run->id)
+                    ->where('patient_exam_id', $examId)
+                    ->update(['image_deidentification' => $outcome]);
+            }
+        });
 
         $sent    = array_column($prepared['attachments'], 'exam_id');
         $blocked = count(array_keys($prepared['outcomes'], EyeImageAttachmentService::SKIPPED_UNRECOGNIZED_LAYOUT, true));
 
-        if ($sent === [] && $blocked > 0) {
-            throw new AiImageNotDeidentifiedException(trans_choice('ai.eye_image_none_sent', $blocked, ['count' => $blocked]));
+        // $blocked só conta o motivo "layout não reconhecido" — um exame de
+        // VÍDEO (aceito na importação desde a Fase 5/6a, mas que
+        // encodeExam() não decodifica com GD) nunca chega a gerar outcome
+        // nenhum, então caía fora daqui com $sent === [] e $blocked === 0:
+        // o run seguia pro provedor sem nenhuma imagem, cobrando créditos
+        // por uma análise que não analisou nada (achado via revisão Codex).
+        // Qualquer motivo de "nada pôde ser enviado" falha aqui, nunca só o
+        // de layout.
+        if ($sent === []) {
+            throw new AiImageNotDeidentifiedException($blocked > 0
+                ? trans_choice('ai.eye_image_none_sent', $blocked, ['count' => $blocked])
+                : trans_choice('ai.eye_image_none_available', count($examIds), ['count' => count($examIds)]));
         }
 
         if (isset($context['selected_exams']) && is_array($context['selected_exams'])) {
@@ -319,9 +366,20 @@ class AiRunExecutionService
             $context['selected_exams'] = $kept;
         }
 
-        $notes = $blocked > 0 ? [trans_choice('ai.eye_image_some_not_sent', $blocked, ['count' => $blocked])] : [];
+        // Diferente de $blocked (bloqueado por layout LGPD não reconhecido,
+        // JÁ avisado acima): aqui são exames selecionados que nem outcome
+        // chegaram a ter — nunca tentados de verdade (vídeo é o caso real;
+        // GD não decodifica, então encodeExam() sai antes de registrar
+        // qualquer outcome). Sem avisar separado, o médico não tinha como
+        // saber que um exame da seleção ficou de fora da análise por um
+        // motivo diferente de LGPD (achado via revisão adversarial Codex).
+        $neverAttempted = count(array_diff($examIds, $sent, array_keys($prepared['outcomes'])));
+        $notes          = array_filter([
+            $blocked > 0 ? trans_choice('ai.eye_image_some_not_sent', $blocked, ['count' => $blocked]) : null,
+            $neverAttempted > 0 ? trans_choice('ai.eye_image_some_unsupported', $neverAttempted, ['count' => $neverAttempted]) : null,
+        ]);
 
-        return [$prepared['attachments'], $context, $notes];
+        return [$prepared['attachments'], $context, array_values($notes)];
     }
 
     private function releaseReservationOnFailure(AiRun $run): void

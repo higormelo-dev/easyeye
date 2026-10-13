@@ -436,5 +436,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('medical-record-drafts', static function (Request $r) {
             return Limit::perMinute(60)->by('medical-record-drafts|' . ($r->user()?->id ?? $r->ip()));
         });
+
+        // Laudo pro médico solicitante (Fase 5): rota pública, sem sessão/
+        // usuário — o link já é assinado (HMAC, impossível de forjar); o
+        // throttle é só defesa extra contra varredura/compartilhamento em
+        // massa do link, por IP.
+        RateLimiter::for('external-report-view', static function (Request $r) {
+            return Limit::perMinute(10)->by('external-report-view|' . $r->ip());
+        });
     }
 }

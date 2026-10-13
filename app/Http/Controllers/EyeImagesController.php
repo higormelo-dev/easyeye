@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService};
+use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService, EyeImageAttachmentService};
 use App\DTOs\EyeImageFilters;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
-use App\Enums\FeatureKey;
-use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, Patient, PatientDocumentShare, PatientExam};
+use App\Enums\{DraftStatus, EntityGate, FeatureKey};
+use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, EyeImageReportDraft, Patient, PatientDocumentShare, PatientExam};
 use App\Services\FeatureGateService;
 use App\Support\{BrazilianFormat, CurrentDoctor};
+use App\Support\Documents\DocumentDate;
 use App\Traits\LogsDataAccess;
 use Closure;
 use Illuminate\Database\Eloquent\{Builder, Collection};
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\{Carbon, Str};
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\{Gate, Storage};
 use Inertia\{Inertia, Response as InertiaResponse};
 
 class EyeImagesController extends Controller
@@ -51,6 +52,15 @@ class EyeImagesController extends Controller
         $canEyeImage      = $this->featureGate->can($entityId, FeatureKey::HasAiEyeImageAnalysis);
         $canConsensus     = $this->providerSettings->isModeAvailable(AiRunMode::Consensus)
             && $this->featureGate->can($entityId, FeatureKey::HasAiConsensus);
+
+        // Rascunho de laudo (Fase 5 — secretária-rascunha/médico-emite):
+        // contagem só quando o papel atual pode rascunhar, pra não gastar
+        // query em perfis sem acesso (ex.: financeiro, que também cai neste
+        // index() sem entity.role).
+        $canDraftReports = (bool) ($entity && Gate::allows(EntityGate::DraftImageReport->value, $entity));
+        $pendingDrafts   = $canDraftReports
+            ? EyeImageReportDraft::query()->where('entity_id', $entityId)->where('status', DraftStatus::Submitted)->count()
+            : 0;
 
         // Modos disponíveis escalam com o nº de provedores ativos (Gemini-only
         // ⇒ só Economia). Consenso ainda depende do recurso da entidade.
@@ -98,10 +108,33 @@ class EyeImagesController extends Controller
             'isDoctor'          => CurrentDoctor::canIssue(),
             'doctorMissing'     => CurrentDoctor::issuerMissing(),
             'doctorMissingText' => CurrentDoctor::missingMessage(),
-            'urls'              => [
+            // Data alternativa do laudo manual (Fase 5) — mesma faixa/config
+            // já usada em MedicalRecordsController (documents.date).
+            'document_date_config' => DocumentDate::clientConfig(),
+            // Rascunho de laudo (Fase 5) — ver EyeImageReportDraftController.
+            'canDraftReports'          => $canDraftReports,
+            'draftReportsPendingCount' => $pendingDrafts,
+            // Captura pela câmera (Fase 5 / 6a) — auto-stop client-side da
+            // gravação; o teto que de fato vale é max_video_kb, validado no
+            // backend em ImportExternalExamRequest.
+            'max_video_seconds' => (int) config('eye_image_capture.capture.max_video_seconds'),
+            // Pedal USB (Fase 5 / 7a/7b) — allowlist + default; a tecla
+            // efetivamente salva é sempre revalidada em PreferencesController
+            // (ALLOWED_KEYS + Rule::in), isto aqui só monta o <select>.
+            'pedal_shortcuts_config' => [
+                'allowed_keys'        => config('eye_image_capture.pedal.allowed_keys'),
+                'default_capture_key' => config('eye_image_capture.pedal.default_capture_key'),
+                'default_advance_key' => config('eye_image_capture.pedal.default_advance_key'),
+            ],
+            'urls' => [
                 'search'       => route('panel.eye-images.search'),
                 'patient_urls' => route('panel.eye-images.patient-urls', ['patient' => '__ID__']),
-                'image_url'    => route('panel.eye-images.image-url', ['exam' => '__ID__']),
+                // Exames com metadados (tipo/olho) + URL — usado ao abrir um
+                // rascunho de laudo (Fase 5): o paciente do rascunho pode não
+                // ser o paciente selecionado na tela (sem exams/URLs já em
+                // memória). Mesmo endpoint já usado pelo painel do prontuário.
+                'patient_exams' => route('panel.eye-images.patient-exams', ['patient' => '__ID__']),
+                'image_url'     => route('panel.eye-images.image-url', ['exam' => '__ID__']),
                 // Portal do Paciente (Fase 2) — toggle "compartilhar com paciente".
                 'document_share_store'   => route('panel.document-shares.store'),
                 'document_share_destroy' => route('panel.document-shares.destroy', ['share' => '__ID__']),
@@ -110,6 +143,15 @@ class EyeImagesController extends Controller
                 'report_preview'          => route('panel.eye-images.report-templates.preview'),
                 'report_store'            => route('panel.eye-images.reports.store'),
                 'report_extract_pdf_text' => route('panel.eye-images.reports.extract-pdf-text'),
+                // Reenvio ao médico solicitante (Fase 5) — ver EyeImageReportResendController.
+                'report_resend' => route('panel.eye-images.reports.resend', ['documentation' => '__ID__']),
+                // Rascunho de laudo (Fase 5) — ver EyeImageReportDraftController.
+                'report_drafts_index'   => route('panel.eye-images.report-drafts.index'),
+                'report_drafts_store'   => route('panel.eye-images.report-drafts.store'),
+                'report_drafts_show'    => route('panel.eye-images.report-drafts.show', ['draft' => '__ID__']),
+                'report_drafts_update'  => route('panel.eye-images.report-drafts.update', ['draft' => '__ID__']),
+                'report_drafts_submit'  => route('panel.eye-images.report-drafts.submit', ['draft' => '__ID__']),
+                'report_drafts_destroy' => route('panel.eye-images.report-drafts.destroy', ['draft' => '__ID__']),
                 // Frases rápidas do médico (benchmark 18/09/2026) — ver
                 // DoctorReportPhrasesController.
                 'report_phrases_index'   => route('panel.eye-images.report-phrases.index'),
@@ -316,10 +358,23 @@ class EyeImagesController extends Controller
                 'exam_type'    => $exam->examType?->name,
                 'performed_at' => ($exam->exam_performed_at ?? $exam->created_at)?->format('d/m/Y'),
                 'laterality'   => [1 => 'OD', 2 => 'OE'][$exam->laterality] ?? 'AO',
-                'source'       => $exam->is_external ? ($exam->external_origin ?: 'Importado') : null,
-                'diagnosis'    => collect((array) $exam->diagnosis_cids)
+                // Exame desabilitado (active=false) nunca deve compor um laudo
+                // novo/rascunho reaberto (Fase 5 / revisão Codex) — sem este
+                // campo, o rascunho não tinha como saber e emitir travava sem
+                // explicação nem forma de corrigir.
+                'active'    => $exam->active,
+                'source'    => $exam->is_external ? ($exam->external_origin ?: 'Importado') : null,
+                'diagnosis' => collect((array) $exam->diagnosis_cids)
                     ->pluck('code')->filter()->values()->all(),
-                'is_pdf'       => str_ends_with(mb_strtolower((string) $exam->archive), '.pdf'),
+                'is_pdf' => str_ends_with(mb_strtolower((string) $exam->archive), '.pdf'),
+                // Vídeo capturado pela câmera (Fase 5 / 6a) tem archive/
+                // display_url/original_url preenchidos como qualquer exame —
+                // sem este campo, quem consome esta lista pra montar
+                // candidato de IMAGEM (Inserir imagem/Imagens no laudo) não
+                // tinha como saber que aquela URL é um vídeo, e acabava
+                // tratando como foto (preview quebrado, pode até entrar no
+                // corpo do laudo como <img>) — achado via revisão Codex.
+                'is_video'     => (bool) preg_match('/\.(webm|mp4)$/i', (string) $exam->archive),
                 'thumb_url'    => $temporary($exam->thumb_archive) ?? $display ?? $original,
                 'display_url'  => $display ?? $original,
                 'original_url' => $original,
@@ -443,8 +498,20 @@ class EyeImagesController extends Controller
             return null;
         }
 
+        // image_deidentification do pivot (ver withPivot() em
+        // PatientExam::aiRuns()) — mesmo critério de
+        // PatientExam::reportedConstraint(): só conta como "aprovado pra
+        // ESTE exame" quando ele foi DE FATO analisado NESTA execução,
+        // nunca só por o run estar Approved. Um vídeo num run misto
+        // foto+vídeo nunca ganha outcome (GD não decodifica) — o run pode
+        // estar Approved pela foto, e sem esta checagem a galeria rotulava
+        // o vídeo como aprovado e abria o conteúdo/PDF da foto (achado via
+        // revisão adversarial Codex).
+        $wasAnalyzedIn = fn (AiRun $r) => $r->pivot->image_deidentification !== null
+            && $r->pivot->image_deidentification !== EyeImageAttachmentService::SKIPPED_UNRECOGNIZED_LAYOUT;
+
         $approved = $exam->aiRuns->first(
-            fn (AiRun $r) => $r->status === AiRunStatus::Approved,
+            fn (AiRun $r) => $r->status === AiRunStatus::Approved && $wasAnalyzedIn($r),
         );
         $run = $approved ?? $exam->aiRuns->first();
 
@@ -452,7 +519,7 @@ class EyeImagesController extends Controller
             return null;
         }
 
-        $isApproved = $run->status === AiRunStatus::Approved;
+        $isApproved = $run->status === AiRunStatus::Approved && $wasAnalyzedIn($run);
         $doc        = $run->relationLoaded('documentation') ? $run->documentation : null;
 
         return [
@@ -462,8 +529,11 @@ class EyeImagesController extends Controller
             'content'  => $isApproved ? (string) $run->final_output : null,
             // PDF formal do laudo (timbre/assinatura) — só existe quando o laudo
             // já foi gravado no prontuário (aprovado + prontuário do dia
-            // resolvido; ver AiRunDocumentationService). Mesmo PDF do laudo manual.
-            'pdf_url' => ($doc && $doc->medical_record_id)
+            // resolvido; ver AiRunDocumentationService). Mesmo PDF do laudo
+            // manual. Gated por $isApproved (não só $doc existir): o
+            // documento do run misto existe de verdade, mas é o laudo da
+            // FOTO — nunca o PDF certo pro exame que nunca foi analisado.
+            'pdf_url' => ($isApproved && $doc && $doc->medical_record_id)
                 ? route('panel.patients.medicalrecords.documentations.pdf', [$exam->patient_id, $doc->medical_record_id, $doc->id])
                 : null,
         ];

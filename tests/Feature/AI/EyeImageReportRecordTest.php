@@ -118,6 +118,74 @@ describe('laudo de imagem -> prontuário do dia da consulta', function () {
             ->exists())->toBeTrue();
     });
 
+    it('[GAP] exame de vídeo selecionado junto com foto analisada: laudo de IA nunca o vincula, continua pendente (achado via revisão adversarial Codex)', function () {
+        $record = MedicalRecord::query()->create([
+            'entity_id'   => $this->entity->id,
+            'patient_id'  => $this->patient->id,
+            'doctor_id'   => $this->doctorModel->id,
+            'schedule_id' => $this->schedule->id,
+        ]);
+
+        $video = PatientExam::factory()->create([
+            'patient_id'  => $this->patient->id,
+            'schedule_id' => $this->schedule->id,
+            'archive'     => 'exams/captura.webm',
+        ]);
+
+        $run = AiRun::query()->create([
+            'entity_id'         => $this->entity->id,
+            'patient_id'        => $this->patient->id,
+            'requested_by'      => $this->doctor->id,
+            'workflow'          => 'eye_image_analysis',
+            'mode'              => AiRunMode::Economy->value,
+            'risk_level'        => AiRiskLevel::Medium->value,
+            'status'            => AiRunStatus::WaitingApproval->value,
+            'estimated_credits' => 10,
+            'reserved_credits'  => 10,
+            'consumed_credits'  => 8,
+            'final_output'      => 'Achados compatíveis com retinopatia leve na foto.',
+            'input_summary'     => ['exam_ids' => [(string) $this->exam->id, (string) $video->id]],
+        ]);
+
+        DB::table('ai_run_patient_exam')->insert([
+            [
+                'ai_run_id'              => $run->id,
+                'patient_exam_id'        => $this->exam->id,
+                'entity_id'              => $this->entity->id,
+                'created_at'             => now(),
+                'image_deidentification' => 'oculus_pentacam_panel_a_pt',
+            ],
+            // Vídeo: a linha nasce no momento da CRIAÇÃO do run (seleção
+            // original do médico), mas NUNCA recebe outcome — GD não
+            // decodifica vídeo, encodeExam() sai antes de registrar
+            // qualquer coisa. image_deidentification fica null pra sempre,
+            // mesmo o run terminando (Approved).
+            [
+                'ai_run_id'              => $run->id,
+                'patient_exam_id'        => $video->id,
+                'entity_id'              => $this->entity->id,
+                'created_at'             => now(),
+                'image_deidentification' => null,
+            ],
+        ]);
+
+        approveAs($this, $run)->assertOk()->assertJsonPath('requires_record_confirmation', false);
+
+        $doc = MedicalRecordDocumentation::query()->where('ai_run_id', $run->id)->sole();
+        // Sem a correção, syncExams() usava input_summary['exam_ids'] (a
+        // seleção ORIGINAL inteira) — o vídeo entrava no laudo mesmo nunca
+        // tendo sido analisado, e reportedConstraint() (via
+        // medical_record_documentation_exams OU ai_run_patient_exam de um
+        // run Approved) tirava ele da fila de pendentes como se tivesse
+        // sido coberto.
+        expect($doc->patientExams->pluck('id')->map(fn ($id) => (string) $id)->all())->toBe([(string) $this->exam->id]);
+
+        expect(PatientExam::query()->pendingReport($this->entity->id)->pluck('patient_exams.id'))
+            ->toContain($video->id)
+            ->and(PatientExam::query()->pendingReport($this->entity->id)->pluck('patient_exams.id'))
+            ->not->toContain($this->exam->id);
+    });
+
     it('endpoint record abre prontuário e registra o laudo quando confirmado', function () {
         $run = makeWaitingEyeRun($this);
         approveAs($this, $run)->assertOk();

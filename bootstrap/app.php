@@ -94,6 +94,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'teste.easyeye.app',
         ], subdomains: true);
 
+        // Pedal USB do Gerenciador de Imagens (Fase 5 / 7a) guarda o caractere
+        // de espaço (' ') como valor LEGÍTIMO de tecla (eye_images_pedal_shortcuts.
+        // {capture_key,advance_key}) — sem esta exceção, TrimStrings reduziria
+        // ' ' a '' (achado via teste real) e SÓ ENTÃO ConvertEmptyStringsToNull
+        // decretaria null; como ele só mexe em '' literal (nunca ' '), bastou
+        // tirar o TrimStrings do caminho — nada a fazer no outro middleware,
+        // que não tem exceção por campo (só skip da request inteira).
+        $middleware->trimStrings(except: [
+            'eye_images_pedal_shortcuts.capture_key',
+            'eye_images_pedal_shortcuts.advance_key',
+        ]);
+
         $middleware->alias([
             'tenant.bind'          => BindTenantContext::class,
             'entity.selected'      => EnsureEntitySelected::class,

@@ -48,6 +48,18 @@ it('formata telefone, celular e CEP no rodapé dos PDFs clínicos', function () 
         ->toContain('CEP 01310-100');
 });
 
+it('EE-14: rótulos Tel/Cel do rodapé respeitam o locale (pt_BR e en) — telefone em si nunca converte, é dado BR', function () {
+    app()->setLocale('en');
+
+    $html = invokePdfFooter('buildFooterFile', [pdfEntity(), null]);
+
+    expect($html)
+        ->toContain('Phone: (61) 3333-4444')
+        ->toContain('Mobile: (61) 99999-8888');
+
+    app()->setLocale('pt_BR');
+});
+
 it('renderiza o rodapé mais de uma vez no mesmo processo (sem função declarada no Blade)', function () {
     $partial = fn () => view('pdf.partials.footer', [
         'address'   => null,
@@ -109,4 +121,63 @@ it('imprime CNPJ alfanumérico como gravado (não mutila as letras)', function (
     $html = renderPurchaseOrderPdf(pdfEntity(['national_registration' => '12ABC345000195']));
 
     expect($html)->toContain('CNPJ: 12ABC345000195');
+});
+
+/**
+ * tempnam() + concatenar ".html" no resultado CRIA um arquivo (vazio, o do
+ * tempnam()) e ESCREVE em outro (o .html) — o primeiro nunca tinha mais
+ * nenhuma referência pra limpar: um temporário órfão por PDF com rodapé,
+ * sempre (achado via auditoria de encerramento, EE-10).
+ */
+function eePdfOrphanTempFiles(): array
+{
+    // Qualquer "eeye_*_" SEM ".html" no fim é exatamente o que tempnam()
+    // deixava — glob() com negação de sufixo não existe, filtra em PHP.
+    $all = glob(sys_get_temp_dir() . '/eeye_*') ?: [];
+
+    return array_values(array_filter($all, fn ($f) => ! str_ends_with($f, '.html')));
+}
+
+it('[GAP] montar o rodapé não deixa o arquivo vazio do tempnam() órfão (EE-10)', function () {
+    $before = eePdfOrphanTempFiles();
+
+    $path = (new ReflectionMethod(app(MedicalRecordPdfService::class), 'buildFooterFile'))
+        ->invoke(app(MedicalRecordPdfService::class), pdfEntity(), null);
+
+    try {
+        expect(eePdfOrphanTempFiles())->toBe($before);
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('arquivo temporário do rodapé é criado com permissões restritas (0600) — EE-10', function () {
+    $path = (new ReflectionMethod(app(MedicalRecordPdfService::class), 'buildFooterFile'))
+        ->invoke(app(MedicalRecordPdfService::class), pdfEntity(), null);
+
+    try {
+        expect(fileperms($path) & 0777)->toBe(0600);
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('EE-14: rodapé nativo do wkhtmltopdf (--footer-right, generatePdf() do prontuário completo) respeita o locale', function () {
+    // [page]/[topage] são placeholders do PRÓPRIO wkhtmltopdf (substituídos
+    // por ele depois da paginação, nunca pelo Laravel) — preservados
+    // literais na tradução; só o texto em volta muda por locale. generatePdf()
+    // em si não é re-testado aqui: exige o binário wkhtmltopdf de verdade e
+    // um MedicalRecord com todas as relações, sem teste de ponta a ponta
+    // existente hoje (nem antes desta mudança) — a única lógica NOVA deste
+    // achado é esta chamada a __(), já coberta diretamente.
+    expect(__('pdf.page_footer_native'))->toBe('Pág. [page] de [topage]');
+
+    app()->setLocale('en');
+    expect(__('pdf.page_footer_native'))->toBe('Page [page] of [topage]');
+    app()->setLocale('pt_BR');
+});
+
+it('timeout do Snappy é finito, nunca "false" (sem limite) — EE-10', function () {
+    expect(config('snappy.pdf.timeout'))->toBeInt()->toBeGreaterThan(0)
+        ->and(config('snappy.image.timeout'))->toBeInt()->toBeGreaterThan(0);
 });

@@ -7,6 +7,7 @@ use App\Models\{Entity, ReportSetting, ReportSettingContent};
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Mews\Purifier\Facades\Purifier;
 
 class ReportSettingService
 {
@@ -650,9 +651,17 @@ class ReportSettingService
                 : null;
 
             $data = [
-                'type'    => $row['type'],
-                'label'   => $row['label'],
-                'content' => $row['content'],
+                'type'  => $row['type'],
+                'label' => $row['label'],
+                // Sanitiza ANTES de persistir — nunca grava <script>/handler
+                // de evento/javascript: cru. Modelo (não documento clínico
+                // final) usa o mesmo profile 'medical' já usado em
+                // MedicalRecordDocumentationsController/EyeImageReport* —
+                // placeholders {{VAR}} são texto puro, nunca afetados
+                // (achado via auditoria de encerramento, EE-01). Linhas já
+                // persistidas antes desta correção são protegidas de novo
+                // na renderização (ver ReportSettingContent::sanitizedContent()).
+                'content' => Purifier::clean($row['content'], 'medical'),
                 'active'  => $row['active'] ?? true,
             ];
 

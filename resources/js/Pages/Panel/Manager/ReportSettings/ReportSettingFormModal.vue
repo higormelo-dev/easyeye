@@ -354,11 +354,11 @@ function err(field) {
                 <p class="text-muted small mb-0">{{ t.header_desc }}</p>
                 <div class="form-check form-switch ms-3 mb-0 flex-shrink-0">
                     <input
+                        id="show_header"
                         v-model="form.show_header"
                         class="form-check-input"
                         type="checkbox"
                         role="switch"
-                        id="show_header"
                     />
                     <label class="form-check-label fw-semibold" for="show_header">{{ t.field_show_header }}</label>
                 </div>
@@ -369,11 +369,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="header_show_logo"
                                 v-model="form.header_show_logo"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="header_show_logo"
                             />
                             <label class="form-check-label" for="header_show_logo">
                                 <i class="ti ti-photo me-1 text-muted"></i>{{ t.field_header_show_logo }}
@@ -383,11 +383,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="header_show_name"
                                 v-model="form.header_show_name"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="header_show_name"
                             />
                             <label class="form-check-label" for="header_show_name">
                                 <i class="ti ti-building-hospital me-1 text-muted"></i>{{ t.field_header_show_name }}
@@ -397,11 +397,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="header_show_address"
                                 v-model="form.header_show_address"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="header_show_address"
                             />
                             <label class="form-check-label" for="header_show_address">
                                 <i class="ti ti-map-pin me-1 text-muted"></i>{{ t.field_header_show_address }}
@@ -411,11 +411,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="header_show_phone"
                                 v-model="form.header_show_phone"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="header_show_phone"
                             />
                             <label class="form-check-label" for="header_show_phone">
                                 <i class="ti ti-phone me-1 text-muted"></i>{{ t.field_header_show_phone }}
@@ -437,11 +437,11 @@ function err(field) {
                 <p class="text-muted small mb-0">{{ t.signature_desc }}</p>
                 <div class="form-check form-switch ms-3 mb-0 flex-shrink-0">
                     <input
+                        id="show_signature"
                         v-model="form.show_signature"
                         class="form-check-input"
                         type="checkbox"
                         role="switch"
-                        id="show_signature"
                     />
                     <label class="form-check-label fw-semibold" for="show_signature">{{
                         t.field_show_signature
@@ -454,11 +454,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="signature_show_name"
                                 v-model="form.signature_show_name"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="signature_show_name"
                             />
                             <label class="form-check-label" for="signature_show_name">
                                 <i class="ti ti-user-check me-1 text-muted"></i>{{ t.field_signature_show_name }}
@@ -468,11 +468,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="signature_show_crm"
                                 v-model="form.signature_show_crm"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="signature_show_crm"
                             />
                             <label class="form-check-label" for="signature_show_crm">
                                 <i class="ti ti-id-badge me-1 text-muted"></i>{{ t.field_signature_show_crm }}
@@ -482,11 +482,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="signature_show_rqe"
                                 v-model="form.signature_show_rqe"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="signature_show_rqe"
                             />
                             <label class="form-check-label" for="signature_show_rqe">
                                 <i class="ti ti-star me-1 text-muted"></i>{{ t.field_signature_show_rqe }}
@@ -508,11 +508,11 @@ function err(field) {
                 <p class="text-muted small mb-0">{{ t.footer_desc }}</p>
                 <div class="form-check form-switch ms-3 mb-0 flex-shrink-0">
                     <input
+                        id="show_footer"
                         v-model="form.show_footer"
                         class="form-check-input"
                         type="checkbox"
                         role="switch"
-                        id="show_footer"
                     />
                     <label class="form-check-label fw-semibold" for="show_footer">{{ t.field_show_footer }}</label>
                 </div>
@@ -523,11 +523,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="footer_show_address"
                                 v-model="form.footer_show_address"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="footer_show_address"
                             />
                             <label class="form-check-label" for="footer_show_address">
                                 <i class="ti ti-map-pin me-1 text-muted"></i>{{ t.field_footer_show_address }}
@@ -537,11 +537,11 @@ function err(field) {
                     <div class="col-6">
                         <div class="form-check form-switch">
                             <input
+                                id="footer_show_phone"
                                 v-model="form.footer_show_phone"
                                 class="form-check-input"
                                 type="checkbox"
                                 role="switch"
-                                id="footer_show_phone"
                             />
                             <label class="form-check-label" for="footer_show_phone">
                                 <i class="ti ti-phone me-1 text-muted"></i>{{ t.field_footer_show_phone }}

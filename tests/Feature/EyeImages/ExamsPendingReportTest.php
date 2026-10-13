@@ -78,7 +78,15 @@ function eprAiRun($test, PatientExam $exam, AiRunStatus $status): AiRun
         'ai_run_id'       => $run->id,
         'patient_exam_id' => $exam->id,
         'entity_id'       => $test->entity->id,
-        'created_at'      => now(),
+        // Exame DE FATO analisado (não só selecionado) — reportedConstraint()
+        // só considera "laudado via IA" quando este outcome está preenchido
+        // e não é SKIPPED_UNRECOGNIZED_LAYOUT (Fase 5 / revisão adversarial
+        // Codex: vídeo selecionado junto com foto nunca tinha esse outcome e
+        // não podia contar como laudado). Produção preenche via
+        // AiRunExecutionService::resolveImages(); aqui é direto, sem
+        // decodificar imagem de verdade.
+        'image_deidentification' => 'oculus_pentacam_panel_a_pt',
+        'created_at'             => now(),
     ]);
 
     return $run;
@@ -219,4 +227,37 @@ it('status desconhecido é ignorado (allowlist)', function () {
     eprExam($this);
 
     expect(eprEyeImagesExamIds($this, ['status' => "pendente' OR 1=1", 'period' => '30']))->toHaveCount(2);
+});
+
+it('[GAP] vínculo histórico em medical_record_documentation_exams (de antes de writeRunDocumentation() filtrar por outcome) não conta exame nunca analisado como laudado — achado via revisão adversarial Codex', function () {
+    $analyzed = eprExam($this);
+    $skipped  = eprExam($this); // "vídeo" do run misto — nunca ganha outcome
+
+    $run = eprAiRun($this, $analyzed, AiRunStatus::Approved);
+    DB::table('ai_run_patient_exam')->insert([
+        'ai_run_id'              => $run->id, 'patient_exam_id' => $skipped->id, 'entity_id' => $this->entity->id,
+        'image_deidentification' => null, 'created_at' => now(),
+    ]);
+
+    $record = MedicalRecord::query()->create([
+        'entity_id' => $this->entity->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
+    ]);
+    $doc = MedicalRecordDocumentation::query()->create([
+        'medical_record_id' => $record->id, 'patient_id' => $this->patient->id, 'doctor_id' => $this->doctor->id,
+        'type'              => DocumentationType::Report, 'title' => 'Laudo de IA (vínculo histórico)', 'content' => '<p>Achado normal.</p>',
+        'ai_run_id'         => $run->id,
+    ]);
+    // Simula o vínculo ANTIGO em medical_record_documentation_exams (de
+    // ANTES de writeRunDocumentation() passar a filtrar por outcome) —
+    // liga os 2 exames, inclusive o nunca analisado. Dado real que já
+    // existia em produção antes da correção, nunca reescrito por nenhum
+    // backfill (só ai_run_patient_exam foi corrigido).
+    $doc->syncExams([(string) $analyzed->id, (string) $skipped->id], $this->entity->id);
+
+    expect(PatientExam::query()->reported($this->entity->id)->pluck('patient_exams.id'))
+        ->toContain($analyzed->id)
+        ->not->toContain($skipped->id);
+    expect(PatientExam::query()->pendingReport($this->entity->id)->pluck('patient_exams.id'))
+        ->toContain($skipped->id)
+        ->not->toContain($analyzed->id);
 });

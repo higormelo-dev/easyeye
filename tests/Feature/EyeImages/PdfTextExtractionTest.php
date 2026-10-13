@@ -80,13 +80,13 @@ it('[SEGURANÇA] exam_id de outra clínica é rejeitado com 403', function () {
         ->assertForbidden();
 });
 
-it('[SEGURANÇA] secretária não extrai texto (Gate IssueReport é doctor-only)', function () {
+it('secretária extrai texto pra rascunhar (Gate DraftImageReport — ato preparatório, não emissão; Fase 5)', function () {
     $this->actingAs($this->secretaryUser)
         ->withSession(panelSession($this->secretaryEntityUser))
         ->postJson(route('panel.eye-images.reports.extract-pdf-text'), [
             'exam_ids' => [$this->pdfExam->id],
         ])
-        ->assertForbidden();
+        ->assertOk();
 });
 
 it('[SEGURANÇA] imagem desabilitada (active=false) é rejeitada com 422', function () {

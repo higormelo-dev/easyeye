@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Enums\ExamSource;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\{Rule, Validator};
 
 /**
@@ -58,6 +61,15 @@ class ImportExternalExamRequest extends FormRequest
             // é convenção de inteiro replicada nos 3 pontos de entrada de
             // PatientExam::laterality).
             'laterality' => ['nullable', 'integer', 'in:0,1,2'],
+            // Olho POR ARQUIVO (Fase 5 / 7b) — índice-alinhado com `files`
+            // (ImportExternalExamModal.vue::syncFormFiles()). Opcional: ausente
+            // ou null num índice cai no `laterality` único acima (upload manual
+            // simples, sem pedal, continua mandando só o campo de sempre). Chave
+            // separada de 'files.*' de propósito — nunca reaproveitar o mesmo
+            // namespace de 'files', que já tem regra explícita documentada
+            // acima sobre substituir (não somar) o wildcard.
+            'files_laterality'   => ['nullable', 'array'],
+            'files_laterality.*' => ['nullable', 'integer', 'in:0,1,2'],
             // doctor_id referencia a tabela `doctors` (PatientExam::doctor()),
             // não `users` — escopado via doctors.entity_user_id -> entity_users.entity_id.
             'doctor_id' => [
@@ -93,7 +105,52 @@ class ImportExternalExamRequest extends FormRequest
             ],
             'external_origin' => ['nullable', 'string', 'max:255'],
             'files'           => ['required', 'array', 'min:1', 'max:10'],
-            'files.*'         => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
+            // 'max:' fica de fora do array — teto diferente por tipo (ver
+            // closure abaixo): imagem/PDF continuam em 10 MB (comportamento
+            // de sempre), webm/mp4 (câmera do navegador) usam o teto
+            // configurável de vídeo, bem maior. NUNCA declarar 'files.0',
+            // 'files.1'... como chave própria aqui — isso SUBSTITUI (não
+            // soma) as regras do wildcard 'files.*' pra aquele índice,
+            // perdendo file/mimes silenciosamente (achado nesta rodada: o
+            // teste do .exe passava a aceitar o arquivo depois disso).
+            'files.*' => [
+                'file',
+                'mimes:jpg,jpeg,png,pdf,webm,mp4',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! $value instanceof UploadedFile) {
+                        return;
+                    }
+
+                    // guessExtension() (baseado no MIME de verdade — getMimeType(),
+                    // o mesmo que validateMimes() usa pra regra "mimes:" acima)
+                    // nunca getClientOriginalExtension() (nome do arquivo, 100%
+                    // controlado pelo cliente): uma imagem/PDF renomeado pra
+                    // .mp4/.webm passava "mimes:" (conteúdo real já é um tipo
+                    // permitido) mas usava o teto de VÍDEO (bem maior) em vez do
+                    // teto de 10 MB de imagem/PDF — achado via revisão Codex.
+                    $isVideo = in_array(strtolower((string) $value->guessExtension()), ['webm', 'mp4'], true);
+                    $maxKb   = $isVideo ? (int) config('eye_image_capture.capture.max_video_kb') : 10240;
+
+                    if ($value->getSize() > $maxKb * 1024) {
+                        $fail(__('eye_images.import_file_too_large', ['max_mb' => round($maxKb / 1024, 1)]));
+                    }
+                },
+            ],
+            // Origem POR ARQUIVO, índice-alinhada com `files` (como files_laterality):
+            // 'external_import' (upload manual) ou 'browser_capture' (foto/vídeo
+            // pela câmera) — nunca 'integrator', reservado ao pipeline real do
+            // equipamento. Lote misto (upload + câmera) tem origem diferente em
+            // cada arquivo; entrada ausente num índice vale 'external_import'
+            // (fora do repasse): na dúvida, nunca promove um arquivo a captura
+            // da clínica. Entradas além do último arquivo são ignoradas.
+            'files_source'   => ['nullable', 'array'],
+            'files_source.*' => ['nullable', Rule::in([ExamSource::ExternalImport->value, ExamSource::BrowserCapture->value])],
+            // Campo ÚNICO do lote, de versões antigas do formulário: marcava TODOS
+            // os arquivos como captura se UM só viesse da câmera (o scan externo
+            // virava produção pagável). Recusa em vez de adivinhar a origem de
+            // cada arquivo — o formulário recarregado manda `files_source`.
+            // (Vazio passa: o formulário antigo mandava `source=''` em upload puro.)
+            'source' => ['prohibited'],
             // Mesmo shape/regra de UpdateExamDiagnosisRequest — mantém consistência
             // entre "Diagnóstico do exame" e "Importar exame externo".
             'diagnoses'        => ['nullable', 'array', 'max:20'],
@@ -108,6 +165,16 @@ class ImportExternalExamRequest extends FormRequest
             ],
             'diagnoses.*.description' => ['required', 'string', 'max:500'],
             'diagnoses.*.is_primary'  => ['boolean'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'source.prohibited' => __('eye_images.import_source_outdated'),
         ];
     }
 

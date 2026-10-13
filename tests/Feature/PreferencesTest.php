@@ -90,3 +90,55 @@ it('merge parcial preserva as outras preferências do bag', function () {
         ->assertJsonPath('data.dashboard_widget_order.0', 'a')
         ->assertJsonPath('data.medical_record_layout.default_mode', 'free');
 });
+
+/**
+ * Pedal USB do Gerenciador de Imagens (Fase 5 / 7a) — eye_images_pedal_shortcuts
+ * {capture_key, advance_key}. Allowlist vem de config('eye_image_capture.pedal.allowed_keys')
+ * — nunca pode aceitar Escape/ArrowLeft/ArrowRight (colidem com os atalhos já
+ * existentes do visualizador em EyeImages/Index.vue).
+ */
+it('persiste capture_key e advance_key do pedal quando ambos estão na allowlist', function () {
+    patchPreferences($this, ['eye_images_pedal_shortcuts' => ['capture_key' => 'Enter', 'advance_key' => ' ']])
+        ->assertOk()
+        ->assertJsonPath('data.eye_images_pedal_shortcuts.capture_key', 'Enter')
+        ->assertJsonPath('data.eye_images_pedal_shortcuts.advance_key', ' ');
+
+    expect(UserPreference::valueFor($this->user->fresh(), 'eye_images_pedal_shortcuts')['capture_key'])->toBe('Enter');
+});
+
+it('aceita só capture_key informado, sem exigir advance_key junto', function () {
+    patchPreferences($this, ['eye_images_pedal_shortcuts' => ['capture_key' => 'PageUp']])
+        ->assertOk()
+        ->assertJsonPath('data.eye_images_pedal_shortcuts.capture_key', 'PageUp');
+});
+
+it('aceita capture_key e advance_key nulos (desliga o pedal) sem disparar "devem ser diferentes"', function () {
+    patchPreferences($this, ['eye_images_pedal_shortcuts' => ['capture_key' => null, 'advance_key' => null]])
+        ->assertOk()
+        ->assertJsonPath('data.eye_images_pedal_shortcuts.capture_key', null)
+        ->assertJsonPath('data.eye_images_pedal_shortcuts.advance_key', null);
+});
+
+it('[GAP] rejeita capture_key === advance_key (422) — pedal com 1 botão só ficaria ambíguo', function () {
+    patchPreferences($this, ['eye_images_pedal_shortcuts' => ['capture_key' => 'Enter', 'advance_key' => 'Enter']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['eye_images_pedal_shortcuts.advance_key']);
+});
+
+it('rejeita tecla fora da allowlist (422)', function () {
+    patchPreferences($this, ['eye_images_pedal_shortcuts' => ['capture_key' => 'A', 'advance_key' => ' ']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['eye_images_pedal_shortcuts.capture_key']);
+});
+
+it('[SEGURANÇA] nunca aceita Escape/ArrowLeft/ArrowRight — colidem com os atalhos do visualizador', function () {
+    foreach (['Escape', 'ArrowLeft', 'ArrowRight'] as $key) {
+        patchPreferences($this, ['eye_images_pedal_shortcuts' => ['capture_key' => $key, 'advance_key' => ' ']])
+            ->assertUnprocessable();
+
+        patchPreferences($this, ['eye_images_pedal_shortcuts' => ['capture_key' => 'Enter', 'advance_key' => $key]])
+            ->assertUnprocessable();
+    }
+
+    expect(UserPreference::valueFor($this->user->fresh(), 'eye_images_pedal_shortcuts'))->toBeNull();
+});

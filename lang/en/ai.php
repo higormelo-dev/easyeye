@@ -146,6 +146,17 @@ return [
     // (equipment layout recognized); otherwise it stays out of the AI.
     'eye_image_some_not_sent' => '{1} 1 image was not sent to the AI: the system did not recognize the equipment layout to redact the patient data (LGPD protection). Ask support for this equipment template.|[2,*] :count images were not sent to the AI: the system did not recognize the equipment layout to redact the patient data (LGPD protection). Ask support for this equipment template.',
     'eye_image_none_sent'     => '{1} The image was not sent to the AI: the system did not recognize the equipment layout to redact the patient data (LGPD protection). Nothing was charged. Ask support for this equipment template.|[2,*] None of the :count images was sent to the AI: the system did not recognize the equipment layout to redact the patient data (LGPD protection). Nothing was charged. Ask support for this equipment template.',
+    // No image could be sent for a reason OTHER than unrecognized layout
+    // (e.g., a selected video — the AI only analyzes photos; missing file;
+    // unreadable format) — generic message on purpose, no LGPD/redaction
+    // wording, which is not the cause here.
+    'eye_image_none_available' => "{1} The selected image could not be sent to the AI (e.g., it's a video, the file is missing, or the format is not supported). Nothing was charged.|[2,*] None of the :count selected images could be sent to the AI (e.g., they're videos, the files are missing, or the format is not supported). Nothing was charged.",
+    // Different from eye_image_some_not_sent (unrecognized LGPD layout) —
+    // this is an exam that was never even attempted (e.g., a video, which
+    // the AI only analyzes as a photo). Stays PENDING for a report — never
+    // covered by this AI report, even though it was selected alongside
+    // images that were.
+    'eye_image_some_unsupported' => '{1} 1 selected exam could not be analyzed by the AI (unsupported format, e.g. video) and remains pending for a report.|[2,*] :count selected exams could not be analyzed by the AI (unsupported format, e.g. video) and remain pending for a report.',
 
     // Security preamble (server-side) — prepended to EVERY AI system prompt
     // by AiPayloadEnricher (never skipped, never client-overridable). Defends

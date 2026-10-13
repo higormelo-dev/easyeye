@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domains\AI\Models\AiRun;
+use App\Domains\AI\Services\EyeImageAttachmentService;
 use App\Enums\AI\AiRunStatus;
 use App\Enums\ExamSource;
 use App\Traits\{Auditable, HasAuditColumns};
@@ -153,8 +154,13 @@ class PatientExam extends Model
      */
     public function aiRuns(): BelongsToMany
     {
+        // image_deidentification no pivot: EyeImagesController::
+        // examAiReport() precisa saber se ESTE exame foi de fato analisado
+        // dentro de cada run (mesmo critério de reportedConstraint() acima
+        // — nunca só "o run está Approved", achado via revisão adversarial
+        // Codex).
         return $this->belongsToMany(AiRun::class, 'ai_run_patient_exam', 'patient_exam_id', 'ai_run_id')
-            ->withPivot('entity_id');
+            ->withPivot('entity_id', 'image_deidentification');
     }
 
     public function archiveUrl(): Attribute
@@ -189,6 +195,18 @@ class PatientExam extends Model
     }
 
     /**
+     * Mesma lista de resources/js/Pages/Panel/EyeImages/Index.vue
+     * (VIDEO_EXTENSIONS) — vídeo capturado pela câmera (Fase 5 / 6a/6c),
+     * nunca decodificável como imagem (GD, montagem, análise de IA).
+     */
+    public function isVideo(): bool
+    {
+        $extension = strtolower((string) pathinfo((string) $this->archive, PATHINFO_EXTENSION));
+
+        return in_array($extension, ['webm', 'mp4'], true);
+    }
+
+    /**
      * Exames com laudo na clínica: laudo manual/conjunto vigente (vínculo em
      * medical_record_documentation_exams, documentação não excluída) OU laudo
      * de IA aprovado. Mesmo critério do filtro "Laudado" do Gerenciador de
@@ -217,13 +235,44 @@ class PatientExam extends Model
                 ->join('medical_record_documentations as mrd', 'mrd.id', '=', 'mrde.medical_record_documentation_id')
                 ->whereColumn('mrde.patient_exam_id', 'patient_exams.id')
                 ->where('mrde.entity_id', $entityId)
-                ->whereNull('mrd.deleted_at'))
+                ->whereNull('mrd.deleted_at')
+                // Documento gerado por IA (mrd.ai_run_id preenchido): o
+                // vínculo em medical_record_documentation_exams pode ser de
+                // ANTES de AiRunDocumentationService::writeRunDocumentation()
+                // passar a filtrar por outcome (histórico real, nunca
+                // corrigido retroativamente por nenhum backfill) — sem
+                // exigir o MESMO outcome do 2º ramo abaixo, um vídeo
+                // vinculado por engano num run antigo contava como
+                // "reportado" pra sempre, mesmo com o laudo da galeria já
+                // mostrando approved=false pra ele (achado via revisão
+                // adversarial Codex). Documento manual (ai_run_id null)
+                // nunca tem esse conceito — vínculo normal já basta.
+                ->where(fn ($q) => $q->whereNull('mrd.ai_run_id')->orWhereExists(
+                    fn ($sub2) => $sub2->selectRaw('1')
+                        ->from('ai_run_patient_exam as arpe2')
+                        ->whereColumn('arpe2.ai_run_id', 'mrd.ai_run_id')
+                        ->whereColumn('arpe2.patient_exam_id', 'mrde.patient_exam_id')
+                        ->where('arpe2.entity_id', $entityId)
+                        ->whereNotNull('arpe2.image_deidentification')
+                        ->where('arpe2.image_deidentification', '!=', EyeImageAttachmentService::SKIPPED_UNRECOGNIZED_LAYOUT),
+                )))
             ->orWhereExists(fn ($sub) => $sub->selectRaw('1')
                 ->from('ai_run_patient_exam as arpe')
                 ->join('ai_runs', 'ai_runs.id', '=', 'arpe.ai_run_id')
                 ->whereColumn('arpe.patient_exam_id', 'patient_exams.id')
                 ->where('arpe.entity_id', $entityId)
-                ->where('ai_runs.status', AiRunStatus::Approved->value));
+                ->where('ai_runs.status', AiRunStatus::Approved->value)
+                // image_deidentification só fica preenchido (e com um valor
+                // DIFERENTE de "layout não reconhecido") quando o exame foi
+                // DE FATO enviado/analisado pela IA. A linha nasce (ainda
+                // null) com TODOS os exames selecionados no momento da
+                // criação do run — um vídeo (GD não decodifica) nunca
+                // recebe outcome nenhum e ficava "reportado" mesmo sem
+                // nunca ter sido examinado, só por ter sido selecionado
+                // junto com uma foto que FOI analisada (achado via revisão
+                // adversarial Codex).
+                ->whereNotNull('arpe.image_deidentification')
+                ->where('arpe.image_deidentification', '!=', EyeImageAttachmentService::SKIPPED_UNRECOGNIZED_LAYOUT));
     }
 
     /**

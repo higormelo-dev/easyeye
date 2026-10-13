@@ -15,6 +15,8 @@ use App\Http\Controllers\{
     EyeImageExamActionsController,
     EyeImageMontageController,
     EyeImageReportController,
+    EyeImageReportDraftController,
+    EyeImageReportResendController,
     EyeImagesController,
     Financial\BillingBulkActionsController,
     Financial\BillingClaimActionsController,
@@ -292,18 +294,49 @@ Route::group(
         // (mesmo allowlist de diagnósticos acima); store() grava documentação
         // clínica e o Gate::IssueReport (doctor-only) é checado dentro do
         // controller, mesmo padrão do bloco de diagnóstico.
+        // Fase 5: secretária também rascunha (Gate DraftImageReport dentro do
+        // controller) — "store" fica de fora de propósito, continua só
+        // admin,doctor na borda + Gate::IssueReport (doctor-only) dentro.
         Route::get('/eye-images/report-templates', [EyeImageReportController::class, 'templates'])
-            ->middleware('entity.role:admin,doctor')
+            ->middleware('entity.role:admin,doctor,secretary')
             ->name('eye-images.report-templates.index');
         Route::post('/eye-images/report-templates/preview', [EyeImageReportController::class, 'previewTemplate'])
-            ->middleware('entity.role:admin,doctor')
+            ->middleware('entity.role:admin,doctor,secretary')
             ->name('eye-images.report-templates.preview');
         Route::post('/eye-images/reports', [EyeImageReportController::class, 'store'])
             ->middleware('entity.role:admin,doctor')
             ->name('eye-images.reports.store');
         Route::post('/eye-images/reports/extract-pdf-text', [EyeImageReportController::class, 'extractPdfText'])
-            ->middleware('entity.role:admin,doctor')
+            ->middleware('entity.role:admin,doctor,secretary')
             ->name('eye-images.reports.extract-pdf-text');
+        // Reenvio ao médico solicitante (Fase 5) — Gate::SendReportToExternalDoctor
+        // (admin/doctor) checado dentro do controller, mesmo padrão do bloco acima.
+        Route::post('/eye-images/reports/{documentation}/resend', EyeImageReportResendController::class)
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.reports.resend');
+
+        // Rascunho de laudo (Fase 5 — secretária/admin preparam, médico
+        // revisa e emite): mesmo allowlist do Gate DraftImageReport checado
+        // dentro do controller. Emitir de fato continua só em
+        // eye-images.reports.store (doctor-only, acima).
+        Route::get('/eye-images/report-drafts', [EyeImageReportDraftController::class, 'index'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('eye-images.report-drafts.index');
+        Route::post('/eye-images/report-drafts', [EyeImageReportDraftController::class, 'store'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('eye-images.report-drafts.store');
+        Route::get('/eye-images/report-drafts/{draft}', [EyeImageReportDraftController::class, 'show'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('eye-images.report-drafts.show');
+        Route::put('/eye-images/report-drafts/{draft}', [EyeImageReportDraftController::class, 'update'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('eye-images.report-drafts.update');
+        Route::post('/eye-images/report-drafts/{draft}/submit', [EyeImageReportDraftController::class, 'submit'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('eye-images.report-drafts.submit');
+        Route::delete('/eye-images/report-drafts/{draft}', [EyeImageReportDraftController::class, 'destroy'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('eye-images.report-drafts.destroy');
 
         // Frases rápidas do médico pro laudo (benchmark 18/09/2026 —
         // DoctorReportPhrasesController) — sempre escopado ao PRÓPRIO
@@ -543,6 +576,14 @@ Route::group(
                 'patients/{patient}/medicalrecords/{medicalrecord}/quick-actions/{action}',
                 [MedicalRecordQuickActionsController::class, 'issue'],
             )->name('patients.medicalrecords.quick-actions.issue');
+            // Assinatura eletrônica (CFM Res. 2.227/2018) — rota aberta a
+            // admin/doctor/secretary (mesmo grupo de leitura do prontuário);
+            // o ato em si é restrito a médico pelo Gate IssueReport DENTRO do
+            // controller (mesmo padrão de evoluções/procedimentos abaixo).
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/sign',
+                [MedicalRecordsController::class, 'sign'],
+            )->name('patients.medicalrecords.sign');
             // Kits do pedido de exames (Fase 2 / B2), pelo convênio do atendimento.
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/exam-kits',
@@ -1261,4 +1302,5 @@ require __DIR__ . '/manager.php';
 require __DIR__ . '/portal.php';
 require __DIR__ . '/patient-portal-auth.php';
 require __DIR__ . '/patient-portal.php';
+require __DIR__ . '/external-reports.php';
 require __DIR__ . '/auth.php';

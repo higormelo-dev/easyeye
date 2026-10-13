@@ -8,6 +8,8 @@ use App\Domains\AI\Models\AiRun;
 use App\Enums\DocumentationType;
 use App\Models\{MedicalRecord, MedicalRecordDocumentation, PatientExam};
 use App\Services\ConsultationRecordResolver;
+use App\Services\EyeImages\ReportExamSummary;
+use Illuminate\Support\Facades\DB;
 use Mews\Purifier\Facades\Purifier;
 
 /**
@@ -142,8 +144,52 @@ class AiRunDocumentationService
         $examIds = array_values(array_map('strval', (array) ($aiRun->input_summary['exam_ids'] ?? [])));
 
         if ($examIds !== []) {
-            $documentation->syncExams($examIds, (string) $aiRun->entity_id);
+            // input_summary['exam_ids'] é a seleção ORIGINAL do médico — inclui
+            // exame que acabou NUNCA sendo enviado/analisado de fato pela IA
+            // (ex.: vídeo, que GD não decodifica, selecionado junto com uma
+            // foto que FOI analisada). Vincular todos ao laudo fazia um exame
+            // nunca examinado sair da fila de pendentes como se tivesse sido
+            // coberto (achado via revisão adversarial Codex) — ai_run_patient_exam.
+            // image_deidentification (preenchido em AiRunExecutionService::
+            // resolveImages()) é quem de fato sabe o que foi enviado.
+            $analyzedExamIds = DB::table('ai_run_patient_exam')
+                ->where('ai_run_id', $aiRun->id)
+                ->whereNotNull('image_deidentification')
+                ->where('image_deidentification', '!=', EyeImageAttachmentService::SKIPPED_UNRECOGNIZED_LAYOUT)
+                ->pluck('patient_exam_id')
+                ->map('strval')
+                ->all();
+
+            $examIds = array_values(array_intersect($examIds, $analyzedExamIds));
         }
+
+        if ($examIds !== []) {
+            $documentation->syncExams($examIds, (string) $aiRun->entity_id);
+            $this->freezeExamSummary($documentation, $examIds);
+        }
+    }
+
+    /**
+     * Congela o resumo dos exames do laudo (metadata.exam_summary) no momento da
+     * emissão — mesmo retrato do laudo manual (ReportExamSummary): o laudo
+     * assinado não muda porque o exame foi editado depois (lateralidade,
+     * mesclar/dividir, renomear). Idempotente: reescrever o mesmo run não regrava
+     * o retrato. (Prontuário já assinado nem chega aqui: o updateOrCreate() acima
+     * é recusado pelo GuardedBySignedRecord antes.).
+     *
+     * @param list<string> $examIds
+     */
+    private function freezeExamSummary(MedicalRecordDocumentation $documentation, array $examIds): void
+    {
+        if (isset($documentation->metadata[ReportExamSummary::SNAPSHOT_KEY])) {
+            return;
+        }
+
+        $documentation->update([
+            'metadata' => array_merge((array) $documentation->metadata, [
+                ReportExamSummary::SNAPSHOT_KEY => app(ReportExamSummary::class)->snapshotForExamIds($examIds),
+            ]),
+        ]);
     }
 
     /**

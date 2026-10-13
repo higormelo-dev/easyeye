@@ -216,7 +216,7 @@ $contents   = $s->activeContents ?? collect();
         <div class="meta-strip">
             PREVIEW &nbsp;·&nbsp; {{ $s->title }}
             &nbsp;·&nbsp; {{ $content->display_label ?? $content->label }}
-            &nbsp;·&nbsp; Pág. {{ $loop->iteration }}/{{ $total }}
+            &nbsp;·&nbsp; {{ __('pdf.page_short', ['current' => $loop->iteration, 'total' => $total]) }}
             &nbsp;·&nbsp; {{ $paperSize->value }}
         </div>
 
@@ -243,7 +243,7 @@ $contents   = $s->activeContents ?? collect();
                 &nbsp;|&nbsp; <strong>Idade:</strong> 45 anos
                 &nbsp;|&nbsp; <strong>Data:</strong> {{ \Illuminate\Support\Carbon::now()->isoFormat('L') }}
             </div>
-            <div class="content-body">{!! $content->content !!}</div>
+            <div class="content-body">{!! $content->sanitizedContent() !!}</div>
         </div>
 
         {{-- Assinatura --}}
@@ -264,7 +264,7 @@ $contents   = $s->activeContents ?? collect();
             {{ $s->footer_text ?: $mockClinic }}
             @if($s->footer_show_address)&nbsp;·&nbsp; {{ $mockAddress }}@endif
             @if($s->footer_show_phone)&nbsp;·&nbsp; {{ $mockPhone }}@endif
-            &nbsp;·&nbsp; Emitido em {{ \Illuminate\Support\Carbon::now()->isoFormat('L LT') }}
+            &nbsp;·&nbsp; {{ __('pdf.issued_at') }} {{ \Illuminate\Support\Carbon::now()->isoFormat('L LT') }}
         </div>
         @endif
     </div>
