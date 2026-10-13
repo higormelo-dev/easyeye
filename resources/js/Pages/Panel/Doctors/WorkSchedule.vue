@@ -321,10 +321,10 @@ const breadcrumbs = [
                             >
                                 <div class="form-check form-switch mb-0 flex-grow-1">
                                     <input
+                                        :id="`day-toggle-${day.day}`"
                                         v-model="day.active"
                                         type="checkbox"
                                         class="form-check-input"
-                                        :id="`day-toggle-${day.day}`"
                                     />
                                     <label
                                         class="form-check-label fw-semibold"

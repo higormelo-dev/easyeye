@@ -87,7 +87,7 @@ function submit() {
             <i class="ti ti-alert-circle me-1"></i> {{ form.errors.email }}
         </div>
 
-        <form @submit.prevent="submit" novalidate>
+        <form novalidate @submit.prevent="submit">
             <div class="mb-4">
                 <label class="form-label">E-mail <span style="color: #ef4444">*</span></label>
                 <div class="input-group">

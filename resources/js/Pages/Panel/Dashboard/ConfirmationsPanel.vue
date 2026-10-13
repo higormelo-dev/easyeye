@@ -89,7 +89,9 @@ const days = computed(() => ['today', 'tomorrow'].map(dayView).filter(Boolean));
                         <div
                             class="progress confirm-meter__bar"
                             role="img"
-                            :aria-label="tx('confirm_meter_aria', { confirmed: number(day.confirmed), total: number(day.total) })"
+                            :aria-label="
+                                tx('confirm_meter_aria', { confirmed: number(day.confirmed), total: number(day.total) })
+                            "
                         >
                             <div class="progress-bar" :style="{ width: `${day.pct}%` }"></div>
                         </div>
@@ -105,16 +107,31 @@ const days = computed(() => ['today', 'tomorrow'].map(dayView).filter(Boolean));
                     </div>
 
                     <div v-if="day.shifts?.length" class="confirm-shifts" :aria-label="t.shifts_label">
-                        <span v-for="shift in day.shifts" :key="shift.key" class="confirm-shift" :data-shift="shift.key">
+                        <span
+                            v-for="shift in day.shifts"
+                            :key="shift.key"
+                            class="confirm-shift"
+                            :data-shift="shift.key"
+                        >
                             <i :class="SHIFTS[shift.key]" aria-hidden="true"></i>
                             {{ t[`shift_${shift.key}`] }}
-                            <strong>{{ number(shift.total) }}</strong>{{ ' ' }}<span class="confirm-shift__conf">{{ tx('confirm_shift_confirmed', { count: number(shift.confirmed) }) }}</span>
+                            <strong>{{ number(shift.total) }}</strong
+                            >{{ ' '
+                            }}<span class="confirm-shift__conf">{{
+                                tx('confirm_shift_confirmed', { count: number(shift.confirmed) })
+                            }}</span>
                         </span>
                     </div>
 
                     <div v-if="day.chips.length" class="confirm-wa" :aria-label="t.confirm_whatsapp_label">
                         <span class="confirm-wa__label"><i class="ti ti-brand-whatsapp" aria-hidden="true"></i></span>
-                        <span v-for="chip in day.chips" :key="chip.key" class="db-chip" :class="`db-chip--${chip.key}`" :data-wa="chip.key">
+                        <span
+                            v-for="chip in day.chips"
+                            :key="chip.key"
+                            class="db-chip"
+                            :class="`db-chip--${chip.key}`"
+                            :data-wa="chip.key"
+                        >
                             <i :class="chip.icon" aria-hidden="true"></i>
                             {{ tx(`confirm_wa_${chip.key}`, { count: number(chip.count) }) }}
                         </span>
@@ -129,7 +146,9 @@ const days = computed(() => ['today', 'tomorrow'].map(dayView).filter(Boolean));
                                     <span class="db-list__title">{{ item.name }}</span>
                                     <span class="db-list__sub">
                                         {{ item.doctor }}
-                                        <template v-if="item.whatsapp">· {{ t[`confirm_wa_state_${item.whatsapp}`] }}</template>
+                                        <template v-if="item.whatsapp"
+                                            >· {{ t[`confirm_wa_state_${item.whatsapp}`] }}</template
+                                        >
                                     </span>
                                 </div>
                                 <a

@@ -9,7 +9,7 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
         "ext-calendar": "*",
         "bacon/bacon-qr-code": "^3.1",
         "barryvdh/laravel-snappy": "^1.0",

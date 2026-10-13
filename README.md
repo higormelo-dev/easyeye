@@ -1,3 +1,14 @@
+## EasyEye
+
+SaaS multi-tenant para oftalmologia (Laravel 12 + Vue 3/Inertia). Guia
+operacional completo em [CLAUDE.md](CLAUDE.md).
+
+**Requisitos:** PHP **8.4** (`composer.json` declara `^8.4` — Docker
+(`Dockerfile`) e CI já usam 8.4; versão mínima real, alinhada em todo o
+projeto — achado via auditoria de encerramento, EE-12).
+
+---
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

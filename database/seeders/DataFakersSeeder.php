@@ -21,9 +21,10 @@ use App\Models\{Covenant,
     User,
     VisitType};
 use App\Services\ActivationService;
+use App\Services\Schedules\ScheduleAvailabilityService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\{DB, Hash};
 use Illuminate\Support\Str;
 
 class DataFakersSeeder extends Seeder
@@ -46,7 +47,7 @@ class DataFakersSeeder extends Seeder
 
         // Clínica Teste Integrador tem seeder próprio (também roda em
         // produção); aqui só garante que exista quando este seeder roda
-        // sozinho — a agenda dela vem do createSchedules() abaixo.
+        // sozinho — o próprio IntegratorTestClinicSeeder prepara a agenda dela.
         if (! Entity::where('subdomain', IntegratorTestClinicSeeder::ENTITY_SUBDOMAIN)->exists()) {
             $this->call(IntegratorTestClinicSeeder::class);
         }
@@ -410,25 +411,65 @@ class DataFakersSeeder extends Seeder
         ]);
     }
 
-    private function createSchedules(): void
+    /** Completa a agenda dos médicos da clínica de teste que ainda não têm dados. */
+    public function seedClinicSchedules(Entity $entity): void
     {
-        $doctors        = Doctor::query()->select('id', 'entity_user_id')->get();
+        DB::transaction(function () use ($entity): void {
+            // Mesmo lock da numeração de Schedule::create(): o INSERT em
+            // lote não pode disputar códigos com a agenda/API da clínica.
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('select pg_advisory_xact_lock(?)', [Schedule::codeLockKey((string) $entity->id)]);
+            } else {
+                Entity::whereKey($entity->id)->lockForUpdate()->first();
+            }
+
+            $this->createSchedules((string) $entity->id);
+        });
+    }
+
+    private function createSchedules(?string $onlyEntityId = null): void
+    {
+        $doctors = Doctor::query()
+            ->where('active', true)
+            ->whereHas('entityUser', fn ($query) => $query->where('active', true))
+            ->when(
+                $onlyEntityId !== null,
+                fn ($query) => $query->ofEntity($onlyEntityId)->whereNotIn('doctors.id', Schedule::withoutGlobalScopes()
+                    ->where('entity_id', $onlyEntityId)
+                    ->whereNotNull('doctor_id')
+                    ->select('doctor_id')),
+                // A clínica reservada tem agenda própria e idempotente: a
+                // massa geral não insere por cima dos seus horários existentes.
+                fn ($query) => $query->whereHas('entityUser.entity', fn ($entity) => $entity->whereNot('subdomain', IntegratorTestClinicSeeder::ENTITY_SUBDOMAIN)),
+            )
+            ->select('id', 'entity_user_id', 'schedule_interval')
+            ->with(['workSchedules', 'scheduleBlocks'])
+            ->get();
+
+        if ($doctors->isEmpty()) {
+            return;
+        }
+
         $schedulesBatch = [];
         $batchSize      = $this->seedInt('SEED_FAKE_SCHEDULE_BATCH_SIZE', 1000, 100);
         $codeCounter    = [];
 
         // Cache em memória para evitar queries repetidas durante o loop
         $entityUsers  = EntityUser::query()->select('id', 'entity_id')->get()->keyBy('id');
+        $doctorCounts = $doctors->countBy(fn (Doctor $doctor) => (string) $entityUsers->get($doctor->entity_user_id)?->entity_id);
         $entitiesById = Entity::query()->select('id', 'schedule_interval')->get()->keyBy('id');
-        $allPatients  = Patient::query()
+        $allPatients  = Patient::withoutGlobalScopes()
+            ->whereNull('deleted_at')
+            ->where('active', true)
+            ->when($onlyEntityId !== null, fn ($query) => $query->where('entity_id', $onlyEntityId))
             ->select('id', 'entity_id', 'person_id')
             ->with('person:id,full_name')
             ->get()
             ->groupBy('entity_id');
-        $allCovenants       = Covenant::query()->select('id', 'entity_id')->get();
+        $allCovenants       = Covenant::query()->where('active', true)->select('id', 'entity_id')->get();
         $globalCovenants    = $allCovenants->whereNull('entity_id');
         $covenantsByEntity  = $allCovenants->whereNotNull('entity_id')->groupBy('entity_id');
-        $allVisitTypes      = VisitType::query()->select('id', 'entity_id')->get();
+        $allVisitTypes      = VisitType::query()->where('active', true)->select('id', 'entity_id')->get();
         $globalVisitTypes   = $allVisitTypes->whereNull('entity_id');
         $visitTypesByEntity = $allVisitTypes->whereNotNull('entity_id')->groupBy('entity_id');
 
@@ -436,7 +477,7 @@ class DataFakersSeeder extends Seeder
         $entityIds = $entityUsers->pluck('entity_id')->unique();
 
         foreach ($entityIds as $entityId) {
-            $lastSchedule = Schedule::where('entity_id', $entityId)
+            $lastSchedule = Schedule::withoutGlobalScopes()->where('entity_id', $entityId)
                 ->where('code', 'like', 'SDL-%')
                 ->orderBy('code', 'desc')
                 ->first();
@@ -455,6 +496,7 @@ class DataFakersSeeder extends Seeder
 
         while ($date->lte($endDate)) {
             $dailyPatientPools = [];
+            $remainingDoctors  = $doctorCounts->all();
             $isPast            = $date->copy()->endOfDay()->isPast();
 
             foreach ($doctors as $doctor) {
@@ -464,7 +506,8 @@ class DataFakersSeeder extends Seeder
                     continue;
                 }
 
-                $entityId = $entityUser->entity_id;
+                $entityId    = $entityUser->entity_id;
+                $doctorsLeft = $remainingDoctors[(string) $entityId]--;
 
                 if (! isset($codeCounter[$entityId])) {
                     $codeCounter[$entityId] = 0;
@@ -474,7 +517,7 @@ class DataFakersSeeder extends Seeder
                 $covenantsOfEntity  = $covenantsByEntity->get($entityId, collect())->merge($globalCovenants);
                 $visitTypesOfEntity = $visitTypesByEntity->get($entityId, collect())->merge($globalVisitTypes);
 
-                if ($patientsOfEntity->isEmpty() || $covenantsOfEntity->isEmpty() || $visitTypesOfEntity->isEmpty()) {
+                if ($patientsOfEntity->isEmpty() || ($onlyEntityId === null && ($covenantsOfEntity->isEmpty() || $visitTypesOfEntity->isEmpty()))) {
                     continue;
                 }
 
@@ -482,19 +525,43 @@ class DataFakersSeeder extends Seeder
                     $dailyPatientPools[$entityId] = $patientsOfEntity->shuffle()->values()->all();
                 }
 
-                $patientPool = &$dailyPatientPools[$entityId];
-
-                if (empty($patientPool)) {
+                if (empty($dailyPatientPools[$entityId])) {
                     continue;
                 }
 
-                $interval       = $entitiesById->get($entityId)?->schedule_interval ?? 15;
-                $morningSlots   = $this->generateTimeSlots($date, 8, 12, $doctor, $entityId, $patientPool, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $isPast, $interval);
-                $afternoonSlots = $this->generateTimeSlots($date, 14, 18, $doctor, $entityId, $patientPool, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $isPast, $interval);
+                $interval = max(5, (int) ($doctor->schedule_interval ?? $entitiesById->get($entityId)?->schedule_interval ?? 15));
+                $ranges   = $doctor->workSchedules->isNotEmpty()
+                    ? $doctor->workSchedules->where('day_of_week', $date->dayOfWeek)
+                    : collect([
+                        (object) ['starts_at' => '08:00:00', 'ends_at' => '12:00:00'],
+                        (object) ['starts_at' => '14:00:00', 'ends_at' => '18:00:00'],
+                    ]);
 
-                foreach (array_merge($morningSlots, $afternoonSlots) as $slot) {
-                    $schedulesBatch[]                          = $slot;
-                    $entitiesWithSchedules[$slot['entity_id']] = true;
+                if ($ranges->isEmpty()) {
+                    continue;
+                }
+
+                // Reserva uma parcela por médico: o primeiro não pode consumir
+                // a lista inteira. Cada paciente continua sendo usado só uma
+                // vez por dia nesta clínica, mesmo com médicos simultâneos.
+                $quota       = (int) ceil(count($dailyPatientPools[$entityId]) / $doctorsLeft);
+                $patientPool = array_splice($dailyPatientPools[$entityId], 0, $quota);
+
+                foreach ($ranges as $range) {
+                    $slots = $this->generateTimeSlots($date, $range->starts_at, $range->ends_at, $doctor, $entityId, $patientPool, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $isPast, $interval);
+
+                    foreach ($slots as $slot) {
+                        if ($onlyEntityId !== null) {
+                            $slot['active'] = true;
+
+                            if (! $isPast) {
+                                $slot['situation'] = ScheduleSituation::Scheduled->value;
+                            }
+                        }
+
+                        $schedulesBatch[]                          = $slot;
+                        $entitiesWithSchedules[$slot['entity_id']] = true;
+                    }
                 }
 
                 if (count($schedulesBatch) >= $batchSize) {
@@ -502,7 +569,9 @@ class DataFakersSeeder extends Seeder
                     $schedulesBatch = [];
                 }
 
-                unset($patientPool);
+                // Bloqueios podem impedir o uso de parte da reserva; devolve
+                // esses pacientes para os próximos médicos do mesmo dia.
+                array_push($dailyPatientPools[$entityId], ...$patientPool);
             }
 
             $date->addDay();
@@ -513,17 +582,23 @@ class DataFakersSeeder extends Seeder
         }
 
         $this->markActivationSteps(array_keys($entitiesWithSchedules), ActivationStep::FirstScheduleCreated);
+
+        // INSERT em lote não dispara os eventos de Schedule: invalida a
+        // disponibilidade por clínica após gerar a massa da agenda.
+        foreach (array_keys($entitiesWithSchedules) as $entityId) {
+            ScheduleAvailabilityService::bumpVersion((string) $entityId);
+        }
     }
 
     /**
-     * Gerar slots de horário com intervalos variáveis de 20–30 minutos.
+     * Gerar slots alinhados ao intervalo efetivo e fora dos bloqueios do médico.
      * Situações ponderadas pelo contexto temporal (passado vs. futuro).
      * Preenche arrived_at para pacientes que compareceram.
      */
     private function generateTimeSlots(
         Carbon $date,
-        int $startHour,
-        int $endHour,
+        string $startsAt,
+        string $endsAt,
         Doctor $doctor,
         string $entityId,
         array &$patientPool,
@@ -534,8 +609,8 @@ class DataFakersSeeder extends Seeder
         int $intervalMinutes = 15,
     ): array {
         $schedules   = [];
-        $currentTime = $date->copy()->setTime($startHour, 0, 0);
-        $endTime     = $date->copy()->setTime($endHour, 0, 0);
+        $currentTime = $date->copy()->setTimeFromTimeString($startsAt);
+        $endTime     = $date->copy()->setTimeFromTimeString($endsAt);
         $now         = Carbon::now();
 
         // Peso por contexto temporal: passado prioriza Attended; futuro prioriza Scheduled
@@ -556,10 +631,16 @@ class DataFakersSeeder extends Seeder
             ];
 
         while ($currentTime < $endTime && ! empty($patientPool)) {
+            if ($doctor->scheduleBlocks->contains(fn ($block) => $currentTime->gte($block->starts_at) && $currentTime->lt($block->ends_at))) {
+                $currentTime->addMinutes($intervalMinutes);
+
+                continue;
+            }
+
             $patient = array_pop($patientPool);
 
-            $covenant  = $covenants->random();
-            $visitType = $visitTypes->random();
+            $covenant  = $covenants->isNotEmpty() ? $covenants->random() : null;
+            $visitType = $visitTypes->isNotEmpty() ? $visitTypes->random() : null;
             $situation = $situationPool[array_rand($situationPool)];
 
             $fullName = $patient->person?->full_name ?? fake()->name();
@@ -585,8 +666,8 @@ class DataFakersSeeder extends Seeder
                 'entity_id'          => $entityId,
                 'doctor_id'          => $doctor->id,
                 'patient_id'         => $patient->id,
-                'covenant_id'        => $covenant->id,
-                'visit_id'           => $visitType->id,
+                'covenant_id'        => $covenant?->id,
+                'visit_id'           => $visitType?->id,
                 'code'               => $code,
                 'full_name'          => $fullName,
                 'date_time'          => $currentTime->copy()->toDateTimeString(),

@@ -3,8 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class() extends Migration {
     /**
      * Scale values were assigned out of clinical order when the intermediate
      * 20/1xx-3xx acuities were added (e.g. 20/150 = 10 came before 20/125 = 17).

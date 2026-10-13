@@ -16,9 +16,10 @@ afterEach(() => {
     window.tinymce = original;
 });
 
-function realisticTinymce() {
+function realisticTinymce(onInit) {
     window.tinymce = {
         init: (cfg) => {
+            onInit?.(cfg);
             const container = document.createElement('div');
             container.className = 'tox-tinymce';
             cfg.target.style.display = 'none';
@@ -68,6 +69,26 @@ describe('TinyMceEditor — troca por :key', () => {
 
         expect(errors).toEqual([]);
         expect(w.findAll('.tox-tinymce')).toHaveLength(1);
+        w.unmount();
+    });
+});
+
+describe('TinyMceEditor — idioma (EE-14)', () => {
+    /**
+     * Sem locale pt_BR (aqui: mock global de usePage() sem a prop `locale`,
+     * ver tests/JavaScript/setup.js) o TinyMCE não deve receber language_url
+     * apontando pra um arquivo que não existe em disco (só existe pt_BR.js
+     * em public/vendor/tinymce-langs/langs7/) — cai no inglês nativo dele.
+     */
+    it('sem locale pt_BR, não configura language/language_url (cai no inglês nativo)', async () => {
+        let receivedConfig;
+        realisticTinymce((cfg) => (receivedConfig = cfg));
+
+        const w = mount(TinyMceEditor, { attachTo: document.body, props: { modelValue: '' } });
+        await flushPromises();
+
+        expect(receivedConfig.language).toBeUndefined();
+        expect(receivedConfig.language_url).toBeUndefined();
         w.unmount();
     });
 });

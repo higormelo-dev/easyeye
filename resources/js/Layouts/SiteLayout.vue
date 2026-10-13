@@ -29,14 +29,14 @@
 
                     <div class="nav-right">
                         <!-- Seletor de idioma -->
-                        <div class="lang-switcher" ref="langSwitcher">
+                        <div ref="langSwitcher" class="lang-switcher">
                             <button
                                 ref="langToggle"
                                 class="lang-btn"
-                                @click="langOpen = !langOpen"
                                 :aria-expanded="langOpen"
                                 :title="t.nav.language"
                                 :aria-label="t.nav.language"
+                                @click="langOpen = !langOpen"
                             >
                                 <span>{{ currentLocaleData?.flag ?? '🌐' }}</span>
                             </button>
@@ -68,10 +68,10 @@
                         ref="mobileToggle"
                         type="button"
                         class="nav-mobile-btn"
-                        @click="mobileOpen = !mobileOpen"
                         :aria-expanded="mobileOpen"
                         :aria-label="t.nav.menu"
                         aria-controls="site-mobile-menu"
+                        @click="mobileOpen = !mobileOpen"
                     >
                         <i class="ti" :class="mobileOpen ? 'ti-x' : 'ti-menu-2'" aria-hidden="true"></i>
                     </button>

@@ -21,20 +21,61 @@ const modules = computed(() => {
     const tile = (key, label, icon, iconClass, url) => ({ key, label, icon, iconClass, url, soon: false });
 
     const clinical = [
-        a.schedules && tile('schedule', props.t.module_schedule, 'ti ti-calendar', 'module-icon--schedule', route('panel.schedules.index')),
-        a.patients && tile('patients', props.t.module_patients, 'ti ti-users', 'module-icon--patients', route('panel.patients.index')),
+        a.schedules &&
+            tile(
+                'schedule',
+                props.t.module_schedule,
+                'ti ti-calendar',
+                'module-icon--schedule',
+                route('panel.schedules.index'),
+            ),
+        a.patients &&
+            tile(
+                'patients',
+                props.t.module_patients,
+                'ti ti-users',
+                'module-icon--patients',
+                route('panel.patients.index'),
+            ),
         tile('eye-images', props.t.module_eye_images, 'ti ti-eye', 'module-icon--eye', route('panel.eye-images.index')),
     ];
     const financial = a.financial
         ? [
-              tile('financial', props.t.module_financial, 'ti ti-report-money', 'module-icon--financial', route('panel.financial.cash-flow.index')),
-              tile('tiss', props.t.module_tiss, 'ti ti-file-invoice', 'module-icon--tiss', route('panel.financial.billing.index')),
-              tile('glosas', props.t.module_glosas, 'ti ti-file-x', 'module-icon--glosas', route('panel.financial.tiss.glosas.index')),
+              tile(
+                  'financial',
+                  props.t.module_financial,
+                  'ti ti-report-money',
+                  'module-icon--financial',
+                  route('panel.financial.cash-flow.index'),
+              ),
+              tile(
+                  'tiss',
+                  props.t.module_tiss,
+                  'ti ti-file-invoice',
+                  'module-icon--tiss',
+                  route('panel.financial.billing.index'),
+              ),
+              tile(
+                  'glosas',
+                  props.t.module_glosas,
+                  'ti ti-file-x',
+                  'module-icon--glosas',
+                  route('panel.financial.tiss.glosas.index'),
+              ),
               tile('bi', props.t.module_bi, 'ti ti-chart-bar', 'module-icon--bi', route('panel.financial.bi.index')),
           ]
         : [];
     const soon = props.showSoon
-        ? [{ key: 'surgery', label: props.t.module_surgery, icon: 'ti ti-stethoscope', iconClass: 'module-icon--soon', url: null, soon: true }]
+        ? [
+              {
+                  key: 'surgery',
+                  label: props.t.module_surgery,
+                  icon: 'ti ti-stethoscope',
+                  iconClass: 'module-icon--soon',
+                  url: null,
+                  soon: true,
+              },
+          ]
         : [];
 
     // Financeiro: os módulos do posto de trabalho dele primeiro.

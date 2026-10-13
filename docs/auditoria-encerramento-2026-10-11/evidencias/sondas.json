@@ -1,0 +1,23 @@
+{
+  "environment": "testing",
+  "data": "synthetic",
+  "fixture_transaction": "rolled_back",
+  "results": [
+    {"probe": "template_preview_html", "script_emitted_unescaped": true},
+    {"probe": "tiss_invalid_xml_default", "valid": true, "errors": [], "warnings": ["Validação XSD ignorada por ausência de schema."], "schema": null},
+    {"probe": "signature_roundtrip", "signed": true, "integrity_after_reload": false},
+    {"probe": "signed_stale_update", "update_allowed": true, "persisted": true, "still_locked": true},
+    {"probe": "portal_audit_clinic", "resource_clinic_matches_log": false, "log_uses_staff_session": true},
+    {"probe": "tiss_completed_key", "status_before": "completed", "status_after": "reserved"},
+    {"probe": "imagick_fork_shutdown", "thread_limit_env": null, "child_exited_within_3s": true},
+    {"probe": "imagick_fork_shutdown", "thread_limit_env": "1", "child_exited_within_3s": true}
+  ],
+  "integration_stall": {
+    "parent_wait": "do_wait",
+    "child_wait": "futex_wait_queue",
+    "results_written_before_shutdown": [200, 404],
+    "active_database_queries_at_probe": 0,
+    "run_status": "terminated; not approved",
+    "native_extension_root_cause": "not established"
+  }
+}

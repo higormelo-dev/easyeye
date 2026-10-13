@@ -18,9 +18,10 @@ use App\Models\{Covenant,
     SkinType,
     Subscription,
     User};
+use App\Services\PatientService;
 use App\Support\SeedCredentials;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\{DB, Hash};
 use RuntimeException;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -28,12 +29,13 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Clínica Teste Integrador: clínica fixa para testes da API de integradores,
  * treinamento e demonstração a clientes — também em PRODUÇÃO. Idempotente:
  * rodar de novo nunca apaga assinatura, nunca troca senha de usuário que já
- * existe e nunca mexe no que foi alterado pelo painel.
+ * existe e preserva cadastros e escalas existentes. Escalas vazias são
+ * completadas com expediente e bloqueios de demonstração.
  *
  * Senhas (decisão do dono — App\Support\SeedCredentials):
  *  - modo fixo (APP_ENV=local ou SEED_FIXED_CREDENTIALS=true — testes
  *    automatizados): credenciais fixas do repositório (Cypress, manuais) e os
- *    20 pacientes de exemplo; a agenda vem do DataFakersSeeder;
+ *    20 pacientes de exemplo e agendamentos para todos os médicos ativos;
  *  - homologação (APP_ENV=testing!) e produção: senha forte e aleatória
  *    (24 letras/números), mostrada UMA vez — na criação do usuário e quando
  *    ele ainda usa a senha fixa antiga do repositório (seed anterior): essa é
@@ -50,11 +52,12 @@ class IntegratorTestClinicSeeder extends Seeder
     // pelo EnsureTestFinancialProfilesCommand.
     public const ENTITY_SUBDOMAIN = 'clinica-teste-integrador';
 
-    /** @var list<array{email: string, name: string, rule: string, password: string, doctor?: array{record: string, record_specialty: string, color: string}}> */
+    /** @var list<array{email: string, name: string, rule: string, password: string, national_registry?: string, doctor?: array{record: string, record_specialty: string, color: string}}> */
     private const STAFF = [
         ['email' => 'admin@clinicateste.com', 'name' => 'ADMIN CLÍNICA TESTE', 'rule' => 'admin', 'password' => 'Admin@123'],
-        ['email' => 'dra.ana@clinicateste.com', 'name' => 'DRA. ANA LIMA', 'rule' => 'doctor', 'password' => 'Medico@123', 'doctor' => ['record' => '123456', 'record_specialty' => '12345', 'color' => '#e91e63']],
-        ['email' => 'dr.carlos@clinicateste.com', 'name' => 'DR. CARLOS SOUZA', 'rule' => 'doctor', 'password' => 'Medico@123', 'doctor' => ['record' => '654321', 'record_specialty' => '54321', 'color' => '#1976d2']],
+        // Identificadores fictícios: não representam documentos de pessoas reais.
+        ['email' => 'dra.ana@clinicateste.com', 'name' => 'DRA. ANA LIMA', 'rule' => 'doctor', 'password' => 'Medico@123', 'national_registry' => '00000000001', 'doctor' => ['record' => '123456', 'record_specialty' => '12345', 'color' => '#e91e63']],
+        ['email' => 'dr.carlos@clinicateste.com', 'name' => 'DR. CARLOS SOUZA', 'rule' => 'doctor', 'password' => 'Medico@123', 'national_registry' => '00000000002', 'doctor' => ['record' => '654321', 'record_specialty' => '54321', 'color' => '#1976d2']],
         ['email' => 'secretaria@clinicateste.com', 'name' => 'SECRETÁRIA CLÍNICA TESTE', 'rule' => 'secretary', 'password' => 'Secretaria@123'],
         // A única clínica com credenciais conhecidas precisa de um Financeiro
         // para testar o fluxo financeiro sem depender da massa aleatória.
@@ -70,20 +73,26 @@ class IntegratorTestClinicSeeder extends Seeder
 
     public function run(): void
     {
-        $plan   = $this->integratorPlan();
-        $entity = $this->ensureEntity();
+        $this->generated = [];
+        $plan            = $this->integratorPlan();
 
-        $this->ensureSubscription($entity, $plan);
+        [$entity, $integrator] = DB::transaction(function () use ($plan): array {
+            $entity = $this->ensureEntity();
+            $this->ensureSubscription($entity, $plan);
 
-        foreach (self::STAFF as $member) {
-            $this->ensureStaff($entity, $member);
-        }
+            foreach (self::STAFF as $member) {
+                $this->ensureStaff($entity, $member);
+            }
 
-        $integrator = $this->ensureIntegrator($entity);
+            $integrator = $this->ensureIntegrator($entity);
 
-        if ($this->usesFixedCredentials()) {
-            $this->seedExamplePatients($entity);
-        }
+            if ($this->usesFixedCredentials()) {
+                $this->seedExamplePatients($entity);
+                app(DataFakersSeeder::class)->seedClinicSchedules($entity);
+            }
+
+            return [$entity, $integrator];
+        });
 
         $this->report($entity, $plan, $integrator);
     }
@@ -128,6 +137,8 @@ class IntegratorTestClinicSeeder extends Seeder
                 'city'      => 'São Paulo',
                 'state'     => 'SP',
                 'country'   => 'BR',
+                'email'     => 'admin@clinicateste.com',
+                'locale'    => 'pt_BR',
                 'is_client' => true,
                 'active'    => true,
             ]);
@@ -178,34 +189,134 @@ class IntegratorTestClinicSeeder extends Seeder
         ]);
     }
 
-    /** @param array{email: string, name: string, rule: string, password: string, doctor?: array{record: string, record_specialty: string, color: string}} $member */
+    /** @param array{email: string, name: string, rule: string, password: string, national_registry?: string, doctor?: array{record: string, record_specialty: string, color: string}} $member */
     private function ensureStaff(Entity $entity, array $member): void
     {
-        $person = People::firstOrCreate(
-            ['email' => $member['email']],
-            ['full_name' => $member['name'], 'cellphone' => ''],
-        );
+        $user = $this->ensureUser($member['email'], $member['name'], $member['password'], $member['rule']);
 
-        $user = $this->ensureUser($member['email'], $person->full_name, $member['password'], $member['rule']);
-
-        $entityUser = EntityUser::firstOrCreate(
+        $entityUser = EntityUser::withTrashed()->firstOrCreate(
             ['entity_id' => $entity->id, 'user_id' => $user->id],
-            ['rule' => $member['rule'], 'active' => true],
+            [
+                'rule'      => $member['rule'],
+                'active'    => true,
+                'is_owner'  => $member['rule'] === 'admin' && ! $entity->entityUsers()->where('is_owner', true)->exists(),
+                'joined_at' => now(),
+            ],
         );
 
-        if (! isset($member['doctor'])) {
+        if (! $entityUser->trashed() && $entityUser->active) {
+            $missingMembership = [];
+
+            if ($entityUser->joined_at === null) {
+                $missingMembership['joined_at'] = $entityUser->created_at;
+            }
+
+            // Seed antigo não cadastrava o responsável. Só completa quando
+            // a clínica ainda não tem dono; preserva responsáveis do painel.
+            if ($member['rule'] === 'admin' && $entityUser->rule === 'admin' && ! $entity->entityUsers()->where('is_owner', true)->exists()) {
+                $missingMembership['is_owner'] = true;
+            }
+
+            if ($missingMembership !== []) {
+                $entityUser->update($missingMembership);
+            }
+        }
+
+        if (! isset($member['doctor']) || $entityUser->trashed()) {
             return;
         }
 
-        Doctor::firstOrCreate(
-            ['entity_user_id' => $entityUser->id],
-            [
-                'person_id' => $person->id,
+        $doctor = Doctor::withTrashed()->firstWhere('entity_user_id', $entityUser->id);
+
+        if (! $doctor) {
+            // Mesmo isolamento do cadastro pelo painel: People próprio do
+            // médico nesta clínica, sem reaproveitar pessoa pelo e-mail global.
+            $person = People::create([
+                'full_name'         => $member['name'],
+                'nickname'          => $member['name'],
+                'email'             => $member['email'],
+                'cellphone'         => '',
+                'national_registry' => $member['national_registry'],
+                'city'              => $entity->city,
+                'state'             => $entity->state,
+                'country'           => $entity->country,
+            ]);
+
+            $doctor = Doctor::create([
+                'entity_user_id' => $entityUser->id,
+                'person_id'      => $person->id,
                 ...$member['doctor'],
                 'partner' => false,
                 'active'  => true,
-            ],
-        );
+            ]);
+        }
+
+        if (! $doctor->trashed() && $doctor->active && $entityUser->active) {
+            // Seed antigo: completa campos obrigatórios que faltavam, somente
+            // se a pessoa não for compartilhada com outra clínica.
+            $person         = $doctor->person;
+            $patientService = app(PatientService::class);
+
+            if ($person && ! $patientService->personSharedWithOtherEntities((string) $person->id, (string) $entity->id)) {
+                $missing = [];
+
+                if (blank($person->nickname)) {
+                    $missing['nickname'] = $person->full_name;
+                }
+
+                if (blank($person->national_registry)) {
+                    $missing['national_registry'] = $member['national_registry'];
+                }
+
+                if ($missing !== []) {
+                    $patientService->fillPersonGuarded($person, $missing, (string) $entity->id, 'national_registry')->save();
+                }
+            }
+
+            $this->ensureDoctorAgenda($doctor);
+        }
+    }
+
+    /** Completa a etapa de escala apenas quando ela ainda não existe. */
+    private function ensureDoctorAgenda(Doctor $doctor): void
+    {
+        // Escala já configurada: mantém inclusive os bloqueios removidos ou
+        // editados pelo painel. Não completa dias de folga de uma escala parcial.
+        if ($doctor->workSchedules()->exists()) {
+            return;
+        }
+
+        foreach (range(1, 5) as $day) {
+            foreach ([['08:00:00', '12:00:00'], ['14:00:00', '18:00:00']] as [$startsAt, $endsAt]) {
+                $doctor->workSchedules()->create([
+                    'day_of_week' => $day,
+                    'starts_at'   => $startsAt,
+                    'ends_at'     => $endsAt,
+                ]);
+            }
+        }
+
+        // Intervalo e teto de encaixes herdam os padrões do sistema. Não
+        // sobrescreve configurações do médico e não renova exemplos vencidos.
+        if ($doctor->scheduleBlocks()->exists()) {
+            return;
+        }
+
+        $monday = now()->next('Monday')->startOfDay();
+
+        $doctor->scheduleBlocks()->create([
+            'starts_at' => $monday->copy()->setTime(10, 0),
+            'ends_at'   => $monday->copy()->setTime(11, 0),
+            'reason'    => 'Reunião de equipe (exemplo de teste)',
+            'type'      => 'meeting',
+        ]);
+
+        $doctor->scheduleBlocks()->create([
+            'starts_at' => $monday->copy()->addDay()->startOfDay(),
+            'ends_at'   => $monday->copy()->addDays(2)->startOfDay(),
+            'reason'    => 'Ausência programada (exemplo de teste)',
+            'type'      => 'absence',
+        ]);
     }
 
     /**
@@ -323,7 +434,10 @@ class IntegratorTestClinicSeeder extends Seeder
 
         $skinTypes = SkinType::all();
         $irisTypes = IrisType::all();
-        $covenants = Covenant::all();
+        $covenants = Covenant::query()
+            ->where('active', true)
+            ->where(fn ($query) => $query->whereNull('entity_id')->orWhere('entity_id', $entity->id))
+            ->get();
 
         for ($i = 0; $i < 20; $i++) {
             Patient::create([

@@ -11,7 +11,10 @@ defineProps({
 </script>
 
 <template>
-    <section class="card db-card recent-patients" :aria-label="mine ? t.section_my_recent_patients : t.section_recent_patients">
+    <section
+        class="card db-card recent-patients"
+        :aria-label="mine ? t.section_my_recent_patients : t.section_recent_patients"
+    >
         <div class="db-card-header">
             <h3 class="db-card-title">
                 <i class="ti ti-users" aria-hidden="true"></i>

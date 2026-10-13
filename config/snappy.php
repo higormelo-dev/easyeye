@@ -38,13 +38,21 @@ return [
     // emissão de PDF do prontuário (laudos, receituários, atestados) dava 500.
     // Agora: env explícito > binário do sistema (container, 0.12.6 patched) >
     // fallback vendor h4cc (host, 0.12.4). Auto-adapta sem trocar .env.
+    // Timeout finito (segundos) — "false" (sem timeout) deixava uma
+    // renderização travada (ex.: wkhtmltopdf pendurado) ocupar o processo
+    // PHP indefinidamente, numa chamada SÍNCRONA dentro de uma requisição
+    // HTTP (achado via auditoria de encerramento, EE-10). 60s é generoso
+    // pra um documento clínico único (prontuário, receituário, laudo — até
+    // com imagens embutidas) e fica abaixo do timeout típico de
+    // PHP-FPM/proxy, pra nunca ser a camada que mascara o erro real com um
+    // 502/504 sem registro nenhum do lado da aplicação.
     'pdf' => [
         'enabled' => true,
         'binary'  => env('WKHTML_PDF_BINARY')
             ?: (is_executable('/usr/local/bin/wkhtmltopdf')
                 ? '/usr/local/bin/wkhtmltopdf'
                 : base_path('vendor/h4cc/wkhtmltopdf-amd64/bin/wkhtmltopdf-amd64')),
-        'timeout' => false,
+        'timeout' => 60,
         'options' => [],
         'env'     => [],
     ],
@@ -55,7 +63,7 @@ return [
             ?: (is_executable('/usr/local/bin/wkhtmltoimage')
                 ? '/usr/local/bin/wkhtmltoimage'
                 : base_path('vendor/h4cc/wkhtmltoimage-amd64/bin/wkhtmltoimage-amd64')),
-        'timeout' => false,
+        'timeout' => 60,
         'options' => [],
         'env'     => [],
     ],

@@ -1,6 +1,7 @@
 <script setup>
 import { Head } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 
 const props = defineProps({
     metrics: { type: Object, required: true },
@@ -8,9 +9,7 @@ const props = defineProps({
     recentCommissions: { type: Array, default: () => [] },
 });
 
-function brl(v) {
-    return 'R$ ' + Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-}
+const { money } = useLocaleFormat();
 </script>
 
 <template>
@@ -44,7 +43,7 @@ function brl(v) {
                 <div class="card shadow-sm border-0 h-100 border-start border-warning border-3">
                     <div class="card-body py-3">
                         <small class="text-muted d-block">Comissões pendentes</small>
-                        <div class="fw-bold fs-4 text-warning">{{ brl(metrics.pending_commissions) }}</div>
+                        <div class="fw-bold fs-4 text-warning">{{ money(metrics.pending_commissions ?? 0) }}</div>
                     </div>
                 </div>
             </div>
@@ -52,7 +51,7 @@ function brl(v) {
                 <div class="card shadow-sm border-0 h-100 border-start border-info border-3">
                     <div class="card-body py-3">
                         <small class="text-muted d-block">Comissões pagas</small>
-                        <div class="fw-bold fs-4 text-info">{{ brl(metrics.paid_commissions) }}</div>
+                        <div class="fw-bold fs-4 text-info">{{ money(metrics.paid_commissions ?? 0) }}</div>
                     </div>
                 </div>
             </div>

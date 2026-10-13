@@ -41,9 +41,9 @@
 
         <!-- JSON-LD Structured Data -->
         <component
+            :is="'script'"
             v-for="(schema, i) in seo.jsonLd"
             :key="i"
-            :is="'script'"
             type="application/ld+json"
             v-text="JSON.stringify(schema)"
         />
@@ -179,7 +179,7 @@
         </div>
 
         <!-- ═══════════════════ PROBLEMAS ═══════════════════ -->
-        <section class="problems" id="problemas">
+        <section id="problemas" class="problems">
             <div class="container">
                 <div class="problems-header text-center">
                     <h2 class="section-title">{{ t.problems.title }}</h2>
@@ -199,7 +199,7 @@
         </section>
 
         <!-- ═══════════════════ DEMONSTRAÇÃO (logo após as dores: prova antes da lista) ═══════════════════ -->
-        <section class="demo" id="demonstracao">
+        <section id="demonstracao" class="demo">
             <div class="container">
                 <div class="demo-header text-center">
                     <h2 class="section-title">{{ t.demo.title }}</h2>
@@ -275,7 +275,7 @@
         <!-- ═══════════════════ FUNCIONALIDADES POR PÚBLICO ═══════════════════ -->
         <!-- Antes: Benefícios (8) + Funcionalidades (6) repetindo as mesmas capacidades.
              Agora 3 blocos, um por público; "Disponível no …" vem dos planos do banco. -->
-        <section class="audiences" id="funcionalidades">
+        <section id="funcionalidades" class="audiences">
             <div class="container">
                 <div class="audiences-header text-center">
                     <h2 class="section-title">{{ t.audiences.title }}</h2>
@@ -346,7 +346,7 @@
         </section>
 
         <!-- ═══════════════════ PLANOS ═══════════════════ -->
-        <section class="pricing" id="precos">
+        <section id="precos" class="pricing">
             <div class="container">
                 <div class="pricing-header text-center">
                     <h2 class="section-title">{{ t.pricing.title }}</h2>
@@ -414,7 +414,7 @@
         </section>
 
         <!-- ═══════════════════ COMO FUNCIONA ═══════════════════ -->
-        <section class="how" id="como-funciona">
+        <section id="como-funciona" class="how">
             <div class="container">
                 <div :class="['how-inner', { 'how-inner--solo': !howImageExists }]">
                     <div>
@@ -448,7 +448,7 @@
         </section>
 
         <!-- ═══════════════════ DIFERENCIAIS + CONFORMIDADE NA PRÁTICA ═══════════════════ -->
-        <section class="differentiators" id="diferenciais">
+        <section id="diferenciais" class="differentiators">
             <div class="container">
                 <div class="diff-header text-center">
                     <h2 class="section-title">{{ t.differentiators.title }}</h2>
@@ -478,7 +478,7 @@
         </section>
 
         <!-- ═══════════════════ DEPOIMENTOS ═══════════════════ -->
-        <section v-if="t.testimonials?.items?.length" class="testimonials" id="depoimentos">
+        <section v-if="t.testimonials?.items?.length" id="depoimentos" class="testimonials">
             <div class="container">
                 <div class="testimonials-header text-center">
                     <h2 class="section-title">{{ t.testimonials.title }}</h2>
@@ -520,7 +520,7 @@
         </section>
 
         <!-- ═══════════════════ FAQ ═══════════════════ -->
-        <section class="faq" id="faq">
+        <section id="faq" class="faq">
             <div class="container">
                 <div class="faq-header text-center">
                     <h2 class="section-title">{{ t.faq.title }}</h2>
@@ -560,7 +560,7 @@
         </section>
 
         <!-- ═══════════════════ CONTATO ═══════════════════ -->
-        <section class="contact" id="contato">
+        <section id="contato" class="contact">
             <div class="container">
                 <div class="contact-main">
                     <div class="contact-header">

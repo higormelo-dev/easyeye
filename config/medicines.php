@@ -61,7 +61,7 @@ return [
         'max_consecutive_failures' => (int) env('MEDICINE_POSOLOGY_BATCH_MAX_CONSECUTIVE_FAILURES', 5),
 
         // Cada job processa grupos por no máximo isto e agenda a continuação
-        // (fica abaixo do retry_after de 90 s da fila).
+        // (bem abaixo do retry_after da fila — 960 s, ver config/queue.php).
         'job_time_budget_seconds' => (int) env('MEDICINE_POSOLOGY_BATCH_JOB_BUDGET', 45),
     ],
 ];

@@ -50,8 +50,12 @@ const receiptRate = computed(() => {
 <template>
     <div class="db-covenants">
         <div class="db-chart__totals">
-            <span><strong>{{ money(totals.billed ?? 0) }}</strong> {{ t.covenants_billed }}</span>
-            <span><strong>{{ money(totals.paid ?? 0) }}</strong> {{ t.covenants_paid }}</span>
+            <span
+                ><strong>{{ money(totals.billed ?? 0) }}</strong> {{ t.covenants_billed }}</span
+            >
+            <span
+                ><strong>{{ money(totals.paid ?? 0) }}</strong> {{ t.covenants_paid }}</span
+            >
             <span v-if="receiptRate !== null">{{ tx('covenants_rate', { rate: number(receiptRate, 1) }) }}</span>
         </div>
 
@@ -85,7 +89,9 @@ const receiptRate = computed(() => {
                 </div>
                 <div class="db-covenants__sub">
                     {{ tx('covenants_row', { paid: money(item.paid) }) }}
-                    <template v-if="item.denied > 0"> · {{ tx('covenants_denied', { denied: money(item.denied) }) }}</template>
+                    <template v-if="item.denied > 0">
+                        · {{ tx('covenants_denied', { denied: money(item.denied) }) }}</template
+                    >
                 </div>
             </li>
         </ul>

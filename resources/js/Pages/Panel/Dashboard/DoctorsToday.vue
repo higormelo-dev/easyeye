@@ -44,7 +44,9 @@ const items = computed(() =>
                 <tr>
                     <th scope="col">{{ t.col_doctor }}</th>
                     <th scope="col" class="text-end">{{ t.doctors_col_progress }}</th>
-                    <th scope="col" class="text-end" :title="t.doctors_col_waiting_hint">{{ t.doctors_col_waiting }}</th>
+                    <th scope="col" class="text-end" :title="t.doctors_col_waiting_hint">
+                        {{ t.doctors_col_waiting }}
+                    </th>
                     <th scope="col" class="text-end" :title="t.summary_cancelled">{{ t.doctors_col_missed }}</th>
                 </tr>
             </thead>
@@ -57,13 +59,19 @@ const items = computed(() =>
                         </span>
                     </th>
                     <td class="text-end text-nowrap">
-                        <span class="visually-hidden">{{ tx('doctors_progress_sr', { attended: doctor.attended, expected: doctor.expected }) }}</span>
-                        <span aria-hidden="true"><strong>{{ number(doctor.attended) }}</strong> / {{ number(doctor.expected) }}</span>
+                        <span class="visually-hidden">{{
+                            tx('doctors_progress_sr', { attended: doctor.attended, expected: doctor.expected })
+                        }}</span>
+                        <span aria-hidden="true"
+                            ><strong>{{ number(doctor.attended) }}</strong> / {{ number(doctor.expected) }}</span
+                        >
                     </td>
                     <td class="text-end" :class="{ 'text-warning-emphasis fw-semibold': doctor.waiting > 0 }">
                         {{ number(doctor.waiting) }}
                     </td>
-                    <td class="text-end" :class="{ 'text-danger-emphasis': doctor.missed > 0 }">{{ number(doctor.missed) }}</td>
+                    <td class="text-end" :class="{ 'text-danger-emphasis': doctor.missed > 0 }">
+                        {{ number(doctor.missed) }}
+                    </td>
                 </tr>
             </tbody>
         </table>

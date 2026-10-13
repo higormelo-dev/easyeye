@@ -105,5 +105,6 @@ vi.mock('@inertiajs/vue3', () => ({
         put: vi.fn(),
         patch: vi.fn(),
         delete: vi.fn(),
+        clearErrors: vi.fn(),
     }),
 }));

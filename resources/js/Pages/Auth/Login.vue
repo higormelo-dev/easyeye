@@ -85,7 +85,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                     <i class="ti ti-alert-circle me-1"></i> {{ form.errors.email }}
                 </div>
 
-                <form @submit.prevent="submit" novalidate>
+                <form novalidate @submit.prevent="submit">
                     <div class="mb-3">
                         <label class="form-label">{{ t.email ?? 'E-mail' }}</label>
                         <div class="input-group">
@@ -131,7 +131,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
 
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="form-check mb-0">
-                            <input v-model="form.remember" type="checkbox" id="remember" class="form-check-input" />
+                            <input id="remember" v-model="form.remember" type="checkbox" class="form-check-input" />
                             <label for="remember" class="form-check-label text-dark">
                                 {{ t.remember_me }}
                             </label>

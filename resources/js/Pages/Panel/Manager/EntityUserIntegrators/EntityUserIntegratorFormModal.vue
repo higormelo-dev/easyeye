@@ -157,7 +157,7 @@ function firstError(field) {
                         {{ loadErr }}
                     </div>
 
-                    <form v-else @submit.prevent="submit" class="row g-3">
+                    <form v-else class="row g-3" @submit.prevent="submit">
                         <div class="col-12">
                             <label class="form-label">
                                 {{ t.field_name ?? 'Nome' }} <span class="text-danger">*</span>

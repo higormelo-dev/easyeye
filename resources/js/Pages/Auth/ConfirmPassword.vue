@@ -34,7 +34,7 @@ function submit() {
             {{ form.errors.password }}
         </div>
 
-        <form @submit.prevent="submit" novalidate>
+        <form novalidate @submit.prevent="submit">
             <div class="mb-4">
                 <label class="form-label">Senha <span style="color: #ef4444">*</span></label>
                 <div class="input-group">

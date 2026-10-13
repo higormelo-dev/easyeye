@@ -169,8 +169,8 @@ it('duas lentes DIFERENTES (fabricante/modelo/preço próprios) apontando pro ME
 
     $this->artisan('iol-lenses:migrate-to-stock', ['--force' => true])->assertSuccessful();
 
-    $originalLink   = DB::table('entity_iol_lenses')->where('id', $originalLensId)->value('entity_product_id');
-    $duplicateLink  = DB::table('entity_iol_lenses')->where('id', $duplicateLensId)->value('entity_product_id');
+    $originalLink  = DB::table('entity_iol_lenses')->where('id', $originalLensId)->value('entity_product_id');
+    $duplicateLink = DB::table('entity_iol_lenses')->where('id', $duplicateLensId)->value('entity_product_id');
 
     expect($originalLink)->toBe($sharedProduct->id);
     expect($duplicateLink)->not->toBe($sharedProduct->id);

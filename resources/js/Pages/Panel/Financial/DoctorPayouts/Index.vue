@@ -380,6 +380,7 @@ function confirmReverse(reason) {
                         </button>
                     </div>
                     <PayoutItemsTable
+                        v-model:selected="selected"
                         :rows="rows"
                         :t="t"
                         :caption="t.items_title"
@@ -388,7 +389,6 @@ function confirmReverse(reason) {
                         show-receipt
                         selectable
                         can-reverse
-                        v-model:selected="selected"
                         :closing-url="routes.closing_show"
                         @reverse-allocation="askReverse"
                     />

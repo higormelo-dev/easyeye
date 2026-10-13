@@ -169,7 +169,7 @@ WHATSAPP_QUEUE=default                 # outra fila precisa entrar no worker (--
 
 Depois: `php artisan migrate` (apaga as credenciais da Z-API, troca os tokens de URL, passa as pendentes da Z-API para `skipped` e limpa o hash do código de verificação de `audit_logs`), `php artisan config:cache` (ou `config:clear`) e reiniciar o worker da fila.
 
-**Fila:** os jobs de envio têm `$timeout` de 150 s (cobre o lock de 120 s do token + o envio). O `retry_after` da conexão da fila (`REDIS_QUEUE_RETRY_AFTER`/`DB_QUEUE_RETRY_AFTER`, padrão 90) precisa ser **maior** que o maior `$timeout` — o `docs/infra/reverb-ambiente-teste.md` já recomenda `960` (importações têm 900 s). Com 90, um envio demorado é entregue a outro worker no meio.
+**Fila:** os jobs de envio têm `$timeout` de 150 s (cobre o lock de 120 s do token + o envio). O `retry_after` da conexão da fila (`REDIS_QUEUE_RETRY_AFTER`/`DB_QUEUE_RETRY_AFTER`, padrão 960 nas duas) precisa continuar **maior** que o maior `$timeout` (importações têm 900 s) — ver `docs/infra/reverb-ambiente-teste.md`. Um valor explícito abaixo disso no `.env` faz um envio demorado ser entregue a outro worker no meio.
 
 **Um app Gupshup por ambiente:** homologação e produção **não** podem usar o mesmo app (App ID) — cada ambiente gera os próprios tokens de app (UAT) e a Gupshup aceita no máximo **3 ativos por app**; dois ambientes no mesmo app disputam esse limite (e o webhook do app só aponta para um servidor). Use um app (e número) de teste na homologação.
 

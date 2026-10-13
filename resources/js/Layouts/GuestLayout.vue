@@ -71,7 +71,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
                             <slot />
                             <!-- Footer -->
                             <div class="border-top pt-3 mt-4 d-flex align-items-center justify-content-center gap-1">
-                                <div v-if="locales.length > 1" class="position-relative" ref="localeEl">
+                                <div v-if="locales.length > 1" ref="localeEl" class="position-relative">
                                     <button
                                         type="button"
                                         class="btn btn-link btn-sm text-muted text-decoration-none"
@@ -152,7 +152,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
                                     <div
                                         class="border-top pt-3 mt-4 d-flex align-items-center justify-content-center gap-1"
                                     >
-                                        <div v-if="locales.length > 1" class="position-relative" ref="localeEl">
+                                        <div v-if="locales.length > 1" ref="localeEl" class="position-relative">
                                             <button
                                                 type="button"
                                                 class="btn btn-link btn-sm text-muted text-decoration-none"

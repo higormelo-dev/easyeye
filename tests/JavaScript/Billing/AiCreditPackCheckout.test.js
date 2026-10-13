@@ -107,14 +107,12 @@ describe('CheckoutFlow — modo aiPack', () => {
             summary: vi.fn(),
             aiPack: vi.fn().mockResolvedValue(pixResponse),
             contract: vi.fn(),
-            instructions: vi
-                .fn()
-                .mockResolvedValue({
-                    invoice: packInvoice,
-                    mode: 'transparent',
-                    method: 'boleto',
-                    instructions: { boleto: { digitable_line: '2379' } },
-                }),
+            instructions: vi.fn().mockResolvedValue({
+                invoice: packInvoice,
+                mode: 'transparent',
+                method: 'boleto',
+                instructions: { boleto: { digitable_line: '2379' } },
+            }),
             issueCharge: vi.fn(),
             payInvoice: vi.fn(),
         };

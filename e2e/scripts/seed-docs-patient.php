@@ -17,29 +17,29 @@ use Illuminate\Support\Str;
 
 require __DIR__ . '/seed-docs-doctor.php';
 
-$ent = Entity::where('name', 'like', '%TESTE INTEGRADOR%')->firstOrFail();
-$ana = Doctor::whereHas('person', fn ($q) => $q->where('email', 'dra.ana@clinicateste.com'))->firstOrFail();
+$ent           = Entity::where('name', 'like', '%TESTE INTEGRADOR%')->firstOrFail();
+$ana           = Doctor::whereHas('person', fn ($q) => $q->where('email', 'dra.ana@clinicateste.com'))->firstOrFail();
 $anaEntityUser = EntityUser::findOrFail($ana->entity_user_id);
 
-$pe  = People::where('full_name', 'MARIANA COSTA E SILVA')->firstOrFail();
-$pat = Patient::where('entity_id', $ent->id)->where('person_id', $pe->id)->firstOrFail();
-$doc = MedicalRecordDocumentation::where('patient_id', $pat->id)->latest('created_at')->firstOrFail();
+$pe     = People::where('full_name', 'MARIANA COSTA E SILVA')->firstOrFail();
+$pat    = Patient::where('entity_id', $ent->id)->where('person_id', $pe->id)->firstOrFail();
+$doc    = MedicalRecordDocumentation::where('patient_id', $pat->id)->latest('created_at')->firstOrFail();
 $record = MedicalRecord::findOrFail($doc->medical_record_id);
 $exams  = PatientExam::where('patient_id', $pat->id)->orderBy('laterality')->get();
 
 // Anexo real na disk 'private' (mesmo padrão de MedicalRecordFilesController::store) —
 // PNG 1x1 mínimo, só pra existir de verdade e a pré-visualização de imagem funcionar.
-$png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
+$png      = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
 $filePath = "medical-records/{$record->id}/" . Str::uuid() . '.png';
 Storage::disk('private')->put($filePath, $png);
 
 $file = MedicalRecordFile::create([
     'medical_record_id' => $record->id,
-    'patient_id'         => $pat->id,
-    'file_path'          => $filePath,
-    'original_name'      => 'retinografia-anexo-demo.png',
-    'mime_type'           => 'image/png',
-    'file_size'           => strlen($png),
+    'patient_id'        => $pat->id,
+    'file_path'         => $filePath,
+    'original_name'     => 'retinografia-anexo-demo.png',
+    'mime_type'         => 'image/png',
+    'file_size'         => strlen($png),
 ]);
 
 // PatientAccount (login do portal) — mesmo e-mail já usado pelo fixture do
@@ -60,6 +60,7 @@ $account->forceFill(['email_verified_at' => now(), 'active' => true])->save();
 // laudo assinado, idempotente se já compartilhado).
 $service = app(PatientDocumentShareService::class);
 $service->grant($anaEntityUser, $doc, $pat);
+
 if ($exams->isNotEmpty()) {
     $service->grant($anaEntityUser, $exams->first(), $pat);
 }

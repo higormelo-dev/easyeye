@@ -472,7 +472,7 @@ onBeforeUnmount(cancelPolling);
                 <!-- Toggle de contexto (só aparece quando a tela atual oferece contexto) -->
                 <div v-if="hasContextAvailable" class="ai-chat-context">
                     <label class="ai-context-toggle">
-                        <input type="checkbox" v-model="useContext" />
+                        <input v-model="useContext" type="checkbox" />
                         <span>{{ tt('context_available', 'Usar contexto desta tela') }}</span>
                     </label>
                     <span v-if="aiAssistantContext.label" class="ai-context-label">{{ aiAssistantContext.label }}</span>

@@ -1,6 +1,7 @@
 <script setup>
-import { computed, nextTick, useId, watch } from 'vue';
+import { computed, ref, useId } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import { useModalA11y } from '@/Support/useModalA11y.js';
 
 /**
  * OffcanvasPanel — Modal centralizado na tela.
@@ -32,41 +33,25 @@ const props = defineProps({
     closeLabel: { type: String, default: '' },
 });
 
-defineEmits(['close']);
+const emit = defineEmits(['close']);
 
 // Acessibilidade: o diálogo é nomeado pelo conteúdo do #header (título) e o
-// botão fechar tem rótulo no idioma do usuário (t_ui compartilhado).
+// botão fechar tem rótulo no idioma do usuário (t_ui compartilhado). Foco
+// de abertura/fechamento, Tab contido e Escape vêm do useModalA11y (mesmo
+// contrato do CenteredModal — este componente é a mesma coisa com outra
+// largura/CSS, não um wrapper do Offcanvas nativo do Bootstrap).
 const page = usePage();
 const titleId = `ee-modal-title-${useId()}`;
+const dialogRef = ref(null);
 
 const closeText = computed(() => props.closeLabel || page?.props?.t_ui?.close || 'Fechar');
-
-// Foco: ao fechar, volta para quem abriu (botão/linha) — sem isso ia para o
-// <body> e o teclado recomeçava do topo. Só devolve se o foco ficou perdido: a
-// página pode ter movido o foco de propósito (ex.: abrir outro modal).
-let returnFocusTo = null;
-
-watch(
-    () => props.open,
-    (isOpen, wasOpen) => {
-        if (isOpen && !wasOpen) {
-            returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-            return;
-        }
-
-        if (!isOpen && wasOpen) {
-            const target = returnFocusTo;
-            returnFocusTo = null;
-
-            nextTick(() => {
-                const active = document.activeElement;
-                if (target?.isConnected && (!active || active === document.body)) target.focus({ preventScroll: true });
-            });
-        }
-    },
-);
 const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.loading || 'Carregando...');
+
+useModalA11y(
+    dialogRef,
+    () => props.open,
+    () => emit('close'),
+);
 </script>
 
 <template>
@@ -86,7 +71,7 @@ const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.load
                 :aria-labelledby="$slots.header ? titleId : undefined"
                 @click.self="$emit('close')"
             >
-                <div class="ee-modal__dialog" :style="{ maxWidth: `${width}px` }">
+                <div ref="dialogRef" class="ee-modal__dialog" :style="{ maxWidth: `${width}px` }" tabindex="-1">
                     <!-- Header -->
                     <div class="ee-modal__header">
                         <div :id="titleId" class="ee-modal__header-content">

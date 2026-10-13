@@ -41,6 +41,22 @@ export default defineConfig([
         },
     },
 
+    // Páginas Inertia (resources/js/Pages/**) são nomeadas pela AÇÃO da rota
+    // (Index/Edit/Show/Create — convenção do próprio Inertia, usada em toda a
+    // documentação oficial), nunca renderizadas como <Componente/> genérico
+    // em outro template — vue/multi-word-component-names é uma regra pra
+    // COMPONENTE reutilizável, não pra página de rota. Reusable components
+    // (resources/js/Components/**) continuam com a regra ligada (achado via
+    // auditoria de encerramento, EE-13 — "diferenças entre convenções de
+    // páginas Inertia e regras genéricas").
+    {
+        name: 'easyeye/inertia-pages',
+        files: ['resources/js/Pages/**/*.vue'],
+        rules: {
+            'vue/multi-word-component-names': 'off',
+        },
+    },
+
     // Vitest roda com `globals: true` (vitest.config.js).
     {
         name: 'easyeye/vitest',

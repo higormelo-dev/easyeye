@@ -168,6 +168,11 @@ function onOutsideClick(e) {
 function onEsc(e) {
     if (e.key !== 'Escape') return;
 
+    // O Esc é do menu: não segue pro diálogo em que o botão está (aberto com o
+    // mouse, o foco fica no botão, dentro do diálogo — sem isto o mesmo Esc
+    // fecharia o menu E o diálogo).
+    e.stopPropagation();
+
     // Fechado pelo Esc, o foco volta ao botão (senão se perde no fim do <body>).
     const hadFocusInside = menuRef.value?.contains(document.activeElement);
 

@@ -38,9 +38,12 @@ const countLabel = computed(() => (props.t.pending_count ?? ':count').replace(':
             <span class="pending-list__title">
                 <i :class="icon" aria-hidden="true"></i>
                 {{ title }}
-                <span class="badge rounded-pill pending-list-count pending-list-count--active" :title="countLabel" :aria-label="countLabel">{{
-                    count
-                }}</span>
+                <span
+                    class="badge rounded-pill pending-list-count pending-list-count--active"
+                    :title="countLabel"
+                    :aria-label="countLabel"
+                    >{{ count }}</span
+                >
             </span>
             <a v-if="seeAllUrl" :href="seeAllUrl" class="db-link">
                 {{ t.btn_see_all }} <i class="ti ti-arrow-right" aria-hidden="true"></i>

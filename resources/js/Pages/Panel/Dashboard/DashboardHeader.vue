@@ -89,18 +89,44 @@ const actions = computed(() => {
     const a = props.access;
     const list = [];
     const newSchedule = () =>
-        a.schedules && { key: 'new_schedule', icon: 'ti ti-calendar-plus', label: props.t.action_new_schedule, url: route('panel.schedules.index', { new: 1 }) };
+        a.schedules && {
+            key: 'new_schedule',
+            icon: 'ti ti-calendar-plus',
+            label: props.t.action_new_schedule,
+            url: route('panel.schedules.index', { new: 1 }),
+        };
     const newPatient = () =>
-        a.patients && { key: 'new_patient', icon: 'ti ti-user-plus', label: props.t.btn_new_patient, url: route('panel.patients.index', { new: 1 }) };
-    const bi = () => a.financial && { key: 'bi', icon: 'ti ti-chart-bar', label: props.t.action_open_bi, url: route('panel.financial.bi.index') };
+        a.patients && {
+            key: 'new_patient',
+            icon: 'ti ti-user-plus',
+            label: props.t.btn_new_patient,
+            url: route('panel.patients.index', { new: 1 }),
+        };
+    const bi = () =>
+        a.financial && {
+            key: 'bi',
+            icon: 'ti ti-chart-bar',
+            label: props.t.action_open_bi,
+            url: route('panel.financial.bi.index'),
+        };
 
     switch (props.profile) {
         case 'doctor':
             if (props.nextPatient?.attend_url && !props.nextVisible) {
-                list.push({ key: 'attend', icon: 'ti ti-player-play', label: props.t.btn_start_attendance, url: props.nextPatient.attend_url });
+                list.push({
+                    key: 'attend',
+                    icon: 'ti ti-player-play',
+                    label: props.t.btn_start_attendance,
+                    url: props.nextPatient.attend_url,
+                });
             }
             if (a.schedules && !props.doctorMissing) {
-                list.push({ key: 'my_schedule', icon: 'ti ti-calendar', label: props.t.action_my_schedule, url: route('panel.schedules.index') });
+                list.push({
+                    key: 'my_schedule',
+                    icon: 'ti ti-calendar',
+                    label: props.t.action_my_schedule,
+                    url: route('panel.schedules.index'),
+                });
             }
             break;
         case 'secretary':
@@ -111,7 +137,12 @@ const actions = computed(() => {
             break;
         case 'financial':
             if (a.financial) {
-                list.push({ key: 'new_cash_entry', icon: 'ti ti-plus', label: props.t.action_new_cash_entry, url: route('panel.financial.cash-flow.index', { new: 1 }) });
+                list.push({
+                    key: 'new_cash_entry',
+                    icon: 'ti ti-plus',
+                    label: props.t.action_new_cash_entry,
+                    url: route('panel.financial.cash-flow.index', { new: 1 }),
+                });
             }
             list.push(bi());
             break;

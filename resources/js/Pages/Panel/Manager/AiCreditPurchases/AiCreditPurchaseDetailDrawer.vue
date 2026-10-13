@@ -66,7 +66,7 @@ async function loadDetail() {
         detail.value = json.purchase;
     } catch (e) {
         errorMsg.value = e.message;
-        // eslint-disable-next-line no-console
+
         console.error('[AiCreditPurchaseDetail] falha ao carregar detalhe:', e);
     } finally {
         loading.value = false;

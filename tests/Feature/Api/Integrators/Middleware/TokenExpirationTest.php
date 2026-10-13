@@ -11,7 +11,7 @@ describe('Middleware ApiCheckTokenExpiration', function () {
         $token = $ctx['integratorUser']->createToken(
             'integrator-token',
             ['integrator_id:' . $ctx['integrator']->id],
-            Carbon::now()->subHour()
+            Carbon::now()->subHour(),
         );
 
         $this->getJson('/api/integrators/v1/patients', [
@@ -27,7 +27,7 @@ describe('Middleware ApiCheckTokenExpiration', function () {
         $token = $ctx['integratorUser']->createToken(
             'integrator-token',
             ['integrator_id:' . $ctx['integrator']->id],
-            Carbon::now()->addDays(7)
+            Carbon::now()->addDays(7),
         );
 
         // Simular último uso há 6 dias atrás (mais de 3 dias úteis)
@@ -51,7 +51,7 @@ describe('Middleware ApiCheckTokenExpiration', function () {
         $token     = $ctx['integratorUser']->createToken(
             'integrator-token',
             ['integrator_id:' . $ctx['integrator']->id],
-            $expiresAt
+            $expiresAt,
         );
 
         $oldExpiresAt = $expiresAt->copy();

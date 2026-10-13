@@ -151,10 +151,10 @@ class MigrateIolLensesToStockCommand extends Command
                     'name'                => $extra->model_name,
                     'manufacturer'        => $extra->manufacturer,
                     'unit'                => 'un',
-                    'is_opm'     => true,
-                    'sale_price' => $extra->price,
-                    'image_path' => $extra->image_path,
-                    'active'     => (bool) $extra->active,
+                    'is_opm'              => true,
+                    'sale_price'          => $extra->price,
+                    'image_path'          => $extra->image_path,
+                    'active'              => (bool) $extra->active,
                 ]);
 
                 DB::table('entity_iol_lenses')
@@ -240,7 +240,7 @@ class MigrateIolLensesToStockCommand extends Command
                 }
 
                 EntityProduct::where('id', $row->product_id)->update($update);
-                $this->line("  ✓ produto {$row->product_id}: completado ".implode(', ', array_keys($update)));
+                $this->line("  ✓ produto {$row->product_id}: completado " . implode(', ', array_keys($update)));
             }
         });
     }

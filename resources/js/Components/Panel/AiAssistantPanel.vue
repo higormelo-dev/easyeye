@@ -1035,7 +1035,7 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
             </h5>
         </template>
 
-        <div class="ai-panel-body" :class="{ 'd-flex gap-3': showSidePreview }" @keydown="onKeydown" tabindex="-1">
+        <div class="ai-panel-body" :class="{ 'd-flex gap-3': showSidePreview }" tabindex="-1" @keydown="onKeydown">
             <!-- F1 — Preview lateral de imagens (eye_image flow) -->
             <aside v-if="showSidePreview" class="ai-side-preview" style="width: 560px; flex-shrink: 0">
                 <h6 class="text-muted small mb-2">

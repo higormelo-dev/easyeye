@@ -165,7 +165,13 @@ function dppAiRun(Entity $entity, User $requester, AiRunStatus $status, array $a
             'ai_run_id'       => $run->id,
             'patient_exam_id' => $exam->id,
             'entity_id'       => $entity->id,
-            'created_at'      => now(),
+            // Exame DE FATO analisado — scopeReported()/scopePendingReport()
+            // só consideram "laudado via IA" com este outcome preenchido e
+            // diferente de SKIPPED_UNRECOGNIZED_LAYOUT (Fase 5 / revisão
+            // adversarial Codex). Produção preenche via
+            // AiRunExecutionService::resolveImages(); aqui é direto.
+            'image_deidentification' => 'oculus_pentacam_panel_a_pt',
+            'created_at'             => now(),
         ]);
     }
 

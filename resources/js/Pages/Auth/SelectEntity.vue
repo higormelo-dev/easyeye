@@ -45,7 +45,7 @@ function logout() {
             {{ form.errors.entity_user_id }}
         </div>
 
-        <form @submit.prevent="submit" novalidate>
+        <form novalidate @submit.prevent="submit">
             <div class="mb-4">
                 <label class="form-label">{{ t.select_entity }} <span style="color: #ef4444">*</span></label>
                 <SearchSelect

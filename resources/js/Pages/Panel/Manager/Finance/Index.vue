@@ -185,11 +185,11 @@ function askChat(text) {
             <div v-if="showCustomPicker" class="d-flex align-items-end gap-2 mb-3 pf-custom-period">
                 <div>
                     <label class="form-label small mb-1">{{ t.period.from }}</label>
-                    <input type="date" v-model="customFrom" class="form-control form-control-sm" />
+                    <input v-model="customFrom" type="date" class="form-control form-control-sm" />
                 </div>
                 <div>
                     <label class="form-label small mb-1">{{ t.period.to }}</label>
-                    <input type="date" v-model="customTo" class="form-control form-control-sm" />
+                    <input v-model="customTo" type="date" class="form-control form-control-sm" />
                 </div>
                 <button type="button" class="btn btn-primary btn-sm" @click="applyCustomPeriod">
                     {{ t.period.apply }}
@@ -485,10 +485,10 @@ function askChat(text) {
                             </div>
                             <div class="form-check mb-2">
                                 <input
+                                    id="pf-recurring"
                                     v-model="expenseForm.recurring"
                                     type="checkbox"
                                     class="form-check-input"
-                                    id="pf-recurring"
                                 />
                                 <label class="form-check-label small" for="pf-recurring">{{
                                     t.expenses.recurring

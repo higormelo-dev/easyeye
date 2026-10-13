@@ -45,7 +45,12 @@ const cur = computed(() => month.value?.current ?? {});
 const prev = computed(() => month.value?.previous ?? {});
 
 /** Indicador do mês com variação vs. o mesmo intervalo do mês anterior. */
-const monthly = (key, field, label, { format = 'number', kind = 'count', better = 'up', icon, hint, url, tone } = {}) => ({
+const monthly = (
+    key,
+    field,
+    label,
+    { format = 'number', kind = 'count', better = 'up', icon, hint, url, tone } = {},
+) => ({
     key,
     label,
     value: cur.value[field] ?? null,
@@ -72,7 +77,10 @@ const todayCaption = () => {
     const total = Number(props.stats.today_count ?? 0);
     const missed = Number(props.stats.cancelled_today ?? 0);
 
-    return tx('kpi_today_progress', { attended: number(props.stats.attended_today ?? 0), expected: number(total - missed) });
+    return tx('kpi_today_progress', {
+        attended: number(props.stats.attended_today ?? 0),
+        expected: number(total - missed),
+    });
 };
 
 const examsCard = (mine) => ({
@@ -271,7 +279,12 @@ const BUILDERS = {
     },
 
     financial: () => [
-        monthly('income', 'income', props.t.kpi_income, { format: 'money', icon: 'ti ti-cash', tone: 'teal', url: biUrl() }),
+        monthly('income', 'income', props.t.kpi_income, {
+            format: 'money',
+            icon: 'ti ti-cash',
+            tone: 'teal',
+            url: biUrl(),
+        }),
         monthly('billed', 'billed', props.t.kpi_billed, {
             format: 'money',
             icon: 'ti ti-file-invoice',

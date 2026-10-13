@@ -22,7 +22,7 @@ describe('Middleware ApiCheckPlanAccess', function () {
         $token = $integratorUser->createToken(
             'integrator-token',
             ['integrator_id:' . $integrator->id],
-            Carbon::now()->addDays(7)
+            Carbon::now()->addDays(7),
         );
 
         $this->getJson('/api/integrators/v1/patients', [
@@ -53,7 +53,7 @@ describe('Middleware ApiCheckPlanAccess', function () {
         $token = $integratorUser->createToken(
             'integrator-token',
             ['integrator_id:' . $integrator->id],
-            Carbon::now()->addDays(7)
+            Carbon::now()->addDays(7),
         );
 
         $this->getJson('/api/integrators/v1/patients', [

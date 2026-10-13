@@ -323,8 +323,8 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                                 accept=".csv,text/csv"
                                 class="form-control form-control-sm"
                                 :class="{ 'is-invalid': uploadForm.errors.file }"
-                                @change="onFileChange"
                                 required
+                                @change="onFileChange"
                             />
                             <button
                                 type="submit"

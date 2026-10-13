@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 
 /**
  * TinyMceEditor — Wrapper Vue 3 para TinyMCE 8.
@@ -26,6 +27,22 @@ const textareaRef = ref(null);
 let editorInstance = null;
 let syncing = false;
 let usingFallback = false;
+
+const page = usePage();
+
+// Só existe pacote de idioma pt_BR em public/vendor/tinymce-langs/langs7/
+// — pra qualquer outro locale (hoje só 'en'), não apontar language_url pra
+// um arquivo que não existe: deixa o TinyMCE cair no inglês nativo dele.
+const TINYMCE_LANG_FILES = {
+    pt_BR: '/vendor/tinymce-langs/langs7/pt_BR.js',
+};
+
+function resolveTinyMceLanguage() {
+    const locale = page?.props?.locale;
+    const languageUrl = TINYMCE_LANG_FILES[locale];
+
+    return languageUrl ? { language: locale, language_url: languageUrl } : {};
+}
 
 /**
  * Carrega o script TinyMCE global apenas uma vez (cache no window).
@@ -70,8 +87,7 @@ async function initEditor() {
         license_key: 'gpl',
         base_url: '/vendor/tinymce',
         suffix: '.min',
-        language: 'pt_BR',
-        language_url: '/vendor/tinymce-langs/langs7/pt_BR.js',
+        ...resolveTinyMceLanguage(),
         placeholder: props.placeholder,
         plugins: ['lists', 'link', 'code', 'autolink'],
         toolbar: props.toolbar || defaultToolbar,
@@ -120,7 +136,6 @@ onMounted(async () => {
     try {
         await initEditor();
     } catch (e) {
-        // eslint-disable-next-line no-console
         console.warn('[TinyMceEditor] fallback para textarea nativo:', e?.message ?? e);
         bindFallbackTextarea();
     }

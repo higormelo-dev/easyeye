@@ -156,8 +156,12 @@ watch([() => props.days, () => props.t, locale], buildChart, { deep: true });
 <template>
     <div class="db-chart">
         <div class="db-chart__totals">
-            <span><strong>{{ number(totals.attended) }}</strong> {{ t.daily_attended }}</span>
-            <span><strong>{{ number(totals.noshow) }}</strong> {{ t.daily_noshow }}</span>
+            <span
+                ><strong>{{ number(totals.attended) }}</strong> {{ t.daily_attended }}</span
+            >
+            <span
+                ><strong>{{ number(totals.noshow) }}</strong> {{ t.daily_noshow }}</span
+            >
             <span>{{ tx('daily_rate', { rate: number(totals.rate, 1) }) }}</span>
         </div>
         <div class="position-relative" :style="{ height: `${height}px` }">
@@ -178,7 +182,11 @@ watch([() => props.days, () => props.t, locale], buildChart, { deep: true });
 
         <div v-show="showData" :id="tableId" class="table-responsive mt-2 db-chart__table" data-test="daily-data">
             <table class="table table-sm align-middle mb-0">
-                <caption class="visually-hidden">{{ t.trend_daily_title }}</caption>
+                <caption class="visually-hidden">
+                    {{
+                        t.trend_daily_title
+                    }}
+                </caption>
                 <thead>
                     <tr>
                         <th scope="col">{{ t.col_day }}</th>

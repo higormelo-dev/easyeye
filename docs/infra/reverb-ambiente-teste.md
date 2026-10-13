@@ -156,13 +156,22 @@ preservada em redeploy pela Jelastic.
 
 A Jelastic exige uma **linha em branco depois da última entrada** da crontab.
 
-**Um worker só, de propósito.** Os jobs de importação têm `$timeout` de 600 s
-(pacientes, médicos, agenda) e 900 s (medicamentos — envio ou download da CMED — e
-sincronização de convênios/planos com a ANS), maior que o
-`retry_after` da conexão `redis` (90 s, `REDIS_QUEUE_RETRY_AFTER`). Com um
-worker isso não importa. Com dois ou mais, um job que passe de 90 s é
-entregue de novo a outro worker. Antes de subir mais workers, defina
-`REDIS_QUEUE_RETRY_AFTER=960` no `.env` (maior que o maior `$timeout`).
+**Um worker só, de propósito — e `retry_after` acima do maior `$timeout`.** Os
+jobs de importação têm `$timeout` de 600 s (pacientes, médicos, agenda) e 900 s
+(medicamentos — envio ou download da CMED — e sincronização de convênios/planos
+com a ANS). O `retry_after` da conexão `redis` (`REDIS_QUEUE_RETRY_AFTER`) tem
+que ficar **acima** disso: vencido, o job reservado volta para a fila e outro
+worker pega o **mesmo** job enquanto o primeiro ainda roda. Com um worker isso
+não aparece; com dois ou mais, aparece. O padrão do código agora é **960 s**
+(`config/queue.php`, igual ao da conexão `database`), então não é preciso
+definir nada no `.env` — mas um `REDIS_QUEUE_RETRY_AFTER` explícito e menor que
+900 s neste ambiente anula a proteção (remova ou ajuste). Como a config fica em
+cache aqui, o deploy que traz o padrão novo precisa de `php artisan config:cache`
+e `php artisan queue:restart`. Contrapartida: um worker que morre no meio de um
+job (OOM, `kill -9`) só devolve esse job à fila depois de `retry_after` (até
+16 min). O teste `tests/Integration/QueueWorkerSmokeTest.php` trava o
+`retry_after` acima do maior `$timeout`, e `tests/Integration/QueueRedisReservationTest.php`
+confere, com um worker real no Redis, o prazo da reserva.
 
 **Memória do nó.** O OOM killer do kernel mata o worker se o processo
 estourar a RAM do nó. Isso acontece mesmo abaixo do `memory_limit` do PHP
@@ -288,8 +297,8 @@ com IA" em Manager → Medicamentos. No deploy que o traz: `php artisan migrate
 --force` (colunas de revisão em `medicines` + tabelas
 `medicine_posology_batches`/`_groups`), `php artisan queue:restart` e
 `php artisan reverb:restart`. O job agenda a própria continuação a cada
-`MEDICINE_POSOLOGY_BATCH_JOB_BUDGET` segundos (padrão 45, abaixo do
-`retry_after` de 90 s da fila).
+`MEDICINE_POSOLOGY_BATCH_JOB_BUDGET` segundos (padrão 45, bem abaixo do
+`retry_after` de 960 s da fila).
 
 ## 4. Como verificar
 

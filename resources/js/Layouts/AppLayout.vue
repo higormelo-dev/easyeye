@@ -341,7 +341,7 @@ onUnmounted(() => panelTour.stop());
                     <a id="mobile_btn" class="mobile-btn" href="#sidebar" data-tour="mobile-menu">
                         <i class="ti ti-menu-deep fs-24"></i>
                     </a>
-                    <button class="sidenav-toggle-btn btn border-0 p-0 active" id="toggle_btn2">
+                    <button id="toggle_btn2" class="sidenav-toggle-btn btn border-0 p-0 active">
                         <i class="ti ti-arrow-right"></i>
                     </button>
                 </div>
@@ -365,7 +365,7 @@ onUnmounted(() => panelTour.stop());
                     </div>
 
                     <!-- Locale selector -->
-                    <div class="header-item" v-if="locales.length > 1" data-tour="locale">
+                    <div v-if="locales.length > 1" class="header-item" data-tour="locale">
                         <div class="dropdown me-2">
                             <button
                                 class="topbar-link btn btn-icon dropdown-toggle drop-arrow-none"
@@ -466,7 +466,7 @@ onUnmounted(() => panelTour.stop());
         <!-- ═══════════════════ END HEADER ═══════════════════ -->
 
         <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-        <div class="sidebar" id="sidebar">
+        <div id="sidebar" class="sidebar">
             <div class="sidebar-logo">
                 <div>
                     <a :href="safeRoute('panel.dashboard')" class="logo logo-normal">
@@ -479,7 +479,7 @@ onUnmounted(() => panelTour.stop());
                         <img :src="logoWhiteSvg" alt="EasyEye" />
                     </a>
                 </div>
-                <button class="sidenav-toggle-btn btn border-0 p-0 active" id="toggle_btn" data-tour="sidebar-toggle">
+                <button id="toggle_btn" class="sidenav-toggle-btn btn border-0 p-0 active" data-tour="sidebar-toggle">
                     <i class="ti ti-arrow-left"></i>
                 </button>
                 <button class="sidebar-close">

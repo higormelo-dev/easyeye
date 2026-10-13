@@ -47,7 +47,9 @@ const more = computed(() => Math.max(0, count.value - items.value.length));
                         class="db-list__title"
                         >{{ item.name }}</component
                     >
-                    <span v-if="item.age" class="db-list__sub">{{ tx('birthdays_age', { age: number(item.age) }) }}</span>
+                    <span v-if="item.age" class="db-list__sub">{{
+                        tx('birthdays_age', { age: number(item.age) })
+                    }}</span>
                 </div>
                 <a
                     v-if="item.phone_href"

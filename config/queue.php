@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Default Queue Connection Name
@@ -29,17 +28,25 @@ return [
     */
 
     'connections' => [
-
         'sync' => [
             'driver' => 'sync',
         ],
 
         'database' => [
-            'driver'       => 'database',
-            'connection'   => env('DB_QUEUE_CONNECTION'),
-            'table'        => env('DB_QUEUE_TABLE', 'jobs'),
-            'queue'        => env('DB_QUEUE', 'default'),
-            'retry_after'  => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            'driver'     => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table'      => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue'      => env('DB_QUEUE', 'default'),
+            // Tem que ficar ACIMA do maior $timeout entre os jobs desta
+            // conexão (hoje: 900s em ProcessCovenantImportJob /
+            // ProcessMedicineImportJob) — abaixo disso, o job vira
+            // "disponível de novo" e OUTRO worker pega a MESMA linha
+            // enquanto a 1ª tentativa, legítima, ainda está rodando (achado
+            // via auditoria de encerramento, EE-09). 90s (o antigo default)
+            // só cobria o --timeout da linha de comando do worker, nunca o
+            // timeout maior que os próprios jobs declaram (que tem
+            // precedência — ver Illuminate\Queue\Worker::timeoutForJob()).
+            'retry_after'  => (int) env('DB_QUEUE_RETRY_AFTER', 960),
             'after_commit' => false,
         ],
 
@@ -64,14 +71,20 @@ return [
         ],
 
         'redis' => [
-            'driver'       => 'redis',
-            'connection'   => env('REDIS_QUEUE_CONNECTION', 'default'),
-            'queue'        => env('REDIS_QUEUE', 'default'),
-            'retry_after'  => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'driver'     => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue'      => env('REDIS_QUEUE', 'default'),
+            // Mesma regra da conexão 'database' acima: SEMPRE acima do maior
+            // $timeout entre os jobs (900s hoje). No Redis a reserva é um
+            // ZSET (queues:{fila}:reserved) com score = agora + retry_after;
+            // vencida, o job volta pra fila e OUTRO worker (o Supervisor sobe
+            // 2) pega o MESMO job enquanto o 1º, legítimo, ainda roda. Este
+            // era o único default que o EE-09 deixou em 90s — e é a conexão
+            // que o .env.example seleciona (QUEUE_CONNECTION=redis).
+            'retry_after'  => (int) env('REDIS_QUEUE_RETRY_AFTER', 960),
             'block_for'    => null,
             'after_commit' => false,
         ],
-
     ],
 
     /*
@@ -108,5 +121,4 @@ return [
         'database' => env('DB_CONNECTION', 'sqlite'),
         'table'    => 'failed_jobs',
     ],
-
 ];

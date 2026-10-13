@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Permission;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,17 +22,16 @@ use Illuminate\Support\Str;
  * enum no futuro continuam entrando pelo PermissionsSeeder (fresh installs)
  * ou por uma nova migration de sync como esta.
  */
-return new class extends Migration
-{
+return new class() extends Migration {
     public function up(): void
     {
         // Guard: um migrate rodado fora do contexto do app (enum removido ou
         // renomeado no futuro) não pode quebrar a cadeia de migrations.
-        if (! class_exists(\App\Enums\Permission::class)) {
+        if (! class_exists(Permission::class)) {
             return;
         }
 
-        foreach (\App\Enums\Permission::cases() as $case) {
+        foreach (Permission::cases() as $case) {
             $exists = DB::table('permissions')->where('key', $case->value)->exists();
 
             if ($exists) {

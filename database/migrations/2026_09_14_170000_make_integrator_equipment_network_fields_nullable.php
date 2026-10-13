@@ -15,8 +15,7 @@ use Illuminate\Support\Facades\DB;
  * por câmera ligada ao laptop. Exigir IP/MAC só criava atrito no cadastro e
  * dados inventados. Ficam como metadados opcionais de inventário.
  */
-return new class extends Migration
-{
+return new class() extends Migration {
     public function up(): void
     {
         DB::statement('ALTER TABLE entity_integrator_equipments ALTER COLUMN ip DROP NOT NULL');

@@ -146,8 +146,8 @@ async function move(p, dir) {
                                     type="button"
                                     class="btn btn-sm btn-outline-secondary py-0 px-1"
                                     :disabled="i === 0"
-                                    @click="move(p, -1)"
                                     :title="lbl('move_up', 'Mover para cima')"
+                                    @click="move(p, -1)"
                                 >
                                     <i class="ti ti-chevron-up" aria-hidden="true"></i>
                                 </button>
@@ -155,8 +155,8 @@ async function move(p, dir) {
                                     type="button"
                                     class="btn btn-sm btn-outline-secondary py-0 px-1"
                                     :disabled="i === items.length - 1"
-                                    @click="move(p, 1)"
                                     :title="lbl('move_down', 'Mover para baixo')"
+                                    @click="move(p, 1)"
                                 >
                                     <i class="ti ti-chevron-down" aria-hidden="true"></i>
                                 </button>

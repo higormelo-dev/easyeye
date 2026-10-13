@@ -3,6 +3,7 @@
 use Database\Seeders\AiModelPriceSeeder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\{Cache, DB};
+use PHPUnit\Framework\TestCase;
 
 /**
  * Atualiza o catálogo de modelos/preços de IA em QUALQUER ambiente no deploy
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\{Cache, DB};
  *    modelo aposentado — o efetivo volta ao fallback do env. Sem isso o run/
  *    teste de conexão continua chamando um modelo morto (404 visto no teste).
  */
-return new class extends Migration {
+return new class() extends Migration {
     private const RETIRED = [
         'gemini-1.5-flash',
         'gemini-1.5-pro',
@@ -37,7 +38,7 @@ return new class extends Migration {
         // APP_ENV=testing e a migration ficaria como "Ran" sem fazer nada.
         // Detecção: TestCase JÁ CARREGADA (autoload=false) — verdadeiro só
         // dentro do runner de testes, nunca num artisan migrate de servidor.
-        if (class_exists(\PHPUnit\Framework\TestCase::class, false)) {
+        if (class_exists(TestCase::class, false)) {
             return;
         }
 

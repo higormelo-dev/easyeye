@@ -28,8 +28,14 @@ it('serializes mixed legacy hardware writes and operational compare-and-swap', f
     expect(DB::table('integrator_equipment_operations')->where('operation_id', $operation)->count())->toBe(0);
 });
 
-/** Separate processes and PDO connections start together, with no outer test transaction. */
-function p2Concurrent(array $jobs): array
+/**
+ * Separate processes and PDO connections start together, with no outer test transaction.
+ *
+ * $waitTimeoutSeconds: só o prazo de ESPERAR O FILHO SAIR (EE-16) — os
+ * outros 2 prazos da função (barreira "ready"/"go") ficam fixos em 10s,
+ * sem relação com um filho travado depois que o job já começou.
+ */
+function p2Concurrent(array $jobs, int $waitTimeoutSeconds = 10): array
 {
     if (! function_exists('pcntl_fork')) {
         test()->markTestSkipped('pcntl required');
@@ -85,7 +91,44 @@ function p2Concurrent(array $jobs): array
         $results = [];
 
         foreach ($pids as $index => $pid) {
-            pcntl_waitpid($pid, $status);
+            // EE-16 (auditoria 11/10/2026): pcntl_waitpid() bloqueante sem
+            // prazo podia travar a suíte inteira pra sempre se o filho
+            // nunca saísse (travado num lock nativo, deadlock, etc.) — a
+            // 1ª execução da auditoria ficou presa exatamente aqui. Mesmo
+            // padrão de barreira (deadline + WNOHANG + usleep) já usado
+            // acima pra "ready"/"go"; filho que não sai dentro do prazo é
+            // morto e a falha fica legível, nunca um processo órfão.
+            $waitDeadline = microtime(true) + $waitTimeoutSeconds;
+
+            while (true) {
+                $waited = pcntl_waitpid($pid, $status, WNOHANG);
+
+                if ($waited === $pid) {
+                    break;
+                }
+
+                if ($waited === -1) {
+                    throw new RuntimeException("pcntl_waitpid failed for pid {$pid} (job {$index})");
+                }
+
+                if (microtime(true) > $waitDeadline) {
+                    posix_kill($pid, SIGKILL);
+                    pcntl_waitpid($pid, $status); // SIGKILL nunca é ignorado — bloqueia só até o kernel reaproveitar o pid, não indefinidamente.
+
+                    throw new RuntimeException("child {$pid} (job {$index}) did not exit within 10s and was killed — check for a hang in the job or a native dependency");
+                }
+
+                usleep(10000);
+            }
+
+            if (pcntl_wifsignaled($status)) {
+                throw new RuntimeException("child {$pid} (job {$index}) was killed by signal " . pcntl_wtermsig($status));
+            }
+
+            if (! pcntl_wifexited($status) || ! in_array(pcntl_wexitstatus($status), [0, 1], true)) {
+                throw new RuntimeException("child {$pid} (job {$index}) exited with an unexpected status");
+            }
+
             $data = json_decode(file_get_contents($dir . '/' . $index . '.json'), true, flags: JSON_THROW_ON_ERROR);
 
             if (isset($data['error'])) {
@@ -108,6 +151,22 @@ function p2Concurrent(array $jobs): array
         DB::purge();
     }
 }
+
+it('[GAP] filho travado é morto dentro do prazo e produz falha legível, nunca trava a suíte pra sempre — achado via auditoria de encerramento (EE-16)', function () {
+    if (! function_exists('pcntl_fork')) {
+        test()->markTestSkipped('pcntl required');
+    }
+    $start = microtime(true);
+
+    expect(fn () => p2Concurrent([fn () => sleep(999)], waitTimeoutSeconds: 1))
+        ->toThrow(RuntimeException::class, 'did not exit within');
+
+    // Prova que o teste não esperou os 999s do job travado — só o prazo
+    // curto configurado (1s) + a margem de poll (usleep 10ms). Sem o
+    // WNOHANG/deadline (código original), pcntl_waitpid() bloqueante teria
+    // travado esta asserção indefinidamente.
+    expect(microtime(true) - $start)->toBeLessThan(5.0);
+});
 
 it('keeps the first terminal ACK across two committed HTTP requests', function () {
     $ctx     = setupIntegrator();

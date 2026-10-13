@@ -76,7 +76,7 @@ function submitPassword() {
             <div class="card">
                 <div class="card-body">
                     <!-- ── Seção 1: Dados pessoais ──────────────────────────────── -->
-                    <form @submit.prevent="submitProfile" class="border-bottom mb-4 pb-3">
+                    <form class="border-bottom mb-4 pb-3" @submit.prevent="submitProfile">
                         <div class="row align-items-center mb-4">
                             <div class="col-lg-2">
                                 <label class="form-label mb-0 fw-medium">Foto</label>
@@ -171,7 +171,7 @@ function submitPassword() {
                     </form>
 
                     <!-- ── Seção 2: Senha ───────────────────────────────────────── -->
-                    <form @submit.prevent="submitPassword" class="border-bottom mb-4 pb-3">
+                    <form class="border-bottom mb-4 pb-3" @submit.prevent="submitPassword">
                         <h5 class="fw-bold mb-3">Alterar senha</h5>
 
                         <div class="row">

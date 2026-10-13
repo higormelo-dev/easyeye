@@ -1,0 +1,100 @@
+ M .claude/settings.json
+ M app/Domains/AI/Services/AiRunDocumentationService.php
+ M app/Domains/AI/Services/AiRunExecutionService.php
+ M app/Enums/EntityGate.php
+ M app/Enums/ExamSource.php
+ M app/Http/Controllers/ComplianceController.php
+ M app/Http/Controllers/Concerns/AuthorizesEyeImageExams.php
+ M app/Http/Controllers/EyeImageReportController.php
+ M app/Http/Controllers/EyeImagesController.php
+ M app/Http/Controllers/MedicalRecordsController.php
+ M app/Http/Controllers/PatientPortal/ClinicController.php
+ M app/Http/Controllers/PatientPortal/DocumentsController.php
+ M app/Http/Controllers/PreferencesController.php
+ M app/Http/Requests/ImportExternalExamRequest.php
+ M app/Jobs/GenerateExamDerivatives.php
+ M app/Models/MedicalRecordDocumentation.php
+ M app/Models/PatientExam.php
+ M app/Providers/AppServiceProvider.php
+ M app/Providers/AuthServiceProvider.php
+ M app/Services/DataAccessLogService.php
+ M app/Services/ExternalExamImportService.php
+ M app/Services/Lgpd/PatientDataExporter.php
+ M app/Services/MedicalRecordPdfService.php
+ M app/Services/ScheduleService.php
+ M app/Traits/Auditable.php
+ M app/Traits/LogsDataAccess.php
+ M bootstrap/app.php
+ M config/purifier.php
+ M database/seeders/DataFakersSeeder.php
+ M database/seeders/IntegratorTestClinicSeeder.php
+ M lang/en/actions.php
+ M lang/en/ai.php
+ M lang/en/eye_images.php
+ M lang/pt_BR/actions.php
+ M lang/pt_BR/ai.php
+ M lang/pt_BR/eye_images.php
+ M resources/js/Components/Panel/ImportExternalExamModal.vue
+ M resources/js/Pages/Panel/EyeImages/EyeImageReportModal.vue
+ M resources/js/Pages/Panel/EyeImages/Index.vue
+ M resources/js/Pages/Panel/MedicalRecords/Components/MedicalRecordForm.vue
+ M resources/js/Pages/Panel/MedicalRecords/Components/MedicalRecordImagingModal.vue
+ M resources/js/Pages/Panel/Schedules/Index.vue
+ M resources/js/Pages/PatientPortal/DocumentView.vue
+ M resources/views/pdf/documentation.blade.php
+ M routes/web.php
+ M tests/Feature/AI/ApproveWithDiagnosisTest.php
+ M tests/Feature/AI/EyeImageDeidentificationFlowTest.php
+ M tests/Feature/AI/EyeImageReportRecordTest.php
+ M tests/Feature/AuditLogTest.php
+ M tests/Feature/DashboardPerProfileTest.php
+ M tests/Feature/EyeImages/ExamsPendingReportTest.php
+ M tests/Feature/EyeImages/ExternalExamImportTest.php
+ M tests/Feature/EyeImages/EyeImageManualReportTest.php
+ M tests/Feature/EyeImages/EyeImagesFiltersTest.php
+ M tests/Feature/EyeImages/PatientExamsForRecordTest.php
+ M tests/Feature/EyeImages/PdfTextExtractionTest.php
+ M tests/Feature/MedicalRecord/IssuerDoctorRecordTest.php
+ M tests/Feature/PatientPortal/PatientDocumentAccessServiceTest.php
+ M tests/Feature/PreferencesTest.php
+ M tests/Feature/Subscriptions/IntegratorTestClinicSeederTest.php
+ M tests/JavaScript/Panel/EyeImages/EyeImageReportModal.test.js
+ M tests/JavaScript/Panel/MedicalRecords/RecordDocuments.test.js
+ M tests/JavaScript/Panel/Schedules/SchedulesSidebar.test.js
+ M tests/JavaScript/setup.js
+?? app/Enums/DraftStatus.php
+?? app/Http/Controllers/ExternalMedicalReportController.php
+?? app/Http/Controllers/EyeImageReportDraftController.php
+?? app/Http/Controllers/EyeImageReportResendController.php
+?? app/Models/EyeImageReportDraft.php
+?? app/Notifications/RequestingDoctorReportReady.php
+?? app/Services/EyeImages/ReportImageBlockBuilder.php
+?? config/eye_image_capture.php
+?? database/migrations/2026_10_20_000000_create_eye_image_report_drafts_table.php
+?? database/migrations/2026_10_20_000100_add_requesting_doctor_to_medical_record_documentations.php
+?? database/migrations/2026_10_21_000000_add_resolved_doctor_id_to_eye_image_report_drafts.php
+?? database/migrations/2026_10_21_000100_add_revision_counter_to_eye_image_report_drafts.php
+?? database/migrations/2026_10_21_000200_backfill_legacy_image_deidentification.php
+?? docs/auditoria-encerramento-2026-10-11/
+?? resources/js/Pages/Panel/EyeImages/EyeImageReportDraftsModal.vue
+?? routes/external-reports.php
+?? tests/Feature/Compliance/
+?? tests/Feature/EyeImages/BackfillLegacyImageDeidentificationMigrationTest.php
+?? tests/Feature/EyeImages/BrowserCaptureScheduleLinkConcurrencyTest.php
+?? tests/Feature/EyeImages/ExternalMedicalReportViewTest.php
+?? tests/Feature/EyeImages/EyeImageReportDraftTest.php
+?? tests/Feature/EyeImages/EyeImageReportResendTest.php
+?? tests/Feature/EyeImages/MixedOutcomeAiReportDisplayTest.php
+?? tests/Feature/EyeImages/ReportImageBlockBuilderTest.php
+?? tests/Feature/MedicalRecord/DocumentationEagerLoadMemoryTest.php
+?? tests/Feature/PatientPortal/LgpdExportMemoryTest.php
+?? tests/Feature/PatientPortal/PatientPortalClinicDocumentsMemoryTest.php
+?? tests/Feature/Subscriptions/DataFakersSeederSchedulesTest.php
+?? tests/JavaScript/Panel/EyeImages/DraftUnavailableExamsRepair.test.js
+?? tests/JavaScript/Panel/EyeImages/EyeImageReportDraftsModal.test.js
+?? tests/JavaScript/Panel/EyeImages/PedalViewerAdvance.test.js
+?? tests/JavaScript/Panel/EyeImages/PrintModalReorder.test.js
+?? tests/JavaScript/Panel/EyeImages/VideoExamExclusion.test.js
+?? tests/JavaScript/Panel/ImportExternalExamModal.test.js
+?? tests/JavaScript/Panel/MedicalRecords/MedicalRecordImagingModal.test.js
+?? tests/JavaScript/PatientPortal/DocumentView.test.js

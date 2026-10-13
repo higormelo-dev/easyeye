@@ -1,8 +1,13 @@
 <?php
+
+use App\Models\{Patient, People};
+
 // Remove a paciente de demonstração do manual do médico (e tudo ligado a ela).
-$peOld = App\Models\People::withTrashed()->where('full_name', 'MARIANA COSTA E SILVA')->first();
+$peOld = People::withTrashed()->where('full_name', 'MARIANA COSTA E SILVA')->first();
+
 if ($peOld) {
-    $patOld = App\Models\Patient::withTrashed()->where('person_id', $peOld->id)->first();
+    $patOld = Patient::withTrashed()->where('person_id', $peOld->id)->first();
+
     if ($patOld) {
         // Query builder (não Eloquent) para ignorar o guard de is_locked do
         // Signable no delete — registro assinado no seed do laudo compartilhável.

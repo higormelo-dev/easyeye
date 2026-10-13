@@ -150,7 +150,7 @@ function firstError(field) {
                         {{ t.loading ?? 'Carregando...' }}
                     </div>
 
-                    <form v-else @submit.prevent="submit" class="row g-3">
+                    <form v-else class="row g-3" @submit.prevent="submit">
                         <template v-for="field in fields" :key="field.key">
                             <div :class="field.type === 'checkbox' ? 'col-md-6' : 'col-12'">
                                 <!-- Label -->

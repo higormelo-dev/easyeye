@@ -42,7 +42,7 @@ const hasResults = computed(() => props.summary !== null);
 
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-body py-3">
-                    <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
+                    <form class="row g-2 align-items-end" @submit.prevent="applyFilter">
                         <div class="col-md-3">
                             <label class="form-label small mb-1">De *</label>
                             <input v-model="form.date_from" type="date" class="form-control" required />

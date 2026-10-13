@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use Error;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 use Tests\TestCase;
 
 class ValidationRuleTest extends TestCase
@@ -19,7 +21,7 @@ class ValidationRuleTest extends TestCase
         });
 
         // where() returns the Exists rule for chaining
-        $this->assertInstanceOf(\Illuminate\Validation\Rules\Exists::class, $result);
+        $this->assertInstanceOf(Exists::class, $result);
     }
 
     public function test_exists_rule_issue_reproduction()
@@ -27,7 +29,7 @@ class ValidationRuleTest extends TestCase
         // The error "Method 'orWhereNull' not found in \Illuminate\Validation\Rules\Exists"
         // strongly suggests that ->orWhereNull was called on an Exists object.
 
-        $this->expectException(\Error::class);
+        $this->expectException(Error::class);
         $this->expectExceptionMessage("Call to undefined method Illuminate\Validation\Rules\Exists::orWhereNull()");
 
         $rule = Rule::exists('skin_types', 'id');

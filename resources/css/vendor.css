@@ -33,7 +33,4 @@
 /* ── Flatpickr ─────────────────────────────────────────────────────────────── */
 @import 'flatpickr/dist/flatpickr.min.css';
 
-/* ── Morris.js ─────────────────────────────────────────────────────────────── */
-@import 'morris.js/morris.css';
-
 /* Preclinic theme CSS agora compilado de SCSS em resources/css/system.scss */

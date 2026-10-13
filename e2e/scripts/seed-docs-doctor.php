@@ -9,8 +9,8 @@ use App\Models\{Covenant, Doctor, Entity, EntityUser, ExamType, MedicalRecord, M
 // (Compartilhar laudo) + 2 exames de imagem (Comparar / Compartilhar exame).
 // Idempotente; limpeza: clean-docs-doctor.php.
 
-$ent = Entity::where('name', 'like', '%TESTE INTEGRADOR%')->firstOrFail();
-$ana = Doctor::whereHas('person', fn ($q) => $q->where('email', 'dra.ana@clinicateste.com'))->firstOrFail();
+$ent           = Entity::where('name', 'like', '%TESTE INTEGRADOR%')->firstOrFail();
+$ana           = Doctor::whereHas('person', fn ($q) => $q->where('email', 'dra.ana@clinicateste.com'))->firstOrFail();
 $anaEntityUser = EntityUser::findOrFail($ana->entity_user_id);
 
 require __DIR__ . '/clean-docs-doctor.php';
@@ -61,16 +61,16 @@ $record->sign($anaEntityUser);
 
 $doc = MedicalRecordDocumentation::create([
     'medical_record_id' => $record->id,
-    'patient_id'         => $pat->id,
-    'doctor_id'          => $ana->id,
-    'type'               => DocumentationType::Certificate,
-    'title'              => 'Atestado Médico',
-    'content'            => '<p>CY-DEMO: atestado de comparecimento — 1 dia.</p>',
+    'patient_id'        => $pat->id,
+    'doctor_id'         => $ana->id,
+    'type'              => DocumentationType::Certificate,
+    'title'             => 'Atestado Médico',
+    'content'           => '<p>CY-DEMO: atestado de comparecimento — 1 dia.</p>',
 ]);
 
 // 2 exames de imagem (reaproveita o arquivo de um exame já existente no
 // disco — evita depender de upload real só para a demonstração).
-$src = PatientExam::whereNotNull('archive')->latest()->first();
+$src      = PatientExam::whereNotNull('archive')->latest()->first();
 $examType = ExamType::first();
 
 if ($src) {

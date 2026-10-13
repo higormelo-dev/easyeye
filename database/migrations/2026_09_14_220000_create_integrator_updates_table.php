@@ -15,8 +15,7 @@ use Illuminate\Support\Facades\Schema;
  * sha256 + assinatura ed25519 (gerada offline — a chave privada NUNCA passa
  * pelo SaaS; ver scripts/sign-update.sh no repositório do integrator).
  */
-return new class extends Migration
-{
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('integrator_updates', function (Blueprint $table) {

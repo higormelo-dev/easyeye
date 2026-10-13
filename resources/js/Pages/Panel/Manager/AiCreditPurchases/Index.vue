@@ -624,7 +624,7 @@ function providerIcon(provider) {
                                 <strong class="small">{{ t?.filters?.title ?? 'Filtros' }}</strong>
                             </div>
                             <div class="card-body p-3">
-                                <form @submit.prevent="applyFilters" class="row g-2">
+                                <form class="row g-2" @submit.prevent="applyFilters">
                                     <div class="col-6">
                                         <label class="form-label small mb-1">{{
                                             t?.filters?.status ?? 'Status'
@@ -719,8 +719,8 @@ function providerIcon(provider) {
                                 <tr
                                     v-for="p in purchases.data"
                                     :key="p.id"
-                                    @click="openDetail(p)"
                                     style="cursor: pointer"
+                                    @click="openDetail(p)"
                                 >
                                     <td class="ps-3">
                                         <div class="small">{{ p.created_at }}</div>

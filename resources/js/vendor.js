@@ -7,9 +7,8 @@
  * Load order:
  *   1. jQuery (npm) → window.jQuery / window.$
  *   2. Bootstrap JS
- *   3. Raphael + Morris (charts)
- *   4. Theme script (preclinic-script)
- *   5. All other plugins (DataTables, SweetAlert2, Flatpickr, etc.)
+ *   3. Theme script (preclinic-script)
+ *   4. All other plugins (DataTables, SweetAlert2, Flatpickr, etc.)
  */
 
 // ── jQuery (MUST be first — exposes window.$ / window.jQuery) ─────────────────
@@ -18,11 +17,6 @@ import './jquery-global.js';
 // ── Bootstrap 5 JS ───────────────────────────────────────────────────────────
 import * as bootstrap from 'bootstrap';
 window.bootstrap = bootstrap;
-
-// ── Raphael + Morris (dashboard charts) ───────────────────────────────────────
-import Raphael from 'raphael';
-window.Raphael = Raphael;
-import 'morris.js/morris.js';
 
 // ── DataTables + responsive extension ────────────────────────────────────────
 // MUST come before preclinic-script.js (which checks for $.fn.DataTable)

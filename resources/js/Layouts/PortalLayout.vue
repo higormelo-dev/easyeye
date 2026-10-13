@@ -62,7 +62,7 @@ function isActive(routeNameStart) {
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
-                <div class="collapse navbar-collapse" id="portalNav">
+                <div id="portalNav" class="collapse navbar-collapse">
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item">
                             <Link

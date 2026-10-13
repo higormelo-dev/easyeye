@@ -41,7 +41,7 @@ describe('GET /api/integrators/v1/examtypes', function () {
 
         $response = $this->getJson(
             '/api/integrators/v1/examtypes?search=FUND',
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);
@@ -53,7 +53,7 @@ describe('GET /api/integrators/v1/examtypes', function () {
 
         $response = $this->getJson(
             '/api/integrators/v1/examtypes?search=1',
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(2);
@@ -64,7 +64,7 @@ describe('GET /api/integrators/v1/examtypes', function () {
 
         $response = $this->getJson(
             '/api/integrators/v1/examtypes?per_page=999',
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.per_page'))->toBeLessThanOrEqual(100);
@@ -85,7 +85,7 @@ describe('GET /api/integrators/v1/examtypes/{id}', function () {
     it('shows exam type by UUID', function () {
         $this->getJson(
             "/api/integrators/v1/examtypes/{$this->examType->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->examType->id]);
     });
@@ -93,7 +93,7 @@ describe('GET /api/integrators/v1/examtypes/{id}', function () {
     it('shows exam type by code', function () {
         $this->getJson(
             "/api/integrators/v1/examtypes/{$this->examType->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->examType->id]);
     });
@@ -103,7 +103,7 @@ describe('GET /api/integrators/v1/examtypes/{id}', function () {
 
         $this->getJson(
             "/api/integrators/v1/examtypes/{$numericPart}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->examType->id]);
     });
@@ -113,7 +113,7 @@ describe('GET /api/integrators/v1/examtypes/{id}', function () {
 
         $this->getJson(
             "/api/integrators/v1/examtypes/{$entityExam->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $entityExam->id]);
     });
@@ -121,7 +121,7 @@ describe('GET /api/integrators/v1/examtypes/{id}', function () {
     it('returns 404 for non-existent exam type', function () {
         $this->getJson(
             '/api/integrators/v1/examtypes/ETP-NAOEXISTE',
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
@@ -131,7 +131,7 @@ describe('GET /api/integrators/v1/examtypes/{id}', function () {
 
         $this->getJson(
             "/api/integrators/v1/examtypes/{$examType->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 

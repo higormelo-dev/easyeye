@@ -420,11 +420,11 @@ async function rejectRun() {
 
                     <!-- Onda 3, P4 — Métricas operacionais ─────────────── -->
                     <div
-                        class="col-md-4"
                         v-if="
                             analytics.avg_approve_time_seconds !== null &&
                             analytics.avg_approve_time_seconds !== undefined
                         "
+                        class="col-md-4"
                     >
                         <div class="border rounded p-3 h-100 bg-white">
                             <div class="text-muted fs-13 mb-1">
@@ -436,8 +436,8 @@ async function rejectRun() {
                         </div>
                     </div>
                     <div
-                        class="col-md-4"
                         v-if="analytics.avg_cost_per_record !== null && analytics.avg_cost_per_record !== undefined"
+                        class="col-md-4"
                     >
                         <div class="border rounded p-3 h-100 bg-white">
                             <div class="text-muted fs-13 mb-1">
@@ -446,7 +446,7 @@ async function rejectRun() {
                             <div class="fs-3 fw-bold text-info">{{ analytics.avg_cost_per_record }} cr</div>
                         </div>
                     </div>
-                    <div class="col-12" v-if="analytics.by_doctor?.length">
+                    <div v-if="analytics.by_doctor?.length" class="col-12">
                         <h6 class="fw-semibold fs-13 mb-2">
                             {{ label('dashboard_by_doctor', 'Médicos mais ativos') }}
                         </h6>
@@ -477,7 +477,7 @@ async function rejectRun() {
                     </div>
 
                     <!-- Top runs por custo -->
-                    <div class="col-12" v-if="analytics.top_runs?.length">
+                    <div v-if="analytics.top_runs?.length" class="col-12">
                         <h6 class="fw-semibold fs-13 mb-2">Top 5 execuções por custo</h6>
                         <div class="table-responsive">
                             <table class="table table-sm table-hover align-middle mb-0">
@@ -615,19 +615,19 @@ async function rejectRun() {
                                  fluxo de imagem ocular; runs de prontuário/texto não têm exame
                                  vinculado, então esta seção some nesse caso). -->
                             <template v-if="selectedRun.exam_context">
-                                <div class="mb-2" v-if="selectedRun.exam_context.exam_types?.length">
+                                <div v-if="selectedRun.exam_context.exam_types?.length" class="mb-2">
                                     <strong>{{ label('exam_type', 'Tipo de exame') }}:</strong>
                                     {{ selectedRun.exam_context.exam_types.join(', ') }}
                                 </div>
-                                <div class="mb-2" v-if="selectedRun.exam_context.exam_date">
+                                <div v-if="selectedRun.exam_context.exam_date" class="mb-2">
                                     <strong>{{ label('exam_date', 'Data do exame') }}:</strong>
                                     {{ selectedRun.exam_context.exam_date }}
                                 </div>
-                                <div class="mb-2" v-if="selectedRun.exam_context.doctors?.length">
+                                <div v-if="selectedRun.exam_context.doctors?.length" class="mb-2">
                                     <strong>{{ label('exam_doctor', 'Médico responsável') }}:</strong>
                                     {{ selectedRun.exam_context.doctors.join(', ') }}
                                 </div>
-                                <div class="mb-2" v-if="selectedRun.exam_context.diagnoses?.length">
+                                <div v-if="selectedRun.exam_context.diagnoses?.length" class="mb-2">
                                     <strong>{{ label('exam_diagnosis', 'Diagnóstico') }}:</strong>
                                     <span
                                         v-for="(d, i) in selectedRun.exam_context.diagnoses"
@@ -644,7 +644,7 @@ async function rejectRun() {
                                 </div>
                             </template>
 
-                            <div class="mb-2" v-if="selectedRun.analysis_summary">
+                            <div v-if="selectedRun.analysis_summary" class="mb-2">
                                 <strong>{{ label('analysis_summary', 'Resumo da análise') }}:</strong>
                                 <div class="text-muted fs-13" style="white-space: pre-wrap">
                                     {{ selectedRun.analysis_summary }}
@@ -654,7 +654,7 @@ async function rejectRun() {
                             <label class="form-label mt-2">{{ label('editable_draft', 'Rascunho editável') }}</label>
                             <textarea v-model="draftOutput" rows="8" class="form-control"></textarea>
 
-                            <div class="mt-3 d-flex gap-2" v-if="canApproveOrReject">
+                            <div v-if="canApproveOrReject" class="mt-3 d-flex gap-2">
                                 <button class="btn btn-success btn-sm" @click="approveRun">
                                     <i class="ti ti-check me-1"></i>{{ label('approve') }}
                                 </button>
@@ -663,7 +663,7 @@ async function rejectRun() {
                                 </button>
                             </div>
 
-                            <div class="mt-2" v-if="canApproveOrReject">
+                            <div v-if="canApproveOrReject" class="mt-2">
                                 <label class="form-label">{{
                                     label('rejection_reason_optional', 'Motivo da rejeição (opcional)')
                                 }}</label>

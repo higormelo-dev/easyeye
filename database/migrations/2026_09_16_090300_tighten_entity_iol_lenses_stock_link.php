@@ -35,7 +35,7 @@ return new class() extends Migration {
 
         if ($missing > 0) {
             throw new RuntimeException(
-                "entity_iol_lenses tem {$missing} linha(s) sem entity_product_id. ".
+                "entity_iol_lenses tem {$missing} linha(s) sem entity_product_id. " .
                 'Rode "php artisan iol-lenses:migrate-to-stock" (e confirme 0 pendências) antes de aplicar esta migration.',
             );
         }
@@ -49,8 +49,8 @@ return new class() extends Migration {
 
         if ($duplicated > 0) {
             throw new RuntimeException(
-                "entity_iol_lenses tem {$duplicated} entity_product_id duplicado(s) entre lentes diferentes — ".
-                'a constraint UNIQUE desta migration vai falhar. Resolva as duplicatas manualmente (ver fase 2 do plano '.
+                "entity_iol_lenses tem {$duplicated} entity_product_id duplicado(s) entre lentes diferentes — " .
+                'a constraint UNIQUE desta migration vai falhar. Resolva as duplicatas manualmente (ver fase 2 do plano ' .
                 '— nunca fundir silenciosamente, clonar o EntityProduct pra segunda lente) antes de reaplicar.',
             );
         }

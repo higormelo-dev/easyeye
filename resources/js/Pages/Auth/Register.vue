@@ -438,7 +438,7 @@ const showPwd2 = ref(false);
                         <!-- ══ Step 1 ══ -->
                         <Transition name="reg-fade" mode="out-in">
                             <div v-if="step === 1" key="step1">
-                                <form @submit.prevent="nextStep" novalidate>
+                                <form novalidate @submit.prevent="nextStep">
                                     <div class="reg-field">
                                         <label class="reg-label"
                                             >{{ tAuth.register?.name }} <span class="req">*</span></label
@@ -575,7 +575,7 @@ const showPwd2 = ref(false);
 
                             <!-- ══ Step 2 ══ -->
                             <div v-else-if="step === 2" key="step2">
-                                <form @submit.prevent="submit" novalidate>
+                                <form novalidate @submit.prevent="submit">
                                     <div class="reg-field">
                                         <label class="reg-label"
                                             >{{ tAuth.register?.company_name }} <span class="req">*</span></label

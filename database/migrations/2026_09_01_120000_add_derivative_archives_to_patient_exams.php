@@ -16,8 +16,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * O arquivo original em `archive` permanece intocado (fonte de verdade).
  */
-return new class extends Migration
-{
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('patient_exams', function (Blueprint $table): void {

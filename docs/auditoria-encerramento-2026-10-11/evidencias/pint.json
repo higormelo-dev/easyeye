@@ -1,0 +1,286 @@
+{
+  "result": "fail",
+  "files": [
+    {
+      "path": "app/Services/Lgpd/PatientDataExporter.php",
+      "fixers": [
+        "unary_operator_spaces",
+        "not_operator_with_successor_space",
+        "binary_operator_spaces"
+      ]
+    },
+    {
+      "path": "app/Console/Commands/MigrateIolLensesToStockCommand.php",
+      "fixers": [
+        "unary_operator_spaces",
+        "concat_space",
+        "not_operator_with_successor_space",
+        "binary_operator_spaces"
+      ]
+    },
+    {
+      "path": "tests/Feature/Api/Integrators/Middleware/TokenExpirationTest.php",
+      "fixers": [
+        "trailing_comma_in_multiline"
+      ]
+    },
+    {
+      "path": "tests/Feature/Api/Integrators/Middleware/PlanAccessTest.php",
+      "fixers": [
+        "trailing_comma_in_multiline"
+      ]
+    },
+    {
+      "path": "tests/Feature/Api/Integrators/ExamTypesTest.php",
+      "fixers": [
+        "trailing_comma_in_multiline"
+      ]
+    },
+    {
+      "path": "tests/Feature/Controllers/SchedulesUpdateSituationTest.php",
+      "fixers": [
+        "fully_qualified_strict_types"
+      ]
+    },
+    {
+      "path": "tests/Feature/Billing/GatewayResolverTest.php",
+      "fixers": [
+        "group_import",
+        "ordered_imports",
+        "binary_operator_spaces",
+        "single_blank_line_at_eof"
+      ]
+    },
+    {
+      "path": "tests/Feature/PatientPortal/LgpdExportMemoryTest.php",
+      "fixers": [
+        "fully_qualified_strict_types"
+      ]
+    },
+    {
+      "path": "tests/Feature/Auth/EmailVerificationTest.php",
+      "fixers": [
+        "trailing_comma_in_multiline"
+      ]
+    },
+    {
+      "path": "tests/Feature/ValidationRuleTest.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "global_namespace_import",
+        "ordered_imports"
+      ]
+    },
+    {
+      "path": "tests/Feature/Console/MigrateIolLensesToStockCommandTest.php",
+      "fixers": [
+        "binary_operator_spaces"
+      ]
+    },
+    {
+      "path": "tests/TestCase.php",
+      "fixers": [
+        "no_empty_comment",
+        "no_blank_lines_after_class_opening"
+      ]
+    },
+    {
+      "path": "database/migrations/2026_09_01_120000_add_derivative_archives_to_patient_exams.php",
+      "fixers": [
+        "new_with_parentheses",
+        "class_definition"
+      ]
+    },
+    {
+      "path": "database/migrations/2026_09_14_220000_create_integrator_updates_table.php",
+      "fixers": [
+        "new_with_parentheses",
+        "class_definition"
+      ]
+    },
+    {
+      "path": "database/migrations/2026_09_14_170000_make_integrator_equipment_network_fields_nullable.php",
+      "fixers": [
+        "new_with_parentheses",
+        "class_definition"
+      ]
+    },
+    {
+      "path": "database/migrations/2026_08_18_110000_fix_visual_acuity_types_scale_order.php",
+      "fixers": [
+        "new_with_parentheses",
+        "class_definition"
+      ]
+    },
+    {
+      "path": "database/migrations/2026_09_16_090300_tighten_entity_iol_lenses_stock_link.php",
+      "fixers": [
+        "concat_space"
+      ]
+    },
+    {
+      "path": "database/migrations/2026_08_24_120000_sync_permissions_catalog_from_enum.php",
+      "fixers": [
+        "new_with_parentheses",
+        "class_definition",
+        "fully_qualified_strict_types",
+        "unary_operator_spaces",
+        "not_operator_with_successor_space",
+        "ordered_imports"
+      ]
+    },
+    {
+      "path": "database/migrations/2026_08_31_180000_refresh_ai_model_price_catalog.php",
+      "fixers": [
+        "new_with_parentheses",
+        "fully_qualified_strict_types",
+        "unary_operator_spaces",
+        "not_operator_with_successor_space"
+      ]
+    },
+    {
+      "path": "e2e/scripts/clean-docs-financial.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "single_line_after_imports"
+      ]
+    },
+    {
+      "path": "e2e/scripts/clean-cyadm.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports",
+        "blank_line_before_statement",
+        "ordered_imports"
+      ]
+    },
+    {
+      "path": "e2e/scripts/clean-cydoc.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports",
+        "blank_line_before_statement"
+      ]
+    },
+    {
+      "path": "e2e/scripts/seed-cymed.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports",
+        "binary_operator_spaces"
+      ]
+    },
+    {
+      "path": "e2e/scripts/seed-docs-doctor.php",
+      "fixers": [
+        "unary_operator_spaces",
+        "not_operator_with_successor_space",
+        "binary_operator_spaces"
+      ]
+    },
+    {
+      "path": "e2e/scripts/clean-cymed.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports",
+        "blank_line_before_statement"
+      ]
+    },
+    {
+      "path": "e2e/scripts/seed-docs-financial.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports",
+        "ordered_imports",
+        "binary_operator_spaces"
+      ]
+    },
+    {
+      "path": "e2e/scripts/clean-docs-doctor.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports",
+        "blank_line_before_statement"
+      ]
+    },
+    {
+      "path": "e2e/scripts/seed-cyadm.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports",
+        "ordered_imports",
+        "binary_operator_spaces"
+      ]
+    },
+    {
+      "path": "e2e/scripts/mr-url-cydoc.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports"
+      ]
+    },
+    {
+      "path": "e2e/scripts/seed-docs-patient.php",
+      "fixers": [
+        "blank_line_before_statement",
+        "binary_operator_spaces"
+      ]
+    },
+    {
+      "path": "config/datatables.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "group_import",
+        "single_line_after_imports"
+      ]
+    },
+    {
+      "path": "config/google2fa.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "single_line_after_imports",
+        "no_extra_blank_lines"
+      ]
+    },
+    {
+      "path": "config/logging.php",
+      "fixers": [
+        "no_extra_blank_lines"
+      ]
+    },
+    {
+      "path": "config/database.php",
+      "fixers": [
+        "no_extra_blank_lines"
+      ]
+    },
+    {
+      "path": "config/sanctum.php",
+      "fixers": [
+        "fully_qualified_strict_types",
+        "no_extra_blank_lines",
+        "ordered_imports"
+      ]
+    },
+    {
+      "path": "config/cache.php",
+      "fixers": [
+        "no_extra_blank_lines"
+      ]
+    },
+    {
+      "path": "config/queue.php",
+      "fixers": [
+        "no_extra_blank_lines"
+      ]
+    }
+  ]
+}
