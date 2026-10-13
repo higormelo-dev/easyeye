@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Tiss\Services;
 
 use App\Domains\Tiss\Actions\{AttachGuideToBatchAction, CancelTissBatchAction, CancelTissGuideAction, CloseTissBatchAction, CreateTissBatchAction, CreateTissGuideAction, DetachGuideFromBatchAction, RetryTissBatchAction};
+use App\Domains\Tiss\DTOs\ReceivedTissReturn;
 use App\Domains\Tiss\Jobs\{GenerateTissBatchXmlJob, SendTissBatchJob};
-use App\Domains\Tiss\Models\{TissBatch, TissGuide, TissReturn};
+use App\Domains\Tiss\Models\{TissBatch, TissGuide};
 
 class TissWorkflowService
 {
@@ -95,6 +96,9 @@ class TissWorkflowService
     }
 
     /**
+     * Idempotente por arquivo (ver ReceiveTissResponseService::receive()):
+     * `alreadyImported` no resultado = o arquivo repetido de um retorno já processado.
+     *
      * @param array<string, mixed> $metadata
      */
     public function receiveResponse(
@@ -103,7 +107,7 @@ class TissWorkflowService
         string $xmlContent,
         bool $processSynchronously = false,
         array $metadata = [],
-    ): TissReturn {
+    ): ReceivedTissReturn {
         return $this->receiveTissResponseService->receive(
             entityId: $entityId,
             operatorId: $operatorId,

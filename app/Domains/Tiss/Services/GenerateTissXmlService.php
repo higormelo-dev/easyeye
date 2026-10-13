@@ -4,14 +4,32 @@ declare(strict_types=1);
 
 namespace App\Domains\Tiss\Services;
 
-use App\Domains\Tiss\Enums\{TissGuideStatus, TissXmlDirection, TissXmlStatus};
-use App\Domains\Tiss\Models\{TissBatch, TissXmlDocument};
+use App\Domains\Tiss\Enums\{TissBatchStatus, TissGuideStatus, TissXmlDirection, TissXmlStatus};
+use App\Domains\Tiss\Exceptions\TissBatchCancelledException;
+use App\Domains\Tiss\Models\{TissBatch, TissTransmission, TissXmlDocument};
 use App\Domains\Tiss\Xml\Builders\{V202601TissXmlBuilder, V202603TissXmlBuilder};
 use App\Domains\Tiss\Xml\Contracts\TissXmlBuilder;
+use App\Domains\Tiss\Xml\TissXmlContentFingerprint;
 use Illuminate\Support\Facades\{DB, Storage};
 
 class GenerateTissXmlService
 {
+    /**
+     * Lote cuja mensagem já saiu para a operadora — ou pode ter saído (enviando:
+     * em voo, worker morto, ou SEM RESPOSTA da operadora — entrega em dúvida,
+     * ver SendTissBatchService::finalizeTransmission): o XML enviado é
+     * imutável. Mesmo conjunto que impede cancelar o lote (CancelTissBatchAction)
+     * e tirar guia dele (DetachGuideFromBatchAction::EDITABLE_STATUSES).
+     */
+    public const SENT_STATUSES = [
+        TissBatchStatus::Sending,
+        TissBatchStatus::Sent,
+        TissBatchStatus::Acknowledged,
+        TissBatchStatus::Processed,
+        TissBatchStatus::PartiallyPaid,
+        TissBatchStatus::Paid,
+    ];
+
     public function __construct(
         private readonly ResolveTissVersionService $resolveVersionService,
         private readonly ValidateTissXmlService $validateTissXmlService,
@@ -21,9 +39,49 @@ class GenerateTissXmlService
     ) {
     }
 
+    /**
+     * Gera o XML do lote — exceto quando ele já foi (ou pode ter sido) à
+     * operadora, caso em que devolve o documento existente:
+     *
+     *  1. lote enviando/enviado/processado/pago: o XML enviado é o registro do
+     *     que a operadora recebeu; regerar divergia dele e ainda empurrava o
+     *     lote (e as guias) de "enviado" de volta para "XML pronto";
+     *  2. documento já oferecido ao transporte (há transmissão sobre ele) e
+     *     conteúdo igual ao que sairia agora: o horário do cabeçalho muda a
+     *     cada geração e entra no hash do arquivo — a chave de idempotência
+     *     do envio —, então regerar o MESMO lote criava outra identidade para
+     *     uma mensagem que a operadora talvez já tivesse recebido. Conteúdo
+     *     diferente (guia retirada/corrigida, dado cadastral) continua
+     *     gerando um documento novo.
+     *
+     * Um documento que nunca foi ao transporte continua sendo regerado, com o
+     * horário de agora, como sempre.
+     */
     public function generateBatch(TissBatch $batch): TissXmlDocument
     {
         return DB::transaction(function () use ($batch): TissXmlDocument {
+            // Estado do lote lido JÁ com o lock: um envio que está virando
+            // "enviando" (ou acabou de confirmar) não é atropelado por uma
+            // geração que leu o status antes.
+            TissBatch::query()->forEntity((string) $batch->entity_id)->whereKey($batch->getKey())->lockForUpdate()->firstOrFail();
+            $batch->refresh();
+
+            // Lote CANCELADO (ex.: a geração e o envio já estavam na fila quando o
+            // usuário cancelou): nada a gerar. Seguir regerava o XML das guias
+            // canceladas ainda anexadas, devolvia o lote a "XML pronto" e as guias a
+            // "XML gerado" — e o envio seguinte, sem mais nenhum sinal do
+            // cancelamento, transmitia o que o usuário cancelou (achado via revisão
+            // adversarial Codex, 23ª rodada). Recusa ANTES de qualquer escrita.
+            if ($batch->status === TissBatchStatus::Cancelled) {
+                throw new TissBatchCancelledException(__('tiss_send.batch_cancelled_xml'));
+            }
+
+            $sent = $this->sentDocument($batch);
+
+            if ($sent !== null) {
+                return $sent;
+            }
+
             $batch->loadMissing(['contract.preferredVersion', 'version', 'guides.items', 'entity', 'operator']);
 
             if (! $batch->version) {
@@ -31,6 +89,15 @@ class GenerateTissXmlService
                 $batch->version()->associate($resolvedVersion);
                 $batch->save();
                 $batch->refresh();
+            }
+
+            $builder = $this->resolveBuilder((string) $batch->version?->code);
+            $xml     = $builder->buildBatch($batch);
+
+            $transmitted = $this->transmittedDocumentWithSameContent($batch, $xml);
+
+            if ($transmitted !== null) {
+                return $transmitted;
             }
 
             $previousBatchStatus = $batch->status->value;
@@ -44,9 +111,6 @@ class GenerateTissXmlService
                 previousStatus: $previousBatchStatus,
                 reason: 'Início da geração XML TISS',
             );
-
-            $builder = $this->resolveBuilder((string) $batch->version?->code);
-            $xml     = $builder->buildBatch($batch);
 
             $relativePath = sprintf(
                 'tiss/%s/batches/%s_%s.xml',
@@ -101,6 +165,57 @@ class GenerateTissXmlService
 
             return $xmlDocument;
         });
+    }
+
+    /** Documento do lote que já saiu (ou pode ter saído) para a operadora — null se ainda é regerável. */
+    private function sentDocument(TissBatch $batch): ?TissXmlDocument
+    {
+        if (! in_array($batch->status, self::SENT_STATUSES, true)) {
+            return null;
+        }
+
+        return $this->currentDocument($batch);
+    }
+
+    /**
+     * Documento atual do lote, se já foi oferecido ao transporte, está válido e
+     * tem o mesmo conteúdo do XML que acabou de ser montado.
+     */
+    private function transmittedDocumentWithSameContent(TissBatch $batch, string $xml): ?TissXmlDocument
+    {
+        $current = $this->currentDocument($batch);
+
+        if ($current === null || ! in_array($current->status, [TissXmlStatus::Validated, TissXmlStatus::Signed], true)) {
+            return null;
+        }
+
+        $transmitted = TissTransmission::query()
+            ->forEntity((string) $batch->entity_id)
+            ->where('batch_id', $batch->id)
+            ->where('xml_document_id', $current->id)
+            ->exists();
+
+        if (! $transmitted) {
+            return null;
+        }
+
+        $fingerprint = TissXmlContentFingerprint::of($xml);
+
+        return $fingerprint !== null && $fingerprint === TissXmlContentFingerprint::of((string) $current->xml_content)
+            ? $current
+            : null;
+    }
+
+    private function currentDocument(TissBatch $batch): ?TissXmlDocument
+    {
+        if ($batch->xml_document_id === null) {
+            return null;
+        }
+
+        return TissXmlDocument::query()
+            ->forEntity((string) $batch->entity_id)
+            ->whereKey($batch->xml_document_id)
+            ->first();
     }
 
     private function resolveBuilder(string $versionCode): TissXmlBuilder

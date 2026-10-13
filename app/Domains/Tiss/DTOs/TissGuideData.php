@@ -71,7 +71,13 @@ final readonly class TissGuideData
             beneficiaryCard: $guide->beneficiary_card_number,
             authorizationNumber: $guide->authorization_number,
             totalAmount: (float) $guide->total_amount,
-            items: $guide->items->map(static fn (TissGuideItem $item) => TissGuideItemData::fromModel($item))->all(),
+            // Ordem fixa (id = ordem de criação), nunca a do banco — a guia de
+            // consulta leva o 1º item no XML (ver TissBatchData::fromModel).
+            items: $guide->items
+                ->sortBy('id')
+                ->values()
+                ->map(static fn (TissGuideItem $item) => TissGuideItemData::fromModel($item))
+                ->all(),
             regimeAtendimento: (string) config('tiss.defaults.regime_atendimento', '01'),
             tipoConsulta: (string) config('tiss.defaults.tipo_consulta', '1'),
             tipoAtendimentoSadt: (string) config('tiss.defaults.tipo_atendimento_sadt', '04'),

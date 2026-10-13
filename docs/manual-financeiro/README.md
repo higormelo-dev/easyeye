@@ -159,6 +159,12 @@ Lotes de guias para envio ao convênio, com download do **XML TISS** no padrão 
 
 ![TISS — lotes](img/10-tiss-lotes.png)
 
+> **Enviar de novo é seguro.** Se o envio ao convênio falhar, ou ficar em dúvida (queda de
+> conexão, tempo esgotado), clique em **Enviar** outra vez: o sistema reaproveita o mesmo
+> XML e a mesma chave de envio enquanto as guias do lote não mudarem, e **não reenvia** um
+> lote que o convênio já confirmou. **Baixar XML** de um lote já enviado entrega o arquivo
+> que foi enviado, sem alterar o status do lote nem das guias.
+
 ---
 
 ## 7. Conciliação de Glosas

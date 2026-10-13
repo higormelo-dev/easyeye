@@ -174,3 +174,77 @@ it('produces a namespace-qualified document that resolves every element into the
         ->and($dom->getElementsByTagNameNS('http://www.ans.gov.br/padroes/tiss/schemas', 'cabecalho')->length)->toBe(1)
         ->and($dom->getElementsByTagNameNS('http://www.ans.gov.br/padroes/tiss/schemas', 'epilogo')->length)->toBe(1);
 });
+
+it('the xml does not depend on the order the database returned guides and items in', function () {
+    // Mesmo lote, sem nada alterado: a ordem em que o banco devolve as linhas
+    // muda com UPDATEs (status das guias) e com o plano da consulta — se ela
+    // entrasse no XML, o conteúdo "mudaria" sozinho e a impressão digital que
+    // reaproveita o documento já enviado (TissXmlContentFingerprint) daria
+    // outra mensagem, logo outra chave de idempotência no reenvio.
+    Carbon\Carbon::setTestNow('2026-10-12 12:00:00');
+
+    $entity   = new Entity(['code' => 'ENT-000000001', 'name' => 'CLINICA TESTE']);
+    $operator = new TissOperator(['ans_code' => '326305']);
+    $version  = new TissVersion(['code' => '202603', 'layout_version' => '04.03.00']);
+
+    $makeItem = function (string $id, string $tuss): TissGuideItem {
+        $item = new TissGuideItem([
+            'table_code'   => '22',
+            'tuss_code'    => $tuss,
+            'description'  => 'CONSULTA ' . $tuss,
+            'quantity'     => 1,
+            'unit_amount'  => 150.00,
+            'total_amount' => 150.00,
+        ]);
+        $item->id = $id;
+
+        return $item;
+    };
+
+    $makeGuide = function (string $number, string $card, array $items): TissGuide {
+        $guide = new TissGuide([
+            'guide_type'              => TissGuideType::Consultation,
+            'guide_number_provider'   => $number,
+            'attendance_date'         => '2026-04-04',
+            'beneficiary_name'        => 'PACIENTE ' . $card,
+            'beneficiary_card_number' => $card,
+            'total_amount'            => 150.00,
+        ]);
+        $guide->id = 'guia-' . $number;
+        $guide->setRelation('items', new Collection($items));
+
+        return $guide;
+    };
+
+    $itemsOfFirst  = [$makeItem('00000000-0000-7000-8000-000000000001', '10101012'), $makeItem('00000000-0000-7000-8000-000000000002', '10101013')];
+    $itemsOfSecond = [$makeItem('00000000-0000-7000-8000-000000000003', '10101014'), $makeItem('00000000-0000-7000-8000-000000000004', '10101015')];
+
+    $first  = $makeGuide('GUI-202604-000001', '11111', $itemsOfFirst);
+    $second = $makeGuide('GUI-202604-000002', '22222', $itemsOfSecond);
+
+    $batch = new TissBatch(['batch_number' => 'LOT-202604-0001', 'reference_month' => '2026-04']);
+    $batch->setRelation('entity', $entity);
+    $batch->setRelation('operator', $operator);
+    $batch->setRelation('version', $version);
+
+    $build = function (array $guides) use ($batch): string {
+        $batch->setRelation('guides', new Collection($guides));
+
+        return app(V202603TissXmlBuilder::class)->buildBatch($batch);
+    };
+
+    $canonical = $build([$first, $second]);
+
+    // Banco devolveu tudo ao contrário.
+    $first->setRelation('items', new Collection(array_reverse($itemsOfFirst)));
+    $second->setRelation('items', new Collection(array_reverse($itemsOfSecond)));
+    $shuffled = $build([$second, $first]);
+
+    Carbon\Carbon::setTestNow();
+
+    expect($shuffled)->toBe($canonical)
+        // A guia de consulta leva o 1º item: o de menor id, nunca "o que veio primeiro".
+        ->and(strpos($canonical, 'GUI-202604-000001'))->toBeLessThan(strpos($canonical, 'GUI-202604-000002'))
+        ->and($canonical)->toContain('<codigoProcedimento>10101012</codigoProcedimento>')
+        ->and($canonical)->toContain('<codigoProcedimento>10101014</codigoProcedimento>');
+});

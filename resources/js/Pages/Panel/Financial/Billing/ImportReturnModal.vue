@@ -39,6 +39,8 @@ watch(
 
 function onFileChange(event) {
     form.xml_file = event.target.files?.[0] ?? null;
+    // O erro "arquivo repetido" é sobre o arquivo anterior: some ao escolher outro.
+    form.clearErrors('xml_file');
 }
 
 function requestClose() {
@@ -86,6 +88,7 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     aria-required="true"
                     :disabled="disabled"
                     :class="{ 'is-invalid': form.errors.covenant_id }"
+                    @change="form.clearErrors('xml_file')"
                 >
                     <option value="">{{ t.select }}</option>
                     <option v-for="c in covenantsWithOperator" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -106,9 +109,13 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     aria-required="true"
                     :disabled="disabled"
                     :class="{ 'is-invalid': form.errors.xml_file }"
+                    :aria-invalid="form.errors.xml_file ? 'true' : null"
+                    :aria-describedby="form.errors.xml_file ? 'billing-import-file-error' : null"
                     @change="onFileChange"
                 />
-                <div v-if="form.errors.xml_file" class="invalid-feedback">{{ form.errors.xml_file }}</div>
+                <div v-if="form.errors.xml_file" id="billing-import-file-error" class="invalid-feedback" role="alert">
+                    {{ form.errors.xml_file }}
+                </div>
             </div>
         </form>
 

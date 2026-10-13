@@ -618,6 +618,17 @@ describe('textos', function (): void {
             ->and(__('financial_billing.errors.import_return_failed'))->not->toBe('financial_billing.errors.import_return_failed');
     });
 
+    it('a mensagem de arquivo de retorno repetido existe em pt_BR e en e leva a data da importação original', function (): void {
+        foreach (['pt_BR' => 'já foi importado e processado', 'en' => 'already imported and processed'] as $locale => $fragment) {
+            $message = __('financial_billing.errors.import_return_duplicate', ['date' => '13/10/2026 12:00'], $locale);
+
+            expect($message)->not->toBe('financial_billing.errors.import_return_duplicate')
+                ->and($message)->toContain('13/10/2026 12:00')
+                ->and($message)->toContain($fragment)
+                ->and($message)->not->toContain(':date');
+        }
+    });
+
     it('mantém as mesmas chaves em lang/pt_BR e lang/en financial_billing.php', function (): void {
         $flatten = function (array $items, string $prefix = '') use (&$flatten): array {
             $keys = [];

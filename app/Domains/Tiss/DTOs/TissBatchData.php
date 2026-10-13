@@ -37,7 +37,14 @@ final readonly class TissBatchData
             operatorAnsCode: (string) ($batch->operator?->ans_code ?? ''),
             versionCode: (string) ($batch->version?->code ?? ''),
             layoutVersion: (string) ($batch->version?->layout_version ?? ''),
-            guides: $batch->guides->map(static fn (TissGuide $guide) => TissGuideData::fromModel($guide))->all(),
+            // Ordem fixa (número da guia, depois id), nunca a do banco: ela muda
+            // com UPDATEs (status das guias) e com o plano da consulta, e entraria
+            // no XML — o mesmo lote, sem nada alterado, sairia com outro conteúdo.
+            guides: $batch->guides
+                ->sortBy([['guide_number_provider', 'asc'], ['id', 'asc']])
+                ->values()
+                ->map(static fn (TissGuide $guide) => TissGuideData::fromModel($guide))
+                ->all(),
             providerCnes: $batch->entity?->cnes,
             providerState: $batch->entity?->state,
         );

@@ -509,6 +509,14 @@ class BillingService
                 $this->tissWorkflow->closeBatch($tissBatch);
             }
 
+            // Seguro para repetir: o "Enviar" pode ser clicado de novo depois de
+            // a operadora já ter confirmado (e só o fechamento do lote de
+            // faturamento, abaixo, ter falhado) ou de uma tentativa em dúvida
+            // (timeout, worker morto). generateXmlNow() devolve o MESMO
+            // documento nesses casos — sem ele, o horário novo no cabeçalho
+            // dava outro hash e, com ele, outra chave de idempotência — e
+            // sendBatchNow() cai na transmissão já confirmada (sem requisição)
+            // ou retoma a em dúvida com a mesma chave.
             $this->tissWorkflow->generateXmlNow($tissBatch);
             $this->tissWorkflow->sendBatchNow($tissBatch->fresh());
         } catch (InvalidArgumentException|RuntimeException $exception) {

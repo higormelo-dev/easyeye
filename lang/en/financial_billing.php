@@ -474,6 +474,7 @@ return [
         'batch_xml_particular'        => 'Batch :code is a private-pay charge and has no TISS XML.',
         'import_return_no_operator'   => 'This insurer does not have a linked TISS operator yet.',
         'import_return_failed'        => 'Could not process the uploaded XML. Check the file and try again.',
+        'import_return_duplicate'     => 'This return file was already imported and processed on :date. Nothing was changed: the denials were not added again.',
         'batch_all_pending'           => 'This batch has no claims free of critical pending issues. Fix the pending claims before sending.',
         'tiss_submit_failed'          => 'TISS submission failed: :reason',
         'no_eligible_schedules'       => 'No eligible appointments to bill in the given period.',

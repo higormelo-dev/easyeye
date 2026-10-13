@@ -731,7 +731,7 @@ class BillingController extends Controller
         $xmlContent = file_get_contents($validated['xml_file']->getRealPath());
 
         try {
-            $return = app(TissWorkflowService::class)->receiveResponse(
+            $received = app(TissWorkflowService::class)->receiveResponse(
                 entityId: (string) $entity->id,
                 operatorId: (string) $covenant->tiss_operator_id,
                 xmlContent: (string) $xmlContent,
@@ -757,6 +757,25 @@ class BillingController extends Controller
             )));
 
             return back()->with('error', __('financial_billing.errors.import_return_failed'));
+        }
+
+        $return = $received->return;
+
+        // O MESMO arquivo de um retorno que já foi processado (duplo clique, reenvio
+        // do formulário, importação repetida): nada foi gravado nem somado. Recusa
+        // como erro do CAMPO — o modal fica aberto com o texto sob o arquivo; um flash
+        // `error` fecharia o modal (onSuccess) e o toast de texto idêntico não reabre.
+        // Retorno que ficou `parsed`/`error` numa tentativa anterior é RETOMADO
+        // (alreadyImported = false) e mostra o sucesso normal.
+        if ($received->alreadyImported) {
+            return back()->withErrors([
+                'xml_file' => __('financial_billing.errors.import_return_duplicate', [
+                    'date' => ($return->processed_at ?? $return->received_at ?? $return->created_at)
+                        ->copy()
+                        ->locale(app()->getLocale())
+                        ->isoFormat('L LT'),
+                ]),
+            ]);
         }
 
         $glosaCount = (int) ($return->summary['glosa_count'] ?? 0);

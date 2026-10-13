@@ -7,6 +7,18 @@ return [
 
     'schema_base_path' => env('TISS_SCHEMA_BASE_PATH', storage_path('app/tiss/schemas')),
 
+    // Nome do XSD de ENTRADA (schema principal — os demais arquivos do
+    // diretório da versão são <xsd:import> dele, resolvidos pelo libxml a
+    // partir do mesmo diretório) por versão TISS. Mapeamento explícito: o
+    // nome real do arquivo distribuído pela ANS não segue uma fórmula
+    // confiável a partir do código da versão (ex.: "202603" -> layout
+    // "04.03.00" -> arquivo "tissV4_03_00.xsd") — achado via auditoria de
+    // encerramento, EE-07 (o serviço procurava um "ansTISS.xsd" que nunca
+    // existiu, então nunca validava nada).
+    'schema_files' => [
+        '202603' => 'tissV4_03_00.xsd',
+    ],
+
     'transport' => [
         'driver'      => env('TISS_TRANSPORT_DRIVER', 'mock'), // mock|http
         'environment' => env('TISS_TRANSPORT_ENVIRONMENT', 'production'), // production|sandbox
@@ -15,6 +27,19 @@ return [
             'timeout_seconds'         => (int) env('TISS_HTTP_TIMEOUT_SECONDS', 30),
             'connect_timeout_seconds' => (int) env('TISS_HTTP_CONNECT_TIMEOUT_SECONDS', 10),
         ],
+
+        // Prazo (s) em que uma transmissão 'sending' é considerada EM VOO de
+        // verdade (lease de propriedade, contado de requested_at). Passado
+        // esse prazo sem resposta gravada, a tentativa é tratada como
+        // INTERROMPIDA (worker morto no meio, falha ao gravar o retorno) e o
+        // próximo envio a retoma, reaproveitando a MESMA linha e a MESMA
+        // chave de idempotência. Tem que ficar ACIMA do maior tempo que uma
+        // tentativa viva pode levar: o $timeout do SendTissBatchJob (90 s) e
+        // os timeouts HTTP acima (timeout + connect). Menos que isso deixa
+        // dois workers enviando o MESMO lote ao mesmo tempo (achado via
+        // revisão adversarial Codex: sem prazo, uma transmissão 'sending'
+        // órfã bloqueava qualquer reenvio — até force=true — pra sempre).
+        'lease_seconds' => (int) env('TISS_SEND_LEASE_SECONDS', 180),
     ],
 
     'returns' => [

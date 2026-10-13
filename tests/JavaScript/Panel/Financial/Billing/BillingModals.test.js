@@ -6,6 +6,7 @@ import SubmitBatchModal from '@/Pages/Panel/Financial/Billing/SubmitBatchModal.v
 import DenyClaimModal from '@/Pages/Panel/Financial/Billing/DenyClaimModal.vue';
 import BatchFormModal from '@/Pages/Panel/Financial/Billing/BatchFormModal.vue';
 import IndividualClaimModal from '@/Pages/Panel/Financial/Billing/IndividualClaimModal.vue';
+import ImportReturnModal from '@/Pages/Panel/Financial/Billing/ImportReturnModal.vue';
 import { forms, resetInertiaMock } from './support/inertiaMock.js';
 import { t, claim, batch, schedule, brl, norm } from './support/fixtures.js';
 
@@ -549,5 +550,112 @@ describe('IndividualClaimModal', () => {
 
         await w.find('[data-test="discard"]').trigger('click');
         expect(w.emitted('close')).toHaveLength(2);
+    });
+});
+
+describe('ImportReturnModal (importar retorno TISS)', () => {
+    const importT = {
+        ...t,
+        import_return_hint: 'Envie o XML de demonstrativo de retorno recebido da operadora.',
+        import_return_covenant: 'Convênio',
+        import_return_file: 'Arquivo XML',
+        import_return_btn: 'Importar',
+        import_return_no_covenants: 'Nenhum convênio com operadora TISS vinculada ainda.',
+        select: 'Selecione',
+    };
+    const covenants = [
+        { id: 'cov-1', name: 'Convênio A', has_tiss_operator: true },
+        { id: 'cov-2', name: 'Convênio B', has_tiss_operator: true },
+    ];
+    const duplicate = 'Este arquivo de retorno já foi importado e processado em 13/10/2026 12:00. Nada foi alterado.';
+
+    function mountImport() {
+        wrapper = mount(ImportReturnModal, {
+            props: { open: true, covenants, url: '/billing/import-return', t: importT },
+            global,
+        });
+
+        return wrapper;
+    }
+
+    function chooseFile(w) {
+        const input = w.find('#billing-import-file');
+        Object.defineProperty(input.element, 'files', {
+            value: [new File(['<ans/>'], 'retorno.xml', { type: 'text/xml' })],
+            configurable: true,
+        });
+
+        return input.trigger('change');
+    }
+
+    it('mostra o erro de arquivo repetido sob o campo, anunciado como alerta, e NÃO fecha nem avisa o pai', async () => {
+        const w = mountImport();
+
+        lastForm().setError('xml_file', duplicate);
+        await nextTick();
+
+        const input = w.find('#billing-import-file');
+        const alert = w.find('#billing-import-file-error');
+
+        expect(alert.text()).toBe(duplicate);
+        expect(alert.attributes('role')).toBe('alert');
+        expect(input.classes()).toContain('is-invalid');
+        expect(input.attributes('aria-invalid')).toBe('true');
+        expect(input.attributes('aria-describedby')).toBe('billing-import-file-error');
+        expect(w.emitted('saved')).toBeUndefined();
+        expect(w.emitted('close')).toBeUndefined();
+    });
+
+    it('sem erro, o campo não declara inválido nem aponta para uma mensagem que não existe', () => {
+        const w = mountImport();
+        const input = w.find('#billing-import-file');
+
+        expect(w.find('#billing-import-file-error').exists()).toBe(false);
+        expect(input.attributes('aria-invalid')).toBeUndefined();
+        expect(input.attributes('aria-describedby')).toBeUndefined();
+    });
+
+    it('escolher outro arquivo limpa o erro do arquivo anterior', async () => {
+        const w = mountImport();
+
+        lastForm().setError('xml_file', duplicate);
+        await nextTick();
+        expect(w.find('#billing-import-file-error').exists()).toBe(true);
+
+        await chooseFile(w);
+
+        expect(lastForm().xml_file).toBeInstanceOf(File);
+        expect(lastForm().errors.xml_file).toBeUndefined();
+        expect(w.find('#billing-import-file-error').exists()).toBe(false);
+    });
+
+    it('trocar o convênio limpa o erro (o veredito depende da operadora)', async () => {
+        const w = mountImport();
+
+        lastForm().setError('xml_file', duplicate);
+        await nextTick();
+
+        await w.find('#billing-import-covenant').setValue('cov-2');
+
+        expect(lastForm().covenant_id).toBe('cov-2');
+        expect(lastForm().errors.xml_file).toBeUndefined();
+        expect(w.find('#billing-import-file-error').exists()).toBe(false);
+    });
+
+    it('posta o arquivo na URL como multipart preservando a tela e avisa o pai no sucesso', async () => {
+        const w = mountImport();
+
+        await w.find('#billing-import-covenant').setValue('cov-1');
+        await chooseFile(w);
+        await w.find('.btn-primary').trigger('click');
+
+        const form = lastForm();
+        expect(form.post).toHaveBeenCalledTimes(1);
+        expect(form.lastPost.url).toBe('/billing/import-return');
+        expect(form.lastPost.options).toMatchObject({ forceFormData: true, preserveScroll: true, preserveState: true });
+        expect(form.lastPost.data).toMatchObject({ covenant_id: 'cov-1' });
+
+        form.lastPost.options.onSuccess();
+        expect(w.emitted('saved')).toHaveLength(1);
     });
 });

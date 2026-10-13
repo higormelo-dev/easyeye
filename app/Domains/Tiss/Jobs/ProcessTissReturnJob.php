@@ -11,6 +11,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\{ShouldBeUnique, ShouldQueue};
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class ProcessTissReturnJob implements ShouldQueue, ShouldBeUnique
@@ -57,21 +58,28 @@ class ProcessTissReturnJob implements ShouldQueue, ShouldBeUnique
 
     public function failed(Throwable $exception): void
     {
-        $query = TissReturn::query()->where('id', $this->returnId);
+        DB::transaction(function () use ($exception): void {
+            $query = TissReturn::query()->where('id', $this->returnId);
 
-        if ($this->entityId) {
-            $query->where('entity_id', $this->entityId);
-        }
+            if ($this->entityId) {
+                $query->where('entity_id', $this->entityId);
+            }
 
-        $return = $query->first();
+            // Lê e escreve na MESMA transação, com a linha travada (a trava do
+            // processamento): `processed` é final. Se o worker morreu depois do
+            // commit do processamento e a confirmação do job falhou até esgotar as
+            // tentativas, marcar o retorno como erro o reabriria — e o próximo
+            // reprocessamento, que só pula `processed`, somaria as glosas de novo.
+            $return = $query->lockForUpdate()->first();
 
-        if (! $return) {
-            return;
-        }
+            if (! $return || $return->status === TissReturnStatus::Processed) {
+                return;
+            }
 
-        $return->update([
-            'status'        => TissReturnStatus::Error->value,
-            'error_message' => mb_substr('Falha ao processar retorno após todas as tentativas: ' . $exception->getMessage(), 0, 1000),
-        ]);
+            $return->update([
+                'status'        => TissReturnStatus::Error->value,
+                'error_message' => mb_substr('Falha ao processar retorno após todas as tentativas: ' . $exception->getMessage(), 0, 1000),
+            ]);
+        });
     }
 }

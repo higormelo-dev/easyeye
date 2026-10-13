@@ -474,6 +474,7 @@ return [
         'batch_xml_particular'        => 'O lote :code é de cobrança particular e não gera XML TISS.',
         'import_return_no_operator'   => 'Este convênio ainda não tem operadora TISS vinculada.',
         'import_return_failed'        => 'Não foi possível processar o XML enviado. Verifique o arquivo e tente novamente.',
+        'import_return_duplicate'     => 'Este arquivo de retorno já foi importado e processado em :date. Nada foi alterado: as glosas não foram somadas de novo.',
         'batch_all_pending'           => 'Este lote não possui guias sem pendência crítica. Corrija as guias pendentes antes de enviar.',
         'tiss_submit_failed'          => 'Falha no envio TISS: :reason',
         'no_eligible_schedules'       => 'Nenhum agendamento elegível para faturar no período informado.',

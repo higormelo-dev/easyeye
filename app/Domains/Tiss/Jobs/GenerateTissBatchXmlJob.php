@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Tiss\Jobs;
 
+use App\Domains\Tiss\Actions\RecordTissBatchFailureAction;
 use App\Domains\Tiss\Enums\TissBatchStatus;
+use App\Domains\Tiss\Exceptions\TissBatchCancelledException;
 use App\Domains\Tiss\Models\TissBatch;
 use App\Domains\Tiss\Services\GenerateTissXmlService;
 use Illuminate\Bus\Queueable;
@@ -52,26 +54,32 @@ class GenerateTissBatchXmlJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
-        $generateTissXmlService->generateBatch($batch);
+        // Cancelado depois de a geração entrar na fila: não há o que gerar, e isso
+        // não é falha (nada de retentativas nem de relatório de erro). O mesmo se o
+        // cancelamento chegar entre esta leitura e a trava da geração.
+        if ($batch->status === TissBatchStatus::Cancelled) {
+            return;
+        }
+
+        try {
+            $generateTissXmlService->generateBatch($batch);
+        } catch (TissBatchCancelledException) {
+            return;
+        }
     }
 
     public function failed(Throwable $exception): void
     {
-        $query = TissBatch::query()->where('id', $this->batchId);
-
-        if ($this->entityId) {
-            $query->where('entity_id', $this->entityId);
-        }
-
-        $batch = $query->first();
-
-        if (! $batch) {
-            return;
-        }
-
-        $batch->update([
-            'status'     => TissBatchStatus::Error->value,
-            'last_error' => mb_substr('Falha ao gerar XML após todas as tentativas: ' . $exception->getMessage(), 0, 1000),
-        ]);
+        // A decisão e a escrita são atômicas, sob a trava da linha do lote
+        // (RecordTissBatchFailureAction). Lote que já saiu — ou pode ter saído:
+        // enviando (em voo, worker morto ou entrega EM DÚVIDA), enviado, processado
+        // —, ou cancelado, não tem XML a gerar: falha local daqui (deadlock, banco)
+        // virar "erro" reabria o lote para edição e o reenvio sairia com outra
+        // identidade. O motivo fica nos jobs falhos da fila.
+        app(RecordTissBatchFailureAction::class)(
+            batchId: $this->batchId,
+            entityId: $this->entityId,
+            reason: mb_substr('Falha ao gerar XML após todas as tentativas: ' . $exception->getMessage(), 0, 1000),
+        );
     }
 }
