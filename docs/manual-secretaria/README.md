@@ -321,7 +321,10 @@ Menu **Imagens oftálmicas** — central de exames de imagem dos pacientes:
 - Busque o paciente na coluna esquerda para ver os exames dele.
 - **Filtros** refina por olho (OD/OE/AO), tipo de exame, equipamento, médico e período.
 - **Novo** importa um exame externo (arquivo trazido pelo paciente): selecione o paciente,
-  o tipo de exame, a data e anexe os arquivos (JPG, PNG ou PDF).
+  o tipo de exame, a data e anexe os arquivos (JPG, PNG ou PDF). Dá para misturar arquivos
+  anexados e fotos/vídeos da câmera no mesmo lote: o sistema guarda a origem de **cada**
+  arquivo — só o que foi capturado pela câmera conta como produção da clínica no repasse
+  médico; os arquivos anexados continuam sendo exame externo.
 
 ### Comparar exames
 

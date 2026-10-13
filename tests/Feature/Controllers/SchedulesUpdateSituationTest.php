@@ -3,6 +3,7 @@
 use App\Enums\{ClientRule, ScheduleSituation};
 use App\Models\{Entity, Schedule, User};
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Testing\TestResponse;
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ beforeEach(function () {
 });
 
 /** Realiza PATCH autenticado com sessão da entity. */
-function patchSituation($test, Schedule $schedule, int $situation): \Illuminate\Testing\TestResponse
+function patchSituation($test, Schedule $schedule, int $situation): TestResponse
 {
     return $test->actingAs($test->user)
         ->withSession(['selected_entity_id' => $test->entity->id])
@@ -88,7 +89,7 @@ describe('PATCH /panel/schedules/{schedule}/situation', function () {
         // ScheduleSituation::from() lança ValueError para valores desconhecidos
         $this->withoutExceptionHandling();
 
-        $this->expectException(\ValueError::class);
+        $this->expectException(ValueError::class);
 
         patchSituation($this, $this->schedule, 99);
     });

@@ -20,8 +20,8 @@ use Inertia\Testing\AssertableInertia as Assert;
  *  - quem emite assina: documento/evolução/procedimento/laudo sempre no nome
  *    do médico LOGADO, nunca no do prontuário ou do exame;
  *  - prontuário no nome do próprio médico (RecordDoctor);
- *  - prontuário ASSINADO: nenhum documento/anexo é emitido, alterado ou
- *    excluído nele (GuardedBySignedRecord).
+ *  - prontuário ASSINADO: nenhum documento/anexo/evolução/procedimento é
+ *    emitido, alterado ou excluído nele (GuardedBySignedRecord).
  */
 beforeEach(function () {
     $this->seed([ReportSettingSeeder::class, ReportSettingContentSeeder::class, ReportSettingVariableSeeder::class]);
@@ -239,8 +239,9 @@ describe('prontuário assinado', function () {
         $this->record->sign($this->euA);
     });
 
-    it('nenhum endpoint emite, altera ou exclui documento/anexo nele (403 traduzido)', function () {
+    it('nenhum endpoint emite, altera ou exclui documento/anexo/evolução/procedimento nele (403 traduzido)', function () {
         $tpl  = ReportSettingContent::query()->where('slug', 'declaracao_medica')->firstOrFail();
+        $proc = Procedure::factory()->create(['entity_id' => $this->entity->id, 'active' => true]);
         $exam = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'doctor_id' => $this->drA->id]);
         $this->record->forceFill(['schedule_id' => null])->saveQuietly();
 
@@ -253,6 +254,9 @@ describe('prontuário assinado', function () {
             ['deleteJson', route('panel.patients.medicalrecords.files.destroy', [$this->patient, $this->record, $this->file]), []],
             // Laudo do Gerenciador de Imagens cairia no prontuário assinado do dia.
             ['postJson', route('panel.eye-images.reports.store'), ['patient_id' => $this->patient->id, 'exam_ids' => [$exam->id], 'content' => '<p>Laudo</p>']],
+            // Aba antiga: a tela esconde "Nova evolução"/"Solicitar", o servidor também recusa.
+            ['postJson', route('panel.patients.medicalrecords.evolutions.store', [$this->patient, $this->record]), ['content' => 'Evolução depois de assinar']],
+            ['postJson', route('panel.patients.medicalrecords.medicalrecord-procedures.store', [$this->patient, $this->record]), ['procedure_id' => $proc->id]],
         ];
 
         foreach ($calls as [$method, $url, $data]) {
@@ -264,7 +268,9 @@ describe('prontuário assinado', function () {
         expect(MedicalRecordDocumentation::count())->toBe(1)
             ->and(MedicalRecordDocumentation::find($this->doc->id))->not->toBeNull()
             ->and(MedicalRecordFile::count())->toBe(1)
-            ->and(MedicalRecordFile::find($this->file->id))->not->toBeNull();
+            ->and(MedicalRecordFile::find($this->file->id))->not->toBeNull()
+            ->and(MedicalRecordEvolution::count())->toBe(0)
+            ->and(MedicalRecordProcedure::count())->toBe(0);
     });
 
     it('laudo de IA aprovado para prontuário assinado: 403 e o run continua aguardando aprovação', function () {
@@ -288,5 +294,58 @@ describe('prontuário assinado', function () {
 
         expect($run->fresh()->status)->toBe(AiRunStatus::WaitingApproval)
             ->and(MedicalRecordDocumentation::count())->toBe(1);
+    });
+});
+
+describe('médico solicitante do laudo (Fase 5 / Eye Images) continua alcançável na lista de documentações', function () {
+    it('[GAP] laudo com e-mail de médico solicitante traz nome/e-mail/sent_at na lista — reenvio continua possível depois de fechar o laudo (achado via revisão Codex)', function () {
+        $doc = MedicalRecordDocumentation::create([
+            'medical_record_id'         => $this->record->id,
+            'patient_id'                => $this->patient->id,
+            'doctor_id'                 => $this->drA->id,
+            'type'                      => DocumentationType::Report,
+            'title'                     => 'Laudo de imagem',
+            'content'                   => '<p>Achados.</p>',
+            'requesting_doctor_name'    => 'Dr. Carlos Souza',
+            'requesting_doctor_email'   => 'carlos@outraclinica.com',
+            'requesting_doctor_sent_at' => now(),
+        ]);
+
+        // A tela de emissão (EyeImageReportModal) esconde o botão "Reenviar"
+        // ao fechar/reabrir o modal — esta é a lista de documentações do
+        // prontuário, a ÚNICA outra tela onde o laudo JÁ EMITIDO reaparece
+        // depois; sem estes 3 campos aqui, o front não tinha como montar o
+        // botão de reenvio nem mostrar "Enviado em" (achado via revisão Codex).
+        issAs($this, $this->euA)
+            ->get(route('panel.patients.medicalrecords.edit', [$this->patient, $this->record]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('medicalrecord.documentations.0.id', (string) $doc->id)
+                ->where('medicalrecord.documentations.0.requesting_doctor_name', 'Dr. Carlos Souza')
+                ->where('medicalrecord.documentations.0.requesting_doctor_email', 'carlos@outraclinica.com')
+                ->where(
+                    'medicalrecord.documentations.0.requesting_doctor_sent_at',
+                    $doc->requesting_doctor_sent_at->format('d/m/Y H:i'),
+                ));
+    });
+
+    it('documentação sem médico solicitante traz os 3 campos como null (nunca omitidos — o front depende de null pra decidir se mostra o botão)', function () {
+        $doc = MedicalRecordDocumentation::create([
+            'medical_record_id' => $this->record->id,
+            'patient_id'        => $this->patient->id,
+            'doctor_id'         => $this->drA->id,
+            'type'              => DocumentationType::Report,
+            'title'             => 'Declaração',
+            'content'           => '<p>x</p>',
+        ]);
+
+        issAs($this, $this->euA)
+            ->get(route('panel.patients.medicalrecords.edit', [$this->patient, $this->record]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('medicalrecord.documentations.0.id', (string) $doc->id)
+                ->where('medicalrecord.documentations.0.requesting_doctor_name', null)
+                ->where('medicalrecord.documentations.0.requesting_doctor_email', null)
+                ->where('medicalrecord.documentations.0.requesting_doctor_sent_at', null));
     });
 });

@@ -249,6 +249,7 @@ function openDetail(row) {
             :open="detailOpen"
             :record="detailRecord"
             :patient="{ id: detailRecord?.patient_id ?? '' }"
+            :can-sign="isDoctor"
             :t="t"
             @close="detailOpen = false"
         />

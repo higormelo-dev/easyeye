@@ -8,6 +8,7 @@ defineProps({
     typeLabel: { type: String, default: '' },
     title: { type: String, default: '' },
     isImage: { type: Boolean, default: false },
+    isVideo: { type: Boolean, default: false },
     isPdf: { type: Boolean, default: false },
     showUrl: { type: String, required: true },
     downloadUrl: { type: String, required: true },
@@ -43,6 +44,9 @@ defineProps({
                 ></iframe>
                 <div v-else-if="isImage" class="text-center p-3">
                     <img :src="showUrl" class="img-fluid rounded" :alt="title" style="max-height: 75vh" />
+                </div>
+                <div v-else-if="isVideo" class="text-center p-3">
+                    <video :src="showUrl" controls style="max-width: 100%; max-height: 75vh"></video>
                 </div>
                 <div v-else class="text-center py-5 text-muted">
                     <i class="ti ti-file fs-1 d-block mb-2"></i>

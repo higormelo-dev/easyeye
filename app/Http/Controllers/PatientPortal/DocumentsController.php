@@ -6,7 +6,7 @@ namespace App\Http\Controllers\PatientPortal;
 
 use App\Enums\{DataAccessPurpose, ShareableDocumentType};
 use App\Http\Controllers\Controller;
-use App\Models\{MedicalRecordDocumentation, MedicalRecordFile, PatientAccount, PatientExam};
+use App\Models\{MedicalRecordDocumentation, MedicalRecordFile, Patient, PatientAccount, PatientExam};
 use App\Services\{MedicalRecordPdfService, PatientDocumentAccessService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Database\Eloquent\Model;
@@ -52,8 +52,12 @@ class DocumentsController extends Controller
             'type'      => $type->value,
             'typeLabel' => $type->label(),
             'title'     => $type->resolveTitle($shareable),
-            'isImage'   => $type === ShareableDocumentType::Exame
+            // Exame nem sempre é foto — vídeo capturado pela câmera (Fase 5 /
+            // 6a) teria renderizado como <img> quebrada aqui (achado via
+            // revisão Codex: isImage assumia TODO Exame como imagem).
+            'isImage' => ($type === ShareableDocumentType::Exame && ! $shareable->isVideo())
                 || ($type === ShareableDocumentType::Anexo && method_exists($shareable, 'isImage') && $shareable->isImage()),
+            'isVideo'     => $type === ShareableDocumentType::Exame && $shareable->isVideo(),
             'isPdf'       => $type === ShareableDocumentType::Laudo,
             'showUrl'     => route('patient-portal.documents.show', [$type->value, $shareable->getKey()]),
             'downloadUrl' => route('patient-portal.documents.download', [$type->value, $shareable->getKey()]),
@@ -74,7 +78,19 @@ class DocumentsController extends Controller
     {
         [$type, $shareable] = $this->authorize($tipo, $id);
 
-        $this->logAccess($shareable, DataAccessPurpose::PatientCare, patientId: $shareable->getAttribute('patient_id'));
+        // $shareable (PatientExam/MedicalRecordDocumentation/MedicalRecordFile)
+        // nunca tem entity_id próprio — sem passar explícito, o log caía na
+        // clínica da SESSÃO do guard (nenhuma, no portal) em vez da clínica
+        // DONA do recurso (achado via auditoria de encerramento, EE-05).
+        // patient_id já confirmado presente e validado em authorize()
+        // (PatientDocumentAccessService::canView()).
+        $patientId = $shareable->getAttribute('patient_id');
+        $this->logAccess(
+            $shareable,
+            DataAccessPurpose::PatientCare,
+            patientId: $patientId,
+            entityId: Patient::query()->find($patientId)?->entity_id,
+        );
 
         return match ($type) {
             ShareableDocumentType::Exame => $this->respondExam($shareable, $forDownload),

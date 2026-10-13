@@ -8,6 +8,8 @@ use App\Models\WhatsApp\WhatsAppMessage;
 use App\Presenters\SchedulePresenter;
 use App\Support\Database\UniqueViolation;
 use App\Traits\{Auditable, HasAuditColumns};
+use Carbon\Carbon;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\{Builder, Casts\Attribute, Collection, Model, Relations\BelongsTo, Relations\BelongsToMany, Relations\HasMany, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -82,6 +84,8 @@ class Schedule extends Model
 
     /** Namespace da chave do advisory lock da numeração SDL (PostgreSQL). */
     private const CODE_LOCK_NAMESPACE = 'schedule_code';
+
+    private const PATIENT_DAY_LOCK_NAMESPACE = 'schedule_patient_day';
 
     /**
      * Generated code for the entity_id field.
@@ -167,6 +171,115 @@ class Schedule extends Model
     public static function codeLockKey(string $entityId): int
     {
         return (int) hexdec(substr(sha1(self::CODE_LOCK_NAMESPACE . '|' . $entityId), 0, 15));
+    }
+
+    /**
+     * Serializa, até o fim da transação corrente, tudo que decide o vínculo
+     * "este paciente foi atendido neste dia": a transição de um agendamento
+     * para Atendido (que reconcilia capturas órfãs do paciente/dia —
+     * ExternalExamImportService::relinkBrowserCapturesForSchedule) e a
+     * importação de captura (ExternalExamImportService::import).
+     *
+     * REGRA DE ORDEM (achado via revisão adversarial Codex): este lock sai
+     * ANTES de qualquer lock de linha de agendamento da transação. A
+     * reconciliação trava TODOS os agendamentos do paciente naquele dia;
+     * duas transições simultâneas, cada uma já segurando a linha do PRÓPRIO
+     * agendamento, esperavam a do outro — deadlock, e o PostgreSQL abortava
+     * uma delas (um "Atendido" válido virava erro). Com este lock primeiro,
+     * quem chega depois espera sem segurar linha nenhuma.
+     *
+     * PostgreSQL: advisory lock de transação (só quem disputa o MESMO
+     * paciente/dia espera); demais drivers: lock na linha do paciente.
+     */
+    public static function lockPatientDay(string $entityId, string $patientId, DateTimeInterface|string $day): void
+    {
+        $connection = (new static())->getConnection();
+
+        if ($connection->getDriverName() === 'pgsql') {
+            $connection->select('select pg_advisory_xact_lock(?)', [static::patientDayLockKey($entityId, $patientId, $day)]);
+
+            return;
+        }
+
+        Patient::query()->withoutGlobalScopes()->whereKey($patientId)->where('entity_id', $entityId)->lockForUpdate()->first();
+    }
+
+    /**
+     * Vários locks paciente/dia de uma vez, em ORDEM DETERMINÍSTICA (pela chave).
+     * Quem muda um agendamento Atendido de paciente ou de dia precisa travar a
+     * identidade de ORIGEM e a de DESTINO antes de qualquer linha: a
+     * reconciliação das capturas trava todos os agendamentos do paciente/dia
+     * pela identidade já comitada, então duas edições em sentidos opostos
+     * (X→Y e Y→X), cada uma só com o lock do próprio destino, seguravam a linha
+     * do PRÓPRIO agendamento e esperavam a do outro — deadlock (achado via
+     * revisão adversarial Codex). Na mesma ordem em todo mundo, a segunda
+     * espera a primeira terminar, sem segurar linha nenhuma.
+     *
+     * @param list<array{0: ?string, 1: DateTimeInterface|string|null}> $patientDays pares [paciente, dia]; par sem paciente ou sem dia é ignorado
+     *
+     * @return list<int> as chaves travadas, em ordem
+     */
+    public static function lockPatientDays(string $entityId, array $patientDays): array
+    {
+        $pairs = static::patientDayPairs($entityId, $patientDays);
+
+        foreach ($pairs as [$patientId, $day]) {
+            static::lockPatientDay($entityId, $patientId, $day);
+        }
+
+        return array_keys($pairs);
+    }
+
+    /**
+     * Os pares [paciente, dia] sem repetição e ordenados pela chave do lock.
+     *
+     * @param list<array{0: ?string, 1: DateTimeInterface|string|null}> $patientDays
+     *
+     * @return array<int, array{0: string, 1: DateTimeInterface|string}> chave => [paciente, dia]
+     */
+    public static function patientDayPairs(string $entityId, array $patientDays): array
+    {
+        $byKey = [];
+
+        foreach ($patientDays as [$patientId, $day]) {
+            if ($patientId === null || $day === null) {
+                continue;
+            }
+
+            $byKey[static::patientDayLockKey($entityId, (string) $patientId, $day)] = [(string) $patientId, $day];
+        }
+
+        ksort($byKey);
+
+        return $byKey;
+    }
+
+    /**
+     * Chave bigint estável do lock paciente/dia (60 bits do sha1, sempre
+     * positiva). Colisão só serializaria dois paciente/dia — nunca mistura
+     * vínculos. Pública para os testes disputarem o mesmo lock.
+     */
+    public static function patientDayLockKey(string $entityId, string $patientId, DateTimeInterface|string $day): int
+    {
+        $date = Carbon::parse($day)->toDateString();
+
+        return (int) hexdec(substr(sha1(self::PATIENT_DAY_LOCK_NAMESPACE . '|' . $entityId . '|' . $patientId . '|' . $date), 0, 15));
+    }
+
+    /**
+     * Chave do lock paciente/dia DESTE agendamento: a identidade (clínica,
+     * paciente, dia) com que ele se reconcilia com as capturas ao virar
+     * Atendido. Null = sem paciente ou sem data — nada a travar nem a
+     * reconciliar. Compara-se a chave de ANTES e de DEPOIS de reler a linha
+     * travada para saber se o lock tomado ainda é o certo.
+     */
+    public function attendanceLockKey(): ?int
+    {
+        if ($this->patient_id === null || $this->date_time === null) {
+            return null;
+        }
+
+        return static::patientDayLockKey((string) $this->entity_id, (string) $this->patient_id, $this->date_time);
     }
 
     public static function formatCode(int $number): string

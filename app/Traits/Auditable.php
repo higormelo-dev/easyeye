@@ -28,7 +28,7 @@ trait Auditable
                 event: 'created',
                 model: $model,
                 old: null,
-                new: $model->getAttributes(),
+                new: $model->getAuditableAttributes(),
             );
         });
 
@@ -62,7 +62,7 @@ trait Auditable
             app(AuditService::class)->log(
                 event: 'deleted',
                 model: $model,
-                old: $model->getAttributes(),
+                old: $model->getAuditableAttributes(),
                 new: null,
             );
         });
@@ -73,10 +73,25 @@ trait Auditable
                     event: 'restored',
                     model: $model,
                     old: null,
-                    new: $model->getAttributes(),
+                    new: $model->getAuditableAttributes(),
                 );
             });
         }
+    }
+
+    /**
+     * Valores gravados em audit_logs pra created/deleted/restored (updated
+     * usa getDirty()/getOriginal() — diff, não isto). Default: o model
+     * inteiro. Sobrescrever quando algum campo tem bytes pesados demais pra
+     * duplicar na trilha (ex.: MedicalRecordDocumentation::metadata com
+     * imagem embutida, ~27 MiB em base64 — achado via revisão adversarial
+     * Codex: ComplianceController::exportAuditLogs() nunca usa essas
+     * colunas, mas carregava 500 linhas inteiras por chunk e esgotava o
+     * memory_limit).
+     */
+    public function getAuditableAttributes(): array
+    {
+        return $this->getAttributes();
     }
 
     /**

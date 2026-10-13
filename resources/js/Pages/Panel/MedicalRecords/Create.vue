@@ -138,8 +138,8 @@ function closeView() {
         <MedicalRecordViewModal :open="viewOpen" :record="viewRecord" :t="t" @close="closeView" />
 
         <ScheduleFlowGuard
-            :t="t"
             ref="flowGuard"
+            :t="t"
             :flow="scheduleFlow"
             :is-doctor="isDoctor"
             :locked="false"

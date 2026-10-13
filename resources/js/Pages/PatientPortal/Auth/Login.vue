@@ -48,7 +48,7 @@ function submit() {
                     <i class="ti ti-alert-circle me-1"></i>{{ form.errors.email }}
                 </div>
 
-                <form @submit.prevent="submit" novalidate>
+                <form novalidate @submit.prevent="submit">
                     <div class="mb-3">
                         <label class="form-label">E-mail</label>
                         <div class="input-group">
@@ -93,7 +93,7 @@ function submit() {
 
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="form-check mb-0">
-                            <input v-model="form.remember" type="checkbox" id="remember" class="form-check-input" />
+                            <input id="remember" v-model="form.remember" type="checkbox" class="form-check-input" />
                             <label for="remember" class="form-check-label">Lembrar de mim</label>
                         </div>
                         <a :href="route('patient-portal.password.request')" class="small">Esqueci minha senha</a>

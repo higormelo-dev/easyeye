@@ -57,7 +57,15 @@ class ComplianceController extends Controller
 
             fputcsv($output, ['Data/Hora', 'Usuário', 'Evento', 'Modelo', 'ID do Registro', 'IP', 'User-Agent'], ';');
 
-            AuditLog::with('user')
+            // Projeção de colunas: o CSV abaixo nunca usa old_values/
+            // new_values, mas um laudo de imagem embutida pode duplicar
+            // ~27 MiB em base64 nessas colunas a cada criação (metadata
+            // congelado — EyeImageReportController::store()). Carregar 500
+            // linhas inteiras por chunk esgotava o memory_limit configurado
+            // conforme laudos de imagem se acumulam (achado via revisão
+            // adversarial Codex).
+            AuditLog::select(['id', 'created_at', 'user_id', 'event', 'auditable_type', 'auditable_id', 'ip_address', 'user_agent'])
+                ->with('user:id,name')
                 ->where('entity_id', $entityId)
                 ->whereBetween('created_at', [$dateFrom, $dateUntil])
                 ->orderBy('created_at')

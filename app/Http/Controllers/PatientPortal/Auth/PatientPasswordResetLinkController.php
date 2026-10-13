@@ -48,9 +48,6 @@ class PatientPasswordResetLinkController extends Controller
 
         Password::broker('patients')->sendResetLink($request->only('email'));
 
-        return back()->with(
-            'status',
-            'Se este e-mail estiver cadastrado, você vai receber um link de redefinição de senha.',
-        );
+        return back()->with('status', __('patient_portal.password.reset_link_sent'));
     }
 }

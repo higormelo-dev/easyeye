@@ -7,7 +7,7 @@ namespace App\Services\Financial\DoctorPayouts;
 use App\DTOs\DoctorPayout\PayoutItemData;
 use App\Enums\{CashEntryReferenceType, FinancialEntryType, MedicalRecordProcedureStatus, ScheduleSituation};
 use App\Enums\DoctorPayout\{DoctorPayoutBaseSource, DoctorPayoutBasis, DoctorPayoutServiceType, DoctorPayoutSourceType, DoctorPayoutWarning};
-use App\Support\Money;
+use App\Support\{ExamScheduleLink, Money};
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -248,6 +248,7 @@ final class DoctorPayoutProductionService
         return DB::table('patient_exams as lpe')
             ->join('exam_types as let', 'let.id', '=', 'lpe.exam_id')
             ->whereColumn('lpe.schedule_id', 's.id')
+            ->whereRaw(ExamScheduleLink::compatibleSql('lpe', 's'))
             ->where('lpe.active', true)
             ->where(fn (Builder $q) => $q->whereNull('lpe.source')->orWhere('lpe.source', '<>', self::EXTERNAL_EXAM_SOURCE))
             ->selectRaw('COUNT(DISTINCT lpe.exam_id) AS exam_type_count')
@@ -450,8 +451,11 @@ final class DoctorPayoutProductionService
             ->selectRaw('MIN(COALESCE(pe.exam_performed_at, pe.created_at)) AS performed_at')
             ->selectRaw('MIN(s.covenant_id::text) AS schedule_covenant_id')
             ->selectRaw('MIN(pat.covenant_id::text) AS patient_covenant_id')
+            // Só vale o vínculo que ainda é verdade (paciente, dia e médico do
+            // exame batem com os do agendamento): agendamento remarcado/trocado
+            // depois da captura não engole o exame da competência original.
             ->selectRaw(
-                'BOOL_OR(COALESCE(vp.treatment, 0) = ? AND s.situation = ? AND s.deleted_at IS NULL) AS linked_exam_appointment',
+                'BOOL_OR(COALESCE(vp.treatment, 0) = ? AND s.situation = ? AND s.deleted_at IS NULL AND ' . ExamScheduleLink::compatibleSql('pe', 's') . ') AS linked_exam_appointment',
                 [self::TREATMENT_EXAM, ScheduleSituation::Attended->value],
             )
             ->get()

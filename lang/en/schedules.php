@@ -260,6 +260,8 @@ return [
     'cash_installments_required' => 'Enter the number of installments (minimum 1) for credit payments.',
     'cash_entry_created'         => 'Cash entry registered successfully.',
     'cash_entry_duplicate'       => 'This appointment already has a cash entry.',
+    'exam_links_removed'         => '{1} 1 exam is no longer linked to this appointment.|[2,*] :count exams are no longer linked to this appointment.',
+    'changed_concurrently'       => 'The appointment was changed by someone else while its status was being updated. Refresh the schedule and try again.',
     'cash_entry_required'        => 'Register a cash entry (or mark as Courtesy) before completing the attendance.',
     'cash_copay_notice'          => 'Covenant appointment: record only the patient co-payment here. The covenant amount is billed separately via claim.',
 

@@ -94,6 +94,19 @@ describe('Agenda — calendário lateral', () => {
         expect(wrapper.text()).toContain('DRA. ANA LIMA');
         expect(wrapper.text()).toContain('Horário');
     });
+
+    it('destaca com FUNDO quem está selecionado na lista — "tudo" ou o médico (a borda 1↔2px sozinha não se via)', async () => {
+        const wrapper = mountPage({ doctors: [...doctors, { id: 'd2', name: 'DR. BRUNO', color: '#0d6efd' }] });
+
+        const tudoRow = wrapper.find('[data-testid="availability-clinic-total"]').element.closest('.d-flex');
+        expect(tudoRow.style.backgroundColor).not.toBe('transparent');
+        expect(wrapper.find('[data-doctor="d1"]').element.style.backgroundColor).toBe('transparent');
+
+        await wrapper.find('[data-doctor="d1"]').trigger('click');
+
+        expect(wrapper.find('[data-doctor="d1"]').element.style.backgroundColor).not.toBe('transparent');
+        expect(tudoRow.style.backgroundColor).toBe('transparent');
+    });
 });
 
 describe('Agenda — vagas na visão de vários médicos', () => {

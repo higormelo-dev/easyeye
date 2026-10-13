@@ -2,6 +2,7 @@
 import { clinicalTexts, recordSafetyRows } from '@/Support/clinicalSafety.js';
 import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 import { ref, computed, watch } from 'vue';
+import { router } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import PdfPreviewModal from './Components/PdfPreviewModal.vue';
@@ -19,6 +20,9 @@ const props = defineProps({
     open: { type: Boolean, required: true },
     record: { type: Object, default: null },
     patient: { type: Object, required: true },
+    /** Médico com cadastro ativo nesta clínica — mesma flag que libera
+     * criar/editar (CurrentDoctor::canIssue(), Gate IssueReport). */
+    canSign: { type: Boolean, default: false },
     /** Traduções actions.medical_records (mesma prop `t` da página). */
     t: { type: Object, default: () => ({}) },
 });
@@ -126,6 +130,67 @@ function closePdfPreview() {
     pdfPreviewUrl.value = '';
     pdfPreviewTitle.value = '';
     pdfPreviewName.value = '';
+}
+
+// ── Assinatura eletrônica (CFM Res. 2.227/2018) — EE-06 ────────────────────
+const signing = ref(false);
+
+async function confirmSign() {
+    if (signing.value || !detail.value?.sign_url) return;
+
+    let confirmed;
+    const title = tt('sign_confirm_title', 'Assinar este prontuário?');
+    const text = tt(
+        'sign_confirm_text',
+        'Após assinar, o prontuário fica travado e não pode mais ser editado. Esta ação não pode ser desfeita.',
+    );
+    if (window.Swal) {
+        const result = await window.Swal.fire({
+            icon: 'warning',
+            title,
+            text,
+            showCancelButton: true,
+            confirmButtonText: tt('sign_confirm_button', 'Assinar'),
+            cancelButtonText: tt('cancel', 'Cancelar'),
+            confirmButtonColor: '#dc3545',
+        });
+        confirmed = result.isConfirmed;
+    } else {
+        confirmed = window.confirm(`${title}\n${text}`);
+    }
+    if (!confirmed) return;
+
+    signing.value = true;
+    router.post(
+        detail.value.sign_url,
+        // clinical_revision: o que ESTA tela mostrou pro médico — o
+        // servidor rejeita (StaleMedicalRecordRevisionException) se outra
+        // aba/usuário editou o conteúdo depois que carregamos este detail
+        // (achado via revisão adversarial Codex: corpo vazio aqui deixava
+        // o servidor assinar o que estivesse no banco na hora do clique,
+        // nunca o que o médico de fato revisou).
+        { clinical_revision: detail.value.clinical_revision },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: (page) => {
+                const flash = page.props?.flash ?? {};
+                if (!flash.success) {
+                    window.Swal?.fire({
+                        icon: 'error',
+                        text: flash.error ?? tt('sign_error', 'Não foi possível assinar o prontuário.'),
+                    });
+                }
+                loadDetail();
+            },
+            onError: () => {
+                window.Swal?.fire({ icon: 'error', text: tt('sign_error', 'Não foi possível assinar o prontuário.') });
+            },
+            onFinish: () => {
+                signing.value = false;
+            },
+        },
+    );
 }
 </script>
 
@@ -442,12 +507,12 @@ function closePdfPreview() {
                 </section>
 
                 <!-- Assinatura -->
-                <section v-if="detail.is_signed" class="detail-section">
+                <section v-if="detail.is_signed || canSign" class="detail-section">
                     <h6 class="detail-section__title">
                         <i class="ti ti-shield-check me-1 text-success"></i
                         >{{ tt('digital_signature', 'Assinatura digital') }}
                     </h6>
-                    <div class="alert alert-success small mb-0">
+                    <div v-if="detail.is_signed" class="alert alert-success small mb-0">
                         <i class="ti ti-check me-1"></i>
                         {{ tt('signed_on', 'Assinado em') }} <strong>{{ detail.signed_at_formatted }}</strong>
                         <span v-if="detail.signed_by_name"
@@ -457,6 +522,16 @@ function closePdfPreview() {
                             tt('signed_lock_note', 'CFM Res. 2.227/2018 — prontuário travado para edição.')
                         }}</small>
                     </div>
+                    <button
+                        v-else
+                        type="button"
+                        class="btn btn-sm btn-outline-success"
+                        :disabled="signing"
+                        @click="confirmSign"
+                    >
+                        <i class="ti me-1" :class="signing ? 'ti-loader-2 ee-spin' : 'ti-signature'"></i
+                        >{{ tt('sign_button', 'Assinar prontuário') }}
+                    </button>
                 </section>
             </div>
 

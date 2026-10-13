@@ -78,3 +78,22 @@ it('recurso com patient_id segue usando o atributo; patientId explícito tem pri
     expect(DataAccessLog::where('resource_type', MedicalRecord::class)->sole()->patient_id)->toBe($this->patient->id)
         ->and(DataAccessLog::where('resource_type', Patient::class)->sole()->patient_id)->toBe($other->id);
 });
+
+it('[GAP] entity_id do RECURSO tem prioridade sobre session(selected_entity_id) — achado via auditoria de encerramento (EE-05)', function () {
+    $otherClinic  = Entity::factory()->create(['is_client' => true]);
+    $otherPatient = Patient::create([
+        'entity_id'   => $otherClinic->id,
+        'person_id'   => People::factory()->create()->id,
+        'covenant_id' => Covenant::factory()->create()->id,
+        'active'      => true,
+    ]);
+
+    // session() continua em $this->entity (ver beforeEach) — o RECURSO
+    // acessado é de outra clínica (ex.: staff com sessão administrativa
+    // de uma clínica acessando, por engano ou API, recurso de outra).
+    app(DataAccessLogService::class)->log($otherPatient, DataAccessPurpose::PatientCare);
+
+    $log = DataAccessLog::sole();
+    expect($log->entity_id)->toBe($otherClinic->id)
+        ->and($log->entity_id)->not->toBe($this->entity->id);
+});

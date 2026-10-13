@@ -49,7 +49,7 @@ function submit() {
                     <i class="ti ti-alert-circle me-1"></i>{{ form.errors.password }}
                 </div>
 
-                <form @submit.prevent="submit" novalidate>
+                <form novalidate @submit.prevent="submit">
                     <div class="mb-3">
                         <label class="form-label">Senha</label>
                         <div class="input-group">

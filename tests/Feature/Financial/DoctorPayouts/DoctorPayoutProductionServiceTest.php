@@ -638,3 +638,75 @@ it('número de consultas ao banco não cresce com o número de atendimentos', fu
     expect($items)->toHaveCount(8)
         ->and($queries)->toBeLessThanOrEqual(8);
 });
+
+/*
+ * Vínculo exame → agendamento DESATUALIZADO — achado via revisão adversarial
+ * Codex: o exame de equipamento é suprimido sempre que o agendamento vinculado
+ * é um exame atendido, sem conferir se o vínculo ainda vale. Agendamento
+ * remarcado pra outro mês, passado a outro médico ou trocado de paciente
+ * depois da captura engolia o exame: sumia da competência (e do médico) onde
+ * ele aconteceu. O vínculo só vale quando paciente, dia e médico batem.
+ */
+describe('exame com vínculo desatualizado', function () {
+    it('[GAP] agendamento de exame remarcado pra OUTRO mês: o exame continua na competência dele e o agendamento conta na nova', function () {
+        $oct      = ExamType::factory()->create(['name' => 'OCT']);
+        $type     = payoutProdVisitType($this, payoutProdProcedure(3, 'RETINOGRAFIA'), 'EXAME');
+        $schedule = payoutProdSchedule($this, ['visit_id' => $type->id, 'date_time' => '2026-07-15 09:00:00']);
+        payoutProdExam($this, $oct, ['schedule_id' => $schedule->id]); // exame de 10/06, ainda vinculado
+
+        $june = payoutProdRun($this);
+        $july = payoutProdRun($this, null, '2026-07-01', '2026-07-31');
+
+        expect($june)->toHaveCount(1)
+            ->and($june->first()->sourceType)->toBe(DoctorPayoutSourceType::PatientExam)
+            ->and($july)->toHaveCount(1)
+            ->and($july->first()->sourceType)->toBe(DoctorPayoutSourceType::Schedule);
+    });
+
+    it('[GAP] agendamento de exame passado a OUTRO médico: o exame segue no médico que o fez e o agendamento vai pro novo', function () {
+        $oct      = ExamType::factory()->create(['name' => 'OCT']);
+        $type     = payoutProdVisitType($this, payoutProdProcedure(3, 'RETINOGRAFIA'), 'EXAME');
+        $schedule = payoutProdSchedule($this, ['visit_id' => $type->id, 'doctor_id' => $this->otherDoctor->id]);
+        payoutProdExam($this, $oct, ['schedule_id' => $schedule->id]); // feito pelo médico 1
+
+        expect(payoutProdRun($this)->sole()->sourceType)->toBe(DoctorPayoutSourceType::PatientExam)
+            ->and(payoutProdRun($this, $this->otherDoctor)->sole()->sourceType)->toBe(DoctorPayoutSourceType::Schedule);
+    });
+
+    it('[GAP] agendamento de exame trocado de PACIENTE: o exame do paciente antigo não é engolido pelo agendamento do novo', function () {
+        $oct          = ExamType::factory()->create(['name' => 'OCT']);
+        $type         = payoutProdVisitType($this, payoutProdProcedure(3, 'RETINOGRAFIA'), 'EXAME');
+        $otherPatient = Patient::factory()->create(['entity_id' => $this->entity->id, 'covenant_id' => $this->ansCovenant->id]);
+        $schedule     = payoutProdSchedule($this, ['visit_id' => $type->id, 'patient_id' => $otherPatient->id]);
+        payoutProdExam($this, $oct, ['schedule_id' => $schedule->id]); // exame do paciente 1
+
+        $items = payoutProdRun($this);
+
+        expect($items)->toHaveCount(2)
+            ->and($items->pluck('sourceType')->all())->toContain(DoctorPayoutSourceType::Schedule)
+            ->and($items->pluck('sourceType')->all())->toContain(DoctorPayoutSourceType::PatientExam);
+    });
+
+    it('[GAP] exame com vínculo desatualizado não empresta o tipo de exame ao agendamento', function () {
+        $oct          = ExamType::factory()->create(['name' => 'OCT']);
+        $type         = payoutProdVisitType($this, payoutProdProcedure(3, 'RETINOGRAFIA'), 'EXAME');
+        $otherPatient = Patient::factory()->create(['entity_id' => $this->entity->id, 'covenant_id' => $this->ansCovenant->id]);
+        $schedule     = payoutProdSchedule($this, ['visit_id' => $type->id, 'patient_id' => $otherPatient->id]);
+        payoutProdExam($this, $oct, ['schedule_id' => $schedule->id]); // exame de OUTRO paciente
+
+        $scheduleItem = payoutProdBySource(payoutProdRun($this), DoctorPayoutSourceType::Schedule, $schedule->id);
+
+        expect($scheduleItem)->not->toBeNull()
+            ->and($scheduleItem->examTypeId)->toBeNull()
+            ->and($scheduleItem->description)->toBe('RETINOGRAFIA');
+    });
+
+    it('vínculo que ainda vale (mesmo paciente, dia e médico; horário diferente) continua suprimindo o exame', function () {
+        $oct      = ExamType::factory()->create(['name' => 'OCT']);
+        $type     = payoutProdVisitType($this, payoutProdProcedure(3, 'RETINOGRAFIA'), 'EXAME');
+        $schedule = payoutProdSchedule($this, ['visit_id' => $type->id, 'date_time' => '2026-06-10 07:30:00']);
+        payoutProdExam($this, $oct, ['schedule_id' => $schedule->id, 'exam_performed_at' => '2026-06-10 18:45:00']);
+
+        expect(payoutProdRun($this)->sole()->sourceType)->toBe(DoctorPayoutSourceType::Schedule);
+    });
+});

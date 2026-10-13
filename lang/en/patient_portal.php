@@ -6,6 +6,17 @@
  * by accepting each clinic's invitation (signed in and confirming the password).
  */
 return [
+    'auth' => [
+        'invalid_credentials' => 'Invalid credentials.',
+        'session_expired'     => 'Your session has expired. Please sign in again to continue.',
+    ],
+
+    'password' => [
+        // Never distinguish a registered e-mail from an unregistered one here
+        // (see PatientPasswordResetLinkController) — account enumeration.
+        'reset_link_sent' => 'If this e-mail is registered, you will receive a password reset link.',
+    ],
+
     // Clinic with suspended service: the portal is view-only (never tell the
     // patient why — no payment/subscription talk).
     'read_only' => [

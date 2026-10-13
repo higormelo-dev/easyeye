@@ -11,6 +11,10 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'rescheduled']);
 
+// Ponto em "bs.modal" seria lido como modificador pelo Vue — ver
+// BulkCancelModal.vue (mesmo bug, EE-13).
+const HIDDEN_BS_MODAL_EVENT = 'hidden.bs.modal';
+
 const dateTime = ref('');
 const doctorId = ref('');
 // Encaixe: começa como o agendamento é (a recepção desmarca se o novo
@@ -81,7 +85,7 @@ function onHidden() {
 
 <template>
     <Teleport to="body">
-        <div id="rescheduleModal" class="modal fade" tabindex="-1" @hidden.bs.modal="onHidden">
+        <div id="rescheduleModal" class="modal fade" tabindex="-1" @[HIDDEN_BS_MODAL_EVENT]="onHidden">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">

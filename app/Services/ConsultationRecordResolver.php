@@ -6,7 +6,7 @@ namespace App\Services;
 
 use App\Models\{MedicalRecord, Patient, PatientExam, Schedule, User};
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
-use App\Support\CurrentDoctor;
+use App\Support\{CurrentDoctor, ExamScheduleLink};
 use Illuminate\Support\Carbon;
 
 /**
@@ -34,11 +34,18 @@ class ConsultationRecordResolver
      */
     public function anchorForExamIds(array $examIds): array
     {
+        // Só ancora num agendamento a que o exame AINDA pertence (mesmo
+        // paciente e dia): agendamento trocado de paciente ou remarcado depois
+        // da captura não leva o laudo pro atendimento (e pro prontuário) de
+        // outro paciente — nesse caso o exame vale como sem agendamento (achado
+        // via revisão adversarial Codex; regra em App\Support\ExamScheduleLink).
         $scheduleId = PatientExam::query()
-            ->whereIn('id', $examIds)
-            ->whereNotNull('schedule_id')
-            ->orderByDesc('created_at')
-            ->value('schedule_id');
+            ->join('schedules as s', 's.id', '=', 'patient_exams.schedule_id')
+            ->whereIn('patient_exams.id', $examIds)
+            ->whereNull('s.deleted_at')
+            ->whereRaw(ExamScheduleLink::compatibleSql('patient_exams', 's'))
+            ->orderByDesc('patient_exams.created_at')
+            ->value('patient_exams.schedule_id');
 
         if ($scheduleId) {
             $dateTime = Schedule::query()->whereKey($scheduleId)->value('date_time');

@@ -4,22 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService};
 use App\Enums\AI\AiRunMode;
-use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey, ScheduleSituation};
+use App\Enums\{ClientRule, DataAccessPurpose, EntityGate, ExamReportRegistry, FeatureKey, ScheduleSituation};
 use App\Enums\ClinicalSafety\{AllergyCategory, AllergySeverity, AllergyStatus, MedicationSource};
-use App\Exceptions\{AttendanceRequiresCashEntryException, LockedMedicalRecordException};
+use App\Exceptions\{AttendanceRequiresCashEntryException, LockedMedicalRecordException, StaleMedicalRecordRevisionException};
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
     MedicalRecord, MedicalRecordDocumentation, NearPointConvergence, Patient, PatientDocumentShare, Schedule, ScheduleSituationLog, User, VisualAcuityType};
 use App\Models\{ReportSetting, ReportSettingContent};
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Services\Documents\DoctorDocumentTemplateService;
-use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, ProcedureSolicitationService, ScheduleService, UsageMeterService};
+use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, MedicalRecordSignatureService, ProcedureSolicitationService, ScheduleService, UsageMeterService};
 use App\Services\MedicalRecords\MedicalRecordDraftService;
 use App\Support\{BrazilianFormat, ContactLensUse, CurrentDoctor, PatientAccess};
 use App\Support\Documents\DocumentDate;
 use App\Traits\LogsDataAccess;
 use Carbon\Carbon;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -41,6 +42,7 @@ class MedicalRecordsController extends Controller
         private readonly AiPaywallService $aiPaywall,
         private readonly MedicalRecordDraftService $drafts,
         private readonly PatientClinicalSafetyService $clinicalSafety,
+        private readonly MedicalRecordSignatureService $signatureService,
     ) {
     }
 
@@ -115,7 +117,15 @@ class MedicalRecordsController extends Controller
         // CFM Res. 2.227/2018 + LGPD Art. 37 — registra acesso à lista de prontuários do paciente
         $this->logAccess($patient, DataAccessPurpose::PatientCare);
 
-        $records = MedicalRecord::with(['doctor.person', 'doctor.entityUser', 'documentations'])
+        // withCount() (não ->with('documentations')): só a CONTAGEM é usada
+        // abaixo — carregar a relação inteira trazia metadata de TODAS as
+        // documentações de TODOS os 10 prontuários da página, inclusive
+        // bytes de imagem embutida (~27 MiB em base64 por laudo com imagem
+        // — ReportImageBlockBuilder/EyeImageReportController::store()); 20
+        // laudos nessa faixa já excedem o memory_limit configurado, nunca
+        // usados pra nada aqui (achado via revisão adversarial Codex).
+        $records = MedicalRecord::with(['doctor.person', 'doctor.entityUser'])
+            ->withCount('documentations')
             ->where('patient_id', $patient->id)
             ->orderBy('created_at', 'desc')
             ->paginate($request->integer('per_page', 10));
@@ -133,7 +143,7 @@ class MedicalRecordsController extends Controller
                 'is_signed'            => $r->isSigned(),
                 'is_locked'            => $r->isLocked(),
                 'signed_at'            => $r->signed_at?->format('d/m/Y H:i'),
-                'documentations_count' => $r->documentations->count(),
+                'documentations_count' => $r->documentations_count,
                 'edit_url'             => route('panel.patients.medicalrecords.edit', [$patient, $r]),
                 'show_url'             => route('panel.patients.medicalrecords.show', [$patient, $r]),
                 'pdf_url'              => route('panel.patients.medicalrecords.pdf', [$patient, $r]),
@@ -225,8 +235,20 @@ class MedicalRecordsController extends Controller
             'lensAway',
             'lensNear',
             'signedBy.user',
-            'documentations.doctor.person',
-            'documentations.aiRun',
+            // Projeção de colunas (nunca metadata/content): laudo com
+            // imagem embutida pode ter ~27 MiB em base64 no metadata
+            // (ReportImageBlockBuilder/EyeImageReportController::store())
+            // — a serialização abaixo nunca lê esse campo, só os listados
+            // aqui (achado via revisão adversarial Codex). medical_record_id
+            // é obrigatório mesmo sem uso direto: é a FK que o Eloquent usa
+            // pra casar cada linha de volta ao prontuário certo no hasMany.
+            'documentations' => fn ($query) => $query
+                ->select([
+                    'id', 'medical_record_id', 'doctor_id', 'type', 'title', 'created_at',
+                    'document_date', 'ai_run_id',
+                    'requesting_doctor_name', 'requesting_doctor_email', 'requesting_doctor_sent_at',
+                ])
+                ->with(['doctor.person', 'aiRun']),
         ]);
 
         // Portal do Paciente (Fase 2) — grant ativo por documentação, numa
@@ -302,6 +324,12 @@ class MedicalRecordsController extends Controller
             'is_signed'           => $medicalrecord->isSigned(),
             'signed_at_formatted' => $medicalrecord->signed_at?->format('d/m/Y H:i'),
             'signed_by_name'      => $medicalrecord->signedBy?->user?->name,
+            'sign_url'            => route('panel.patients.medicalrecords.sign', [$patient, $medicalrecord]),
+            // Token de concorrência (achado via revisão adversarial Codex):
+            // a tela precisa devolver EXATAMENTE isto ao assinar, pra
+            // MedicalRecordsController::sign() rejeitar um clique sobre
+            // conteúdo que outra sessão já editou nesse meio-tempo.
+            'clinical_revision' => $medicalrecord->clinical_revision,
             // Documentações
             'documentations' => $medicalrecord->documentations->map(fn ($d) => [
                 'id'          => $d->id,
@@ -341,9 +369,18 @@ class MedicalRecordsController extends Controller
         $patient->load(['person', 'covenant', 'covenantPlan', 'skinType', 'irisType']);
         $medicalrecord->load([
             'doctor.person',
-            'documentations.doctor.person',
-            'documentations.reportSettingContent',
-            'documentations.aiRun',
+            // Mesma projeção de colunas de show() acima (nunca metadata/
+            // content) — report_setting_content_id entra aqui porque,
+            // diferente de show(), esta tela também carrega
+            // reportSettingContent (belongsTo — precisa da própria FK
+            // presente pra resolver, mesmo sem ela aparecer na seleção).
+            'documentations' => fn ($query) => $query
+                ->select([
+                    'id', 'medical_record_id', 'doctor_id', 'type', 'title', 'created_at',
+                    'document_date', 'ai_run_id', 'report_setting_content_id',
+                    'requesting_doctor_name', 'requesting_doctor_email', 'requesting_doctor_sent_at',
+                ])
+                ->with(['doctor.person', 'reportSettingContent', 'aiRun']),
             'files',
         ]);
 
@@ -370,7 +407,12 @@ class MedicalRecordsController extends Controller
         unset($validated['flow_action'], $validated['post_save_action']);
 
         try {
-            $this->service->update($medicalrecord, $validated);
+            // O service grava numa instância FRESCA e travada e devolve ela: o
+            // que vem a seguir (rascunho, Finalizar/Dilatar/Exame) tem que ler
+            // o prontuário como ficou salvo — um schedule_id novo só existe
+            // nessa instância, não no $medicalrecord resolvido no início da
+            // requisição (achado via revisão adversarial Codex).
+            $medicalrecord = $this->service->update($medicalrecord, $validated);
         } catch (LockedMedicalRecordException) {
             return back()->with('error', __('actions.medical_records.locked'));
         }
@@ -423,6 +465,47 @@ class MedicalRecordsController extends Controller
         return redirect()
             ->route('panel.patients.medicalrecords.index', $patient)
             ->with('message', __('actions.medical_records.restored'));
+    }
+
+    /**
+     * Assinatura eletrônica do prontuário (CFM Res. 2.227/2018). A rota é
+     * aberta a admin/doctor/secretary (mesmo grupo de leitura), mas o ato em
+     * si é exclusivo do médico — Gate IssueReport, mesmo padrão já usado em
+     * evoluções e procedimentos estruturados. Achado via auditoria de
+     * encerramento (EE-06): o serviço de assinatura e a UI já existiam, mas
+     * nenhuma rota chamava o serviço.
+     *
+     * clinical_revision é OBRIGATÓRIO (achado via revisão adversarial
+     * Codex): sem ele, o clique em "Assinar" travava em definitivo o que
+     * estivesse no banco na hora da requisição, nunca o que o médico de
+     * fato tinha revisado na tela — outra aba/usuário podia ter editado o
+     * conteúdo entre o carregamento da tela e o clique. A comparação de
+     * verdade roda sob o MESMO lock de Signable::whileUnlocked() (ver
+     * Signable::sign()), nunca aqui fora da transação.
+     */
+    public function sign(Request $request, Patient $patient, MedicalRecord $medicalrecord): RedirectResponse
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+
+        $entity = Entity::findOrFail((string) session('selected_entity_id'));
+        Gate::authorize(EntityGate::IssueReport->value, $entity);
+
+        $doctor = CurrentDoctor::issuer()?->loadMissing('entityUser');
+        abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
+
+        $validated = $request->validate([
+            'clinical_revision' => ['required', 'integer', 'min:1'],
+        ]);
+
+        try {
+            $this->signatureService->sign($medicalrecord, $doctor->entityUser, (int) $validated['clinical_revision']);
+        } catch (LockedMedicalRecordException) {
+            return back()->with('error', __('actions.medical_records.already_signed'));
+        } catch (StaleMedicalRecordRevisionException) {
+            return back()->with('error', __('actions.medical_records.sign_stale_revision'));
+        }
+
+        return back()->with('success', __('actions.medical_records.sign_success'));
     }
 
     /**
@@ -1275,6 +1358,16 @@ class MedicalRecordsController extends Controller
                     'panel.patients.medicalrecords.documentations.pdf',
                     [$r->patient_id, $r, $d],
                 ),
+                // Médico solicitante (Fase 5 / Eye Images) — só presente em
+                // laudos emitidos com e-mail de encaminhamento. O botão de
+                // reenvio na tela do laudo recém-emitido (EyeImageReportModal)
+                // some ao fechar/reabrir o modal; esta é a ÚNICA outra tela
+                // onde um laudo JÁ EMITIDO reaparece depois, então é aqui que
+                // "Reenviar"/renovar o link de 7 dias continua alcançável
+                // (achado via revisão Codex).
+                'requesting_doctor_name'    => $d->requesting_doctor_name,
+                'requesting_doctor_email'   => $d->requesting_doctor_email,
+                'requesting_doctor_sent_at' => $d->requesting_doctor_sent_at?->format('d/m/Y H:i'),
             ])->all(),
 
             // Anexos já enviados — consumido pela lista no rodapé do form

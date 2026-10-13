@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Enums\MedicalRecordProcedureStatus;
 use App\Models\Concerns\BelongsToEntity;
-use App\Traits\{Auditable, HasAuditColumns};
+use App\Traits\{Auditable, GuardedBySignedRecord, HasAuditColumns};
 use Illuminate\Database\Eloquent\{Builder, Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
@@ -21,11 +21,22 @@ use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
  * médico via Gate IssueReport — ver
  * App\Http\Controllers\MedicalRecordProceduresController (mesmo padrão de
  * MedicalRecordEvolutionsController).
+ *
+ * GuardedBySignedRecord: solicitar, alterar o PEDIDO (olho, tipo, catálogo,
+ * texto original) ou excluir é recusado com o prontuário de origem ASSINADO e,
+ * antes disso, sobe o clinical_revision dele. O CICLO DE VIDA (status,
+ * executed_at, executed_by, notes) é a exceção deliberada: a lista de
+ * procedimentos atravessa os prontuários do paciente e executa/cancela, num
+ * atendimento de hoje, o que foi pedido num atendimento antigo já assinado —
+ * ver signedRecordWritableAttributes() e
+ * MedicalRecordProcedureExecutionService (nunca sobrescreve o texto do
+ * pedido assinado).
  */
 class MedicalRecordProcedure extends Model
 {
     use Auditable;
     use BelongsToEntity;
+    use GuardedBySignedRecord;
     use HasAuditColumns;
     use HasUuids;
     use SoftDeletes;
@@ -65,6 +76,17 @@ class MedicalRecordProcedure extends Model
             'status'      => MedicalRecordProcedureStatus::class,
             'executed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Colunas que mudam no ciclo de vida requested → done|cancelled e que
+     * seguem graváveis com o prontuário de origem assinado.
+     *
+     * @return list<string>
+     */
+    protected function signedRecordWritableAttributes(): array
+    {
+        return ['status', 'executed_at', 'executed_by', 'notes'];
     }
 
     public function medicalRecord(): BelongsTo

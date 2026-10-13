@@ -63,7 +63,7 @@ async function load() {
     } catch (e) {
         if (isAbortError(e) || !req.current()) return;
         errorMsg.value = tt('view_error', 'Não foi possível carregar o prontuário.');
-        // eslint-disable-next-line no-console
+
         console.error('[MedicalRecordView] falha ao carregar prontuário:', e);
     } finally {
         if (req.current()) loading.value = false;

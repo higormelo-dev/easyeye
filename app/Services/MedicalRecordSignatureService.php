@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Exceptions\LockedMedicalRecordException;
+use App\Exceptions\{LockedMedicalRecordException, StaleMedicalRecordRevisionException};
 use App\Models\{EntityUser, MedicalRecord};
 use App\Services\MedicalRecords\MedicalRecordDraftService;
 use Illuminate\Database\Eloquent\Collection;
@@ -20,10 +20,14 @@ class MedicalRecordSignatureService
      * Assina um prontuário em nome de um médico (EntityUser).
      * Após a assinatura o prontuário fica bloqueado para edições.
      *
-     * @throws LockedMedicalRecordException se o prontuário já estiver assinado
-     * @throws InvalidArgumentException     se o EntityUser não for um médico
+     * $expectedRevision: ver Signable::sign() — null pula a checagem de
+     * revisão (callers internos que não vêm de uma tela).
+     *
+     * @throws LockedMedicalRecordException        se o prontuário já estiver assinado
+     * @throws InvalidArgumentException            se o EntityUser não for um médico
+     * @throws StaleMedicalRecordRevisionException se $expectedRevision não bate com o atual
      */
-    public function sign(MedicalRecord $record, EntityUser $entityUser): MedicalRecord
+    public function sign(MedicalRecord $record, EntityUser $entityUser, ?int $expectedRevision = null): MedicalRecord
     {
         if (! $entityUser->doctor) {
             throw new InvalidArgumentException(
@@ -31,7 +35,7 @@ class MedicalRecordSignatureService
             );
         }
 
-        $record->sign($entityUser);
+        $record->sign($entityUser, $expectedRevision);
 
         // Assinado = imutável: nenhum rascunho (autosave) dele sobrevive.
         app(MedicalRecordDraftService::class)->purgeForRecord($record);

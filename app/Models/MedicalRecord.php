@@ -25,6 +25,19 @@ class MedicalRecord extends Model
     protected $primaryKey = 'id';
 
     /**
+     * clinical_revision nasce em 1 no PHP, não só no banco (migration
+     * default(1)) — sem isto, a instância recém-criada em memória (antes de
+     * um reload) mostraria null pro primeiro show() da tela, e o 1º
+     * clinical_revision enviado ao assinar não bateria com o que o banco
+     * de fato tem (mesmo achado de EyeImageReportDraft::$attributes).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'clinical_revision' => 1,
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -147,6 +160,24 @@ class MedicalRecord extends Model
                 );
             }
         });
+
+        // Token de concorrência do endpoint de assinatura (achado via
+        // revisão adversarial Codex): incrementado a cada atualização bem-
+        // sucedida, pra MedicalRecordsController::sign() exigir a revisão
+        // que o médico de fato revisou (StaleMedicalRecordRevisionException
+        // se outra aba/usuário editou o conteúdo depois). Documento e anexo
+        // (GuardedBySignedRecord) também sobem esta coluna, direto no banco
+        // — por isso quem grava o prontuário precisa de instância FRESCA sob
+        // lock (MedicalRecordService::update), senão o +1 em memória partiria
+        // de um valor defasado. Registrado em
+        // booted() (não num bootXxx() de trait) de propósito: roda DEPOIS
+        // do updating de Signable (guard de prontuário travado, que já
+        // bloqueia esta linha de rodar se is_locked) e DEPOIS do updating de
+        // Versionable (o snapshot precisa capturar a revisão ANTERIOR ao
+        // incremento, não a nova).
+        static::updating(function (self $record) {
+            $record->clinical_revision = ((int) $record->clinical_revision) + 1;
+        });
     }
 
     /**
@@ -251,6 +282,28 @@ class MedicalRecord extends Model
         });
     }
 
+    /**
+     * Trava a linha do prontuário (FOR UPDATE, sem escopos) e diz se ele já
+     * está ASSINADO — a mesma trava que Signable::sign() toma, então quem
+     * escreve conteúdo clínico filho (documento, anexo, evolução,
+     * procedimento) e quem assina se serializam: o que chega depois enxerga o
+     * resultado do outro. O lock vale até o fim da transação ABERTA pelo
+     * caller (sem transação, o FOR UPDATE solta na hora). Prontuário
+     * inexistente ou id nulo contam como não assinado.
+     */
+    public static function lockAndCheckSigned(mixed $recordId): bool
+    {
+        if ($recordId === null) {
+            return false;
+        }
+
+        return (bool) static::query()
+            ->withoutGlobalScopes()
+            ->whereKey($recordId)
+            ->lockForUpdate()
+            ->value('is_locked');
+    }
+
     private static function codeNumberingLockKey(?string $entityId): int
     {
         return self::advisoryLockKey(self::CODE_LOCK_NAMESPACE, $entityId ?? 'global');
@@ -291,6 +344,7 @@ class MedicalRecord extends Model
             'contact_lens_use'         => 'array',
             'medications_snapshot'     => 'array',
             'allergies_snapshot'       => 'array',
+            'clinical_revision'        => 'integer',
         ];
     }
 
@@ -305,6 +359,22 @@ class MedicalRecord extends Model
     protected function signatureOptionalAttributes(): array
     {
         return ['contact_lens_calculation', 'contact_lens_use', 'medications_snapshot', 'allergies_snapshot'];
+    }
+
+    /**
+     * clinical_revision é só o token de concorrência do endpoint de
+     * assinatura (achado via revisão adversarial Codex) — nasce com
+     * default(1) no banco até pra prontuários assinados ANTES desta
+     * coluna existir (backfill da migration, nunca null), então
+     * signatureOptionalAttributes() não bastaria aqui: incluir mudaria o
+     * hash dessas assinaturas antigas sem o conteúdo clínico em si ter
+     * mudado.
+     *
+     * @return list<string>
+     */
+    protected function signatureExcludedAttributes(): array
+    {
+        return ['clinical_revision'];
     }
 
     /**

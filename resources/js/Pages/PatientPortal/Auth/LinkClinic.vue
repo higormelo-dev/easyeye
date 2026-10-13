@@ -73,7 +73,7 @@ function logout() {
                     </div>
                 </template>
 
-                <form v-else @submit.prevent="submit" novalidate>
+                <form v-else novalidate @submit.prevent="submit">
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary btn-lg fw-semibold" :disabled="form.processing">
                             <i v-if="form.processing" class="ti ti-loader-2 ee-spin me-1" aria-hidden="true"></i>

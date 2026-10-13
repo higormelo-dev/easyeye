@@ -50,7 +50,7 @@ class PatientAuthenticatedSessionController extends Controller
 
         if (! $guard->attempt($credentials, $request->boolean('remember'))) {
             throw ValidationException::withMessages([
-                'email' => 'Credenciais inválidas.',
+                'email' => __('patient_portal.auth.invalid_credentials'),
             ]);
         }
 
@@ -61,7 +61,7 @@ class PatientAuthenticatedSessionController extends Controller
             $guard->logout();
 
             throw ValidationException::withMessages([
-                'email' => 'Este acesso foi desativado. Entre em contato com a clínica.',
+                'email' => __('patient_portal.invitation.account_disabled'),
             ]);
         }
 

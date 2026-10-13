@@ -61,6 +61,25 @@ test('login do paciente falha com senha incorreta', function () {
     expect(Auth::guard('patient')->check())->toBeFalse();
 });
 
+test('EE-14: senha incorreta devolve mensagem traduzida, pt_BR por padrao e en com locale', function () {
+    $person  = People::factory()->create();
+    $account = PatientAccount::factory()->create([
+        'person_id' => $person->id,
+        'email'     => 'paciente@teste.com',
+    ]);
+
+    $this->post(route('patient-portal.login.store'), [
+        'email'    => $account->email,
+        'password' => 'senha-errada',
+    ])->assertSessionHasErrors(['email' => 'Credenciais inválidas.']);
+
+    $this->withSession(['locale' => 'en'])
+        ->post(route('patient-portal.login.store'), [
+            'email'    => $account->email,
+            'password' => 'senha-errada',
+        ])->assertSessionHasErrors(['email' => 'Invalid credentials.']);
+});
+
 test('conta desativada (kill-switch) nao consegue logar mesmo com senha correta', function () {
     $person  = People::factory()->create();
     $account = PatientAccount::factory()->create([
@@ -75,6 +94,33 @@ test('conta desativada (kill-switch) nao consegue logar mesmo com senha correta'
     ])->assertSessionHasErrors('email');
 
     expect(Auth::guard('patient')->check())->toBeFalse();
+});
+
+test('EE-14: conta desativada no login reaproveita a mensagem traduzida do convite (pt_BR e en)', function () {
+    // Mesma chave de lang/*/patient_portal.php usada por InvitationController
+    // (invitation.account_disabled) — propositalmente reaproveitada aqui em
+    // vez de duplicada, pra login e convite nunca divergirem de texto.
+    $person  = People::factory()->create();
+    $account = PatientAccount::factory()->create([
+        'person_id' => $person->id,
+        'email'     => 'paciente@teste.com',
+        'active'    => false,
+    ]);
+
+    $this->post(route('patient-portal.login.store'), [
+        'email'    => $account->email,
+        'password' => 'password',
+    ])->assertSessionHasErrors([
+        'email' => 'O acesso deste e-mail ao Portal do Paciente está desativado. Entre em contato com a clínica.',
+    ]);
+
+    $this->withSession(['locale' => 'en'])
+        ->post(route('patient-portal.login.store'), [
+            'email'    => $account->email,
+            'password' => 'password',
+        ])->assertSessionHasErrors([
+            'email' => 'Patient Portal access for this e-mail is disabled. Please contact the clinic.',
+        ]);
 });
 
 test('logout do paciente encerra somente o guard patient', function () {
@@ -147,4 +193,18 @@ test('esqueci-senha do paciente: e-mail inexistente devolve a MESMA mensagem gen
     ])
         ->assertSessionHasNoErrors()
         ->assertSessionHas('status', 'Se este e-mail estiver cadastrado, você vai receber um link de redefinição de senha.');
+});
+
+test('EE-14: esqueci-senha respeita locale en, nos dois casos (existente e inexistente)', function () {
+    $account = PatientAccount::factory()->create();
+
+    $this->withSession(['locale' => 'en'])
+        ->post(route('patient-portal.password.email'), ['email' => $account->email])
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('status', 'If this e-mail is registered, you will receive a password reset link.');
+
+    $this->withSession(['locale' => 'en'])
+        ->post(route('patient-portal.password.email'), ['email' => 'ninguem-' . uniqid() . '@teste.com'])
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('status', 'If this e-mail is registered, you will receive a password reset link.');
 });

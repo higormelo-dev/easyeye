@@ -286,7 +286,7 @@ function clv2SignRaw(MedicalRecord $record, string $signerId, array $withoutColu
     $signedAt = now()->startOfSecond();
     $content  = array_diff_key(
         $record->getAttributes(),
-        array_flip(['signed_by', 'signed_at', 'signature_hash', 'is_locked', ...$withoutColumns]),
+        array_flip(['signed_by', 'signed_at', 'signature_hash', 'is_locked', 'clinical_revision', ...$withoutColumns]),
     );
 
     // Como o Signable: colunas opcionais vazias (criadas depois — ex.: as da

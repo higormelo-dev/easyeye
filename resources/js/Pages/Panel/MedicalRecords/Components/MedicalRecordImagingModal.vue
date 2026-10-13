@@ -140,8 +140,21 @@ function pick(exam) {
                                     <div
                                         class="flex-grow-1 d-flex align-items-center justify-content-center overflow-hidden"
                                     >
+                                        <!-- Vídeo capturado pela câmera (Fase 5 / 6a) tem display_url/
+                                             original_url apontando pro próprio arquivo .webm/.mp4 — sem
+                                             is_video, caía aqui como <img> (ícone quebrado). Mesmo padrão
+                                             já usado no painel principal do Gerenciador de Imagens
+                                             (EyeImages/Index.vue): <video controls> em vez de <img>
+                                             (achado via revisão Codex). -->
+                                        <video
+                                            v-if="selected.is_video && selected.display_url"
+                                            :src="selected.display_url"
+                                            controls
+                                            class="rounded"
+                                            style="max-height: 62vh; max-width: 100%"
+                                        ></video>
                                         <img
-                                            v-if="selected.display_url"
+                                            v-else-if="selected.display_url"
                                             :src="selected.display_url"
                                             :alt="selected.exam_type ?? 'Exame'"
                                             class="img-fluid rounded"
@@ -165,8 +178,12 @@ function pick(exam) {
                                         :class="{ active: selected && selected.id === exam.id }"
                                         @click="pick(exam)"
                                     >
+                                        <!-- Miniatura de vídeo exclui, não tenta <img> (sem poster-frame
+                                             gerado ainda — mesmo padrão do painel principal, que só troca
+                                             por <video> na visualização ampliada acima, nunca na lista —
+                                             achado via revisão Codex). -->
                                         <img
-                                            v-if="exam.thumb_url"
+                                            v-if="exam.thumb_url && !exam.is_video"
                                             :src="exam.thumb_url"
                                             alt=""
                                             class="rounded border flex-shrink-0"
@@ -176,7 +193,10 @@ function pick(exam) {
                                             v-else
                                             class="rounded border bg-light d-inline-flex align-items-center justify-content-center flex-shrink-0"
                                             style="width: 56px; height: 42px"
-                                            ><i class="fas fa-file-medical text-muted"></i
+                                            ><i
+                                                :class="exam.is_video ? 'fas fa-video' : 'fas fa-file-medical'"
+                                                class="text-muted"
+                                            ></i
                                         ></span>
                                         <span class="text-start small lh-sm">
                                             <span class="d-block fw-semibold text-truncate" style="max-width: 180px">

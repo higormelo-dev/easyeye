@@ -78,3 +78,16 @@ test('login efetuado no guard patient nunca autentica no guard web', function ()
 
     expect(Auth::guard('web')->check())->toBeFalse();
 });
+
+test('EE-14: mensagem de sessao expirada (401 JSON) vem traduzida, pt_BR por padrao', function () {
+    $this->getJson('/_test/patient-only')
+        ->assertUnauthorized()
+        ->assertJson(['message' => 'Sua sessão expirou. Faça login novamente para continuar.']);
+});
+
+test('EE-14: mensagem de sessao expirada (401 JSON) respeita locale en', function () {
+    $this->withSession(['locale' => 'en'])
+        ->getJson('/_test/patient-only')
+        ->assertUnauthorized()
+        ->assertJson(['message' => 'Your session has expired. Please sign in again to continue.']);
+});

@@ -8,7 +8,7 @@ use App\Models\{Entity, MedicalRecord, Patient};
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Support\ContactLensUse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\{DB, Gate};
 
 /**
  * Encapsula a lógica de negócio do prontuário médico.
@@ -41,18 +41,24 @@ class MedicalRecordService
     /**
      * Atualiza um prontuário existente — lança exceção se estiver assinado/bloqueado.
      *
+     * A gravação é feita numa instância FRESCA e travada, que é a devolvida;
+     * $record NÃO é atualizado em memória. Quem precisa dos valores salvos
+     * (ex.: um schedule_id novo) usa o retorno, nunca o $record que passou.
+     *
      * @throws LockedMedicalRecordException
      */
     public function update(MedicalRecord $record, array $data): MedicalRecord
     {
-        // A trait Signable já lança LockedMedicalRecordException em updating se is_locked=true
-        $patient = Patient::query()->withoutGlobalScopes()->findOrFail($record->patient_id);
+        $patient  = Patient::query()->withoutGlobalScopes()->findOrFail($record->patient_id);
+        $snapshot = $this->clinicalSafety->snapshot($patient);
 
         // Retrato refeito a cada salvar: o prontuário reflete o que estava
         // ativo quando o médico salvou/finalizou a consulta (Fase 2 / A2).
-        $record->update(array_merge($this->normalize($data), $this->clinicalSafety->snapshot($patient)));
+        return $this->whileUnlocked($record, function (MedicalRecord $locked) use ($data, $snapshot) {
+            $locked->update(array_merge($this->normalize($data), $snapshot));
 
-        return $record->fresh();
+            return $locked;
+        });
     }
 
     /**
@@ -62,11 +68,41 @@ class MedicalRecordService
      */
     public function delete(MedicalRecord $record): void
     {
-        if ($record->is_locked) {
-            throw new LockedMedicalRecordException();
-        }
+        $this->whileUnlocked($record, function (MedicalRecord $locked) {
+            $locked->delete();
+        });
+    }
 
-        $record->delete();
+    /**
+     * Roda $change com o prontuário travado no banco (FOR UPDATE) e só se
+     * ainda NÃO estiver assinado — a trait Signable (hooks updating/
+     * deleting) só confere is_locked em memória, na instância que o
+     * controller resolveu no início da requisição; uma instância antiga
+     * (is_locked=false em memória) passava pelo guard mesmo com o registro
+     * já assinado por outra conexão nesse meio-tempo. Travar a linha aqui
+     * serializa editar/excluir contra assinar no banco, não só em memória
+     * (achado via auditoria de encerramento, EE-04). $change recebe a
+     * linha FRESCA e travada, nunca $record (que pode estar desatualizado).
+     *
+     * @template T
+     *
+     * @param callable(MedicalRecord): T $change
+     *
+     * @return T
+     *
+     * @throws LockedMedicalRecordException
+     */
+    private function whileUnlocked(MedicalRecord $record, callable $change): mixed
+    {
+        return DB::transaction(function () use ($record, $change) {
+            $locked = MedicalRecord::query()->whereKey($record->getKey())->lockForUpdate()->first();
+
+            if ($locked === null || $locked->is_locked) {
+                throw new LockedMedicalRecordException();
+            }
+
+            return $change($locked);
+        });
     }
 
     /**

@@ -442,8 +442,8 @@ watch(
                             @drop="onDrop"
                         >
                             <input
-                                type="file"
                                 id="upload-picker"
+                                type="file"
                                 multiple
                                 :accept="quota.accept"
                                 :disabled="isFull"

@@ -21,12 +21,20 @@ class DataAccessLogService
      * @param DataAccessPurpose $purpose       Finalidade do acesso
      * @param string|null       $justification Obrigatório para EmergencyAccess
      * @param string|null       $patientId     UUID do paciente; inferido automaticamente se possível
+     * @param string|null       $entityId      Clínica dona do recurso, quando o chamador já sabe
+     *                                         (ex.: rota pública sem sessão) — tem prioridade sobre
+     *                                         session('selected_entity_id'); sem isso, acesso
+     *                                         anônimo (ou de visitante autenticado noutra clínica)
+     *                                         gravava entity_id null ou da clínica ERRADA, e o
+     *                                         registro desaparecia (ou vazava) do relatório de
+     *                                         auditoria da clínica certa (achado via revisão Codex).
      */
     public function log(
         Model $resource,
         DataAccessPurpose $purpose,
         ?string $justification = null,
         ?string $patientId = null,
+        ?string $entityId = null,
     ): void {
         if ($purpose->requiresJustification() && blank($justification)) {
             Log::warning('DataAccessLogService: acesso emergencial sem justificativa', [
@@ -37,7 +45,17 @@ class DataAccessLogService
         }
 
         DataAccessLog::create([
-            'entity_id' => session('selected_entity_id') ?? $resource->getAttribute('entity_id'),
+            // Clínica DONA DO RECURSO sempre primeiro — nunca a sessão do
+            // ator. Com guard de paciente (portal) ou staff cobrindo outra
+            // clínica, selected_entity_id podia divergir da clínica real do
+            // recurso, e o acesso saía registrado (ou desaparecia) na
+            // clínica errada no relatório de auditoria (achado via
+            // auditoria de encerramento, EE-05). session() só como ÚLTIMO
+            // recurso, pra model sem entity_id OU sem relação validada
+            // (ex.: MedicalRecordDocumentation/PatientExam — chamador deve
+            // passar $entityId explícito nesses casos, resolvido a partir
+            // do paciente já validado).
+            'entity_id' => $entityId ?? $resource->getAttribute('entity_id') ?? session('selected_entity_id'),
             ...AuditContext::integratorActor(),
             ...AuditContext::patientAccountActor(),
             'user_id'       => AuditContext::userId(),
@@ -71,8 +89,10 @@ class DataAccessLogService
 
         foreach ($resources as $resource) {
             $rows[] = [
-                'id'        => (string) Str::orderedUuid(),
-                'entity_id' => session('selected_entity_id') ?? $resource->getAttribute('entity_id'),
+                'id' => (string) Str::orderedUuid(),
+                // Mesma prioridade de log() acima (EE-05) — clínica do
+                // recurso antes da sessão do ator.
+                'entity_id' => $resource->getAttribute('entity_id') ?? session('selected_entity_id'),
                 ...AuditContext::integratorActor(),
                 ...AuditContext::patientAccountActor(),
                 'user_id'        => AuditContext::userId(),

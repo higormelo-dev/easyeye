@@ -190,7 +190,7 @@ function firstError(f) {
                         }}
                     </div>
 
-                    <form @submit.prevent="submit" class="row g-3">
+                    <form class="row g-3" @submit.prevent="submit">
                         <!-- Fornecedor / Cliente (paciente) + Médico -->
                         <div class="col-md-8">
                             <label class="form-label"

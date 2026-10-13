@@ -35,18 +35,23 @@ trait LogsDataAccess
      * @param DataAccessPurpose $purpose       Finalidade do acesso
      * @param string|null       $justification Obrigatório para EmergencyAccess
      * @param string|null       $patientId     UUID do paciente (inferido automaticamente se o model tiver patient_id)
+     * @param string|null       $entityId      Clínica dona do recurso — ver DataAccessLogService::log().
+     *                                         Só precisa ser passado em rota sem sessão de painel
+     *                                         (ex.: link público assinado).
      */
     protected function logAccess(
         Model $resource,
         DataAccessPurpose $purpose = DataAccessPurpose::PatientCare,
         ?string $justification = null,
         ?string $patientId = null,
+        ?string $entityId = null,
     ): void {
         app(DataAccessLogService::class)->log(
             resource: $resource,
             purpose: $purpose,
             justification: $justification,
             patientId: $patientId,
+            entityId: $entityId,
         );
     }
 }

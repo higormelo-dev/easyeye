@@ -350,3 +350,84 @@ describe('Props do formulário', function () {
         expect($response->viewData('page')['props']['urls']['schedules'])->toBe(route('panel.schedules.index'));
     });
 });
+
+/*
+ * Vínculo com a agenda alterado no PRÓPRIO update — achado via revisão
+ * adversarial Codex: MedicalRecordService::update() passou a gravar numa
+ * instância travada e separada, mas o controller continuou usando o
+ * $medicalrecord carregado no início da requisição. Com um schedule_id novo
+ * (anexar ao agendamento que o médico abriu pela Agenda, ou trocar de
+ * agendamento do mesmo paciente), Finalizar/Dilatar/Exame lia o vínculo
+ * ANTIGO: transitava o agendamento errado ou nem transitava.
+ */
+describe('Vínculo com a agenda alterado no próprio update', function () {
+    $actions = [
+        'finish' => ['finish', ScheduleSituation::Attended],
+        'dilate' => ['dilate', ScheduleSituation::Dilating],
+        'exam'   => ['exam', ScheduleSituation::Exam],
+    ];
+
+    beforeEach(function () {
+        $this->anotherSchedule = fn (ScheduleSituation $situation = ScheduleSituation::InProgress) => Schedule::query()->create([
+            'entity_id'  => $this->entity->id,
+            'doctor_id'  => $this->doctor->id,
+            'patient_id' => $this->patient->id,
+            'full_name'  => 'PACIENTE FLUXO (2º agendamento)',
+            'date_time'  => now()->addHours(2),
+            'situation'  => $situation->value,
+            'active'     => true,
+        ]);
+    });
+
+    it('[GAP] update que VINCULA o prontuário a um agendamento aplica o flow_action nesse agendamento', function (string $action, ScheduleSituation $expected) {
+        $record = MedicalRecord::create([
+            'entity_id'      => $this->entity->id,
+            'patient_id'     => $this->patient->id,
+            'doctor_id'      => $this->doctor->id,
+            'main_complaint' => 'Aberto fora da Agenda',
+        ]);
+
+        $this->put(
+            route('panel.patients.medicalrecords.update', [$this->patient, $record]),
+            ($this->payload)(['schedule_id' => $this->schedule->id, 'flow_action' => $action]),
+        )->assertRedirect(route('panel.schedules.index'));
+
+        expect($this->schedule->fresh()->situation)->toBe($expected)
+            ->and($record->fresh()->schedule_id)->toBe($this->schedule->id)
+            ->and(ScheduleSituationLog::where('schedule_id', $this->schedule->id)->count())->toBe(1);
+    })->with($actions);
+
+    it('[GAP] update que TROCA o agendamento vinculado aplica o flow_action no NOVO e não mexe no antigo', function (string $action, ScheduleSituation $expected) {
+        $record = ($this->makeRecord)();
+        $newer  = ($this->anotherSchedule)();
+
+        $this->put(
+            route('panel.patients.medicalrecords.update', [$this->patient, $record]),
+            ($this->payload)(['schedule_id' => $newer->id, 'flow_action' => $action]),
+        )->assertRedirect(route('panel.schedules.index'));
+
+        expect($newer->fresh()->situation)->toBe($expected)
+            ->and($this->schedule->fresh()->situation)->toBe(ScheduleSituation::InProgress)
+            ->and($record->fresh()->schedule_id)->toBe($newer->id)
+            ->and(ScheduleSituationLog::where('schedule_id', $this->schedule->id)->count())->toBe(0)
+            ->and(ScheduleSituationLog::where('schedule_id', $newer->id)->count())->toBe(1);
+    })->with($actions);
+
+    it('[GAP] troca para um agendamento já TERMINAL: o vínculo novo é salvo, nada é reaberto e o antigo NÃO transita', function () {
+        $record = ($this->makeRecord)();
+        $closed = ($this->anotherSchedule)(ScheduleSituation::Cancelled);
+
+        $response = $this->put(
+            route('panel.patients.medicalrecords.update', [$this->patient, $record]),
+            ($this->payload)(['schedule_id' => $closed->id, 'flow_action' => 'dilate']),
+        );
+
+        $response->assertRedirect(route('panel.patients.medicalrecords.edit', [$this->patient, $record]));
+        $response->assertSessionHas('error');
+
+        expect($closed->fresh()->situation)->toBe(ScheduleSituation::Cancelled)
+            ->and($this->schedule->fresh()->situation)->toBe(ScheduleSituation::InProgress)
+            ->and($record->fresh()->schedule_id)->toBe($closed->id)
+            ->and(ScheduleSituationLog::query()->count())->toBe(0);
+    });
+});

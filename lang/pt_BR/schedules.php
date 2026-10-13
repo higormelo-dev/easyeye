@@ -264,6 +264,8 @@ return [
     'cash_installments_required' => 'Informe o número de parcelas (mínimo 1) para pagamento no crédito.',
     'cash_entry_created'         => 'Entrada registrada no caixa com sucesso.',
     'cash_entry_duplicate'       => 'Este agendamento já possui uma entrada no caixa.',
+    'exam_links_removed'         => '{1} 1 exame deixou de estar vinculado a este atendimento.|[2,*] :count exames deixaram de estar vinculados a este atendimento.',
+    'changed_concurrently'       => 'O agendamento foi alterado por outra pessoa enquanto a situação era atualizada. Atualize a agenda e tente novamente.',
     'cash_entry_required'        => 'Lance no caixa (ou marque Cortesia) antes de concluir o atendimento.',
     'cash_copay_notice'          => 'Atendimento de convênio: registre aqui apenas a co-participação do paciente. O valor do convênio é faturado à parte via guia.',
 

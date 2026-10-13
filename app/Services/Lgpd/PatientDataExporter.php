@@ -243,13 +243,23 @@ final class PatientDataExporter
         $byRecord = fn (string $model, array $with = []) => $model::query()->with($with)
             ->whereIn('medical_record_id', $ids)->where('patient_id', $patient->id)
             ->orderBy('created_at')->get()->groupBy('medical_record_id');
-        $documentations = $byRecord(MedicalRecordDocumentation::class);
-        $files          = $byRecord(MedicalRecordFile::class);
-        $evolutions     = $byRecord(MedicalRecordEvolution::class);
-        $procedures     = $byRecord(MedicalRecordProcedure::class, ['procedure']);
-        $versions       = RecordVersion::query()->with('user')
+        $files      = $byRecord(MedicalRecordFile::class);
+        $evolutions = $byRecord(MedicalRecordEvolution::class);
+        $procedures = $byRecord(MedicalRecordProcedure::class, ['procedure']);
+        $versions   = RecordVersion::query()->with('user')
             ->where('versionable_type', MedicalRecord::class)->whereIn('versionable_id', $ids)
             ->orderBy('version')->get()->groupBy('versionable_id');
+
+        // Documentação: NUNCA via get()/cursor() sobre as linhas inteiras. O
+        // metadata de um laudo com imagem embutida chega a ~27 MiB em base64 e
+        // o PDO_PGSQL (libpq) lê o resultado INTEIRO de uma consulta pra
+        // memória nativa do processo no execute() — cursor() só entrega as
+        // linhas uma a uma DEPOIS disso, então o histórico todo ficava
+        // residente antes de qualquer redação (invisível pro memory_limit e
+        // pro memory_get_peak_usage(), fatal pro contêiner; achado via revisão
+        // adversarial Codex). Aqui, uma consulta leve pelos ids e UMA linha por
+        // consulta (chave primária): o que fica residente é um laudo por vez.
+        $documentations = $this->documentationsByRecord($ids, $patient);
 
         $this->loadClinicalNames([
             ...$records->map(fn (MedicalRecord $r) => $r->getAttributes())->all(),
@@ -279,24 +289,8 @@ final class PatientDataExporter
                 'executed_at'       => $this->iso($p->executed_at),
                 'doctor'            => $this->doctorName($p->doctor_id),
             ])->values()->all(),
-            'documentations' => ($documentations[$r->id] ?? collect())->map(fn (MedicalRecordDocumentation $d) => [
-                'type'              => $d->getTypeLabel(),
-                'title'             => $d->title,
-                'content'           => $d->contentForRender(),
-                'generated_with_ai' => filled($d->ai_run_id),
-                // Receita emitida apesar de alergia ativa: motivo e conflitos.
-                'allergy_override' => is_array($d->safety_override) ? [
-                    'reason'    => $d->safety_override['reason'] ?? null,
-                    'conflicts' => $d->safety_override['conflicts'] ?? [],
-                    'at'        => $d->safety_override['at'] ?? null,
-                ] : null,
-                'created_at' => $this->iso($d->created_at),
-                // Fase 2 / Bloco B: data impressa (data alternativa) e dados
-                // estruturados (atestado, CID autorizado, itens do pedido).
-                'document_date' => $d->document_date?->toDateString(),
-                'details'       => is_array($d->metadata) ? $d->metadata : null,
-            ])->values()->all(),
-            'files' => ($files[$r->id] ?? collect())->map(fn (MedicalRecordFile $f) => [
+            'documentations' => $documentations[$r->id] ?? [],
+            'files'          => ($files[$r->id] ?? collect())->map(fn (MedicalRecordFile $f) => [
                 'original_name' => $f->original_name,
                 'mime_type'     => $f->mime_type,
                 'file_size'     => $f->file_size,
@@ -314,6 +308,82 @@ final class PatientDataExporter
                 ],
             ])->values()->all(),
         ])->all();
+    }
+
+    /**
+     * Documentações do paciente já na forma exportada (e redigida), por
+     * prontuário e em ordem cronológica. Só o array pequeno de cada uma fica
+     * retido — o model cru, com o metadata inteiro, é solto a cada volta.
+     *
+     * Ids primeiro (linhas minúsculas, sem metadata), depois UMA consulta por
+     * chave primária por documentação. Não paginar por `id > ?` (lazyById):
+     * numa tabela compartilhada entre clínicas o planejador pode varrer o
+     * índice da chave primária inteiro a cada página.
+     *
+     * @param Collection<int, string> $recordIds
+     *
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private function documentationsByRecord(Collection $recordIds, Patient $patient): array
+    {
+        $refs = MedicalRecordDocumentation::query()
+            ->whereIn('medical_record_id', $recordIds)->where('patient_id', $patient->id)
+            ->orderBy('created_at')->orderBy('id')
+            ->get(['id', 'medical_record_id']);
+
+        $byRecord = [];
+
+        foreach ($refs as $ref) {
+            $documentation = MedicalRecordDocumentation::query()->find($ref->id);
+
+            if ($documentation === null) { // removida entre as duas leituras
+                continue;
+            }
+
+            $byRecord[$ref->medical_record_id][] = $this->documentationData($documentation);
+
+            unset($documentation);
+        }
+
+        return $byRecord;
+    }
+
+    /**
+     * Forma exportada de UMA documentação (já redigida) — chamada uma vez por
+     * documentação em documentationsByRecord(), nunca sobre o conjunto.
+     *
+     * @return array<string, mixed>
+     */
+    private function documentationData(MedicalRecordDocumentation $d): array
+    {
+        return [
+            'type'  => $d->getTypeLabel(),
+            'title' => $d->title,
+            // contentWithoutDateHeader() (NUNCA contentForRender()): este
+            // último injeta de volta o byte da imagem inline embutida
+            // (metadata.inline_images) no HTML — ignorando por completo a
+            // redação de redactImageReportBytes() abaixo (achado via
+            // revisão adversarial Codex). O export mantém só a referência
+            // (data-exam-image-id), igual ao resto do metadata redigido.
+            'content'           => $d->contentWithoutDateHeader(),
+            'generated_with_ai' => filled($d->ai_run_id),
+            // Receita emitida apesar de alergia ativa: motivo e conflitos.
+            'allergy_override' => is_array($d->safety_override) ? [
+                'reason'    => $d->safety_override['reason'] ?? null,
+                'conflicts' => $d->safety_override['conflicts'] ?? [],
+                'at'        => $d->safety_override['at'] ?? null,
+            ] : null,
+            'created_at' => $this->iso($d->created_at),
+            // Fase 2 / Bloco B: data impressa (data alternativa) e dados
+            // estruturados (atestado, CID autorizado, itens do pedido).
+            'document_date' => $d->document_date?->toDateString(),
+            // Bytes do laudo de imagem embutido nunca entram aqui (até
+            // ~27 MiB em base64 por laudo esgotava o memory_limit com
+            // poucos laudos no histórico) — mesma regra já aplicada a
+            // foto/vídeo de exame nesta exportação (ver exams(), só
+            // has_file, nunca os bytes). Resto do metadata intacto.
+            'details' => MedicalRecordDocumentation::redactImageReportBytes($d->metadata),
+        ];
     }
 
     /**

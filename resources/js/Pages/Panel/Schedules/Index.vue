@@ -1001,10 +1001,16 @@ const breadcrumbs = [
                                     </span>
                                 </div>
 
-                                <!-- Todos -->
+                                <!-- Todos — fundo marca o selecionado (borda 1↔2px sozinha não
+                                     se via; o destaque de "quem tá selecionado" tem que estar
+                                     aqui na lista, não só no texto acima do calendário). -->
                                 <div
-                                    class="d-flex align-items-center mb-3 gap-2"
-                                    style="cursor: pointer"
+                                    class="d-flex align-items-center mb-3 gap-2 rounded-3 p-2"
+                                    :style="{
+                                        cursor: 'pointer',
+                                        backgroundColor:
+                                            doctor === 'tudo' ? 'var(--bs-tertiary-bg, #e9ecef)' : 'transparent',
+                                    }"
                                     @click="setDoctor('tudo')"
                                 >
                                     <div
@@ -1029,8 +1035,11 @@ const breadcrumbs = [
                                 <div
                                     v-for="d in doctors"
                                     :key="d.id"
-                                    class="d-flex align-items-center mb-3 gap-2"
-                                    style="cursor: pointer"
+                                    class="d-flex align-items-center mb-3 gap-2 rounded-3 p-2"
+                                    :style="{
+                                        cursor: 'pointer',
+                                        backgroundColor: doctor === d.id ? `${d.color}1f` : 'transparent',
+                                    }"
                                     :data-doctor="d.id"
                                     @click="setDoctor(d.id)"
                                 >

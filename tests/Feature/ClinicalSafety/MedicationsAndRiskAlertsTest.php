@@ -457,7 +457,7 @@ describe('retrato no prontuário (snapshot)', function () {
         // Hash "de antes do deploy": sem as chaves das colunas novas.
         $signedAt = now()->startOfSecond();
         $content  = array_diff_key($record->getAttributes(), array_flip([
-            'signed_by', 'signed_at', 'signature_hash', 'is_locked', 'contact_lens_calculation', 'medications_snapshot', 'allergies_snapshot', 'contact_lens_use',
+            'signed_by', 'signed_at', 'signature_hash', 'is_locked', 'clinical_revision', 'contact_lens_calculation', 'medications_snapshot', 'allergies_snapshot', 'contact_lens_use',
         ]));
         $hash = hash('sha256', implode('|', [$record->getKey(), $this->docEu->id, $signedAt->toIso8601String(), hash('sha256', serialize($content))]));
         DB::table('medical_records')->where('id', $record->id)->update([

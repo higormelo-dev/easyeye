@@ -9,6 +9,16 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'done']);
 
+// @hidden.bs.modal (ponto na sintaxe do Vue = modificador, não nome de
+// evento) nunca disparava onHidden — Vue escutava um evento "hidden" com
+// modificadores inexistentes "bs"/"modal", nunca o evento REAL que o
+// Bootstrap dispara (hidden.bs.modal, com ponto no nome mesmo). Fechar
+// pelo Esc/backdrop/botão nativo do Bootstrap nunca emitia 'close' pro
+// pai — argumento DINÂMICO (@[nome]) trata o valor como nome de evento
+// literal, sem o parser de modificadores (achado via auditoria de
+// encerramento, EE-13 — lint vue/valid-v-on).
+const HIDDEN_BS_MODAL_EVENT = 'hidden.bs.modal';
+
 const notes = ref('');
 const saving = ref(false);
 const errorMsg = ref('');
@@ -62,7 +72,7 @@ function onHidden() {
 
 <template>
     <Teleport to="body">
-        <div id="bulkCancelModal" class="modal fade" tabindex="-1" @hidden.bs.modal="onHidden">
+        <div id="bulkCancelModal" class="modal fade" tabindex="-1" @[HIDDEN_BS_MODAL_EVENT]="onHidden">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">

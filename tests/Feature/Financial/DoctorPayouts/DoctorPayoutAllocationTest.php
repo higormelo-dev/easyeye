@@ -157,6 +157,24 @@ describe('alocar', function () {
             ->and(allocRelease(allocCompute($this), 'schedule:' . $schedule->id)?->payoutCents)->toBe(5000);
     });
 
+    it('[GAP] exame com vínculo desatualizado (agendamento remarcado pra outro dia): o recebido vai para o EXAME, não para o agendamento que mudou', function () {
+        $type     = VisitType::create(['entity_id' => $this->entity->id, 'name' => 'EXAMES', 'procedure_id' => Procedure::factory()->create(['treatment' => 3])->id, 'active' => true]);
+        $schedule = allocSchedule($this, ['visit_id' => $type->id, 'date_time' => '2026-07-15 09:00:00']);
+        $oct      = ExamType::factory()->create(['name' => 'OCT']);
+        PatientExam::factory()->create([
+            'patient_id'        => $this->patient->id, 'exam_id' => $oct->id, 'doctor_id' => $this->doctor->id, 'schedule_id' => $schedule->id,
+            'exam_performed_at' => '2026-06-10 11:00:00', 'source' => 'integrator', 'active' => true,
+        ]);
+        $examKey = DoctorPayoutSourceType::PatientExam->value . ':' . DoctorPayoutProductionService::examKey($this->patient->id, $oct->id, '2026-06-10');
+
+        $this->allocations->allocate($this->entity->id, allocIncome($this, 100.00)->id, [['key' => $examKey, 'amount_cents' => 10000]], null);
+
+        $allocation = DoctorPayoutReceiptAllocation::query()->sole();
+
+        expect($allocation->source_type)->toBe(DoctorPayoutSourceType::PatientExam)
+            ->and((string) $allocation->source_id)->toBe(DoctorPayoutProductionService::examKey($this->patient->id, $oct->id, '2026-06-10'));
+    });
+
     it('exame só de importação externa não é ato: alocar nele é recusado', function () {
         $oct = ExamType::factory()->create(['name' => 'OCT']);
         PatientExam::factory()->create([

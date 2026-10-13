@@ -3,15 +3,24 @@
 namespace App\Services;
 
 use App\Enums\{FinancialEntryStatus, ScheduleSituation};
-use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleSlotUnavailableException};
-use App\Models\{ClinicResource, Doctor, DoctorWorkSchedule, Entity, ResourceBlock, ResourceWorkSchedule, Schedule, ScheduleBlock, ScheduleSituationLog};
-use App\Support\ScheduleShift;
+use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleChangedConcurrentlyException, ScheduleSlotUnavailableException};
+use App\Models\{ClinicResource, Doctor, DoctorWorkSchedule, Entity, PatientExam, ResourceBlock, ResourceWorkSchedule, Schedule, ScheduleBlock, ScheduleSituationLog};
+use App\Support\{ExamScheduleLink, ScheduleShift};
 use Carbon\Carbon;
+use Closure;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\{Cache, DB};
 
 class ScheduleService
 {
+    /** Tentativas de travar paciente/dia + linha com a identidade do agendamento estável. */
+    private const ATTENDANCE_LOCK_ATTEMPTS = 3;
+
+    public function __construct(
+        private readonly ExternalExamImportService $externalExamImportService,
+    ) {
+    }
+
     /**
      * Central slot validation.
      *
@@ -597,12 +606,10 @@ class ScheduleService
         ?string $notes = null,
     ): bool {
         return DB::transaction(function () use ($schedule, $situation, $entityUserId, $notes): bool {
-            // Relê situação/chegada com a linha travada até o COMMIT: dois
-            // cliques simultâneos ("Chegou" 2x, duas abas) liam a mesma situação
-            // antiga e os dois gravavam — 2 logs, arrived_at resetado e o "de"
-            // do histórico errado. Agora o segundo vê a situação nova (no-op).
-            // Update + log na MESMA transação: sem mudança de situação sem trilha.
-            $this->refreshSituationUnderLock($schedule);
+            // Travas da transição (lock paciente/dia → linha) e releitura do
+            // que a instância pode ter de velho. Update + log na MESMA
+            // transação: sem mudança de situação sem trilha.
+            $this->lockForTransition($schedule, $situation);
 
             if ($situation === $schedule->situation) {
                 return false;
@@ -643,6 +650,14 @@ class ScheduleService
                 'created_at'     => now(),
             ]);
 
+            // Captura pela câmera feita ANTES do "Atendido" (ex.: ainda em
+            // Aguardando) nunca ganha schedule_id no import — reconcilia
+            // aqui, na mesma transação, pra nunca duplicar o ato no repasse
+            // médico (achado via revisão adversarial Codex).
+            if ($situation === ScheduleSituation::Attended) {
+                $this->externalExamImportService->relinkBrowserCapturesForSchedule($schedule);
+            }
+
             Cache::forget("waiting_room:{$schedule->entity_id}");
 
             return true;
@@ -650,27 +665,238 @@ class ScheduleService
     }
 
     /**
-     * Trava a linha do agendamento (FOR UPDATE, mesmo lock do lançamento de
-     * caixa da chegada) e traz para a instância a situação/chegada ATUAIS do
-     * banco, como originais — os demais atributos (inclusive alterações ainda
-     * não salvas do chamador) ficam como estão. Agendamento não gravado: nada.
+     * Travas da transição de situação, na ordem em que não dão deadlock, e a
+     * instância atualizada com o que o banco tem AGORA.
+     *
+     * Transição pra Atendido reconcilia capturas órfãs do paciente/dia
+     * (relinkBrowserCapturesForSchedule), que trava TODOS os agendamentos do
+     * dia: o lock paciente/dia tem que sair ANTES da linha deste agendamento,
+     * senão duas transições simultâneas, cada uma já segurando a PRÓPRIA
+     * linha, entram em deadlock. Mas o paciente/dia que valem são os da
+     * linha TRAVADA, não os da instância carregada no início da requisição
+     * (achado via revisão adversarial Codex): se outra requisição remarcou, ou
+     * trocou o paciente/médico, nesse intervalo, o lock e a busca de capturas
+     * olhavam a identidade antiga — a linha virava Atendido e as capturas do
+     * agendamento de verdade ficavam sem vínculo (o repasse contava o ato 2x;
+     * repetir "Atendido" é no-op e não repara). Por isso: trava o dia →
+     * trava a linha e relê a identidade → se a chave do lock mudou, desfaz
+     * (SAVEPOINT: solta a linha E o lock desta tentativa) e recomeça com o
+     * lock certo, sem segurar linha nenhuma. A instância sai com paciente/
+     * data/médico atuais, e é com ela que se reconcilia.
+     *
+     * Outras transições só travam e relêem a linha (situação/chegada): nada
+     * a reconciliar, nenhuma identidade a conferir.
+     *
+     * @throws ScheduleChangedConcurrentlyException a identidade mudou em todas as tentativas
      */
-    private function refreshSituationUnderLock(Schedule $schedule): void
+    private function lockForTransition(Schedule $schedule, ScheduleSituation $situation): void
+    {
+        if ($situation !== ScheduleSituation::Attended || ! $schedule->exists) {
+            $this->lockAttendanceReconciliation($situation, $schedule);
+            $this->refreshSituationUnderLock($schedule);
+
+            return;
+        }
+
+        $this->lockPatientDaysThenRow($schedule, fn (Schedule $s): array => [[$s->patient_id, $s->date_time]]);
+    }
+
+    /**
+     * Travas de uma EDIÇÃO do formulário (PUT), ANTES do UPDATE: a linha do
+     * agendamento e, se ele vai ficar Atendido, o paciente/dia de ORIGEM e de
+     * DESTINO em ordem determinística — ver lockPatientDaysThenRow(). Só o
+     * destino não basta: duas edições em sentidos opostos (X→Y e Y→X) do mesmo
+     * paciente, ambas reconciliando capturas, seguravam a linha do PRÓPRIO
+     * agendamento e esperavam a do outro, que pro banco ainda estava no dia
+     * original — deadlock (achado via revisão adversarial Codex).
+     *
+     * "Vai ficar Atendido" é a situação FINAL da edição: a pedida, ou — se o
+     * formulário a omitiu — a que o BANCO tem, lida sob a trava da linha, não a
+     * da instância do route binding (achado via revisão adversarial Codex): um
+     * agendamento carregado Aguardando que outra requisição comitou Atendido no
+     * meio saía daqui sem locks e sem releitura, e a edição de médico/dia
+     * deixava as capturas da identidade nova sem vínculo (o repasse contava o
+     * agendamento de exame E a captura). Mudou a situação final, a tentativa é
+     * desfeita e refeita com os locks antes da linha. A linha é travada sempre
+     * (o UPDATE a travaria logo depois); quem não fica Atendido não toma lock
+     * paciente/dia — nada a reconciliar.
+     *
+     * A instância sai com situação, paciente, médico e data ATUAIS do banco; os
+     * $attributes ainda não foram aplicados.
+     *
+     * @param array<string, mixed> $attributes o que o formulário vai gravar
+     *
+     * @throws ScheduleChangedConcurrentlyException a situação ou a identidade mudou em todas as tentativas
+     */
+    public function lockForEdit(Schedule $schedule, ?ScheduleSituation $requested, array $attributes): void
     {
         if (! $schedule->exists) {
             return;
         }
 
+        $this->lockPatientDaysThenRow($schedule, function (Schedule $s) use ($requested, $attributes): array {
+            if (($requested ?? $s->situation) !== ScheduleSituation::Attended) {
+                return [];
+            }
+
+            return [
+                [$s->patient_id, $s->date_time],
+                [$attributes['patient_id'] ?? $s->patient_id, $attributes['date_time'] ?? $s->date_time],
+            ];
+        });
+    }
+
+    /**
+     * Lock(s) paciente/dia → linha do agendamento, com a identidade (e a
+     * situação, se o closure depender dela) conferida sob a trava. Cada
+     * tentativa roda num SAVEPOINT: trava os paciente/dia que a instância
+     * (possivelmente velha) indica, trava a linha e relê situação e identidade;
+     * se agora ela pede um paciente/dia que não está entre os travados, desfaz
+     * (solta a linha E os locks da tentativa) e recomeça com o estado novo, sem
+     * segurar linha nenhuma — a ordem que evita deadlock (ver
+     * Schedule::lockPatientDay).
+     *
+     * @param Closure(Schedule): list<array{0: ?string, 1: mixed}> $patientDays pares [paciente, dia] a travar, pelo estado ATUAL da instância (vazio = nenhum lock paciente/dia)
+     *
+     * @throws ScheduleChangedConcurrentlyException a identidade mudou em todas as tentativas
+     */
+    private function lockPatientDaysThenRow(Schedule $schedule, Closure $patientDays): void
+    {
+        for ($attempt = 1;; $attempt++) {
+            try {
+                DB::transaction(function () use ($schedule, $patientDays): void {
+                    $entityId = (string) $schedule->entity_id;
+                    $held     = Schedule::lockPatientDays($entityId, $patientDays($schedule));
+
+                    $this->refreshSituationUnderLock($schedule, withIdentity: true);
+
+                    if (array_diff(array_keys(Schedule::patientDayPairs($entityId, $patientDays($schedule))), $held) !== []) {
+                        throw new ScheduleChangedConcurrentlyException($schedule);
+                    }
+                });
+
+                return;
+            } catch (ScheduleChangedConcurrentlyException $e) {
+                if ($attempt >= self::ATTENDANCE_LOCK_ATTEMPTS) {
+                    throw $e;
+                }
+            }
+        }
+    }
+
+    /**
+     * Lock paciente/dia da reconciliação de capturas órfãs — só a transição
+     * pra Atendido a faz (ver Schedule::lockPatientDay, regra de ordem).
+     * Quem escreve a linha do agendamento ANTES de chamar changeSituation()
+     * (ex.: o formulário da agenda, que dá UPDATE e só depois aplica a
+     * situação) precisa chamar isto primeiro, com os $attributes que vai
+     * gravar — o dia/paciente que valem são os de DEPOIS da gravação.
+     *
+     * @param array<string, mixed> $attributes
+     */
+    public function lockAttendanceReconciliation(?ScheduleSituation $situation, Schedule $schedule, array $attributes = []): void
+    {
+        if ($situation !== ScheduleSituation::Attended) {
+            return;
+        }
+
+        $entityId  = $attributes['entity_id'] ?? $schedule->entity_id;
+        $patientId = $attributes['patient_id'] ?? $schedule->patient_id;
+        $dateTime  = $attributes['date_time'] ?? $schedule->date_time;
+
+        if ($entityId === null || $patientId === null || $dateTime === null) {
+            return;
+        }
+
+        Schedule::lockPatientDay((string) $entityId, (string) $patientId, Carbon::parse($dateTime));
+    }
+
+    /**
+     * Identidade do agendamento a que os exames vinculados pertencem:
+     * paciente, médico e dia (ver App\Support\ExamScheduleLink). Tirada ANTES
+     * de gravar uma edição para reconcileExamLinks() saber o que mudou.
+     *
+     * @return array{patient_id: ?string, doctor_id: ?string, day: ?string}
+     */
+    public function examLinkIdentity(Schedule $schedule): array
+    {
+        return [
+            'patient_id' => $schedule->patient_id === null ? null : (string) $schedule->patient_id,
+            'doctor_id'  => $schedule->doctor_id === null ? null : (string) $schedule->doctor_id,
+            'day'        => $schedule->date_time?->toDateString(),
+        ];
+    }
+
+    /**
+     * Depois de gravar uma EDIÇÃO do agendamento (e de aplicar a situação):
+     * desvincula os exames cujo vínculo deixou de valer — sempre, pelo dado, e
+     * não só quando a identidade parece ter mudado — e, se paciente, médico ou
+     * dia mudaram e ele segue Atendido, vincula as capturas órfãs da identidade
+     * nova. Sem isso, editar um Atendido deixava as capturas presas à identidade
+     * antiga (o repasse as engolia na competência errada; o laudo ancorava no
+     * atendimento de outro paciente) e as da identidade nova sem vínculo — a
+     * reconciliação só rodava na transição pra Atendido, que aqui é no-op
+     * (achado via revisão adversarial Codex).
+     *
+     * O exame desvinculado segue existindo (mesmo paciente/dia/médico) e passa a
+     * contar como exame avulso; a mudança fica na trilha de auditoria do exame.
+     * A reconciliação precisa do lock paciente/dia da identidade nova tomado
+     * ANTES do UPDATE do agendamento (lockAttendanceReconciliation).
+     *
+     * @param array{patient_id: ?string, doctor_id: ?string, day: ?string} $before identidade antes da edição
+     *
+     * @return int exames desvinculados
+     */
+    public function reconcileExamLinks(Schedule $schedule, array $before): int
+    {
+        $unlinked = 0;
+
+        ExamScheduleLink::staleFor($schedule)->get()->each(function (PatientExam $exam) use (&$unlinked): void {
+            $exam->update(['schedule_id' => null]);
+            $unlinked++;
+        });
+
+        if ($schedule->situation === ScheduleSituation::Attended && $this->examLinkIdentity($schedule) !== $before) {
+            $this->externalExamImportService->relinkBrowserCapturesForSchedule($schedule);
+        }
+
+        return $unlinked;
+    }
+
+    /**
+     * Trava a linha do agendamento (FOR UPDATE, mesmo lock do lançamento de
+     * caixa da chegada) até o COMMIT e traz para a instância a situação/
+     * chegada ATUAIS do banco, como originais — os demais atributos (inclusive
+     * alterações ainda não salvas do chamador) ficam como estão. Agendamento
+     * não gravado: nada.
+     *
+     * Dois cliques simultâneos ("Chegou" 2x, duas abas) liam a mesma situação
+     * antiga e os dois gravavam — 2 logs, arrived_at resetado e o "de" do
+     * histórico errado. Com a releitura sob trava, o segundo vê a situação
+     * nova (no-op).
+     *
+     * Com $withIdentity, traz também paciente/data/médico atuais (a identidade
+     * da reconciliação de capturas) — menos o que o chamador alterou em
+     * memória e ainda não gravou: isso é dele.
+     */
+    private function refreshSituationUnderLock(Schedule $schedule, bool $withIdentity = false): void
+    {
+        if (! $schedule->exists) {
+            return;
+        }
+
+        $identity = ['patient_id', 'date_time', 'doctor_id'];
+
         $current = Schedule::query()
             ->whereKey($schedule->getKey())
             ->lockForUpdate()
-            ->first(['situation', 'arrived_at']);
+            ->first($withIdentity ? ['situation', 'arrived_at', ...$identity] : ['situation', 'arrived_at']);
 
         if ($current === null) {
             return;
         }
 
-        $fresh = $current->getAttributes();
+        $fresh = array_diff_key($current->getAttributes(), array_flip(array_intersect($identity, array_keys($schedule->getDirty()))));
 
         $schedule->setRawAttributes(array_merge($schedule->getAttributes(), $fresh));
         $schedule->syncOriginalAttributes(array_keys($fresh));

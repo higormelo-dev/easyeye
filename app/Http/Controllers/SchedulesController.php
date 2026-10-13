@@ -398,6 +398,11 @@ class SchedulesController extends Controller
                     $this->service->assertFitInCapacity($doctorId, $dateTime);
                 }
 
+                // Mesma ordem de update(): cota → paciente/dia → linha. O lock
+                // paciente/dia (só pra quem já nasce Atendido) sai antes do
+                // INSERT, não escondido dentro de changeSituation() depois dele.
+                $this->service->lockAttendanceReconciliation($request->requestedSituation(), $this->model, $baseData);
+
                 $schedule = $this->model->create($baseData);
                 $this->applyRequestedSituation($request, $schedule);
 
@@ -451,18 +456,35 @@ class SchedulesController extends Controller
 
         // Tudo-ou-nada: se a situação pedida esbarrar na trava de caixa, os
         // demais campos do formulário também não são gravados (422 = nada mudou).
+        $unlinkedExams = 0;
+
         try {
-            DB::transaction(function () use ($request, $schedule): void {
+            DB::transaction(function () use ($request, $schedule, &$unlinkedExams): void {
                 $attributes = $request->scheduleAttributes();
 
+                // ORDEM ÚNICA DE LOCKS (a mesma de store()): cota do encaixe →
+                // lock paciente/dia → linha do agendamento. Invertida (paciente/
+                // dia antes da cota), uma criação e uma edição do mesmo
+                // paciente/dia e médico/turno esperavam uma a outra (deadlock).
+                //
                 // Encaixe: teto do turno de destino conferido sob lock (o
                 // próprio agendamento não conta).
                 if (! empty($attributes['is_fit_in'])) {
                     $this->service->assertFitInCapacity((string) $attributes['doctor_id'], Carbon::parse($attributes['date_time']), (string) $schedule->id);
                 }
 
+                // Linha do agendamento e, se ele fica Atendido, locks paciente/dia da
+                // reconciliação de capturas órfãs — origem E destino, em ordem
+                // determinística —, ANTES do UPDATE abaixo (ver
+                // ScheduleService::lockForEdit). Situação omitida = a do BANCO, lida
+                // sob a trava (não a do route binding). A instância sai relida.
+                $this->service->lockForEdit($schedule, $request->requestedSituation(), $attributes);
+
+                $identityBefore = $this->service->examLinkIdentity($schedule);
+
                 $schedule->update($attributes);
                 $this->applyRequestedSituation($request, $schedule);
+                $unlinkedExams = $this->service->reconcileExamLinks($schedule, $identityBefore);
                 $schedule->resources()->sync($request->input('resource_ids', []));
             });
         } catch (UniqueConstraintViolationException $e) {
@@ -476,8 +498,10 @@ class SchedulesController extends Controller
         Cache::forget("waiting_room:{$schedule->entity_id}");
 
         return response()->json([
-            'message' => __('schedules.updated'),
-            'data'    => $schedule->fresh(),
+            'message' => $unlinkedExams > 0
+                ? __('schedules.updated') . ' ' . trans_choice('schedules.exam_links_removed', $unlinkedExams, ['count' => $unlinkedExams])
+                : __('schedules.updated'),
+            'data' => $schedule->fresh(),
         ]);
     }
 

@@ -143,6 +143,22 @@ test('registra data_access_log com patient_account_id (nao user_id) e purpose lg
     expect($log->user_id)->toBeNull();
 });
 
+test('[GAP] sessão administrativa de outra clínica não contamina o entity_id do log de exportação LGPD — achado via auditoria de encerramento (EE-05)', function () {
+    $f           = makeLgpdExportFixture();
+    $otherClinic = Entity::factory()->create(['is_client' => true]);
+
+    loginAsPatient($f['account']);
+
+    $this->withSession(['selected_entity_id' => $otherClinic->id])
+        ->get(route('patient-portal.clinics.export', $f['patient']));
+
+    $log = DataAccessLog::query()->where('patient_id', $f['patient']->id)->latest('accessed_at')->first();
+
+    expect($log)->not->toBeNull();
+    expect($log->entity_id)->toBe($f['entity']->id)
+        ->and($log->entity_id)->not->toBe($otherClinic->id);
+});
+
 test('paciente de outro titular (person_id diferente) nunca exporta dados alheios, 404 nunca 403', function () {
     $f = makeLgpdExportFixture();
 

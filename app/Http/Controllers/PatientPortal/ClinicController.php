@@ -6,8 +6,10 @@ namespace App\Http\Controllers\PatientPortal;
 
 use App\Enums\ShareableDocumentType;
 use App\Http\Controllers\Controller;
-use App\Models\{Patient, PatientAccount, PatientDocumentShare};
+use App\Models\{MedicalRecordDocumentation, MedicalRecordFile, Patient, PatientAccount, PatientDocumentShare, PatientExam};
 use App\Services\Billing\ClinicServiceGate;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Auth;
 use Inertia\{Inertia, Response};
 
@@ -25,10 +27,25 @@ class ClinicController extends Controller
         // Nunca 403: não revelar a um paciente que {patient} existe mas não é dele.
         abort_unless($account->ownsPerson($patient->person_id), 404);
 
+        // shareable é polimórfico (laudo/exame/anexo) — sem projeção de
+        // colunas por tipo, um ->with('shareable') cru traz SELECT * de
+        // cada tabela, inclusive metadata de MedicalRecordDocumentation
+        // (pode ter ~27 MiB em base64 quando o laudo tem imagem embutida —
+        // mesma classe de esgotamento de memória do achado original em
+        // MedicalRecordsController, aqui sem nenhum teto: esta lista nunca
+        // pagina, mostra TODOS os documentos já liberados pro paciente).
+        // serializeShare() abaixo nunca lê metadata/content — só id e o
+        // campo que resolveTitle() precisa por tipo.
         $shares = PatientDocumentShare::query()
             ->where('patient_id', $patient->id)
             ->whereNull('revoked_at')
-            ->with('shareable')
+            ->with(['shareable' => function (MorphTo $morphTo) {
+                $morphTo->constrain([
+                    MedicalRecordDocumentation::class => fn (Builder $q) => $q->select(['id', 'title', 'type']),
+                    PatientExam::class                => fn (Builder $q) => $q->select(['id', 'name']),
+                    MedicalRecordFile::class          => fn (Builder $q) => $q->select(['id', 'original_name']),
+                ]);
+            }])
             ->orderByDesc('granted_at')
             ->get()
             ->filter(fn (PatientDocumentShare $s) => $s->shareable !== null);

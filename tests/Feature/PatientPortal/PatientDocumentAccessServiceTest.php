@@ -75,6 +75,60 @@ test('exame com grant ativo é lido pelo dono; revogado vira 404 imediato', func
     $this->get(route('patient-portal.documents.view', ['exame', $exam->id]))->assertNotFound();
 });
 
+test('[GAP] exame de vídeo compartilhado: isImage vem false e isVideo vem true (nunca renderiza <img> quebrada — achado via revisão Codex)', function () {
+    $f = makeSharePortalFixture();
+
+    $video = PatientExam::factory()->create([
+        'patient_id' => $f['patient']->id,
+        'doctor_id'  => $f['doctor']->id,
+        'active'     => true,
+        'source'     => ExamSource::BrowserCapture,
+        'archive'    => 'exams/captura-123.webm',
+    ]);
+
+    PatientDocumentShare::create([
+        'entity_id'      => $f['entity']->id,
+        'patient_id'     => $f['patient']->id,
+        'shareable_type' => PatientExam::class,
+        'shareable_id'   => $video->id,
+        'granted_by'     => $f['entityUser']->id,
+        'granted_at'     => now(),
+    ]);
+
+    loginAsPatient($f['account']);
+
+    $this->get(route('patient-portal.documents.view', ['exame', $video->id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('isImage', false)->where('isVideo', true));
+});
+
+test('exame de foto compartilhado continua com isImage true e isVideo false (comportamento de sempre)', function () {
+    $f = makeSharePortalFixture();
+
+    $photo = PatientExam::factory()->create([
+        'patient_id' => $f['patient']->id,
+        'doctor_id'  => $f['doctor']->id,
+        'active'     => true,
+        'source'     => ExamSource::ExternalImport,
+        'archive'    => 'exams/foto-123.jpg',
+    ]);
+
+    PatientDocumentShare::create([
+        'entity_id'      => $f['entity']->id,
+        'patient_id'     => $f['patient']->id,
+        'shareable_type' => PatientExam::class,
+        'shareable_id'   => $photo->id,
+        'granted_by'     => $f['entityUser']->id,
+        'granted_at'     => now(),
+    ]);
+
+    loginAsPatient($f['account']);
+
+    $this->get(route('patient-portal.documents.view', ['exame', $photo->id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('isImage', true)->where('isVideo', false));
+});
+
 test('paciente de outro titular (person_id diferente) nunca le, mesmo com grant ativo', function () {
     $f = makeSharePortalFixture();
 
@@ -244,4 +298,41 @@ test('registra patient_account_id (nao user_id) em data_access_logs na leitura d
     expect($log)->not->toBeNull();
     expect($log->patient_account_id)->toBe($f['account']->id);
     expect($log->user_id)->toBeNull();
+});
+
+test('[GAP] sessão administrativa de outra clínica (ex.: admin explorando o painel na mesma aba) não contamina o entity_id do log do paciente — achado via auditoria de encerramento (EE-05)', function () {
+    Storage::fake('s3');
+
+    $f           = makeSharePortalFixture();
+    $otherClinic = Entity::factory()->create(['is_client' => true]);
+
+    $exam = PatientExam::factory()->create([
+        'patient_id' => $f['patient']->id,
+        'doctor_id'  => $f['doctor']->id,
+        'active'     => true,
+        'source'     => ExamSource::ExternalImport,
+        'archive'    => 'exams/fake.jpg',
+    ]);
+
+    PatientDocumentShare::create([
+        'entity_id'      => $f['entity']->id,
+        'patient_id'     => $f['patient']->id,
+        'shareable_type' => PatientExam::class,
+        'shareable_id'   => $exam->id,
+        'granted_at'     => now(),
+    ]);
+
+    loginAsPatient($f['account']);
+
+    // selected_entity_id de OUTRA clínica, ainda na sessão (nunca usado
+    // pelo guard de paciente, mas pode sobrar de uma sessão admin anterior
+    // no mesmo navegador) — o log tem que usar a clínica DONA do exame, nunca essa.
+    $this->withSession(['selected_entity_id' => $otherClinic->id])
+        ->get(route('patient-portal.documents.show', ['exame', $exam->id]));
+
+    $log = DataAccessLog::query()->latest('accessed_at')->first();
+
+    expect($log)->not->toBeNull();
+    expect($log->entity_id)->toBe($f['entity']->id)
+        ->and($log->entity_id)->not->toBe($otherClinic->id);
 });

@@ -66,8 +66,10 @@ class LgpdExportController extends Controller
 
         // CFM Res. 2.227/2018 + LGPD Art. 37 — leitura em massa dos próprios
         // dados clínicos também é um acesso a registrar (patient_account_id,
-        // não user_id — ver AuditContext).
-        $this->logAccess($patient, DataAccessPurpose::LgpdRequest, patientId: $patient->id);
+        // não user_id — ver AuditContext). entity_id explícito (não a
+        // sessão, que no guard de paciente nem existe) — mesma correção de
+        // DocumentsController (achado via auditoria de encerramento, EE-05).
+        $this->logAccess($patient, DataAccessPurpose::LgpdRequest, patientId: $patient->id, entityId: $patient->entity_id);
 
         $filename = 'meus-dados-' . ($patient->entity?->name ?? 'clinica') . '-' . now()->format('Y-m-d') . '.json';
         $filename = preg_replace('/[^A-Za-z0-9\-_.]/', '_', $filename);

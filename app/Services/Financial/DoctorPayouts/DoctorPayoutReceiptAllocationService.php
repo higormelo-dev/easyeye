@@ -8,7 +8,7 @@ use App\Enums\DoctorPayout\DoctorPayoutSourceType;
 use App\Enums\{ExamSource, FinancialEntryStatus, FinancialEntryType, MedicalRecordProcedureStatus, ScheduleSituation};
 use App\Models\{DoctorPayoutReceiptAllocation, FinancialCashEntry};
 use App\Support\Database\UniqueViolation;
-use App\Support\Money;
+use App\Support\{ExamScheduleLink, Money};
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -352,8 +352,10 @@ final class DoctorPayoutReceiptAllocationService
             ->where(fn (Builder $q) => $q->whereNull('pe.source')->orWhere('pe.source', '<>', ExamSource::ExternalImport->value))
             ->whereRaw('CAST(COALESCE(pe.exam_performed_at, pe.created_at) AS date) = ?', [$date])
             ->selectRaw('COUNT(*) AS exams')
+            // Só o vínculo que ainda vale (paciente, dia e médico batem) manda o
+            // recebido pro agendamento — a mesma regra da produção.
             ->selectRaw(
-                'MIN(CASE WHEN COALESCE(vp.treatment, 0) = ? AND s.situation = ? AND s.deleted_at IS NULL THEN s.id::text END) AS exam_schedule_id',
+                'MIN(CASE WHEN COALESCE(vp.treatment, 0) = ? AND s.situation = ? AND s.deleted_at IS NULL AND ' . ExamScheduleLink::compatibleSql('pe', 's') . ' THEN s.id::text END) AS exam_schedule_id',
                 [self::TREATMENT_EXAM, ScheduleSituation::Attended->value],
             )
             ->first();

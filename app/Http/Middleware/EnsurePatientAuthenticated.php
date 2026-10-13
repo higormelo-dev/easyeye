@@ -46,7 +46,7 @@ class EnsurePatientAuthenticated
     {
         if ($request->expectsJson() || $request->header('X-Inertia')) {
             return response()->json([
-                'message' => 'Sua sessão expirou. Faça login novamente para continuar.',
+                'message' => __('patient_portal.auth.session_expired'),
             ], Response::HTTP_UNAUTHORIZED);
         }
 

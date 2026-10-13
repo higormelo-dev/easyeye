@@ -173,6 +173,36 @@ it('médico cancela solicitação', function () {
     expect($mrProcedure->fresh()->status)->toBe(MedicalRecordProcedureStatus::Cancelled);
 });
 
+it('[CORRIDA] procedimento já concluído: executar de novo ou cancelar responde 422 e o material não é baixado duas vezes', function () {
+    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente IOL', 'unit' => 'un', 'active' => true]);
+    app(StockService::class)->manualIn($product, 5, 800.00);
+
+    $mrProcedure = MedicalRecordProcedure::create([
+        'entity_id'    => $this->entity->id, 'patient_id' => $this->patient->id, 'medical_record_id' => $this->record->id,
+        'procedure_id' => $this->catalogProcedure->id, 'doctor_id' => $this->doctor->id,
+    ]);
+
+    $markDone = fn (string $notes) => actingAsDoctorAccount($this)->postJson(
+        route('panel.patients.medicalrecord-procedures.mark-done', [$this->patient->id, $mrProcedure->id]),
+        ['items' => [['entity_product_id' => $product->id, 'quantity' => 1]], 'notes' => $notes],
+    );
+
+    $markDone('Primeira execução.')->assertOk();
+
+    // Segunda aba / clique duplo: estado final não regride, nada é regravado.
+    $markDone('Segunda execução.')->assertUnprocessable();
+    actingAsDoctorAccount($this)->postJson(
+        route('panel.patients.medicalrecord-procedures.cancel', [$this->patient->id, $mrProcedure->id]),
+        ['notes' => 'Cancelar depois de executar.'],
+    )->assertUnprocessable();
+
+    $fresh = $mrProcedure->fresh();
+
+    expect($fresh->status)->toBe(MedicalRecordProcedureStatus::Done)
+        ->and($fresh->notes)->toBe('Primeira execução.')
+        ->and((float) $product->fresh()->qty_on_hand)->toBe(4.0);
+});
+
 it('[ISOLAMENTO] admin/médico de outra clínica recebe 404 ao tentar marcar executado procedimento alheio', function () {
     $mrProcedure = MedicalRecordProcedure::create([
         'entity_id'    => $this->entity->id, 'patient_id' => $this->patient->id, 'medical_record_id' => $this->record->id,

@@ -6,6 +6,17 @@
  * aceitando o convite de cada uma (logado e confirmando a senha).
  */
 return [
+    'auth' => [
+        'invalid_credentials' => 'Credenciais inválidas.',
+        'session_expired'     => 'Sua sessão expirou. Faça login novamente para continuar.',
+    ],
+
+    'password' => [
+        // Nunca distinguir e-mail cadastrado de não cadastrado aqui (ver
+        // PatientPasswordResetLinkController) — enumeração de conta.
+        'reset_link_sent' => 'Se este e-mail estiver cadastrado, você vai receber um link de redefinição de senha.',
+    ],
+
     // Clínica com o serviço suspenso: o portal fica só para consulta (sem
     // expor ao paciente o motivo — nunca falar de pagamento/assinatura).
     'read_only' => [

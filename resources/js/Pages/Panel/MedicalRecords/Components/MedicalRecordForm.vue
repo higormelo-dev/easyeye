@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
+import { useEscapeToClose } from '@/Support/useEscapeToClose.js';
 import { useForm, router, usePage } from '@inertiajs/vue3';
 import { validatePayload } from '@/utils/formRulesValidator.js';
 import PdfPreviewModal from './PdfPreviewModal.vue';
@@ -92,6 +93,9 @@ const props = defineProps({
 
 const r = props.medicalrecord;
 const isLocked = computed(() => Boolean(r?.is_locked));
+// ASSINADO (signed_at + hash), não só travado: é o que libera o envio do laudo
+// ao médico solicitante (imutável — achado via revisão adversarial Codex).
+const isSigned = computed(() => Boolean(r?.is_signed));
 
 // Andamento do atendimento (Salvar ≠ Finalizar): só pra médico, com
 // agendamento vinculado, prontuário editável e situação NÃO terminal —
@@ -1137,6 +1141,11 @@ function chooseSaveDestination(action) {
     // 'continue' (ou Esc/fora/X): fica no prontuário — nada a fazer.
 }
 
+useEscapeToClose(
+    () => showSaveDestinationModal.value,
+    () => chooseSaveDestination('continue'),
+);
+
 // ──────────────────────────────────────────────────────────────────────────
 // Ações da barra inferior ANTES do 1º save (create): receita/atestado/laudo
 // precisam do prontuário persistido (documentos são filhos do registro), mas
@@ -1308,6 +1317,8 @@ function closeTonometry() {
     tonometryPdfSrc.value = '';
 }
 
+useEscapeToClose(() => showTonometryModal.value, closeTonometry);
+
 // ──────────────────────────────────────────────────────────────────────────
 // Presbiopia
 // ──────────────────────────────────────────────────────────────────────────
@@ -1455,6 +1466,46 @@ function issueLensPrescription(mode) {
 // ──────────────────────────────────────────────────────────────────────────
 function openDocumentationsModal() {
     showDocumentationsModal.value = true;
+}
+
+// Envio/reenvio ao médico solicitante (laudo do Gerenciador de Imagens,
+// Fase 5) — usa sempre o e-mail já gravado na emissão (sem campo de correção
+// aqui, mesma regra de EyeImageReportModal.vue). Esta lista é a ÚNICA tela
+// onde um laudo JÁ EMITIDO reaparece depois do modal de emissão fechar — e,
+// agora, é também onde o PRIMEIRO envio acontece: o laudo nasce num prontuário
+// ainda editável e só sai da clínica quando o prontuário é assinado
+// (imutável; achado via revisão adversarial Codex). Antes da assinatura o
+// botão fica desabilitado (o servidor recusa de qualquer jeito); depois,
+// "Reenviar" também renova o link de 7 dias (achado via revisão Codex).
+const resendingDocId = ref(null);
+
+function docSendTitle(doc) {
+    if (!isSigned.value) return tt('doc_send_locked_hint', 'Disponível depois que o prontuário for assinado.');
+
+    return doc.requesting_doctor_sent_at
+        ? tt('doc_resend_to_doctor', 'Reenviar ao médico solicitante')
+        : tt('doc_send_to_doctor', 'Enviar ao médico solicitante');
+}
+
+async function resendDocToRequestingDoctor(doc) {
+    if (!doc.requesting_doctor_email || !isSigned.value || resendingDocId.value === doc.id) return;
+    const firstSend = !doc.requesting_doctor_sent_at;
+    resendingDocId.value = doc.id;
+    try {
+        const { data } = await window.axios.post(route('panel.eye-images.reports.resend', doc.id));
+        doc.requesting_doctor_sent_at = data.requesting_doctor_sent_at;
+        window.showSuccessToast?.(
+            firstSend
+                ? tt('doc_sent_ok', 'Laudo enviado ao médico solicitante.')
+                : tt('doc_resent', 'Laudo reenviado ao médico solicitante.'),
+        );
+    } catch (e) {
+        window.showErrorToast?.(
+            e?.response?.data?.message ?? tt('doc_resend_failed', 'Não foi possível reenviar o laudo.'),
+        );
+    } finally {
+        resendingDocId.value = null;
+    }
 }
 
 async function openNewDoc() {
@@ -2173,7 +2224,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 </script>
 
 <template>
-    <form @submit.prevent="submit" class="pmr-form" enctype="multipart/form-data" novalidate>
+    <form class="pmr-form" enctype="multipart/form-data" novalidate @submit.prevent="submit">
         <!-- Assistente de IA -->
         <div v-if="aiEnabled" class="d-flex justify-content-end align-items-center gap-2 px-3 pt-2">
             <button
@@ -2397,11 +2448,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         :class="{ 'pmr-risk-switch--on': form[flag] }"
                                     >
                                         <input
+                                            :id="`risk-${flag}-self`"
                                             v-model="form[flag]"
                                             type="checkbox"
                                             class="form-check-input"
                                             role="switch"
-                                            :id="`risk-${flag}-self`"
                                             :name="flag"
                                             :value="1"
                                             :disabled="isLocked"
@@ -2420,11 +2471,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         :class="{ 'pmr-risk-switch--on': form[`${flag}_family`] }"
                                     >
                                         <input
+                                            :id="`risk-${flag}-family`"
                                             v-model="form[`${flag}_family`]"
                                             type="checkbox"
                                             class="form-check-input"
                                             role="switch"
-                                            :id="`risk-${flag}-family`"
                                             :name="`${flag}_family`"
                                             :value="1"
                                             :disabled="isLocked"
@@ -2460,8 +2511,8 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             <div v-show="showOthersHistory" class="row g-2 mt-1">
                 <div class="col-12">
                     <input
-                        v-model="form.others_history"
                         ref="othersHistoryInput"
+                        v-model="form.others_history"
                         type="text"
                         name="others_history"
                         class="form-control form-control-sm"
@@ -2661,8 +2712,8 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                  crescem até ocupar a largura do bloco. -->
                             <div class="d-flex gap-1 align-items-center flex-nowrap pmr-tono-time">
                                 <input
-                                    type="time"
                                     v-model="tonometryStampedTime"
+                                    type="time"
                                     step="600"
                                     class="form-control form-control-sm"
                                     :disabled="isLocked"
@@ -2983,8 +3034,8 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         type="button"
                                         class="btn btn-outline-secondary btn-sm"
                                         :disabled="isLocked"
-                                        @click="openPresbyopiaCalc"
                                         :title="tt('calc', 'Calcular presbiopia')"
+                                        @click="openPresbyopiaCalc"
                                     >
                                         <i class="fas fa-pencil-alt"></i>
                                     </button>
@@ -4082,6 +4133,43 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         >
                                     </td>
                                     <td class="text-end">
+                                        <span
+                                            v-if="doc.requesting_doctor_email && doc.requesting_doctor_sent_at"
+                                            class="d-block small text-success-emphasis"
+                                        >
+                                            {{
+                                                tt('doc_sent_at', 'Enviado em :date').replace(
+                                                    ':date',
+                                                    doc.requesting_doctor_sent_at,
+                                                )
+                                            }}
+                                        </span>
+                                        <span
+                                            v-else-if="doc.requesting_doctor_email && !isSigned"
+                                            class="d-block small text-muted"
+                                            data-testid="doc-awaiting-signature"
+                                        >
+                                            {{
+                                                tt(
+                                                    'doc_awaiting_signature',
+                                                    'Aguardando a assinatura do prontuário para enviar',
+                                                )
+                                            }}
+                                        </span>
+                                        <button
+                                            v-if="doc.requesting_doctor_email"
+                                            type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            :disabled="!isSigned || resendingDocId === doc.id"
+                                            :title="docSendTitle(doc)"
+                                            @click="resendDocToRequestingDoctor(doc)"
+                                        >
+                                            <span
+                                                v-if="resendingDocId === doc.id"
+                                                class="spinner-border spinner-border-sm"
+                                            ></span>
+                                            <i v-else class="fas fa-paper-plane"></i>
+                                        </button>
                                         <a
                                             :href="doc.pdf_url"
                                             target="_blank"
@@ -4161,10 +4249,10 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                     :class="{ 'opacity-50': sectionLayout.hidden.includes(key) }"
                                 >
                                     <input
+                                        :id="`layout-${key}`"
                                         type="checkbox"
                                         class="form-check-input m-0"
                                         :checked="!sectionLayout.hidden.includes(key)"
-                                        :id="`layout-${key}`"
                                         @change="toggleSection(key)"
                                     />
                                     <label
@@ -4816,31 +4904,31 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <label class="pmr-label mb-1">{{ tt('cataract_eye_label', 'Olho operado') }}</label>
                         <div class="btn-group w-100 mb-3" role="group">
                             <input
+                                id="cataractEyeRight"
+                                v-model="cataractForm.eye"
                                 type="radio"
                                 class="btn-check"
-                                id="cataractEyeRight"
                                 value="right"
-                                v-model="cataractForm.eye"
                             />
                             <label class="btn btn-outline-primary btn-sm" for="cataractEyeRight">{{
                                 tt('cataract_eye_right', 'OD')
                             }}</label>
                             <input
+                                id="cataractEyeLeft"
+                                v-model="cataractForm.eye"
                                 type="radio"
                                 class="btn-check"
-                                id="cataractEyeLeft"
                                 value="left"
-                                v-model="cataractForm.eye"
                             />
                             <label class="btn btn-outline-primary btn-sm" for="cataractEyeLeft">{{
                                 tt('cataract_eye_left', 'OE')
                             }}</label>
                             <input
+                                id="cataractEyeBoth"
+                                v-model="cataractForm.eye"
                                 type="radio"
                                 class="btn-check"
-                                id="cataractEyeBoth"
                                 value="both"
-                                v-model="cataractForm.eye"
                             />
                             <label class="btn btn-outline-primary btn-sm" for="cataractEyeBoth">{{
                                 tt('cataract_eye_both', 'AO')
@@ -4951,8 +5039,8 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                     v-if="!exam.subtypes || exam.subtypes.length === 0"
                                     type="button"
                                     class="btn pmr-exam-card w-100 h-100"
-                                    @click="openExamFromHub(exam.value)"
                                     :title="exam.label"
+                                    @click="openExamFromHub(exam.value)"
                                 >
                                     <i :class="`fas ${exam.icon} pmr-exam-card-icon`"></i>
                                     <span class="pmr-exam-card-label">{{ exam.label }}</span>
@@ -4999,7 +5087,6 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             class="modal fade show d-block"
             tabindex="-1"
             style="background: rgba(0, 0, 0, 0.5)"
-            @keydown.escape.window="closeTonometry"
         >
             <div class="modal-dialog modal-xl modal-dialog-centered" style="height: 90vh">
                 <div class="modal-content" style="height: 100%">
@@ -5259,7 +5346,6 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             tabindex="-1"
             style="background: rgba(0, 0, 0, 0.5); z-index: 1080"
             @click.self="chooseSaveDestination('continue')"
-            @keydown.escape.window="chooseSaveDestination('continue')"
         >
             <div class="modal-dialog modal-dialog-centered pmr-save-modal-dialog">
                 <div class="modal-content">

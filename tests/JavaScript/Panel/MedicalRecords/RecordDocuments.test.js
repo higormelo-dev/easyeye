@@ -198,9 +198,21 @@ function mountForm(record = {}) {
 }
 
 beforeEach(() => {
+    // EE-11 (auditoria 11/10/2026): CertificateModal só pré-preenche "das"
+    // com a chegada do paciente se arrived < now (string "HH:MM", relógio
+    // real do processo) — sem congelar o relógio, a suíte passa ou falha
+    // dependendo da hora em que roda (fixture usa arrived_at: '08:15', que
+    // fica "no futuro" de madrugada). Horário fixo = meio-dia em São Paulo
+    // (GMT-3), sempre depois de qualquer chegada normal de consultório.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-11T15:00:00Z'));
     rxConflicts = null;
     companionErrors = null;
     mockFetch();
+});
+
+afterEach(() => {
+    vi.useRealTimers();
 });
 
 describe('receituário — data alternativa e modelo pessoal', () => {
@@ -254,6 +266,34 @@ describe('atestados novos na barra do prontuário', () => {
             companion_name: 'Ana Lima',
         });
         expect(w.text()).toContain('Informe o nome completo do acompanhante.');
+    });
+
+    // EE-11 (auditoria 11/10/2026): intervalo inválido nunca pode ser
+    // "corrigido" só pra satisfazer um teste — chegada no FUTURO (depois
+    // do "agora" congelado acima) nunca pré-preenche; a regra já existente
+    // (arrived < now) é a que decide, o teste só comprova.
+    it('acompanhante: chegada no futuro (depois de agora) nunca pré-preenche o "das"', async () => {
+        DOCUMENTS.arrived_at = '23:59';
+        try {
+            const w = mountForm();
+            await w.find('[data-testid="companion-certificate-btn"]').trigger('click');
+            await flushPromises();
+            expect(w.find('[data-testid="cert-time-from"]').element.value).toBe('');
+        } finally {
+            DOCUMENTS.arrived_at = '08:15';
+        }
+    });
+
+    it('acompanhante: sem chegada registrada, o "das" nunca pré-preenche (fica em branco, nunca quebra)', async () => {
+        DOCUMENTS.arrived_at = null;
+        try {
+            const w = mountForm();
+            await w.find('[data-testid="companion-certificate-btn"]').trigger('click');
+            await flushPromises();
+            expect(w.find('[data-testid="cert-time-from"]').element.value).toBe('');
+        } finally {
+            DOCUMENTS.arrived_at = '08:15';
+        }
     });
 
     it('aptidão visual também tem botão próprio', async () => {
@@ -439,5 +479,116 @@ describe('editor de Documentações', () => {
         await flushPromises();
 
         expect(w.vm.$.setupState.docForm.content).toBe('<p>prévia 2026-09-30</p>');
+    });
+});
+
+describe('envio ao médico solicitante (laudo do Gerenciador de Imagens) — só com o prontuário assinado (achado via revisão adversarial Codex)', () => {
+    beforeEach(() => {
+        globalThis.window.axios = {
+            post: vi.fn(() => Promise.resolve({ data: { requesting_doctor_sent_at: '09/10/2026 21:00' } })),
+        };
+        globalThis.window.showSuccessToast = vi.fn();
+        globalThis.window.showErrorToast = vi.fn();
+    });
+
+    const REPORT = {
+        id: 'doc-rep',
+        type_label: 'Laudo',
+        title: 'Laudo de imagem',
+        created_at: '09/10/2026 20:00',
+        pdf_url: '/pdf/doc-rep',
+        requesting_doctor_email: 'carlos@outraclinica.com',
+        requesting_doctor_sent_at: null,
+    };
+
+    it('prontuário ASSINADO e laudo ainda não enviado mostra "Enviar"; clicar chama o endpoint certo, atualiza o status e avisa "enviado"', async () => {
+        const w = mountForm({ is_signed: true, is_locked: true, documentations: [{ ...REPORT }] });
+        await w.vm.$.setupState.openDocumentationsModal();
+        await flushPromises();
+
+        expect(w.text()).not.toContain('Enviado em'); // ainda não enviado
+        expect(w.text()).not.toContain('Aguardando a assinatura');
+
+        const sendBtn = w.find('[title="Enviar ao médico solicitante"]');
+        expect(sendBtn.exists()).toBe(true);
+        expect(sendBtn.attributes('disabled')).toBeUndefined();
+
+        await sendBtn.trigger('click');
+        await flushPromises();
+
+        // Esta lista é a ÚNICA tela onde um laudo JÁ EMITIDO reaparece
+        // depois de fechar o modal de emissão — e, agora, é onde o 1º envio
+        // acontece (o laudo nasce num prontuário ainda editável).
+        expect(window.axios.post).toHaveBeenCalledWith('/_routes/panel.eye-images.reports.resend/doc-rep');
+        expect(w.text()).toContain('Enviado em 09/10/2026 21:00');
+        expect(window.showSuccessToast).toHaveBeenCalledWith('Laudo enviado ao médico solicitante.');
+    });
+
+    it('prontuário assinado e laudo JÁ enviado mostra "Reenviar" e avisa "reenviado"', async () => {
+        const w = mountForm({
+            is_signed: true,
+            is_locked: true,
+            documentations: [{ ...REPORT, requesting_doctor_sent_at: '08/10/2026 10:00' }],
+        });
+        await w.vm.$.setupState.openDocumentationsModal();
+        await flushPromises();
+
+        const resendBtn = w.find('[title="Reenviar ao médico solicitante"]');
+        expect(resendBtn.exists()).toBe(true);
+
+        await resendBtn.trigger('click');
+        await flushPromises();
+
+        expect(window.axios.post).toHaveBeenCalledWith('/_routes/panel.eye-images.reports.resend/doc-rep');
+        expect(window.showSuccessToast).toHaveBeenCalledWith('Laudo reenviado ao médico solicitante.');
+    });
+
+    it('[SEGURANÇA] prontuário NÃO assinado: botão desabilitado com a dica, aviso "Aguardando a assinatura" e clicar nunca chama o servidor', async () => {
+        const w = mountForm({ is_signed: false, is_locked: false, documentations: [{ ...REPORT }] });
+        await w.vm.$.setupState.openDocumentationsModal();
+        await flushPromises();
+
+        expect(w.text()).toContain('Aguardando a assinatura do prontuário para enviar');
+
+        const btn = w.find('[title="Disponível depois que o prontuário for assinado."]');
+        expect(btn.exists()).toBe(true);
+        expect(btn.attributes('disabled')).toBeDefined();
+        expect(w.find('[title="Enviar ao médico solicitante"]').exists()).toBe(false);
+
+        // Mesmo chamando o handler direto (clique forçado), nada sai.
+        await w.vm.$.setupState.resendDocToRequestingDoctor(w.vm.$.setupState.documentations[0]);
+        expect(window.axios.post).not.toHaveBeenCalled();
+    });
+
+    it('[SEGURANÇA] prontuário só travado (is_locked) sem assinatura (is_signed) também fica sem o botão de envio', async () => {
+        const w = mountForm({ is_signed: false, is_locked: true, documentations: [{ ...REPORT }] });
+        await w.vm.$.setupState.openDocumentationsModal();
+        await flushPromises();
+
+        expect(
+            w.find('[title="Disponível depois que o prontuário for assinado."]').attributes('disabled'),
+        ).toBeDefined();
+    });
+
+    it('prontuário não assinado com laudo que já tem sent_at (enviado antes da regra) mostra o "Enviado em" e não o aviso de espera', async () => {
+        const w = mountForm({
+            is_signed: false,
+            documentations: [{ ...REPORT, requesting_doctor_sent_at: '07/10/2026 09:00' }],
+        });
+        await w.vm.$.setupState.openDocumentationsModal();
+        await flushPromises();
+
+        expect(w.text()).toContain('Enviado em 07/10/2026 09:00');
+        expect(w.text()).not.toContain('Aguardando a assinatura');
+    });
+
+    it('laudo sem e-mail de médico solicitante não mostra o botão de envio', async () => {
+        const w = mountForm(); // fixture default ("old") não tem requesting_doctor_email
+        await w.vm.$.setupState.openDocumentationsModal();
+        await flushPromises();
+
+        expect(w.find('[title="Reenviar ao médico solicitante"]').exists()).toBe(false);
+        expect(w.find('[title="Enviar ao médico solicitante"]').exists()).toBe(false);
+        expect(w.find('[title="Disponível depois que o prontuário for assinado."]').exists()).toBe(false);
     });
 });

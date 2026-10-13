@@ -45,7 +45,7 @@ function submit() {
                     <i class="ti ti-alert-circle me-1"></i>{{ form.errors.email }}
                 </div>
 
-                <form @submit.prevent="submit" novalidate>
+                <form novalidate @submit.prevent="submit">
                     <input type="hidden" :value="form.token" name="token" />
 
                     <div class="mb-3">
