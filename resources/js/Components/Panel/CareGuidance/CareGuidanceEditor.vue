@@ -149,7 +149,7 @@ function submit() {
             </h5>
         </template>
 
-        <form :id="`${uid}-form`" novalidate data-testid="guidance-editor" @submit.prevent="submit">
+        <form :id="`${uid}-form`" class="recall-form" novalidate data-testid="guidance-editor" @submit.prevent="submit">
             <div class="row g-2 mb-2">
                 <div class="col-12 col-md-8">
                     <label class="form-label small mb-1" :for="`${uid}-title`"
@@ -395,17 +395,22 @@ function submit() {
         </form>
 
         <template #footer>
-            <button type="button" class="btn btn-light btn-sm" @click="$emit('close')">{{ t.settings.cancel }}</button>
-            <button
-                type="submit"
-                :form="`${uid}-form`"
-                class="btn btn-primary btn-sm"
-                :disabled="busy"
-                data-testid="guidance-save"
-            >
-                <span v-if="busy" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span
-                >{{ t.settings.save }}
-            </button>
+            <!-- `display: contents`: o rodapé do diálogo fica fora do formulário, mas dentro do escopo de cores AA. -->
+            <div class="recall-form" style="display: contents">
+                <button type="button" class="btn btn-light btn-sm" @click="$emit('close')">
+                    {{ t.settings.cancel }}
+                </button>
+                <button
+                    type="submit"
+                    :form="`${uid}-form`"
+                    class="btn btn-primary btn-sm"
+                    :disabled="busy"
+                    data-testid="guidance-save"
+                >
+                    <span v-if="busy" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span
+                    >{{ t.settings.save }}
+                </button>
+            </div>
         </template>
     </CenteredModal>
 </template>

@@ -12,7 +12,10 @@ pre-push:
       glob: "*.php"
       # --diff-filter=d: arquivo apagado no push não existe para o Pint
       # ("path is not readable") e travava o push.
-      files: git diff --name-only --diff-filter=d HEAD @{push}
+      # Branch nova ainda não tem upstream: `@{push}` não resolve ("no upstream
+      # configured") e o primeiro publish falhava aqui. Sem ele, compara com
+      # origin/desenv (nesta ordem, para o --diff-filter=d tirar só os apagados).
+      files: git diff --name-only --diff-filter=d HEAD @{push} 2>/dev/null || git diff --name-only --diff-filter=d origin/desenv HEAD
       run: vendor/bin/pint --test {files}
 
     js-tests:

@@ -8,6 +8,7 @@ use App\Domains\Recall\Engine\RecallFacts;
 use App\Domains\Recall\Models\RecallExamMapping;
 use App\Enums\{Eye, ScheduleSituation};
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -124,16 +125,44 @@ final class RecallFactsLoader
      */
     private function openSchedules(string $entityId, string $patientId, CarbonImmutable $today): array
     {
-        return DB::table('schedules')
-            ->where('entity_id', $entityId)
-            ->where('patient_id', $patientId)
-            ->whereNull('deleted_at')
-            ->whereNotIn('situation', [ScheduleSituation::Attended->value, ScheduleSituation::NoShow->value, ScheduleSituation::Cancelled->value])
-            ->where('date_time', '>=', $today)
+        return $this->openQuery($entityId, $patientId, $today)
             ->orderBy('date_time')
             ->limit(20)
             ->get(['id', 'date_time'])
             ->map(static fn ($row): array => ['id' => (string) $row->id, 'date' => CarbonImmutable::parse($row->date_time)->startOfDay()])
             ->all();
+    }
+
+    /**
+     * Dos ids dados, os que são agendamentos ABERTOS deste paciente — a MESMA conta de `openSchedules`, sem o teto de 20: a
+     * reserva da aplicação planejada de um curso pode estar numa série longe de hoje, atrás de muitas consultas mais
+     * próximas. Agendamento de outro paciente ou de outra clínica nunca entra.
+     *
+     * @param list<string> $scheduleIds
+     *
+     * @return list<string>
+     */
+    public function openAmong(string $entityId, string $patientId, array $scheduleIds, CarbonImmutable $today): array
+    {
+        if ($scheduleIds === []) {
+            return [];
+        }
+
+        return $this->openQuery($entityId, $patientId, $today)
+            ->whereIn('id', $scheduleIds)
+            ->pluck('id')
+            ->map(static fn ($id): string => (string) $id)
+            ->all();
+    }
+
+    /** O que é "agendamento aberto" do paciente: de hoje em diante, sem exclusão, nem atendido, nem faltado, nem cancelado. */
+    private function openQuery(string $entityId, string $patientId, CarbonImmutable $today): Builder
+    {
+        return DB::table('schedules')
+            ->where('entity_id', $entityId)
+            ->where('patient_id', $patientId)
+            ->whereNull('deleted_at')
+            ->whereNotIn('situation', [ScheduleSituation::Attended->value, ScheduleSituation::NoShow->value, ScheduleSituation::Cancelled->value])
+            ->where('date_time', '>=', $today);
     }
 }

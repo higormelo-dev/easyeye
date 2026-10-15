@@ -19,7 +19,7 @@ const set = (key, value) => emit('update:modelValue', { ...props.modelValue, [ke
 </script>
 
 <template>
-    <fieldset class="border rounded p-2 mb-2" data-testid="ivt-request">
+    <fieldset class="border rounded p-2 mb-2 recall-form" data-testid="ivt-request">
         <legend class="small fw-semibold float-none w-auto px-1 mb-1">{{ t.request.title }}</legend>
         <p class="small text-muted mb-2">{{ t.request.hint }}</p>
         <p

@@ -92,3 +92,36 @@ it('startsAt: início da tarefa contado do início da condição; nulo quando va
         // 31/08/2020 + 60 meses = 31/08/2025; 29/02/2020 + 60 meses = 28/02/2025 (sem overflow)
         ->and(TaskTimeline::startsAt($by['triagem_oct_macula'], CarbonImmutable::parse('2020-02-29'))?->toDateString())->toBe('2025-02-28');
 });
+
+it('deferToStart: a tarefa que só começa depois de N meses vence no dia em que passa a valer e os demais prazos andam o mesmo tanto', function () {
+    $hcq      = ProtocolContentSchema::normalize(ProposedProtocolDrafts::all()['hidroxicloroquina']['content']);
+    $task     = array_column($hcq['tasks'], null, 'key')['triagem_campimetria']; // intervalo de 12 meses, começa aos 60
+    $start    = CarbonImmutable::parse('2026-01-01');
+    $timeline = TaskTimeline::from($task, $start);
+    $startsAt = TaskTimeline::startsAt($task, $start);
+
+    ['timeline' => $deferred, 'deferred_to' => $to] = TaskTimeline::deferToStart($timeline, $startsAt);
+
+    $shift = (int) $timeline['due_at']->diffInDays($startsAt);
+
+    expect($timeline['due_at']->toDateString())->toBe('2027-01-01')
+        ->and($to?->toDateString())->toBe('2031-01-01')
+        ->and($deferred['due_at']->toDateString())->toBe('2031-01-01')
+        ->and($shift)->toBeGreaterThan(1000);
+
+    // Todos os prazos andam os mesmos dias: a distância entre eles não muda.
+    foreach ($timeline as $name => $date) {
+        expect($deferred[$name]->toDateString())->toBe($date->addDays($shift)->toDateString());
+    }
+});
+
+it('deferToStart: sem início da tarefa, ou com o vencimento já no início ou depois dele, nada muda', function () {
+    $timeline = TaskTimeline::from(ttTask(), CarbonImmutable::parse('2026-01-15')); // vence em 15/05/2026
+
+    foreach ([null, CarbonImmutable::parse('2026-05-15'), CarbonImmutable::parse('2026-03-01')] as $startsAt) {
+        ['timeline' => $same, 'deferred_to' => $to] = TaskTimeline::deferToStart($timeline, $startsAt);
+
+        expect(ttDates($same))->toBe(ttDates($timeline))
+            ->and($to)->toBeNull();
+    }
+});

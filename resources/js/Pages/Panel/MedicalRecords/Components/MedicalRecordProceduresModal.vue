@@ -856,7 +856,7 @@ async function cancelProcedure(proc) {
                                 </div>
                                 <div
                                     v-if="proc.status !== 'cancelled' && urls.care_guidance_template"
-                                    class="mt-2"
+                                    class="mt-2 recall-form"
                                     data-testid="guidance-slot"
                                 >
                                     <button

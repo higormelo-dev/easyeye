@@ -103,7 +103,7 @@ final class RecallRuleEngine
         return new RecallItem(
             RecallItem::SOURCE_COURSE,
             null,
-            'course:' . $courseId,
+            RecallItem::courseTaskKey($courseId),
             RecallTaskKind::TreatmentCourse->value,
             null,
             $eye,
@@ -164,14 +164,11 @@ final class RecallRuleEngine
         $anchor            = $lastDone ?? $start;
         [$timeline, $meta] = $this->timeline($condition, $task, $anchor);
 
-        $startsAt = TaskTimeline::startsAt($task, $start);
+        // A tarefa só passa a valer em `starts_at`: vence nesse dia (e os demais prazos andam junto) — a conta da prévia do Revisor.
+        ['timeline' => $timeline, 'deferred_to' => $deferredTo] = TaskTimeline::deferToStart($timeline, TaskTimeline::startsAt($task, $start));
 
-        if ($startsAt !== null && $timeline['due_at']->lessThan($startsAt)) {
-            // A tarefa só passa a valer em $startsAt: vence nesse dia (e os demais prazos andam junto).
-            $shift    = $timeline['due_at']->diffInDays($startsAt);
-            $timeline = array_map(static fn (CarbonImmutable $date): CarbonImmutable => $date->addDays($shift), $timeline);
-
-            $meta['starts_at'] = $startsAt->toDateString();
+        if ($deferredTo !== null) {
+            $meta['starts_at'] = $deferredTo->toDateString();
         }
 
         return new RecallItem(

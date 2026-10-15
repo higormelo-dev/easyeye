@@ -113,7 +113,7 @@ class RecallEvaluator
     /**
      * @param Collection<int, PatientRecall> $existing
      *
-     * @return array{items: list<array{item: RecallItem, protocol_key: ?string, version_id: ?string}>, suspended: array<string, true>, unadopted: array<string, true>, active: array<string, true>, open_schedules: list<array{id: string, date: CarbonImmutable}>, doctor_order_ended: ?string}
+     * @return array{items: list<array{item: RecallItem, protocol_key: ?string, version_id: ?string}>, suspended: array<string, true>, unadopted: array<string, true>, active: array<string, true>, open_schedules: list<array{id: string, date: CarbonImmutable}>, course_bookings: array<string, string>, doctor_order_ended: ?string}
      */
     private function plan(string $entityId, string $patientId, Collection $existing, Collection $adoptions, CarbonImmutable $today): array
     {
@@ -183,9 +183,19 @@ class RecallEvaluator
         }
 
         // O tratamento com injeções intravítreas: a próxima aplicação de cada curso ATIVO vira retorno, com ou sem
-        // protocolo adotado (o intervalo é o que o médico decidiu na última aplicação).
-        foreach ($this->courseItems($entityId, $patientId) as $item) {
-            $items[] = ['item' => $item, 'protocol_key' => null, 'version_id' => null];
+        // protocolo adotado (o intervalo é o que o médico decidiu na última aplicação). O agendamento do retorno do curso é a
+        // reserva da PRÓPRIA aplicação planejada, quando ainda é um agendamento aberto deste paciente — conferida sem o teto
+        // da lista `open_schedules` (a série pode estar longe, atrás de muitas consultas mais próximas).
+        $courses  = $this->courseItems($entityId, $patientId);
+        $open     = $this->loader->openAmong($entityId, $patientId, array_values(array_filter(array_column($courses, 'booking'))), $today);
+        $bookings = [];
+
+        foreach ($courses as $course) {
+            $items[] = ['item' => $course['item'], 'protocol_key' => null, 'version_id' => null];
+
+            if ($course['booking'] !== null && in_array($course['booking'], $open, true)) {
+                $bookings[$course['item']->taskKey] = $course['booking'];
+            }
         }
 
         return [
@@ -194,15 +204,18 @@ class RecallEvaluator
             'unadopted'          => $unadopted,
             'active'             => $active,
             'open_schedules'     => $loaded['open_schedules'],
+            'course_bookings'    => $bookings,
             'doctor_order_ended' => $orderEnded,
         ];
     }
 
     /**
-     * Um item por curso ATIVO com próxima aplicação. Curso pausado, concluído, interrompido ou perdido não gera item:
-     * a linha que existia se encerra (`course_ended`).
+     * Um item por curso ATIVO com próxima aplicação. Curso pausado, concluído, interrompido, perdido ou excluído não gera
+     * item: a linha que existia se encerra (`course_ended`). Junto de cada item vai a reserva da Agenda que a aplicação
+     * PLANEJADA do curso guarda (`booking`, ainda não conferida: pode estar cancelada ou no passado) — a mais antiga, a
+     * mesma que o agendamento da próxima aplicação usa.
      *
-     * @return list<RecallItem>
+     * @return list<array{item: RecallItem, booking: ?string}>
      */
     private function courseItems(string $entityId, string $patientId): array
     {
@@ -212,47 +225,53 @@ class RecallEvaluator
         $courses = IntravitrealCourse::query()->withoutGlobalScopes()
             ->where('entity_id', $entityId)
             ->where('patient_id', $patientId)
+            ->whereNull('deleted_at')
             ->where('status', CourseStatus::Active->value)
             ->whereNotNull('next_due_on')
             ->orderBy('eye')
             ->get();
 
-        $booked = $this->bookedDays($entityId, $patientId, $courses);
+        $planned = $this->plannedApplications($entityId, $patientId, $courses);
+        $booked  = $this->bookedDays($entityId, $patientId, $planned);
 
         foreach ($courses as $course) {
-            $items[] = $this->engine->courseItem(
-                (string) $course->id,
-                Eye::from((string) $course->eye),
-                (string) $course->drug_label,
-                $course->last_applied_on !== null ? CarbonImmutable::parse($course->last_applied_on) : null,
-                CarbonImmutable::parse($course->started_on),
-                // O prazo é o dia da reserva viva (a Agenda pode tê-la remarcado: o curso guarda a data de quando foi
-                // reservada); sem reserva, o que o curso tem gravado.
-                $booked[(string) $course->id] ?? CarbonImmutable::parse($course->next_due_on),
-                $course->current_interval_weeks !== null ? (int) $course->current_interval_weeks : null,
-                $operational,
-            );
+            $schedule = $planned->get((string) $course->id)?->schedule_id;
+
+            $items[] = [
+                'item' => $this->engine->courseItem(
+                    (string) $course->id,
+                    Eye::from((string) $course->eye),
+                    (string) $course->drug_label,
+                    $course->last_applied_on !== null ? CarbonImmutable::parse($course->last_applied_on) : null,
+                    CarbonImmutable::parse($course->started_on),
+                    // O prazo é o dia da reserva viva (a Agenda pode tê-la remarcado: o curso guarda a data de quando foi
+                    // reservada); sem reserva, o que o curso tem gravado.
+                    $booked[(string) $course->id] ?? CarbonImmutable::parse($course->next_due_on),
+                    $course->current_interval_weeks !== null ? (int) $course->current_interval_weeks : null,
+                    $operational,
+                ),
+                'booking' => $schedule !== null ? (string) $schedule : null,
+            ];
         }
 
         return $items;
     }
 
     /**
-     * O dia da reserva VIVA da aplicação planejada de cada curso (só dos que têm uma). Reserva cancelada, faltada,
-     * excluída ou passada a outro paciente não conta: o prazo volta ao que o curso tem gravado.
+     * A aplicação PLANEJADA de cada curso: a de menor sequência (a mesma que a tela do curso mostra e que o agendamento da
+     * próxima usa). Aplicação excluída não conta (o escopo de exclusão fica; só o de tenant sai).
      *
      * @param Collection<int, IntravitrealCourse> $courses
      *
-     * @return array<string, CarbonImmutable> id do curso => dia da reserva
+     * @return Collection<string, IntravitrealApplication> id do curso => aplicação planejada
      */
-    private function bookedDays(string $entityId, string $patientId, Collection $courses): array
+    private function plannedApplications(string $entityId, string $patientId, Collection $courses): Collection
     {
         if ($courses->isEmpty()) {
-            return [];
+            return new Collection();
         }
 
-        // A aplicação planejada de cada curso é a de menor sequência (a mesma que a tela do curso mostra).
-        $planned = IntravitrealApplication::query()->withoutGlobalScope(EntityScope::class)
+        return IntravitrealApplication::query()->withoutGlobalScope(EntityScope::class)
             ->where('entity_id', $entityId)
             ->where('patient_id', $patientId)
             ->whereIn('course_id', $courses->modelKeys())
@@ -261,7 +280,18 @@ class RecallEvaluator
             ->get()
             ->unique('course_id')
             ->keyBy(static fn (IntravitrealApplication $application): string => (string) $application->course_id);
+    }
 
+    /**
+     * O dia da reserva VIVA da aplicação planejada de cada curso (só dos que têm uma). Reserva cancelada, faltada,
+     * excluída ou passada a outro paciente não conta: o prazo volta ao que o curso tem gravado.
+     *
+     * @param Collection<string, IntravitrealApplication> $planned o resultado de `plannedApplications()`
+     *
+     * @return array<string, CarbonImmutable> id do curso => dia da reserva
+     */
+    private function bookedDays(string $entityId, string $patientId, Collection $planned): array
+    {
         $live = ApplicationBooking::live($entityId, $patientId, $planned->pluck('schedule_id')->filter()->all());
 
         return $planned
@@ -337,8 +367,8 @@ class RecallEvaluator
     // ── gravar a diferença ──────────────────────────────────────────────────
 
     /**
-     * @param Collection<int, PatientRecall>                                                                                                                                                                                                                                                    $existing
-     * @param array{items: list<array{item: RecallItem, protocol_key: ?string, version_id: ?string}>, suspended: array<string, true>, unadopted: array<string, true>, active: array<string, true>, open_schedules: list<array{id: string, date: CarbonImmutable}>, doctor_order_ended: ?string} $plan
+     * @param Collection<int, PatientRecall>                                                                                                                                                                                                                                                                                            $existing
+     * @param array{items: list<array{item: RecallItem, protocol_key: ?string, version_id: ?string}>, suspended: array<string, true>, unadopted: array<string, true>, active: array<string, true>, open_schedules: list<array{id: string, date: CarbonImmutable}>, course_bookings: array<string, string>, doctor_order_ended: ?string} $plan
      *
      * @return array{created: int, updated: int, closed: int, unchanged: int}
      */
@@ -356,7 +386,7 @@ class RecallEvaluator
             $row    = $byKey->get($key);
             $kept[] = $key;
 
-            $attributes = $this->attributes($item, $planned['protocol_key'], $planned['version_id'], $row?->scheduled_schedule_id, $plan['open_schedules'], $openId);
+            $attributes = $this->attributes($item, $planned['protocol_key'], $planned['version_id'], $row?->scheduled_schedule_id, $plan['open_schedules'], $openId, $plan['course_bookings'][$item->taskKey] ?? null);
 
             if ($row === null) {
                 $this->create($item, $attributes, $entityId, $patientId);
@@ -388,16 +418,19 @@ class RecallEvaluator
     /**
      * @param list<array{id: string, date: CarbonImmutable}> $openSchedules
      * @param list<string>                                   $openIds
+     * @param ?string                                        $courseBooking a reserva ABERTA da aplicação planejada do curso (só para o retorno de curso)
      *
      * @return array<string, mixed>
      */
-    private function attributes(RecallItem $item, ?string $protocolKey, ?string $versionId, ?string $currentScheduleId, array $openSchedules, array $openIds): array
+    private function attributes(RecallItem $item, ?string $protocolKey, ?string $versionId, ?string $currentScheduleId, array $openSchedules, array $openIds, ?string $courseBooking): array
     {
-        // O vínculo com um agendamento (feito pela tela de Retornos) sobrevive enquanto ele estiver aberto; senão, o
-        // próximo agendamento aberto do paciente.
+        // O vínculo com um agendamento (feito pela tela de Retornos) sobrevive enquanto ele estiver aberto. Senão: o
+        // retorno de um CURSO liga SÓ à reserva da própria aplicação planejada — "o próximo agendamento aberto do
+        // paciente" ligaria ao mesmo horário o retorno de OUTRO olho (ou de uma consulta qualquer) e o tiraria de "a
+        // contatar" e do convite; os demais retornos (consulta, exame) ligam ao próximo agendamento aberto do paciente.
         $scheduleId = $currentScheduleId !== null && in_array($currentScheduleId, $openIds, true)
             ? $currentScheduleId
-            : ($openSchedules[0]['id'] ?? null);
+            : ($item->source === RecallItem::SOURCE_COURSE ? $courseBooking : ($openSchedules[0]['id'] ?? null));
 
         return [
             'source'                => $item->source,

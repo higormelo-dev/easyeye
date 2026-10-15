@@ -20,6 +20,8 @@ export default defineConfig({
     test: {
         environment: 'happy-dom',
         globals: true,
+        // Fixa o fuso (America/Sao_Paulo) antes dos workers: as datas formatadas dependem dele.
+        globalSetup: ['./tests/JavaScript/globalSetup.js'],
         setupFiles: ['./tests/JavaScript/setup.js'],
         include: ['./tests/JavaScript/**/*.{test,spec}.js'],
         coverage: {

@@ -96,6 +96,22 @@ describe('a cada N semanas', function () {
         }
     });
 
+    it('o gerador aceita os extremos de 2 e 16 semanas e recusa 1 e 17 (só a 1ª data)', function () {
+        $start   = Carbon::parse('2026-10-05 09:00');
+        $service = app(ScheduleSeriesService::class);
+
+        foreach ([2, 16] as $weeks) {
+            $dates = $service->generate($start, 'every_weeks', [], 3, null, $weeks);
+
+            expect($dates)->toHaveCount(3)
+                ->and($dates[1]->toDateString())->toBe($start->copy()->addWeeks($weeks)->toDateString());
+        }
+
+        foreach ([1, 17] as $weeks) {
+            expect($service->generate($start, 'every_weeks', [], 3, null, $weeks))->toHaveCount(1);
+        }
+    });
+
     it('sem intervalo válido o gerador devolve só a 1ª data (nunca laço sem fim)', function () {
         $dates = app(ScheduleSeriesService::class)->generate(Carbon::parse('2026-10-05 09:00'), 'every_weeks', [], 5, null, null);
 
@@ -187,6 +203,31 @@ describe('série aberta', function () {
 
         osrAdd($this, $closed, '2026-11-02 09:00')->assertNotFound();
         osrAdd($this, $loose, '2026-11-02 09:00')->assertNotFound();
+    });
+
+    it('o serviço também recusa série fechada e agendamento sem série (o 404 do controlador não é a única barreira)', function () {
+        $service = app(ScheduleSeriesService::class);
+
+        $closed = osrSchedule($this, '2026-10-12 09:00');
+        $closed->forceFill(['series_id' => (string) Str::uuid(), 'session_number' => 1, 'session_total' => 3])->save();
+
+        $loose = osrSchedule($this, '2026-10-19 09:00', ['full_name' => 'SOLTO']);
+
+        foreach ([$closed, $loose] as $anchor) {
+            expect(fn () => $service->addSession($anchor, Carbon::parse('2026-11-02 09:00')))
+                ->toThrow(InvalidArgumentException::class, __('schedules.series_add_closed'));
+        }
+
+        expect(Schedule::query()->where('entity_id', $this->entity->id)->count())->toBe(2);
+    });
+
+    it('encaixe: a mesma data não entra duas vezes na série (mensagem própria, não a do horário ocupado)', function () {
+        $first = osrOpenSeries($this, ['is_fit_in' => true]);
+
+        osrAdd($this, $first, '2026-11-03 09:00')->assertCreated();
+        osrAdd($this, $first, '2026-11-03 09:00')->assertUnprocessable()->assertJsonPath('errors.date_time.0', __('schedules.series_duplicate_date'));
+
+        expect(Schedule::query()->where('series_id', $first->series_id)->count())->toBe(2);
     });
 
     it('o detalhe do agendamento oferece "acrescentar" só na série aberta, e o rótulo da sessão não tem total', function () {

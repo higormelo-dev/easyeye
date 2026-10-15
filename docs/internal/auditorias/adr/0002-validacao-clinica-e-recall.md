@@ -227,9 +227,9 @@ versões e depois o Revisor. Todo evento de governança é gravado na mesma tran
   `auto_contact` da adoção (ato do médico); o convite que uma pessoa manda pela lista de Retornos não depende dele.
 - **Uma única porta** (`RecallInviteGuard`): canal (as chaves, número que envia, assinatura em dia) → paciente (cadastro ativo, sem bloqueio,
   **autorização `care_reminders`**, celular móvel marcado como WhatsApp, sem SAIR naquele número) → retornos (em aberto, sem agendamento, na janela de
-  convite, **regra em uso e íntegra — I3**, teto por ciclo) → ritmo. A prévia, o clique, a rodada automática e o job leem a mesma decisão.
+  convite, **regra em uso e íntegra — I3** — versão liberada e íntegra, **tarefa ainda ligada na adoção** e, no curso de injeções, **curso ainda ativo** —, teto por ciclo) → ritmo. A prévia, o clique, a rodada automática e o job leem a mesma decisão.
 - **O envio revalida** (`stillEligible`): o que mudou entre enfileirar e enviar (consentimento retirado, SAIR, pausa, retorno tratado, versão suspensa,
-  telefone trocado) vira `suppressed` com `error_code = recall_<motivo>` e **não sai**. Automático fora da janela fica `pending` (o `recall:requeue-pending`
+  tarefa opcional desligada pela clínica, curso de injeções encerrado, telefone trocado) vira `suppressed` com `error_code = recall_<motivo>` e **não sai**. Automático fora da janela fica `pending` (o `recall:requeue-pending`
   traz de volta e cancela após 3 dias). `skipped` ficou para falha transitória do WhatsApp; nenhum dos dois conta nos tetos.
 - **Ritmo** (protege o número, que é o mesmo da confirmação de consulta): janela de horário e dias, intervalo mínimo entre convites do paciente (piso 7
   dias), teto de convites automáticos por retorno no ciclo e **teto diário com ramp-up** (5/10/20 por dia nas 3 primeiras semanas). Os tetos são decididos
@@ -262,8 +262,16 @@ versões e depois o Revisor. Todo evento de governança é gravado na mesma tran
 - **O médico decide o intervalo** a cada aplicação (2 a 16 semanas, "trate e estenda") ou encerra o curso com motivo; a próxima aplicação planejada
   é o retorno do curso na lista de Retornos (prazos próprios, mais curtos que o de consulta). A EasyEye não sugere intervalo.
 - "Feito fora" **não** serve para aplicação de curso: o intervalo é decisão do médico e só o prontuário (uma nova aplicação) re-ancora o retorno (`RecallActionException::notForCourse`).
-- Tudo sob a trava do **paciente** do recall (`RecallLocks::patient`, a mesma do avaliador): dois cliques nunca abrem dois cursos do mesmo olho.
+- Tudo sob a trava do **paciente** do recall (`RecallLocks::patient`, a mesma do avaliador): dois cliques nunca abrem dois cursos do mesmo olho. Isso inclui
+  **agendar a próxima aplicação** (`scheduleNext`): cota do encaixe (se a referência é encaixe) → paciente → curso → aplicação → série → INSERT da sessão, a ordem
+  de `store()`; sem a trava do paciente ele travava curso → aplicação enquanto a execução travava aplicação → curso (deadlock 40P01).
 - A **série aberta** da Agenda (`every_weeks`, `session_total` nulo, `addSession`) é o agendamento do tratamento; segue a ordem de locks de `store()`.
+- A **próxima aplicação** depois de uma execução é a planejada que o curso já tem (`planNext`: a mais antiga ganha a data da decisão mais recente; só nasce outra se não
+  houver nenhuma). Dois pedidos no mesmo olho antes de executar geram as aplicações 1 e 2; inserir sempre deixava duas "próximas" com datas diferentes, e o agendamento
+  da próxima (que pega a mais antiga) ficava com o intervalo velho.
+- O **retorno do curso** na lista de Retornos liga à **reserva da própria aplicação planejada** (enquanto é um agendamento aberto do paciente) ou ao agendamento que a
+  equipe vinculou; nunca ao próximo agendamento aberto do paciente, que vale para a consulta e o exame de protocolo. Com os dois olhos em tratamento, agendar um não
+  pode tirar o outro de "a contatar" nem do convite.
 - **Quem agenda a próxima.** Mesma regra da Agenda: o perfil médico só agenda a partir de uma âncora da **própria** agenda (a sessão herda o médico da âncora; outra agenda recusa com `other_doctor_calendar`, sem tocar a série dela) e o paciente é avisado da criação (`NotifyScheduleChangeJob`, só depois do commit).
 - **A reserva é do paciente e a data é a dela.** A reserva da aplicação (`schedule_id`) só vale se existir, não estiver cancelada/faltada e for do **mesmo paciente** do curso (a recepção pode passar o agendamento a outra pessoa sem cancelá-lo). Enquanto vale, a data da próxima aplicação — no painel e no prazo do retorno — é a da reserva: remarcar na Agenda muda só o agendamento, e o `planned_for`/`next_due_on` gravados só valem sem reserva viva. É derivado na leitura de propósito: um observador de agendamento escreveria no curso com a linha da Agenda já travada, na ordem de locks errada.
 - Gerir o curso (agendar a próxima, encerrar) não depende de o prontuário de origem estar aberto: o curso não é do prontuário e os endpoints não olham a assinatura.

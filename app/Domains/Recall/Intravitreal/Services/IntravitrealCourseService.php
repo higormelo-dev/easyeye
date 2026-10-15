@@ -107,6 +107,36 @@ final class IntravitrealCourseService
         ]);
     }
 
+    /**
+     * A próxima aplicação do curso DEPOIS de uma execução. Se o curso já tem uma aplicação PLANEJADA — a de outro
+     * procedimento pedido antes de executar (dois pedidos no mesmo olho geram as aplicações 1 e 2, uma por procedimento)
+     * ou a que ficou solta quando um procedimento foi cancelado —, é ela a próxima e só ganha a data da decisão mais
+     * recente; só quando não há nenhuma nasce outra. Inserir sempre deixava DUAS "próximas" com datas diferentes (a
+     * execução da 1 criava a 3 e a da 2 criava a 4), e o agendamento da próxima, que pega a mais antiga, ficava com o
+     * intervalo velho. A reserva da Agenda que ela já guarda (`schedule_id`) não se perde: o agendamento é um fato.
+     *
+     * Quem chama (`recordExecution`) já tem a trava do paciente e o curso travado; a aplicação executada já está
+     * `performed`, então não volta como candidata.
+     */
+    public function planNext(IntravitrealCourse $course, CarbonImmutable $plannedFor): IntravitrealApplication
+    {
+        $pending = IntravitrealApplication::query()->withoutGlobalScopes()
+            ->where('course_id', $course->id)
+            ->where('status', ApplicationStatus::Planned->value)
+            ->whereNull('deleted_at')
+            ->orderBy('sequence_no')
+            ->lockForUpdate()
+            ->first();
+
+        if ($pending === null) {
+            return $this->plan($course, null, $plannedFor);
+        }
+
+        $pending->forceFill(['planned_for' => $plannedFor->toDateString()])->save();
+
+        return $pending;
+    }
+
     /** Planeja a próxima aplicação do curso (sequência seguinte), opcionalmente já ligada a um procedimento. */
     public function plan(IntravitrealCourse $course, ?string $procedureId, CarbonImmutable $plannedFor): IntravitrealApplication
     {

@@ -186,7 +186,7 @@ todas as sessões e a situação de cada uma. O rótulo "3/10" quer dizer sessã
 **Série aberta.** É uma série **sem total**: não se sabe quantas sessões terá, porque o médico decide o
 intervalo a cada visita (o "trate e estenda" das injeções intravítreas). Ela nasce quando o médico
 agenda a próxima aplicação de um tratamento com injeções
-([Manual do Médico](../medico/README.md#13-injeções-intravítreas-anti-vegf-e-série-aberta-na-agenda)).
+([Manual do Médico](../medico/README.md#tratamento-com-injeções-intravítreas-anti-vegf)).
 Na agenda, a sessão aparece só com o número ("3"), sem "/total".
 
 Para marcar a próxima sessão de uma série aberta:
@@ -537,6 +537,10 @@ nem fecha o retorno.
 
 Se você marcar pela Agenda sem usar o botão **Agendar**, o sistema liga o próximo agendamento
 aberto do paciente ao retorno em poucos minutos.
+
+No retorno da **Próxima aplicação do tratamento** é diferente: o sistema só liga o horário da
+própria aplicação (pelo botão **Agendar** ou pelo *Agendar a próxima* do médico). Uma consulta
+marcada para o paciente, ou a injeção do outro olho, não tira esse retorno de **Para contatar**.
 
 **Adiar** (menu **⋮ Mais ações**) — só para retorno em aberto:
 

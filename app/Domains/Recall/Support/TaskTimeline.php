@@ -73,4 +73,31 @@ final class TaskTimeline
 
         return $months === null ? null : IntervalUnit::Months->addTo($conditionStart, (int) $months);
     }
+
+    /**
+     * A linha do tempo com o INÍCIO da tarefa aplicado: a tarefa que só começa depois de N meses (`startsAt`) não vence
+     * antes disso — vence no dia em que passa a valer e os demais prazos andam os mesmos dias. É a conta do avaliador
+     * (`RecallRuleEngine`) E a da prévia do Revisor (`RecallPreview`): uma só, para o exemplo que ele aprova ser o que o
+     * sistema faz (a prévia mostrava a triagem da hidroxicloroquina vencendo 4 anos antes do início dela).
+     *
+     * `deferred_to` é o dia em que a tarefa passou a valer quando houve deslocamento, e nulo quando nada mudou (sem início
+     * da tarefa, ou o vencimento já cai nele ou depois dele).
+     *
+     * @param array<string, CarbonImmutable> $timeline o resultado de `from()`
+     *
+     * @return array{timeline: array<string, CarbonImmutable>, deferred_to: ?CarbonImmutable}
+     */
+    public static function deferToStart(array $timeline, ?CarbonImmutable $startsAt): array
+    {
+        if ($startsAt === null || ! $timeline['due_at']->lessThan($startsAt)) {
+            return ['timeline' => $timeline, 'deferred_to' => null];
+        }
+
+        $shift = $timeline['due_at']->diffInDays($startsAt);
+
+        return [
+            'timeline'    => array_map(static fn (CarbonImmutable $date): CarbonImmutable => $date->addDays($shift), $timeline),
+            'deferred_to' => $startsAt,
+        ];
+    }
 }
