@@ -12,7 +12,7 @@ use App\Enums\AI\AiProvider;
  * papéis do assistente e do filtro em execução real.
  *
  * Fatos conferidos nas fontes oficiais em 03/10/2026 (lista em sources() e
- * em docs/legal/ai-providers-lgpd.md). Mudou o contrato/termo do provedor:
+ * em docs/internal/legal/ai-providers-lgpd.md). Mudou o contrato/termo do provedor:
  * revise aqui e no documento.
  *
  * - Transferência internacional (LGPD art. 33): no Brasil não há; para a UE

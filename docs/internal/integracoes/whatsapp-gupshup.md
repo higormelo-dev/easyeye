@@ -218,6 +218,19 @@ Olá, {{1}}! Esperamos que seu atendimento em {{2}} tenha sido bom. De 1 a 5, co
 - Exemplo: `Maria` · `Clínica Visão`
 - Payload enviado: `survey:<id da mensagem>:<nota>`
 
+**`easyeye_lembrete_retorno`** — Utilidade (convite de retorno, Fase 6)
+
+```text
+Olá, {{1}}! A {{2}} lembra que chegou a hora de agendar o seu retorno de acompanhamento. Para marcar, toque em Quero agendar ou fale com a clínica.
+```
+
+- Rodapé: `Para não receber mais avisos, responda SAIR.`
+- Botões (resposta rápida): `Quero agendar` · `Já agendei`
+- Exemplo: `Maria` · `Clínica Visão`
+- Payload enviado: `recall_book:<id da mensagem>` / `recall_done:<id da mensagem>`
+- **Texto neutro de propósito:** só primeiro nome e clínica; nunca cita condição, exame ou motivo (a tela do celular pode ser vista por outra pessoa). Um teste (`RecallInviteServiceTest`) varre o texto e as variáveis atrás de termos clínicos.
+- **Aprovação manual na Meta, em cada número que envia, ANTES de ligar `recall_enabled` na clínica.** Se a Meta reclassificar para *Marketing*, a tarifa é maior e a categoria exige outro consentimento: decisão do dono antes de seguir.
+
 ### 6.2 Cadastro e teste
 
 **`easyeye_codigo_verificacao`** — **Autenticação** (pt_BR; en opcional)
@@ -285,6 +298,10 @@ Versões em inglês (opcionais — só usadas com `WHATSAPP_TEMPLATE_LANGUAGES=p
 | Status de mensagem desconhecida (outro sistema/console no mesmo app) é descartado com log de debug; só volta à fila se houver envio daquele app em `sending` (corrida do id) | `ProcessWhatsAppStatusJob` |
 | Clínica bloqueada (`ClinicServiceGate`): nada automático ao paciente (`skipped`, volta sozinho); avisos do SaaS seguem | sem mudança |
 | Janelas: confirmações 08–20h, pesquisas 09–20h, avisos do SaaS 08–20h; código sem janela | sem mudança |
+| **Convite de retorno (Fase 6):** mensagem `kind = recall`, sem consulta (`schedule_id` nulo), achada pelo paciente (`patient_id`) e pela onda (`recall_invite_id`, uma mensagem de saída por onda). Só sai com **autorização de lembretes** (`ConsentType::CareReminders`, marcada no cadastro), celular marcado como WhatsApp e móvel, sem SAIR naquele número e sem bloqueio de contato. **Três chaves**: pausa global do EasyEye (Manager), `whatsapp_settings.recall_enabled` da clínica (Manager, nasce desligada) e `recall_clinic_settings.whatsapp_invites_enabled` (a própria clínica). O job **reconfere tudo no momento do envio** (chaves, consentimento, SAIR, telefone, retorno ainda em aberto, regra clínica ainda em uso): o que deixou de valer vira `suppressed` com `error_code = recall_<motivo>` e **não é enviado**; automático fora da janela de horário fica `pending` e o `recall:requeue-pending` traz de volta (cancela após `recall.invites.expire_pending_days`) | `RecallInviteGuard`, `RecallInviteService`, `SendWhatsAppMessageJob` |
+| Convite de retorno — ritmo (para não queimar o número, que é o mesmo da confirmação de consulta): janela de horário e dias da semana da clínica (só automático), intervalo mínimo entre convites do mesmo paciente (piso de 7 dias), teto de convites automáticos por retorno no ciclo, teto diário da clínica com **ramp-up** (5/dia na 1ª semana, 10, 20, depois só o da clínica) e uma onda por paciente por dia. Mensagem `skipped`/`suppressed` não conta nos tetos | `RecallInvitePacing`, `config/recall.php` |
+| Resposta ao convite: botão `recall_book` ("Quero agendar") ou `recall_done` ("Já agendei") grava a resposta na onda e um evento em cada retorno coberto; "Quero agendar" põe o paciente no topo da lista de Retornos. O botão vale 30 dias. Texto livre ou citação **não** decide nada (o convite não é candidata de texto livre) | `WhatsAppService::applyRecallReply`, `RecallInviteResponder` |
+| **SAIR retira também a autorização de lembretes** do celular (no app próprio da clínica, só os pacientes dela; no número do EasyEye, todas as clínicas que enviam por ele). VOLTAR reativa o número, **não** devolve a autorização: ela só volta com novo consentimento no cadastro | `WhatsAppService::optOut`, `ConsentService::revokeCareRemindersForPhone` |
 
 **Respostas em texto aceitas** (comparação exata, sem acento, maiúsculas nem pontuação — `lang/{pt_BR,en}/whatsapp.php`, `replies`; vale pt_BR e en):
 
@@ -307,6 +324,7 @@ Versões em inglês (opcionais — só usadas com `WHATSAPP_TEMPLATE_LANGUAGES=p
 - **Transferência internacional (art. 33):** os dois tratam fora do Brasil → contrato/DPA com **cláusulas-padrão da ANPD** (Resolução CD/ANPD nº 19/2024) com a Gupshup; termos de tratamento de dados do WhatsApp Business com a Meta. O sistema não guarda os contratos (mesmo critério de `docs/legal/ai-providers-lgpd.md`).
 - **Minimização:** templates só com primeiro nome, clínica, data/hora e médico; nada de dado clínico. Avisos do SaaS sem dado de paciente. Código de verificação nunca em claro (hash no banco; payload do job cifrado; histórico mascarado).
 - **Opt-in/opt-out:** marcação "WhatsApp" no agendamento/cadastro + SAIR/VOLTAR com confirmação.
+- **Convite de retorno:** base legal **consentimento** (art. 7, I), registrado em `patient_consents` (`care_reminders`: quem coletou, canal, IP, versão do texto `care_reminders_v1`). Sem a autorização o paciente fica só na lista de ligação. O texto nunca revela a condição. SAIR revoga na hora. Exportação do titular e eliminação em cascata alcançam `recall_invites` e as mensagens (`whatsapp_messages.patient_id`).
 - **Export do titular:** `PatientDataExporter` continua levando `whatsapp_messages` da consulta, agora com entrega/leitura e com as respostas do paciente (que passaram a ganhar o `schedule_id`), e o bloco `whatsapp_opt_outs` (descadastros dos celulares do paciente — cadastro e agendamentos — no número da clínica e no do EasyEye: `sender`, `phone`, `source`, `opted_out_at`).
 - **SAIR no número do EasyEye vale para TODAS as clínicas que usam esse número** (o descadastro é por número que envia, não por clínica). No painel, a agenda (detalhes da consulta) e o cadastro do paciente (detalhes) mostram o selo "Descadastrado do WhatsApp".
 - **Código de verificação:** no banco só o HMAC-SHA256 com a `APP_KEY` (antes sha256 puro, reversível por força bruta com 10⁶ tentativas); fora de `audit_logs` (`User::$auditExclude`) e a migration `2026_10_08_000100` limpou o que já estava lá (só linhas do User, só as chaves `phone_verification_code/_expires_at/_attempts`). Códigos pendentes no formato antigo continuam aceitos até expirar (10 min) — comparar os dois formatos não enfraquece o novo.

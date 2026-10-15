@@ -13,7 +13,7 @@ use Illuminate\Console\Command;
  * Pagar.me, token do Asaas, cookie…) — o mesmo que a ingestão aplica desde
  * então. Idempotente (o já limpo não muda). --dry-run só conta quantos
  * mudariam. Depois de rodar, trocar as credenciais de webhook que vazaram
- * para o banco (docs/billing/checkout-transparente-deploy.md).
+ * para o banco (docs/internal/integracoes/billing/checkout-transparente-deploy.md).
  */
 class SanitizeWebhookEventsCommand extends Command
 {
