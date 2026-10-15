@@ -48,9 +48,10 @@ BROAD_PREFIXES = ('database/migrations/', 'database/seeders/', 'database/factori
 # sem ele o passo falha com "Missing generated HTTP fixture".
 ALWAYS = {'tests/Feature/Api/Integrators/P2ContractsTest.php'}
 CORE_LIMIT = 120  # classe citada por tantos testes é núcleo (Model, Service base): não adianta selecionar
-# Teto de tempo (minutos) do passo do Pest. A suíte inteira leva ~45 min na CI (~670 arquivos, ~4 s cada).
+# Teto de tempo (minutos) do passo do Pest, POR JOB: vale para cada fatia da matriz. A suíte inteira leva ~37 min de Pest
+# serial (~670 arquivos); em 6 fatias cada job leva uma fração, então 60 é folga contra travamento, não meta de duração.
 SHORT_TIMEOUT = 15  # seleção pequena de PR: se travar, falha rápida
-LONG_TIMEOUT = 60   # suíte inteira (push main/desenv ou PR de efeito amplo) e seleção grande; suba antes de chegar a ~50 min
+LONG_TIMEOUT = 60   # suíte inteira (push main/desenv ou PR de efeito amplo) e seleção grande; suba se uma fatia chegar perto de ~50 min
 SHORT_LIMIT = 100   # arquivos que cabem em SHORT_TIMEOUT com folga (~7 min); a seleção mais larga já vista foi de 53
 
 
