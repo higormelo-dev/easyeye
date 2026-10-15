@@ -68,10 +68,17 @@ function externalReportPdfText(string $pdf): string
         test()->fail('Pré-requisito ausente: pdftotext (poppler-utils) não encontrado no PATH. Instale com `apt-get install poppler-utils`.');
     }
 
-    $path = (string) tempnam(sys_get_temp_dir(), 'eeye_test_pdf_');
+    $path = tempnam(sys_get_temp_dir(), 'eeye_test_pdf_');
+
+    if ($path === false) {
+        test()->fail('Não foi possível criar o arquivo temporário do PDF em ' . sys_get_temp_dir());
+    }
 
     try {
-        file_put_contents($path, $pdf);
+        if (file_put_contents($path, $pdf) === false) {
+            test()->fail("Não foi possível gravar o PDF em {$path}");
+        }
+
         $process = new Process([$binary, $path, '-']);
         $process->run();
     } finally {
