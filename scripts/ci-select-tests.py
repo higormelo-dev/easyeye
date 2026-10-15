@@ -13,6 +13,7 @@ Regras (na dúvida, suíte inteira):
   - qualquer outro app/**/*.php                 -> testes que citam o nome da classe (se forem muitos, é núcleo: inteira);
   - lang/**                                     -> testes de contrato de texto (`*TextsTest.php`) e quem cita o grupo;
   - resources/js, docs, e2e, workflows          -> nenhum teste PHP (o Vitest roda sempre inteiro, é rápido).
+  - sempre: P2ContractsTest (gera as fixtures que validate-integrator-contracts.php lê);
   - tests/Integration (corrida real, 2 sessões)  -> FORA do PR (cada teste segura 2,5-8 s; rodam no push main/desenv).
 Saída: `mode` e `pest_args` em $GITHUB_OUTPUT (pest_args vazio = não rodar o Pest). Uso local: CI_BASE_SHA=<sha> python3 ...
 """
@@ -27,6 +28,9 @@ SAFE = re.compile(r'^[A-Za-z0-9_./-]+$')
 BROAD_FILES = {'composer.json', 'composer.lock', 'phpunit.xml', 'tests/Pest.php', 'tests/TestCase.php', 'artisan'}
 BROAD_PREFIXES = ('database/migrations/', 'database/seeders/', 'database/factories/', 'config/', 'routes/', 'bootstrap/',
                   'app/Providers/')
+# Sempre roda no PR: gera as fixtures HTTP (storage/framework/testing/p2) que o passo validate-integrator-contracts.php lê;
+# sem ele o passo falha com "Missing generated HTTP fixture".
+ALWAYS = {'tests/Feature/Api/Integrators/P2ContractsTest.php'}
 CORE_LIMIT = 120  # classe citada por tantos testes é núcleo (Model, Service base): não adianta selecionar
 
 
@@ -80,8 +84,7 @@ def main() -> None:
 
     skipped = {t for t in selected if t.startswith('tests/Integration/')}
     selected -= skipped  # lentos por natureza: valem no push para main/desenv, não a cada PR
-    if not selected:
-        out('none', '', f'nenhum teste Feature/Unit alcançado ({len(skipped)} de Integration ficam para o push)')
+    selected |= ALWAYS
     out('selected', ' '.join(sorted(selected)), f'{len(selected)} arquivo(s) de teste alcançados por {len(changed)} arquivo(s) alterado(s); {len(skipped)} de Integration ficam para o push')
 
 
