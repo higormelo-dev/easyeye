@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use PHPUnit\Framework\AssertionFailedError;
 
 /**
  * Filho de pcntl_fork() que trava ao sair, depois de o pai aquecer o pool OpenMP do Imagick (libgomp).
@@ -255,6 +256,10 @@ function ompSurvivors(array $run): array
 /**
  * Espera um pouco (o init reapa os órfãos de forma assíncrona) e reprova se sobrou processo vivo da rodada.
  *
+ * SÓ OBSERVA: nunca sinaliza. Um PID lido de /proc é a identidade de um instante; até o sinal o processo pode ter
+ * terminado e o número ser de outro processo do mesmo usuário. Quem encerra descendentes é o supervisor (ompRunProbe),
+ * que ainda segura o líder do grupo (vivo ou zumbi) e por isso o número não pode ser reaproveitado.
+ *
  * @param array{group: int, marker: string} $run
  */
 function ompAssertNoSurvivors(array $run): void
@@ -272,10 +277,6 @@ function ompAssertNoSurvivors(array $run): void
 
         usleep(50000);
     } while (microtime(true) < $until);
-
-    foreach (array_keys($alive) as $pid) {
-        posix_kill($pid, SIGKILL); // não deixa lixo para as próximas rodadas
-    }
 
     test()->fail('Sobraram processos vivos da sonda ' . $run['group'] . ': ' . json_encode($alive));
 }
@@ -591,7 +592,8 @@ it('prazo estourado antes de a sonda virar líder de grupo: o wrapper ainda a en
 });
 
 it('a sonda roda com ambiente mínimo: segredos do processo do teste não chegam a ela', function () {
-    $secrets = ['DB_PASSWORD' => 'omp-sentinela-db', 'SENTRY_DSN' => 'omp-sentinela-dsn', 'APP_KEY' => 'omp-sentinela-key'];
+    $secrets  = ['DB_PASSWORD' => 'omp-sentinela-db', 'SENTRY_DSN' => 'omp-sentinela-dsn', 'APP_KEY' => 'omp-sentinela-key'];
+    $previous = array_map(fn (string $name) => getenv($name), array_keys($secrets));
 
     foreach ($secrets as $name => $value) {
         putenv("{$name}={$value}");
@@ -600,8 +602,9 @@ it('a sonda roda com ambiente mínimo: segredos do processo do teste não chegam
     try {
         $names = ompRunProbe(OMP_SUPERVISION_FIXTURE, ['env'], ['OMP_THREAD_LIMIT' => '1'], run: $run)['env'];
     } finally {
-        foreach (array_keys($secrets) as $name) {
-            putenv($name);
+        // Restaura o valor de antes (ou a ausência): remover deixaria um teste posterior sem a variável que o runner tinha.
+        foreach (array_keys($secrets) as $i => $name) {
+            putenv($previous[$i] === false ? $name : "{$name}={$previous[$i]}");
         }
     }
 
@@ -611,4 +614,32 @@ it('a sonda roda com ambiente mínimo: segredos do processo do teste não chegam
         ->and($names)->toContain('OMP_THREAD_LIMIT')
         ->and(array_diff($names, [...OMP_PROBE_ENV_ALLOWLIST, 'OMP_THREAD_LIMIT', 'PWD', 'SHLVL', '_', 'OLDPWD']))->toBe([]);
     ompAssertNoSurvivors($run);
+});
+
+it('o verificador de sobreviventes só observa e reprova: nunca sinaliza um PID lido de /proc', function () {
+    // Sobrevivente falso: processo vivo, que não é de nenhum grupo da sonda, com o marcador da rodada no cmdline.
+    $marker   = sys_get_temp_dir() . '/omp-survivor-' . bin2hex(random_bytes(6));
+    $survivor = proc_open([PHP_BINARY, '-r', 'sleep(30);', $marker], [], $pipes);
+
+    if (! is_resource($survivor)) {
+        test()->fail('não foi possível iniciar o sobrevivente falso');
+    }
+
+    try {
+        $run   = ['group' => -1, 'marker' => $marker];
+        $until = microtime(true) + 3;
+
+        // Entre o fork e o exec o cmdline ainda é o do pai: espera o marcador aparecer antes de chamar o verificador.
+        while (ompSurvivors($run) === [] && microtime(true) < $until) {
+            usleep(20000);
+        }
+
+        expect(ompSurvivors($run))->not->toBe([]);
+        expect(fn () => ompAssertNoSurvivors($run))->toThrow(AssertionFailedError::class, 'Sobraram processos vivos');
+        usleep(300000); // o SIGKILL é assíncrono: dá tempo de um sinal indevido fazer efeito antes de conferir
+        test()->assertTrue(proc_get_status($survivor)['running'], 'o verificador sinalizou um PID lido de /proc');
+    } finally {
+        proc_terminate($survivor);
+        proc_close($survivor);
+    }
 });
