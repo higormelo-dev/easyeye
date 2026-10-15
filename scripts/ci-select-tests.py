@@ -6,13 +6,14 @@ roda-se só o que a mudança alcança; a suíte INTEIRA continua rodando em todo
 
 Regras (na dúvida, suíte inteira):
   - fora de pull_request, sem base conhecida ou com nome de arquivo estranho  -> inteira;
-  - mudou algo de efeito amplo (composer, phpunit.xml, migrations, config, rotas, providers, fábricas, base dos testes,
-    workflows)                                                                   -> inteira;
+  - mudou algo de efeito amplo (composer, phpunit.xml, migrations, config, rotas, providers, fábricas, base dos testes)
+                                                                                 -> inteira (workflow e scripts, não);
   - teste alterado                              -> ele mesmo (e quem usa o auxiliar de teste alterado, pelo nome);
   - app/Domains/<X>/...                         -> todo teste de <X> (pasta ou `Domains\\<X>\\` no código);
   - qualquer outro app/**/*.php                 -> testes que citam o nome da classe (se forem muitos, é núcleo: inteira);
   - lang/**                                     -> testes de contrato de texto (`*TextsTest.php`) e quem cita o grupo;
-  - resources/js, docs, e2e                     -> nenhum teste PHP (o Vitest roda sempre inteiro, é rápido).
+  - resources/js, docs, e2e, workflows          -> nenhum teste PHP (o Vitest roda sempre inteiro, é rápido).
+  - tests/Integration (corrida real, 2 sessões)  -> FORA do PR (cada teste segura 2,5-8 s; rodam no push main/desenv).
 Saída: `mode` e `pest_args` em $GITHUB_OUTPUT (pest_args vazio = não rodar o Pest). Uso local: CI_BASE_SHA=<sha> python3 ...
 """
 import os
@@ -25,7 +26,7 @@ FULL = 'tests/Feature tests/Unit tests/Integration'
 SAFE = re.compile(r'^[A-Za-z0-9_./-]+$')
 BROAD_FILES = {'composer.json', 'composer.lock', 'phpunit.xml', 'tests/Pest.php', 'tests/TestCase.php', 'artisan'}
 BROAD_PREFIXES = ('database/migrations/', 'database/seeders/', 'database/factories/', 'config/', 'routes/', 'bootstrap/',
-                  'app/Providers/', '.github/')
+                  'app/Providers/')
 CORE_LIMIT = 120  # classe citada por tantos testes é núcleo (Model, Service base): não adianta selecionar
 
 
@@ -77,9 +78,11 @@ def main() -> None:
             selected |= {t for t in tests if t.endswith('TextsTest.php')}
             selected |= {t for t, body in tests.items() if f"'{name}." in body or f'"{name}.' in body}
 
+    skipped = {t for t in selected if t.startswith('tests/Integration/')}
+    selected -= skipped  # lentos por natureza: valem no push para main/desenv, não a cada PR
     if not selected:
-        out('none', '', 'nenhuma mudança alcança teste PHP')
-    out('selected', ' '.join(sorted(selected)), f'{len(selected)} arquivo(s) de teste alcançados por {len(changed)} arquivo(s) alterado(s)')
+        out('none', '', f'nenhum teste Feature/Unit alcançado ({len(skipped)} de Integration ficam para o push)')
+    out('selected', ' '.join(sorted(selected)), f'{len(selected)} arquivo(s) de teste alcançados por {len(changed)} arquivo(s) alterado(s); {len(skipped)} de Integration ficam para o push')
 
 
 if __name__ == '__main__':
