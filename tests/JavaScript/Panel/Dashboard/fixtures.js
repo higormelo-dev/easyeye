@@ -19,6 +19,8 @@ export const T = {
     kpi_surgeries: 'Surgeries today',
     kpi_exams_pending: 'Pending exams',
     kpi_exams_pending_hint: 'Unreported · last 30 days',
+    kpi_recall: 'Returns to contact',
+    kpi_recall_hint: 'Lost to follow-up: :lost',
     kpi_guides_waiting: 'Pending guides',
     kpi_receivable: 'Receivable',
     kpi_satisfaction: 'Satisfaction',

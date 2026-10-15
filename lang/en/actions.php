@@ -254,6 +254,7 @@ return [
         'surgery_indicators'       => 'Surgical indicators',
         'surgery_facilities'       => 'Surgical locations and rooms',
         'surgery_templates'        => 'Surgical templates',
+        'recall'                   => 'Returns',
         'lenses'                   => 'Lenses',
         'iol_lenses'               => 'Cataract Lenses',
         'stock'                    => 'Stock',

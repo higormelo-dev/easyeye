@@ -112,6 +112,47 @@ Schedule::command('ai:notify-waiting-approval')
     ->name('ai:notify-waiting-approval')
     ->withoutOverlapping();
 
+// Convites de revisão clínica (Fase 6) vencidos: expiram e perdem o rascunho do parecer.
+Schedule::command('clinical-review:expire')
+    ->dailyAt('03:20')
+    ->name('clinical-review:expire')
+    ->withoutOverlapping();
+
+// Integridade dos protocolos de retorno (Fase 6): refaz o hash do texto gravado de cada versão em uso
+// ou em revisão; a que divergir sai de uso (suspensa/retirada) e o comando FALHA para o monitoramento ver.
+Schedule::command('recall:verify-integrity')
+    ->dailyAt('05:15')
+    ->name('recall:verify-integrity')
+    ->withoutOverlapping();
+
+// Recall de pacientes (Fase 6): reavalia, a cada minuto, os pacientes que um ato clínico marcou na outbox
+// (prontuário, exame, agenda, medicação, cadastro, condição) — quem grava nunca espera a avaliação.
+Schedule::command('recall:evaluate-dirty')
+    ->everyMinute()
+    ->name('recall:evaluate-dirty')
+    ->withoutOverlapping(10);
+
+// Conciliação noturna do recall: rede de segurança da outbox (gravação em massa, importação, prazos que
+// passaram com o relógio). Falha de paciente é relatada e o comando falha para o monitoramento ver.
+Schedule::command('recall:reconcile')
+    ->dailyAt('02:30')
+    ->name('recall:reconcile')
+    ->withoutOverlapping();
+
+// Convites de retorno por WhatsApp (Fase 6): de hora em hora convida quem tem retorno a vencer/vencido, só nas clínicas
+// com o canal ligado nos três níveis e dentro da janela de horário de cada uma. O ritmo (intervalo mínimo, teto por
+// ciclo, teto diário com ramp-up) é do RecallInviteGuard; cada convite é reconferido no momento do envio.
+Schedule::command('recall:send-invites')
+    ->hourlyAt(5)
+    ->name('recall:send-invites')
+    ->withoutOverlapping(30);
+
+// Rede de segurança do convite: reenfileira o que ficou pending sem job e cancela o que não saiu no prazo.
+Schedule::command('recall:requeue-pending')
+    ->everyTenMinutes()
+    ->name('recall:requeue-pending')
+    ->withoutOverlapping(10);
+
 // Convites de clínica (médico/usuário) vencidos: expira e descarta os dados
 // digitados (LGPD).
 Schedule::command('clinic-invitations:expire')

@@ -33,7 +33,7 @@ it('envia dados validados ao destinatário configurado sem gravar dados pessoais
     expect($message->getTo()[0]->getAddress())->toBe('contato@easyeye.app')
         ->and($message->getReplyTo()[0]->getAddress())->toBe($this->contact['email'])
         ->and($message->getHtmlBody())->toContain($this->contact['name'], $this->contact['message'])
-        ->not->toContain('untrusted', 'other@example.test');
+        ->not->toContain('untrusted')->not->toContain('other@example.test');
     Log::shouldNotHaveReceived('info');
     Log::shouldNotHaveReceived('error');
 });

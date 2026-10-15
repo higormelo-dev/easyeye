@@ -441,6 +441,8 @@ return [
     'series_conflict'         => ':date: :reason',
     'series_has_conflicts'    => '{1} 1 date of the series is not available.|[2,*] :count dates of the series are not available.',
     'series_created'          => 'Series created: :count sessions booked.',
+    'recall_mismatch'         => 'This follow-up belongs to another patient.',
+    'form_recall_banner'      => 'Scheduling the follow-up: :task',
     'series_title'            => 'Session series',
     'series_current'          => 'this one',
     'series_cancel_future'    => 'Cancel upcoming (:count)',
@@ -451,4 +453,17 @@ return [
     'series_cancel_confirm'   => 'Cancel upcoming sessions',
     'series_cancel_error'     => 'The sessions could not be cancelled.',
     'series_cancelled'        => '{0} No upcoming sessions to cancel.|{1} 1 upcoming session cancelled.|[2,*] :count upcoming sessions cancelled.',
+
+    // Series every N weeks and open series (interval decided at each visit)
+    'form_every_weeks'       => 'Every N weeks',
+    'form_rec_interval'      => 'Interval (weeks)',
+    'form_rec_interval_hint' => 'From 2 to 16 weeks between sessions.',
+    'series_add'             => 'Add session',
+    'series_add_date'        => 'Date and time of the new session',
+    'series_add_hint'        => 'The series has no total: the interval is decided at each visit. The new session follows the same time rule as a regular appointment.',
+    'series_add_confirm'     => 'Add',
+    'series_add_error'       => 'Could not add the session.',
+    'series_added'           => 'Session added to the series.',
+    'series_add_closed'      => 'Sessions can only be added to an open series (no total).',
+    'series_add_past'        => 'The new session must be on a future date.',
 ];

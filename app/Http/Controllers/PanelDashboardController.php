@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domains\AI\Models\AiRun;
+use App\Domains\Recall\Services\RecallListService;
 use App\Enums\AI\AiRunStatus;
 use App\Enums\{ClientRule, EntityGate, FeatureKey, Permission, ScheduleSituation};
 use App\Enums\Surgery\SurgicalCaseStatus;
@@ -417,7 +418,27 @@ class PanelDashboardController extends Controller
             $stats['exams_pending'] = $this->pendingExamsQuery($entityId)->count();
         }
 
-        return $stats;
+        return [...$stats, ...$this->recallStats($entityId)];
+    }
+
+    /**
+     * Retornos a contatar (Fase 6): só a CONTAGEM (nenhum nome), só para quem opera o recall numa clínica com a
+     * feature no plano. Mesma conta da tela "Retornos" — o número do card bate com a lista que ele abre.
+     *
+     * @return array{recall_to_contact?: int, recall_lost?: int}
+     */
+    private function recallStats(string $entityId): array
+    {
+        $entity = $this->entity($entityId);
+
+        if ($entity === null || ! Gate::allows(EntityGate::OperateRecall->value, $entity)
+            || ! app(FeatureGateService::class)->can($entityId, FeatureKey::HasPatientRecall)) {
+            return [];
+        }
+
+        $counts = app(RecallListService::class)->counts($entityId);
+
+        return ['recall_to_contact' => $counts['to_contact'], 'recall_lost' => $counts['lost']];
     }
 
     /**
@@ -454,6 +475,7 @@ class PanelDashboardController extends Controller
                 ->count(),
             // Fila do pronto atendimento que ele vê (dele + sem médico).
             'urgent_queue' => $this->operations->urgentCareQueued($entityId, (string) $doctor->id),
+            ...$this->recallStats($entityId),
         ];
     }
 

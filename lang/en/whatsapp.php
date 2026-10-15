@@ -279,6 +279,29 @@ return [
         'warn_failed' => 'The webhook could not be registered at Gupshup right now. Check the partner credentials and use "Register again".',
     ],
 
+    // Follow-up invitation (Phase 6): clinic switch and global pause in the Manager.
+    'recall' => [
+        'toggle'         => 'Follow-up invitation',
+        'toggle_hint'    => 'Enable only after the "Follow-up reminder" template is approved by Meta on this number. The clinic still has to turn on its own switch in the follow-up settings.',
+        'enabled'        => 'Follow-up invitation enabled',
+        'badge_paused'   => 'Paused',
+        'badge_active'   => 'Active',
+        'pause_title'    => 'Follow-up invitations',
+        'pause_text'     => 'Pause follow-up invitations for ALL clinics (burned number, rejected template, complaint). What is already queued is also cancelled.',
+        'paused_since'   => 'Paused by :name on :date',
+        'paused_reason'  => 'Reason: :reason',
+        'impact'         => ':clinics clinics and :recalls follow-ups affected',
+        'pause'          => 'Pause all invitations',
+        'resume'         => 'Release invitations',
+        'reason'         => 'Reason for the pause',
+        'reason_hint'    => 'Required (at least 10 characters). It is recorded in the audit log.',
+        'confirm_pause'  => 'Pause follow-up invitations for all clinics now?',
+        'confirm_resume' => 'Release follow-up invitations again? Each clinic keeps its own switches.',
+        'paused'         => 'Follow-up invitations paused.',
+        'resumed'        => 'Follow-up invitations released.',
+        'resume_reason'  => 'Follow-up invitations resumed by the Manager',
+    ],
+
     'toggles' => [
         'active'                    => 'Integration active',
         'confirmation_enabled'      => 'Appointment confirmation',
@@ -295,6 +318,8 @@ return [
         'confirmations_answered' => 'Confirmations answered',
         'surveys_sent'           => 'Surveys sent',
         'surveys_answered'       => 'Surveys answered',
+        'recall_sent'            => 'Follow-up invitations sent',
+        'recall_answered'        => 'Follow-up invitations answered',
         'survey_average'         => 'Average score',
         'delivered'              => 'Delivered',
         'read'                   => 'Read',
@@ -303,11 +328,12 @@ return [
 
     // Text equivalent to each approved template (system history). The text
     // registered at Meta, with {{1}}, {{2}}..., is in
-    // docs/integracoes/whatsapp-gupshup.md — change it here, there and at Meta.
+    // docs/internal/integracoes/whatsapp-gupshup.md — change it here, there and at Meta.
     'templates' => [
         'appointment_confirmation'             => "Hello, :first_name! Reminder from :clinic: your appointment is scheduled for :when with :doctor. Can we confirm your attendance?\nTo stop receiving notices, reply STOP.\n[Confirm] [Cancel]",
         'satisfaction_survey'                  => "Hello, :first_name! We hope your visit to :clinic went well. From 1 to 5, how would you rate your experience?\nTo stop receiving notices, reply STOP.\n[5 - Excellent] [4 - Good] [3 - Fair] [2 - Poor] [1 - Very poor]",
         'surgery_authorization_notice'         => "Hello, :first_name! :clinic has some information for you. Please contact the clinic when you can.\nTo stop receiving notices, reply STOP.",
+        'care_recall'                          => "Hello, :first_name! :clinic reminds you it is time to schedule your follow-up visit. To book, tap Book now or contact the clinic.\nTo stop receiving notices, reply STOP.\n[Book now] [Already booked]",
         'verification_code'                    => '*:code* is your verification code. For your security, do not share this code. This code expires in 10 minutes.',
         'connection_test'                      => 'This is a test message from :app. If you received it, WhatsApp is set up correctly.',
         'saas_dunning_reminder'                => 'EasyEye: the :entity subscription (:amount) is due on :date. You can pay in the panel, under My subscription.',
@@ -363,6 +389,9 @@ return [
         'opted_out'                   => 'Done, you will no longer receive automatic notices from this number. To receive them again, reply START.',
         'opted_in'                    => 'Done, you will receive automatic notices from this number again. To stop, reply STOP.',
         'use_buttons'                 => "We got your message, but we could not tell which notice it refers to. 🙂\nPlease tap the button of the message you want to answer (Confirm, Cancel or the score).",
+        'recall_book'                 => 'Thank you! The clinic received your request and will contact you to schedule your follow-up. 📅',
+        'recall_done'                 => 'Thank you for letting us know! The clinic will check your appointment. If you need help, contact the front desk.',
+        'recall_use_buttons'          => "We got your message. 🙂\nTo answer the follow-up reminder, tap Book now or Already booked in the message, or contact the clinic.",
         'rescheduled'                 => "This appointment was rescheduled by the clinic. 📅\nYou will soon get a new message with the new date to confirm.",
         // Schedule record (history and cancellation reason).
         'confirmed_note' => 'Confirmed by the patient via WhatsApp',

@@ -197,9 +197,11 @@ it('[SONDA] o MESMO arquivo importado duas vezes: um retorno só, a glosa entra 
         ->and($afterFirst['glosas'])->toBe(1)
         ->and($afterFirst['files'])->toBe(1);
 
-    // Outro segundo: o nome do arquivo em disco tem granularidade de segundo, e sem isto
-    // uma gravação repetida sobrescreveria o mesmo caminho e passaria despercebida.
-    $this->travel(2)->seconds();
+    // O arquivo em disco é nomeado pelo hash dos bytes: gravar de novo cairia no MESMO caminho
+    // e a contagem de arquivos não notaria. Datá-lo no passado faz a reescrita aparecer no mtime.
+    $storedPath = Storage::disk()->allFiles()[0];
+    $absolute   = Storage::disk()->path($storedPath);
+    touch($absolute, 946_684_800);
 
     $statements = [];
     DB::listen(function (QueryExecuted $query) use (&$statements): void {
@@ -209,12 +211,31 @@ it('[SONDA] o MESMO arquivo importado duas vezes: um retorno só, a glosa entra 
     $second       = rtdReceive($f, $xml);
     $duringSecond = $statements; // antes do retrato abaixo, que também consulta o banco
 
+    clearstatcache(true, $absolute);
+
     expect($second->alreadyImported)->toBeTrue()
         ->and($second->return->id)->toBe($first->return->id)
         ->and(rtdSnapshot($f))->toBe($afterFirst)
+        ->and(filemtime($absolute))->toBe(946_684_800)
         // O atalho: UMA leitura do retorno existente — nenhuma escrita, trava ou transação.
         ->and($duringSecond)->toHaveCount(1)
         ->and($duringSecond[0])->toStartWith('select')->toContain('"tiss_returns"');
+});
+
+it('[CAMINHO] o arquivo é nomeado pelo hash dos bytes, nunca por texto do XML: numeroProtocolo com ".." não escreve fora do prefixo da clínica', function () {
+    Queue::fake();
+
+    $f   = rtdFixture();
+    $xml = str_replace('PRT-RTD-0001', '../../' . Str::uuid() . '/PRT', rtdXml());
+
+    $received = rtdReceive($f, $xml, sync: false);
+
+    $expected = 'tiss/' . $f['entity']->id . '/returns/' . hash('sha256', $xml) . '.xml';
+
+    expect(Storage::disk()->allFiles())->toBe([$expected])
+        ->and(Storage::disk()->get($expected))->toBe($xml)
+        ->and($received->return->xmlDocument->file_path)->toBe($expected)
+        ->and($received->return->xmlDocument->file_hash)->toBe(hash('sha256', $xml));
 });
 
 it('o aviso de arquivo repetido registra só ids no log, nunca o conteúdo do XML', function () {

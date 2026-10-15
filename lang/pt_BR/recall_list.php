@@ -1,0 +1,199 @@
+<?php
+
+/*
+ * Tela "Retornos" (Fase 6): quem precisa voltar à clínica. O vocabulário compartilhado (estados do prazo,
+ * ciclo de vida, motivos) está em `recall.php`; aqui ficam os textos da própria tela. Plural com "a|b"
+ * (escolhe pela contagem :count). Sem diagnóstico para quem não é médico: a tela fala em "o que falta".
+ */
+
+return [
+    'title'    => 'Retornos',
+    'subtitle' => 'Pacientes que precisam voltar: contate, agende ou dispense.',
+    'settings' => 'Configurar',
+
+    'tabs' => [
+        'label'      => 'Visões da lista de retornos',
+        'to_contact' => 'Para contatar',
+        'scheduled'  => 'Agendados',
+        'lost'       => 'Perdidos de vista',
+        'snoozed'    => 'Adiados',
+        'history'    => 'Histórico',
+        'needs_info' => 'Falta informação',
+        'suspended'  => 'Regra suspensa',
+    ],
+
+    'kpi' => [
+        'breakdown' => ':soon a vencer · :overdue vencidos',
+    ],
+
+    'filters' => [
+        'search'              => 'Buscar paciente',
+        'search_placeholder'  => 'Nome ou código do paciente',
+        'source'              => 'Origem',
+        'source_all'          => 'Todas',
+        'source_doctor_order' => 'Retorno pedido pelo médico',
+        'source_protocol'     => 'Acompanhamento de condição',
+        'source_course'       => 'Aplicações do tratamento',
+        'clear'               => 'Limpar filtros',
+    ],
+
+    'columns' => [
+        'patient' => 'Paciente',
+        'task'    => 'O que falta',
+        'due'     => 'Vencimento',
+        'contact' => 'Contato',
+        'actions' => 'Ações',
+    ],
+
+    'due' => [
+        'today'      => 'Vence hoje',
+        'in'         => 'Vence em :count dia|Vence em :count dias',
+        'overdue_by' => 'Venceu há :count dia|Venceu há :count dias',
+        'on'         => 'Em :date',
+    ],
+
+    'row' => [
+        'age'        => ':age anos',
+        'last_done'  => 'Último registro: :date',
+        'never_done' => 'Sem registro neste acompanhamento',
+        'capped'     => 'Prazo limitado ao máximo validado para a condição',
+        'condition'  => 'Condição: :name',
+        'eye'        => [
+            'right' => 'Olho direito',
+            'left'  => 'Olho esquerdo',
+            'both'  => 'Ambos os olhos',
+        ],
+        'contact_never' => 'Sem contato ainda',
+        'contact_count' => ':count contato|:count contatos',
+        'contact_last'  => ':outcome · :date',
+        'scheduled_for' => 'Agendado para :date',
+        'snoozed_until' => 'Adiado até :date',
+        'dismissed'     => 'Dispensado: :reason',
+        'closed'        => 'Encerrado: :reason',
+        'needs_info'    => 'Falta a data de início do acompanhamento. O médico preenche na ficha do paciente.',
+        'suspended'     => 'A EasyEye suspendeu a regra deste retorno. Nenhuma ação enquanto durar a suspensão.',
+        'block_warning' => 'Não ligue/envie: :label',
+        'whatsapp'      => 'Tem WhatsApp',
+        'invite'        => [
+            'queued'        => 'Convite por WhatsApp na fila',
+            'sent'          => 'Convite por WhatsApp enviado em :date',
+            'delivered'     => 'Convite entregue em :date',
+            'read'          => 'Convite lido em :date',
+            'failed'        => 'O convite por WhatsApp não foi entregue',
+            'cancelled'     => 'Convite cancelado antes de sair',
+            'origin_auto'   => 'automático',
+            'origin_manual' => 'enviado pela equipe',
+            'requested'     => 'Pediu para agendar',
+            'asked_book'    => 'Pediu para agendar em :date',
+            'asked_done'    => 'Disse que já agendou em :date — confira a agenda',
+            'no_consent'    => 'Sem autorização de WhatsApp — só ligação',
+            'opted_out'     => 'Respondeu SAIR — só ligação',
+        ],
+    ],
+
+    'actions' => [
+        'contact'        => 'Contatar',
+        'schedule'       => 'Agendar',
+        'snooze'         => 'Adiar',
+        'dismiss'        => 'Dispensar',
+        'done_elsewhere' => 'Já fez fora',
+        'reopen'         => 'Reabrir',
+        'more'           => 'Mais ações',
+        'invite'         => 'Enviar convite',
+        'patient'        => 'Ver cadastro do paciente',
+    ],
+
+    'modal' => [
+        'cancel' => 'Cancelar',
+        'close'  => 'Fechar',
+        'for'    => 'Paciente: :name',
+
+        'contact' => [
+            'title'     => 'Registrar contato',
+            'outcome'   => 'Como foi o contato?',
+            'note'      => 'Observação (opcional)',
+            'note_hint' => 'Até :max caracteres. Não escreva diagnóstico nem dado de saúde aqui.',
+            'submit'    => 'Registrar contato',
+        ],
+        'snooze' => [
+            'title'      => 'Adiar o retorno',
+            'until'      => 'Adiar até',
+            'until_hint' => 'De amanhã até :days dias. O retorno volta sozinho para a lista nessa data.',
+            'reason'     => 'Motivo (opcional)',
+            'submit'     => 'Adiar',
+        ],
+        'dismiss' => [
+            'title'       => 'Dispensar este retorno',
+            'warning'     => 'O retorno sai da lista até o paciente voltar à clínica. Use quando ele não precisa ou não vai voltar.',
+            'reason'      => 'Motivo',
+            'reason_hint' => 'Obrigatório. Até :max caracteres.',
+            'submit'      => 'Dispensar',
+        ],
+        'done_elsewhere' => [
+            'title'     => 'Feito em outro serviço',
+            'text'      => 'O paciente já fez isto em outra clínica. A data entra no cálculo do próximo vencimento.',
+            'date'      => 'Data em que foi feito',
+            'date_hint' => 'Não pode ser futura.',
+            'submit'    => 'Registrar',
+        ],
+        'reopen' => [
+            'title'  => 'Reabrir o retorno',
+            'text'   => 'O retorno volta para a lista "Para contatar".',
+            'submit' => 'Reabrir',
+        ],
+        'invite' => [
+            'title'         => 'Convidar por WhatsApp',
+            'submit'        => 'Enviar convite',
+            'loading'       => 'Conferindo se o convite pode sair…',
+            'load_error'    => 'Não foi possível conferir o convite agora. Feche e tente de novo.',
+            'to'            => 'Para: :phone',
+            'covers'        => 'O convite cobre :count retorno deste paciente.|O convite cobre :count retornos deste paciente.',
+            'message_title' => 'Mensagem que o paciente vai receber',
+            'buttons'       => 'Botões da mensagem',
+            'neutral'       => 'O texto não cita o motivo do acompanhamento nem o exame.',
+            'daily'         => 'Hoje: :used de :cap convites da clínica.',
+            'daily_open'    => 'Hoje: :used convites da clínica.',
+            'last'          => 'Último convite: :date.',
+            'next'          => 'Novo convite só a partir de :date.',
+            'blocked'       => 'Este convite não pode sair agora:',
+            'blocked_hint'  => 'Registre o contato por telefone na ação "Contatar".',
+            'sent_note'     => 'O paciente pode responder pelos botões; a resposta aparece nesta lista.',
+        ],
+    ],
+
+    'empty' => [
+        'to_contact_title' => 'Tudo em dia',
+        'to_contact'       => 'Nenhum paciente precisa ser contatado agora.',
+        'filtered_title'   => 'Nada encontrado',
+        'filtered'         => 'Nenhum retorno com esses filtros.',
+        'none_title'       => 'Nenhum retorno ainda',
+        'none'             => 'Os retornos aparecem quando o médico pede um retorno no atendimento ou quando um protocolo de acompanhamento é ativado para a clínica.',
+        'doctor_order_off' => 'O retorno pedido pelo médico está desligado nas configurações desta clínica.',
+        'other_views'      => 'Veja também as outras visões acima.',
+    ],
+
+    'suspended_banner'  => 'Estes retornos estão parados porque a EasyEye suspendeu a regra de acompanhamento. Eles voltam sozinhos quando a regra for retomada.',
+    'needs_info_banner' => 'Estes pacientes precisam de uma data de início do acompanhamento para o retorno ser calculado.',
+
+    'loading' => 'Atualizando…',
+
+    'done' => [
+        'contacted'      => 'Contato registrado.',
+        'snoozed'        => 'Retorno adiado.',
+        'dismissed'      => 'Retorno dispensado.',
+        'reopened'       => 'Retorno reaberto.',
+        'done_elsewhere' => 'Registrado como feito em outro serviço.',
+        'invited'        => 'Convite enviado para a fila do WhatsApp.',
+    ],
+
+    'errors' => [
+        'not_found'       => 'Este retorno não existe mais ou não é desta clínica.',
+        'not_workable'    => 'Este retorno mudou: outra pessoa já tratou. A lista foi atualizada.',
+        'rule_suspended'  => 'A regra deste retorno está suspensa pela EasyEye.',
+        'not_reopenable'  => 'Só retorno adiado ou dispensado pode ser reaberto.',
+        'invalid_date'    => 'A data informada não é válida para esta ação.',
+        'reason_required' => 'Informe o motivo.',
+        'link_mismatch'   => 'Este agendamento não é do mesmo paciente deste retorno.',
+        'not_for_course'  => 'A aplicação do tratamento não se marca como feita em outro serviço: o médico registra a aplicação e decide o novo intervalo.',
+    ],
+];

@@ -83,6 +83,17 @@ class PanelNavigation
                 'label' => __('actions.sidemenu.urgent_care'),
                 'match' => ['panel.urgent-care.*'],
             ];
+
+            // Retornos (Fase 6) — mesmo grupo de rota da Agenda e a mesma feature do plano da rota.
+            if (self::hasRecallFeature()) {
+                $nav[] = [
+                    'key'   => 'recall',
+                    'route' => 'panel.recall.index',
+                    'icon'  => 'ti ti-phone-call',
+                    'label' => __('actions.sidemenu.recall'),
+                    'match' => ['panel.recall.*'],
+                ];
+            }
         }
 
         if ($canSeePatients) {
@@ -350,6 +361,8 @@ class PanelNavigation
                 ['route' => 'panel.setting.report-settings.index', 'label' => __('actions.report_settings.title'), 'match' => ['panel.setting.report-settings.*']],
                 // Kits de exames por convênio do pedido de exames (Fase 2 / B2).
                 ['route' => 'panel.setting.exam-kits.index', 'label' => __('clinical_documents.kits.menu'), 'match' => ['panel.setting.exam-kits.*']],
+                // Orientações pós-procedimento: texto, local, colírios e PDFs entregues ao paciente (Fase 6 / S14).
+                ['route' => 'panel.setting.care-guidance.index', 'label' => __('care_guidance.menu'), 'match' => ['panel.setting.care-guidance.*']],
             ];
 
             // Modelos de TCLE e orientações cirúrgicas (Fase 4) — rota registrada pelo módulo de documentos.
@@ -500,6 +513,18 @@ class PanelNavigation
         return $user->hasPermissionInEntity($entity, $permission);
     }
 
+    /** Espelha o middleware `feature:has_patient_recall` das rotas de Retornos (sem a feature o item some). */
+    private static function hasRecallFeature(): bool
+    {
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        return app(FeatureGateService::class)->can((string) $entityId, FeatureKey::HasPatientRecall);
+    }
+
     /**
      * Espelha o middleware `feature:has_inventory_module` das rotas de
      * estoque (routes/web.php) — mesmo padrão de canSeeAi() acima pras
@@ -636,6 +661,35 @@ class PanelNavigation
         ];
     }
 
+    /**
+     * Governança clínica (Fase 6): protocolos de retorno e, adiante, as revisões do
+     * Revisor Clínico. Só admin SaaS — as rotas são saas.role:admin, então o item não
+     * pode aparecer para quem receberia 403 ao clicar.
+     */
+    private static function managerGovernanceItems(bool $isSaasAdmin): array
+    {
+        if (! $isSaasAdmin) {
+            return [];
+        }
+
+        return [
+            [
+                'key'   => 'recall-protocols',
+                'route' => 'manager.recall-protocols.index',
+                'icon'  => 'ti ti-calendar-repeat',
+                'label' => __('manager_recall.menu'),
+                'match' => ['manager.recall-protocols.*'],
+            ],
+            [
+                'key'   => 'clinical-reviews',
+                'route' => 'manager.clinical-reviews.index',
+                'icon'  => 'ti ti-stethoscope',
+                'label' => __('manager_reviews.menu'),
+                'match' => ['manager.clinical-reviews.*', 'manager.clinical-reviewers.*'],
+            ],
+        ];
+    }
+
     private static function managerNav(): array
     {
         $nav = [
@@ -701,6 +755,7 @@ class PanelNavigation
                 'match' => ['manager.report-settings.*'],
             ],
             ...self::managerCatalogItems($isOwnerOrAdmin),
+            ...self::managerGovernanceItems($isSaasAdmin),
             [
                 'key'   => 'partners',
                 'route' => 'manager.partners.index',

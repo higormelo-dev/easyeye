@@ -1,0 +1,148 @@
+{
+    "title": "Configurar retornos",
+    "subtitle": "Quais protocolos de acompanhamento a clínica usa, e como.",
+    "back": "Voltar para os retornos",
+    "doctor_only": "Só o médico com cadastro ativo pode ativar ou desativar um protocolo. Você pode ver a regra e quem a validou.",
+    "general": {
+        "title": "Retorno pedido pelo médico",
+        "text": "Quando o médico pede um retorno no atendimento (em dias), o paciente entra na lista de retornos na data certa. Não depende de protocolo.",
+        "enabled": "Usar o retorno pedido pelo médico",
+        "save": "Salvar"
+    },
+    "invites": {
+        "title": "Convite por WhatsApp",
+        "text": "A clínica pode convidar por WhatsApp o paciente com retorno a vencer ou vencido. Só recebe quem autorizou lembretes de retorno no cadastro; a mensagem não cita o motivo do acompanhamento, e o paciente pode parar respondendo SAIR.",
+        "enabled": "Enviar convites de retorno por WhatsApp",
+        "auto_note": "O envio automático acontece só para os protocolos com \"contato automático\" ligado e para o retorno pedido pelo médico. Quem a recepção convida pela lista de Retornos não depende disso.",
+        "unavailable": "Ainda não dá para ligar: :reason",
+        "window_start": "Enviar a partir de",
+        "window_end": "Enviar até",
+        "weekdays": "Dias da semana",
+        "weekday": {
+            "1": "Seg",
+            "2": "Ter",
+            "3": "Qua",
+            "4": "Qui",
+            "5": "Sex",
+            "6": "Sáb",
+            "7": "Dom"
+        },
+        "min_days": "Dias entre convites do mesmo paciente",
+        "min_days_hint": "No mínimo :min dias, para não incomodar o paciente nem queimar o número de WhatsApp.",
+        "max_per_cycle": "Convites automáticos por retorno",
+        "max_per_cycle_hint": "Quantas vezes o robô convida o mesmo retorno antes de deixá-lo para ligação.",
+        "daily_cap": "Limite de convites por dia",
+        "daily_cap_hint": "O envio começa devagar e sobe nas primeiras semanas (limite de hoje: :today).",
+        "daily_cap_open": "sem limite do período de adaptação",
+        "sent_today": ":count convites hoje.",
+        "max_overdue": "Parar de convidar após (dias de atraso)",
+        "max_overdue_hint": "Retorno atrasado há mais que isto vai para a busca ativa por telefone.",
+        "save": "Salvar convites"
+    },
+    "protocols": {
+        "title": "Protocolos de acompanhamento",
+        "intro": "Cada protocolo é uma regra de retorno para uma condição (glaucoma, DMRI…), validada por um oftalmologista externo e liberada pela EasyEye. A clínica escolhe quais usar e ajusta os intervalos DENTRO da faixa validada.",
+        "empty": "Nenhum protocolo foi liberado ainda. Quando a EasyEye liberar o primeiro, ele aparece aqui.",
+        "status": {
+            "available": "Disponível",
+            "active": "Ativo",
+            "update_available": "Nova versão disponível",
+            "paused": "Parado",
+            "unavailable": "Indisponível"
+        },
+        "version": "Versão :version",
+        "validated_by": "Validada por :name (:crm · :rqe)",
+        "validated_by_anonymous": "Validada por um oftalmologista revisor externo",
+        "validated_on": "Validada em :date",
+        "accepted_on": "Registro profissional conferido no CFM em :date",
+        "hash": "Código da versão: :hash",
+        "review_due": "Revalidação prevista até :date",
+        "review_overdue": "A revalidação desta regra venceu em :date. A EasyEye foi avisada; a regra segue valendo até a decisão dela.",
+        "show_rule": "Ver a regra",
+        "hide_rule": "Esconder a regra",
+        "active_since": "Ativo desde :date, por :name",
+        "active_since_unknown": "Ativo desde :date",
+        "unavailable": "Nenhuma versão liberada deste protocolo.",
+        "paused": {
+            "suspended": "A EasyEye suspendeu esta regra. Nenhum retorno novo é calculado e os existentes ficam parados até ela voltar.",
+            "superseded": "Esta versão não está mais em uso.",
+            "retired": "A EasyEye aposentou esta regra. Escolha outro protocolo ou aguarde uma versão nova.",
+            "integrity": "A verificação de integridade desta versão falhou. A EasyEye foi avisada; nada novo é calculado até a conferência.",
+            "hash": "O conteúdo desta versão não é o que a clínica adotou. Nada novo é calculado até a conferência.",
+            "draft": "Esta versão não está em uso.",
+            "in_review": "Esta versão não está em uso.",
+            "validated": "Esta versão não está em uso.",
+            "declined": "Esta versão não está em uso.",
+            "withdrawn": "Esta versão não está em uso."
+        },
+        "update": {
+            "title": "Há uma versão nova liberada",
+            "text": "A versão :version foi validada e liberada. A clínica continua na versão :current até você trocar. Veja o que mudou antes.",
+            "text_paused": "A versão :version foi validada e liberada. Enquanto você não trocar da versão :current, os retornos deste protocolo seguem parados. Veja o que mudou antes."
+        },
+        "form": {
+            "title_activate": "Ativar este protocolo",
+            "title_adjust": "Ajustar os parâmetros",
+            "title_upgrade": "Trocar para a versão :version",
+            "tasks": "Tarefas e intervalos",
+            "enabled": "Ligada",
+            "required": "Obrigatória",
+            "optional": "Opcional",
+            "interval": "Intervalo",
+            "range": "de :min a :max :unit (padrão :default)",
+            "units": {
+                "days": "dias",
+                "weeks": "semanas",
+                "months": "meses"
+            },
+            "acknowledge": "Li a regra e a validação e sou responsável por ativá-la nesta clínica.",
+            "submit_activate": "Ativar protocolo",
+            "submit_adjust": "Salvar ajustes",
+            "submit_upgrade": "Trocar para a versão :version"
+        },
+        "deactivate": {
+            "button": "Desativar",
+            "title": "Desativar este protocolo",
+            "text": "Os retornos deste protocolo saem da lista. As condições dos pacientes continuam cadastradas e voltam se o protocolo for ativado de novo.",
+            "reason": "Motivo",
+            "reason_hint": "Obrigatório, ao menos :min caracteres.",
+            "submit": "Desativar",
+            "cancel": "Cancelar"
+        }
+    },
+    "exams": {
+        "title": "Exames",
+        "text": "Diga quais dos exames da clínica contam como cada exame dos protocolos. Um exame feito e registrado na clínica adia o próximo retorno daquele exame.",
+        "none": "Nenhum exame associado",
+        "unavailable": "desativado",
+        "suggested": "Sugestão: :name",
+        "add": "Adicionar",
+        "add_label": "Adicionar um exame a \":exam\"",
+        "remove": "Remover :name",
+        "select": "Escolher exame…",
+        "save": "Salvar exames"
+    },
+    "done": {
+        "general": "Configuração salva.",
+        "activated": "Protocolo ativado. Os retornos dos pacientes são calculados nos próximos minutos.",
+        "deactivated": "Protocolo desativado.",
+        "mappings": "Exames salvos. Os retornos são recalculados nos próximos minutos."
+    },
+    "errors": {
+        "protocol_unavailable": "Este protocolo não está disponível.",
+        "version_mismatch": "A versão informada não é deste protocolo.",
+        "version_not_released": "Só a versão liberada pode ser ativada.",
+        "no_validation_evidence": "Esta versão não tem a prova completa de validação. Fale com a EasyEye.",
+        "not_acknowledged": "Confirme que leu a regra e a validação.",
+        "not_adopted": "Este protocolo não está ativo na clínica.",
+        "reason_required": "Informe o motivo.",
+        "invalid_parameters": "Há parâmetros fora do que foi validado.",
+        "interval_out_of_range": "Fora da faixa validada.",
+        "interval_not_integer": "Use um número inteiro.",
+        "required_task_cannot_be_disabled": "Esta tarefa é obrigatória.",
+        "enabled_not_boolean": "Valor inválido.",
+        "unknown_task": "Tarefa desconhecida.",
+        "unknown_exam_key": "Exame desconhecido: :key.",
+        "invalid_mapping": "Há um exame que a clínica não pode usar."
+    }
+}

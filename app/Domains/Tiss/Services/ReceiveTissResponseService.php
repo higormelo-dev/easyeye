@@ -120,12 +120,9 @@ class ReceiveTissResponseService
                 return $existing;
             }
 
-            $relativePath = sprintf(
-                'tiss/%s/returns/%s_%s.xml',
-                $entityId,
-                mb_strtolower((string) ($parsed['protocol_number'] ?? $batch?->batch_number ?? 'return')),
-                now()->format('YmdHis'),
-            );
+            // Nome pelo hash do conteúdo, nunca por texto vindo do XML: um numeroProtocolo
+            // com ".." escreveria fora do prefixo da clínica. Mesmos bytes, mesmo caminho.
+            $relativePath = sprintf('tiss/%s/returns/%s.xml', $entityId, $fileHash);
 
             Storage::disk()->put($relativePath, $xmlContent);
 

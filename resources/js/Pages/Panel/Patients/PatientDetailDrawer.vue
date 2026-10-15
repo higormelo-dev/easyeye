@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
+import PatientConditionsCard from '@/Components/Panel/Recall/PatientConditionsCard.vue';
 import { clinicalTexts, tc, requestJson } from '@/Support/clinicalSafety.js';
 import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 
@@ -13,6 +14,8 @@ const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
 const props = defineProps({
     open: { type: Boolean, required: true },
     patientId: { type: [String, Number], default: null },
+    // Condições crônicas do paciente (Fase 6): só o médico com cadastro ativo, num plano com o recall.
+    recallConditions: { type: Boolean, default: false },
 });
 
 defineEmits(['close']);
@@ -170,6 +173,9 @@ function invitePortal() {
                 </p>
             </div>
 
+            <!-- Condições crônicas (Fase 6): o médico decide o que gera retorno -->
+            <PatientConditionsCard v-if="recallConditions" :patient-id="patient.id" />
+
             <!-- Identificação -->
             <div class="detail-section">
                 <div class="detail-section__title"><i class="ti ti-id-badge me-1"></i> Identificação</div>
@@ -313,6 +319,14 @@ function invitePortal() {
                                 :title="ui.wa_opted_out_hint"
                                 data-test="whatsapp-opted-out"
                                 ><i class="ti ti-bell-off"></i> {{ ui.wa_opted_out }}</span
+                            >
+                            <span
+                                v-if="patient.care_reminders_consent"
+                                class="badge bg-info-subtle text-info-emphasis border border-info ms-1 rounded-pill"
+                                style="font-size: 0.65rem"
+                                :title="ui.care_reminders_badge_hint"
+                                data-test="care-reminders-consent"
+                                ><i class="ti ti-bell-check"></i> {{ ui.care_reminders_badge }}</span
                             >
                         </span>
                     </div>

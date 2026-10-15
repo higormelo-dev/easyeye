@@ -254,6 +254,7 @@ return [
         'surgery_indicators'    => 'Indicadores cirúrgicos',
         'surgery_facilities'    => 'Locais e salas cirúrgicas',
         'surgery_templates'     => 'Modelos cirúrgicos',
+        'recall'                => 'Retornos',
         'lenses'                => 'Lentes',
         'iol_lenses'            => 'Lentes de Catarata',
         'product_categories'    => 'Categorias de produto',

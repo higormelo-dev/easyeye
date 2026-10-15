@@ -1,0 +1,17 @@
+DECLARAÇÃO DO REVISOR CLÍNICO — EASYEYE (versão 1.0)
+
+Ao enviar este parecer, declaro que:
+
+1. IDENTIDADE. Sou médico(a) inscrito(a) no Conselho Regional de Medicina (CRM/UF) e, quando informado, possuo o título de especialista (RQE) indicados neste formulário. Os dados que informei são verdadeiros e respondo por eles.
+
+2. O QUE REVISEI. Li o conteúdo clínico de cada versão de protocolo de retorno listada neste convite — critérios de entrada, intervalos e faixas, prazos, justificativa e referências — e registrei, para cada uma, a minha decisão. Fiz a análise com independência, com base no meu conhecimento clínico e na literatura que considero adequada.
+
+3. O QUE A MINHA DECISÃO VALE. Entendo que a minha validação vale apenas para o conteúdo EXATO que me foi apresentado, identificado pelo código de verificação (hash) de cada versão; qualquer alteração depois disso exige nova revisão. Entendo também que o EasyEye usará o conteúdo validado apenas para lembrar pacientes de retornar, e que o lembrete não substitui o julgamento do médico assistente em cada paciente nem define conduta clínica.
+
+4. CONFLITO DE INTERESSES. Informei abaixo se tenho conflito de interesses (financeiro, comercial, institucional ou de outra natureza) com o EasyEye, com clínicas que o utilizam ou com fabricantes e laboratórios relacionados às condições revisadas.
+
+5. REGISTRO DA PROVA. Autorizo o EasyEye a registrar esta declaração, o meu parecer, os meus dados de identificação, o endereço IP e o navegador usados, a data e a hora do envio e o código de verificação do que revisei, como prova de que a validação ocorreu, enquanto a versão validada existir e por 5 (cinco) anos depois dela.
+
+6. CONFERÊNCIA. Sei que o EasyEye confere o meu CRM/UF e o meu RQE no portal do Conselho Federal de Medicina antes de liberar qualquer regra validada por mim.
+
+7. EXIBIÇÃO DO MEU NOME. Registrei abaixo se autorizo, ou não, que o meu nome e o meu CRM/UF sejam exibidos às clínicas que adotarem a regra validada.

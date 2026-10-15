@@ -279,6 +279,29 @@ return [
         'warn_failed' => 'Não foi possível registrar o webhook na Gupshup agora. Confira as credenciais do parceiro e use "Registrar de novo".',
     ],
 
+    // Convite de retorno (Fase 6): chave da clínica e pausa global no Manager.
+    'recall' => [
+        'toggle'         => 'Convite de retorno',
+        'toggle_hint'    => 'Libere só depois de o modelo "Lembrete de retorno" estar aprovado na Meta neste número. A clínica ainda precisa ligar a própria chave nas configurações dos retornos.',
+        'enabled'        => 'Convite de retorno liberado',
+        'badge_paused'   => 'Pausado',
+        'badge_active'   => 'Ativo',
+        'pause_title'    => 'Convites de retorno',
+        'pause_text'     => 'Pause o envio dos convites de retorno de TODAS as clínicas (número queimado, modelo reprovado, denúncia). O que já está na fila também é cancelado.',
+        'paused_since'   => 'Pausado por :name em :date',
+        'paused_reason'  => 'Motivo: :reason',
+        'impact'         => ':clinics clínicas e :recalls retornos afetados',
+        'pause'          => 'Pausar todos os convites',
+        'resume'         => 'Liberar os convites',
+        'reason'         => 'Motivo da pausa',
+        'reason_hint'    => 'Obrigatório (mínimo 10 caracteres). Fica registrado na auditoria.',
+        'confirm_pause'  => 'Pausar os convites de retorno de todas as clínicas agora?',
+        'confirm_resume' => 'Liberar de novo os convites de retorno? Cada clínica segue com as próprias chaves.',
+        'paused'         => 'Convites de retorno pausados.',
+        'resumed'        => 'Convites de retorno liberados.',
+        'resume_reason'  => 'Retomada dos convites de retorno pelo Manager',
+    ],
+
     'toggles' => [
         'active'                    => 'Integração ativa',
         'confirmation_enabled'      => 'Confirmação de consulta',
@@ -295,6 +318,8 @@ return [
         'confirmations_answered' => 'Confirmações respondidas',
         'surveys_sent'           => 'Pesquisas enviadas',
         'surveys_answered'       => 'Pesquisas respondidas',
+        'recall_sent'            => 'Convites de retorno enviados',
+        'recall_answered'        => 'Convites de retorno respondidos',
         'survey_average'         => 'Nota média',
         'delivered'              => 'Entregues',
         'read'                   => 'Lidas',
@@ -303,11 +328,12 @@ return [
 
     // Texto equivalente de cada template aprovado (histórico do sistema). O
     // texto cadastrado na Meta, com {{1}}, {{2}}..., está em
-    // docs/integracoes/whatsapp-gupshup.md — mudou aqui, mude lá e na Meta.
+    // docs/internal/integracoes/whatsapp-gupshup.md — mudou aqui, mude lá e na Meta.
     'templates' => [
         'appointment_confirmation'             => "Olá, :first_name! Lembrete de :clinic: sua consulta está marcada para :when com :doctor. Podemos confirmar sua presença?\nPara não receber mais avisos, responda SAIR.\n[Confirmar] [Cancelar]",
         'satisfaction_survey'                  => "Olá, :first_name! Esperamos que seu atendimento em :clinic tenha sido bom. De 1 a 5, como você avalia a sua experiência?\nPara não receber mais avisos, responda SAIR.\n[5 - Excelente] [4 - Bom] [3 - Regular] [2 - Ruim] [1 - Péssimo]",
         'surgery_authorization_notice'         => "Olá, :first_name! A :clinic tem uma informação para você. Por favor, entre em contato com a clínica quando puder.\nPara não receber mais avisos, responda SAIR.",
+        'care_recall'                          => "Olá, :first_name! A :clinic lembra que chegou a hora de agendar o seu retorno de acompanhamento. Para marcar, toque em Quero agendar ou fale com a clínica.\nPara não receber mais avisos, responda SAIR.\n[Quero agendar] [Já agendei]",
         'verification_code'                    => '*:code* é seu código de verificação. Para sua segurança, não o compartilhe. Este código expira em 10 minutos.',
         'connection_test'                      => 'Este é um teste de envio do :app. Se você recebeu, o WhatsApp está configurado corretamente.',
         'saas_dunning_reminder'                => 'EasyEye: a assinatura de :entity (:amount) vence em :date. Você pode pagar pelo painel, em Minha assinatura.',
@@ -363,6 +389,9 @@ return [
         'opted_out'                   => 'Pronto, você não vai mais receber avisos automáticos por este número. Para voltar a receber, responda VOLTAR.',
         'opted_in'                    => 'Pronto, você voltou a receber os avisos automáticos por este número. Para parar, responda SAIR.',
         'use_buttons'                 => "Recebemos sua mensagem, mas não conseguimos saber a qual aviso ela se refere. 🙂\nToque no botão da mensagem que você quer responder (Confirmar, Cancelar ou a nota).",
+        'recall_book'                 => 'Obrigado! A clínica recebeu o seu pedido e vai entrar em contato para agendar o seu retorno. 📅',
+        'recall_done'                 => 'Obrigado pelo aviso! A clínica vai conferir o seu agendamento. Se precisar de ajuda, fale com a recepção.',
+        'recall_use_buttons'          => "Recebemos a sua mensagem. 🙂\nPara responder ao lembrete de retorno, toque em Quero agendar ou Já agendei na mensagem, ou fale com a clínica.",
         'rescheduled'                 => "Esta consulta foi remarcada pela clínica. 📅\nEm breve você recebe uma nova mensagem com a nova data para confirmar.",
         // Registro na agenda (histórico e motivo do cancelamento).
         'confirmed_note' => 'Confirmado pelo paciente via WhatsApp',

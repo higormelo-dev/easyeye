@@ -29,7 +29,7 @@ class HandleInertiaRequests extends Middleware
         // usam o rootView guest-app, que carrega vendor.css + system.scss —
         // necessário para o GuestLayout renderizar com Bootstrap grid + estilos
         // ee-auth-*. O rootView default 'app' carrega só site.scss (marketing).
-        if ($request->routeIs('security.*')) {
+        if ($request->routeIs('security.*') || $request->routeIs('clinical-review.*')) {
             return 'guest-app';
         }
 
@@ -98,7 +98,11 @@ class HandleInertiaRequests extends Middleware
             // recebia o perfil de STAFF nesse prop (autodivulgação do
             // próprio usuário, não vazamento cross-user, mas o portal nunca
             // deveria depender do guard "web" pra nada).
-            'auth' => fn () => $request->routeIs('patient-portal.*') ? [] : $this->authProps($request),
+            //
+            // Idem para a página PÚBLICA do Revisor Clínico (clinical-review.*): quem
+            // abre o link é uma pessoa de fora, e o HTML dela (data-page) não pode carregar
+            // o perfil de um usuário da EasyEye que por acaso esteja logado nesse navegador.
+            'auth' => fn () => $request->routeIs('patient-portal.*') || $request->routeIs('clinical-review.*') ? [] : $this->authProps($request),
 
             'nav' => fn () => ($request->routeIs('panel.*') || $request->routeIs('manager.*')) && $request->user()
                 ? PanelNavigation::build()

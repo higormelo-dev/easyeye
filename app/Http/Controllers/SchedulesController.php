@@ -2,20 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{CashEntryReferenceType, ClientRule, DataAccessPurpose, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleSituation};
-use App\Enums\{FeatureKey, ScheduleAttendanceType};
+use App\Domains\Recall\Exceptions\RecallActionException;
+use App\Domains\Recall\Models\PatientRecall;
+use App\Domains\Recall\Services\RecallLinkService;
+use App\Domains\Recall\Support\{RecallLocks, RecallRuleInUse, RecallTaskLabel};
+use App\Enums\{CashEntryReferenceType, ClientRule, DataAccessPurpose, EntityGate, FeatureKey, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleSituation};
+use App\Enums\ScheduleAttendanceType;
 use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleSlotUnavailableException};
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
 use App\Http\Requests\ScheduleRequest;
 use App\Jobs\NotifyScheduleChangeJob;
-use App\Models\{ClinicResource, Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, IrisType, MedicalRecord, PatientCall, People, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
+use App\Models\{ClinicResource, Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, IrisType, MedicalRecord, Patient, PatientCall, People, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
 use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
 use App\Rules\ActiveCovenant;
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
-use App\Services\{DataAccessLogService, ScheduleSeriesService, ScheduleService};
-use App\Services\FeatureGateService;
+use App\Services\{DataAccessLogService, FeatureGateService, ScheduleSeriesService, ScheduleService};
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
 use App\Services\Schedules\{AgendaFilters, AgendaQueryService, ScheduleAvailabilityService};
 use App\Services\Surgery\PostOp\PostOpReturnService;
@@ -29,6 +32,7 @@ use Illuminate\Support\Facades\{Cache, DB, Gate};
 use Illuminate\Support\Str;
 use Illuminate\Validation\{Rule, ValidationException};
 use Inertia\{Inertia, Response as InertiaResponse};
+use InvalidArgumentException;
 
 class SchedulesController extends Controller
 {
@@ -133,7 +137,9 @@ class SchedulesController extends Controller
                 ->map(fn (ClinicResource $r) => ['id' => $r->id, 'name' => $r->name, 'type_label' => $r->typeLabel()])
                 ->values(),
             'canSeePatients' => $canSeePatients,
-            'urls'           => [
+            // "Agendar" a partir da tela de Retornos (?recall=<id>): paciente e retorno já escolhidos no formulário.
+            'recallPrefill' => fn () => $this->recallPrefill($request, $entityId, $canSeePatients),
+            'urls'          => [
                 'print'         => route('panel.schedules.print'),
                 'availability'  => route('panel.schedules.availability'),
                 'seriesPreview' => route('panel.schedules.series.preview'),
@@ -282,6 +288,8 @@ class SchedulesController extends Controller
             // Retorno do pós-operatório de uma cirurgia (Fase 4): atalho para a avaliação
             // pós-op do caso. Só o médico, com o recurso do plano.
             'postop_case_url' => $this->postOpCaseUrl($schedule),
+            // Série aberta (sem total — "trate e estenda"): dá para acrescentar a próxima sessão.
+            'add_session_url' => $schedule->series_id && $schedule->session_total === null ? route('panel.schedules.series.add-session', $schedule->id) : null,
             // Ficha impressa = cadastro do paciente: mesma regra de Pacientes.
             'patient_sheet_url' => $schedule->patient_id && app(PatientAccess::class)->current()
                 ? route('panel.schedules.patient-sheet', $schedule->id)
@@ -400,7 +408,7 @@ class SchedulesController extends Controller
         // Tudo ou nada: agendamento, sala, situação pedida e as demais sessões
         // da série. Encaixe confere o teto do turno sob lock antes de gravar.
         try {
-            $schedule = DB::transaction(function () use ($baseData, $request, $doctorId, $dateTime, $isFitIn, $resourceIds, $extraDates, $series): Schedule {
+            $schedule = DB::transaction(function () use ($baseData, $request, $doctorId, $dateTime, $isFitIn, $resourceIds, $extraDates, $series, $entityId): Schedule {
                 // Médico em cirurgia não atende: reconferido sob a trava das janelas cirúrgicas.
                 $this->service->assertDoctorFreeOfSurgery($doctorId, $dateTime);
 
@@ -413,6 +421,13 @@ class SchedulesController extends Controller
                 // INSERT, não escondido dentro de changeSituation() depois dele.
                 $this->service->lockAttendanceReconciliation($request->requestedSituation(), $this->model, $baseData);
 
+                // Agendando um retorno: a trava do paciente no recall vem ANTES do INSERT. O INSERT dispara o
+                // MarksRecallDirty (linha da outbox do paciente, presa até o commit) e o vínculo (linkRecall) toma
+                // depois a trava do paciente; quem confirma/edita uma condição toma a trava e só então grava a
+                // outbox. Em ordem invertida as duas se esperavam (deadlock 40P01 → 500). Ordem única:
+                // cota → paciente/dia → paciente (recall) → INSERT → vínculo.
+                $this->lockRecallPatient($request, $baseData, $entityId);
+
                 $schedule = $this->model->create($baseData);
                 $this->applyRequestedSituation($request, $schedule);
 
@@ -423,6 +438,8 @@ class SchedulesController extends Controller
                 if ($extraDates !== []) {
                     $series->createSessions($schedule, $extraDates, $resourceIds);
                 }
+
+                $this->linkRecall($request, $schedule, $entityId);
 
                 return $schedule;
             });
@@ -1006,10 +1023,11 @@ class SchedulesController extends Controller
                     $fail(__('validation.custom.schedule.doctor_not_found'));
                 }
             }],
-            'date_time'  => ['required', 'date'],
-            'frequency'  => ['required', Rule::in([...ScheduleSeriesService::FREQUENCIES, ScheduleSeriesService::FREQUENCY_OFFSETS])],
-            'weekdays'   => ['nullable', 'array', 'required_if:frequency,weekdays'],
-            'weekdays.*' => ['integer', 'between:0,6'],
+            'date_time'      => ['required', 'date'],
+            'frequency'      => ['required', Rule::in([...ScheduleSeriesService::FREQUENCIES, ScheduleSeriesService::FREQUENCY_OFFSETS])],
+            'interval_weeks' => ['nullable', 'required_if:frequency,every_weeks', 'integer', 'between:' . ScheduleSeriesService::INTERVAL_WEEKS_MIN . ',' . ScheduleSeriesService::INTERVAL_WEEKS_MAX],
+            'weekdays'       => ['nullable', 'array', 'required_if:frequency,weekdays'],
+            'weekdays.*'     => ['integer', 'between:0,6'],
             // Frequência por deslocamentos (dias a partir da data): a série são as
             // datas âncora + N dias; "end" não se aplica.
             'offsets'        => ['nullable', 'array', 'required_if:frequency,offsets', 'max:' . (ScheduleSeriesService::MAX_SESSIONS - 1)],
@@ -1034,6 +1052,7 @@ class SchedulesController extends Controller
                 array_map('intval', (array) ($validated['weekdays'] ?? [])),
                 $validated['end'] === 'count' ? (int) $validated['count'] : null,
                 $validated['end'] === 'until' ? Carbon::parse($validated['until']) : null,
+                isset($validated['interval_weeks']) ? (int) $validated['interval_weeks'] : null,
             );
 
         $truncated = count($dates) > ScheduleSeriesService::MAX_SESSIONS;
@@ -1044,6 +1063,35 @@ class SchedulesController extends Controller
             'truncated' => $truncated,
             'max'       => ScheduleSeriesService::MAX_SESSIONS,
         ]);
+    }
+
+    /**
+     * Acrescenta UMA sessão à série ABERTA do agendamento (o intervalo se decide a cada visita): mesma regra de
+     * horário do agendamento comum; horário que não cabe volta 422 com o motivo e nada é gravado. Perfil médico: só a
+     * agenda dele.
+     */
+    public function addSeriesSession(Request $request, Schedule $schedule, ScheduleSeriesService $series): JsonResponse
+    {
+        $this->authorizeSchedule($schedule);
+        abort_unless($schedule->series_id && $schedule->session_total === null, 404);
+
+        if (CurrentDoctor::isDoctorProfile()) {
+            abort_unless((string) $schedule->doctor_id === (string) CurrentDoctor::doctor()?->id, 403);
+        }
+
+        $dateTime = Carbon::parse($request->validate(['date_time' => ['required', 'date']])['date_time']);
+
+        try {
+            $session = DB::transaction(fn (): Schedule => $series->addSession($schedule, $dateTime));
+        } catch (ScheduleSlotUnavailableException $e) {
+            return $this->slotUnavailableResponse($e);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => ['date_time' => [$e->getMessage()]]], 422);
+        }
+
+        NotifyScheduleChangeJob::dispatch($session->id, ScheduleNotification::EVENT_CREATED);
+
+        return response()->json(['message' => __('schedules.series_added'), 'data' => ['id' => $session->id]], 201);
     }
 
     /**
@@ -1082,6 +1130,86 @@ class SchedulesController extends Controller
      * calendário do dia) leva a linha completa; semana/mês, a linha compacta
      * do calendário (o payload do mês não carrega URLs/caixa de cada linha).
      */
+    /**
+     * Toma a trava do recall do paciente ANTES de gravar o agendamento que vai atender um retorno (`recall_id`):
+     * ver o comentário em store(). Sem retorno (ou sem a feature) nada é travado — agendar comum não paga esta espera.
+     *
+     * @param array<string, mixed> $attributes
+     */
+    private function lockRecallPatient(ScheduleRequest $request, array $attributes, string $entityId): void
+    {
+        $recallId  = $request->input('recall_id');
+        $patientId = $attributes['patient_id'] ?? null;
+
+        if (! is_string($recallId) || $recallId === '' || ! is_string($patientId) || $patientId === ''
+            || ! app(FeatureGateService::class)->can($entityId, FeatureKey::HasPatientRecall)) {
+            return;
+        }
+
+        RecallLocks::patient($patientId);
+    }
+
+    /**
+     * Vincula o retorno que este agendamento atende (Fase 6), dentro da transação do agendamento. Retorno recusado
+     * (tratado por outra pessoa no meio do caminho, regra suspensa) NÃO derruba o agendamento: a avaliação vincula
+     * o próximo agendamento aberto do paciente sozinha.
+     */
+    private function linkRecall(ScheduleRequest $request, Schedule $schedule, string $entityId): void
+    {
+        $recallId = $request->input('recall_id');
+
+        if (! is_string($recallId) || $recallId === '' || ! app(FeatureGateService::class)->can($entityId, FeatureKey::HasPatientRecall)) {
+            return;
+        }
+
+        try {
+            app(RecallLinkService::class)->link($entityId, $recallId, $schedule, $request->user());
+        } catch (RecallActionException) {
+            // O agendamento vale; o vínculo ficou para a reavaliação.
+        }
+    }
+
+    /**
+     * O retorno que a tela de Retornos pediu para agendar (`?recall=<id>`): só para quem opera o recall numa clínica
+     * com a feature, e só se o retorno ainda está em aberto e a regra não está suspensa. Telefone só para quem tem
+     * acesso a Pacientes; o rótulo é o "o que falta" (nunca a condição clínica).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function recallPrefill(Request $request, string $entityId, bool $canSeePatients): ?array
+    {
+        $recallId = (string) $request->query('recall', '');
+        $entity   = Entity::query()->find($entityId);
+
+        if (! Str::isUuid($recallId) || $entity === null || ! Gate::allows(EntityGate::OperateRecall->value, $entity)
+            || ! app(FeatureGateService::class)->can($entityId, FeatureKey::HasPatientRecall)) {
+            return null;
+        }
+
+        $recall = PatientRecall::query()->withoutGlobalScopes()->where('entity_id', $entityId)->whereKey($recallId)->first();
+
+        if ($recall === null || $recall->rule_suspended || ! RecallRuleInUse::for($recall) || ! $recall->lifecycle->isWorkable()) {
+            return null;
+        }
+
+        $patient = Patient::query()->where('entity_id', $entityId)->with('person')->find($recall->patient_id);
+
+        if ($patient === null) {
+            return null;
+        }
+
+        return [
+            'recall_id'          => (string) $recall->id,
+            'recall_label'       => RecallTaskLabel::of((string) $recall->source, (string) $recall->kind, $recall->exam_key),
+            'patient_id'         => (string) $patient->id,
+            'full_name'          => (string) $patient->person?->full_name,
+            'cellphone'          => $canSeePatients ? $patient->person?->cellphone : null,
+            'telephone'          => $canSeePatients ? $patient->person?->telephone : null,
+            'cellphone_whatsapp' => (bool) $patient->person?->whatsapp,
+            'covenant_id'        => $patient->covenant_id,
+        ];
+    }
+
     private function buildScheduleItems(AgendaQueryService $agenda, AgendaFilters $filters, bool $canSeePatients): array
     {
         $entityId  = $filters->entityId;

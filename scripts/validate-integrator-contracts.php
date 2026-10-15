@@ -9,7 +9,7 @@ use Symfony\Component\Yaml\Yaml;
 require dirname(__DIR__) . '/vendor/autoload.php';
 $app = require dirname(__DIR__) . '/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
-$spec     = Yaml::parseFile(dirname(__DIR__) . '/docs/api/integrators-openapi.yaml');
+$spec     = Yaml::parseFile(dirname(__DIR__) . '/docs/external/api/integrators-openapi.yaml');
 $failures = [];
 
 foreach (Route::getRoutes() as $route) {

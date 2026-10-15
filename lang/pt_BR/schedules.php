@@ -460,6 +460,8 @@ return [
     'series_conflict'         => ':date: :reason',
     'series_has_conflicts'    => '{1} 1 data da série não está disponível.|[2,*] :count datas da série não estão disponíveis.',
     'series_created'          => 'Série criada: :count sessões agendadas.',
+    'recall_mismatch'         => 'Este retorno é de outro paciente.',
+    'form_recall_banner'      => 'Agendando o retorno: :task',
     'series_title'            => 'Série de sessões',
     'series_current'          => 'esta',
     'series_cancel_future'    => 'Cancelar as futuras (:count)',
@@ -470,4 +472,17 @@ return [
     'series_cancel_confirm'   => 'Cancelar sessões futuras',
     'series_cancel_error'     => 'Não foi possível cancelar as sessões.',
     'series_cancelled'        => '{0} Nenhuma sessão futura para cancelar.|{1} 1 sessão futura cancelada.|[2,*] :count sessões futuras canceladas.',
+
+    // Série a cada N semanas e série aberta (intervalo decidido a cada visita)
+    'form_every_weeks'       => 'A cada N semanas',
+    'form_rec_interval'      => 'Intervalo (semanas)',
+    'form_rec_interval_hint' => 'De 2 a 16 semanas entre as sessões.',
+    'series_add'             => 'Acrescentar sessão',
+    'series_add_date'        => 'Data e hora da nova sessão',
+    'series_add_hint'        => 'A série não tem total: o intervalo se decide a cada visita. A nova sessão segue a mesma regra de horário do agendamento comum.',
+    'series_add_confirm'     => 'Acrescentar',
+    'series_add_error'       => 'Não foi possível acrescentar a sessão.',
+    'series_added'           => 'Sessão acrescentada à série.',
+    'series_add_closed'      => 'Só se acrescenta sessão a uma série aberta (sem total).',
+    'series_add_past'        => 'A nova sessão precisa ser numa data futura.',
 ];

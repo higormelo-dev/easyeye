@@ -126,6 +126,7 @@ return [
         'has_api_integrator'        => 'Integração com equipamentos oftalmológicos',
         'has_inventory_module'      => 'Módulo de estoque',
         'has_surgery'               => 'Módulo cirúrgico',
+        'has_patient_recall'        => 'Retorno de pacientes crônicos (recall)',
         'ai_monthly_credits'        => 'Créditos mensais de IA',
         'api_monthly_exam_sends'    => 'Envios via integrador (mensal)',
         'plan_upgrade_required'     => 'Seu plano não inclui integração com equipamentos. Faça upgrade para continuar.',

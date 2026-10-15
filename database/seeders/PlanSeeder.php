@@ -34,6 +34,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::ApiMonthlyExamSends->value   => '0',
                     FeatureKey::HasInventoryModule->value    => '0',
                     FeatureKey::HasSurgery->value            => '0',
+                    FeatureKey::HasPatientRecall->value      => '0',
                 ],
             ],
             [
@@ -67,6 +68,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::ApiMonthlyExamSends->value   => '0',
                     FeatureKey::HasInventoryModule->value    => '1',
                     FeatureKey::HasSurgery->value            => '0',
+                    FeatureKey::HasPatientRecall->value      => '1',
                 ],
             ],
             [
@@ -92,6 +94,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::ApiMonthlyExamSends->value   => '0',   // ilimitado → cap interno 1000
                     FeatureKey::HasInventoryModule->value    => '1',
                     FeatureKey::HasSurgery->value            => '1',   // módulo cirúrgico (Fase 4)
+                    FeatureKey::HasPatientRecall->value      => '1',
                 ],
             ],
         ];

@@ -184,6 +184,43 @@ describe('KpiCards — indicadores por perfil', () => {
         expect(kpi(w, 'waitlist').find('.db-metric__value').text()).toBe('4');
     });
 
+    it('retornos a contatar: só quando o servidor manda a contagem; abre a tela de Retornos; mostra os perdidos de vista', () => {
+        for (const profile of ['secretary', 'admin', 'doctor']) {
+            const w = mount(KpiCards, {
+                props: {
+                    stats: { ...STATS, doctor_id: 'doc-1', recall_to_contact: 8, recall_lost: 3 },
+                    profile,
+                    insights: profile === 'admin' ? INSIGHTS_ADMIN : null,
+                    access: ALL,
+                    t: T,
+                },
+            });
+
+            expect(keysOf(w)).toContain('recall');
+            expect(kpi(w, 'recall').find('.db-metric__value').text()).toBe('8');
+            expect(kpi(w, 'recall').text()).toContain('Returns to contact');
+            expect(kpi(w, 'recall').text()).toContain('Lost to follow-up: 3');
+            expect(kpi(w, 'recall').classes()).toContain('db-metric--alert');
+            expect(kpi(w, 'recall').element.tagName).toBe('A'); // é link para a tela de Retornos
+            expect(globalThis.route).toHaveBeenCalledWith('panel.recall.index');
+        }
+
+        // Sem a feature no plano (ou sem permissão), o servidor não manda a contagem: o card não existe.
+        const without = mount(KpiCards, { props: { stats: STATS, profile: 'secretary', access: ALL, t: T } });
+        expect(keysOf(without)).not.toContain('recall');
+
+        // Zero retornos: o card aparece sem alerta.
+        const none = mount(KpiCards, {
+            props: {
+                stats: { ...STATS, recall_to_contact: 0, recall_lost: 0 },
+                profile: 'secretary',
+                access: ALL,
+                t: T,
+            },
+        });
+        expect(kpi(none, 'recall').classes()).not.toContain('db-metric--alert');
+    });
+
     it('usuário sem acesso: só números, nenhum link (sem 403)', () => {
         const w = mount(KpiCards, { props: { stats: STATS, profile: 'user', access: NONE, t: T } });
 

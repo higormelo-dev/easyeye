@@ -16,7 +16,7 @@ return [
         'password' => env('DOCS_API_PASSWORD'),
 
         // Caminho da spec OpenAPI servida pelo Swagger UI.
-        'spec_path' => base_path('docs/api/integrators-openapi.yaml'),
+        'spec_path' => base_path('docs/external/api/integrators-openapi.yaml'),
 
         // Servers exibidos no Swagger UI. A lista final é montada por ambiente
         // em ApiDocsController::servers() — em deploy (homolog/produção) o

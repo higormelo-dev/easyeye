@@ -31,13 +31,15 @@ class ProcedureSearchController extends Controller
                 ->orWhereLikeUnaccent('code', $q))
             ->orderBy('name')
             ->limit(20)
-            ->get(['id', 'code', 'name']);
+            ->get(['id', 'code', 'name', 'clinical_kind']);
 
         return response()->json(
             $results->map(fn (Procedure $p) => [
                 'id'   => $p->id,
                 'code' => $p->code,
                 'name' => $p->name,
+                // Injeção intravítrea pede os dados do curso (droga, esquema) na solicitação.
+                'clinical_kind' => $p->clinical_kind,
             ]),
         );
     }

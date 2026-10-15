@@ -11,8 +11,10 @@ use App\Http\Middleware\{
     CheckJsonResponse,
     CheckSubscription,
     CheckoutContentSecurityPolicy,
+    ClinicalReviewHeaders,
     EnsureApiDocsAccess,
     EnsureBillingContact,
+    EnsureClinicalReviewSession,
     EnsureEntityPermission,
     EnsureEntityRole,
     EnsureEntitySelected,
@@ -40,6 +42,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Sentry\Laravel\Integration;
@@ -107,31 +110,33 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'tenant.bind'          => BindTenantContext::class,
-            'entity.selected'      => EnsureEntitySelected::class,
-            'entity.member'        => EnsureUserBelongsToEntity::class,
-            'entity.role'          => EnsureEntityRole::class,
-            'permission'           => EnsureEntityPermission::class,
-            'check.subscription'   => CheckSubscription::class,
-            'feature'              => CheckFeature::class,
-            'auth_with_integrator' => ApiAuthenticateWithIntegrator::class,
-            'token.precheck'       => ApiTokenPreCheck::class,
-            'token.expiration'     => ApiCheckTokenExpiration::class,
-            'token.scope'          => EnsureTokenScope::class,
-            'idempotency'          => ApiIdempotency::class,
-            'api.plan'             => ApiCheckPlanAccess::class,
-            'terms.accepted'       => RequireTermsAcceptance::class,
-            'partner'              => EnsureIsPartner::class,
-            'patient.auth'         => EnsurePatientAuthenticated::class,
-            'patient.read-only'    => PatientPortalReadOnly::class,
-            'saas.admin'           => EnsureSaasAdmin::class,
-            'saas.role'            => EnsureSaasRole::class,
-            'phone.verified'       => EnsurePhoneVerified::class,
-            'admin.audit'          => LogAdminAccess::class,
-            '2fa'                  => EnsureTwoFactor::class,
-            'docs.access'          => EnsureApiDocsAccess::class,
-            'billing.contact'      => EnsureBillingContact::class,
-            'checkout.csp'         => CheckoutContentSecurityPolicy::class,
+            'clinical-review.headers' => ClinicalReviewHeaders::class,
+            'review.session'          => EnsureClinicalReviewSession::class,
+            'tenant.bind'             => BindTenantContext::class,
+            'entity.selected'         => EnsureEntitySelected::class,
+            'entity.member'           => EnsureUserBelongsToEntity::class,
+            'entity.role'             => EnsureEntityRole::class,
+            'permission'              => EnsureEntityPermission::class,
+            'check.subscription'      => CheckSubscription::class,
+            'feature'                 => CheckFeature::class,
+            'auth_with_integrator'    => ApiAuthenticateWithIntegrator::class,
+            'token.precheck'          => ApiTokenPreCheck::class,
+            'token.expiration'        => ApiCheckTokenExpiration::class,
+            'token.scope'             => EnsureTokenScope::class,
+            'idempotency'             => ApiIdempotency::class,
+            'api.plan'                => ApiCheckPlanAccess::class,
+            'terms.accepted'          => RequireTermsAcceptance::class,
+            'partner'                 => EnsureIsPartner::class,
+            'patient.auth'            => EnsurePatientAuthenticated::class,
+            'patient.read-only'       => PatientPortalReadOnly::class,
+            'saas.admin'              => EnsureSaasAdmin::class,
+            'saas.role'               => EnsureSaasRole::class,
+            'phone.verified'          => EnsurePhoneVerified::class,
+            'admin.audit'             => LogAdminAccess::class,
+            '2fa'                     => EnsureTwoFactor::class,
+            'docs.access'             => EnsureApiDocsAccess::class,
+            'billing.contact'         => EnsureBillingContact::class,
+            'checkout.csp'            => CheckoutContentSecurityPolicy::class,
         ]);
 
         // Adiciona o SetLocale, HandleImpersonation e HandleInertiaRequests ao grupo web
@@ -157,6 +162,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Token/cartão criptografado do checkout nunca volta para a sessão.
         $exceptions->dontFlash(['card_token']);
+
+        // Link do Revisor Clínico adulterado ou com a assinatura vencida: a MESMA página
+        // genérica de qualquer outro problema do link (id, token, prazo, revogação) — a
+        // resposta nunca diz qual deles foi (ADR 0002).
+        $exceptions->render(function (InvalidSignatureException $e, $request) {
+            if ($request->routeIs('clinical-review.open')) {
+                return redirect()->route('clinical-review.unavailable');
+            }
+        });
 
         // Prontuário assinado (Signable / GuardedBySignedRecord): ação sobre o
         // prontuário ou seus documentos que o caller não tratou vira 403
@@ -231,9 +245,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 // digitado (ex.: prontuário). Resposta não-Inertia aparece no
                 // diálogo do Inertia e a tela continua montada com os dados.
                 if ($e->getStatusCode() === 419) {
+                    // O Revisor Clínico não tem conta: "entre novamente" não faz sentido para ele.
+                    $message = $request->routeIs('clinical-review.*')
+                        ? __('clinical_review.public.errors.session_expired')
+                        : __('auth.session_expired_unsaved');
+
                     return response(
                         '<p style="font-family: system-ui, sans-serif; padding: 1.5rem; font-size: 1rem;">'
-                        . e(__('auth.session_expired_unsaved')) . '</p>',
+                        . e($message) . '</p>',
                         419,
                     );
                 }

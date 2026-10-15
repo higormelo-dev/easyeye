@@ -437,6 +437,29 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by('medical-record-drafts|' . ($r->user()?->id ?? $r->ip()));
         });
 
+        // Ações da equipe sobre os retornos (contato, adiar, dispensar, reabrir, "feito fora"): uso humano, teto
+        // por usuário contra laço de script.
+        RateLimiter::for('recall-write', static function (Request $r) {
+            return Limit::perMinute(90)->by('recall-write|' . ($r->user()?->id ?? $r->ip()));
+        });
+
+        // Convite de retorno por WhatsApp mandado por uma pessoa (prévia e envio): cada clique pode gastar o teto do dia
+        // da clínica e a qualidade do número — teto por usuário bem abaixo das demais ações da tela.
+        RateLimiter::for('recall-invite', static function (Request $r) {
+            return Limit::perMinute(30)->by('recall-invite|' . ($r->user()?->id ?? $r->ip()));
+        });
+
+        // Página PÚBLICA do Revisor Clínico (Fase 6, ADR 0002): sem login, o token do
+        // link é o segredo. O 1º salto (token na URL) e o PIN têm teto por IP contra
+        // varredura e adivinhação; as demais rotas, por IP + convite da sessão.
+        $reviewKey = static fn (Request $r): string => $r->ip() . '|' . ($r->session()->get('clinical_review.invitation_id') ?? 'none');
+
+        RateLimiter::for('clinical-review-open', static fn (Request $r) => Limit::perMinute(20)->by('clinical-review-open|' . $r->ip()));
+        RateLimiter::for('clinical-review-view', static fn (Request $r) => Limit::perMinute(60)->by('clinical-review-view|' . $reviewKey($r)));
+        RateLimiter::for('clinical-review-code', static fn (Request $r) => Limit::perMinute(10)->by('clinical-review-code|' . $reviewKey($r)));
+        RateLimiter::for('clinical-review-draft', static fn (Request $r) => Limit::perMinute(40)->by('clinical-review-draft|' . $reviewKey($r)));
+        RateLimiter::for('clinical-review-submit', static fn (Request $r) => Limit::perMinute(6)->by('clinical-review-submit|' . $reviewKey($r)));
+
         // Laudo pro médico solicitante (Fase 5): rota pública, sem sessão/
         // usuário — o link já é assinado (HMAC, impossível de forjar); o
         // throttle é só defesa extra contra varredura/compartilhamento em

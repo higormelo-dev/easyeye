@@ -85,7 +85,7 @@ describe('A2 — CSP na tela de IA', function () {
         expect($policy)->not->toBe('')
             // SDKs de cartão dos gateways liberados — e nada de host arbitrário em script-src.
             ->and($csp['script-src'])->toContain('https://sdk.mercadopago.com', 'https://js.stripe.com', 'https://checkout.pagar.me', 'https://assets.pagseguro.com.br')
-            ->and($csp['script-src'])->not->toContain('https:', '*', 'http:', 'data:', 'blob:')
+            ->and($csp['script-src'])->not->toContain('https:')->not->toContain('*')->not->toContain('http:')->not->toContain('data:')->not->toContain('blob:')
             ->and($csp['object-src'])->toBe(["'none'"])
             ->and($csp['form-action'])->toBe(["'self'"]);
     });

@@ -9,7 +9,7 @@ use App\Services\Surgery\Sections\{AuthorizationSection, ChecklistSection, Disch
 |--------------------------------------------------------------------------
 | Módulo cirúrgico (Fase 4)
 |--------------------------------------------------------------------------
-| Ver docs/adr/0003-modulo-cirurgico.md.
+| Ver docs/internal/auditorias/adr/0003-modulo-cirurgico.md.
 */
 return [
     /*

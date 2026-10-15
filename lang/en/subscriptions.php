@@ -126,6 +126,7 @@ return [
         'has_api_integrator'        => 'Ophthalmic equipment integration',
         'has_inventory_module'      => 'Inventory module',
         'has_surgery'               => 'Surgical module',
+        'has_patient_recall'        => 'Chronic-patient return reminders (recall)',
         'ai_monthly_credits'        => 'Monthly AI credits',
         'api_monthly_exam_sends'    => 'Integrator exam sends (monthly)',
         'plan_upgrade_required'     => 'Your plan does not include equipment integration. Upgrade to continue.',

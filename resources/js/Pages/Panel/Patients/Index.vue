@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { ref, watch, onMounted } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PatientTable from './PatientTable.vue';
 import PatientCards from './PatientCards.vue';
@@ -10,6 +10,8 @@ import PatientDetailDrawer from './PatientDetailDrawer.vue';
 const props = defineProps({
     patients: { type: Object, required: true },
     totalPatients: { type: Number, default: 0 },
+    // Condições crônicas na gaveta (Fase 6): só o médico com cadastro ativo, num plano com o recall.
+    recallConditions: { type: Boolean, default: false },
     covenants: { type: Array, default: () => [] },
     skinTypes: { type: Array, default: () => [] },
     irisTypes: { type: Array, default: () => [] },
@@ -265,6 +267,11 @@ const breadcrumbs = [
         />
 
         <!-- ── Patient Detail Drawer ─────────────────────────────────────── -->
-        <PatientDetailDrawer :open="detailOpen" :patient-id="viewPatientId" @close="closeDetail" />
+        <PatientDetailDrawer
+            :open="detailOpen"
+            :patient-id="viewPatientId"
+            :recall-conditions="recallConditions"
+            @close="closeDetail"
+        />
     </AppLayout>
 </template>

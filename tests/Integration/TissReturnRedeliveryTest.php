@@ -32,7 +32,7 @@ use Tests\TestCase;
 uses(TestCase::class, DatabaseMigrations::class);
 
 /** Ambiente do processo filho: mesmo banco de teste desta suíte. */
-function trdChildEnv(): array
+function trrdChildEnv(): array
 {
     $db = config('database.connections.' . config('database.default'));
 
@@ -57,7 +57,7 @@ function trdChildEnv(): array
  *
  * @return array{return: TissReturn, guide: TissGuide, batch: TissBatch}
  */
-function trdFixture(bool $withBatch): array
+function trrdFixture(bool $withBatch): array
 {
     $entity   = Entity::factory()->create(['is_client' => true]);
     $operator = TissOperator::create(['ans_code' => '123456', 'name' => 'Operadora Teste']);
@@ -118,7 +118,7 @@ function trdFixture(bool $withBatch): array
  * vivo): pg_stat_activity é "congelada" na 1ª leitura de uma transação aberta e
  * esta sessão está com a transação da execução A aberta.
  */
-function trdWaitUntilBlocked(InvokedProcess $child): bool
+function trrdWaitUntilBlocked(InvokedProcess $child): bool
 {
     $deadline = microtime(true) + 30;
 
@@ -136,7 +136,7 @@ function trdWaitUntilBlocked(InvokedProcess $child): bool
 }
 
 it('[CORRIDA] reentrega concorrente do mesmo retorno: a 2ª execução espera a 1ª comitar e, relendo o retorno já processado, não soma a glosa de novo', function (bool $withBatch) {
-    $f = trdFixture($withBatch);
+    $f = trrdFixture($withBatch);
 
     // statement_timeout = rede de segurança contra pendurar a suíte.
     DB::statement("set statement_timeout = '30s'");
@@ -151,11 +151,11 @@ it('[CORRIDA] reentrega concorrente do mesmo retorno: a 2ª execução espera a 
 
         // Execução B: carrega o retorno ainda "parseado" (A não comitou) e tenta processá-lo.
         $child = Process::path(base_path())
-            ->env(trdChildEnv())
+            ->env(trrdChildEnv())
             ->timeout(60)
             ->start([PHP_BINARY, 'tests/Integration/Support/tiss_process_return_child.php', (string) $f['return']->id]);
 
-        $blocked = trdWaitUntilBlocked($child);
+        $blocked = trrdWaitUntilBlocked($child);
     } finally {
         // Comita mesmo se algo falhou: o filho não pode ficar pendurado numa trava.
         DB::commit();

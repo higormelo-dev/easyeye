@@ -4,19 +4,20 @@ namespace App\Http\Controllers;
 
 use App\DTOs\ActionPolicy;
 use App\Enums\ClinicalSafety\AllergyCategory;
+use App\Enums\{ConsentType, EntityGate, FeatureKey};
 use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\PatientResource;
-use App\Models\{Covenant, IrisType, Patient, People, SkinType};
+use App\Models\{Covenant, Entity, IrisType, Patient, People, SkinType};
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
-use App\Services\{PatientDuplicateFinder, PatientService};
+use App\Services\{ConsentService, FeatureGateService, PatientDuplicateFinder, PatientService};
 use App\Services\WhatsApp\WhatsAppService;
-use App\Support\BrazilianFormat;
+use App\Support\{BrazilianFormat, CurrentDoctor};
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\{DB, Storage, Vite};
+use Illuminate\Support\Facades\{DB, Gate, Storage, Vite};
 use Illuminate\Validation\ValidationException;
 use Inertia\{Inertia, Response};
 
@@ -95,7 +96,23 @@ class PatientsController extends Controller
             'maritalStatuses' => People::$maritalStatuses,
             'statesOfBrazil'  => People::$statesOfBrazil,
             'filters'         => $request->only(['search', 'sort', 'direction']),
+            // Condições crônicas na gaveta (Fase 6): só o médico com cadastro ativo, e só com a feature no plano.
+            'recallConditions' => $this->canSeeRecallConditions($entityId),
         ]);
+    }
+
+    /** A gaveta mostra as condições crônicas (Fase 6) só ao médico com cadastro ativo, num plano com o recall. */
+    private function canSeeRecallConditions(string $entityId): bool
+    {
+        if (! CurrentDoctor::isDoctorProfile()) {
+            return false;
+        }
+
+        $entity = Entity::query()->find($entityId);
+
+        return $entity !== null
+            && Gate::allows(EntityGate::DecideRecall->value, $entity)
+            && app(FeatureGateService::class)->can($entityId, FeatureKey::HasPatientRecall);
     }
 
     private function toTableRow(Patient $p, string $entityId): array
@@ -224,47 +241,48 @@ class PatientsController extends Controller
 
         return response()->json([
             'data' => [
-                'id'                  => $record->id,
-                'code'                => $record->code,
-                'import_code'         => $record->import_code,
-                'covenant'            => $record->covenant?->name,
-                'covenant_plan'       => $this->planDetails($record),
-                'card_number'         => $record->card_number,
-                'skin_type'           => $record->skinType?->name,
-                'iris_type'           => $record->irisType?->name,
-                'active'              => (bool) $record->active,
-                'partner'             => (bool) $record->partner,
-                'photo_url'           => $photoUrl,
-                'created_at'          => $record->created_at?->format('d/m/Y H:i'),
-                'updated_at'          => $record->updated_at?->format('d/m/Y H:i'),
-                'deleted_at'          => $record->deleted_at?->format('d/m/Y H:i'),
-                'full_name'           => $person->full_name,
-                'nickname'            => $person->nickname,
-                'cpf'                 => BrazilianFormat::cpf($person->national_registry),
-                'birth_date'          => $person->birth_date ? $person->present()->getBirthDate() : null,
-                'age'                 => $person->birth_date ? $person->present()->getAge() : null,
-                'gender'              => $person->present()->getGender(),
-                'marital_status'      => $person->present()->getMaritalStatus(),
-                'email'               => $person->email,
-                'mother_name'         => $person->mother_name,
-                'father_name'         => $person->father_name,
-                'occupation'          => $person->occupation,
-                'rg'                  => $person->state_registry,
-                'rg_agency'           => $person->state_registry_agency,
-                'rg_state'            => $person->state_registry_initial,
-                'rg_date'             => $person->state_registry_date ? $person->present()->getStateRegistryDate() : null,
-                'telephone'           => BrazilianFormat::phone($person->telephone),
-                'cellphone'           => BrazilianFormat::phone($person->cellphone),
-                'whatsapp'            => (bool) $person->whatsapp,
-                'whatsapp_opted_out'  => WhatsAppService::optedOutFor((string) $record->entity_id, $person->cellphone),
-                'zipcode'             => $person->zipcode ? $person->present()->getZipcode() : null,
-                'address'             => $person->address,
-                'number'              => $person->number,
-                'complement'          => $person->complement,
-                'district'            => $person->district,
-                'city'                => $person->city,
-                'state'               => $person->state,
-                'medical_records_url' => route('panel.patients.medicalrecords.index', $record->id),
+                'id'                     => $record->id,
+                'code'                   => $record->code,
+                'import_code'            => $record->import_code,
+                'covenant'               => $record->covenant?->name,
+                'covenant_plan'          => $this->planDetails($record),
+                'card_number'            => $record->card_number,
+                'skin_type'              => $record->skinType?->name,
+                'iris_type'              => $record->irisType?->name,
+                'active'                 => (bool) $record->active,
+                'partner'                => (bool) $record->partner,
+                'photo_url'              => $photoUrl,
+                'created_at'             => $record->created_at?->format('d/m/Y H:i'),
+                'updated_at'             => $record->updated_at?->format('d/m/Y H:i'),
+                'deleted_at'             => $record->deleted_at?->format('d/m/Y H:i'),
+                'full_name'              => $person->full_name,
+                'nickname'               => $person->nickname,
+                'cpf'                    => BrazilianFormat::cpf($person->national_registry),
+                'birth_date'             => $person->birth_date ? $person->present()->getBirthDate() : null,
+                'age'                    => $person->birth_date ? $person->present()->getAge() : null,
+                'gender'                 => $person->present()->getGender(),
+                'marital_status'         => $person->present()->getMaritalStatus(),
+                'email'                  => $person->email,
+                'mother_name'            => $person->mother_name,
+                'father_name'            => $person->father_name,
+                'occupation'             => $person->occupation,
+                'rg'                     => $person->state_registry,
+                'rg_agency'              => $person->state_registry_agency,
+                'rg_state'               => $person->state_registry_initial,
+                'rg_date'                => $person->state_registry_date ? $person->present()->getStateRegistryDate() : null,
+                'telephone'              => BrazilianFormat::phone($person->telephone),
+                'cellphone'              => BrazilianFormat::phone($person->cellphone),
+                'whatsapp'               => (bool) $person->whatsapp,
+                'whatsapp_opted_out'     => WhatsAppService::optedOutFor((string) $record->entity_id, $person->cellphone),
+                'care_reminders_consent' => app(ConsentService::class)->hasActiveConsent($record, ConsentType::CareReminders),
+                'zipcode'                => $person->zipcode ? $person->present()->getZipcode() : null,
+                'address'                => $person->address,
+                'number'                 => $person->number,
+                'complement'             => $person->complement,
+                'district'               => $person->district,
+                'city'                   => $person->city,
+                'state'                  => $person->state,
+                'medical_records_url'    => route('panel.patients.medicalrecords.index', $record->id),
             ],
         ]);
     }
@@ -473,6 +491,8 @@ class PatientsController extends Controller
                 'telephone'              => $person->telephone,
                 'cellphone'              => $person->cellphone,
                 'whatsapp'               => (bool) $person->whatsapp,
+                // Autorização vigente de lembretes de retorno por WhatsApp (o formulário parte do estado atual).
+                'care_reminders_consent' => app(ConsentService::class)->hasActiveConsent($patient, ConsentType::CareReminders),
                 'zipcode'                => $person->zipcode,
                 'address'                => $person->address,
                 'number'                 => $person->number,

@@ -164,6 +164,14 @@ class PatientRequest extends FormRequest
                 'required_without:type_method',
                 'boolean',
             ],
+            // Autorização de lembretes de retorno por WhatsApp (LGPD, ADR 0002 item 9). Ausente/nulo = não mexe;
+            // verdadeiro registra o consentimento, falso revoga o vigente. É um ATO: o formulário só o envia quando a
+            // pessoa mudou a caixa (nunca o valor carregado a cada salvamento).
+            'care_reminders_consent' => [
+                'sometimes',
+                'nullable',
+                'boolean',
+            ],
             'zipcode' => [
                 'nullable',
                 'string',
@@ -416,7 +424,7 @@ class PatientRequest extends FormRequest
             $merge['zipcode'] = preg_replace('/\D/', '', (string) $this->input('zipcode'));
         }
 
-        foreach (['whatsapp', 'active'] as $booleanField) {
+        foreach (['whatsapp', 'active', 'care_reminders_consent'] as $booleanField) {
             if ($this->has($booleanField)) {
                 $merge[$booleanField] = $this->normalizeBoolean($this->input($booleanField));
             }

@@ -163,10 +163,10 @@ it('requires a nonzero expected generation before any operational update effect'
 it('records registration login observed capture and confirmed receipt as separate milestones', function () {
     $entity = $this->ctx['entity']->id;
     $steps  = fn () => EntityActivation::where('entity_id', $entity)->pluck('step')->map(fn ($step) => $step->value)->all();
-    expect($steps())->toContain('integrator_registered')->not->toContain('integrator_connected', 'integrator_capture_observed', 'integrator_receipt_confirmed');
+    expect($steps())->toContain('integrator_registered')->not->toContain('integrator_connected')->not->toContain('integrator_capture_observed')->not->toContain('integrator_receipt_confirmed');
     $this->ctx['integratorUser']->update(['password' => Hash::make('SyntheticPassword123!')]);
     $this->postJson('/api/integrators/signin', ['email' => $this->ctx['integratorUser']->email, 'password' => 'SyntheticPassword123!', 'code' => $this->ctx['integrator']->code])->assertOk();
-    expect($steps())->toContain('integrator_connected')->not->toContain('integrator_capture_observed', 'integrator_receipt_confirmed');
+    expect($steps())->toContain('integrator_connected')->not->toContain('integrator_capture_observed')->not->toContain('integrator_receipt_confirmed');
     $health = ['pending_count' => 0, 'failed_count' => 0, 'blocked_count' => 0, 'sent_last_24h_count' => 0, 'problems' => [], 'operational' => ['version' => '1.0.0', 'scope' => str_repeat('a', 64), 'ingest_pending' => 0, 'quarantined' => 0, 'acquisition_rejected' => 0, 'devices' => [['equipment_id' => 1, 'rejected_count' => 0, 'last_accepted_at' => now()->toIso8601String()]], 'next_action' => 'verificar gravação do spool; journal preservado']];
     $this->putJson('/api/integrators/v1/queue-health', $health, $this->ctx['headers'])->assertNoContent();
     expect($steps())->toContain('integrator_capture_observed')->not->toContain('integrator_receipt_confirmed');

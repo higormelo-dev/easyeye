@@ -251,6 +251,8 @@ it('estatísticas de 30 dias por clínica iguais às de antes, agregadas numa co
         'confirmations_answered' => 1,
         'surveys_sent'           => 2,
         'surveys_answered'       => 2,
+        'recall_sent'            => 0,
+        'recall_answered'        => 0,
         'survey_average'         => 4.5,
         'delivered'              => 2,
         'read'                   => 1,

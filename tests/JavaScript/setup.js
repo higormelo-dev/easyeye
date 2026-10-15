@@ -29,43 +29,47 @@ globalThis.fetch = vi.fn(() =>
     }),
 );
 
-// Stub do TinyMCE: o wrapper TinyMceEditor.vue injeta um <script> para carregar
-// o vendor, mas o happy-dom bloqueia carregamento de script (DOMException). Ao
-// pré-popular `window.tinymce`, o loader curto-circuita (sem appendChild) e
-// inicializa um editor fake — zero ruído no stderr, sem rejeição pendente.
-window.tinymce = {
-    init: (cfg) => {
-        const editor = {
-            _content: '',
-            getContent: () => editor._content,
-            setContent: (v) => {
-                editor._content = v ?? '';
-            },
-            // insertContent/focus/selection: usados por
-            // TinyMceEditor::insertContent()/getSelectionHtml() (botões
-            // "Inserir imagem"/"Frases rápidas" do Gerenciador de Imagens,
-            // benchmark 18/09/2026) — sem eles aqui, chamar insertContent()
-            // num teste montado por cima do stub quebra com "is not a
-            // function" bem antes de qualquer asserção rodar.
-            insertContent: (html) => {
-                editor._content += html;
-            },
-            focus: () => {},
-            selection: { getContent: () => '' },
-            mode: { set: () => {} },
-            remove: () => {},
-            on: () => {},
-        };
-        if (typeof cfg?.setup === 'function') cfg.setup(editor);
-        return Promise.resolve([editor]);
-    },
-};
+// O que depende do DOM só liga quando há DOM: os testes de SSR (`// @vitest-environment node`) rodam este mesmo setup
+// num ambiente de servidor, sem `window` nem `document` — é justamente o que eles provam.
+if (typeof window !== 'undefined') {
+    // Stub do TinyMCE: o wrapper TinyMceEditor.vue injeta um <script> para carregar
+    // o vendor, mas o happy-dom bloqueia carregamento de script (DOMException). Ao
+    // pré-popular `window.tinymce`, o loader curto-circuita (sem appendChild) e
+    // inicializa um editor fake — zero ruído no stderr, sem rejeição pendente.
+    window.tinymce = {
+        init: (cfg) => {
+            const editor = {
+                _content: '',
+                getContent: () => editor._content,
+                setContent: (v) => {
+                    editor._content = v ?? '';
+                },
+                // insertContent/focus/selection: usados por
+                // TinyMceEditor::insertContent()/getSelectionHtml() (botões
+                // "Inserir imagem"/"Frases rápidas" do Gerenciador de Imagens,
+                // benchmark 18/09/2026) — sem eles aqui, chamar insertContent()
+                // num teste montado por cima do stub quebra com "is not a
+                // function" bem antes de qualquer asserção rodar.
+                insertContent: (html) => {
+                    editor._content += html;
+                },
+                focus: () => {},
+                selection: { getContent: () => '' },
+                mode: { set: () => {} },
+                remove: () => {},
+                on: () => {},
+            };
+            if (typeof cfg?.setup === 'function') cfg.setup(editor);
+            return Promise.resolve([editor]);
+        },
+    };
 
-// CSRF token meta tag (alguns componentes leem dele)
-const csrfMeta = document.createElement('meta');
-csrfMeta.setAttribute('name', 'csrf-token');
-csrfMeta.setAttribute('content', 'test-csrf-token');
-document.head.appendChild(csrfMeta);
+    // CSRF token meta tag (alguns componentes leem dele)
+    const csrfMeta = document.createElement('meta');
+    csrfMeta.setAttribute('name', 'csrf-token');
+    csrfMeta.setAttribute('content', 'test-csrf-token');
+    document.head.appendChild(csrfMeta);
+}
 
 // Stub global para componentes Inertia comuns
 config.global.stubs = {

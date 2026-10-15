@@ -158,7 +158,7 @@ describe('adicionar guias ao lote', function (): void {
             ->and($data[$pendingOther->id]['origin_batch_code'])->toBe($other->code)
             ->and($data[$individual->id]['origin'])->toBe('individual')
             ->and($data[$individual->id]['patient_name'])->toBe($individual->patient->person->full_name)
-            ->and($data->keys()->all())->not->toContain(bbaClaimOf($s3)->id, $paid->id, $otherCovenant->id);
+            ->and($data->keys()->all())->not->toContain(bbaClaimOf($s3)->id)->not->toContain($paid->id)->not->toContain($otherCovenant->id);
 
         // Lote com o lote TISS inteiro (sem pendência): só "Adicionar guias".
         expect(bbaRows('batches')[$inTiss->id]['allowed_actions'])->toContain('add_claims')->not->toContain('reprocess_pending');

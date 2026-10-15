@@ -37,10 +37,16 @@ return [
     // Cadastro de paciente (componente compartilhado Pacientes/Agenda).
     'patient_form' => [
         // Celular respondeu SAIR ao WhatsApp da clínica/EasyEye.
-        'wa_opted_out'           => 'Descadastrado do WhatsApp',
-        'wa_opted_out_hint'      => 'Este celular respondeu SAIR: não recebe confirmação nem pesquisa por WhatsApp até responder VOLTAR.',
-        'occupation'             => 'Profissão',
-        'occupation_placeholder' => 'Ex.: professora, motorista, aposentado(a)',
+        'wa_opted_out'      => 'Descadastrado do WhatsApp',
+        'wa_opted_out_hint' => 'Este celular respondeu SAIR: não recebe confirmação nem pesquisa por WhatsApp até responder VOLTAR.',
+        // Autorização de lembretes de retorno por WhatsApp (Fase 6, LGPD).
+        'care_reminders'                => 'Autoriza lembretes de retorno por WhatsApp',
+        'care_reminders_hint'           => 'O lembrete não cita o motivo do acompanhamento. O paciente pode parar a qualquer momento respondendo SAIR.',
+        'care_reminders_needs_whatsapp' => 'Marque que o celular tem WhatsApp para registrar esta autorização.',
+        'care_reminders_badge'          => 'Lembretes de retorno',
+        'care_reminders_badge_hint'     => 'O paciente autorizou lembretes de retorno por WhatsApp.',
+        'occupation'                    => 'Profissão',
+        'occupation_placeholder'        => 'Ex.: professora, motorista, aposentado(a)',
         // Plano do convênio (produto da ANS ou plano da clínica)
         'plan'                 => 'Plano',
         'plan_placeholder'     => 'Buscar pelo nome ou registro na ANS',

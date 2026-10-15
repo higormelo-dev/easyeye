@@ -101,6 +101,23 @@ enum EntityGate: string
     /** Indicadores cirúrgicos (admin, financial, doctor — o médico vê só os próprios números). */
     case ViewSurgeryIndicators = 'entity.view-surgery-indicators';
 
+    /**
+     * Operar o recall de pacientes crônicos: ver a lista de retornos, registrar
+     * contato, adiar, dispensar, marcar "feito fora" e agendar o retorno
+     * (admin, doctor, secretary — Fase 6). Ato administrativo de contato com o
+     * paciente; as decisões clínicas (confirmar condição, ativar protocolo)
+     * ficam em DecideRecall.
+     */
+    case OperateRecall = 'entity.operate-recall';
+
+    /**
+     * Decidir o recall: confirmar/descartar/dar alta de uma condição crônica do
+     * paciente e ativar na clínica um protocolo de retorno validado (doctor com
+     * cadastro de médico ATIVO — Fase 6). Mesmo corpo de IssueReport: admin e
+     * secretária nunca decidem conduta clínica, e a decisão grava quem a tomou.
+     */
+    case DecideRecall = 'entity.decide-recall';
+
     /** Gerenciar configurações da entity (admin). */
     case ManageSettings = 'entity.manage-settings';
 

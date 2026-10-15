@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService};
+use App\Domains\Recall\Services\FollowUpSuggestionService;
 use App\Enums\AI\AiRunMode;
 use App\Enums\{ClientRule, DataAccessPurpose, EntityGate, ExamReportRegistry, FeatureKey, ScheduleSituation};
 use App\Enums\ClinicalSafety\{AllergyCategory, AllergySeverity, AllergyStatus, MedicationSource};
@@ -18,7 +19,7 @@ use App\Services\MedicalRecords\MedicalRecordDraftService;
 use App\Support\{BrazilianFormat, ContactLensUse, CurrentDoctor, PatientAccess};
 use App\Support\Documents\DocumentDate;
 use App\Traits\LogsDataAccess;
-use Carbon\Carbon;
+use Carbon\{Carbon, CarbonImmutable};
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -869,6 +870,19 @@ class MedicalRecordsController extends Controller
         return $out === '' ? null : $out;
     }
 
+    /**
+     * @return array{suggestions: list<array<string, mixed>>, max_days: ?int, t: array<string, mixed>}|null
+     */
+    private function followUpProps(string $entityId, Patient $patient, ?MedicalRecord $record, ?Schedule $flowSchedule): ?array
+    {
+        $today = CarbonImmutable::now()->startOfDay();
+        $on    = CarbonImmutable::parse($flowSchedule?->date_time ?? $record?->created_at ?? $today)->startOfDay();
+
+        $result = app(FollowUpSuggestionService::class)->forPatient($entityId, (string) $patient->id, $on->greaterThan($today) ? $today : $on);
+
+        return $result['suggestions'] === [] ? null : $result + ['t' => trans('recall_followup')];
+    }
+
     private function buildFormProps(Patient $patient, ?MedicalRecord $record): array
     {
         $entityId = (string) session('selected_entity_id');
@@ -923,9 +937,12 @@ class MedicalRecordsController extends Controller
                 'id'   => (string) $d->id,
                 'name' => $d->person?->full_name,
             ]),
-            'currentDoctorId'   => $currentDoctor ? (string) $currentDoctor->id : null,
-            'canChooseDoctor'   => (bool) $canChooseDoctor,
-            'isDoctor'          => $isDoctor,
+            'currentDoctorId' => $currentDoctor ? (string) $currentDoctor->id : null,
+            'canChooseDoctor' => (bool) $canChooseDoctor,
+            'isDoctor'        => $isDoctor,
+            // Sugestão do campo "Retorno" (Fase 6): intervalo que a clínica escolheu para a consulta de cada condição
+            // crônica ATIVA do paciente — só para o médico, só com protocolo em uso.
+            'followUp'          => $isDoctor ? $this->followUpProps($entityId, $patient, $record, $flowSchedule) : null,
             'doctorMissing'     => CurrentDoctor::issuerMissing(),
             'doctorMissingText' => CurrentDoctor::missingMessage(),
             'isEdit'            => $isEdit,
@@ -1150,6 +1167,13 @@ class MedicalRecordsController extends Controller
             // do CATÁLOGO, disponível assim que o médico escolhe um.
             'medicalrecordprocedures_index' => route('panel.patients.medicalrecord-procedures.index', $patient),
             'procedure_bom_template'        => route('panel.procedures.bom', '__PROCEDURE_ID__'),
+            // Cursos de injeções intravítreas (anti-VEGF): leitura do painel por paciente; encerrar e agendar a
+            // próxima levam o id do curso no lugar de __COURSE_ID__.
+            // Orientações pós-procedimento (S14): estado e emissão de UM procedimento.
+            'care_guidance_template'                     => route('panel.patients.medicalrecord-procedures.care-guidance', [$patient, '__PROCEDURE_ID__']),
+            'intravitreal_courses_index'                 => route('panel.patients.intravitreal-courses.index', $patient),
+            'intravitreal_course_close_template'         => route('panel.patients.intravitreal-courses.close', [$patient, '__COURSE_ID__']),
+            'intravitreal_course_schedule_next_template' => route('panel.patients.intravitreal-courses.schedule-next', [$patient, '__COURSE_ID__']),
             // Autosave (rascunho do autor): GET recupera, PUT grava, DELETE
             // descarta — só para quem pode salvar o prontuário.
             'draft' => CurrentDoctor::canIssue() ? route('panel.patients.medicalrecord-draft.save', $patient) : null,

@@ -60,6 +60,8 @@ const props = defineProps({
     resourceOptions: { type: Array, default: () => [] },
     // Telefone/WhatsApp/ficha do paciente só para quem tem acesso a Pacientes.
     canSeePatients: { type: Boolean, default: false },
+    /** Retorno a agendar (vindo da tela de Retornos, `?recall=<id>`): paciente e retorno já escolhidos. */
+    recallPrefill: { type: Object, default: null },
     urls: { type: Object, default: () => ({}) },
     t: { type: Object, default: () => ({}) },
 });
@@ -389,7 +391,10 @@ onMounted(() => {
     if (params.get('new') !== '1') return;
 
     openCreate();
+    // Vindo de "Agendar" na tela de Retornos: o formulário abre com o paciente e o retorno escolhidos.
+    if (props.recallPrefill) prefillData.value = { ...props.recallPrefill };
     params.delete('new');
+    params.delete('recall');
     router.get(route('panel.schedules.index'), Object.fromEntries(params.entries()), {
         replace: true,
         preserveState: true,

@@ -93,11 +93,15 @@ despachado e o resultado vem com `alreadyImported` (`ReceivedTissReturn`); a tel
 a data da importação original. Retorno `received`/`parsed`/`error` (a 1ª tentativa caiu depois do commit): é RETOMADO — o
 MESMO retorno é processado e nunca nasce o 2º; sem isso o "tente novamente" que a tela manda fazer não teria saída.
 Serialização: `pg_advisory_xact_lock` por (clínica, operadora, hash) como 1ª instrução da transação de `receive()`
-(`ReceiveTissResponseService::importLockKey()`), antes do `Storage::put`, e releitura sob a trava (READ COMMITTED); fora do
+(`ReceiveTissResponseService::importLockKey()`), antes do `Storage::put` (o arquivo em disco é nomeado pelo SHA-256 dos bytes,
+`tiss/{clínica}/returns/{hash}.xml`, nunca por texto do XML — um `numeroProtocolo` com `..` escreveria fora do prefixo da clínica), e releitura sob a trava (READ COMMITTED); fora do
 PostgreSQL só a releitura barra a repetição sequencial. Invariantes (no PHPDoc de `receive()`): a chave é a 1ª trava; nenhum
 `FOR UPDATE` de lote/retorno/protocolo sob ela; `process()` e o despacho ficam FORA da transação; `receive()` nunca roda
 dentro de transação que já segure lote ou protocolo; nenhuma outra rotina toma a chave. Limites assumidos: identidade por
 bytes exatos (arquivo regravado com BOM/CRLF ou reexportado pela operadora com data/hora nova é outro arquivo e soma de novo);
+o arquivo NÃO é conferido com a operadora do convênio escolhido na tela (importar pelo convênio errado grava o retorno e um
+protocolo novo na operadora errada e, se o `numeroLote` casar com um lote dela, processa lote e guias dela; os mesmos bytes
+sob outro convênio são OUTRO arquivo de propósito — a identidade inclui a operadora — e não existe tela para desfazer);
 retorno `processed` ÓRFÃO (importado sem lote/guia casando) não é reimportável — não existe "substituir retorno"; duplicatas
 JÁ gravadas antes da correção não são curadas (consulta para achá-las abaixo). Não transforme `ProcessGlosaReturnService`
 em delta por glosa: a chave do upsert tem `return_id` e o item é resolvido pelo 1º código igual (exame bilateral de mesmo

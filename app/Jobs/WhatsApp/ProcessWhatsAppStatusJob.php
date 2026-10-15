@@ -128,7 +128,7 @@ class ProcessWhatsAppStatusJob implements ShouldQueue
                     // Falha transitória: confirmação/pesquisa volta a ser
                     // reenfileirável (o comando reaproveita a linha).
                     $updates['status'] = GupshupProvider::isTransientErrorCode($classified['error_code'])
-                        && in_array($message->kind, [WhatsAppMessage::KIND_CONFIRMATION, WhatsAppMessage::KIND_SURVEY], true)
+                        && in_array($message->kind, [WhatsAppMessage::KIND_CONFIRMATION, WhatsAppMessage::KIND_SURVEY, WhatsAppMessage::KIND_RECALL], true)
                         ? WhatsAppMessage::STATUS_SKIPPED
                         : WhatsAppMessage::STATUS_FAILED;
 

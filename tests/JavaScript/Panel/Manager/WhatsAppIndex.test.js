@@ -40,6 +40,24 @@ const t = {
     title: 'WhatsApp (API oficial)',
     save: 'Salvar',
     close: 'Fechar',
+    recall: {
+        toggle: 'Convite de retorno',
+        toggle_hint: 'Libere só depois de o modelo estar aprovado na Meta.',
+        enabled: 'Convite de retorno liberado',
+        badge_paused: 'Pausado',
+        badge_active: 'Ativo',
+        pause_title: 'Convites de retorno',
+        pause_text: 'Pause o envio dos convites de retorno de TODAS as clínicas.',
+        paused_since: 'Pausado por :name em :date',
+        paused_reason: 'Motivo: :reason',
+        impact: ':clinics clínicas e :recalls retornos afetados',
+        pause: 'Pausar todos os convites',
+        resume: 'Liberar os convites',
+        reason: 'Motivo da pausa',
+        reason_hint: 'Obrigatório (mínimo 10 caracteres).',
+        confirm_pause: 'Pausar os convites de retorno de todas as clínicas agora?',
+        confirm_resume: 'Liberar de novo os convites de retorno?',
+    },
     manager: {
         configure: 'Configurar',
         status_via_global: 'Ativo (número do EasyEye)',
@@ -664,6 +682,7 @@ describe('modal da clínica', () => {
                 confirmation_hours_before: 24,
                 survey_enabled: false,
                 survey_delay_hours: 2,
+                recall_enabled: false,
             },
             expect.any(Object),
         );
@@ -697,7 +716,23 @@ describe('modal da clínica', () => {
                 confirmation_hours_before: 24,
                 survey_enabled: true,
                 survey_delay_hours: 2,
+                recall_enabled: false,
             },
+            expect.any(Object),
+        );
+    });
+
+    it('a chave do convite de retorno vai no mesmo envio quando ligada', async () => {
+        wrapper = factory();
+
+        await wrapper.find('[data-test="configure-c2"]').trigger('click');
+        await wrapper.find('[data-test="recall-switch"]').setValue(true);
+        await wrapper.find('[data-test="clinic-save"]').trigger('click');
+        await flushPromises();
+
+        expect(window.axios.patch).toHaveBeenLastCalledWith(
+            '/panel/manager/whatsapp/c2',
+            expect.objectContaining({ recall_enabled: true }),
             expect.any(Object),
         );
     });
