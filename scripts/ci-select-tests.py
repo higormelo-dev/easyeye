@@ -15,7 +15,11 @@ Regras (na dúvida, suíte inteira):
   - resources/js, docs, e2e, workflows          -> nenhum teste PHP (o Vitest roda sempre inteiro, é rápido).
   - sempre: P2ContractsTest (gera as fixtures que validate-integrator-contracts.php lê);
   - tests/Integration (corrida real, 2 sessões)  -> FORA do PR (cada teste segura 2,5-8 s; rodam no push main/desenv).
-Saída: `mode` e `pest_args` em $GITHUB_OUTPUT (pest_args vazio = não rodar o Pest). Uso local: CI_BASE_SHA=<sha> python3 ...
+Teto de tempo do passo do Pest (`timeout_minutes`): quem sabe quanto vai rodar é este script, não o evento. Seleção de até
+SHORT_LIMIT arquivos = SHORT_TIMEOUT (se travar, falha rápida em vez de 6 h); suíte inteira e seleção maior = LONG_TIMEOUT.
+Teto por evento (pull_request = curto) estourava em todo PR de efeito amplo, que roda a suíte inteira (~45 min).
+Saída em $GITHUB_OUTPUT: `mode`, `pest_args` (vazio = não rodar o Pest) e `timeout_minutes`; o workflow só lê.
+Uso local: CI_BASE_SHA=<sha> python3 ...
 """
 import os
 import re
@@ -32,14 +36,25 @@ BROAD_PREFIXES = ('database/migrations/', 'database/seeders/', 'database/factori
 # sem ele o passo falha com "Missing generated HTTP fixture".
 ALWAYS = {'tests/Feature/Api/Integrators/P2ContractsTest.php'}
 CORE_LIMIT = 120  # classe citada por tantos testes é núcleo (Model, Service base): não adianta selecionar
+# Teto de tempo (minutos) do passo do Pest. A suíte inteira leva ~45 min na CI (~670 arquivos, ~4 s cada).
+SHORT_TIMEOUT = 15  # seleção pequena de PR: se travar, falha rápida
+LONG_TIMEOUT = 60   # suíte inteira (push main/desenv ou PR de efeito amplo) e seleção grande; suba antes de chegar a ~50 min
+SHORT_LIMIT = 100   # arquivos que cabem em SHORT_TIMEOUT com folga (~7 min); a seleção mais larga já vista foi de 53
 
 
-def out(mode: str, args: str, why: str) -> None:
+def timeout_for(mode: str, test_files: int) -> int:
+    """Teto do passo do Pest: curto só para seleção pequena; o resto (suíte inteira, seleção grande) tem o longo."""
+    return SHORT_TIMEOUT if mode == 'selected' and test_files <= SHORT_LIMIT else LONG_TIMEOUT
+
+
+def out(mode: str, args: str, why: str, test_files: int = 0) -> None:
+    timeout = timeout_for(mode, test_files)
     print(f'[ci-select-tests] {mode}: {why}')
     print(f'[ci-select-tests] pest_args={args or "(nenhum)"}')
+    print(f'[ci-select-tests] timeout_minutes={timeout}')
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
-            fh.write(f'mode={mode}\npest_args={args}\n')
+            fh.write(f'mode={mode}\npest_args={args}\ntimeout_minutes={timeout}\n')
     sys.exit(0)
 
 
@@ -85,7 +100,7 @@ def main() -> None:
     skipped = {t for t in selected if t.startswith('tests/Integration/')}
     selected -= skipped  # lentos por natureza: valem no push para main/desenv, não a cada PR
     selected |= ALWAYS
-    out('selected', ' '.join(sorted(selected)), f'{len(selected)} arquivo(s) de teste alcançados por {len(changed)} arquivo(s) alterado(s); {len(skipped)} de Integration ficam para o push')
+    out('selected', ' '.join(sorted(selected)), f'{len(selected)} arquivo(s) de teste alcançados por {len(changed)} arquivo(s) alterado(s); {len(skipped)} de Integration ficam para o push', len(selected))
 
 
 if __name__ == '__main__':
