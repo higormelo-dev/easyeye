@@ -9,7 +9,8 @@ declare(strict_types=1);
  * O teto de tempo do passo do Pest vem do seletor (`timeout_minutes`), que sabe quanto vai rodar. Antes ele vinha do
  * evento (pull_request = 15 min), e todo PR de efeito amplo (migrations, config, rotas, providers — a maioria dos PRs
  * de feature) roda a suíte inteira, uns 45 min: estourava sempre. Aqui ficam fixados o teto de cada cenário, o limite
- * da seleção grande e a ligação (id do passo e nome da saída) entre o script e o workflow.
+ * da seleção grande e a ligação (id do passo e nome da saída) entre o script e o workflow. As fatias da matriz (jobs de
+ * Pest com banco próprio) e o resto do workflow têm os contratos em CiShardMatrixTest e CiWorkflowTest.
  */
 
 use Symfony\Component\Finder\Finder;
@@ -208,21 +209,32 @@ it('seleção grande não cabe no teto curto: até o limite é curto, acima dele
 
 it('o passo do Pest lê o teto da saída do seletor, não do evento', function () {
     $workflow = Yaml::parseFile(cisRoot() . '/.github/workflows/integrator-contracts.yml');
-    $steps    = $workflow['jobs']['contracts']['steps'];
+    $jobs     = $workflow['jobs'];
 
-    $select = collect($steps)->firstWhere('id', 'select');
-    $pest   = collect($steps)->first(fn (array $step) => str_contains((string) ($step['run'] ?? ''), 'vendor/bin/pest'));
+    // Produtor: o job `select` roda o script e expõe, uma a uma, as saídas que ele escreve.
+    $select = collect($jobs['select']['steps'])->firstWhere('id', 'select');
+    // Consumidor: o job de Pest (uma entrada da matriz por fatia) lê o teto e a matriz do `select`.
+    $pest = collect($jobs['php-tests']['steps'])->first(fn (array $step) => str_contains((string) ($step['run'] ?? ''), 'vendor/bin/pest'));
 
     expect($select['run'])->toContain('scripts/ci-select-tests.py')
-        ->and($pest['timeout-minutes'])->toContain('steps.select.outputs.')
+        ->and($jobs['php-tests']['needs'])->toContain('select')
+        ->and($jobs['php-tests']['strategy']['matrix'])->toContain('needs.select.outputs.matrix')
+        ->and($pest['timeout-minutes'])->toContain('needs.select.outputs.')
         ->and($pest['timeout-minutes'])->not->toContain('github.event_name')
-        ->and($pest['if'])->toContain('steps.select.outputs.pest_args')
-        ->and($pest['env']['PEST_ARGS'])->toContain('steps.select.outputs.pest_args');
+        ->and($pest['env']['PEST_ARGS'])->toContain('matrix.pest_args');
 
-    // O nome que o workflow lê tem que ser um que o script de fato escreve (renomear só um dos lados cairia no 60 do
-    // fallback sem avisar).
-    preg_match('/steps\.select\.outputs\.(\w+)/', $pest['timeout-minutes'], $read);
+    // Os nomes que o workflow lê têm que ser os que o script de fato escreve (renomear só um dos lados cairia no 60 do
+    // fallback, ou numa matriz vazia, sem avisar).
+    $written = array_keys(cisRun('push', ''));
 
-    expect($read[1] ?? null)->toBe('timeout_minutes')
-        ->and(cisRun('push', ''))->toHaveKey($read[1]);
+    preg_match('/needs\.select\.outputs\.(\w+)/', $pest['timeout-minutes'], $timeout);
+    preg_match('/needs\.select\.outputs\.(\w+)/', $jobs['php-tests']['strategy']['matrix'], $matrix);
+
+    expect($timeout[1] ?? null)->toBe('timeout_minutes')
+        ->and($matrix[1] ?? null)->toBe('matrix')
+        ->and(array_keys($jobs['select']['outputs']))->toEqualCanonicalizing($written);
+
+    foreach ($jobs['select']['outputs'] as $name => $expression) {
+        expect($expression)->toBe('${{ steps.select.outputs.' . $name . ' }}');
+    }
 });
