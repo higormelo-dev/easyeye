@@ -413,6 +413,7 @@ return [
     'print_generated'              => 'Impresso em :datetime por :user',
     'print_confidential'           => 'Documento com dados pessoais e de saúde — uso restrito à clínica (LGPD).',
     'print_patient_sheet'          => 'Imprimir ficha do paciente',
+    'postop_evaluation_shortcut'   => 'Avaliação pós-operatória',
     'sheet_title'                  => 'Ficha do paciente',
     'sheet_section_identification' => 'Identificação',
     'sheet_section_contact'        => 'Contato',

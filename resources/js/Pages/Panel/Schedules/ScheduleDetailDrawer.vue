@@ -224,7 +224,10 @@ function copyNumericCode(field, code) {
                         </span>
                     </div>
                     <div
-                        v-if="schedule && (schedule.patient_sheet_url || schedule.whatsapp_state)"
+                        v-if="
+                            schedule &&
+                            (schedule.patient_sheet_url || schedule.whatsapp_state || schedule.postop_case_url)
+                        "
                         class="d-flex gap-2 mt-2 flex-wrap"
                     >
                         <a
@@ -237,6 +240,15 @@ function copyNumericCode(field, code) {
                         >
                             <i class="ti ti-printer me-1" aria-hidden="true"></i
                             >{{ t.print_patient_sheet ?? 'Ficha do paciente' }}
+                        </a>
+                        <a
+                            v-if="schedule.postop_case_url"
+                            :href="schedule.postop_case_url"
+                            class="btn btn-sm btn-outline-primary"
+                            data-test="drawer-postop-evaluation"
+                        >
+                            <i class="ti ti-eye-check me-1" aria-hidden="true"></i
+                            >{{ t.postop_evaluation_shortcut ?? 'Avaliação pós-op' }}
                         </a>
                         <a
                             v-if="schedule.whatsapp_state === 'ok'"

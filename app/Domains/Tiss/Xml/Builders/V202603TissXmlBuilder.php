@@ -6,6 +6,7 @@ namespace App\Domains\Tiss\Xml\Builders;
 
 use App\Domains\Tiss\DTOs\{TissBatchData, TissGuideData, TissGuideItemData};
 use App\Domains\Tiss\Enums\TissGuideType;
+use App\Domains\Tiss\Exceptions\TissGuideTypeNotBatchableException;
 use App\Domains\Tiss\Models\TissBatch;
 use App\Domains\Tiss\Xml\Contracts\TissXmlBuilder;
 use DOMDocument;
@@ -73,13 +74,15 @@ class V202603TissXmlBuilder implements TissXmlBuilder
         $guidesNode = $loteGuias->appendChild($dom->createElement('guiasTISS'));
 
         foreach ($data->guides as $guide) {
-            if ($guide->guideType === TissGuideType::Consultation) {
-                $this->appendConsultaGuide($dom, $guidesNode, $guide, $data);
-
-                continue;
-            }
-
-            $this->appendSadtGuide($dom, $guidesNode, $guide, $data);
+            // Despacho EXPLÍCITO por tipo: tipo sem builder de lote é recusado, nunca
+            // convertido em SP-SADT. Solicitação de internação e anexo de OPME são
+            // mensagens avulsas (V202603TissSurgicalMessageBuilder).
+            match ($guide->guideType) {
+                TissGuideType::Consultation => $this->appendConsultaGuide($dom, $guidesNode, $guide, $data),
+                TissGuideType::Sadt         => $this->appendSadtGuide($dom, $guidesNode, $guide, $data),
+                TissGuideType::InpatientRequest,
+                TissGuideType::OpmeAttachment => throw TissGuideTypeNotBatchableException::for($guide->guideType, $guide->guideNumber),
+            };
         }
 
         // ctm_guiaLote (tipo real de loteGuias) só tem numeroLote + guiasTISS.

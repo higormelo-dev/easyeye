@@ -100,6 +100,7 @@ return [
     'section_agenda'    => 'Agenda de hoje',
     'section_patients'  => 'Pacientes recentes',
     'section_stock'     => 'Alertas de estoque',
+    'section_surgery'   => 'Cirurgias',
 
     // Atalhos favoritos
     'shortcuts'       => 'Atalhos',

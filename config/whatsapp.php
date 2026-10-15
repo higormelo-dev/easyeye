@@ -130,6 +130,17 @@ return [
                 ['type' => 'quick_reply', 'action' => 'score', 'score' => 1],
             ],
         ],
+        // Cirurgia (Fase 4 / M3a): aviso NEUTRO de que a operadora respondeu o
+        // pedido de autorização. Nunca cita procedimento, olho, motivo nem
+        // resultado — o paciente é convidado a falar com a clínica.
+        'surgery_authorization_notice' => [
+            'name'     => 'easyeye_cirurgia_aviso',
+            'category' => 'UTILITY',
+            // Rodapé "responda SAIR" (opt-out) cadastrado no template.
+            'footer'  => true,
+            'body'    => ['first_name', 'clinic'],
+            'buttons' => [],
+        ],
         'verification_code' => [
             'name'     => 'easyeye_codigo_verificacao',
             'category' => 'AUTHENTICATION',

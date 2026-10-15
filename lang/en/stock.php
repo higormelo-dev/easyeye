@@ -18,6 +18,8 @@ return [
     'movement_registered'      => 'Stock movement registered.',
     'insufficient_balance'     => 'Insufficient balance for :product: requested :requested, available :available.',
     'insufficient_lot_balance' => 'Insufficient balance for :product (lot :lot): requested :requested, available :available.',
+    'lot_expired'              => 'Lot :lot of :product expired on :date and cannot be used.',
+    'reversal_refused'         => 'Only a consumption recorded in this clinic can be reversed.',
     'lot_required'             => 'Product :product requires a lot — select an existing lot or enter a new one.',
     'lot_pick_one'             => 'Choose an existing lot OR enter a new one, not both.',
     'new_lot_only_on_inbound'  => 'A new lot can only be created on an inbound movement.',

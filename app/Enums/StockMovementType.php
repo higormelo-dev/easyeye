@@ -12,14 +12,15 @@ namespace App\Enums;
  */
 enum StockMovementType: string
 {
-    case PurchaseIn     = 'purchase_in';    // entrada por compra/recebimento de fornecedor
-    case ManualIn       = 'manual_in';      // entrada manual (doação, transferência recebida, correção)
-    case ConsumptionOut = 'consumption_out'; // saída por consumo em procedimento/cirurgia
-    case ManualOut      = 'manual_out';     // saída manual (uso avulso não ligado a procedimento)
-    case AdjustmentIn   = 'adjustment_in';   // ajuste de balanço (contagem física > saldo sistema)
-    case AdjustmentOut  = 'adjustment_out';  // ajuste de balanço (contagem física < saldo sistema)
-    case Loss           = 'loss';           // perda/quebra/vencimento
-    case ReturnOut      = 'return_out';     // devolução ao fornecedor
+    case PurchaseIn          = 'purchase_in';    // entrada por compra/recebimento de fornecedor
+    case ManualIn            = 'manual_in';      // entrada manual (doação, transferência recebida, correção)
+    case ConsumptionOut      = 'consumption_out'; // saída por consumo em procedimento/cirurgia
+    case ManualOut           = 'manual_out';     // saída manual (uso avulso não ligado a procedimento)
+    case AdjustmentIn        = 'adjustment_in';   // ajuste de balanço (contagem física > saldo sistema)
+    case AdjustmentOut       = 'adjustment_out';  // ajuste de balanço (contagem física < saldo sistema)
+    case Loss                = 'loss';           // perda/quebra/vencimento
+    case ReturnOut           = 'return_out';     // devolução ao fornecedor
+    case ConsumptionReversal = 'consumption_reversal'; // estorno de um consumo (implante não usado, lançamento errado)
 
     public function label(): string
     {
@@ -31,7 +32,7 @@ enum StockMovementType: string
     public function direction(): int
     {
         return match ($this) {
-            self::PurchaseIn, self::ManualIn, self::AdjustmentIn => 1,
+            self::PurchaseIn, self::ManualIn, self::AdjustmentIn, self::ConsumptionReversal => 1,
             self::ConsumptionOut, self::ManualOut, self::AdjustmentOut, self::Loss, self::ReturnOut => -1,
         };
     }
@@ -47,7 +48,8 @@ enum StockMovementType: string
      * (Panel/Stock/Movements). `purchase_in` fica de fora aqui — na Fase 4
      * (compras) ele nasce do recebimento de um pedido de compra, não de
      * lançamento livre; `consumption_out` fica de fora porque nasce da baixa
-     * automática do prontuário (Fase 3), não de lançamento livre.
+     * automática do prontuário (Fase 3), não de lançamento livre; e
+     * `consumption_reversal` só nasce de StockService::reverseConsumption().
      *
      * @return list<self>
      */

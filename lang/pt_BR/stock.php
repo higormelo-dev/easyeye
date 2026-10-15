@@ -20,6 +20,8 @@ return [
     'movement_registered'      => 'Movimentação registrada.',
     'insufficient_balance'     => 'Saldo insuficiente para :product: solicitado :requested, disponível :available.',
     'insufficient_lot_balance' => 'Saldo insuficiente para :product (lote :lot): solicitado :requested, disponível :available.',
+    'lot_expired'              => 'O lote :lot de :product venceu em :date e não pode ser usado.',
+    'reversal_refused'         => 'Só é possível estornar um consumo registrado nesta clínica.',
     'lot_required'             => 'Produto :product exige lote — selecione um lote existente ou informe um novo.',
     'lot_pick_one'             => 'Escolha um lote existente OU informe um novo, não os dois.',
     'new_lot_only_on_inbound'  => 'Só é possível criar um lote novo numa entrada.',

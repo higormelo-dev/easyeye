@@ -238,6 +238,78 @@ function entityWithoutInventoryModule(): Entity
 }
 
 /**
+ * Mundo mínimo do módulo cirúrgico (Fase 4): clínica com assinatura ativa num
+ * plano que inclui `has_surgery`, um usuário de cada perfil (admin, médico com
+ * cadastro, secretária, financeiro), um paciente e uma segunda clínica
+ * (isolamento). `skipAutoTrial` evita a 2ª assinatura do EntityObserver, que
+ * deixaria o gate não-determinístico (ver entityWithoutInventoryModule).
+ *
+ * Uso: `$w = surgeryWorld(); surgeryAs($w, 'secretary')->post(...)`.
+ */
+function surgeryWorld(bool $withModule = true): object
+{
+    $entity                = Entity::factory()->make(['is_client' => true, 'active' => true]);
+    $entity->skipAutoTrial = true;
+    $entity->save();
+
+    $plan = Plan::factory()->create(['active' => true]);
+
+    if ($withModule) {
+        PlanFeature::factory()->enabled(FeatureKey::HasSurgery)->for($plan)->create();
+    }
+
+    Subscription::factory()->create([
+        'entity_id' => $entity->id, 'plan_id' => $plan->id, 'status' => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
+    ]);
+
+    $w         = new stdClass();
+    $w->entity = $entity;
+    $w->users  = [];
+    $w->eus    = [];
+
+    foreach (['admin' => ClientRule::Admin, 'secretary' => ClientRule::Secretary, 'financial' => ClientRule::Financial, 'doctor' => ClientRule::Doctor] as $key => $rule) {
+        $user = User::factory()->create(['name' => strtoupper($key) . ' ' . $key]);
+        $eu   = createEntityUser($entity, $user, $rule->value);
+
+        $w->users[$key] = $user;
+        $w->eus[$key]   = $eu;
+    }
+
+    $w->doctor = Doctor::create([
+        'entity_user_id' => $w->eus['doctor']->id,
+        'person_id'      => People::factory()->create(['full_name' => 'DR. CIRURGIAO'])->id,
+        'record'         => '12345',
+        'active'         => true,
+    ]);
+
+    // Paciente sempre tem convênio: o padrão é o PARTICULAR global (sem registro ANS).
+    $w->particular = Covenant::factory()->create(['entity_id' => null, 'name' => 'PARTICULAR', 'ans_registry' => null, 'active' => true]);
+    $w->insurer    = Covenant::factory()->create(['entity_id' => $entity->id, 'name' => 'UNIMED TESTE', 'ans_registry' => '326305', 'active' => true]);
+
+    $w->patient = Patient::factory()->create([
+        'entity_id'   => $entity->id,
+        'person_id'   => People::factory()->create(['full_name' => 'PACIENTE CIRURGICO', 'birth_date' => '1950-03-10'])->id,
+        'covenant_id' => $w->particular->id,
+        'card_number' => null,
+        'active'      => true,
+    ]);
+
+    $other                = Entity::factory()->make(['is_client' => true, 'active' => true]);
+    $other->skipAutoTrial = true;
+    $other->save();
+    $w->other = $other;
+
+    return $w;
+}
+
+/** Requisição autenticada como o perfil `$who` da clínica do mundo cirúrgico. */
+function surgeryAs(object $world, string $who): TestCase
+{
+    return test()->actingAs($world->users[$who])->withSession(panelSession($world->eus[$who]));
+}
+
+/**
  * Headers de uma request Inertia. Inclui X-Inertia-Version computado pelo middleware
  * para evitar 409 (version mismatch) em testes que disparam GET com X-Inertia.
  */

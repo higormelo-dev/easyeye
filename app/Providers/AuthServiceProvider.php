@@ -263,6 +263,60 @@ class AuthServiceProvider extends ServiceProvider
         });
 
         /**
+         * Operar o módulo cirúrgico: pedido, autorização, agenda cirúrgica,
+         * documentos e equipe (admin, doctor, secretary). Ato preparatório e
+         * administrativo — o ato médico fica em PerformSurgery.
+         */
+        Gate::define(EntityGate::ManageSurgery->value, function (User $user, Entity $entity): bool {
+            if (! $entity->isClient()) {
+                return false;
+            }
+
+            return $user->hasAnyRoleInEntity($entity, [
+                ClientRule::Admin,
+                ClientRule::Doctor,
+                ClientRule::Secretary,
+            ]);
+        });
+
+        /**
+         * Ato médico do módulo cirúrgico: plano de LIO, checklist, descrição,
+         * implante, avaliação pós-operatória e alta. Exclusivo de médico com
+         * cadastro ativo na clínica — o documento sai no nome dele, nunca no
+         * de um colega (mesma regra de IssueReport).
+         */
+        Gate::define(EntityGate::PerformSurgery->value, function (User $user, Entity $entity): bool|Response {
+            if (! $entity->isClient()) {
+                return false;
+            }
+
+            if (! $user->hasRoleInEntity($entity, ClientRule::Doctor)) {
+                return false;
+            }
+
+            return CurrentDoctor::activeFor($user, (string) $entity->id) !== null
+                ? Response::allow()
+                : Response::deny(CurrentDoctor::missingMessage());
+        });
+
+        /**
+         * Indicadores cirúrgicos (taxa de autorização, tempo até a cirurgia,
+         * erro refracional): admin, financeiro e médico. O recorte do médico
+         * (só os próprios números) é aplicado pelo SurgeryIndicatorsService.
+         */
+        Gate::define(EntityGate::ViewSurgeryIndicators->value, function (User $user, Entity $entity): bool {
+            if (! $entity->isClient()) {
+                return false;
+            }
+
+            return $user->hasAnyRoleInEntity($entity, [
+                ClientRule::Admin,
+                ClientRule::Financial,
+                ClientRule::Doctor,
+            ]);
+        });
+
+        /**
          * Gerenciar configurações da entity: dados cadastrais, convênios,
          * tipos de consulta, integrações.
          * Somente admin da entity cliente.

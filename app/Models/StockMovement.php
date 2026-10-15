@@ -30,6 +30,7 @@ class StockMovement extends Model
         'entity_id',
         'entity_product_id',
         'stock_lot_id',
+        'reversal_of_id',
         'type',
         'quantity',
         'unit_cost',

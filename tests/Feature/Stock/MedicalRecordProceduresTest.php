@@ -253,6 +253,38 @@ it('[GAP] bom() inclui lotes disponíveis pra item requires_lot=true — doctor 
         ->and($res->json('data.0.lots.0.lot_number'))->toBe('L1');
 });
 
+it('[M4] bom() não oferece lote vencido, e marcar executado com lote vencido é recusado (422) sem baixar nada', function () {
+    $lotProduct = EntityProduct::create([
+        'entity_id' => $this->entity->id, 'name' => 'OPM rastreável', 'unit' => 'un', 'active' => true, 'requires_lot' => true,
+    ]);
+    ProcedureProduct::create([
+        'entity_id' => $this->entity->id, 'procedure_id' => $this->catalogProcedure->id, 'entity_product_id' => $lotProduct->id, 'quantity' => 1,
+    ]);
+
+    $stock   = app(StockService::class);
+    $expired = $stock->findOrCreateLot($lotProduct, 'VENCIDO', now()->subDay());
+    $valid   = $stock->findOrCreateLot($lotProduct, 'VALIDO', now()->addMonth());
+    $stock->manualIn($lotProduct, 5, 100.00, lot: $expired);
+    $stock->manualIn($lotProduct, 5, 100.00, lot: $valid);
+
+    $res = actingAsDoctorAccount($this)->getJson(route('panel.procedures.bom', $this->catalogProcedure->id));
+    expect(collect($res->json('data.0.lots'))->pluck('lot_number')->all())->toBe(['VALIDO']);
+
+    $mrProcedure = MedicalRecordProcedure::create([
+        'entity_id'    => $this->entity->id, 'patient_id' => $this->patient->id, 'medical_record_id' => $this->record->id,
+        'procedure_id' => $this->catalogProcedure->id, 'doctor_id' => $this->doctor->id,
+    ]);
+
+    actingAsDoctorAccount($this)->postJson(
+        route('panel.patients.medicalrecord-procedures.mark-done', [$this->patient->id, $mrProcedure->id]),
+        ['items' => [['entity_product_id' => $lotProduct->id, 'quantity' => 1, 'stock_lot_id' => $expired->id]]],
+    )->assertStatus(422);
+
+    expect($mrProcedure->fresh()->status)->toBe(MedicalRecordProcedureStatus::Requested)
+        ->and((float) $expired->fresh()->qty_on_hand)->toBe(5.0)
+        ->and((float) $lotProduct->fresh()->qty_on_hand)->toBe(10.0);
+});
+
 it('médico solicita um procedimento GLOBAL (entity_id null — catálogo compartilhado)', function () {
     $globalProcedure = Procedure::query()->create(['entity_id' => null, 'code' => 'GLOBAL-1', 'name' => 'Consulta padrão', 'active' => true]);
 

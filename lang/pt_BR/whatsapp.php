@@ -307,6 +307,7 @@ return [
     'templates' => [
         'appointment_confirmation'             => "Olá, :first_name! Lembrete de :clinic: sua consulta está marcada para :when com :doctor. Podemos confirmar sua presença?\nPara não receber mais avisos, responda SAIR.\n[Confirmar] [Cancelar]",
         'satisfaction_survey'                  => "Olá, :first_name! Esperamos que seu atendimento em :clinic tenha sido bom. De 1 a 5, como você avalia a sua experiência?\nPara não receber mais avisos, responda SAIR.\n[5 - Excelente] [4 - Bom] [3 - Regular] [2 - Ruim] [1 - Péssimo]",
+        'surgery_authorization_notice'         => "Olá, :first_name! A :clinic tem uma informação para você. Por favor, entre em contato com a clínica quando puder.\nPara não receber mais avisos, responda SAIR.",
         'verification_code'                    => '*:code* é seu código de verificação. Para sua segurança, não o compartilhe. Este código expira em 10 minutos.',
         'connection_test'                      => 'Este é um teste de envio do :app. Se você recebeu, o WhatsApp está configurado corretamente.',
         'saas_dunning_reminder'                => 'EasyEye: a assinatura de :entity (:amount) vence em :date. Você pode pagar pelo painel, em Minha assinatura.',

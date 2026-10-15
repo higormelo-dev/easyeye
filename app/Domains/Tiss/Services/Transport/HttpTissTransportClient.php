@@ -8,7 +8,7 @@ use App\Domains\Tiss\Models\TissEntityOperatorCredential;
 use Illuminate\Support\Facades\{Crypt, Http};
 use Throwable;
 
-class HttpTissTransportClient implements TissTransportContract
+class HttpTissTransportClient implements TissMessageTransportContract, TissTransportContract
 {
     /**
      * @param array<string, mixed> $context
@@ -21,6 +21,39 @@ class HttpTissTransportClient implements TissTransportContract
         string $idempotencyKey,
         array $context = [],
     ): array {
+        return $this->post($credential, $xml, $idempotencyKey, [
+            'X-Batch-Number' => (string) ($context['batch_number'] ?? ''),
+        ]);
+    }
+
+    /**
+     * Mensagem avulsa (sem lote): mesmo endpoint, credenciais e política de erro do
+     * lote; o cabeçalho diz qual transação é e de qual guia.
+     *
+     * @param array<string, mixed> $context
+     *
+     * @return array<string, mixed>
+     */
+    public function sendMessage(
+        TissEntityOperatorCredential $credential,
+        string $xml,
+        string $idempotencyKey,
+        string $transactionType,
+        array $context = [],
+    ): array {
+        return $this->post($credential, $xml, $idempotencyKey, [
+            'X-Tiss-Transaction' => $transactionType,
+            'X-Guide-Number'     => (string) ($context['guide_number'] ?? ''),
+        ]);
+    }
+
+    /**
+     * @param array<string, string> $extraHeaders
+     *
+     * @return array<string, mixed>
+     */
+    private function post(TissEntityOperatorCredential $credential, string $xml, string $idempotencyKey, array $extraHeaders): array
+    {
         $endpoint = $credential->endpoint_submission
             ?: ($credential->operator?->webservice_base_url ? rtrim((string) $credential->operator->webservice_base_url, '/') . '/tiss' : null);
 
@@ -52,7 +85,7 @@ class HttpTissTransportClient implements TissTransportContract
                     'X-Idempotency-Key'  => $idempotencyKey,
                     'X-Entity-Id'        => (string) $credential->entity_id,
                     'X-Tiss-Environment' => (string) $credential->environment,
-                    'X-Batch-Number'     => (string) ($context['batch_number'] ?? ''),
+                    ...$extraHeaders,
                 ])
                 ->withOptions([
                     'verify' => $verifySsl,

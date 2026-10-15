@@ -100,6 +100,7 @@ return [
     'section_agenda'    => "Today's schedule",
     'section_patients'  => 'Recent patients',
     'section_stock'     => 'Stock alerts',
+    'section_surgery'   => 'Surgeries',
 
     // Favorite shortcuts
     'shortcuts'       => 'Shortcuts',

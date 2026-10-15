@@ -6,6 +6,7 @@ use App\Enums\{ClientRule, FeatureKey, Permission, SaasRule};
 use App\Models\Entity;
 use App\Services\Billing\SubscriptionNoticeService;
 use App\Services\FeatureGateService;
+use Illuminate\Support\Facades\Route;
 
 class PanelNavigation
 {
@@ -123,6 +124,40 @@ class PanelNavigation
             'label' => __('dashboard.module_eye_images'),
             'match' => ['panel.eye-images.*'],
         ];
+
+        // Cirurgias (Fase 4): pedido → autorização → agenda cirúrgica → cirurgia
+        // → pós-operatório. Espelha o middleware das rotas (entity.role:admin,
+        // doctor,secretary + feature:has_surgery): menu que levaria a 403 não aparece.
+        if ($canSeeSchedules && self::hasSurgeryFeature()) {
+            $surgeryChildren = [
+                ['route' => 'panel.surgery.index', 'icon' => 'ti ti-list-details', 'label' => __('actions.sidemenu.surgery_cases'), 'match' => ['panel.surgery.index', 'panel.surgery.show']],
+            ];
+
+            if (Route::has('panel.surgery.agenda')) {
+                $surgeryChildren[] = ['route' => 'panel.surgery.agenda', 'icon' => 'ti ti-calendar-event', 'label' => __('actions.sidemenu.surgery_agenda'), 'match' => ['panel.surgery.agenda*']];
+            }
+
+            if (Route::has('panel.surgery.indicators')) {
+                $surgeryChildren[] = ['route' => 'panel.surgery.indicators', 'icon' => 'ti ti-chart-bar', 'label' => __('actions.sidemenu.surgery_indicators'), 'match' => ['panel.surgery.indicators*']];
+            }
+
+            $nav[] = [
+                'key'      => 'surgery',
+                'icon'     => 'ti ti-heartbeat',
+                'label'    => __('actions.sidemenu.surgery'),
+                'match'    => ['panel.surgery.*'],
+                'children' => $surgeryChildren,
+            ];
+        } elseif (self::hasSurgeryFeature() && in_array($rule, [ClientRule::Financial->value], true) && Route::has('panel.surgery.indicators')) {
+            // Financeiro não opera cirurgias, mas vê os indicadores (ViewSurgeryIndicators).
+            $nav[] = [
+                'key'   => 'surgery-indicators',
+                'route' => 'panel.surgery.indicators',
+                'icon'  => 'ti ti-chart-bar',
+                'label' => __('actions.sidemenu.surgery_indicators'),
+                'match' => ['panel.surgery.indicators*'],
+            ];
+        }
 
         if ($canSeeAi) {
             $isDoctor = $rule === ClientRule::Doctor->value;
@@ -276,6 +311,11 @@ class PanelNavigation
                 ['route' => 'panel.setting.call-panel.index', 'label' => __('schedules.call_panel_title'), 'match' => ['panel.setting.call-panel.*']],
             ];
 
+            // Cirurgia (Fase 4): locais e salas cirúrgicas — só com o recurso do plano.
+            if (self::hasSurgeryFeature()) {
+                $clinicalChildren[] = ['route' => 'panel.setting.surgery-facilities.index', 'label' => __('actions.sidemenu.surgery_facilities'), 'match' => ['panel.setting.surgery-facilities.*']];
+            }
+
             // Atendimento: catálogos ligados ao fluxo de agendamento/atendimento.
             $attendanceChildren = [
                 // Agenda: limiar de "poucas vagas" do calendário lateral.
@@ -311,6 +351,11 @@ class PanelNavigation
                 // Kits de exames por convênio do pedido de exames (Fase 2 / B2).
                 ['route' => 'panel.setting.exam-kits.index', 'label' => __('clinical_documents.kits.menu'), 'match' => ['panel.setting.exam-kits.*']],
             ];
+
+            // Modelos de TCLE e orientações cirúrgicas (Fase 4) — rota registrada pelo módulo de documentos.
+            if (self::hasSurgeryFeature() && Route::has('panel.setting.surgery-templates.index')) {
+                $documentsChildren[] = ['route' => 'panel.setting.surgery-templates.index', 'label' => __('actions.sidemenu.surgery_templates'), 'match' => ['panel.setting.surgery-templates.*']];
+            }
 
             // Oftalmologia: os 9 sub-catálogos clínicos viram ABAS dentro de
             // uma única página ("Parâmetros oftalmológicos"), não itens soltos
@@ -464,6 +509,18 @@ class PanelNavigation
      * mesmo lugar sem aviso nenhum (ver comentário no bloco de montagem do
      * menu acima).
      */
+    /** Espelha `feature:has_surgery` das rotas do módulo cirúrgico. */
+    private static function hasSurgeryFeature(): bool
+    {
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        return app(FeatureGateService::class)->can((string) $entityId, FeatureKey::HasSurgery);
+    }
+
     private static function hasInventoryModuleFeature(): bool
     {
         $entityId = session('selected_entity_id');

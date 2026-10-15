@@ -83,6 +83,24 @@ enum EntityGate: string
     /** Enviar/reenviar laudo ao médico solicitante por e-mail (admin, doctor — Fase 5). */
     case SendReportToExternalDoctor = 'entity.send-report-to-external-doctor';
 
+    /**
+     * Operar o módulo cirúrgico (Fase 4): pedido, autorização, agenda
+     * cirúrgica, documentos e equipe (admin, doctor, secretary). Não é ato
+     * clínico — descrição cirúrgica, plano de LIO, implante e alta ficam em
+     * PerformSurgery.
+     */
+    case ManageSurgery = 'entity.manage-surgery';
+
+    /**
+     * Ato médico do módulo cirúrgico (Fase 4): plano cirúrgico, checklist,
+     * descrição, implante, avaliação pós-operatória e alta. Só perfil médico
+     * COM cadastro de médico ativo (mesma regra de IssueReport).
+     */
+    case PerformSurgery = 'entity.perform-surgery';
+
+    /** Indicadores cirúrgicos (admin, financial, doctor — o médico vê só os próprios números). */
+    case ViewSurgeryIndicators = 'entity.view-surgery-indicators';
+
     /** Gerenciar configurações da entity (admin). */
     case ManageSettings = 'entity.manage-settings';
 

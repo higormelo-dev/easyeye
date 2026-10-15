@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Domains\AI\Models\AiRun;
 use App\Enums\AI\AiRunStatus;
 use App\Enums\{ClientRule, EntityGate, FeatureKey, Permission, ScheduleSituation};
+use App\Enums\Surgery\SurgicalCaseStatus;
 use App\Models\{Doctor, Entity, EntityProduct, MedicalRecord, Patient, PatientExam, Schedule};
+use App\Models\Surgery\SurgicalCase;
 use App\Services\{ActivationService, FeatureGateService};
 use App\Services\Dashboard\{ClinicOperationsService, DashboardInsightsService};
+use App\Services\Surgery\SurgeryIndicatorsService;
 use App\Support\{BrazilianFormat, CurrentDoctor, PatientAccess, ScheduleShift};
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -100,7 +103,13 @@ class PanelDashboardController extends Controller
         // enviado — painel vazio com aviso.
         $doctor = $isDoctor ? CurrentDoctor::doctor() : null;
 
-        $sections      = $this->sectionsFor($profile);
+        $sections = $this->sectionsFor($profile);
+        $surgery  = $this->surgeryEnabledFor($profile, $entityId);
+
+        if ($surgery) {
+            $sections[] = 'surgery';
+        }
+
         $has           = fn (string $section): bool => in_array($section, $sections, true);
         $isClinicAdmin = $profile === ClientRule::Admin;
 
@@ -163,6 +172,8 @@ class PanelDashboardController extends Controller
             // E feature has_inventory_module) — se o menu Estoque não
             // aparece pro usuário, o card também não aparece.
             'stockAlerts' => fn () => $this->buildStockAlerts($entityId),
+            // Módulo cirúrgico (Fase 4): cartão resumido para admin e médico, só com o recurso do plano.
+            'surgeryCard' => fn () => $surgery ? $this->buildSurgeryCard($entityId, $doctor) : null,
             // Quais atalhos do Dashboard levam a telas que o usuário pode abrir
             // — mesmas regras do middleware das rotas; antes os botões
             // apareciam para todos e alguns perfis caíam num 403.
@@ -292,6 +303,43 @@ class PanelDashboardController extends Controller
                 default     => false,
             };
         })();
+    }
+
+    /** Admin e médico veem o cartão cirúrgico quando o plano tem `has_surgery` (e o médico tem cadastro). */
+    private function surgeryEnabledFor(ClientRule $profile, string $entityId): bool
+    {
+        return in_array($profile, [ClientRule::Admin, ClientRule::Doctor], true)
+            && app(FeatureGateService::class)->can($entityId, FeatureKey::HasSurgery);
+    }
+
+    /**
+     * Cartão cirúrgico: cirurgias dos últimos 90 dias, taxa de autorização e pedidos
+     * aguardando resposta. Só agregados; médico = os próprios casos (cache por escopo).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildSurgeryCard(string $entityId, ?Doctor $doctor): ?array
+    {
+        if (CurrentDoctor::isDoctorProfile() && $doctor === null) {
+            return null;
+        }
+
+        $doctorId = $doctor ? (string) $doctor->id : null;
+        $summary  = app(SurgeryIndicatorsService::class)->summary($entityId, now()->subDays(89), now(), $doctorId);
+
+        $awaiting = SurgicalCase::query()
+            ->where('entity_id', $entityId)
+            ->where('status', SurgicalCaseStatus::AwaitingAuthorization->value)
+            ->when($doctorId, fn ($q) => $q->where('surgeon_doctor_id', $doctorId))
+            ->count();
+
+        return [
+            'surgeries' => $summary['surgeries']['total'],
+            'rate'      => $summary['authorization']['rate'],
+            'awaiting'  => $awaiting,
+            'url'       => route('panel.surgery.indicators'),
+            'labels'    => (array) trans('surgery_indicators.card'),
+        ];
     }
 
     private function entity(string $entityId): ?Entity

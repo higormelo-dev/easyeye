@@ -95,12 +95,21 @@ class StockReportService
             ->groupBy('entity_product_id')
             ->pluck('qty_out', 'entity_product_id');
 
+        // Consumo estornado (implante não usado) não foi "uso": abate da saída.
+        $reversedByProduct = StockMovement::query()
+            ->where('entity_id', $entityId)
+            ->where('type', StockMovementType::ConsumptionReversal->value)
+            ->whereBetween('occurred_at', ["{$from} 00:00:00", "{$to} 23:59:59"])
+            ->selectRaw('entity_product_id, SUM(quantity) as qty_back')
+            ->groupBy('entity_product_id')
+            ->pluck('qty_back', 'entity_product_id');
+
         return EntityProduct::query()
             ->where('entity_id', $entityId)
             ->active()
             ->get(['id', 'name', 'code', 'qty_on_hand', 'cost_avg'])
-            ->map(function (EntityProduct $p) use ($consumedByProduct) {
-                $qtyOut       = (float) ($consumedByProduct[$p->id] ?? 0);
+            ->map(function (EntityProduct $p) use ($consumedByProduct, $reversedByProduct) {
+                $qtyOut       = max(0.0, (float) ($consumedByProduct[$p->id] ?? 0) - (float) ($reversedByProduct[$p->id] ?? 0));
                 $currentValue = (float) $p->qty_on_hand * (float) $p->cost_avg;
                 $outValue     = $qtyOut * (float) $p->cost_avg;
 

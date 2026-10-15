@@ -426,7 +426,7 @@ describe('retrato no prontuário (snapshot)', function () {
             ->and(collect($export['clinical_safety']['medications'])->pluck('name')->sort()->values()->all())->toBe(['Secotex', 'Suspensa'])
             ->and($export['medical_records'][0]['medications_snapshot'][0]['name'])->toBe('Secotex')
             ->and($export['medical_records'][0]['allergies_snapshot']['state'])->toBe('has')
-            ->and($export['format_version'])->toBe(4);
+            ->and($export['format_version'])->toBe(6);
     });
 
     it('PDF de prontuário anterior ao retrato mostra as alergias do cadastro atual, marcadas', function () {

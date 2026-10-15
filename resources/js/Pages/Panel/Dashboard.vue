@@ -9,6 +9,7 @@ import ScheduleToday from './Dashboard/ScheduleToday.vue';
 import DaySummary from './Dashboard/DaySummary.vue';
 import RecentPatients from './Dashboard/RecentPatients.vue';
 import StockAlerts from './Dashboard/StockAlerts.vue';
+import SurgeryCard from './Dashboard/SurgeryCard.vue';
 import NextPatient from './Dashboard/NextPatient.vue';
 import DoctorPending from './Dashboard/DoctorPending.vue';
 import WaitingRoom from './Dashboard/WaitingRoom.vue';
@@ -65,6 +66,8 @@ const props = defineProps({
     // null quando a clínica não usa o estoque OU não tem nada crítico agora
     // (PanelDashboardController::buildStockAlerts()).
     stockAlerts: { type: Object, default: null },
+    // null sem o recurso cirúrgico do plano (PanelDashboardController::buildSurgeryCard()).
+    surgeryCard: { type: Object, default: null },
     // Telas que o usuário pode abrir (mesmas regras das rotas —
     // PanelDashboardController::buildAccess()): sem a permissão, nada vira
     // link para um 403.
@@ -97,6 +100,7 @@ const { isRefreshing, isFullRefresh, lastUpdated, refresh } = useDashboardPollin
         'activation',
         'activationScore',
         'stockAlerts',
+        'surgeryCard',
         'reception',
         'waitlist',
         'birthdays',
@@ -124,6 +128,7 @@ const SECTION_DEFS = {
     birthdays: { label: 'section_birthdays', size: 'compact' },
     patients: { label: 'section_patients', size: 'compact' },
     stock: { label: 'section_stock', size: 'compact' },
+    surgery: { label: 'section_surgery', size: 'compact' },
     shortcuts: { label: 'section_shortcuts', size: 'full' },
 };
 
@@ -147,6 +152,7 @@ const availableSections = computed(() =>
     sectionOrder.value
         .filter((key) => profileKeys.value.includes(key))
         .filter((key) => key !== 'stock' || props.stockAlerts)
+        .filter((key) => key !== 'surgery' || props.surgeryCard)
         .map((key) => ({
             key,
             size: SECTION_DEFS[key].size,
@@ -383,6 +389,12 @@ function onRefresh() {
                             data-section="stock"
                             :alerts="stockAlerts"
                             :t="t"
+                        />
+
+                        <SurgeryCard
+                            v-else-if="section.key === 'surgery' && surgeryCard"
+                            data-section="surgery"
+                            :card="surgeryCard"
                         />
                     </template>
                 </div>

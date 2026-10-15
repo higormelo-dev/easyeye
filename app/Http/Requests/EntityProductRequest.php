@@ -58,15 +58,16 @@ class EntityProductRequest extends FormRequest
                     ->ignore($productId)
                     ->where(fn ($query) => $query->where('entity_id', $entityId)),
             ],
-            'name'         => ['required', 'string', 'max:255'],
-            'description'  => ['nullable', 'string', 'max:2000'],
-            'unit'         => ['required', Rule::enum(StockUnit::class)],
-            'is_opm'       => ['boolean'],
-            'requires_lot' => ['boolean'],
-            'sale_price'   => ['nullable', 'numeric', 'min:0'],
-            'min_qty'      => ['nullable', 'numeric', 'min:0'],
-            'max_qty'      => ['nullable', 'numeric', 'min:0', 'gte:min_qty'],
-            'active'       => ['boolean'],
+            'name'            => ['required', 'string', 'max:255'],
+            'description'     => ['nullable', 'string', 'max:2000'],
+            'unit'            => ['required', Rule::enum(StockUnit::class)],
+            'is_opm'          => ['boolean'],
+            'requires_lot'    => ['boolean'],
+            'requires_serial' => ['boolean'],
+            'sale_price'      => ['nullable', 'numeric', 'min:0'],
+            'min_qty'         => ['nullable', 'numeric', 'min:0'],
+            'max_qty'         => ['nullable', 'numeric', 'min:0', 'gte:min_qty'],
+            'active'          => ['boolean'],
         ];
     }
 
@@ -83,7 +84,7 @@ class EntityProductRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        foreach (['active', 'is_opm', 'requires_lot'] as $field) {
+        foreach (['active', 'is_opm', 'requires_lot', 'requires_serial'] as $field) {
             if ($this->has($field)) {
                 $this->merge([$field => $this->normalizeBoolean($this->input($field))]);
             }

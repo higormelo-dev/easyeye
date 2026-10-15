@@ -104,7 +104,8 @@ it('mantém o padrão (data desc), normaliza sort/direction inválidos e envia o
             ->has('t.col_product')
             ->has('t.columns_label')
             ->missing('t.type_purchase_in')
-            ->has('filterTypes', 8)
+            // 8 tipos de sempre + estorno de consumo (M4): o extrato filtra por ele, mas não é lançável à mão.
+            ->has('filterTypes', 9)
             ->has('movementTypes', 6));
 });
 

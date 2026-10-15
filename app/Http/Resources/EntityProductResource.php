@@ -27,6 +27,7 @@ class EntityProductResource extends JsonResource
             'category_name'       => $this->whenLoaded('category', fn () => $this->category?->name),
             'is_opm'              => (bool) $this->is_opm,
             'requires_lot'        => (bool) $this->requires_lot,
+            'requires_serial'     => (bool) $this->requires_serial,
             'cost_avg'            => (float) $this->cost_avg,
             'sale_price'          => $this->sale_price !== null ? (float) $this->sale_price : null,
             'min_qty'             => (float) $this->min_qty,

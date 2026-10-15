@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Stock;
 
 use App\Enums\StockMovementType;
-use App\Exceptions\{InsufficientStockException, LotRequiredException};
+use App\Exceptions\{ExpiredLotException, InsufficientStockException, LotRequiredException, StockReversalException};
 use App\Models\{EntityProduct, StockLot, StockMovement};
 use Carbon\CarbonInterface;
 use Illuminate\Database\QueryException;
@@ -85,6 +85,79 @@ class StockService
         ?StockLot $lot = null,
     ): StockMovement {
         return $this->registerMovement($product, StockMovementType::ConsumptionOut, $quantity, null, $note, $occurredAt, $referenceType, $referenceId, $lot);
+    }
+
+    /**
+     * Estorna um CONSUMO (implante não usado, lançamento errado): nova linha de
+     * sentido oposto no ledger (`consumption_reversal`), no MESMO produto e
+     * lote, sob a trava produto → lote. O consumo original nunca é editado.
+     *
+     * Idempotente: um consumo só é estornado uma vez (índice único em
+     * `reversal_of_id`); chamar de novo devolve o estorno que já existe, sem
+     * mexer no saldo. Recusa (StockReversalException) o que não é consumo.
+     *
+     * Custo: o produto volta pelo custo médio que o consumo registrou; o lote
+     * mantém o PRÓPRIO custo médio, intocado (o consumo não grava o custo do lote
+     * e o do produto é outra média — ver registerMovement()).
+     *
+     * Tenant-agnóstico como o resto do service: quem chama já resolveu o
+     * movimento. `$entityId` (opcional) é a clínica de quem pede: se o
+     * movimento for de outra, a operação é recusada.
+     */
+    public function reverseConsumption(
+        StockMovement $consumption,
+        ?string $note = null,
+        ?CarbonInterface $occurredAt = null,
+        ?string $referenceType = null,
+        ?string $referenceId = null,
+        ?string $entityId = null,
+    ): StockMovement {
+        return DB::transaction(function () use ($consumption, $note, $occurredAt, $referenceType, $referenceId, $entityId) {
+            // Mesma ordem de registerMovement(): produto primeiro, depois o lote.
+            $product = EntityProduct::query()->whereKey($consumption->entity_product_id)->lockForUpdate()->first();
+
+            if ($product === null) {
+                throw new StockReversalException('Produto do consumo não encontrado.');
+            }
+
+            if ($consumption->stock_lot_id !== null) {
+                StockLot::query()->whereKey($consumption->stock_lot_id)->lockForUpdate()->first();
+            }
+
+            // Relido sob a trava do produto: dois estornos simultâneos se serializam aqui.
+            $current = StockMovement::query()
+                ->withoutGlobalScopes()
+                ->whereKey($consumption->getKey())
+                ->first();
+
+            if ($current === null
+                || $current->type !== StockMovementType::ConsumptionOut
+                || (string) $current->entity_id !== (string) $product->entity_id
+                || ($entityId !== null && (string) $current->entity_id !== $entityId)) {
+                throw new StockReversalException('Movimento não é um consumo desta clínica.');
+            }
+
+            $existing = StockMovement::query()->withoutGlobalScopes()->where('reversal_of_id', $current->getKey())->first();
+
+            if ($existing !== null) {
+                return $existing;
+            }
+
+            $lot = $current->stock_lot_id !== null ? StockLot::query()->withoutGlobalScopes()->find($current->stock_lot_id) : null;
+
+            return $this->registerMovement(
+                $product,
+                StockMovementType::ConsumptionReversal,
+                (float) $current->quantity,
+                $current->unit_cost !== null ? (float) $current->unit_cost : null,
+                $note,
+                $occurredAt,
+                $referenceType,
+                $referenceId,
+                $lot,
+                reversalOfId: (string) $current->getKey(),
+            );
+        });
     }
 
     /** Saída manual avulsa (uso não ligado a um procedimento específico). */
@@ -231,12 +304,13 @@ class StockService
         ?string $referenceType,
         ?string $referenceId,
         ?StockLot $lot = null,
+        ?string $reversalOfId = null,
     ): StockMovement {
         if ($quantity <= 0) {
             throw new InvalidArgumentException('quantity deve ser maior que zero.');
         }
 
-        return DB::transaction(function () use ($product, $type, $quantity, $unitCost, $note, $occurredAt, $referenceType, $referenceId, $lot) {
+        return DB::transaction(function () use ($product, $type, $quantity, $unitCost, $note, $occurredAt, $referenceType, $referenceId, $lot, $reversalOfId) {
             /** @var EntityProduct $lockedProduct */
             $lockedProduct = EntityProduct::query()->whereKey($product->id)->lockForUpdate()->firstOrFail();
 
@@ -252,6 +326,16 @@ class StockService
 
                 if ((string) $lockedLot->entity_product_id !== (string) $lockedProduct->id) {
                     throw new InvalidArgumentException('Lote informado não pertence a este produto.');
+                }
+
+                // Material vencido nunca é usado em paciente: o consumo recusa o lote
+                // vencido NA DATA DO USO (`occurredAt`; o registro tardio da cirurgia de ontem vale
+                // contra ontem), lido sob a trava — a edição retroativa da validade vale.
+                // Perda, ajuste, devolução e o estorno não passam por aqui.
+                if ($type === StockMovementType::ConsumptionOut
+                    && $lockedLot->expiry_date !== null
+                    && $lockedLot->expiry_date->toDateString() < ($occurredAt ?? now())->format('Y-m-d')) {
+                    throw new ExpiredLotException($lockedProduct, $lockedLot);
                 }
             }
 
@@ -274,7 +358,14 @@ class StockService
 
                 $newLotCost = $oldLotCost;
 
-                if ($type->isInbound() && $unitCost !== null) {
+                // O estorno de consumo devolve a unidade pelo custo do PRÓPRIO lote,
+                // ou seja, não mexe nele. O `unit_cost` do consumo é o custo médio do
+                // PRODUTO (a saída nunca grava o custo do lote): entrar com ele na
+                // média do lote distorce — 9 un. a 100 + 1 estornada a 150 = 105 num
+                // lote que sempre custou 100 (e, com o lote zerado, o lote passava a
+                // valer o custo do produto). Só entrada que traz custo de aquisição
+                // (compra, entrada manual) pondera.
+                if ($type->isInbound() && $unitCost !== null && $type !== StockMovementType::ConsumptionReversal) {
                     $totalLotQty = $oldLotQty + $quantity;
                     $newLotCost  = $totalLotQty > 0
                         ? round((($oldLotQty * $oldLotCost) + ($quantity * $unitCost)) / $totalLotQty, 4)
@@ -322,12 +413,14 @@ class StockService
                 'entity_id'         => $lockedProduct->entity_id,
                 'entity_product_id' => $lockedProduct->id,
                 'stock_lot_id'      => $lockedLot?->id,
+                'reversal_of_id'    => $reversalOfId,
                 'type'              => $type,
                 'quantity'          => $quantity,
                 // Custo do PRODUTO fica no campo principal (mantém contrato da
-                // Fase 1); o custo específico do lote (`$lotUnitCost`), quando
-                // divergente, não tem coluna própria no movimento — o extrato
-                // por lote consulta stock_lots.cost_avg diretamente.
+                // Fase 1); o custo específico do lote, quando divergente, não
+                // tem coluna própria no movimento — o extrato por lote consulta
+                // stock_lots.cost_avg diretamente. Por isso o estorno não usa
+                // este valor para o lote (ver acima).
                 'unit_cost'      => $movementUnitCost,
                 'balance_after'  => $newQty,
                 'reference_type' => $referenceType,

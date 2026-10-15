@@ -33,6 +33,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::AiMonthlyCredits->value      => '0',
                     FeatureKey::ApiMonthlyExamSends->value   => '0',
                     FeatureKey::HasInventoryModule->value    => '0',
+                    FeatureKey::HasSurgery->value            => '0',
                 ],
             ],
             [
@@ -65,6 +66,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::AiMonthlyCredits->value      => '30',  // degustação — excedente R$ 2,50/crédito
                     FeatureKey::ApiMonthlyExamSends->value   => '0',
                     FeatureKey::HasInventoryModule->value    => '1',
+                    FeatureKey::HasSurgery->value            => '0',
                 ],
             ],
             [
@@ -89,6 +91,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::AiMonthlyCredits->value      => '80',  // franquia — excedente R$ 2,00/crédito
                     FeatureKey::ApiMonthlyExamSends->value   => '0',   // ilimitado → cap interno 1000
                     FeatureKey::HasInventoryModule->value    => '1',
+                    FeatureKey::HasSurgery->value            => '1',   // módulo cirúrgico (Fase 4)
                 ],
             ],
         ];

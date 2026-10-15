@@ -206,6 +206,9 @@ Route::group(
         // ver PreferencesController.
         Route::patch('/preferences', [PreferencesController::class, 'update'])->name('preferences.update');
 
+        // Módulo cirúrgico (Fase 4) — ver routes/surgery.php.
+        require __DIR__ . '/surgery.php';
+
         // Minha assinatura — checkout transparente (Pix, boleto e cartão
         // tokenizado no navegador). Só admin, financeiro e dono
         // (billing.contact); liberado mesmo com o acesso bloqueado ou limitado

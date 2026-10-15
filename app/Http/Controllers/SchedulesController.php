@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\{CashEntryReferenceType, ClientRule, DataAccessPurpose, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleSituation};
+use App\Enums\{FeatureKey, ScheduleAttendanceType};
 use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleSlotUnavailableException};
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
@@ -14,8 +15,11 @@ use App\Notifications\ScheduleNotification;
 use App\Rules\ActiveCovenant;
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Services\{DataAccessLogService, ScheduleSeriesService, ScheduleService};
+use App\Services\FeatureGateService;
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
 use App\Services\Schedules\{AgendaFilters, AgendaQueryService, ScheduleAvailabilityService};
+use App\Services\Surgery\PostOp\PostOpReturnService;
+use App\Services\Surgery\Sections\PostOpSection;
 use App\Services\WhatsApp\WhatsAppService;
 use App\Support\{BrazilianFormat, CurrentDoctor, PatientAccess};
 use Carbon\Carbon;
@@ -275,6 +279,9 @@ class SchedulesController extends Controller
             'series'             => $this->seriesRows($schedule),
             'series_cancellable' => $this->seriesCancellableCount($schedule),
             'cancel_series_url'  => $schedule->series_id ? route('panel.schedules.series.cancel-future', $schedule->id) : null,
+            // Retorno do pós-operatório de uma cirurgia (Fase 4): atalho para a avaliação
+            // pós-op do caso. Só o médico, com o recurso do plano.
+            'postop_case_url' => $this->postOpCaseUrl($schedule),
             // Ficha impressa = cadastro do paciente: mesma regra de Pacientes.
             'patient_sheet_url' => $schedule->patient_id && app(PatientAccess::class)->current()
                 ? route('panel.schedules.patient-sheet', $schedule->id)
@@ -394,6 +401,9 @@ class SchedulesController extends Controller
         // da série. Encaixe confere o teto do turno sob lock antes de gravar.
         try {
             $schedule = DB::transaction(function () use ($baseData, $request, $doctorId, $dateTime, $isFitIn, $resourceIds, $extraDates, $series): Schedule {
+                // Médico em cirurgia não atende: reconferido sob a trava das janelas cirúrgicas.
+                $this->service->assertDoctorFreeOfSurgery($doctorId, $dateTime);
+
                 if ($isFitIn) {
                     $this->service->assertFitInCapacity($doctorId, $dateTime);
                 }
@@ -461,6 +471,12 @@ class SchedulesController extends Controller
         try {
             DB::transaction(function () use ($request, $schedule, &$unlinkedExams): void {
                 $attributes = $request->scheduleAttributes();
+
+                // Mudou médico ou horário: reconfere a cirurgia agendada do médico sob trava.
+                if ((string) $attributes['doctor_id'] !== (string) $schedule->doctor_id
+                    || ! Carbon::parse($attributes['date_time'])->equalTo($schedule->date_time)) {
+                    $this->service->assertDoctorFreeOfSurgery((string) $attributes['doctor_id'], Carbon::parse($attributes['date_time']));
+                }
 
                 // ORDEM ÚNICA DE LOCKS (a mesma de store()): cota do encaixe →
                 // lock paciente/dia → linha do agendamento. Invertida (paciente/
@@ -552,6 +568,10 @@ class SchedulesController extends Controller
             $this->service->changeSituation($schedule, $situation, session('selected_entity_user_id'), $notes);
         } catch (AttendanceRequiresCashEntryException) {
             return $this->cashEntryRequiredResponse();
+        } catch (ScheduleSlotUnavailableException $e) {
+            // Reativar (Cancelado/Faltou/Atendido → ativa) no horário em que uma
+            // cirurgia do médico passou a estar agendada: nada foi gravado.
+            return $this->slotUnavailableResponse($e);
         }
 
         // ── Notificações por situação ─────────────────────────────────────────
@@ -663,6 +683,8 @@ class SchedulesController extends Controller
         // série continua na série ("3/10"); encaixe confere o teto sob lock.
         try {
             $newSchedule = DB::transaction(function () use ($schedule, $entityId, $doctorId, $dateTime, $isFitIn, $resourceIds): Schedule {
+                $this->service->assertDoctorFreeOfSurgery($doctorId, $dateTime);
+
                 if ($isFitIn) {
                     $this->service->assertFitInCapacity($doctorId, $dateTime, (string) $schedule->id);
                 }
@@ -686,11 +708,19 @@ class SchedulesController extends Controller
                     'series_id'          => $schedule->series_id,
                     'session_number'     => $schedule->session_number,
                     'session_total'      => $schedule->session_total,
-                    'active'             => true,
+                    // Retorno de uma cirurgia continua sendo dela: o agendamento novo herda o caso.
+                    'surgical_case_id' => $schedule->surgical_case_id,
+                    'active'           => true,
                 ]);
 
                 if ($resourceIds !== []) {
                     $newSchedule->resources()->sync($resourceIds);
+                }
+
+                // O retorno pós-operatório que apontava para o agendamento antigo passa a apontar para o novo,
+                // na MESMA transação (senão a aba do caso mostra o cancelado e a alta não cancela o novo).
+                if ($schedule->surgical_case_id !== null) {
+                    app(PostOpReturnService::class)->followReschedule($schedule, $newSchedule);
                 }
 
                 $cancelNote    = __('schedules.reschedule_note', ['code' => $newSchedule->code]);
@@ -796,11 +826,14 @@ class SchedulesController extends Controller
             $this->doctorScopeForBulk(),
         );
 
-        // Contrato de bulk = sucesso parcial (200): linha barrada pela trava
-        // "Atendido exige caixa" é ignorada como as demais (entra em `skipped`)
-        // e sai também em `blocked`, com o motivo traduzido por linha.
+        // Contrato de bulk = sucesso parcial (200): linha barrada por regra — a
+        // trava "Atendido exige caixa" ou a reativação num horário de cirurgia
+        // do médico — é ignorada como as demais (entra em `skipped`) e sai também
+        // em `blocked`, com o motivo traduzido por linha.
         $blocked      = $result['blocked'];
         $otherSkipped = $result['skipped'] - count($blocked);
+        $cashBlocked  = collect($blocked)->where('reason', 'cash_entry')->count();
+        $slotBlocked  = collect($blocked)->where('reason', 'slot_unavailable');
 
         $message = __('schedules.bulk_updated', ['updated' => $result['updated']]);
 
@@ -808,8 +841,13 @@ class SchedulesController extends Controller
             $message .= ' ' . __('schedules.bulk_skipped_trans', ['skipped' => $otherSkipped]);
         }
 
-        if ($blocked !== []) {
-            $message .= ' ' . __('schedules.bulk_skipped_cash', ['blocked' => count($blocked)]);
+        if ($cashBlocked > 0) {
+            $message .= ' ' . __('schedules.bulk_skipped_cash', ['blocked' => $cashBlocked]);
+        }
+
+        // As 3 primeiras na mensagem (a mesma conta do reagendamento em lote), todas em `blocked`.
+        if ($slotBlocked->isNotEmpty()) {
+            $message .= ' ' . $slotBlocked->take(3)->pluck('message')->implode(' · ');
         }
 
         // ── Notifica cada paciente afetado pela mudança de situação ───────────
@@ -936,6 +974,20 @@ class SchedulesController extends Controller
         return response()->json($availability->month($entityId, Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth(), $doctorId));
     }
 
+    /** Link da aba Pós-operatório do caso quando o agendamento é um retorno cirúrgico e quem vê é médico (e o plano tem cirurgia). */
+    private function postOpCaseUrl(Schedule $schedule): ?string
+    {
+        if (! $schedule->surgical_case_id
+            || $schedule->attendance_type !== ScheduleAttendanceType::PostOpEvaluation
+            || ! CurrentDoctor::isDoctorProfile()
+            || ! app(FeatureGateService::class)->can((string) $schedule->entity_id, FeatureKey::HasSurgery)) {
+            return null;
+        }
+
+        // A tela do caso escolhe a aba pelo FRAGMENTO (`#tab=<chave>`), não por query string.
+        return route('panel.surgery.show', $schedule->surgical_case_id) . '#tab=' . PostOpSection::KEY;
+    }
+
     /**
      * Prévia da série de sessões: as datas geradas (semanal, mensal ou dias
      * da semana; N sessões ou até a data) e o conflito de cada uma — antes de
@@ -954,11 +1006,15 @@ class SchedulesController extends Controller
                     $fail(__('validation.custom.schedule.doctor_not_found'));
                 }
             }],
-            'date_time'      => ['required', 'date'],
-            'frequency'      => ['required', Rule::in(ScheduleSeriesService::FREQUENCIES)],
-            'weekdays'       => ['nullable', 'array', 'required_if:frequency,weekdays'],
-            'weekdays.*'     => ['integer', 'between:0,6'],
-            'end'            => ['required', Rule::in(['count', 'until'])],
+            'date_time'  => ['required', 'date'],
+            'frequency'  => ['required', Rule::in([...ScheduleSeriesService::FREQUENCIES, ScheduleSeriesService::FREQUENCY_OFFSETS])],
+            'weekdays'   => ['nullable', 'array', 'required_if:frequency,weekdays'],
+            'weekdays.*' => ['integer', 'between:0,6'],
+            // Frequência por deslocamentos (dias a partir da data): a série são as
+            // datas âncora + N dias; "end" não se aplica.
+            'offsets'        => ['nullable', 'array', 'required_if:frequency,offsets', 'max:' . (ScheduleSeriesService::MAX_SESSIONS - 1)],
+            'offsets.*'      => ['integer', 'between:1,730'],
+            'end'            => ['required_unless:frequency,offsets', 'nullable', Rule::in(['count', 'until'])],
             'count'          => ['nullable', 'required_if:end,count', 'integer', 'min:2', 'max:' . ScheduleSeriesService::MAX_SESSIONS],
             'until'          => ['nullable', 'required_if:end,until', 'date', 'after_or_equal:' . Carbon::parse((string) $request->input('date_time', 'now'))->toDateString()],
             'is_fit_in'      => ['nullable', 'boolean'],
@@ -969,13 +1025,16 @@ class SchedulesController extends Controller
             ],
         ]);
 
-        $dates = $series->generate(
-            Carbon::parse($validated['date_time']),
-            $validated['frequency'],
-            array_map('intval', (array) ($validated['weekdays'] ?? [])),
-            $validated['end'] === 'count' ? (int) $validated['count'] : null,
-            $validated['end'] === 'until' ? Carbon::parse($validated['until']) : null,
-        );
+        $dates = $validated['frequency'] === ScheduleSeriesService::FREQUENCY_OFFSETS
+            // A 1ª data é a sessão 1; as demais são âncora + cada deslocamento.
+            ? [Carbon::parse($validated['date_time']), ...$series->datesFromOffsets(Carbon::parse($validated['date_time']), (array) ($validated['offsets'] ?? []))]
+            : $series->generate(
+                Carbon::parse($validated['date_time']),
+                $validated['frequency'],
+                array_map('intval', (array) ($validated['weekdays'] ?? [])),
+                $validated['end'] === 'count' ? (int) $validated['count'] : null,
+                $validated['end'] === 'until' ? Carbon::parse($validated['until']) : null,
+            );
 
         $truncated = count($dates) > ScheduleSeriesService::MAX_SESSIONS;
         $dates     = array_slice($dates, 0, ScheduleSeriesService::MAX_SESSIONS);
