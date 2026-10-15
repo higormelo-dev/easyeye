@@ -8,14 +8,17 @@ declare(strict_types=1);
  *
  * O teto de tempo do passo do Pest vem do seletor (`timeout_minutes`), que sabe quanto vai rodar. Antes ele vinha do
  * evento (pull_request = 15 min), e todo PR de efeito amplo (migrations, config, rotas, providers — a maioria dos PRs
- * de feature) roda a suíte inteira, uns 45 min: estourava sempre. Aqui ficam fixados o teto de cada cenário, o limite
- * da seleção grande e a ligação (id do passo e nome da saída) entre o script e o workflow. As fatias da matriz (jobs de
- * Pest com banco próprio) e o resto do workflow têm os contratos em CiShardMatrixTest e CiWorkflowTest.
+ * de feature) roda a suíte inteira (40m37s na rodada 38775084843, num job só): estourava sempre. Aqui ficam fixados o
+ * teto de cada cenário, o limite da seleção grande e a ligação (id do passo e nome da saída) entre o script e o
+ * workflow, além de quais mudanças escolhem quais testes (workflow/scripts → contratos de CI; caminho final seguro).
+ * As fatias da matriz (jobs de Pest com banco próprio) e o resto do workflow têm os contratos em CiShardMatrixTest e
+ * CiWorkflowTest.
  */
 
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
+use Tests\Unit\Ci\Support\CiHarness;
 
 function cisRoot(): string
 {
@@ -162,7 +165,7 @@ it('PR sem base conhecida roda a suíte inteira com o teto longo', function () {
         ->and($out['timeout_minutes'])->toBe((string) cisPolicy()['long']);
 });
 
-it('PR de efeito amplo roda a suíte inteira COM o teto longo (o bug: 15 min para ~45 min de testes)', function () {
+it('PR de efeito amplo roda a suíte inteira COM o teto longo (o bug: 15 min para a suíte inteira, 40m37s na rodada 38775084843)', function () {
     // Diff contra a árvore vazia do git = todos os arquivos do repositório, entre eles composer.json, config/ e routes/.
     $out = cisRun('pull_request', '4b825dc642cb6eb9a060e54bf8d69288fbee4904');
 
@@ -236,5 +239,86 @@ it('o passo do Pest lê o teto da saída do seletor, não do evento', function (
 
     foreach ($jobs['select']['outputs'] as $name => $expression) {
         expect($expression)->toBe('${{ steps.select.outputs.' . $name . ' }}');
+    }
+});
+
+/** Os contratos de CI que existem no disco (o que o seletor deve escolher quando o workflow ou os scripts mudam), com o dono das fixtures. */
+function cisCiContractTests(): array
+{
+    $tests = array_map(
+        fn (string $path) => 'tests/Unit/Ci/' . basename($path),
+        glob(CiHarness::root() . '/tests/Unit/Ci/*Test.php') ?: [],
+    );
+    $tests[] = CiHarness::FIXTURES_OWNER;
+    sort($tests, SORT_STRING);
+
+    return $tests;
+}
+
+it('mudar só o workflow ou só os scripts seleciona os contratos de CI (tests/Unit/Ci) além do P2ContractsTest', function (array $changed) {
+    $out      = CiHarness::selectWithChanged($changed);
+    $expected = cisCiContractTests();
+
+    // O teste só vale se há contratos de CI de verdade no disco (3 arquivos hoje + o dono das fixtures).
+    expect(count($expected))->toBeGreaterThan(2)
+        ->and($out['mode'])->toBe('selected')
+        ->and(explode(' ', $out['pest_args']))->toBe($expected)
+        ->and($out['timeout_minutes'])->toBe('15')
+        ->and($out['matrix']['include'])->toHaveCount(1);
+})->with([
+    'só o workflow'            => [['.github/workflows/integrator-contracts.yml']],
+    'só o seletor'             => [['scripts/ci-select-tests.py']],
+    'outro script'             => [['scripts/check-integrator-style.py']],
+    'workflow e script juntos' => [['.github/workflows/integrator-contracts.yml', 'scripts/ci-select-tests.py']],
+]);
+
+it('a regra dos contratos de CI não vaza: docs, front e e2e seguem sem nenhum teste PHP além do P2ContractsTest', function (string $changed) {
+    $out = CiHarness::selectWithChanged([$changed]);
+
+    expect($out['mode'])->toBe('selected')
+        ->and($out['pest_args'])->toBe(CiHarness::FIXTURES_OWNER);
+})->with([
+    'docs'                    => ['docs/internal/runbooks/algo.md'],
+    'front'                   => ['resources/js/Pages/Panel/Algo.vue'],
+    'e2e'                     => ['e2e/cypress/e2e/profiles/algo.cy.js'],
+    'outro arquivo do GitHub' => ['.github/CODEOWNERS'],
+]);
+
+it('um caminho de teste fora do padrão que vem da DESCOBERTA (não do diff) manda para a suíte inteira, nunca para o PEST_ARGS', function (string $odd) {
+    // O nome entra no conjunto selecionado pelo `rglob` do disco (um teste que cita o auxiliar alterado), não pela lista
+    // de arquivos alterados — essa já passa pelo SAFE. O workflow expande PEST_ARGS com `args=($PEST_ARGS)` (split + glob).
+    $setup = str_replace('__ODD__', json_encode($odd, JSON_UNESCAPED_SLASHES), <<<'PY'
+import pathlib
+odd = pathlib.Path(__ODD__)
+real_rglob, real_read = pathlib.Path.rglob, pathlib.Path.read_text
+def rglob(self, pattern):
+    yield from real_rglob(self, pattern)
+    if str(self) == 'tests/Unit':
+        yield odd
+def read_text(self, *args, **kwargs):
+    return 'CiHarness' if self == odd else real_read(self, *args, **kwargs)
+pathlib.Path.rglob = rglob
+pathlib.Path.read_text = read_text
+PY);
+
+    $out = CiHarness::selectWithChanged(['tests/Unit/Ci/Support/CiHarness.php'], $setup);
+
+    expect($out['mode'])->toBe('full')
+        ->and($out['pest_args'])->toBe('tests/Feature tests/Unit tests/Integration')
+        ->and(str_contains(json_encode($out, JSON_UNESCAPED_SLASHES), $odd))->toBeFalse()
+        ->and($out['timeout_minutes'])->toBe('60')
+        ->and($out['matrix']['include'])->toHaveCount(6);
+})->with([
+    'metacaracteres de shell (falha o SAFE)'                => ['tests/Unit/Odd $(touch pwned)Test.php'],
+    'casa o SAFE mas não é caminho sob tests/ (vira opção)' => ['--help/OddTest.php'],
+]);
+
+it('o conjunto final selecionado só tem caminhos seguros sob tests/ (o que sai no PEST_ARGS)', function () {
+    foreach ([CiHarness::testFiles(3), CiHarness::testFiles(120)] as $changed) {
+        $out = CiHarness::selectWithChanged($changed);
+
+        foreach (explode(' ', $out['pest_args']) as $path) {
+            expect($path)->toMatch('/^tests\/[A-Za-z0-9_.\/-]+$/');
+        }
     }
 });

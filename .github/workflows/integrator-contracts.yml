@@ -2,14 +2,16 @@ name: Integrator contracts
 # PR: roda só o que a mudança alcança (scripts/ci-select-tests.py). Suíte inteira em todo push para main/desenv
 # (pós-merge). Sem `push` em branch de PR: o pull_request já cobre, e os dois rodavam a suíte inteira em duplicata.
 #
-# Jobs (a suíte inteira levava ~40 min num job só: Vitest, build e Pest em série, com o Pest sozinho em ~37 min):
+# Jobs (num job só a suíte inteira levava 40m37s na rodada 38775084843: Vitest, build e Pest em série, o Pest com 2.206 s):
 #   select          escolhe os testes, o teto de tempo e a matriz de jobs de Pest (sem banco, sem PHP)
-#   assets          build do front uma vez; os jobs de Pest só baixam o resultado
-#   frontend-tests  Vitest, em paralelo com tudo
+#   assets          build do cliente uma vez (manifest do Vite); os jobs de Pest só baixam o resultado
+#   frontend-tests  Vitest e o build SSR (compilado e conferido aqui, fora do caminho do Pest), em paralelo com tudo
 #   quality         estilo dos arquivos alterados, em paralelo com tudo
 #   php-tests       um job por fatia da matriz, cada um com o PRÓPRIO Postgres e Redis (fatias nunca dividem banco);
 #                   o Pest roda serial dentro do job
 #   contracts       agregador: mantém o nome do check exigido e só passa se TODAS as etapas passaram
+# Teto de tempo: o passo do Pest tem o do seletor (timeout_minutes); os jobs sem Pest têm um teto FIXO no próprio job
+# (apt/composer/npm/build travados não seguram o runner por 6 h).
 on:
   pull_request:
   push:
@@ -28,6 +30,7 @@ env:
 jobs:
   select:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     outputs:
       mode: ${{ steps.select.outputs.mode }}
       pest_args: ${{ steps.select.outputs.pest_args }}
@@ -46,6 +49,7 @@ jobs:
 
   assets:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,23 +59,25 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run build
-      # Os testes PHP renderizam páginas Blade com @vite: precisam do manifest em public/build. O TinyMCE (public/vendor)
-      # nasce no `npm ci`/build e fica no pacote para o ambiente dos jobs de Pest ser o mesmo de antes (um job só).
-      # O bundle SSR (bootstrap/ssr) não vai: o phpunit.xml desliga o SSR nos testes.
+      # Só o build do CLIENTE (o `npm run build` ainda faria o tinymce:install e o `vite build --ssr`, que ficam fora do
+      # caminho crítico dos jobs de Pest). Mesmos limites de memória do script `build` do package.json.
+      - run: node node_modules/vite/bin/vite.js build
+        env:
+          NODE_OPTIONS: --max-old-space-size=1536
+      # Os testes PHP renderizam páginas Blade com @vite: precisam do manifest em public/build, e SÓ dele. Nenhum código PHP ou
+      # teste lê public/vendor/tinymce (só o navegador) nem bootstrap/ssr (o phpunit.xml desliga o SSR nos testes). Com UM
+      # caminho a raiz do artefato é o próprio public/build (upload-artifact): o download abaixo cai em public/build.
+      # Sem include-hidden-files: public/build não tem arquivo oculto e o flag só alargaria o que pode entrar no pacote.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: assets
-          path: |
-            public/build
-            public/vendor/tinymce
-            public/vendor/tinymce-langs
-          include-hidden-files: true
+          path: public/build
           if-no-files-found: error
           retention-days: 1
 
   frontend-tests:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,9 +88,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node node_modules/vitest/vitest.mjs run
+      # O bundle SSR (o que `npm run build` faz depois do cliente) continua sendo compilado na CI e reprova se quebrar, mas
+      # aqui, em paralelo, e não no caminho crítico dos jobs de Pest (que nunca o leem). Mesmo limite do script `build`.
+      - run: node node_modules/vite/bin/vite.js build --ssr
+        env:
+          NODE_OPTIONS: --max-old-space-size=1024
 
   quality:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -93,7 +105,9 @@ jobs:
       - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
         with:
           php-version: '8.4'
-          extensions: pdo_pgsql, gd, mbstring, calendar, sodium, zip, pcntl, posix, redis
+          # Sem redis: o composer só exige ext-calendar e o package:discover não abre conexão Redis. Quem fala com um Redis
+          # de verdade é o Pest (job php-tests).
+          extensions: pdo_pgsql, gd, mbstring, calendar, sodium, zip, pcntl, posix
           coverage: none
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -169,10 +183,11 @@ jobs:
       # (5 falhas na rodada 38775084843). Limita só os processos de teste; os dois processos de uma corrida seguem paralelos.
       OMP_THREAD_LIMIT: '1'
     steps:
+      # Clone raso (profundidade 1): os testes só precisam de HEAD (`git rev-parse HEAD`, diff contra a árvore vazia do git),
+      # e o histórico inteiro (75 MiB) seria baixado uma vez por fatia. Quem precisa de histórico é o `select` (diff contra a base).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
       - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
         with:
           php-version: '8.4'
@@ -195,8 +210,8 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: assets
-          path: public
-      - run: test -f public/build/manifest.json && test -d public/vendor/tinymce
+          path: public/build
+      - run: test -f public/build/manifest.json
       - name: Pest (${{ matrix.id }})
         run: |
           mkdir -p "$JUNIT_DIR"
@@ -204,7 +219,7 @@ jobs:
           if [ -n "$PEST_SHARD" ]; then
             args+=("--shard=$PEST_SHARD")
           fi
-          php vendor/bin/pest "${args[@]}" --compact --log-junit="$JUNIT_DIR/$MATRIX_ID.xml"
+          php vendor/bin/pest "${args[@]}" --fail-on-empty-test-suite --compact --log-junit="$JUNIT_DIR/$MATRIX_ID.xml"
         # O teto vem do seletor (scripts/ci-select-tests.py), que sabe quanto vai rodar: 15 min para seleção pequena de PR
         # (travou = falha rápida, não 6 h); 60 min para a suíte inteira (push main/desenv OU PR de efeito amplo: migrations,
         # config, rotas, providers — a maioria dos PRs de feature) e para seleção grande. Escolher pelo evento deixava 15 min
@@ -225,6 +240,7 @@ jobs:
         with:
           name: synthetic-integrator-contracts
           path: storage/framework/testing/p2
+          retention-days: 14
       # JUnit por fatia (tempo por classe/caso: base para rebalancear as fatias por duração), inclusive quando falha.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
@@ -240,6 +256,9 @@ jobs:
     needs: [select, assets, frontend-tests, quality, php-tests]
     if: always()
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Não faz checkout nem chama a API: só lê o resultado dos outros jobs pelo ambiente. Sem permissão nenhuma.
+    permissions: {}
     env:
       SELECT: ${{ needs.select.result }}
       ASSETS: ${{ needs.assets.result }}

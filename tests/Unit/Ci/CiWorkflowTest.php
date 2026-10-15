@@ -10,7 +10,9 @@ declare(strict_types=1);
  *  - OMP_THREAD_LIMIT=1 no ambiente INICIAL do Pest (sem ele o fork de IntegratorP2ConcurrencyTest trava no libgomp);
  *  - o check exigido `contracts` continua existindo e só passa se tudo passou;
  *  - o teto de tempo e a matriz vêm do seletor, nunca do evento;
- *  - fixtures HTTP validadas só no job que as gera; JUnit de cada fatia enviado mesmo em falha.
+ *  - fixtures HTTP validadas só no job que as gera; JUnit de cada fatia enviado mesmo em falha;
+ *  - nada deixa uma falha passar por verde (fatia vazia, `continue-on-error`, `|| true`) e nada de `${{ }}` em `run:`;
+ *  - privilégio mínimo: permissões, credenciais do checkout e retenção dos artefatos.
  */
 
 use Symfony\Component\Process\Process;
@@ -75,14 +77,21 @@ it('cada job de Pest tem o PRÓPRIO Postgres e Redis, e as variáveis do app apo
     expect(array_filter(array_map(fn (array $job) => array_key_exists('services', $job), $withoutPest)))->toBe([]);
 });
 
-it('a extensão redis está na lista do setup-php de todo job que sobe o Laravel', function () {
+it('a extensão redis está na lista do setup-php só dos jobs que rodam o Pest (o quality não abre conexão Redis)', function () {
     $workflow = CiHarness::workflow();
+    $pestJobs = array_keys(ciwPestJobs($workflow));
 
     foreach (['php-tests', 'quality'] as $id) {
         $setup      = collect($workflow['jobs'][$id]['steps'])->first(fn (array $step) => str_starts_with((string) ($step['uses'] ?? ''), 'shivammathur/setup-php@'));
         $extensions = array_map('trim', explode(',', $setup['with']['extensions']));
 
-        expect($extensions)->toContain('redis', 'pdo_pgsql', 'pcntl', 'posix', 'gd', 'sodium');
+        expect($extensions)->toContain('pdo_pgsql', 'pcntl', 'posix', 'gd', 'sodium', 'calendar');
+
+        if (in_array($id, $pestJobs, true)) {
+            expect($extensions)->toContain('redis'); // QueueRedisReservationTest fala com um Redis de verdade
+        } else {
+            expect($extensions)->not->toContain('redis'); // composer + package:discover não precisam; custo à toa
+        }
     }
 });
 
@@ -158,8 +167,118 @@ it('as fatias vêm da matriz do seletor: fail-fast desligado e sem modo paralelo
         ->and($pest['env']['PEST_SHARD'])->toBe('${{ matrix.shard }}')
         ->and($pest['run'])->toContain('--shard=')
         ->and($pest['run'])->toContain('--log-junit')
+        ->and($command)->toContain('--fail-on-empty-test-suite') // fatia que roda 0 testes sairia verde (exit 0)
         ->and($command)->not->toContain('--parallel')
         ->and($command)->not->toMatch('/\s-p(\s|$)/');
+});
+
+/**
+ * Executa o passo do Pest de verdade, com um `php` falso no PATH que grava o argv (um argumento por linha) e sai com o
+ * código pedido. As expressões do `env:` do passo são resolvidas com a entrada da matriz — o mapeamento do workflow é
+ * parte do que se prova.
+ *
+ * @param array{id: string, pest_args: string, shard: string, fixtures: bool} $entry
+ *
+ * @return array{exit: int, argv: list<string>, junit: string, dir: string}
+ */
+function ciwRunPestStep(array $entry, int $phpExit = 0, ?string $pestArgs = null): array
+{
+    [$step] = ciwPestSteps(CiHarness::workflow()['jobs']['php-tests']);
+
+    $dir = sys_get_temp_dir() . '/ciw-' . bin2hex(random_bytes(6));
+    mkdir($dir . '/bin', 0777, true);
+    file_put_contents($dir . '/bin/php', "#!/bin/sh\nprintf '%s\\n' \"\$@\" > \"\$FAKE_PHP_ARGV\"\nexit \"\${FAKE_PHP_EXIT:-0}\"\n");
+    chmod($dir . '/bin/php', 0755);
+
+    $env = [
+        'PATH'          => $dir . '/bin:/usr/bin:/bin',
+        'FAKE_PHP_ARGV' => $dir . '/argv',
+        'FAKE_PHP_EXIT' => (string) $phpExit,
+    ];
+
+    foreach ($step['env'] as $name => $expression) {
+        $env[$name] = preg_replace_callback(
+            '/\$\{\{\s*(matrix\.(\w+)|runner\.temp)\s*\}\}/',
+            fn (array $m) => $m[1] === 'runner.temp' ? $dir . '/runner-temp' : (string) $entry[$m[2]],
+            (string) $expression,
+        );
+    }
+
+    if ($pestArgs !== null) {
+        $env['PEST_ARGS'] = $pestArgs;
+    }
+
+    // O shell padrão do Actions no Linux: `bash --noprofile --norc -eo pipefail`.
+    $process = new Process(['bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', $step['run']], $dir, $env);
+    $process->run();
+
+    return [
+        'exit'  => (int) $process->getExitCode(),
+        'argv'  => is_file($dir . '/argv') ? explode("\n", rtrim((string) file_get_contents($dir . '/argv'), "\n")) : [],
+        'junit' => $env['JUNIT_DIR'],
+        'dir'   => $dir,
+    ];
+}
+
+it('o passo do Pest, executado, leva --shard só nas entradas fatiadas e sempre --fail-on-empty-test-suite e o JUnit da fatia', function () {
+    $entries = [
+        ...CiHarness::select('push', '')['matrix']['include'],                         // 6 fatias
+        ...CiHarness::selectWithChanged(CiHarness::testFiles(3))['matrix']['include'], // entrada única, sem --shard
+    ];
+
+    expect($entries)->toHaveCount(7);
+
+    foreach ($entries as $entry) {
+        $ran = ciwRunPestStep($entry);
+
+        $expected = [
+            'vendor/bin/pest',
+            ...explode(' ', $entry['pest_args']),
+            ...($entry['shard'] === '' ? [] : ['--shard=' . $entry['shard']]),
+            '--fail-on-empty-test-suite',
+            '--compact',
+            '--log-junit=' . $ran['junit'] . '/' . $entry['id'] . '.xml',
+        ];
+
+        expect([$entry['id'] => $ran['argv']])->toBe([$entry['id'] => $expected])
+            ->and($ran['exit'])->toBe(0)
+            ->and(is_dir($ran['junit']))->toBeTrue(); // `mkdir -p` do diretório do JUnit
+    }
+
+    // As entradas fatiadas levam o --shard; a única não (o inverso rodaria o grupo inteiro em cada job).
+    $sharded = array_filter($entries, fn (array $entry) => $entry['shard'] !== '');
+
+    expect($sharded)->toHaveCount(6);
+
+    foreach (ciwRunPestStep($entries[6])['argv'] as $arg) {
+        expect($arg)->not->toStartWith('--shard');
+    }
+});
+
+it('o passo do Pest propaga a falha do Pest (exit != 0) e não deixa o PEST_ARGS virar comando', function () {
+    $entry = CiHarness::select('push', '')['matrix']['include'][0];
+
+    expect(ciwRunPestStep($entry, phpExit: 1)['exit'])->toBe(1)
+        ->and(ciwRunPestStep($entry, phpExit: 2)['exit'])->toBe(2);
+
+    // Word splitting e glob acontecem, mas nada é reavaliado como código: nenhum marcador é criado.
+    $marker = sys_get_temp_dir() . '/ciw-marker-' . bin2hex(random_bytes(6));
+    $ran    = ciwRunPestStep($entry, pestArgs: 'tests/A.php $(touch ' . $marker . ') `touch ' . $marker . '`; touch ' . $marker);
+
+    expect(file_exists($marker))->toBeFalse()
+        ->and($ran['argv'])->toContain('tests/A.php', '$(touch', '`touch');
+});
+
+it('nada deixa uma falha passar por verde: sem continue-on-error em job ou passo, sem `|| true`/`set +e` no Pest', function () {
+    $workflow = CiHarness::workflow();
+
+    expect(json_encode($workflow))->not->toContain('continue-on-error');
+
+    foreach (ciwPestSteps($workflow['jobs']['php-tests']) as $step) {
+        expect($step['run'])->not->toContain('|| true')
+            ->and($step['run'])->not->toContain('|| :')
+            ->and($step['run'])->not->toContain('set +e');
+    }
 });
 
 it('o job php-tests não espera o Vitest nem o estilo (eles correm em paralelo)', function () {
@@ -206,7 +325,8 @@ it('as fixtures HTTP são validadas e publicadas só pelo job que tem o P2Contra
             ->and($step['if'])->not->toContain('always()');
     }
 
-    expect($upload['with']['path'])->toBe('storage/framework/testing/p2');
+    expect($upload['with']['path'])->toBe('storage/framework/testing/p2')
+        ->and($upload['with']['retention-days'])->toBe(14); // dados sintéticos: higiene, como o JUnit
 
     // Nenhum outro job toca nas fixtures: um dono só.
     foreach ($workflow['jobs'] as $id => $job) {
@@ -232,26 +352,75 @@ it('o JUnit de cada fatia é enviado com always() e nome único por fatia', func
         ->and($pest['run'])->toContain('--log-junit="$JUNIT_DIR/$MATRIX_ID.xml"');
 });
 
-it('o build roda uma vez e os jobs de Pest baixam o resultado onde o Laravel o procura', function () {
+it('o build do cliente roda uma vez e os jobs de Pest baixam SÓ o public/build, onde o Laravel o procura', function () {
     $jobs     = CiHarness::workflow()['jobs'];
     $upload   = collect($jobs['assets']['steps'])->first(fn (array $step) => str_starts_with((string) ($step['uses'] ?? ''), 'actions/upload-artifact@'));
     $download = collect($jobs['php-tests']['steps'])->first(fn (array $step) => str_starts_with((string) ($step['uses'] ?? ''), 'actions/download-artifact@'));
 
-    expect(collect($jobs['assets']['steps'])->pluck('run')->filter()->all())->toContain('npm ci', 'npm run build')
+    expect(collect($jobs['assets']['steps'])->pluck('run')->filter()->all())->toContain('npm ci')
         ->and($upload['with']['name'])->toBe('assets')
-        ->and($upload['with']['path'])->toContain('public/build')
-        ->and($upload['with']['path'])->toContain('public/vendor/tinymce')
-        ->and($upload['with']['include-hidden-files'])->toBeTrue()
+        // UM caminho: a raiz do artefato é o próprio public/build (upload-artifact), então o download cai no MESMO caminho.
+        ->and($upload['with']['path'])->toBe('public/build')
+        ->and($download['with'])->toBe(['name' => 'assets', 'path' => $upload['with']['path']])
         ->and($upload['with']['if-no-files-found'])->toBe('error')
-        ->and($download['with'])->toBe(['name' => 'assets', 'path' => 'public']);
+        // public/build não tem arquivo oculto: o flag só alargaria o que pode entrar no pacote.
+        ->and($upload['with'])->not->toHaveKey('include-hidden-files')
+        // O TinyMCE só o navegador lê, e o bundle SSR nenhum teste PHP lê: nenhum dos dois viaja no artefato.
+        ->and(json_encode($upload, JSON_UNESCAPED_SLASHES))->not->toContain('tinymce')
+        ->and(json_encode($upload, JSON_UNESCAPED_SLASHES))->not->toContain('bootstrap/ssr');
 
-    // O Vitest e o estilo não repetem o build, e o Pest não depende do node.
+    // O Pest confere o manifest (falha alto se o layout do artefato divergir) e nada mais do front.
+    $checks = collect($jobs['php-tests']['steps'])->pluck('run')->filter(fn ($run) => str_contains((string) $run, 'public/'))->values()->all();
+
+    expect($checks)->toBe(['test -f public/build/manifest.json'])
+        ->and(json_encode($jobs['php-tests']))->not->toContain('tinymce');
+
+    // O Vitest e o estilo não repetem o build do cliente, e o Pest não depende do node.
     foreach (['frontend-tests', 'quality'] as $id) {
-        expect(collect($jobs[$id]['steps'])->pluck('run')->filter()->all())->not->toContain('npm run build');
+        expect(collect($jobs[$id]['steps'])->pluck('run')->filter()->all())->not->toContain('node node_modules/vite/bin/vite.js build');
     }
 
     expect(json_encode($jobs['php-tests']))->not->toContain('npm ci')
         ->and(json_encode($jobs['php-tests']))->not->toContain('setup-node');
+});
+
+it('o `npm run build` do package.json continua inteiro na CI, dividido: cliente no assets, SSR no frontend-tests, mesma memória', function () {
+    $package  = json_decode((string) file_get_contents(CiHarness::root() . '/package.json'), true, flags: JSON_THROW_ON_ERROR);
+    $jobs     = CiHarness::workflow()['jobs'];
+    $segments = array_values(array_filter(array_map('trim', explode('&&', $package['scripts']['build'])), fn (string $segment) => str_contains($segment, 'vite build')));
+
+    expect($segments)->toHaveCount(2); // o cliente e o SSR; se o script mudar, este contrato precisa ser relido
+
+    foreach ($segments as $segment) {
+        preg_match("/^NODE_OPTIONS='([^']+)' vite (build( --ssr)?)$/", $segment, $m);
+
+        $isSsr   = ($m[3] ?? '') !== '';
+        $jobId   = $isSsr ? 'frontend-tests' : 'assets';
+        $command = 'node node_modules/vite/bin/vite.js ' . $m[2];
+
+        $holders = [];
+
+        foreach ($jobs as $id => $job) {
+            foreach ($job['steps'] as $step) {
+                if (($step['run'] ?? '') === $command) {
+                    $holders[$id] = $step['env']['NODE_OPTIONS'] ?? null;
+                }
+            }
+        }
+
+        expect([$segment => $holders])->toBe([$segment => [$jobId => $m[1]]]);
+    }
+
+    // Nenhum job roda o script inteiro (ele traria o tinymce:install e o SSR de volta ao caminho crítico).
+    expect(array_filter(array_map(
+        fn (array $job) => collect($job['steps'])->contains(fn (array $step) => str_contains((string) ($step['run'] ?? ''), 'npm run build')),
+        $jobs,
+    )))->toBe([]);
+
+    // O SSR compila depois do Vitest e reprova o job se quebrar (passo comum, sem continue-on-error).
+    $runs = collect($jobs['frontend-tests']['steps'])->pluck('run')->filter()->values()->all();
+
+    expect(array_search('node node_modules/vitest/vitest.mjs run', $runs, true))->toBeLessThan(array_search('node node_modules/vite/bin/vite.js build --ssr', $runs, true));
 });
 
 it('nenhuma política de tempo ou de fatia depende do evento — só o seletor lê o evento', function () {
@@ -326,4 +495,98 @@ it('o agregador `contracts` espera todos os jobs, roda sempre e só passa se TOD
     }
 
     expect($approved)->toBe([]); // nenhum resultado diferente de success pode aprovar o contracts
+});
+
+it('nenhum `run:` interpola expressão do GitHub: o que vem do PR chega ao shell só por `env:`', function () {
+    $workflow = CiHarness::workflow();
+
+    foreach ($workflow['jobs'] as $id => $job) {
+        foreach ($job['steps'] as $index => $step) {
+            if (isset($step['run'])) {
+                expect(["{$id}[{$index}]" => str_contains($step['run'], '${{')])->toBe(["{$id}[{$index}]" => false]);
+            }
+        }
+    }
+});
+
+it('todo checkout larga o token (persist-credentials: false) e só quem precisa de histórico baixa o histórico', function () {
+    $workflow = CiHarness::workflow();
+    $depths   = [];
+
+    foreach ($workflow['jobs'] as $id => $job) {
+        foreach ($job['steps'] as $step) {
+            if (str_starts_with((string) ($step['uses'] ?? ''), 'actions/checkout@')) {
+                expect([$id => $step['with']['persist-credentials'] ?? null])->toBe([$id => false]);
+
+                $depths[$id] = $step['with']['fetch-depth'] ?? 1;
+            }
+        }
+    }
+
+    // `select` (diff contra a base) e `quality` (idem) precisam do histórico; o resto roda em clone raso. O contracts não faz checkout.
+    expect($depths)->toBe(['select' => 0, 'assets' => 1, 'frontend-tests' => 1, 'quality' => 0, 'php-tests' => 1]);
+});
+
+it('os testes PHP só usam do git o que existe num clone raso (HEAD e a árvore vazia): nada de histórico, base ou remoto', function () {
+    $root  = CiHarness::root();
+    $found = [];
+
+    foreach (['Feature', 'Unit', 'Integration'] as $dir) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator("{$root}/tests/{$dir}", FilesystemIterator::SKIP_DOTS)) as $file) {
+            // tests/Unit/Ci é a exceção declarada: só `rev-parse HEAD` e o diff contra a árvore vazia (CiHarness::EMPTY_TREE).
+            if ($file->getExtension() !== 'php' || str_contains($file->getPathname(), '/Unit/Ci/')) {
+                continue;
+            }
+
+            if (preg_match("/['\"]git['\"]\\s*,|\\bgit (log|diff|rev-list|fetch|show|merge-base|describe|blame|branch|tag)\\b|exec\\(['\"]git /", (string) file_get_contents($file->getPathname()))) {
+                $found[] = substr($file->getPathname(), strlen($root) + 1);
+            }
+        }
+    }
+
+    expect($found)->toBe([]);
+
+    // E os de tests/Unit/Ci só pedem HEAD ou a árvore vazia — nunca uma base remota nem log.
+    foreach (glob("{$root}/tests/Unit/Ci/*.php") ?: [] as $path) {
+        if (basename($path) === 'CiWorkflowTest.php') {
+            continue; // cita os padrões acima no próprio contrato
+        }
+
+        $body = (string) file_get_contents($path);
+
+        expect($body)->not->toMatch('/\bgit (log|fetch|merge-base|describe|show|blame)\b/')
+            ->and($body)->not->toContain('origin/');
+    }
+});
+
+it('privilégio mínimo: contents: read no workflow, nenhum job com escrita, e o agregador sem permissão nenhuma', function () {
+    $workflow = CiHarness::workflow();
+
+    expect($workflow['permissions'])->toBe(['contents' => 'read']);
+
+    foreach ($workflow['jobs'] as $id => $job) {
+        $effective = $job['permissions'] ?? $workflow['permissions'];
+
+        // Todo escopo concedido é `read` (nada de write, id-token, pull-requests...).
+        expect([$id => array_filter($effective, fn ($level) => $level !== 'read')])->toBe([$id => []]);
+    }
+
+    // O agregador não faz checkout nem chama a API: só lê o `needs.*.result` pelo ambiente.
+    $contracts = $workflow['jobs']['contracts'];
+
+    expect($contracts)->toHaveKey('permissions')
+        ->and($contracts['permissions'])->toBe([])
+        ->and(json_encode($contracts['steps']))->not->toContain('actions/checkout');
+});
+
+it('os jobs sem Pest têm teto de tempo FIXO no job; o do Pest segue vindo do seletor, no passo', function () {
+    $workflow = CiHarness::workflow();
+
+    foreach (array_diff_key($workflow['jobs'], ['php-tests' => 1]) as $id => $job) {
+        expect([$id => is_int($job['timeout-minutes'] ?? null) && $job['timeout-minutes'] > 0 && $job['timeout-minutes'] <= 30])->toBe([$id => true]);
+    }
+
+    // O teto do job de Pest é do passo (seletor): um número fixo no job seria uma segunda política de tempo.
+    expect($workflow['jobs']['php-tests'])->not->toHaveKey('timeout-minutes')
+        ->and(ciwPestSteps($workflow['jobs']['php-tests'])[0]['timeout-minutes'])->toContain('needs.select.outputs.timeout_minutes');
 });

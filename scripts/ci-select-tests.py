@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Escolhe os testes do Pest que a CI roda num PR, a partir dos arquivos alterados.
 
-Por quê: a suíte inteira (Feature + Unit + Integration) leva ~40 min e rodava duas vezes (push + pull_request). Num PR
-roda-se só o que a mudança alcança; a suíte INTEIRA continua rodando em todo push para main/desenv (pós-merge).
+Por quê: a suíte inteira (Feature + Unit + Integration) rodava serial num job só — 40m37s na rodada 38775084843, com o
+Pest sozinho em 2.206 s — e rodava duas vezes (push + pull_request). Num PR roda-se só o que a mudança alcança; a suíte
+INTEIRA continua rodando em todo push para main/desenv (pós-merge).
 
 Regras (na dúvida, suíte inteira):
   - fora de pull_request, sem base conhecida ou com nome de arquivo estranho  -> inteira;
@@ -12,12 +13,15 @@ Regras (na dúvida, suíte inteira):
   - app/Domains/<X>/...                         -> todo teste de <X> (pasta ou `Domains\\<X>\\` no código);
   - qualquer outro app/**/*.php                 -> testes que citam o nome da classe (se forem muitos, é núcleo: inteira);
   - lang/**                                     -> testes de contrato de texto (`*TextsTest.php`) e quem cita o grupo;
-  - resources/js, docs, e2e, workflows          -> nenhum teste PHP (o Vitest roda sempre inteiro, é rápido).
+  - .github/workflows, scripts/                 -> os contratos de CI (`tests/Unit/Ci/*Test.php`, ~15 s, sem banco): são eles que
+                                                   protegem o workflow e este seletor, e sem a regra um PR que muda só o
+                                                   workflow passava sem rodar nenhum deles (só o P2ContractsTest);
+  - resources/js, docs, e2e                     -> nenhum teste PHP (o Vitest roda sempre inteiro, é rápido).
   - sempre: P2ContractsTest (gera as fixtures que validate-integrator-contracts.php lê);
   - tests/Integration (corrida real, 2 sessões)  -> FORA do PR (cada teste segura 2,5-8 s; rodam no push main/desenv).
 Teto de tempo do passo do Pest (`timeout_minutes`): quem sabe quanto vai rodar é este script, não o evento. Seleção de até
 SHORT_LIMIT arquivos = SHORT_TIMEOUT (se travar, falha rápida em vez de 6 h); suíte inteira e seleção maior = LONG_TIMEOUT.
-Teto por evento (pull_request = curto) estourava em todo PR de efeito amplo, que roda a suíte inteira (~45 min).
+Teto por evento (pull_request = curto) estourava em todo PR de efeito amplo, que roda a suíte inteira.
 Fatias (`matrix`): o Pest roda serial dentro de cada job, mas a suíte inteira vira jobs paralelos, cada um com o PRÓPRIO
 Postgres/Redis (fatias nunca dividem banco). Suíte inteira = Feature+Unit em SHARDS fatias e Integration em SHARDS fatias
 (corridas reais lentas não se misturam com o resto). Seleção grande (> SHORT_LIMIT) = só Feature/Unit em SHARDS fatias;
@@ -48,11 +52,12 @@ BROAD_PREFIXES = ('database/migrations/', 'database/seeders/', 'database/factori
 # sem ele o passo falha com "Missing generated HTTP fixture".
 ALWAYS = {'tests/Feature/Api/Integrators/P2ContractsTest.php'}
 CORE_LIMIT = 120  # classe citada por tantos testes é núcleo (Model, Service base): não adianta selecionar
-# Teto de tempo (minutos) do passo do Pest, POR JOB: vale para cada fatia da matriz. A suíte inteira leva ~37 min de Pest
-# serial (~670 arquivos); em 6 fatias cada job leva uma fração, então 60 é folga contra travamento, não meta de duração.
+# Teto de tempo (minutos) do passo do Pest, POR JOB: vale para cada fatia da matriz. Base: rodada 38775084843, a suíte
+# inteira em UM job (Pest serial, 2.206 s, ~670 arquivos); em 6 fatias cada job leva uma fração, então 60 é folga contra
+# travamento, não meta de duração.
 SHORT_TIMEOUT = 15  # seleção pequena de PR: se travar, falha rápida
 LONG_TIMEOUT = 60   # suíte inteira (push main/desenv ou PR de efeito amplo) e seleção grande; suba se uma fatia chegar perto de ~50 min
-SHORT_LIMIT = 100   # arquivos que cabem em SHORT_TIMEOUT com folga (~7 min); a seleção mais larga já vista foi de 53
+SHORT_LIMIT = 100   # arquivos que cabem em SHORT_TIMEOUT com folga; a seleção mais larga já vista foi de 53
 
 
 def timeout_for(mode: str, test_files: int) -> int:
@@ -101,6 +106,10 @@ def build_matrix(mode: str, files: list[str]) -> dict:
 
 def out(mode: str, args: str, why: str, files: list[str] | None = None) -> None:
     files = files or []
+    # O conjunto FINAL, não só os alterados: os selecionados vêm de `rglob` no disco e o workflow os expande com
+    # `args=($PEST_ARGS)` (word splitting + glob). Todo token tem que ser um caminho seguro sob tests/; senão, suíte inteira.
+    if mode == 'selected' and not all(SAFE.match(f) and f.startswith('tests/') for f in files):
+        out('full', FULL, 'caminho de teste selecionado fora do padrão: suíte inteira')
     timeout = timeout_for(mode, len(files))
     matrix = json.dumps(build_matrix(mode, files), separators=(',', ':'))
     print(f'[ci-select-tests] {mode}: {why}')
@@ -151,6 +160,8 @@ def main() -> None:
         elif p.startswith('lang/'):
             selected |= {t for t in tests if t.endswith('TextsTest.php')}
             selected |= {t for t, body in tests.items() if f"'{name}." in body or f'"{name}.' in body}
+        elif p.startswith(('.github/workflows/', 'scripts/')):  # os contratos de CI protegem exatamente estes arquivos
+            selected |= {t for t in tests if t.startswith('tests/Unit/Ci/')}
 
     skipped = {t for t in selected if t.startswith('tests/Integration/')}
     selected -= skipped  # lentos por natureza: valem no push para main/desenv, não a cada PR

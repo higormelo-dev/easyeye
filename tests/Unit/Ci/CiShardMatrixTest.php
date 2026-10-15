@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Contrato das fatias da CI: a `matrix` que o seletor (scripts/ci-select-tests.py) emite e que o workflow transforma em
  * jobs de Pest, cada um com o PRÓPRIO banco.
  *
- * A suíte inteira passou de um job de ~40 min para 6 jobs (Feature+Unit em 3 fatias, Integration em 3). Dividir é
+ * A suíte inteira passou de um job de 40m37s (rodada 38775084843) para 6 jobs (Feature+Unit em 3 fatias, Integration em 3). Dividir é
  * perigoso de dois jeitos que estes testes fecham: (1) teste que some ou roda em dobro — a união das fatias tem que ser
  * exatamente a descoberta do Pest e as interseções vazias; (2) fatia vazia — o `--shard=i/n` do Pest 4 monta
  * `--filter ''` para ela, e filtro vazio seleciona TUDO. Quem confere a fatia é o Pest de verdade (`--list-tests` não

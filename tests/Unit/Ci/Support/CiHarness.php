@@ -64,10 +64,12 @@ final class CiHarness
      * determinístico de provar uma seleção de tamanho conhecido pelo caminho real, sem depender do histórico do git.
      *
      * @param list<string> $changed
+     * @param string       $setup   Python que roda ANTES do `main()` (com `module` já carregado): para simular o estado do disco
+     *                              (um teste de nome estranho que o `rglob` do seletor encontra, por exemplo)
      *
      * @return array{mode: string, pest_args: string, timeout_minutes: string, matrix: array{include: list<array{id: string, pest_args: string, shard: string, fixtures: bool}>}}
      */
-    public static function selectWithChanged(array $changed): array
+    public static function selectWithChanged(array $changed, string $setup = ''): array
     {
         $body = <<<'PY'
 import contextlib, io, os, subprocess, tempfile
@@ -90,7 +92,7 @@ sys.stdout.write(open(output).read())
 os.unlink(output)
 PY;
 
-        return self::parseOutputs(self::python($body, [json_encode($changed, JSON_THROW_ON_ERROR)], decode: false));
+        return self::parseOutputs(self::python($setup . "\n" . $body, [json_encode($changed, JSON_THROW_ON_ERROR)], decode: false));
     }
 
     /**
