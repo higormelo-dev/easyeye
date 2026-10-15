@@ -29,6 +29,32 @@ it('serializes mixed legacy hardware writes and operational compare-and-swap', f
 });
 
 /**
+ * Estado de um filho que não saiu no prazo, lido de /proc (Linux). Na CI a falha dizia só "travou" e não havia como saber
+ * onde: dormindo num futex, esperando I/O, em CPU? Cada campo é opcional — o que o kernel não deixar ler vira "?".
+ */
+function p2ChildState(int $pid): string
+{
+    $read   = fn (string $file): string => trim((string) @file_get_contents("/proc/{$pid}/{$file}"));
+    $status = $read('status');
+    preg_match('/^State:\s*(.+)$/m', $status, $state);
+    preg_match('/^Threads:\s*(\d+)/m', $status, $threads);
+    $links = [];
+
+    foreach (array_slice(array_values(array_diff(@scandir("/proc/{$pid}/fd") ?: [], ['.', '..'])), 0, 12) as $fd) {
+        $links[] = $fd . '=' . (string) @readlink("/proc/{$pid}/fd/{$fd}");
+    }
+
+    return sprintf(
+        '[estado=%s threads=%s wchan=%s syscall=%s fds=%s]',
+        $state[1] ?? '?',
+        $threads[1] ?? '?',
+        $read('wchan') ?: '?',
+        strtok($read('syscall'), ' ') ?: '?', // só o número da syscall (o resto são argumentos)
+        implode(' ', $links) ?: '?',
+    );
+}
+
+/**
  * Separate processes and PDO connections start together, with no outer test transaction.
  *
  * $waitTimeoutSeconds: só o prazo de ESPERAR O FILHO SAIR (EE-16) — os
@@ -112,10 +138,13 @@ function p2Concurrent(array $jobs, int $waitTimeoutSeconds = 10): array
                 }
 
                 if (microtime(true) > $waitDeadline) {
+                    // ANTES de matar: depois do SIGKILL o /proc some. "resultado_gravado" separa travar no job (não) de travar
+                    // só ao sair (sim: o filho já escreveu o JSON e o que falta é o encerramento do processo).
+                    $state = p2ChildState($pid) . ' resultado_gravado=' . (is_file($dir . '/' . $index . '.json') ? 'sim' : 'nao');
                     posix_kill($pid, SIGKILL);
                     pcntl_waitpid($pid, $status); // SIGKILL nunca é ignorado — bloqueia só até o kernel reaproveitar o pid, não indefinidamente.
 
-                    throw new RuntimeException("child {$pid} (job {$index}) did not exit within 10s and was killed — check for a hang in the job or a native dependency");
+                    throw new RuntimeException("child {$pid} (job {$index}) did not exit within {$waitTimeoutSeconds}s and was killed — check for a hang in the job or a native dependency {$state}");
                 }
 
                 usleep(10000);
