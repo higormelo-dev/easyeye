@@ -1,5 +1,13 @@
 name: Integrator contracts
-on: [push, pull_request]
+# PR: roda só o que a mudança alcança (scripts/ci-select-tests.py). Suíte inteira em todo push para main/desenv
+# (pós-merge). Sem `push` em branch de PR: o pull_request já cobre, e os dois rodavam a suíte inteira em duplicata.
+on:
+  pull_request:
+  push:
+    branches: [main, desenv]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -57,9 +65,17 @@ jobs:
       - run: python3 scripts/check-integrator-style.py
         env:
           CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - id: select
+        run: python3 scripts/ci-select-tests.py
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_EVENT: ${{ github.event_name }}
       - run: node node_modules/vitest/vitest.mjs run
       - run: npm run build
-      - run: php vendor/bin/pest tests/Feature tests/Unit tests/Integration --compact
+      - run: php vendor/bin/pest $PEST_ARGS --compact
+        if: steps.select.outputs.pest_args != ''
+        env:
+          PEST_ARGS: ${{ steps.select.outputs.pest_args }}
       - run: php scripts/validate-integrator-contracts.php
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
