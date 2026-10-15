@@ -39,6 +39,9 @@ final readonly class TissGuideData
         // (esse CPF é de ct_contratadoDados, papel de PESSOA JURÍDICA/física
         // contratada — não do profissional; mantido pra uso futuro, não
         // emitido no builder hoje).
+        // Só solicitação de internação / anexo de OPME (mensagens avulsas do
+        // módulo cirúrgico): dados congelados na guia. Null nas guias de lote.
+        public ?SurgicalGuideData $surgical = null,
     ) {
     }
 
@@ -88,6 +91,7 @@ final readonly class TissGuideData
             doctorCbo: $doctorCbo ?: null,
             doctorCouncilNumber: $doctorCouncilNumber ?: null,
             doctorCpf: $doctorCpf ?: null,
+            surgical: $guide->guide_type->isSurgicalRequest() ? SurgicalGuideData::fromGuide($guide) : null,
         );
     }
 }

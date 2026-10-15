@@ -16,6 +16,7 @@ use App\Domains\Tiss\PreValidation\Rules\{
     GuideItemsRequired,
     ItemAmountsValid,
     SadtExecutionDateRequired,
+    SurgicalGuideRules,
     TussCodeActive,
 };
 use App\Domains\Tiss\PreValidation\TissGuideValidationResult;
@@ -32,7 +33,7 @@ final class PreValidateTissGuideService
 
         $result = new TissGuideValidationResult();
 
-        foreach ($this->rules() as $rule) {
+        foreach ($this->rules($guide) as $rule) {
             $result->merge($rule->validate($guide));
         }
 
@@ -58,8 +59,14 @@ final class PreValidateTissGuideService
     }
 
     /** @return list<TissGuideValidationRule> */
-    private function rules(): array
+    private function rules(TissGuide $guide): array
     {
+        // Mensagens avulsas do módulo cirúrgico têm o próprio conjunto (campos de outro
+        // formato: o CID é uma lista, o "item" é procedimento solicitado ou OPME).
+        if ($guide->guide_type->isSurgicalRequest()) {
+            return [new SurgicalGuideRules(), new TussCodeActive()];
+        }
+
         return [
             new BeneficiaryCardNumberRequired(),
             new BeneficiaryNameRequired(),

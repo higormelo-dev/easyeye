@@ -52,6 +52,7 @@ class EntityProduct extends Model
         'unit',
         'is_opm',
         'requires_lot',
+        'requires_serial',
         'sale_price',
         'image_path',
         'min_qty',
@@ -67,15 +68,16 @@ class EntityProduct extends Model
     protected function casts(): array
     {
         return [
-            'unit'         => StockUnit::class,
-            'is_opm'       => 'boolean',
-            'requires_lot' => 'boolean',
-            'active'       => 'boolean',
-            'cost_avg'     => 'decimal:4',
-            'sale_price'   => 'decimal:2',
-            'min_qty'      => 'decimal:3',
-            'max_qty'      => 'decimal:3',
-            'qty_on_hand'  => 'decimal:3',
+            'unit'            => StockUnit::class,
+            'is_opm'          => 'boolean',
+            'requires_lot'    => 'boolean',
+            'requires_serial' => 'boolean',
+            'active'          => 'boolean',
+            'cost_avg'        => 'decimal:4',
+            'sale_price'      => 'decimal:2',
+            'min_qty'         => 'decimal:3',
+            'max_qty'         => 'decimal:3',
+            'qty_on_hand'     => 'decimal:3',
         ];
     }
 

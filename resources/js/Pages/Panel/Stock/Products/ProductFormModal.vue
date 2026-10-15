@@ -41,6 +41,7 @@ const form = useForm({
     unit: 'un',
     is_opm: false,
     requires_lot: false,
+    requires_serial: false,
     sale_price: null,
     min_qty: 0,
     max_qty: null,
@@ -68,6 +69,7 @@ watch(
             form.unit = props.item.unit ?? 'un';
             form.is_opm = !!props.item.is_opm;
             form.requires_lot = !!props.item.requires_lot;
+            form.requires_serial = !!props.item.requires_serial;
             form.sale_price = props.item.sale_price ?? null;
             form.min_qty = props.item.min_qty ?? 0;
             form.max_qty = props.item.max_qty ?? null;
@@ -318,6 +320,21 @@ async function saveLot(lot) {
                     <small class="text-muted d-block">
                         Toda movimentação deste produto vai exigir um lote. Lotes nascem ao registrar uma entrada — não
                         são cadastrados aqui.
+                    </small>
+                    <div class="form-check mt-2">
+                        <input
+                            id="product_requires_serial"
+                            v-model="form.requires_serial"
+                            type="checkbox"
+                            class="form-check-input"
+                        />
+                        <label class="form-check-label" for="product_requires_serial">
+                            Exige número de série (implante)
+                        </label>
+                    </div>
+                    <small class="text-muted d-block">
+                        Na cirurgia, cada unidade usada é registrada com o número de série (rastreabilidade do
+                        implante).
                     </small>
                 </div>
             </div>

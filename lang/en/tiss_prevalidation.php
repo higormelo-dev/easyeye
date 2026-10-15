@@ -9,8 +9,10 @@ declare(strict_types=1);
 return [
     'operator_fallback' => 'the payer',
     'guide_type'        => [
-        'sadt'         => 'SP-SADT',
-        'consultation' => 'consultation',
+        'sadt'              => 'SP-SADT',
+        'consultation'      => 'consultation',
+        'inpatient_request' => 'admission request',
+        'opme_attachment'   => 'OPME attachment',
     ],
     'AUTHORIZATION_REQUIRED' => [
         'message'       => 'Prior authorization number not provided.',
@@ -78,5 +80,91 @@ return [
     'TUSS_CODE_EXPIRED' => [
         'message'    => 'TUSS code :code expired on :until.',
         'suggestion' => 'Use the current replacement TUSS code to avoid a denial for an expired code.',
+    ],
+
+    // ── Standalone surgical messages (inpatient request / OPME attachment) ──
+    'OPERATOR_ANS_INVALID' => [
+        'message'       => 'Payer ANS registry missing or invalid (it must have 6 digits).',
+        'suggestion'    => 'Fix the ANS registry in the insurance record.',
+        'operator_hint' => 'Warning: without the correct ANS registry the message does not even reach :operator.',
+    ],
+    'PROVIDER_CODE_INVALID' => [
+        'message'    => 'Provider code at the payer missing or longer than 14 characters.',
+        'suggestion' => 'Review the clinic code in the company record.',
+    ],
+    'PROFESSIONAL_COUNCIL_REQUIRED' => [
+        'message'       => 'Surgeon\'s medical council (CRM) number not provided.',
+        'suggestion'    => 'Fill in the registry (CRM) in the doctor record: council, number, state and CBO go together in the form.',
+        'operator_hint' => 'Warning: :operator rejects a request without the professional\'s CRM.',
+    ],
+    'PROFESSIONAL_UF_REQUIRED' => [
+        'message'    => 'Surgeon\'s council state could not be identified.',
+        'suggestion' => 'Fill in the state in the clinic record: the form uses the clinic\'s state as the council\'s.',
+    ],
+    'HOSPITAL_CODE_REQUIRED' => [
+        'message'       => 'Hospital code at the payer not provided.',
+        'suggestion'    => 'Fill in the payer code in the location record (Settings › Surgery), up to 14 characters.',
+        'operator_hint' => 'Warning: :operator cannot locate the requested hospital without the code.',
+    ],
+    'HOSPITAL_NAME_REQUIRED' => [
+        'message'    => 'Requested hospital name not provided.',
+        'suggestion' => 'Choose the surgery location in the request.',
+    ],
+    'HOSPITAL_CNES_RECOMMENDED' => [
+        'message'    => 'Hospital CNES missing or not 7 digits.',
+        'suggestion' => 'Fill in the CNES in the location record: some payers check it during review.',
+    ],
+    'SUGGESTED_DATE_REQUIRED' => [
+        'message'       => 'Suggested admission date not provided.',
+        'suggestion'    => 'Enter the suggested date on the form (or schedule the surgery and refresh the form).',
+        'operator_hint' => 'Warning: :operator requires the suggested date on the admission request.',
+    ],
+    'CID_TOO_MANY' => [
+        'message'    => 'The request accepts at most 4 diagnoses (ICD).',
+        'suggestion' => 'Reduce the diagnoses in the surgery request.',
+    ],
+    'CLINICAL_INDICATION_REQUIRED' => [
+        'message'       => 'Clinical indication not provided.',
+        'suggestion'    => 'Describe the clinical indication in the surgery request.',
+        'operator_hint' => 'Warning: :operator denies a request without a clinical indication.',
+    ],
+    'CLINICAL_INDICATION_TRUNCATED' => [
+        'message'    => 'The clinical indication is over 500 characters and will be cut on the form.',
+        'suggestion' => 'Summarize the indication so nothing important is lost.',
+    ],
+    'DAYS_REQUESTED_INVALID' => [
+        'message'    => 'Requested days outside the 1 to 99 range.',
+        'suggestion' => 'Fix the days in the surgery request.',
+    ],
+    'OPME_REFERENCED_GUIDE_REQUIRED' => [
+        'message'       => 'Referenced guide number not provided.',
+        'suggestion'    => 'Generate the admission request (the attachment references it on its own) or enter the number of the guide the attachment refers to.',
+        'operator_hint' => 'Warning: :operator cannot tie the OPME attachment to any request without the referenced guide.',
+    ],
+    'OPME_PROFESSIONAL_PHONE_REQUIRED' => [
+        'message'    => 'Requesting professional\'s phone not provided (required on the OPME attachment).',
+        'suggestion' => 'Fill in the phone on the form or in the doctor record (up to 11 digits, with area code).',
+    ],
+    'OPME_JUSTIFICATION_REQUIRED' => [
+        'message'       => 'OPME technical justification not provided.',
+        'suggestion'    => 'Fill in the technical justification in the request materials or directly on the form.',
+        'operator_hint' => 'Warning: :operator denies OPME without a technical justification.',
+    ],
+    'OPME_JUSTIFICATION_TRUNCATED' => [
+        'message'    => 'The technical justification is over 1000 characters and will be cut on the form.',
+        'suggestion' => 'Summarize the justification.',
+    ],
+    'OPME_MANUFACTURER_OPTION_INVALID' => [
+        'message'    => 'OPME ":item": invalid manufacturer option (1, 2 or 3).',
+        'suggestion' => 'Choose the material\'s manufacturer option (1 = first option).',
+    ],
+    'OPME_ANVISA_REQUIRED' => [
+        'message'       => 'OPME ":item": ANVISA registration not provided.',
+        'suggestion'    => 'Enter the material\'s ANVISA registration (on the packaging and the manufacturer\'s invoice).',
+        'operator_hint' => 'Warning: :operator denies OPME without an ANVISA registration.',
+    ],
+    'OPME_QUANTITY_INVALID' => [
+        'message'    => 'OPME ":item": quantity outside the 1 to 999 range.',
+        'suggestion' => 'Fix the material quantity.',
     ],
 ];

@@ -25,6 +25,7 @@ class TissTransmission extends Model
         'entity_id',
         'operator_id',
         'batch_id',
+        'guide_id',
         'xml_document_id',
         'protocol_id',
         'idempotency_key',
@@ -72,6 +73,11 @@ class TissTransmission extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(TissBatch::class, 'batch_id');
+    }
+
+    public function guide(): BelongsTo
+    {
+        return $this->belongsTo(TissGuide::class, 'guide_id');
     }
 
     public function xmlDocument(): BelongsTo

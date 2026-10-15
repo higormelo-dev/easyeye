@@ -21,6 +21,11 @@ describe('Middleware ApiCheckTokenExpiration', function () {
     });
 
     it('blocks request with token expired by inactivity (4+ business days)', function () {
+        // Relógio fixo: a política conta DIAS ÚTEIS (sem fim de semana nem feriado). Com o relógio real, "6 dias atrás"
+        // soma só 3 dias úteis quando um feriado cai na janela (ex.: segunda 12/10, Aparecida) e o teste reprovava sem
+        // o código ter mudado (48 dos 365 dias de 2026).
+        Carbon::setTestNow(Carbon::parse('2025-03-12 10:00:00')); // quarta; o último uso (06/03) deixa 4 dias úteis: 07, 10, 11 e 12
+
         $ctx = setupIntegrator();
 
         // Token criado há 6 dias úteis sem uso
@@ -39,6 +44,8 @@ describe('Middleware ApiCheckTokenExpiration', function () {
             'Authorization' => 'Bearer ' . $token->plainTextToken,
         ])->assertUnauthorized()
             ->assertJsonPath('message', __('auth.token_expired_inactivity'));
+
+        Carbon::setTestNow();
     });
 
     it('auto-renews token that expires within 1 business day', function () {

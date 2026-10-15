@@ -125,6 +125,7 @@ return [
         'has_ai_chat_assistant'     => 'Assistente virtual de IA (chat flutuante)',
         'has_api_integrator'        => 'Integração com equipamentos oftalmológicos',
         'has_inventory_module'      => 'Módulo de estoque',
+        'has_surgery'               => 'Módulo cirúrgico',
         'has_patient_recall'        => 'Retorno de pacientes crônicos (recall)',
         'ai_monthly_credits'        => 'Créditos mensais de IA',
         'api_monthly_exam_sends'    => 'Envios via integrador (mensal)',

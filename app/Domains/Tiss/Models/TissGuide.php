@@ -7,6 +7,7 @@ namespace App\Domains\Tiss\Models;
 use App\Domains\Tiss\Concerns\BelongsToEntity;
 use App\Domains\Tiss\Enums\{TissGuideStatus, TissGuideType};
 use App\Models\{Doctor, Entity, MedicalRecord, Patient, Schedule};
+use App\Models\Surgery\SurgicalCase;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\BelongsToMany, Relations\HasMany, SoftDeletes};
@@ -30,6 +31,8 @@ class TissGuide extends Model
         'doctor_id',
         'schedule_id',
         'medical_record_id',
+        'surgical_case_id',
+        'xml_document_id',
         'guide_type',
         'guide_number_provider',
         'guide_number_operator',
@@ -107,6 +110,23 @@ class TissGuide extends Model
     public function medicalRecord(): BelongsTo
     {
         return $this->belongsTo(MedicalRecord::class, 'medical_record_id');
+    }
+
+    /** Caso cirúrgico de origem (só solicitação de internação / anexo de OPME). */
+    public function surgicalCase(): BelongsTo
+    {
+        return $this->belongsTo(SurgicalCase::class, 'surgical_case_id');
+    }
+
+    /** XML atual desta guia (mensagem avulsa; o da guia de lote fica no lote). */
+    public function xmlDocument(): BelongsTo
+    {
+        return $this->belongsTo(TissXmlDocument::class, 'xml_document_id');
+    }
+
+    public function transmissions(): HasMany
+    {
+        return $this->hasMany(TissTransmission::class, 'guide_id');
     }
 
     public function items(): HasMany

@@ -42,7 +42,9 @@ it('audits lists once with counts and safe filters without search content', func
 });
 it('rejects token arrays and checks inactivity before renewal', function () {
     $this->postJson('/api/integrators/check-token', ['token' => ['wrong']])->assertUnprocessable();
-    $this->ctx['integratorUser']->tokens()->update(['last_used_at' => now()->subDays(8)]);
+    // 30 dias, não 8: a política conta dias úteis (sem feriado) e, com o relógio real, 8 dias atrás soma só 3 logo depois
+    // do Carnaval (de quarta de cinzas à segunda seguinte) — o token não expirava e o teste reprovava sem o código mudar.
+    $this->ctx['integratorUser']->tokens()->update(['last_used_at' => now()->subDays(30)]);
     $this->postJson('/api/integrators/check-token', ['token' => $this->ctx['token']])->assertUnauthorized()->assertJsonPath('valid', false);
     expect($this->ctx['integratorUser']->tokens()->count())->toBe(0);
 });

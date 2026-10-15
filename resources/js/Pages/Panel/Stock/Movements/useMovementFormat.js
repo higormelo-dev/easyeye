@@ -15,6 +15,7 @@ const TYPE_VARIANTS = {
     manual_in: 'success',
     adjustment_in: 'info',
     consumption_out: 'primary',
+    consumption_reversal: 'info',
     manual_out: 'secondary',
     adjustment_out: 'warning',
     loss: 'danger',

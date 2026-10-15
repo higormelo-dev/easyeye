@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\{FinancialEntryStatus, ScheduleSituation};
 use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleChangedConcurrentlyException, ScheduleSlotUnavailableException};
 use App\Models\{ClinicResource, Doctor, DoctorWorkSchedule, Entity, PatientExam, ResourceBlock, ResourceWorkSchedule, Schedule, ScheduleBlock, ScheduleSituationLog};
+use App\Services\Surgery\SurgeryScheduleService;
 use App\Support\{ExamScheduleLink, ScheduleShift};
 use Carbon\Carbon;
 use Closure;
@@ -70,6 +71,11 @@ class ScheduleService
             $errors[] = __('actions.work_schedule_blocked');
         }
 
+        // 4b ── Cirurgia agendada do médico (módulo cirúrgico) ─────────────────
+        if ($surgery = $this->surgeryOverlapError($doctorId, $dateTime)) {
+            $errors[] = $surgery;
+        }
+
         // 5 ── Resource conflicts ─────────────────────────────────────────────
         return array_merge($errors, $this->resourceErrors($resourceIds, $dateTime, $excludeScheduleId));
     }
@@ -99,6 +105,10 @@ class ScheduleService
             $errors[] = __('actions.work_schedule_blocked');
         }
 
+        if ($surgery = $this->surgeryOverlapError($doctorId, $dateTime)) {
+            $errors[] = $surgery;
+        }
+
         if ($limitError = $this->fitInLimitError($doctorId, $dateTime, $excludeScheduleId)) {
             $errors[] = $limitError;
         }
@@ -119,6 +129,50 @@ class ScheduleService
         return $isFitIn
             ? $this->validateFitIn($doctorId, $dateTime, $excludeScheduleId, $resourceIds)
             : $this->validateSlot($doctorId, $dateTime, $excludeScheduleId, $resourceIds);
+    }
+
+    /**
+     * O horário da consulta (início + intervalo do médico) cai dentro de uma
+     * cirurgia AGENDADA em que o médico opera (cirurgião ou equipe)? Devolve a
+     * mensagem (null = livre). Vale para consulta e encaixe: quem está em
+     * cirurgia não atende.
+     */
+    public function surgeryOverlapError(string $doctorId, Carbon $dateTime): ?string
+    {
+        $doctor = Doctor::query()->find($doctorId);
+
+        if (! $doctor) {
+            return null; // doctor_id inválido já é recusado pela regra do campo
+        }
+
+        $end   = $dateTime->copy()->addMinutes(max(1, $doctor->effectiveInterval()));
+        $other = app(SurgeryScheduleService::class)->windowsOverlapping([$doctorId], $dateTime, $end)->first();
+
+        if ($other === null) {
+            return null;
+        }
+
+        return __('surgery_schedule.agenda_conflict', [
+            'start' => $other->scheduled_start->format(__('surgery_operation.date_format') . ' H:i'),
+            'end'   => $other->scheduled_end->format('H:i'),
+        ]);
+    }
+
+    /**
+     * Versão sob lock de surgeryOverlapError(): dentro da transação de gravação
+     * da consulta, trava as janelas cirúrgicas do médico (mesma chave que
+     * agendar a cirurgia usa) e reconfere — uma consulta e uma cirurgia no mesmo
+     * horário não passam as duas.
+     *
+     * @throws ScheduleSlotUnavailableException
+     */
+    public function assertDoctorFreeOfSurgery(string $doctorId, Carbon $dateTime): void
+    {
+        app(SurgeryScheduleService::class)->lockDoctorWindows($doctorId);
+
+        if ($message = $this->surgeryOverlapError($doctorId, $dateTime)) {
+            throw new ScheduleSlotUnavailableException($message);
+        }
     }
 
     /**
@@ -455,6 +509,11 @@ class ScheduleService
             ->where('ends_at', '>', $date->copy()->startOfDay())
             ->get();
 
+        // Cirurgias agendadas do médico no dia: o horário que encosta numa delas
+        // não é vaga (módulo cirúrgico).
+        $surgeries = app(SurgeryScheduleService::class)
+            ->windowsOverlapping([(string) $doctor->id], $date->copy()->startOfDay(), $date->copy()->endOfDay());
+
         $slots = [];
 
         foreach ($ranges as $range) {
@@ -464,8 +523,11 @@ class ScheduleService
             while ($current->lt($end)) {
                 $timeStr   = $current->format('H:i');
                 $isBooked  = in_array($timeStr, $booked, true);
+                $slotEnd   = $current->copy()->addMinutes($interval);
                 $isInBlock = $blocks->contains(
                     fn ($block) => $current->gte($block->starts_at) && $current->lt($block->ends_at),
+                ) || $surgeries->contains(
+                    fn ($case) => $case->scheduled_start->lt($slotEnd) && $case->scheduled_end->gt($current),
                 );
 
                 $slots[] = [
@@ -542,6 +604,12 @@ class ScheduleService
             if (empty($errors)) {
                 try {
                     DB::transaction(function () use ($schedule, $newDateTime, $isFitIn): void {
+                        // Médico em cirurgia não atende — reconferido SOB a trava das
+                        // janelas cirúrgicas, como remarcar um e criar fazem. A
+                        // validação acima leu sem trava: uma cirurgia agendada ao mesmo
+                        // tempo passava as duas e a consulta caía dentro dela.
+                        $this->assertDoctorFreeOfSurgery((string) $schedule->doctor_id, $newDateTime);
+
                         if ($isFitIn) {
                             $this->assertFitInCapacity($schedule->doctor_id, $newDateTime, (string) $schedule->id);
                         }
@@ -597,7 +665,16 @@ class ScheduleService
      * Retorna false quando é no-op (já está na situação-alvo) — evita reset
      * indevido de timestamps e ruído no histórico.
      *
+     * REATIVAR (Cancelado/Faltou/Atendido → situação ativa) devolve a consulta
+     * ao horário do médico, que foi liberado quando ela saiu da grade: uma
+     * cirurgia pode ter passado a ocupá-lo desde então. Criar e remarcar já
+     * recusam o horário em cirurgia; reativar recusa igual
+     * (ScheduleSlotUnavailableException, nada gravado), sob a trava das janelas
+     * cirúrgicas do médico (assertDoctorFreeOfSurgery). Vale para todo
+     * chamador deste método: PATCH da situação, lote e `situation` do formulário.
+     *
      * @throws AttendanceRequiresCashEntryException antes de qualquer escrita
+     * @throws ScheduleSlotUnavailableException     reativação em horário de cirurgia agendada do médico
      */
     public function changeSituation(
         Schedule $schedule,
@@ -606,6 +683,11 @@ class ScheduleService
         ?string $notes = null,
     ): bool {
         return DB::transaction(function () use ($schedule, $situation, $entityUserId, $notes): bool {
+            // Janelas cirúrgicas do médico ANTES da linha do agendamento (a
+            // ordem de store()/update()), quando a instância já mostra uma
+            // reativação.
+            $this->lockSurgeryWindowsForReactivation($schedule, $situation);
+
             // Travas da transição (lock paciente/dia → linha) e releitura do
             // que a instância pode ter de velho. Update + log na MESMA
             // transação: sem mudança de situação sem trilha.
@@ -693,7 +775,10 @@ class ScheduleService
     {
         if ($situation !== ScheduleSituation::Attended || ! $schedule->exists) {
             $this->lockAttendanceReconciliation($situation, $schedule);
-            $this->refreshSituationUnderLock($schedule);
+            // Situação-alvo ativa pode ser reativação: a cirurgia é conferida
+            // contra o médico e o horário ATUAIS da linha travada (outra
+            // requisição pode tê-la remarcado), não os do route binding.
+            $this->refreshSituationUnderLock($schedule, withIdentity: $situation->isActive());
 
             return;
         }
@@ -931,15 +1016,17 @@ class ScheduleService
      * do fluxo unitário).
      *
      * Contrato de bulk (sucesso parcial, nunca aborta o lote): linha que não
-     * existe/não é da entity, que já está na situação-alvo (no-op) ou que
-     * esbarra na trava "Atendido exige caixa" é IGNORADA e contada em
-     * `skipped` (updated + skipped = total de ids). As barradas pela trava
-     * também saem em `blocked`, com mensagem traduzida por linha.
+     * existe/não é da entity, que já está na situação-alvo (no-op), que
+     * esbarra na trava "Atendido exige caixa" ou cuja reativação cai numa
+     * cirurgia agendada do médico é IGNORADA e contada em `skipped` (updated +
+     * skipped = total de ids). As barradas por regra também saem em `blocked`,
+     * com mensagem traduzida por linha e o `reason` (`cash_entry` |
+     * `slot_unavailable`).
      *
      * @param string[]    $ids
      * @param string|null $doctorId perfil médico: só os agendamentos dele (os demais entram em skipped)
      *
-     * @return array{updated: int, skipped: int, updated_ids: string[], blocked: list<array{id: string, code: ?string, message: string}>}
+     * @return array{updated: int, skipped: int, updated_ids: string[], blocked: list<array{id: string, code: ?string, message: string, reason: string}>}
      */
     public function bulkUpdateSituation(
         array $ids,
@@ -973,6 +1060,18 @@ class ScheduleService
                     'id'      => $schedule->id,
                     'code'    => $schedule->code,
                     'message' => __('schedules.bulk_row_cash_entry_required', ['code' => $schedule->code]),
+                    'reason'  => 'cash_entry',
+                ];
+
+                continue;
+            } catch (ScheduleSlotUnavailableException $e) {
+                // Reativação num horário que uma cirurgia do médico passou a ocupar.
+                $skipped++;
+                $blocked[] = [
+                    'id'      => $schedule->id,
+                    'code'    => $schedule->code,
+                    'message' => $schedule->code . ': ' . $e->getMessage(),
+                    'reason'  => 'slot_unavailable',
                 ];
 
                 continue;
@@ -1009,6 +1108,40 @@ class ScheduleService
     {
         if ($situation === ScheduleSituation::Attended && $this->attendedBlockedByCash($schedule)) {
             throw new AttendanceRequiresCashEntryException($schedule);
+        }
+
+        // Reativação: médico em cirurgia agendada não volta a ter a consulta. A
+        // linha já está travada e relida (situação e identidade atuais).
+        if ($this->isReactivation($schedule, $situation) && $schedule->date_time !== null) {
+            $this->assertDoctorFreeOfSurgery((string) $schedule->doctor_id, Carbon::parse($schedule->date_time));
+        }
+    }
+
+    /**
+     * Cancelado/Faltou/Atendido voltando a uma situação ativa, num agendamento
+     * da grade. O atendimento do pronto atendimento fica de fora: nasce fora da
+     * grade, sem passar pela conferência de cirurgia (UrgentCareService::attend),
+     * e reabri-lo não pode ser mais restrito do que abri-lo.
+     */
+    private function isReactivation(Schedule $schedule, ScheduleSituation $to): bool
+    {
+        return $schedule->situation->isTerminal()
+            && $to->isActive()
+            && ! $schedule->isUrgentCare()
+            && filled($schedule->doctor_id);
+    }
+
+    /**
+     * FOR SHARE na linha do médico (janelas cirúrgicas) ANTES de travar a linha
+     * do agendamento, como a criação e a edição fazem. Só lê a instância: se ela
+     * estava velha e a reativação só aparece depois da releitura sob a trava, o
+     * guardSituationChange() trava então — sem ciclo, porque quem agenda cirurgia
+     * (FOR NO KEY UPDATE no médico) nunca espera por linha de agendamento.
+     */
+    private function lockSurgeryWindowsForReactivation(Schedule $schedule, ScheduleSituation $to): void
+    {
+        if ($schedule->exists && $this->isReactivation($schedule, $to)) {
+            app(SurgeryScheduleService::class)->lockDoctorWindows((string) $schedule->doctor_id);
         }
     }
 

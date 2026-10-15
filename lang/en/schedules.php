@@ -394,6 +394,7 @@ return [
     'print_generated'              => 'Printed on :datetime by :user',
     'print_confidential'           => 'Document with personal and health data — restricted to the clinic (LGPD).',
     'print_patient_sheet'          => 'Print patient sheet',
+    'postop_evaluation_shortcut'   => 'Post-op evaluation',
     'sheet_title'                  => 'Patient sheet',
     'sheet_section_identification' => 'Identification',
     'sheet_section_contact'        => 'Contact',

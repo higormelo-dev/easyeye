@@ -332,6 +332,7 @@ return [
     'templates' => [
         'appointment_confirmation'             => "Hello, :first_name! Reminder from :clinic: your appointment is scheduled for :when with :doctor. Can we confirm your attendance?\nTo stop receiving notices, reply STOP.\n[Confirm] [Cancel]",
         'satisfaction_survey'                  => "Hello, :first_name! We hope your visit to :clinic went well. From 1 to 5, how would you rate your experience?\nTo stop receiving notices, reply STOP.\n[5 - Excellent] [4 - Good] [3 - Fair] [2 - Poor] [1 - Very poor]",
+        'surgery_authorization_notice'         => "Hello, :first_name! :clinic has some information for you. Please contact the clinic when you can.\nTo stop receiving notices, reply STOP.",
         'care_recall'                          => "Hello, :first_name! :clinic reminds you it is time to schedule your follow-up visit. To book, tap Book now or contact the clinic.\nTo stop receiving notices, reply STOP.\n[Book now] [Already booked]",
         'verification_code'                    => '*:code* is your verification code. For your security, do not share this code. This code expires in 10 minutes.',
         'connection_test'                      => 'This is a test message from :app. If you received it, WhatsApp is set up correctly.',

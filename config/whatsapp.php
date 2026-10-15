@@ -130,6 +130,17 @@ return [
                 ['type' => 'quick_reply', 'action' => 'score', 'score' => 1],
             ],
         ],
+        // Cirurgia (Fase 4 / M3a): aviso NEUTRO de que a operadora respondeu o
+        // pedido de autorização. Nunca cita procedimento, olho, motivo nem
+        // resultado — o paciente é convidado a falar com a clínica.
+        'surgery_authorization_notice' => [
+            'name'     => 'easyeye_cirurgia_aviso',
+            'category' => 'UTILITY',
+            // Rodapé "responda SAIR" (opt-out) cadastrado no template.
+            'footer'  => true,
+            'body'    => ['first_name', 'clinic'],
+            'buttons' => [],
+        ],
         // Convite de retorno (Fase 6): texto NEUTRO — primeiro nome e clínica, nunca a condição nem o exame
         // (a tela do celular pode ser vista por outra pessoa). Aprovação manual na Meta antes de ligar
         // `recall_enabled` numa clínica (docs/internal/integracoes/whatsapp-gupshup.md).

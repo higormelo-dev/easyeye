@@ -63,6 +63,7 @@ class Schedule extends Model
         'series_id',
         'session_number',
         'session_total',
+        'surgical_case_id',
     ];
 
     /** Prefixo do código sequencial por clínica (SDL-0000000042). */

@@ -49,6 +49,13 @@ class ScheduleSeriesService
 
     public const INTERVAL_WEEKS_MAX = 16;
 
+    /**
+     * Frequência por DESLOCAMENTOS: cada sessão cai N dias depois da 1ª data
+     * (a âncora) — retornos D1/D7/D30 de uma cirurgia. A âncora é a data da
+     * cirurgia (não é uma sessão); as datas devolvidas são âncora + offset.
+     */
+    public const FREQUENCY_OFFSETS = 'offsets';
+
     /** Situações que "Cancelar as futuras" alcança (não chegou, não começou). */
     public const CANCELLABLE_SITUATIONS = [ScheduleSituation::Scheduled, ScheduleSituation::Confirmed];
 
@@ -95,6 +102,30 @@ class ScheduleSeriesService
         }
 
         return $dates;
+    }
+
+    /**
+     * Datas da série por deslocamento: âncora + N dias, na ordem crescente,
+     * sem repetir e sem passar de MAX_SESSIONS. O horário é o da âncora; quem
+     * precisa de um horário livre por dia (retornos de cirurgia) ajusta cada
+     * data depois — ver App\Services\Surgery\PostOp\PostOpReturnService.
+     *
+     * @param list<int|string> $offsets dias a partir da âncora (>= 0)
+     *
+     * @return list<Carbon>
+     */
+    public function datesFromOffsets(Carbon $anchor, array $offsets): array
+    {
+        $days = array_values(array_unique(array_filter(
+            array_map('intval', $offsets),
+            fn (int $day) => $day >= 0,
+        )));
+        sort($days);
+
+        return array_map(
+            fn (int $day) => $anchor->copy()->addDays($day),
+            array_slice($days, 0, self::MAX_SESSIONS),
+        );
     }
 
     /**
@@ -171,6 +202,9 @@ class ScheduleSeriesService
         }
 
         foreach (array_values($extraDates) as $index => $date) {
+            // Médico em cirurgia na data da sessão não atende (módulo cirúrgico).
+            $this->schedules->assertDoctorFreeOfSurgery((string) $first->doctor_id, $date);
+
             if ($first->is_fit_in) {
                 $this->schedules->assertFitInCapacity((string) $first->doctor_id, $date);
             }
@@ -366,6 +400,7 @@ class ScheduleSeriesService
             'is_fit_in'           => (bool) $first->is_fit_in,
             'series_id'           => $first->series_id,
             'recurrence_group_id' => $first->recurrence_group_id,
+            'surgical_case_id'    => $first->surgical_case_id,
             'recurrence_type'     => $first->recurrence_type,
             'recurrence_until'    => $first->recurrence_until,
             'active'              => true,

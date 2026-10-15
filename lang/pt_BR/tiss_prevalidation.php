@@ -9,8 +9,10 @@ declare(strict_types=1);
 return [
     'operator_fallback' => 'a operadora',
     'guide_type'        => [
-        'sadt'         => 'SP-SADT',
-        'consultation' => 'Consulta',
+        'sadt'              => 'SP-SADT',
+        'consultation'      => 'Consulta',
+        'inpatient_request' => 'Solicitação de internação',
+        'opme_attachment'   => 'Anexo de OPME',
     ],
     'AUTHORIZATION_REQUIRED' => [
         'message'       => 'Número de autorização prévia não informado.',
@@ -78,5 +80,91 @@ return [
     'TUSS_CODE_EXPIRED' => [
         'message'    => 'Código TUSS :code expirou em :until.',
         'suggestion' => 'Utilize o código TUSS substituto vigente para evitar glosa por código expirado.',
+    ],
+
+    // ── Mensagens avulsas do módulo cirúrgico (solicitação de internação / anexo de OPME) ──
+    'OPERATOR_ANS_INVALID' => [
+        'message'       => 'Registro ANS da operadora ausente ou inválido (precisa ter 6 dígitos).',
+        'suggestion'    => 'Corrija o registro ANS no cadastro do convênio.',
+        'operator_hint' => 'Atenção: sem o registro ANS correto a mensagem nem chega a :operator.',
+    ],
+    'PROVIDER_CODE_INVALID' => [
+        'message'    => 'Código do prestador na operadora ausente ou com mais de 14 caracteres.',
+        'suggestion' => 'Revise o código da clínica no cadastro da empresa.',
+    ],
+    'PROFESSIONAL_COUNCIL_REQUIRED' => [
+        'message'       => 'Número do CRM do cirurgião não informado.',
+        'suggestion'    => 'Preencha o registro (CRM) no cadastro do médico: conselho, número, UF e CBO vão juntos na guia.',
+        'operator_hint' => 'Atenção: :operator recusa solicitação sem o CRM do profissional.',
+    ],
+    'PROFESSIONAL_UF_REQUIRED' => [
+        'message'    => 'UF do conselho do cirurgião não identificada.',
+        'suggestion' => 'Informe o estado (UF) no cadastro da clínica: a guia usa a UF da clínica como a do conselho.',
+    ],
+    'HOSPITAL_CODE_REQUIRED' => [
+        'message'       => 'Código do hospital na operadora não informado.',
+        'suggestion'    => 'Preencha o código na operadora no cadastro do local (Configurações › Cirurgia), com até 14 caracteres.',
+        'operator_hint' => 'Atenção: :operator não localiza o hospital solicitado sem o código.',
+    ],
+    'HOSPITAL_NAME_REQUIRED' => [
+        'message'    => 'Nome do hospital solicitado não informado.',
+        'suggestion' => 'Escolha o local da cirurgia no pedido.',
+    ],
+    'HOSPITAL_CNES_RECOMMENDED' => [
+        'message'    => 'CNES do hospital ausente ou fora do padrão de 7 dígitos.',
+        'suggestion' => 'Informe o CNES no cadastro do local: algumas operadoras o conferem na análise.',
+    ],
+    'SUGGESTED_DATE_REQUIRED' => [
+        'message'       => 'Data sugerida para a internação não informada.',
+        'suggestion'    => 'Informe a data sugerida na guia (ou agende a cirurgia e atualize a guia).',
+        'operator_hint' => 'Atenção: :operator exige a data sugerida na solicitação de internação.',
+    ],
+    'CID_TOO_MANY' => [
+        'message'    => 'A solicitação aceita no máximo 4 diagnósticos (CID).',
+        'suggestion' => 'Reduza os diagnósticos no pedido da cirurgia.',
+    ],
+    'CLINICAL_INDICATION_REQUIRED' => [
+        'message'       => 'Indicação clínica não informada.',
+        'suggestion'    => 'Descreva a indicação clínica no pedido da cirurgia.',
+        'operator_hint' => 'Atenção: :operator nega solicitação sem indicação clínica.',
+    ],
+    'CLINICAL_INDICATION_TRUNCATED' => [
+        'message'    => 'A indicação clínica passa de 500 caracteres e será cortada na guia.',
+        'suggestion' => 'Resuma a indicação para que nada importante fique de fora.',
+    ],
+    'DAYS_REQUESTED_INVALID' => [
+        'message'    => 'Diárias solicitadas fora do intervalo de 1 a 99.',
+        'suggestion' => 'Corrija as diárias no pedido da cirurgia.',
+    ],
+    'OPME_REFERENCED_GUIDE_REQUIRED' => [
+        'message'       => 'Número da guia referenciada não informado.',
+        'suggestion'    => 'Gere a solicitação de internação (o anexo a referencia sozinho) ou informe o número da guia à qual o anexo se refere.',
+        'operator_hint' => 'Atenção: :operator não liga o anexo de OPME a nenhum pedido sem a guia referenciada.',
+    ],
+    'OPME_PROFESSIONAL_PHONE_REQUIRED' => [
+        'message'    => 'Telefone do profissional solicitante não informado (obrigatório no anexo de OPME).',
+        'suggestion' => 'Preencha o telefone na guia ou no cadastro do médico (até 11 dígitos, com DDD).',
+    ],
+    'OPME_JUSTIFICATION_REQUIRED' => [
+        'message'       => 'Justificativa técnica da OPME não informada.',
+        'suggestion'    => 'Preencha a justificativa técnica nos materiais do pedido ou direto na guia.',
+        'operator_hint' => 'Atenção: :operator nega OPME sem justificativa técnica.',
+    ],
+    'OPME_JUSTIFICATION_TRUNCATED' => [
+        'message'    => 'A justificativa técnica passa de 1000 caracteres e será cortada na guia.',
+        'suggestion' => 'Resuma a justificativa.',
+    ],
+    'OPME_MANUFACTURER_OPTION_INVALID' => [
+        'message'    => 'OPME ":item": opção de fabricante inválida (1, 2 ou 3).',
+        'suggestion' => 'Escolha a opção de fabricante do material (1 = primeira opção).',
+    ],
+    'OPME_ANVISA_REQUIRED' => [
+        'message'       => 'OPME ":item": registro na ANVISA não informado.',
+        'suggestion'    => 'Informe o registro ANVISA do material (consta na embalagem e na nota do fabricante).',
+        'operator_hint' => 'Atenção: :operator glosa OPME sem registro na ANVISA.',
+    ],
+    'OPME_QUANTITY_INVALID' => [
+        'message'    => 'OPME ":item": quantidade fora do intervalo de 1 a 999.',
+        'suggestion' => 'Corrija a quantidade do material.',
     ],
 ];

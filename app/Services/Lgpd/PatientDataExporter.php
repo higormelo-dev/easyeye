@@ -59,7 +59,7 @@ use Illuminate\Support\Collection;
  */
 final class PatientDataExporter
 {
-    public const FORMAT_VERSION = 5; // 5: retornos/recall e convites por WhatsApp, curso de injeções intravítreas, orientações pós-procedimento e pronto atendimento (Fase 6); 4: alergias, medicações em uso, retrato na consulta e uso de LC (Fase 2)
+    public const FORMAT_VERSION = 6; // 6: cirurgias — pedido, autorização, documentos, implante, pós-operatório (Fase 4); 5: retornos/recall e convites por WhatsApp, curso de injeções intravítreas, orientações pós-procedimento e pronto atendimento (Fase 6); 4: alergias, medicações em uso, retrato na consulta e uso de LC (Fase 2)
 
     /** @var array<class-string, array<string, ?string>> nomes de catálogo por id */
     private array $names = [];
@@ -93,6 +93,7 @@ final class PatientDataExporter
             'panel_calls'        => $this->panelCalls($patient, $scheduleIds),
             'financial'          => $this->financial($patient),
             'tiss_guides'        => $this->tissGuides($patient),
+            'surgery'            => app(SurgeryDataExporter::class)->export($patient),
             'ai_processing'      => $this->aiProcessing($patient),
             'consents'           => $this->consents($patient),
             'document_shares'    => $this->documentShares($patient),

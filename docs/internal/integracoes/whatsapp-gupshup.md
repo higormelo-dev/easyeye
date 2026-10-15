@@ -218,6 +218,16 @@ Olá, {{1}}! Esperamos que seu atendimento em {{2}} tenha sido bom. De 1 a 5, co
 - Exemplo: `Maria` · `Clínica Visão`
 - Payload enviado: `survey:<id da mensagem>:<nota>`
 
+**`easyeye_cirurgia_aviso`** — Utilidade (módulo cirúrgico, aviso neutro da resposta da operadora)
+
+```text
+Olá, {{1}}! A {{2}} tem uma informação para você. Por favor, entre em contato com a clínica quando puder.
+```
+
+- Rodapé: `Para não receber mais avisos, responda SAIR.`
+- Sem botões. Exemplo: `Maria` · `Clínica Visão`
+- Texto **neutro de propósito**: nunca cita procedimento, olho, motivo nem se a autorização foi aprovada ou negada. Só sai com o aviso ligado pela clínica (Configurações > Modelos cirúrgicos), celular marcado como WhatsApp e sem SAIR.
+
 **`easyeye_lembrete_retorno`** — Utilidade (convite de retorno, Fase 6)
 
 ```text

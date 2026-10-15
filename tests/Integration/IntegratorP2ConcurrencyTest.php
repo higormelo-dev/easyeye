@@ -29,6 +29,112 @@ it('serializes mixed legacy hardware writes and operational compare-and-swap', f
 });
 
 /**
+ * Estado de um filho que não saiu no prazo, lido de /proc (Linux). Na CI a falha dizia só "travou" e não havia como saber
+ * onde: dormindo num futex, esperando I/O, em CPU? Cada campo é opcional — o que o kernel não deixar ler vira "?".
+ */
+function p2ChildState(int $pid): string
+{
+    $read   = fn (string $file): string => trim((string) @file_get_contents("/proc/{$pid}/{$file}"));
+    $status = $read('status');
+    preg_match('/^State:\s*(.+)$/m', $status, $state);
+    preg_match('/^Threads:\s*(\d+)/m', $status, $threads);
+    $links = [];
+
+    foreach (array_slice(array_values(array_diff(@scandir("/proc/{$pid}/fd") ?: [], ['.', '..'])), 0, 12) as $fd) {
+        $links[] = $fd . '=' . (string) @readlink("/proc/{$pid}/fd/{$fd}");
+    }
+
+    $maps = $read('maps');
+    $omp  = p2OpenMpMapping($maps);
+
+    return sprintf(
+        '[estado=%s threads=%s wchan=%s syscall=%s libgomp=%s libs_candidatas=%s fds=%s]',
+        $state[1] ?? '?',
+        $threads[1] ?? '?',
+        $read('wchan') ?: '?',
+        strtok($read('syscall'), ' ') ?: '?', // só o número da syscall (o resto são argumentos)
+        $maps === '' ? '?' : (implode(',', $omp['libgomp']) ?: 'nao-mapeado'), // '?' = mapas ilegíveis, 'nao-mapeado' = lidos e sem libgomp
+        $maps === '' ? '?' : (implode(',', $omp['candidatas']) ?: 'nenhuma'),
+        implode(' ', $links) ?: '?',
+    );
+}
+
+/**
+ * Onde está o libgomp (OpenMP) e quais outras bibliotecas que costumam trazê-lo ou usá-lo (ImageMagick/Imagick, GD, BLAS)
+ * estão mapeadas, a partir do texto de /proc/<pid>/maps. Só caminhos de arquivos .so: nada de environ nem de argumentos.
+ * É o que separa "travou no libgomp herdado do pai" de "travou em outra coisa" quando a CI não carrega o Imagick.
+ *
+ * @return array{libgomp: list<string>, candidatas: list<string>}
+ */
+function p2OpenMpMapping(string $maps): array
+{
+    $libgomp    = [];
+    $candidates = [];
+
+    foreach (explode("\n", $maps) as $line) {
+        if (! preg_match('#\s(/.*?)(?: \(deleted\))?$#', $line, $found)) {
+            continue;
+        }
+
+        $name = basename($found[1]);
+
+        if (str_contains($name, 'libgomp')) {
+            $libgomp[$found[1]] = true;
+        } elseif (preg_match('/magick|^gd\.so|^libgd|blas|lapack|^libi?omp/i', $name)) {
+            $candidates[$name] = true;
+        }
+    }
+
+    return ['libgomp' => array_keys($libgomp), 'candidatas' => array_slice(array_keys($candidates), 0, 8)];
+}
+
+/**
+ * Threads de um processo (linha "Threads:" de /proc/<pid>/status); '?' se o kernel não deixar ler.
+ */
+function p2ThreadCount(int $pid): string
+{
+    return preg_match('/^Threads:\s*(\d+)/m', (string) @file_get_contents("/proc/{$pid}/status"), $found) ? $found[1] : '?';
+}
+
+/**
+ * O que o PROCESSO PAI tinha na hora do fork — o filho herda tudo isso e a CI não guarda nada além da mensagem: threads
+ * (pool nativo já criado?), extensões carregadas (há Imagick/GD?) e o OMP_THREAD_LIMIT que o próprio processo enxerga
+ * (getenv do PHP; não lê /proc/<pid>/environ).
+ */
+function p2ParentState(string $threadsAtFork): string
+{
+    $limit = getenv('OMP_THREAD_LIMIT');
+
+    return sprintf(
+        '[pai: threads_no_fork=%s OMP_THREAD_LIMIT=%s extensoes=%s]',
+        $threadsAtFork,
+        $limit === false ? '(nao definido)' : $limit,
+        implode(',', get_loaded_extensions()),
+    );
+}
+
+/**
+ * Filho parado num futex DEPOIS de gravar o resultado é a assinatura de um encerramento nativo travado; se o libgomp está
+ * mapeado nele, é a causa conhecida (ForkAfterOpenMpWarmupTest); se não está, a dica não pode acusar OpenMP.
+ */
+function p2TimeoutHint(string $state): string
+{
+    if (! str_contains($state, 'wchan=futex') || ! str_contains($state, 'resultado_gravado=sim')) {
+        return '';
+    }
+
+    if (str_contains($state, 'libgomp=/')) {
+        return ' — suspeita: libgomp (OpenMP) herdado pelo fork; rode o Pest com OMP_THREAD_LIMIT=1 no ambiente inicial do PHP e confira libs_candidatas/extensoes acima';
+    }
+
+    if (str_contains($state, 'libgomp=nao-mapeado')) {
+        return ' — filho parado num futex depois de gravar o resultado, mas o libgomp NÃO está mapeado nele: a causa não é OpenMP; investigue as bibliotecas em libs_candidatas e os módulos em extensoes';
+    }
+
+    return ' — filho parado num futex depois de gravar o resultado, mas os mapas de memória não puderam ser lidos (libgomp=?): sem isso não dá para atribuir a causa ao OpenMP';
+}
+
+/**
  * Separate processes and PDO connections start together, with no outer test transaction.
  *
  * $waitTimeoutSeconds: só o prazo de ESPERAR O FILHO SAIR (EE-16) — os
@@ -43,7 +149,9 @@ function p2Concurrent(array $jobs, int $waitTimeoutSeconds = 10): array
     $dir = sys_get_temp_dir() . '/p2-concurrency-' . Str::uuid();
     mkdir($dir, 0700);
     DB::disconnect();
-    $pids = [];
+    $pids          = [];
+    $reaped        = []; // pids que o waitpid já devolveu: o número pode ser de outro processo daqui em diante, nunca mais é sinalizado
+    $parentThreads = p2ThreadCount(getmypid()); // antes do 1º fork: é o que cada filho herda
 
     try {
         foreach ($jobs as $index => $job) {
@@ -104,6 +212,8 @@ function p2Concurrent(array $jobs, int $waitTimeoutSeconds = 10): array
                 $waited = pcntl_waitpid($pid, $status, WNOHANG);
 
                 if ($waited === $pid) {
+                    $reaped[$pid] = true;
+
                     break;
                 }
 
@@ -112,10 +222,16 @@ function p2Concurrent(array $jobs, int $waitTimeoutSeconds = 10): array
                 }
 
                 if (microtime(true) > $waitDeadline) {
+                    // ANTES de matar: depois do SIGKILL o /proc some. "resultado_gravado" separa travar no job (não) de travar
+                    // só ao sair (sim: o filho já escreveu o JSON e o que falta é o encerramento do processo).
+                    $state = p2ChildState($pid) . ' ' . p2ParentState($parentThreads) . ' resultado_gravado=' . (is_file($dir . '/' . $index . '.json') ? 'sim' : 'nao');
                     posix_kill($pid, SIGKILL);
                     pcntl_waitpid($pid, $status); // SIGKILL nunca é ignorado — bloqueia só até o kernel reaproveitar o pid, não indefinidamente.
+                    $reaped[$pid] = true;
 
-                    throw new RuntimeException("child {$pid} (job {$index}) did not exit within 10s and was killed — check for a hang in the job or a native dependency");
+                    $hint = p2TimeoutHint($state);
+
+                    throw new RuntimeException("child {$pid} (job {$index}) did not exit within {$waitTimeoutSeconds}s and was killed — check for a hang in the job or a native dependency {$state}{$hint}");
                 }
 
                 usleep(10000);
@@ -140,6 +256,10 @@ function p2Concurrent(array $jobs, int $waitTimeoutSeconds = 10): array
         return $results;
     } finally {
         foreach ($pids as $pid) {
+            if (isset($reaped[$pid])) {
+                continue; // já reapado: sinalizar agora arriscaria um processo que ganhou o mesmo número
+            }
+
             @posix_kill($pid, SIGKILL);
             pcntl_waitpid($pid, $status, WNOHANG);
         }
@@ -166,6 +286,62 @@ it('[GAP] filho travado é morto dentro do prazo e produz falha legível, nunca 
     // WNOHANG/deadline (código original), pcntl_waitpid() bloqueante teria
     // travado esta asserção indefinidamente.
     expect(microtime(true) - $start)->toBeLessThan(5.0);
+});
+
+it('[GAP] o diagnóstico lê só caminhos de /proc/<pid>/maps: libgomp, bibliotecas candidatas e dica coerente', function () {
+    $withOpenMp = implode("\n", [
+        '55d0a0000000-55d0a0100000 r--p 00000000 08:01 1234                      /usr/bin/php8.4',
+        '7f1c00000000-7f1c00021000 r-xp 00000000 08:01 2001                      /usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0',
+        '7f1c10000000-7f1c10021000 r-xp 00000000 08:01 2002                      /usr/lib/x86_64-linux-gnu/libMagickCore-6.Q16.so.7.0.0',
+        '7f1c20000000-7f1c20021000 r-xp 00000000 08:01 2003                      /usr/lib/php/20240924/imagick.so',
+        '7f1c30000000-7f1c30021000 r-xp 00000000 08:01 2004                      /usr/lib/php/20240924/gd.so',
+        '7f1c40000000-7f1c40021000 r-xp 00000000 08:01 2005                      /usr/lib/x86_64-linux-gnu/libc.so.6',
+        '7ffd00000000-7ffd00021000 rw-p 00000000 00:00 0                         [stack]',
+    ]);
+    $mapping = p2OpenMpMapping($withOpenMp);
+
+    expect($mapping['libgomp'])->toBe(['/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0'])
+        ->and($mapping['candidatas'])->toBe(['libMagickCore-6.Q16.so.7.0.0', 'imagick.so', 'gd.so']);
+
+    $without = p2OpenMpMapping("55d0a0000000-55d0a0100000 r--p 00000000 08:01 1234  /usr/bin/php8.4\n7f1c40000000-7f1c40021000 r-xp 00000000 08:01 2005  /usr/lib/x86_64-linux-gnu/libc.so.6");
+    expect($without)->toBe(['libgomp' => [], 'candidatas' => []]);
+
+    // A dica só acusa OpenMP quando o libgomp está mesmo mapeado no filho parado.
+    $stuck = '[estado=S (sleeping) threads=1 wchan=futex_wait_queue syscall=202 libgomp=%s libs_candidatas=x fds=?] resultado_gravado=sim';
+    expect(p2TimeoutHint(sprintf($stuck, '/usr/lib/libgomp.so.1')))->toContain('suspeita: libgomp')
+        ->and(p2TimeoutHint(sprintf($stuck, 'nao-mapeado')))->toContain('NÃO está mapeado')->not->toContain('suspeita: libgomp')
+        ->and(p2TimeoutHint(sprintf($stuck, '?')))->toContain('não puderam ser lidos')
+        ->and(p2TimeoutHint(str_replace('resultado_gravado=sim', 'resultado_gravado=nao', sprintf($stuck, '/usr/lib/libgomp.so.1'))))->toBe('')
+        ->and(p2TimeoutHint(str_replace('wchan=futex_wait_queue', 'wchan=0', sprintf($stuck, '/usr/lib/libgomp.so.1'))))->toBe('');
+});
+
+it('[GAP] o timeout do filho registra libgomp, bibliotecas, threads do pai no fork, extensões e OMP_THREAD_LIMIT', function () {
+    if (! function_exists('pcntl_fork') || ! is_readable('/proc/self/maps')) {
+        test()->markTestSkipped('pcntl e /proc necessários');
+    }
+    $previous = getenv('OMP_THREAD_LIMIT');
+    putenv('OMP_THREAD_LIMIT=7'); // o diagnóstico mostra o que o processo enxerga; o libgomp já carregado não é afetado
+
+    try {
+        $message = '';
+
+        try {
+            p2Concurrent([fn () => sleep(999)], waitTimeoutSeconds: 1);
+        } catch (RuntimeException $error) {
+            $message = $error->getMessage();
+        }
+    } finally {
+        putenv($previous === false ? 'OMP_THREAD_LIMIT' : 'OMP_THREAD_LIMIT=' . $previous);
+    }
+
+    $expected = p2OpenMpMapping((string) file_get_contents('/proc/self/maps'));
+
+    expect($message)->toContain('did not exit within 1s')
+        ->and($message)->toContain('libgomp=' . (implode(',', $expected['libgomp']) ?: 'nao-mapeado'))
+        ->and($message)->toContain('libs_candidatas=')
+        ->and($message)->toContain('[pai: threads_no_fork=')
+        ->and($message)->toContain('OMP_THREAD_LIMIT=7')
+        ->and($message)->toContain('extensoes=' . implode(',', get_loaded_extensions()));
 });
 
 it('keeps the first terminal ACK across two committed HTTP requests', function () {

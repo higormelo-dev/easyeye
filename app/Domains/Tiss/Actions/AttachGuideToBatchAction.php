@@ -28,6 +28,12 @@ class AttachGuideToBatchAction
             throw new InvalidArgumentException('Guia e lote devem pertencer à mesma operadora.');
         }
 
+        // Solicitação de internação e anexo de OPME são mensagens avulsas do módulo
+        // cirúrgico: não entram em lote (o builder de lote também as recusa).
+        if (! $guide->guide_type->isBatchable()) {
+            throw new InvalidArgumentException('Este tipo de guia é uma mensagem avulsa e não pode ser anexado a um lote.');
+        }
+
         $validation = $this->preValidator->validate($guide);
 
         $guide->update(['errors' => $validation->isEmpty() ? null : $validation->toArray()]);

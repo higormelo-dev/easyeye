@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\{ClientRule, DocumentationType, ReportSettingStatus};
 use App\Models\{DataAccessLog, Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, People, ReportSetting, User};
 use Illuminate\Support\Facades\URL;
+use Symfony\Component\Process\{ExecutableFinder, Process};
 
 /**
  * Laudo de imagem pro médico solicitante (Fase 5) — ExternalMedicalReportController.
@@ -53,6 +54,42 @@ function signedExternalReportUrl(string $documentationId, $expiration = null)
         $expiration ?? now()->addDays(7),
         ['documentation' => $documentationId],
     );
+}
+
+/**
+ * Texto do PDF lido por `pdftotext` (poppler-utils). Sem o executável (ou se ele falhar) o teste reprova dizendo isso:
+ * a saída vazia que o `shell_exec` devolvia fazia a asserção de conteúdo acusar "cabeçalho errado".
+ */
+function externalReportPdfText(string $pdf): string
+{
+    $binary = (new ExecutableFinder())->find('pdftotext');
+
+    if ($binary === null) {
+        test()->fail('Pré-requisito ausente: pdftotext (poppler-utils) não encontrado no PATH. Instale com `apt-get install poppler-utils`.');
+    }
+
+    $path = tempnam(sys_get_temp_dir(), 'eeye_test_pdf_');
+
+    if ($path === false) {
+        test()->fail('Não foi possível criar o arquivo temporário do PDF em ' . sys_get_temp_dir());
+    }
+
+    try {
+        if (file_put_contents($path, $pdf) === false) {
+            test()->fail("Não foi possível gravar o PDF em {$path}");
+        }
+
+        $process = new Process([$binary, $path, '-']);
+        $process->run();
+    } finally {
+        @unlink($path);
+    }
+
+    if (! $process->isSuccessful()) {
+        test()->fail("pdftotext falhou (status {$process->getExitCode()}): " . trim($process->getErrorOutput()));
+    }
+
+    return $process->getOutput();
 }
 
 it('link assinado válido devolve o PDF do laudo, sem precisar de login', function () {
@@ -202,10 +239,7 @@ it('[GAP] usa a clínica DO DOCUMENTO (patient->entity) no log de auditoria e no
     $response = $this->get($url);
     $response->assertOk();
 
-    $pdfPath = tempnam(sys_get_temp_dir(), 'eeye_test_pdf_') . '.pdf';
-    file_put_contents($pdfPath, $response->getContent());
-    $text = (string) shell_exec('pdftotext ' . escapeshellarg($pdfPath) . ' - 2>/dev/null');
-    @unlink($pdfPath);
+    $text = externalReportPdfText($response->getContent());
 
     // O cabeçalho do PDF usa text-transform:uppercase (CSS) — comparação
     // precisa ignorar caixa, senão "SALAZAR..." nunca bate com "Salazar...".

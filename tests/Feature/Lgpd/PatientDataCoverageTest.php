@@ -24,14 +24,21 @@ use Illuminate\Support\Facades\DB;
 
 /** tabela → seção do arquivo exportado (`PatientDataExporter::export()`). */
 const PDC_COVERED = [
-    'ai_runs'                       => 'ai_processing',
-    'billing_claims'                => 'financial',
-    'care_guidance_issues'          => 'care_guidance',
-    'data_access_logs'              => 'access_log_summary',
-    'financial_cash_entries'        => 'financial',
-    'intravitreal_applications'     => 'intravitreal',
-    'intravitreal_courses'          => 'intravitreal',
-    'lgpd_requests'                 => 'lgpd_requests',
+    'ai_runs'                   => 'ai_processing',
+    'billing_claims'            => 'financial',
+    'care_guidance_issues'      => 'care_guidance',
+    'data_access_logs'          => 'access_log_summary',
+    'financial_cash_entries'    => 'financial',
+    'intravitreal_applications' => 'intravitreal',
+    'intravitreal_courses'      => 'intravitreal',
+    'lgpd_requests'             => 'lgpd_requests',
+    // Módulo cirúrgico (Fase 4): SurgeryDataExporter entrega a seção `surgery` (as demais tabelas do módulo ligam ao caso, não ao paciente).
+    'surgery_document_issues'       => 'surgery',
+    'surgical_cases'                => 'surgery',
+    'surgical_description_addenda'  => 'surgery',
+    'surgical_descriptions'         => 'surgery',
+    'surgical_implants'             => 'surgery',
+    'surgical_postop_evaluations'   => 'surgery',
     'medical_record_documentations' => 'medical_records',
     'medical_record_evolutions'     => 'medical_records',
     'medical_record_files'          => 'medical_records',
@@ -102,8 +109,8 @@ it('toda seção declarada como cobertura existe no arquivo exportado e a versã
         expect($export)->toHaveKey($section);
     }
 
-    expect($export['format_version'])->toBe(5)
-        ->and(PatientDataExporter::FORMAT_VERSION)->toBe(5);
+    expect($export['format_version'])->toBe(6)
+        ->and(PatientDataExporter::FORMAT_VERSION)->toBe(6);
 });
 
 it('as exclusões usam categorias que a exportação declara e as lacunas têm explicação', function () {

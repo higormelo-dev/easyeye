@@ -59,10 +59,13 @@ class IolLensStockBridgeService
                 // badge/checkbox visual, não está cablado em faturamento
                 // TISS — ver TissGuideItem.php) — revisar quando o
                 // faturamento OPM/TISS for implementado de verdade.
-                'is_opm'     => true,
-                'sale_price' => $data['price'] ?? null,
-                'image_path' => $data['image_path'] ?? null,
-                'active'     => $data['active'] ?? true,
+                'is_opm' => true,
+                // Implante (RDC 556/2021): lente rastreada por lote/validade E série.
+                'requires_lot'    => true,
+                'requires_serial' => true,
+                'sale_price'      => $data['price'] ?? null,
+                'image_path'      => $data['image_path'] ?? null,
+                'active'          => $data['active'] ?? true,
             ]);
 
             return EntityIolLens::create([

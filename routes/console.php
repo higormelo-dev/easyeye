@@ -275,3 +275,10 @@ Schedule::command('ai:expire-credit-pack-orders')
     ->withoutOverlapping();
 
 Schedule::command('integrator-outbox:publish')->everyMinute()->withoutOverlapping();
+
+// Módulo cirúrgico (Fase 4): autorização cuja validade passou vira evento
+// `expired` e o caso volta a aguardar renovação — idempotente.
+Schedule::command('surgery:expire-authorizations')
+    ->dailyAt('00:25')
+    ->name('surgery:expire-authorizations')
+    ->withoutOverlapping();

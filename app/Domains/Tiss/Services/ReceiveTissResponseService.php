@@ -9,6 +9,7 @@ use App\Domains\Tiss\Enums\{TissProtocolStatus, TissReturnStatus, TissXmlDirecti
 use App\Domains\Tiss\Jobs\ProcessTissReturnJob;
 use App\Domains\Tiss\Models\{TissBatch, TissProtocol, TissReturn, TissXmlDocument};
 use App\Domains\Tiss\Parsers\TissReturnParser;
+use App\Domains\Tiss\Surgical\SurgicalAuthorizationResponseService;
 use Illuminate\Support\Facades\{DB, Log, Storage};
 
 class ReceiveTissResponseService
@@ -18,6 +19,7 @@ class ReceiveTissResponseService
         private readonly ValidateTissXmlService $validateTissXmlService,
         private readonly ProcessTissReturnService $processTissReturnService,
         private readonly LogTissStatusTransitionService $logStatusTransitionService,
+        private readonly SurgicalAuthorizationResponseService $authorizationResponses,
     ) {
     }
 
@@ -79,6 +81,16 @@ class ReceiveTissResponseService
 
         if ($known?->status === TissReturnStatus::Processed) {
             return $this->alreadyImported($known);
+        }
+
+        // Resposta de AUTORIZAÇÃO a uma guia cirúrgica (solicitação de internação / anexo de
+        // OPME): vira evento no log do caso, não retorno de lote. Idempotente por arquivo
+        // (mesma identidade e mesma chave de advisory lock, tratadas lá). Qualquer outro XML
+        // segue o fluxo de retorno de lote, inalterado.
+        $authorization = $this->authorizationResponses->maybeReceive($entityId, $operatorId, $xmlContent, $fileHash, $metadata);
+
+        if ($authorization !== null) {
+            return $authorization;
         }
 
         $parsed = $this->parser->parse($xmlContent);

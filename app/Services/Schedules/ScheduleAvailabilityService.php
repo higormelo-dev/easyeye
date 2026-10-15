@@ -7,6 +7,7 @@ namespace App\Services\Schedules;
 use App\Enums\ScheduleSituation;
 use App\Models\{Doctor, DoctorWorkSchedule, Entity, Schedule, ScheduleBlock};
 use App\Services\Dashboard\ClinicOperationsService;
+use App\Services\Surgery\SurgeryScheduleService;
 use Carbon\Carbon;
 use Illuminate\Support\{Collection, Str};
 use Illuminate\Support\Facades\Cache;
@@ -118,6 +119,15 @@ class ScheduleAvailabilityService
             ->get()
             ->groupBy(fn (ScheduleBlock $b) => (string) $b->doctor_id);
 
+        // Cirurgias agendadas (cirurgião ou equipe) tiram o horário da grade. Ficam
+        // à parte dos bloqueios do médico: o bloqueio vale pelo INÍCIO do horário
+        // (como isBlocked()), a cirurgia vale pelo INTERVALO inteiro da consulta
+        // (início + intervalo do médico, como surgeryOverlapError() e o seletor de
+        // horários) — uma cirurgia às 09:10 tira o horário das 09:00–09:15 mesmo
+        // que o início dele fique fora da janela.
+        /** @var array<string, list<ScheduleBlock>> $surgeries médico → janelas cirúrgicas (não persistidas) */
+        $surgeries = app(SurgeryScheduleService::class)->windowsByDoctor($ids, $start, $end);
+
         $occupied = Schedule::query()
             ->where('entity_id', $entityId)
             ->whereIn('doctor_id', $ids)
@@ -171,10 +181,11 @@ class ScheduleAvailabilityService
                 }
 
                 $working++;
-                $doctorBlocks   = $blocks->get($id, collect());
-                $doctorRaw      = 0;
-                $doctorCapacity = 0;
-                $doctorFree     = 0;
+                $doctorBlocks    = $blocks->get($id, collect());
+                $doctorSurgeries = collect($surgeries[$id] ?? []);
+                $doctorRaw       = 0;
+                $doctorCapacity  = 0;
+                $doctorFree      = 0;
 
                 foreach ($dayRanges as $range) {
                     $slot  = Carbon::parse($date . ' ' . $range->starts_at);
@@ -188,7 +199,10 @@ class ScheduleAvailabilityService
                         $raw++;
                         $doctorRaw++;
 
-                        if ($doctorBlocks->contains(fn (ScheduleBlock $b) => $slot->gte($b->starts_at) && $slot->lt($b->ends_at))) {
+                        $slotEnd = $slot->copy()->addMinutes($intervals[$id]);
+
+                        if ($doctorBlocks->contains(fn (ScheduleBlock $b) => $slot->gte($b->starts_at) && $slot->lt($b->ends_at))
+                            || $doctorSurgeries->contains(fn (ScheduleBlock $w) => $slot->lt($w->ends_at) && $slotEnd->gt($w->starts_at))) {
                             continue;
                         }
 

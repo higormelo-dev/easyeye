@@ -70,10 +70,20 @@ return [
     | connection that should be used to manage these sessions. This should
     | correspond to a connection in your database configuration options.
     |
+    | "database" lê um nome de config/database.php → connections; "redis", um
+    | de config/database.php → redis. SESSION_CONNECTION vale para os dois e
+    | manda sempre. Sem ela, só o driver redis ganha o padrão próprio
+    | (REDIS_SESSION_CONNECTION, "session" = banco 3 do Redis): aplicá-lo
+    | também ao driver database apontava a sessão para uma conexão de banco
+    | chamada "session", que não existe ("Database connection [session] not
+    | configured") e derrubava toda requisição com sessão. env() puro, como
+    | no resto do arquivo: config é carregada antes do container ter o 'env'.
+    |
     */
 
-    // 'connection' => env('SESSION_CONNECTION'),
-    'connection' => env('REDIS_SESSION_CONNECTION', 'session'),
+    'connection' => env('SESSION_CONNECTION', env('SESSION_DRIVER', 'database') === 'redis'
+        ? env('REDIS_SESSION_CONNECTION', 'session')
+        : null),
 
     /*
     |--------------------------------------------------------------------------

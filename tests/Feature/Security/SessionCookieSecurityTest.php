@@ -121,3 +121,79 @@ test('URLs absolutas respeitam o scheme de APP_URL mesmo com APP_ENV=testing (ca
 test('URLs absolutas continuam https em producao de verdade, com APP_URL https', function () {
     expect(resolveLoginUrlInFreshProcess('https://app.easyeye.com.br', 'production'))->toStartWith('https://');
 });
+
+/**
+ * Conexão da sessão (config/session.php 'connection'). O padrão "session" é o
+ * nome da conexão REDIS dedicada às sessões (config/database.php → redis); no
+ * driver "database" a mesma chave nomeia uma conexão de BANCO, e "session" não
+ * existe lá: instalação com SESSION_DRIVER=database estourava "Database
+ * connection [session] not configured" em toda requisição com sessão. Boot real
+ * em subprocesso, com as variáveis como variáveis REAIS do processo (mesma
+ * razão do helper acima); o driver database é construído de verdade, que é
+ * onde o nome da conexão é resolvido.
+ *
+ * @param array<string, string> $env
+ *
+ * @return array{connection: ?string, handler: ?string, error: ?string}
+ */
+function resolveSessionConnectionInFreshProcess(array $env): array
+{
+    $basePath = base_path();
+
+    $script = <<<'PHP'
+        require '%s/vendor/autoload.php';
+        $app = require '%s/bootstrap/app.php';
+        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+        $config  = $app->make('config');
+        $handler = null;
+        $error   = null;
+        try {
+            if ($config->get('session.driver') === 'database') {
+                $handler = class_basename($app->make('session')->driver()->getHandler());
+            }
+        } catch (Throwable $e) {
+            $error = $e->getMessage();
+        }
+        echo json_encode(['connection' => $config->get('session.connection'), 'handler' => $handler, 'error' => $error]);
+        PHP;
+    $script = sprintf($script, $basePath, $basePath);
+
+    $envPrefix = collect($env)
+        ->map(fn ($value, $key) => escapeshellarg("{$key}={$value}"))
+        ->implode(' ');
+
+    $decoded = json_decode((string) shell_exec("env {$envPrefix} php -r " . escapeshellarg($script)), true);
+
+    return is_array($decoded) ? $decoded : ['connection' => null, 'handler' => null, 'error' => 'boot falhou (sem saída do subprocesso)'];
+}
+
+test('sessao no driver database nao herda a conexao redis dedicada e sobe normalmente', function () {
+    // REDIS_SESSION_CONNECTION="session" fica no .env de instalações que já
+    // usaram redis: não pode vazar para o driver database.
+    $result = resolveSessionConnectionInFreshProcess(['SESSION_DRIVER' => 'database', 'REDIS_SESSION_CONNECTION' => 'session']);
+
+    expect($result['error'])->toBeNull()
+        ->and($result['connection'])->toBeNull()
+        ->and($result['handler'])->toBe('DatabaseSessionHandler');
+});
+
+test('SESSION_CONNECTION explicita escolhe a conexao de banco da sessao no driver database', function () {
+    $result = resolveSessionConnectionInFreshProcess([
+        'SESSION_DRIVER'           => 'database',
+        'SESSION_CONNECTION'       => (string) config('database.default'),
+        'REDIS_SESSION_CONNECTION' => 'session',
+    ]);
+
+    expect($result['error'])->toBeNull()
+        ->and($result['connection'])->toBe((string) config('database.default'))
+        ->and($result['handler'])->toBe('DatabaseSessionHandler');
+});
+
+test('sessao no driver redis segue usando a conexao redis dedicada, configuravel por REDIS_SESSION_CONNECTION', function () {
+    expect(resolveSessionConnectionInFreshProcess(['SESSION_DRIVER' => 'redis'])['connection'])->toBe('session')
+        ->and(resolveSessionConnectionInFreshProcess(['SESSION_DRIVER' => 'redis', 'REDIS_SESSION_CONNECTION' => 'sessoes'])['connection'])->toBe('sessoes');
+});
+
+test('SESSION_CONNECTION explicita manda tambem no driver redis', function () {
+    expect(resolveSessionConnectionInFreshProcess(['SESSION_DRIVER' => 'redis', 'SESSION_CONNECTION' => 'cache', 'REDIS_SESSION_CONNECTION' => 'sessoes'])['connection'])->toBe('cache');
+});

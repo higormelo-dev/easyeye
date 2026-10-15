@@ -169,3 +169,42 @@ $received = $workflow->receiveResponse(
 $received->return;          // TissReturn (novo, retomado ou o já processado)
 $received->alreadyImported; // true = arquivo repetido de retorno já processado (nada foi escrito)
 ```
+
+## Mensagens avulsas do módulo cirúrgico (solicitação de internação e anexo de OPME)
+
+Fase 4 / M3b. Dois tipos de guia (`TissGuideType::InpatientRequest`, `OpmeAttachment`) que NÃO viajam em `loteGuias`
+(`ctm_guiaLote` só aceita consulta, SP-SADT, resumo de internação, honorários e odonto): a solicitação de internação é
+`prestadorParaOperadora/solicitacaoProcedimento` (`SOLICITACAO_PROCEDIMENTOS`) e o anexo de OPME é `loteAnexos`
+(`ENVIO_ANEXO`). Código em `App\Domains\Tiss\Surgical`; a guia nasce do caso cirúrgico (`tiss_guides.surgical_case_id`).
+
+- **Despacho explícito**: o builder de LOTE faz `match` por tipo e recusa (`TissGuideTypeNotBatchableException`) o que não é
+  consulta/SP-SADT — antes, tudo que não era consulta saía como SP-SADT sem erro. `AttachGuideToBatchAction` também recusa.
+- **Retrato congelado**: `payload.surgical.data` (derivado do caso) + `overrides` (o que a secretária completou: TUSS do material,
+  data sugerida, telefone). Atualizar a partir do caso troca `data` e preserva `overrides`; `source_hash` acusa guia desatualizada.
+  O builder só lê o retrato, nunca o caso vivo.
+- **XML**: `V202603TissSurgicalMessageBuilder`, validado contra o XSD 4.03.00 (mesma evidência `metadata.schema`); XML recusado nunca
+  sai. Pré-validação própria (`SurgicalGuideRules`).
+- **Envio** (`SendSurgicalGuideService`): UMA transmissão por guia, sem lote e SEM retentativa automática (nenhum job). Idempotência
+  pelo hash do XML (escopo `guide_send`). Mesmas garantias do lote: lease de transmissão em voo (a 2ª requisição não chama o
+  transporte), entrega em dúvida (timeout/408/5xx = transmissão `timeout`, guia TRAVADA — não edita, não cancela, não regera; o reenvio
+  usa o MESMO XML e a MESMA chave mesmo que o caso tenha mudado; só o aceite encerra a dúvida, falha posterior não a desfaz) e erro
+  definitivo (4xx / 500 com recusa explícita → guia `error`, editável). Transporte real exige XSD validado.
+- **Locks**: guia → transmissão. O caso cirúrgico só é travado na GERAÇÃO (caso → guia); envio e retorno não o seguram — o evento no
+  log de autorização é gravado depois, fora das transações da guia.
+- **Retorno**: `TissReturnParser::parseAuthorization()` (aditivo) lê os DOIS envelopes do XSD: a solicitação de internação
+  (`autorizacaoServicos`/`situacaoAutorizacao`) e o anexo de OPME (`recebimentoAnexo/protocoloRecebimentoAnexo/anexosClinicos/anexoOPME`,
+  itens em `servicosAutorizadosOPME`, ou `recebimentoAnexo/mensagemErro`); os outros anexos (quimio, radio, situação inicial) não são
+  autorização cirúrgica e o parser devolve null. `SurgicalAuthorizationResponseService` transforma a resposta (síncrona, anexada na aba ou
+  importada em `ReceiveTissResponseService::receive`) em evento do caso (`channel = tiss`, `tiss_guide_id`) pelo mesmo
+  `SurgeryAuthorizationService::record()` da secretária. Idempotente (resposta conferida por guia + número/validade, seja o evento de
+  desfecho ou a anotação da resposta parcial do pedido; arquivo importado por clínica + operadora + SHA-256). Resposta que não cabe no
+  estado do caso vira anotação.
+- **Escopo da resposta**: a operadora responde por GUIA (internação = procedimentos; anexo de OPME = materiais) e a resposta vale só
+  para os itens da guia (`metadata.source_kind`/`source_id`, casados por TUSS na resposta parcial). O caso só passa a autorizado quando
+  nenhum item fica sem resposta; antes disso segue "aguardando" — e o anexo de OPME continua podendo ser enviado — e a resposta fica no
+  log como anotação (número, validade, itens). Negativa de qualquer guia nega o caso. O número e a senha da autorização da internação
+  vão no cabeçalho do anexo de OPME (`SurgicalGuideSource::authorization()`).
+- Limites: só o código TUSS do material e o telefone do solicitante precisam ser completados à mão; envio por webservice só com
+  transporte `http` configurado (o padrão é `mock`, que responde no envelope certo de cada transação); sem tela de conciliação para
+  entrega em dúvida — ela sai com o aceite da operadora.
+

@@ -168,6 +168,8 @@ class MedicalRecordProceduresController extends Controller
                         ? $product->lots()
                             ->active()
                             ->withBalance()
+                            // Lote vencido não é oferecido: StockService::consumptionOut() o recusa (M4).
+                            ->where(fn ($q) => $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', now()->toDateString()))
                             ->orderBy('expiry_date')
                             ->orderBy('lot_number')
                             ->get()
