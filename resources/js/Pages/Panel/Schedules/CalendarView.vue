@@ -23,6 +23,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import ptBrLocale from '@fullcalendar/core/locales/pt-br';
+import { sessionLabel } from '@/Support/sessionLabel.js';
 
 const props = defineProps({
     scheduleItems: { type: Array, default: () => [] },
@@ -58,7 +59,7 @@ const BADGE_HEX = {
 };
 
 function sessionText(item) {
-    return item.session_total ? `${item.session_number}/${item.session_total}` : null;
+    return sessionLabel(item.session_number, item.session_total);
 }
 
 // ── Transforma scheduleItems em eventos FullCalendar ──────────────────────────

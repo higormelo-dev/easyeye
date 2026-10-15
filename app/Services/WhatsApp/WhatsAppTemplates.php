@@ -13,7 +13,7 @@ use InvalidArgumentException;
  *
  * Payload dos botões de resposta rápida: identifica a MENSAGEM enviada (UUID
  * interno, não adivinhável) — nunca a consulta ou o paciente:
- *   confirm:<id> · cancel:<id> · survey:<id>:<nota>
+ *   confirm:<id> · cancel:<id> · survey:<id>:<nota> · recall_book:<id> · recall_done:<id>
  */
 final class WhatsAppTemplates
 {
@@ -22,6 +22,11 @@ final class WhatsAppTemplates
     public const ACTION_CANCEL = 'cancel';
 
     public const ACTION_SURVEY = 'survey';
+
+    /** Convite de retorno (Fase 6): "Quero agendar" / "Já agendei". */
+    public const ACTION_RECALL_BOOK = 'recall_book';
+
+    public const ACTION_RECALL_DONE = 'recall_done';
 
     /** Texto mostrado no histórico no lugar do código de verificação. */
     public const MASKED_CODE = '••••••';
@@ -111,7 +116,7 @@ final class WhatsAppTemplates
     {
         $uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
-        if (preg_match("/^(confirm|cancel):({$uuid})$/i", trim((string) $payload), $m)) {
+        if (preg_match("/^(confirm|cancel|recall_book|recall_done):({$uuid})$/i", trim((string) $payload), $m)) {
             return ['action' => strtolower($m[1]), 'message_id' => strtolower($m[2])];
         }
 
@@ -129,7 +134,8 @@ final class WhatsAppTemplates
             self::ACTION_CONFIRM => self::ACTION_CONFIRM . ':' . $messageId,
             self::ACTION_CANCEL  => self::ACTION_CANCEL . ':' . $messageId,
             'score'              => self::ACTION_SURVEY . ':' . $messageId . ':' . (int) ($button['score'] ?? 0),
-            default              => throw new InvalidArgumentException('Ação de botão desconhecida.'),
+            self::ACTION_RECALL_BOOK, self::ACTION_RECALL_DONE => $button['action'] . ':' . $messageId,
+            default => throw new InvalidArgumentException('Ação de botão desconhecida.'),
         };
     }
 

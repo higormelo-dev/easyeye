@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\ConsentType;
 use App\Http\Requests\PatientRequest;
-use App\Models\{Covenant, Doctor, Patient, People};
+use App\Models\{Covenant, Doctor, EntityUser, Patient, People};
 use App\Models\Scopes\EntityScope;
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,8 +35,41 @@ class PatientService
                 app(PatientClinicalSafetyService::class)->registerFromPatientForm($patient, $allergies, $denied, $medications);
             }
 
+            $this->syncCareRemindersConsent($patient, $request);
+
             return $patient;
         });
+    }
+
+    /**
+     * Autorização de lembretes de retorno por WhatsApp, marcada no cadastro (LGPD art. 8, ADR 0002 item 9): só age
+     * quando o campo vem (nulo/ausente = não mexe). Marcar registra o consentimento (quem coletou, canal presencial,
+     * IP); desmarcar revoga o vigente. Nada se faz sem uma pessoa da clínica na sessão (importação e API não coletam).
+     *
+     * O campo é um ATO, não o estado do formulário: o cadastro (usePatientForm) só o envia quando a pessoa mudou a
+     * caixa. Quem manda o valor de sempre a cada salvamento restaura em silêncio uma autorização que o titular retirou
+     * (SAIR) com a tela aberta — e, ao contrário, revoga uma que outra pessoa acabou de registrar.
+     */
+    private function syncCareRemindersConsent(Patient $patient, PatientRequest $request): void
+    {
+        if (! $request->has('care_reminders_consent') || $request->input('care_reminders_consent') === null) {
+            return;
+        }
+
+        $collectedBy = EntityUser::query()->find((string) session('selected_entity_user_id'));
+
+        if ($collectedBy === null) {
+            return;
+        }
+
+        $consents = app(ConsentService::class);
+        $active   = $consents->hasActiveConsent($patient, ConsentType::CareReminders);
+
+        if ($request->boolean('care_reminders_consent') && ! $active) {
+            $consents->grant($patient, ConsentType::CareReminders, $collectedBy, 'in_person', 'care_reminders_v1');
+        } elseif (! $request->boolean('care_reminders_consent') && $active) {
+            $consents->revoke($patient, ConsentType::CareReminders, $collectedBy, (string) __('consent.revoked.patient_form', [], 'pt_BR'));
+        }
     }
 
     /**
@@ -85,6 +119,8 @@ class PatientService
             if (! $request->has('type_method')) {
                 $this->updatePersonData($patient, $request);
             }
+
+            $this->syncCareRemindersConsent($patient, $request);
 
             return $patient;
         });

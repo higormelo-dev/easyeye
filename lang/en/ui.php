@@ -37,10 +37,16 @@ return [
     // Cadastro de paciente (componente compartilhado Pacientes/Agenda).
     'patient_form' => [
         // Mobile replied STOP to the clinic/EasyEye WhatsApp.
-        'wa_opted_out'           => 'Opted out of WhatsApp',
-        'wa_opted_out_hint'      => 'This mobile replied STOP: it gets no confirmation or survey via WhatsApp until it replies START.',
-        'occupation'             => 'Occupation',
-        'occupation_placeholder' => 'E.g.: teacher, driver, retired',
+        'wa_opted_out'      => 'Opted out of WhatsApp',
+        'wa_opted_out_hint' => 'This mobile replied STOP: it gets no confirmation or survey via WhatsApp until it replies START.',
+        // Authorisation for follow-up reminders by WhatsApp (Phase 6, LGPD).
+        'care_reminders'                => 'Authorises follow-up reminders by WhatsApp',
+        'care_reminders_hint'           => 'The reminder does not state the reason for the follow-up. The patient can stop at any time by replying STOP.',
+        'care_reminders_needs_whatsapp' => 'Check that the mobile phone has WhatsApp to record this authorisation.',
+        'care_reminders_badge'          => 'Follow-up reminders',
+        'care_reminders_badge_hint'     => 'The patient authorised follow-up reminders by WhatsApp.',
+        'occupation'                    => 'Occupation',
+        'occupation_placeholder'        => 'E.g.: teacher, driver, retired',
         // Insurer plan (ANS product or clinic plan)
         'plan'                 => 'Plan',
         'plan_placeholder'     => 'Search by name or ANS registry',

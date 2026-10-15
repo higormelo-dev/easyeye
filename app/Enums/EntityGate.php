@@ -83,6 +83,23 @@ enum EntityGate: string
     /** Enviar/reenviar laudo ao médico solicitante por e-mail (admin, doctor — Fase 5). */
     case SendReportToExternalDoctor = 'entity.send-report-to-external-doctor';
 
+    /**
+     * Operar o recall de pacientes crônicos: ver a lista de retornos, registrar
+     * contato, adiar, dispensar, marcar "feito fora" e agendar o retorno
+     * (admin, doctor, secretary — Fase 6). Ato administrativo de contato com o
+     * paciente; as decisões clínicas (confirmar condição, ativar protocolo)
+     * ficam em DecideRecall.
+     */
+    case OperateRecall = 'entity.operate-recall';
+
+    /**
+     * Decidir o recall: confirmar/descartar/dar alta de uma condição crônica do
+     * paciente e ativar na clínica um protocolo de retorno validado (doctor com
+     * cadastro de médico ATIVO — Fase 6). Mesmo corpo de IssueReport: admin e
+     * secretária nunca decidem conduta clínica, e a decisão grava quem a tomou.
+     */
+    case DecideRecall = 'entity.decide-recall';
+
     /** Gerenciar configurações da entity (admin). */
     case ManageSettings = 'entity.manage-settings';
 

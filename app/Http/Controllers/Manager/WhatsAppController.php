@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Manager;
 
+use App\Domains\Recall\Services\RecallKillSwitch;
 use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
 use App\Models\Entity;
@@ -47,6 +48,7 @@ class WhatsAppController extends Controller
         private readonly WhatsAppProvider $provider,
         private readonly WhatsAppTemplates $templates,
         private readonly AuditLogger $audit,
+        private readonly RecallKillSwitch $killSwitch,
     ) {
     }
 
@@ -92,11 +94,18 @@ class WhatsAppController extends Controller
             ] : null,
             'templates'         => fn () => $this->templateCatalog(),
             'templateLanguages' => array_values((array) config('whatsapp.template_languages', ['pt_BR'])),
-            'routes'            => [
+            // Pausa global dos convites de retorno (kill-switch do 1º nível) e o que ela atinge.
+            'recall' => fn () => [
+                'paused' => $this->killSwitch->state(),
+                'impact' => $this->killSwitch->impact(),
+            ],
+            'routes' => [
                 'update'        => route('manager.whatsapp.update', ['entity' => '__ID__']),
                 'test'          => route('manager.whatsapp.test', ['entity' => '__ID__']),
                 'global_update' => route('manager.whatsapp.global.update'),
                 'global_test'   => route('manager.whatsapp.global.test'),
+                'recall_pause'  => route('manager.whatsapp.recall.pause'),
+                'recall_resume' => route('manager.whatsapp.recall.resume'),
             ],
             't' => trans('whatsapp'),
         ]);
@@ -219,6 +228,7 @@ class WhatsAppController extends Controller
                     'confirmation_hours_before' => $setting->confirmation_hours_before,
                     'survey_enabled'            => $setting->survey_enabled,
                     'survey_delay_hours'        => $setting->survey_delay_hours,
+                    'recall_enabled'            => $setting->recall_enabled,
                     ...$this->appProps($setting),
                 ] : null,
                 'stats' => $setting ? ($stats[$id] ?? $this->emptyStats()) : null,
@@ -291,6 +301,8 @@ class WhatsAppController extends Controller
             'confirmation_hours_before' => ['required', 'integer', 'min:1', 'max:168'],
             'survey_enabled'            => ['required', 'boolean'],
             'survey_delay_hours'        => ['required', 'integer', 'min:0', 'max:168'],
+            // Convite de retorno (Fase 6): só liga com o template aprovado na Meta. Ausente = não mexe.
+            'recall_enabled' => ['sometimes', 'boolean'],
             ...$this->appRules($setting),
         ]);
 
@@ -306,6 +318,10 @@ class WhatsAppController extends Controller
             'survey_delay_hours'        => $data['survey_delay_hours'],
         ]);
 
+        if (array_key_exists('recall_enabled', $data)) {
+            $setting->recall_enabled = (bool) $data['recall_enabled'];
+        }
+
         $changes = $this->applyApp($setting, $data);
 
         $this->audit->recordAdminAction(
@@ -320,6 +336,7 @@ class WhatsAppController extends Controller
                 'active'               => $data['active'],
                 'confirmation_enabled' => $data['confirmation_enabled'],
                 'survey_enabled'       => $data['survey_enabled'],
+                'recall_enabled'       => $setting->recall_enabled,
                 'app_id'               => $setting->app_id,
                 ...$changes,
             ],
@@ -371,6 +388,7 @@ class WhatsAppController extends Controller
             $setting->survey_enabled            = false;
             $setting->confirmation_hours_before = 24;
             $setting->survey_delay_hours        = 2;
+            $setting->recall_enabled            = false;
         }
 
         $setting->active = $data['active'];
@@ -393,6 +411,60 @@ class WhatsAppController extends Controller
             'webhook_ok' => $changes['webhook_ok'],
             ...$this->appProps($setting->fresh()),
         ]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Pausa GLOBAL dos convites de retorno (kill-switch do 1º nível)
+    // ──────────────────────────────────────────────────────────────────────
+
+    /** Pausa os convites de retorno de TODAS as clínicas na hora (o envio já enfileirado é cancelado no job). */
+    public function pauseRecall(Request $request): JsonResponse
+    {
+        $this->authorizeSaasEntity();
+
+        $data = $request->validate(['reason' => ['required', 'string', 'min:10', 'max:500']]);
+
+        $impact = $this->killSwitch->impact();
+
+        $this->killSwitch->pause(trim($data['reason']), (string) $request->user()->getKey(), (string) $request->user()->name);
+
+        $this->audit->recordAdminAction(
+            event: 'manager.whatsapp_recall.paused',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'system_setting',
+            auditableId: RecallKillSwitch::auditId(),
+            reason: trim($data['reason']),
+            newValues: ['paused' => true, 'impact' => $impact],
+            request: $request,
+            oldValues: ['paused' => false],
+        );
+
+        return response()->json(['message' => __('whatsapp.recall.paused'), 'paused' => $this->killSwitch->state(), 'impact' => $impact]);
+    }
+
+    /** Libera de novo os convites de retorno (cada clínica segue com as próprias chaves). */
+    public function resumeRecall(Request $request): JsonResponse
+    {
+        $this->authorizeSaasEntity();
+
+        $impact = $this->killSwitch->impact();
+
+        $this->killSwitch->resume();
+
+        $this->audit->recordAdminAction(
+            event: 'manager.whatsapp_recall.resumed',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'system_setting',
+            auditableId: RecallKillSwitch::auditId(),
+            reason: __('whatsapp.recall.resume_reason'),
+            newValues: ['paused' => false, 'impact' => $impact],
+            request: $request,
+            oldValues: ['paused' => true],
+        );
+
+        return response()->json(['message' => __('whatsapp.recall.resumed'), 'paused' => null, 'impact' => $impact]);
     }
 
     public function testGlobal(Request $request): JsonResponse
@@ -574,6 +646,8 @@ class WhatsAppController extends Controller
             ->selectRaw("SUM(CASE WHEN kind = 'confirmation' AND status = 'answered' THEN 1 ELSE 0 END) AS confirmations_answered")
             ->selectRaw("SUM(CASE WHEN kind = 'survey' AND {$sentOrAnswered} THEN 1 ELSE 0 END) AS surveys_sent")
             ->selectRaw("SUM(CASE WHEN kind = 'survey' AND status = 'answered' THEN 1 ELSE 0 END) AS surveys_answered")
+            ->selectRaw("SUM(CASE WHEN kind = 'recall' AND {$sentOrAnswered} THEN 1 ELSE 0 END) AS recall_sent")
+            ->selectRaw("SUM(CASE WHEN kind = 'recall' AND status = 'answered' THEN 1 ELSE 0 END) AS recall_answered")
             ->selectRaw("AVG(CASE WHEN kind = 'survey' THEN survey_score END) AS survey_average")
             ->selectRaw("SUM(CASE WHEN direction = 'out' AND delivered_at IS NOT NULL THEN 1 ELSE 0 END) AS delivered")
             ->selectRaw("SUM(CASE WHEN direction = 'out' AND read_at IS NOT NULL THEN 1 ELSE 0 END) AS \"read\"")
@@ -584,6 +658,8 @@ class WhatsAppController extends Controller
                 'confirmations_answered' => (int) $row->confirmations_answered,
                 'surveys_sent'           => (int) $row->surveys_sent,
                 'surveys_answered'       => (int) $row->surveys_answered,
+                'recall_sent'            => (int) $row->recall_sent,
+                'recall_answered'        => (int) $row->recall_answered,
                 'survey_average'         => round((float) ($row->survey_average ?? 0), 1),
                 'delivered'              => (int) $row->delivered,
                 'read'                   => (int) $row->read,
@@ -597,7 +673,7 @@ class WhatsAppController extends Controller
     {
         return [
             'confirmations_sent' => 0, 'confirmations_answered' => 0, 'surveys_sent' => 0, 'surveys_answered' => 0,
-            'survey_average'     => 0.0, 'delivered' => 0, 'read' => 0, 'failed' => 0,
+            'recall_sent'        => 0, 'recall_answered' => 0, 'survey_average' => 0.0, 'delivered' => 0, 'read' => 0, 'failed' => 0,
         ];
     }
 

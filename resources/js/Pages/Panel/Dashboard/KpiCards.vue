@@ -101,6 +101,24 @@ const examsCard = (mine) => ({
           : route('panel.eye-images.index', { status: 'pendente', period: '30' }),
 });
 
+// Retornos a contatar (Fase 6) — só quando o servidor mandou (plano com a feature + perfil que opera o recall).
+// O número é o da lista "Para contatar"; só contagem, nenhum nome de paciente.
+const recallCard = () =>
+    props.stats.recall_to_contact === undefined || props.stats.recall_to_contact === null
+        ? []
+        : [
+              {
+                  key: 'recall',
+                  icon: 'ti ti-phone-call',
+                  tone: 'info',
+                  value: props.stats.recall_to_contact,
+                  label: props.t.kpi_recall,
+                  caption: tx('kpi_recall_hint', { lost: number(props.stats.recall_lost ?? 0) }),
+                  url: route('panel.recall.index'),
+                  alert: Number(props.stats.recall_to_contact) > 0,
+              },
+          ];
+
 // ── Indicadores por perfil ──────────────────────────────────────────────────
 const BUILDERS = {
     doctor: () => [
@@ -133,6 +151,7 @@ const BUILDERS = {
             hint: props.t.kpi_noshow_rate_hint,
         }),
         examsCard(true),
+        ...recallCard(),
         ...(props.aiWaiting
             ? [
                   {
@@ -208,6 +227,7 @@ const BUILDERS = {
                 caption: props.t.kpi_waitlist_hint,
             },
             examsCard(false),
+            ...recallCard(),
         ];
     },
 
@@ -275,6 +295,7 @@ const BUILDERS = {
                       }),
                       examsCard(false),
                   ]),
+            ...recallCard(),
         ];
     },
 

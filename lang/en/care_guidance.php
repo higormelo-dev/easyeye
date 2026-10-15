@@ -1,0 +1,100 @@
+<?php
+
+/*
+ * Post-procedure care guidance (Phase 6 / S14): the clinic's templates (Settings), issuing from the record and the PDF.
+ * Sent to the screens as `t` (Settings › Guidance) and `t_guidance` (record procedures modal).
+ * Same keys as lang/pt_BR/care_guidance.php.
+ */
+
+return [
+    'menu' => 'Post-procedure guidance',
+
+    'settings' => [
+        'title'              => 'Post-procedure guidance',
+        'subtitle'           => 'Templates the doctor hands to the patient after a procedure: text, place, eye drops and PDFs. What the patient receives is frozen at the moment it is issued.',
+        'new'                => 'New template',
+        'empty'              => 'The clinic has no guidance templates yet.',
+        'edit'               => 'Edit',
+        'delete'             => 'Delete',
+        'delete_confirm'     => 'Delete the template ":title"? Guidance already delivered does not change.',
+        'cancel'             => 'Cancel',
+        'save'               => 'Save',
+        'active'             => 'Active',
+        'inactive'           => 'Inactive',
+        'any_procedure'      => 'Any procedure',
+        'saved'              => 'Template saved.',
+        'deleted'            => 'Template deleted.',
+        'attachment_added'   => 'PDF attached.',
+        'attachment_removed' => 'PDF removed.',
+        'save_first'         => 'Save the template to attach PDFs.',
+        'fields'             => [
+            'title'          => 'Title',
+            'procedure'      => 'Procedure',
+            'procedure_hint' => 'Blank = the template serves any procedure. Type 2 letters to search the catalog.',
+            'location'       => 'Place',
+            'location_hint'  => 'Free text: where the patient should go (e.g. "Dressing room, 2nd floor").',
+            'body'           => 'Guidance',
+            'body_hint'      => 'Text the patient receives. The doctor can adjust it for each patient when handing it over.',
+            'eye_drops'      => 'Eye drops',
+            'drop_name'      => 'Eye drop',
+            'drop_how'       => 'How to use',
+            'drop_times'     => 'Times a day',
+            'drop_days'      => 'Days',
+            'add_drop'       => 'Add eye drop',
+            'remove_drop'    => 'Remove eye drop',
+            'attachments'    => 'Accompanying PDFs',
+            'attach_pdf'     => 'Attach PDF',
+            'attach_hint'    => 'Up to :max PDFs of 5 MB each.',
+            'remove_pdf'     => 'Remove PDF',
+        ],
+    ],
+
+    'issue' => [
+        'open'        => 'Guidance',
+        'title'       => 'Guidance for the patient',
+        'none'        => 'No template fits this procedure. Create one in Settings › Post-procedure guidance.',
+        'choose'      => 'Template',
+        'adjust'      => 'Adjust for this patient (optional)',
+        'body'        => 'Text',
+        'location'    => 'Place',
+        'eye_drops'   => 'Eye drops',
+        'issue'       => 'Issue guidance',
+        'issuing'     => 'Issuing…',
+        'issued'      => 'Guidance issued.',
+        'previous'    => 'Already delivered',
+        'no_previous' => 'No guidance delivered for this procedure.',
+        'pdf'         => 'Open PDF',
+        'attachment'  => 'Attached PDF',
+        'frozen_hint' => 'What is issued is frozen: changing the template later does not alter the delivered guidance.',
+        'back'        => 'Back',
+        'loading'     => 'Loading guidance…',
+        'load_error'  => 'Could not load the guidance.',
+    ],
+
+    'pdf' => [
+        'location'    => 'Place',
+        'eye'         => 'Eye',
+        'eyes'        => ['right' => 'Right eye (RE)', 'left' => 'Left eye (LE)', 'both' => 'Both eyes (BE)'],
+        'eye_drops'   => 'Eye drops',
+        'drop_name'   => 'Eye drop',
+        'drop_how'    => 'How to use',
+        'drop_times'  => 'Times a day',
+        'drop_days'   => 'For how many days',
+        'attachments' => 'Accompanying this guidance',
+        'issued_on'   => 'Delivered on :date',
+    ],
+
+    'errors' => [
+        'generic'                 => 'Could not complete. Please try again.',
+        'template_not_found'      => 'Template not found in this clinic.',
+        'template_inactive'       => 'The template is inactive.',
+        'procedure_mismatch'      => 'This template belongs to another procedure.',
+        'procedure_cancelled'     => 'A cancelled procedure has no guidance.',
+        'attachment_not_pdf'      => 'The file is not a PDF.',
+        'attachment_too_large'    => 'The PDF is over 5 MB.',
+        'attachment_limit'        => 'Each template accepts at most 5 PDFs.',
+        'attachment_not_found'    => 'Attachment not found in this template.',
+        'attachment_missing_file' => 'The PDF file is no longer available: upload the attachment again.',
+        'too_many_drops'          => 'At most 10 eye drops per guidance.',
+    ],
+];

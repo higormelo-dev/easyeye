@@ -125,11 +125,23 @@ trait Signable
                 new: ['signed_by' => $entityUser->getKey(), 'signed_at' => $signedAt->toIso8601String(), 'signature_hash' => $signatureHash, 'is_locked' => true],
             );
 
+            // saveQuietly não dispara eventos: quem depende do que foi assinado (ex.: o recall, que só
+            // ativa a condição por CID em prontuário ASSINADO) é avisado aqui, na mesma transação.
+            $locked->afterSignatureWritten();
+
             // $this (a instância que o caller tem em mãos) passa a refletir o
             // que foi gravado — mesmo contrato de antes (sign() mutava $this
             // direto), só que agora a gravação em si rodou sobre $locked.
             $this->setRawAttributes($locked->getAttributes(), true);
         });
+    }
+
+    /**
+     * Gancho chamado dentro da transação da assinatura, depois da gravação silenciosa (sem eventos Eloquent) e da
+     * auditoria. O modelo que precisa reagir à assinatura sobrescreve; o padrão não faz nada.
+     */
+    protected function afterSignatureWritten(): void
+    {
     }
 
     /**

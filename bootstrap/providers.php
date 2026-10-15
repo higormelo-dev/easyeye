@@ -1,6 +1,6 @@
 <?php
 
-use App\Providers\{AppServiceProvider, AuthServiceProvider, BillingServiceProvider, SubscriptionServiceProvider, TenantScopeServiceProvider, TissServiceProvider};
+use App\Providers\{AppServiceProvider, AuthServiceProvider, BillingServiceProvider, RecallServiceProvider, SubscriptionServiceProvider, TenantScopeServiceProvider, TissServiceProvider};
 use Spatie\Html\HtmlServiceProvider;
 
 return [
@@ -9,6 +9,7 @@ return [
     SubscriptionServiceProvider::class,
     TissServiceProvider::class,
     BillingServiceProvider::class,
+    RecallServiceProvider::class,
     TenantScopeServiceProvider::class,
     HtmlServiceProvider::class,
 ];

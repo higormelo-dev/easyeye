@@ -248,6 +248,7 @@ return [
         'schedules'                => 'Schedules',
         'schedules_calendar'       => 'Calendar',
         'urgent_care'              => 'Urgent care',
+        'recall'                   => 'Returns',
         'lenses'                   => 'Lenses',
         'iol_lenses'               => 'Cataract Lenses',
         'stock'                    => 'Stock',

@@ -4,6 +4,7 @@ import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 import { formatPatientCode } from '@/utils/formatPatientCode.js';
+import { sessionLabel } from '@/Support/sessionLabel.js';
 import AllergyBadge from '@/Components/Panel/ClinicalSafety/AllergyBadge.vue';
 
 const props = defineProps({
@@ -51,9 +52,7 @@ const whatsappTitle = computed(() => {
     }
 });
 
-const sessionLabel = computed(() =>
-    props.item.session_total ? `${props.item.session_number}/${props.item.session_total}` : null,
-);
+const sessionText = computed(() => sessionLabel(props.item.session_number, props.item.session_total));
 
 const patientSheetUrl = computed(() =>
     props.item.patient_id && props.canSeePatients ? route('panel.schedules.patient-sheet', props.item.id) : null,
@@ -189,12 +188,12 @@ function onSituationClick(trans) {
 
                         <!-- Sessão da série ("3/10") -->
                         <span
-                            v-if="sessionLabel"
+                            v-if="sessionText"
                             class="badge schedule-session-badge"
-                            :title="(t.session_label ?? 'Sessão :session').replace(':session', sessionLabel)"
+                            :title="(t.session_label ?? 'Sessão :session').replace(':session', sessionText)"
                             data-test="session-badge"
                         >
-                            <i class="ti ti-repeat me-1" aria-hidden="true"></i>{{ sessionLabel }}
+                            <i class="ti ti-repeat me-1" aria-hidden="true"></i>{{ sessionText }}
                         </span>
 
                         <!-- Sala/equipamento reservado -->

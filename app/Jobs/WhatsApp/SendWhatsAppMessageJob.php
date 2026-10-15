@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs\WhatsApp;
 
+use App\Domains\Recall\Enums\InviteBlocker;
+use App\Domains\Recall\Services\RecallInviteGuard;
 use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppOptOut, WhatsAppSetting};
 use App\Services\Billing\ClinicServiceGate;
 use App\Services\WhatsApp\Contracts\WhatsAppProvider;
@@ -40,7 +42,7 @@ use Throwable;
  * $timeout (150 s) cobre o pior caso de uma chamada (renovação do token em
  * 401 com o lock de 120 s + envio); o retry_after da conexão da fila
  * (REDIS_QUEUE_RETRY_AFTER / DB_QUEUE_RETRY_AFTER) precisa ser MAIOR que
- * ele — ver docs/infra/reverb-ambiente-teste.md.
+ * ele — ver docs/internal/infra/reverb-ambiente-teste.md.
  */
 class SendWhatsAppMessageJob implements ShouldQueue, ShouldBeUnique
 {
@@ -65,7 +67,7 @@ class SendWhatsAppMessageJob implements ShouldQueue, ShouldBeUnique
         return $this->messageId;
     }
 
-    public function handle(WhatsAppProvider $provider, WhatsAppService $service, WhatsAppTemplates $templates, ClinicServiceGate $gate): void
+    public function handle(WhatsAppProvider $provider, WhatsAppService $service, WhatsAppTemplates $templates, ClinicServiceGate $gate, ?RecallInviteGuard $recall = null): void
     {
         $message = WhatsAppMessage::find($this->messageId);
 
@@ -97,6 +99,28 @@ class SendWhatsAppMessageJob implements ShouldQueue, ShouldBeUnique
             ]);
 
             return;
+        }
+
+        // Convite de retorno (Fase 6, I3): a regra, o consentimento, o descadastro e as chaves foram decididos quando a
+        // onda nasceu e podem ter mudado desde então (versão suspensa, SAIR, pausa global). Reconfere AGORA; o que
+        // deixou de valer é cancelado, nunca enviado.
+        if ($message->kind === WhatsAppMessage::KIND_RECALL) {
+            $blocker = ($recall ?? app(RecallInviteGuard::class))->stillEligible($message);
+
+            // Fora da janela de horário (fila atrasada): segue pending; recall:requeue-pending traz de volta.
+            if ($blocker === InviteBlocker::OutsideWindow) {
+                return;
+            }
+
+            if ($blocker !== null) {
+                $message->update([
+                    'status'     => WhatsAppMessage::STATUS_SUPPRESSED,
+                    'error_code' => 'recall_' . $blocker->value,
+                    'error'      => 'Convite de retorno cancelado antes de sair: ' . $blocker->value . '.',
+                ]);
+
+                return;
+            }
         }
 
         $setting = WhatsAppSetting::query()->where('entity_id', $message->entity_id)->first();

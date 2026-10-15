@@ -12,6 +12,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Tests\TestCase;
 
 require_once __DIR__ . '/P2ManifestFixture.php';
+require_once __DIR__ . '/ClinicalReviewFixtures.php';
+require_once __DIR__ . '/RecallFixtures.php';
 
 /*
 |--------------------------------------------------------------------------

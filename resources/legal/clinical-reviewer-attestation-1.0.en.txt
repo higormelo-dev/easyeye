@@ -1,0 +1,19 @@
+CLINICAL REVIEWER STATEMENT — EASYEYE (version 1.0)
+
+By submitting this opinion, I declare that:
+
+1. IDENTITY. I am a physician registered with the Regional Medical Council (CRM/state) and, where stated, hold the specialist title (RQE) indicated in this form. The data I provided are true and I answer for them.
+
+2. WHAT I REVIEWED. I read the clinical content of each return-protocol version listed in this invitation — entry criteria, intervals and ranges, deadlines, rationale and references — and recorded my decision on each one. I carried out the analysis independently, based on my clinical knowledge and on the literature I consider appropriate.
+
+3. WHAT MY DECISION COVERS. I understand that my validation covers only the EXACT content shown to me, identified by the verification code (hash) of each version; any later change requires a new review. I also understand that EasyEye will use the validated content only to remind patients to return, and that the reminder neither replaces the treating physician's judgment for each patient nor sets clinical conduct.
+
+4. CONFLICT OF INTEREST. I stated below whether I have a conflict of interest (financial, commercial, institutional or otherwise) with EasyEye, with the clinics that use it, or with manufacturers and laboratories related to the conditions reviewed.
+
+5. RECORD OF PROOF. I authorize EasyEye to record this statement, my opinion, my identification data, the IP address and browser used, the date and time of submission and the verification code of what I reviewed, as proof that the validation took place, for as long as the validated version exists and for 5 (five) years after it.
+
+6. VERIFICATION. I know that EasyEye checks my CRM/state and RQE on the Federal Council of Medicine portal before releasing any rule I validated.
+
+7. DISPLAY OF MY NAME. I stated below whether or not I authorize my name and CRM/state to be shown to the clinics that adopt the validated rule.
+
+Courtesy translation: the Portuguese text prevails.

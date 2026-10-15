@@ -317,6 +317,83 @@ test('[cenário 5] entity.issue-report nega entity SaaS mesmo com admin', functi
         ->toBeFalse();
 });
 
+// ── entity.operate-recall ─────────────────────────────────────────────────────
+
+test('entity.operate-recall permite admin, doctor e secretary da entity cliente', function (string $rule) {
+    createEntityUser($this->clientEntity, $this->user, $rule);
+
+    expect(Gate::forUser($this->user)->check(EntityGate::OperateRecall->value, $this->clientEntity))
+        ->toBeTrue();
+})->with(['admin', 'doctor', 'secretary']);
+
+test('entity.operate-recall nega financial, user, sem vínculo e vínculo inativo', function () {
+    createEntityUser($this->clientEntity, $this->user, 'financial');
+    expect(Gate::forUser($this->user)->check(EntityGate::OperateRecall->value, $this->clientEntity))->toBeFalse();
+
+    $plain = User::factory()->create();
+    createEntityUser($this->clientEntity, $plain, 'user');
+    expect(Gate::forUser($plain)->check(EntityGate::OperateRecall->value, $this->clientEntity))->toBeFalse();
+
+    $outsider = User::factory()->create();
+    expect(Gate::forUser($outsider)->check(EntityGate::OperateRecall->value, $this->clientEntity))->toBeFalse();
+
+    $inactive = User::factory()->create();
+    createEntityUser($this->clientEntity, $inactive, 'secretary', active: false);
+    expect(Gate::forUser($inactive)->check(EntityGate::OperateRecall->value, $this->clientEntity))->toBeFalse();
+});
+
+test('entity.operate-recall nega a entity SaaS mesmo com admin', function () {
+    createEntityUser($this->saasEntity, $this->user, 'admin');
+
+    expect(Gate::forUser($this->user)->check(EntityGate::OperateRecall->value, $this->saasEntity))
+        ->toBeFalse();
+});
+
+// ── entity.decide-recall ──────────────────────────────────────────────────────
+
+test('entity.decide-recall permite doctor com cadastro de médico ativo', function () {
+    egDoctorRecord(createEntityUser($this->clientEntity, $this->user, 'doctor'));
+
+    expect(Gate::forUser($this->user)->check(EntityGate::DecideRecall->value, $this->clientEntity))
+        ->toBeTrue();
+});
+
+test('entity.decide-recall nega perfil médico SEM cadastro ativo, com a mensagem traduzida', function () {
+    $eu = createEntityUser($this->clientEntity, $this->user, 'doctor');
+
+    $response = Gate::forUser($this->user)->inspect(EntityGate::DecideRecall->value, $this->clientEntity);
+    expect($response->allowed())->toBeFalse()
+        ->and($response->message())->toBe(__('schedules.doctor_missing'));
+
+    egDoctorRecord($eu, active: false);
+    expect(Gate::forUser($this->user)->check(EntityGate::DecideRecall->value, $this->clientEntity))->toBeFalse();
+});
+
+test('entity.decide-recall nega admin, secretary, financial e a entity SaaS, mesmo com cadastro de médico ativo', function () {
+    foreach (['admin', 'secretary', 'financial'] as $rule) {
+        $user = User::factory()->create();
+        // Cadastro de médico ativo NÃO basta: o perfil (rule) também tem que ser médico.
+        egDoctorRecord(createEntityUser($this->clientEntity, $user, $rule));
+
+        expect(Gate::forUser($user)->check(EntityGate::DecideRecall->value, $this->clientEntity))
+            ->toBeFalse($rule);
+    }
+
+    createEntityUser($this->saasEntity, $this->user, 'admin');
+    expect(Gate::forUser($this->user)->check(EntityGate::DecideRecall->value, $this->saasEntity))->toBeFalse();
+});
+
+test('entity.decide-recall vale só na clínica do cadastro de médico (médico de uma clínica, secretário de outra)', function () {
+    $otherClient = Entity::factory()->create(['is_client' => true]);
+
+    egDoctorRecord(createEntityUser($this->clientEntity, $this->user, 'doctor'));
+    createEntityUser($otherClient, $this->user, 'secretary');
+
+    expect(Gate::forUser($this->user)->check(EntityGate::DecideRecall->value, $this->clientEntity))->toBeTrue()
+        ->and(Gate::forUser($this->user)->check(EntityGate::DecideRecall->value, $otherClient))->toBeFalse()
+        ->and(Gate::forUser($this->user)->check(EntityGate::OperateRecall->value, $otherClient))->toBeTrue();
+});
+
 // ── entity.manage-settings ────────────────────────────────────────────────────
 
 test('entity.manage-settings permite admin da entity cliente', function () {

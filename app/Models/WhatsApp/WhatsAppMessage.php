@@ -43,6 +43,12 @@ class WhatsAppMessage extends Model
     /** Aviso do SaaS à clínica (régua, fim do teste, cobrança). */
     public const KIND_SAAS_NOTICE = 'saas_notice';
 
+    /**
+     * Convite de retorno (Fase 6): sem consulta (schedule_id nulo); achado pelo paciente (patient_id) e pela
+     * onda (recall_invite_id). Texto neutro, nunca cita condição nem exame.
+     */
+    public const KIND_RECALL = 'recall';
+
     public const STATUS_PENDING = 'pending';
 
     /**
@@ -68,7 +74,10 @@ class WhatsAppMessage extends Model
 
     public const STATUS_RECEIVED = 'received';
 
-    /** Paciente descadastrado (respondeu SAIR) — não é reenviada. */
+    /**
+     * Cancelada antes de sair por regra de elegibilidade — paciente descadastrado (SAIR), consentimento retirado,
+     * regra clínica suspensa, chave desligada (error_code diz qual). Não é reenviada.
+     */
     public const STATUS_SUPPRESSED = 'suppressed';
 
     protected $table = 'whatsapp_messages';
@@ -76,6 +85,8 @@ class WhatsAppMessage extends Model
     protected $fillable = [
         'entity_id',
         'schedule_id',
+        'patient_id',
+        'recall_invite_id',
         'whatsapp_setting_id',
         'sender_app_id',
         'direction',

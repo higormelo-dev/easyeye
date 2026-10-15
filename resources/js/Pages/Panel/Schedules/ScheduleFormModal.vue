@@ -35,7 +35,12 @@ const recurrenceTypeOptions = computed(() => [
     { value: 'weekly', label: props.t.form_weekly },
     { value: 'monthly', label: props.t.form_monthly },
     { value: 'weekdays', label: props.t.form_weekdays ?? 'Dias da semana' },
+    { value: 'every_weeks', label: props.t.form_every_weeks ?? 'A cada N semanas' },
 ]);
+
+// "A cada N semanas" (injeção intravítrea: ataque 4/4, depois 6/6, 8/8…): N entre 2 e 16, como no servidor.
+const INTERVAL_WEEKS_MIN = 2;
+const INTERVAL_WEEKS_MAX = 16;
 
 const sessionLocale = typeof window !== 'undefined' && window.sessionLocale ? window.sessionLocale : 'pt-BR';
 
@@ -70,12 +75,14 @@ const form = ref({
     specialty_area: '',
     resource_ids: [],
     waiting_list_id: '',
+    recall_id: '',
     use_recurrence: false,
     recurrence_type: 'weekly',
     recurrence_until: '',
     recurrence_weekdays: [],
     recurrence_end: 'count',
     recurrence_count: 4,
+    recurrence_interval_weeks: 4,
     is_fit_in: false,
 });
 
@@ -105,6 +112,7 @@ function seriesParams() {
     if (f.recurrence_end === 'count') params.set('count', String(f.recurrence_count || ''));
     else params.set('until', f.recurrence_until || '');
     if (f.recurrence_type === 'weekdays') f.recurrence_weekdays.forEach((d) => params.append('weekdays[]', String(d)));
+    if (f.recurrence_type === 'every_weeks') params.set('interval_weeks', String(f.recurrence_interval_weeks || ''));
     (f.resource_ids ?? []).forEach((id) => params.append('resource_ids[]', id));
     return params;
 }
@@ -113,6 +121,15 @@ function seriesReady() {
     const f = form.value;
     if (!f.use_recurrence || !f.doctor_id || !f.date_time) return false;
     if (f.recurrence_type === 'weekdays' && f.recurrence_weekdays.length === 0) return false;
+    if (
+        f.recurrence_type === 'every_weeks' &&
+        !(
+            Number(f.recurrence_interval_weeks) >= INTERVAL_WEEKS_MIN &&
+            Number(f.recurrence_interval_weeks) <= INTERVAL_WEEKS_MAX
+        )
+    ) {
+        return false;
+    }
     if (f.recurrence_end === 'count') return Number(f.recurrence_count) >= 2;
     return Boolean(f.recurrence_until);
 }
@@ -262,6 +279,8 @@ onBeforeUnmount(() => {
 });
 
 function selectPatient(p) {
+    // O retorno é de UM paciente: escolher outro desfaz o vínculo (o servidor também recusa).
+    if (p.id !== props.prefillData?.patient_id) form.value.recall_id = '';
     form.value.patient_id = p.id;
     form.value.full_name = p.full_name;
     form.value.cellphone = p.cellphone ?? '';
@@ -275,6 +294,7 @@ function selectPatient(p) {
 }
 
 function clearPatient() {
+    form.value.recall_id = '';
     form.value.patient_id = '';
     form.value.full_name = '';
     patientSearch.value = '';
@@ -328,6 +348,7 @@ watch(
         form.value.date_time,
         form.value.recurrence_type,
         form.value.recurrence_weekdays.join(','),
+        form.value.recurrence_interval_weeks,
         form.value.recurrence_end,
         form.value.recurrence_count,
         form.value.recurrence_until,
@@ -380,12 +401,14 @@ watch(
                 specialty_area: s.specialty_area ?? '',
                 resource_ids: (s.resources ?? []).map((r) => r.id),
                 waiting_list_id: '',
+                recall_id: '',
                 use_recurrence: false,
                 recurrence_type: 'weekly',
                 recurrence_until: '',
                 recurrence_weekdays: [],
                 recurrence_end: 'count',
                 recurrence_count: 4,
+                recurrence_interval_weeks: 4,
                 is_fit_in: Boolean(s.is_fit_in),
             };
             patientSearch.value = s.full_name ?? s.patient_name ?? '';
@@ -416,12 +439,14 @@ watch(
                 specialty_area: p?.specialty_area ?? '',
                 resource_ids: [],
                 waiting_list_id: p?.id ?? '',
+                recall_id: p?.recall_id ?? '',
                 use_recurrence: false,
                 recurrence_type: 'weekly',
                 recurrence_until: '',
                 recurrence_weekdays: [],
                 recurrence_end: 'count',
                 recurrence_count: 4,
+                recurrence_interval_weeks: 4,
                 is_fit_in: false,
             };
             patientSearch.value = p?.full_name ?? '';
@@ -515,6 +540,7 @@ async function onSubmit() {
         specialty_area: form.value.specialty_area,
         resource_ids: form.value.resource_ids,
         waiting_list_id: form.value.waiting_list_id,
+        recall_id: form.value.recall_id || null,
         is_fit_in: form.value.is_fit_in,
         ...(useSeries ? { series_dates: seriesSelected.value.slice(1).map((session) => session.date_time) } : {}),
     };
@@ -591,6 +617,22 @@ async function onSubmit() {
         <form @submit.prevent="onSubmit">
             <!-- ════════════ ABA: AGENDAMENTO (fluxo rápido atual) ════════════ -->
             <div v-show="activeTab === 'schedule'">
+                <!-- Agendando a partir da tela de Retornos: diz qual retorno este agendamento atende. -->
+                <div
+                    v-if="form.recall_id && prefillData?.recall_label"
+                    class="alert alert-info py-2 small mb-3"
+                    role="note"
+                    data-test="recall-banner"
+                >
+                    <i class="ti ti-phone-call me-1" aria-hidden="true"></i
+                    >{{
+                        (t.form_recall_banner ?? 'Agendando o retorno: :task').replace(
+                            ':task',
+                            prefillData.recall_label,
+                        )
+                    }}
+                </div>
+
                 <!-- ── Médico ────────────────────────────────────────────────── -->
                 <div v-if="doctors.length !== 1" class="mb-3">
                     <label class="form-label fw-semibold">
@@ -918,6 +960,22 @@ async function onSubmit() {
                                     :aria-label="t.form_rec_until"
                                 />
                             </div>
+                        </div>
+
+                        <div v-if="form.recurrence_type === 'every_weeks'" class="col-12 col-sm-6">
+                            <label class="form-label small" for="rec-interval-weeks">{{
+                                t.form_rec_interval ?? 'Intervalo (semanas)'
+                            }}</label>
+                            <input
+                                id="rec-interval-weeks"
+                                v-model.number="form.recurrence_interval_weeks"
+                                type="number"
+                                :min="INTERVAL_WEEKS_MIN"
+                                :max="INTERVAL_WEEKS_MAX"
+                                class="form-control form-control-sm"
+                                data-test="rec-interval-weeks"
+                            />
+                            <div class="form-text small">{{ t.form_rec_interval_hint ?? '' }}</div>
                         </div>
 
                         <div v-if="form.recurrence_type === 'weekdays'" class="col-12">

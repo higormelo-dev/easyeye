@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domains\Recall\Intravitreal\Enums\CourseRegimen;
 use App\Services\{ProcedureSolicitationService, SurgerySchedulingDocService};
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -45,7 +46,24 @@ class MedicalRecordProcedureRequest extends FormRequest
             'eye'               => ['nullable', Rule::in(SurgerySchedulingDocService::eyeKeys())],
             'solicitation_type' => ['nullable', Rule::in(ProcedureSolicitationService::typeKeys())],
             'notes'             => ['nullable', 'string', 'max:2000'],
+            // Injeção intravítrea (anti-VEGF): os dados do CURSO do olho. Só valem quando o procedimento escolhido é do
+            // tipo intravítreo; o serviço do curso decide se precisa (curso já aberto não precisa de droga).
+            'intravitreal'            => ['nullable', 'array'],
+            'intravitreal.drug_key'   => ['nullable', 'string', 'max:40'],
+            'intravitreal.drug_label' => ['nullable', 'string', 'max:120'],
+            'intravitreal.regimen'    => ['nullable', Rule::in(array_map(static fn (CourseRegimen $regimen): string => $regimen->value, CourseRegimen::cases()))],
+            'intravitreal.indication' => ['nullable', 'string', 'max:120'],
         ];
+    }
+
+    /**
+     * Os dados do curso intravítreo enviados com a solicitação (vazio quando não vieram).
+     *
+     * @return array{drug_key?: ?string, drug_label?: ?string, regimen?: ?string, indication?: ?string}
+     */
+    public function intravitreal(): array
+    {
+        return (array) ($this->validated('intravitreal') ?? []);
     }
 
     /**

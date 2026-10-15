@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 /**
  * Configuração do WhatsApp oficial (Gupshup) — linha GLOBAL (entity_id
  * nulo: app/número do EasyEye, padrão de todas as clínicas) ou da clínica
- * (toggles de confirmação/pesquisa e, opcionalmente, app próprio).
+ * (toggles de confirmação/pesquisa/convite de retorno e, opcionalmente, app próprio).
  *
  * - app_id: id do app na Gupshup, em claro (não é segredo; roteia o
  *   webhook). Os tokens do parceiro ficam só no .env; os do app, só em cache.
@@ -47,6 +47,7 @@ class WhatsAppSetting extends Model
         'confirmation_hours_before',
         'survey_enabled',
         'survey_delay_hours',
+        'recall_enabled',
     ];
 
     protected $hidden = ['webhook_token', 'webhook_secret'];
@@ -62,6 +63,7 @@ class WhatsAppSetting extends Model
             'active'                    => 'boolean',
             'confirmation_enabled'      => 'boolean',
             'survey_enabled'            => 'boolean',
+            'recall_enabled'            => 'boolean',
             'confirmation_hours_before' => 'integer',
             'survey_delay_hours'        => 'integer',
         ];

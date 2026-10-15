@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\WhatsApp;
 
+use App\Domains\Recall\Enums\InviteResponse;
+use App\Domains\Recall\Services\RecallInviteResponder;
 use App\Enums\ScheduleSituation;
 use App\Jobs\NotifyScheduleChangeJob;
 use App\Models\Schedule;
 use App\Models\Scopes\EntityScope;
 use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppOptOut, WhatsAppSetting};
 use App\Notifications\ScheduleNotification;
-use App\Services\ScheduleService;
+use App\Services\{ConsentService, ScheduleService};
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -118,6 +120,14 @@ class WhatsAppService
         WhatsAppOptOut::query()->firstOrCreate(
             ['whatsapp_setting_id' => $sender->id, 'phone' => $phone],
             ['source' => $source, 'opted_out_at' => now()],
+        );
+
+        // SAIR também retira a autorização de lembretes de retorno (ADR 0002, item 9): VOLTAR só reativa o número,
+        // não ressuscita uma autorização que o titular retirou.
+        app(ConsentService::class)->revokeCareRemindersForPhone(
+            $sender,
+            $phone,
+            $source === WhatsAppOptOut::SOURCE_PROVIDER ? 'provider_opt_out' : 'whatsapp_opt_out',
         );
     }
 
@@ -245,6 +255,30 @@ class WhatsAppService
     }
 
     /**
+     * Cria a linha pending do convite de retorno (Fase 6): sem consulta, achada pelo paciente e pela onda. Uma por
+     * onda (unique parcial whatsapp_messages_recall_invite_once). Texto neutro: só primeiro nome e clínica — a
+     * elegibilidade (consentimento, SAIR, regra em uso) já foi decidida pelo RecallInviteGuard e é refeita pelo job.
+     */
+    public function queueRecall(string $entityId, string $patientId, string $inviteId, string $phone, string $firstName, string $clinic): WhatsAppMessage
+    {
+        $values  = ['first_name' => $firstName, 'clinic' => $clinic];
+        $payload = ['template_key' => 'care_recall', 'values' => $values, 'locale' => 'pt_BR'];
+
+        return WhatsAppMessage::create([
+            'entity_id'        => $entityId,
+            'patient_id'       => $patientId,
+            'recall_invite_id' => $inviteId,
+            'direction'        => 'out',
+            'kind'             => WhatsAppMessage::KIND_RECALL,
+            'template'         => $this->templates->config('care_recall')['name'],
+            'phone'            => $phone,
+            'body'             => $this->templates->render('care_recall', $values, 'pt_BR'),
+            'status'           => WhatsAppMessage::STATUS_PENDING,
+            'payload'          => $payload,
+        ]);
+    }
+
+    /**
      * @param array<string, ?string> $values
      * @param array<string, ?string> $extra  gravado no payload (ex.: schedule_at)
      */
@@ -321,7 +355,13 @@ class WhatsAppService
 
     private function firstName(Schedule $schedule): string
     {
-        return Str::title(Str::lower(Str::before(trim((string) $schedule->full_name), ' ')));
+        return self::firstNameOf((string) $schedule->full_name);
+    }
+
+    /** Primeiro nome em caixa de título ("MARIA DA SILVA" → "Maria"), como vai nas variáveis dos templates. */
+    public static function firstNameOf(?string $fullName): string
+    {
+        return Str::title(Str::lower(Str::before(trim((string) $fullName), ' ')));
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -400,8 +440,18 @@ class WhatsAppService
             // prova que a mensagem chegou. Só o tipo precisa bater.
             $target = $this->outboundTo($receiver, $phone)->whereKey($button['message_id'])->first();
 
-            if ($target === null || ($target->kind === WhatsAppMessage::KIND_SURVEY) !== ($button['action'] === WhatsAppTemplates::ACTION_SURVEY)) {
+            $expectedKind = match ($button['action']) {
+                WhatsAppTemplates::ACTION_SURVEY => WhatsAppMessage::KIND_SURVEY,
+                WhatsAppTemplates::ACTION_RECALL_BOOK, WhatsAppTemplates::ACTION_RECALL_DONE => WhatsAppMessage::KIND_RECALL,
+                default => WhatsAppMessage::KIND_CONFIRMATION,
+            };
+
+            if ($target === null || $target->kind !== $expectedKind) {
                 return (string) __('whatsapp.patient.use_buttons');
+            }
+
+            if ($target->kind === WhatsAppMessage::KIND_RECALL) {
+                return $this->applyRecallReply($inbound, $target, $button['action']);
             }
 
             $choice = $button['action'] === WhatsAppTemplates::ACTION_SURVEY
@@ -455,6 +505,11 @@ class WhatsAppService
     /** Aplica a resposta ($choice do botão, ou lida de $answerText) à mensagem. */
     private function apply(WhatsAppMessage $inbound, WhatsAppMessage $target, ?int $choice, string $answerText): ?string
     {
+        // Convite de retorno só se responde pelos botões; texto livre (ou citação) não decide nada.
+        if ($target->kind === WhatsAppMessage::KIND_RECALL) {
+            return (string) __('whatsapp.patient.recall_use_buttons');
+        }
+
         if ($inbound->entity_id === null || $inbound->schedule_id === null) {
             $inbound->update(['entity_id' => $target->entity_id, 'schedule_id' => $target->schedule_id]);
         }
@@ -469,8 +524,8 @@ class WhatsAppService
     }
 
     /**
-     * Confirmações/pesquisas que saíram por $receiver para $phone, em
-     * qualquer status (botão e citação provam a entrega).
+     * Confirmações/pesquisas/convites de retorno que saíram por $receiver para
+     * $phone, em qualquer status (botão e citação provam a entrega).
      */
     private function outboundTo(WhatsAppSetting $receiver, string $phone)
     {
@@ -478,7 +533,7 @@ class WhatsAppService
             ->where('direction', 'out')
             ->where('whatsapp_setting_id', $receiver->id)
             ->where('phone', $phone)
-            ->whereIn('kind', [WhatsAppMessage::KIND_CONFIRMATION, WhatsAppMessage::KIND_SURVEY]);
+            ->whereIn('kind', [WhatsAppMessage::KIND_CONFIRMATION, WhatsAppMessage::KIND_SURVEY, WhatsAppMessage::KIND_RECALL]);
     }
 
     /** Confirmações/pesquisas enviadas (sent) por $receiver para $phone. */
@@ -621,6 +676,38 @@ class WhatsAppService
 
         return is_string($sentFor) && $sentFor !== '' && $schedule->date_time !== null
             && $sentFor !== $schedule->date_time->format(self::SCHEDULE_AT_FORMAT);
+    }
+
+    /**
+     * "Quero agendar" / "Já agendei" no convite de retorno: grava a resposta na onda e avisa a recepção (evento em
+     * cada retorno coberto). O botão só vale por `recall.invites.reply_valid_days`; depois disso o clique é ignorado.
+     * A mensagem fica `answered` — o clique prova a entrega, qualquer que fosse o status.
+     */
+    private function applyRecallReply(WhatsAppMessage $inbound, WhatsAppMessage $target, string $action): ?string
+    {
+        $validDays = (int) config('recall.invites.reply_valid_days', 30);
+
+        if ($target->sent_at && $target->sent_at->lt(now()->subDays($validDays))) {
+            return null;
+        }
+
+        $inbound->update(array_filter([
+            'entity_id'        => $inbound->entity_id === null ? $target->entity_id : null,
+            'patient_id'       => $target->patient_id,
+            'recall_invite_id' => $target->recall_invite_id,
+        ]));
+
+        app(RecallInviteResponder::class)->record(
+            (string) $target->recall_invite_id,
+            $action === WhatsAppTemplates::ACTION_RECALL_BOOK ? InviteResponse::WantsToSchedule : InviteResponse::AlreadyScheduled,
+        );
+
+        $target->update([
+            'status'      => WhatsAppMessage::STATUS_ANSWERED,
+            'answered_at' => $target->answered_at ?? now(),
+        ]);
+
+        return (string) __($action === WhatsAppTemplates::ACTION_RECALL_BOOK ? 'whatsapp.patient.recall_book' : 'whatsapp.patient.recall_done');
     }
 
     private function applySurveyReply(WhatsAppMessage $message, ?int $score): ?string

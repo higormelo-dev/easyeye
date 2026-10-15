@@ -18,6 +18,8 @@ return [
     'kpi_surgeries'          => 'Cirurgias hoje',
     'kpi_exams_pending'      => 'Exames pendentes',
     'kpi_exams_pending_hint' => 'Sem laudo · últimos 30 dias',
+    'kpi_recall'             => 'Retornos a contatar',
+    'kpi_recall_hint'        => 'Perdidos de vista: :lost',
     'kpi_guides_waiting'     => 'Guias aguardando',
     'kpi_receivable'         => 'A receber',
     'kpi_satisfaction'       => 'Satisfação',

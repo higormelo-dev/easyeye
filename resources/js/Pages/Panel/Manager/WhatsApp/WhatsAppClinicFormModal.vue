@@ -28,6 +28,7 @@ const form = reactive({
     confirmation_hours_before: 24,
     survey_enabled: true,
     survey_delay_hours: 2,
+    recall_enabled: false,
     app_id: '',
 });
 
@@ -53,6 +54,7 @@ watch(
             confirmation_hours_before: s?.confirmation_hours_before ?? 24,
             survey_enabled: s?.survey_enabled ?? true,
             survey_delay_hours: s?.survey_delay_hours ?? 2,
+            recall_enabled: s?.recall_enabled ?? false,
             app_id: '',
         });
         current.value = s ? { ...s } : null;
@@ -80,6 +82,7 @@ function payload(extra = {}) {
         confirmation_hours_before: form.confirmation_hours_before,
         survey_enabled: form.survey_enabled,
         survey_delay_hours: form.survey_delay_hours,
+        recall_enabled: form.recall_enabled,
         ...extra,
     };
 }
@@ -247,6 +250,25 @@ const firstError = computed(() => {
                             <div v-if="errors.survey_delay_hours" class="text-danger small mt-1">
                                 {{ errors.survey_delay_hours[0] }}
                             </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="border rounded p-2">
+                            <div class="form-check form-switch">
+                                <input
+                                    id="mgr-wpp-recall"
+                                    v-model="form.recall_enabled"
+                                    type="checkbox"
+                                    class="form-check-input"
+                                    role="switch"
+                                    aria-describedby="mgr-wpp-recall-hint"
+                                    data-test="recall-switch"
+                                />
+                                <label class="form-check-label small fw-semibold" for="mgr-wpp-recall">{{
+                                    t.recall.toggle
+                                }}</label>
+                            </div>
+                            <p id="mgr-wpp-recall-hint" class="text-muted mb-0 small">{{ t.recall.toggle_hint }}</p>
                         </div>
                     </div>
                 </div>

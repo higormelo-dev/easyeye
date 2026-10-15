@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domains\Recall\Intravitreal\Exceptions\IntravitrealException;
+use App\Domains\Recall\Intravitreal\Models\{IntravitrealApplication, IntravitrealCourse};
+use App\Domains\Recall\Intravitreal\Services\{IntravitrealApplicationService, IntravitrealCourseService};
 use App\Enums\{DataAccessPurpose, EntityGate, FeatureKey};
 use App\Http\Requests\{MarkMedicalRecordProcedureDoneRequest, MedicalRecordProcedureRequest};
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordProcedure, Patient, Procedure, StockLot};
 use App\Services\{FeatureGateService, MedicalRecordProcedureExecutionService};
 use App\Support\CurrentDoctor;
 use App\Traits\LogsDataAccess;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\{JsonResponse, Request};
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\{DB, Gate};
 use InvalidArgumentException;
 
 /**
@@ -26,6 +30,10 @@ use InvalidArgumentException;
  * acessa o prontuário precisa ver, não só quem administra o catálogo de
  * estoque) — a escrita de fato (consumo) continua condicionada à feature
  * `has_inventory_module` estar habilitada no plano, checada abaixo.
+ *
+ * Injeção intravítrea (anti-VEGF — Fase 6): a solicitação abre (ou continua) o curso do olho na MESMA transação do
+ * pedido e a execução registra a aplicação (lote, autorização, intervalo decidido) na transação do `markDone`. Recusa
+ * de negócio do curso (`IntravitrealException`) vira 422 com a mensagem traduzida e o campo, e nada é gravado.
  */
 class MedicalRecordProceduresController extends Controller
 {
@@ -34,6 +42,8 @@ class MedicalRecordProceduresController extends Controller
     public function __construct(
         private readonly MedicalRecordProcedureExecutionService $executionService,
         private readonly FeatureGateService $featureGate,
+        private readonly IntravitrealCourseService $courses,
+        private readonly IntravitrealApplicationService $applications,
     ) {
     }
 
@@ -80,18 +90,31 @@ class MedicalRecordProceduresController extends Controller
         $doctor = CurrentDoctor::issuer()?->loadMissing('person');
         abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
 
-        $procedure = MedicalRecordProcedure::create([
-            'entity_id'         => $entity->id,
-            'patient_id'        => $patient->id,
-            'medical_record_id' => $medicalrecord->id,
-            'procedure_id'      => $request->validated('procedure_id'),
-            'doctor_id'         => $doctor->id,
-            'eye'               => $request->validated('eye'),
-            'solicitation_type' => $request->validated('solicitation_type'),
-            'notes'             => $request->validated('notes'),
-        ]);
+        try {
+            $procedure = DB::transaction(function () use ($request, $entity, $patient, $medicalrecord, $doctor): MedicalRecordProcedure {
+                $procedure = MedicalRecordProcedure::create([
+                    'entity_id'         => $entity->id,
+                    'patient_id'        => $patient->id,
+                    'medical_record_id' => $medicalrecord->id,
+                    'procedure_id'      => $request->validated('procedure_id'),
+                    'doctor_id'         => $doctor->id,
+                    'eye'               => $request->validated('eye'),
+                    'solicitation_type' => $request->validated('solicitation_type'),
+                    'notes'             => $request->validated('notes'),
+                ]);
 
-        $procedure->load(['procedure', 'doctor.person:id,full_name']);
+                $procedure->load(['procedure', 'doctor.person:id,full_name']);
+
+                // Injeção intravítrea: o curso do olho nasce (ou continua) junto com o pedido.
+                if ($procedure->procedure?->isIntravitreal()) {
+                    $this->courses->ensureForProcedure($procedure, (string) $procedure->eye, $request->intravitreal());
+                }
+
+                return $procedure;
+            });
+        } catch (IntravitrealException $e) {
+            return $this->refused($e);
+        }
 
         $this->logAccess($procedure, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
@@ -180,20 +203,32 @@ class MedicalRecordProceduresController extends Controller
             return response()->json(['message' => __('http-statuses.403')], 403);
         }
 
+        $intravitreal = $request->intravitreal();
+
         try {
             $updated = $this->executionService->markDone(
                 procedure: $medicalRecordProcedure,
                 executedBy: $entityUser,
                 items: $items,
                 notes: $request->validated('notes'),
+                intravitreal: $intravitreal === [] ? null : $intravitreal,
+                performedBy: CurrentDoctor::issuer(),
             );
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        } catch (IntravitrealException $e) {
+            return $this->refused($e);
         }
 
         $updated->load(['procedure', 'doctor.person:id,full_name', 'executedBy.user:id,name']);
 
-        return response()->json(['data' => $this->serialize($updated)]);
+        $payload = ['data' => $this->serialize($updated)];
+
+        if ($updated->procedure?->isIntravitreal()) {
+            $payload['intravitreal'] = $this->afterExecution($updated, $intravitreal);
+        }
+
+        return response()->json($payload);
     }
 
     public function cancel(Request $request, Patient $patient, MedicalRecordProcedure $medicalRecordProcedure): JsonResponse
@@ -207,6 +242,53 @@ class MedicalRecordProceduresController extends Controller
         }
 
         return response()->json(['data' => $this->serialize($updated->load(['procedure', 'doctor.person:id,full_name']))]);
+    }
+
+    /**
+     * O que a tela precisa saber depois da aplicação: a data da próxima, se o curso foi encerrado e o resultado do
+     * agendamento pedido (a injeção já está registrada; horário que não coube não desfaz nada).
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array{message: string, next_due_on: ?string, closed: bool, schedule: ?array{ok: bool, message: ?string, schedule_id: ?string}}
+     */
+    private function afterExecution(MedicalRecordProcedure $procedure, array $data): array
+    {
+        $application = IntravitrealApplication::query()->withoutGlobalScopes()->where('medical_record_procedure_id', $procedure->id)->first();
+        $course      = $application !== null ? IntravitrealCourse::query()->withoutGlobalScopes()->find($application->course_id) : null;
+        $closed      = $course === null || ! $course->status->isOpen();
+        $schedule    = null;
+
+        if (! $closed && filled($data['schedule_at'] ?? null)) {
+            $schedule = $this->applications->scheduleNext((string) $procedure->entity_id, (string) $course->id, CarbonImmutable::parse((string) $data['schedule_at']));
+
+            // A reserva que acabou de sair É a data da próxima aplicação (scheduleNext a gravou no curso): o aviso e o
+            // `next_due_on` mostram a data marcada, não a do intervalo que o curso tinha antes.
+            if ($schedule['ok']) {
+                $course->refresh();
+            }
+        }
+
+        $next = $course?->next_due_on?->toDateString();
+
+        return [
+            'message' => $closed
+                ? __('recall_course.done.executed_closed')
+                : __('recall_course.done.executed', ['date' => $course->next_due_on?->format('d/m/Y')]),
+            'next_due_on' => $next,
+            'closed'      => $closed,
+            'schedule'    => $schedule !== null && ! $schedule['ok']
+                ? $schedule + ['message' => __('recall_course.done.schedule_failed', ['reason' => (string) $schedule['message']])]
+                : $schedule,
+        ];
+    }
+
+    private function refused(IntravitrealException $e): JsonResponse
+    {
+        return response()->json([
+            'message' => __('recall_course.errors.' . $e->reason()),
+            'errors'  => $e->field() !== null ? [$e->field() => [__('recall_course.errors.' . $e->reason())]] : null,
+        ], 422);
     }
 
     private function authorizeProcedureWrite(Patient $patient, MedicalRecordProcedure $procedure): Entity
@@ -236,12 +318,14 @@ class MedicalRecordProceduresController extends Controller
             'doctor_name'       => $procedure->doctor?->person?->full_name,
             'eye'               => $procedure->eye,
             'solicitation_type' => $procedure->solicitation_type,
-            'status'            => $procedure->status->value,
-            'status_label'      => $procedure->status->label(),
-            'notes'             => $procedure->notes,
-            'executed_at'       => $procedure->executed_at?->format('d/m/Y H:i'),
-            'executed_by_name'  => $procedure->executedBy?->user?->name,
-            'created_at'        => $procedure->created_at?->format('d/m/Y H:i'),
+            // intravitreal_injection pede os dados do curso na solicitação e da aplicação na execução.
+            'clinical_kind'    => $procedure->procedure?->clinical_kind,
+            'status'           => $procedure->status->value,
+            'status_label'     => $procedure->status->label(),
+            'notes'            => $procedure->notes,
+            'executed_at'      => $procedure->executed_at?->format('d/m/Y H:i'),
+            'executed_by_name' => $procedure->executedBy?->user?->name,
+            'created_at'       => $procedure->created_at?->format('d/m/Y H:i'),
         ];
     }
 }

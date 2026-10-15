@@ -14,29 +14,16 @@ enum ConsentType: string
     case MinorGuardian         = 'minor_guardian';        // Representação legal de menor de idade
     case ImageAndVoice         = 'image_and_voice';       // Uso de imagem/voz (exames com foto/vídeo)
     case ResearchParticipation = 'research';             // Participação em pesquisa clínica
+    case CareReminders         = 'care_reminders';        // Lembretes de retorno por WhatsApp (Fase 6, ADR 0002 item 9)
 
     public function label(): string
     {
-        return match ($this) {
-            self::DataCollection        => 'Coleta e Armazenamento de Dados',
-            self::SensitiveData         => 'Tratamento de Dados de Saúde',
-            self::DataSharing           => 'Compartilhamento com Terceiros',
-            self::MinorGuardian         => 'Representação de Menor de Idade',
-            self::ImageAndVoice         => 'Uso de Imagem e Voz',
-            self::ResearchParticipation => 'Participação em Pesquisa',
-        };
+        return (string) __('consent.types.' . $this->value . '.label');
     }
 
     public function description(): string
     {
-        return match ($this) {
-            self::DataCollection        => 'Autorizo a coleta, armazenamento e uso dos meus dados pessoais para fins de atendimento clínico.',
-            self::SensitiveData         => 'Autorizo o tratamento dos meus dados de saúde (diagnósticos, exames, prescrições) para fins de atendimento médico.',
-            self::DataSharing           => 'Autorizo o compartilhamento dos meus dados com convênios e operadoras para fins de faturamento.',
-            self::MinorGuardian         => 'Na qualidade de responsável legal, autorizo o tratamento dos dados do menor sob minha responsabilidade.',
-            self::ImageAndVoice         => 'Autorizo o uso de imagens e registros de voz para fins de documentação clínica.',
-            self::ResearchParticipation => 'Autorizo a utilização anonimizada dos meus dados para fins de pesquisa científica.',
-        };
+        return (string) __('consent.types.' . $this->value . '.description');
     }
 
     /** Indica se este tipo de consentimento é obrigatório para o atendimento */

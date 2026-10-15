@@ -2,7 +2,7 @@
 
 /*
  * WhatsApp oficial (API da Meta) via Gupshup — ver
- * docs/integracoes/whatsapp-gupshup.md (passo a passo, lista de templates e
+ * docs/internal/integracoes/whatsapp-gupshup.md (passo a passo, lista de templates e
  * links da documentação oficial usada em cada ponto).
  */
 
@@ -96,7 +96,7 @@ return [
 
     /*
      * Templates aprovados na Meta (chave lógica → nome na Meta). O corpo de
-     * cada um está em docs/integracoes/whatsapp-gupshup.md (§6) e, para o
+     * cada um está em docs/internal/integracoes/whatsapp-gupshup.md (§6) e, para o
      * histórico do sistema, em lang/{pt_BR,en}/whatsapp.php (templates.*).
      *
      * body:    ordem das variáveis {{1}}, {{2}}... do corpo
@@ -128,6 +128,20 @@ return [
                 ['type' => 'quick_reply', 'action' => 'score', 'score' => 3],
                 ['type' => 'quick_reply', 'action' => 'score', 'score' => 2],
                 ['type' => 'quick_reply', 'action' => 'score', 'score' => 1],
+            ],
+        ],
+        // Convite de retorno (Fase 6): texto NEUTRO — primeiro nome e clínica, nunca a condição nem o exame
+        // (a tela do celular pode ser vista por outra pessoa). Aprovação manual na Meta antes de ligar
+        // `recall_enabled` numa clínica (docs/internal/integracoes/whatsapp-gupshup.md).
+        'care_recall' => [
+            'name'     => 'easyeye_lembrete_retorno',
+            'category' => 'UTILITY',
+            // Rodapé "responda SAIR" (opt-out) cadastrado no template.
+            'footer'  => true,
+            'body'    => ['first_name', 'clinic'],
+            'buttons' => [
+                ['type' => 'quick_reply', 'action' => 'recall_book'],
+                ['type' => 'quick_reply', 'action' => 'recall_done'],
             ],
         ],
         'verification_code' => [

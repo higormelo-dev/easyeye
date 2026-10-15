@@ -21,8 +21,24 @@
  * Fora de escopo aqui (BOM já cobre o caso comum): adicionar item de consumo
  * que NÃO está na composição padrão do procedimento — se a clínica precisar
  * disso, o caminho é cadastrar a BOM (tela Estoque > Procedimentos).
+ *
+ * Injeção intravítrea (anti-VEGF — Fase 6): o procedimento do catálogo com
+ * `clinical_kind` = intravitreal_injection pede, na solicitação, a droga e o
+ * esquema do curso do OLHO (OD ou OE, nunca AO) e, na execução, o lote e a
+ * validade, a autorização do convênio por aplicação e o intervalo que o
+ * médico decide até a próxima (ou o encerramento do curso). O painel dos
+ * cursos do paciente fica no topo. O servidor recusa por inteiro (422, nada
+ * gravado) o que faltar; a tela só guia.
+ *
+ * Orientações pós-procedimento (Fase 6 / S14): cada procedimento tem o botão
+ * "Orientações" (o que já foi entregue e, para o médico, a emissão a partir de
+ * um modelo da clínica; o que é emitido fica congelado).
  */
 import { computed, reactive, ref, watch } from 'vue';
+import CareGuidancePanel from '@/Components/Panel/CareGuidance/CareGuidancePanel.vue';
+import IntravitrealCoursesPanel from '@/Components/Panel/Intravitreal/IntravitrealCoursesPanel.vue';
+import IntravitrealExecutionFields from '@/Components/Panel/Intravitreal/IntravitrealExecutionFields.vue';
+import IntravitrealRequestFields from '@/Components/Panel/Intravitreal/IntravitrealRequestFields.vue';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -71,6 +87,64 @@ const STATUS_BADGE = {
 // "prontuário salvo" sem precisar repetir isEdit como prop.
 const canWrite = computed(() => props.isDoctor && !props.isLocked && !!props.urls.medicalrecordprocedures_store);
 
+// Gerir o CURSO de injeções (agendar a próxima aplicação, encerrar) também é ato do médico, mas sobre as tabelas do curso,
+// que não são do prontuário: os endpoints não olham a assinatura e as URLs são do PACIENTE (existem mesmo com o
+// prontuário ainda não salvo). Vale, portanto, com o atendimento ASSINADO — quem revisa uma consulta antiga continua
+// podendo agendar a próxima aplicação ou encerrar o tratamento. `canWrite`, que exige o prontuário aberto para edição,
+// é só para o que escreve NELE (solicitar, confirmar execução, cancelar).
+const canManageCourse = computed(
+    () =>
+        props.isDoctor &&
+        !!props.urls.intravitreal_course_close_template &&
+        !!props.urls.intravitreal_course_schedule_next_template,
+);
+
+// Orientações pós-procedimento: painel aberto sob UM procedimento por vez.
+const guidanceOpenId = ref(null);
+const guidanceUrl = (proc) => props.urls.care_guidance_template?.replace('__PROCEDURE_ID__', proc.id) ?? '';
+const toggleGuidance = (proc) => (guidanceOpenId.value = guidanceOpenId.value === proc.id ? null : proc.id);
+
+const INTRAVITREAL = 'intravitreal_injection';
+const isIntravitreal = (item) => item?.clinical_kind === INTRAVITREAL;
+
+// ── Cursos de injeções intravítreas (painel do topo) ────────────────────
+const ivt = reactive({
+    loaded: false,
+    courses: [],
+    drugs: [],
+    regimens: [],
+    statuses: [],
+    weeks: { min: 2, max: 16 },
+    t: null,
+});
+const ivtUrls = computed(() => ({
+    close: props.urls.intravitreal_course_close_template,
+    schedule: props.urls.intravitreal_course_schedule_next_template,
+}));
+
+async function loadIvt() {
+    if (!props.urls.intravitreal_courses_index) return;
+    try {
+        const res = await fetch(props.urls.intravitreal_courses_index, {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()).data ?? {};
+        ivt.courses = data.courses ?? [];
+        ivt.drugs = data.drugs ?? [];
+        ivt.regimens = data.regimens ?? [];
+        ivt.statuses = data.statuses ?? [];
+        ivt.weeks = data.weeks ?? ivt.weeks;
+        ivt.t = data.t ?? null;
+        ivt.loaded = true;
+    } catch (e) {
+        console.error('Failed to load intravitreal courses:', e);
+    }
+}
+
+// Mensagem do resultado da última aplicação (próxima data, agendamento que não coube).
+const ivtNotice = ref('');
+
 // ── Listagem (histórico por paciente, cronológico) ──────────────────────
 const loading = ref(false);
 const loaded = ref(false);
@@ -100,9 +174,11 @@ watch(
     () => props.show,
     (open) => {
         if (open && !loaded.value) loadProcedures();
+        if (open) loadIvt();
         if (!open) {
             showNewForm.value = false;
             markDoneTarget.value = null;
+            guidanceOpenId.value = null;
         }
     },
 );
@@ -114,9 +190,19 @@ const procSearchResults = ref([]);
 const procSearchOpen = ref(false);
 const procSearchLoading = ref(false);
 const selectedProcedure = ref(null);
-const newForm = reactive({ eye: '', solicitation_type: '', notes: '' });
+const newForm = reactive({
+    eye: '',
+    solicitation_type: '',
+    notes: '',
+    intravitreal: { drug_key: '', drug_label: '', regimen: 'loading_tae', indication: '' },
+});
 const requestBusy = ref(false);
 const requestError = ref('');
+const requestFieldErrors = ref({});
+
+// Injeção intravítrea escolhida no catálogo: o curso é de UM olho.
+const newIsIvt = computed(() => isIntravitreal(selectedProcedure.value));
+const newEyeInvalidForIvt = computed(() => newIsIvt.value && !['right', 'left'].includes(newForm.eye));
 let searchDebounce = null;
 
 function searchProcedures() {
@@ -167,7 +253,9 @@ function openNewForm() {
     newForm.eye = '';
     newForm.solicitation_type = '';
     newForm.notes = '';
+    newForm.intravitreal = { drug_key: '', drug_label: '', regimen: 'loading_tae', indication: '' };
     requestError.value = '';
+    requestFieldErrors.value = {};
 }
 
 async function submitRequest() {
@@ -178,8 +266,15 @@ async function submitRequest() {
     }
     if (requestBusy.value || !props.urls.medicalrecordprocedures_store) return;
 
+    if (newEyeInvalidForIvt.value) {
+        requestError.value = ivt.t?.request?.eye_required ?? tt('procedures_ivt_eye', 'Escolha OD ou OE.');
+
+        return;
+    }
+
     requestBusy.value = true;
     requestError.value = '';
+    requestFieldErrors.value = {};
     try {
         const res = await fetch(props.urls.medicalrecordprocedures_store, {
             method: 'POST',
@@ -189,17 +284,20 @@ async function submitRequest() {
                 eye: newForm.eye || null,
                 solicitation_type: newForm.solicitation_type || null,
                 notes: newForm.notes || null,
+                ...(newIsIvt.value ? { intravitreal: { ...newForm.intravitreal } } : {}),
             }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
             requestError.value =
                 json.message ?? tt('procedures_request_error', 'Não foi possível solicitar o procedimento.');
+            requestFieldErrors.value = flattenErrors(json.errors);
 
             return;
         }
         procedures.value.unshift(json.data);
         showNewForm.value = false;
+        if (isIntravitreal(json.data)) loadIvt();
     } catch (e) {
         console.error('Procedure request error:', e);
         requestError.value = tt('procedures_request_error', 'Não foi possível solicitar o procedimento.');
@@ -208,8 +306,52 @@ async function submitRequest() {
     }
 }
 
+/** { campo: ['msg'] } do Laravel/servidor → { 'intravitreal.campo' ou campo: 'msg' } sem prefixo. */
+function flattenErrors(errors) {
+    const flat = {};
+    for (const [key, messages] of Object.entries(errors ?? {})) {
+        flat[key.replace(/^intravitreal\./, '')] = Array.isArray(messages) ? messages[0] : String(messages);
+    }
+
+    return flat;
+}
+
 // ── Confirmar execução (consumo opcional, pré-preenchido pela BOM) ──────
 const markDoneTarget = ref(null); // linha da listagem em execução
+const markDoneIsIvt = computed(() => isIntravitreal(markDoneTarget.value));
+const ivtExec = ref(emptyIvtExec());
+const ivtExecErrors = ref({});
+
+function emptyIvtExec(previousInterval = '') {
+    return {
+        stock_lot_id: '',
+        lot_number: '',
+        lot_expiry: '',
+        authorization_required: false,
+        authorization_status: 'pending',
+        authorization_number: '',
+        authorization_valid_until: '',
+        authorization_override: false,
+        authorization_notes: '',
+        end_course: '',
+        end_reason: '',
+        next_interval_weeks: previousInterval,
+        schedule_at: '',
+    };
+}
+
+// O curso aberto do olho do procedimento: de onde saem a aplicação (nº) e o intervalo da última decisão.
+const markDoneCourse = computed(() =>
+    markDoneIsIvt.value ? ivt.courses.find((c) => c.open && c.eye === markDoneTarget.value.eye) : null,
+);
+// Lotes de estoque disponíveis para escolher (os dos materiais da composição do procedimento).
+const ivtLots = computed(() => {
+    const seen = new Set();
+
+    return consumptionItems.value
+        .flatMap((item) => item.lots ?? [])
+        .filter((lot) => (seen.has(lot.id) ? false : seen.add(lot.id)));
+});
 const bomLoading = ref(false);
 const consumptionItems = ref([]);
 const markDoneNotes = ref('');
@@ -222,6 +364,10 @@ async function openMarkDone(proc) {
     markDoneError.value = '';
     markDoneNotes.value = '';
     consumptionItems.value = [];
+    ivtExecErrors.value = {};
+    ivtExec.value = emptyIvtExec(
+        isIntravitreal(proc) ? (ivt.courses.find((c) => c.open && c.eye === proc.eye)?.interval_weeks ?? '') : '',
+    );
 
     if (!props.urls.procedure_bom_template) return;
 
@@ -257,6 +403,28 @@ function closeMarkDone() {
     markDoneTarget.value = null;
 }
 
+/** Só o que o servidor lê: strings vazias viram nulo, datas e semanas seguem como estão. */
+function ivtPayload() {
+    const e = ivtExec.value;
+    const blank = (v) => (v === '' || v === undefined ? null : v);
+
+    return {
+        stock_lot_id: blank(e.stock_lot_id),
+        lot_number: blank(e.lot_number),
+        lot_expiry: blank(e.lot_expiry),
+        authorization_required: !!e.authorization_required,
+        authorization_status: e.authorization_required ? blank(e.authorization_status) : null,
+        authorization_number: blank(e.authorization_number),
+        authorization_valid_until: blank(e.authorization_valid_until),
+        authorization_override: !!e.authorization_override,
+        authorization_notes: blank(e.authorization_notes),
+        end_course: blank(e.end_course),
+        end_reason: blank(e.end_reason),
+        next_interval_weeks: e.end_course ? null : blank(e.next_interval_weeks),
+        schedule_at: e.end_course ? null : blank(e.schedule_at),
+    };
+}
+
 function removeConsumptionItem(idx) {
     consumptionItems.value.splice(idx, 1);
 }
@@ -280,11 +448,13 @@ async function confirmMarkDone() {
 
     markDoneBusy.value = true;
     markDoneError.value = '';
+    ivtExecErrors.value = {};
     try {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
             body: JSON.stringify({
+                ...(markDoneIsIvt.value ? { intravitreal: ivtPayload() } : {}),
                 notes: markDoneNotes.value || null,
                 items: consumptionItems.value
                     .filter((i) => Number(i.quantity) > 0)
@@ -298,11 +468,21 @@ async function confirmMarkDone() {
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
             markDoneError.value = json.message ?? tt('procedures_done_error', 'Não foi possível confirmar a execução.');
+            ivtExecErrors.value = flattenErrors(json.errors);
 
             return;
         }
         const idx = procedures.value.findIndex((p) => p.id === json.data.id);
         if (idx !== -1) procedures.value[idx] = json.data;
+        if (json.intravitreal) {
+            ivtNotice.value = [
+                json.intravitreal.message,
+                json.intravitreal.schedule?.ok === false ? json.intravitreal.schedule.message : '',
+            ]
+                .filter(Boolean)
+                .join(' ');
+            loadIvt();
+        }
         closeMarkDone();
     } catch (e) {
         console.error('Mark done error:', e);
@@ -368,6 +548,30 @@ async function cancelProcedure(proc) {
                     </div>
 
                     <div class="modal-body">
+                        <div
+                            v-if="ivtNotice"
+                            class="alert alert-info py-1 px-2 small d-flex justify-content-between"
+                            role="status"
+                            data-testid="ivt-notice"
+                        >
+                            <span>{{ ivtNotice }}</span>
+                            <button
+                                type="button"
+                                class="btn-close btn-sm"
+                                aria-label="×"
+                                @click="ivtNotice = ''"
+                            ></button>
+                        </div>
+
+                        <IntravitrealCoursesPanel
+                            v-if="ivt.t && !showNewForm && !markDoneTarget"
+                            :courses="ivt.courses"
+                            :can-manage="canManageCourse"
+                            :urls="ivtUrls"
+                            :t="ivt.t"
+                            @changed="loadIvt"
+                        />
+
                         <!-- Nova solicitação -->
                         <div v-if="showNewForm" class="border rounded p-2 mb-3 bg-light">
                             <div class="position-relative mb-2">
@@ -432,6 +636,16 @@ async function cancelProcedure(proc) {
                                     </select>
                                 </div>
                             </div>
+
+                            <IntravitrealRequestFields
+                                v-if="newIsIvt && ivt.t"
+                                v-model="newForm.intravitreal"
+                                :drugs="ivt.drugs"
+                                :regimens="ivt.regimens"
+                                :eye="newForm.eye"
+                                :errors="requestFieldErrors"
+                                :t="ivt.t"
+                            />
 
                             <div class="mb-2">
                                 <label class="form-label small fw-semibold mb-1">{{
@@ -553,6 +767,17 @@ async function cancelProcedure(proc) {
                                     </div>
                                 </div>
 
+                                <IntravitrealExecutionFields
+                                    v-if="markDoneIsIvt && ivt.t"
+                                    v-model="ivtExec"
+                                    :statuses="ivt.statuses"
+                                    :weeks="ivt.weeks"
+                                    :lots="ivtLots"
+                                    :sequence="markDoneCourse?.planned?.sequence_no ?? null"
+                                    :errors="ivtExecErrors"
+                                    :t="ivt.t"
+                                />
+
                                 <div class="mb-2">
                                     <label class="form-label small fw-semibold mb-1">{{
                                         tt('procedures_notes_label', 'Observações')
@@ -628,6 +853,27 @@ async function cancelProcedure(proc) {
                                 <div v-if="proc.status === 'done'" class="small text-success mt-1">
                                     <i class="fas fa-check-circle me-1"></i>{{ proc.executed_by_name }} ·
                                     {{ proc.executed_at }}
+                                </div>
+                                <div
+                                    v-if="proc.status !== 'cancelled' && urls.care_guidance_template"
+                                    class="mt-2"
+                                    data-testid="guidance-slot"
+                                >
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        :aria-expanded="guidanceOpenId === proc.id ? 'true' : 'false'"
+                                        :data-testid="`guidance-toggle-${proc.id}`"
+                                        @click="toggleGuidance(proc)"
+                                    >
+                                        <i class="fas fa-file-medical me-1"></i
+                                        >{{ tt('procedures_guidance', 'Orientações') }}
+                                    </button>
+                                    <CareGuidancePanel
+                                        v-if="guidanceOpenId === proc.id"
+                                        :key="proc.id"
+                                        :url="guidanceUrl(proc)"
+                                    />
                                 </div>
                                 <div v-if="canWrite && proc.status === 'requested'" class="d-flex gap-2 mt-2">
                                     <button

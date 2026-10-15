@@ -32,6 +32,7 @@ const automations = computed(() =>
         ? [
               [props.t.toggles.confirmation_enabled, automationText(c.value, 'confirmation', ui.value)],
               [props.t.toggles.survey_enabled, automationText(c.value, 'survey', ui.value)],
+              [props.t.recall.toggle, setting.value?.recall_enabled ? props.t.recall.enabled : null],
           ]
         : [],
 );
@@ -45,6 +46,8 @@ const stats = computed(() => {
         ['confirmations_answered', number(s.confirmations_answered)],
         ['surveys_sent', number(s.surveys_sent)],
         ['surveys_answered', number(s.surveys_answered)],
+        ['recall_sent', number(s.recall_sent)],
+        ['recall_answered', number(s.recall_answered)],
         [
             'survey_average',
             s.survey_average ? fill(ui.value.survey_average_value, { value: number(s.survey_average, 1) }) : '—',

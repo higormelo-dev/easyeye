@@ -51,6 +51,10 @@ export function usePatientForm(catalogs) {
         telephone: '',
         cellphone: '',
         whatsapp: false,
+        // Autorização de lembretes de retorno por WhatsApp (LGPD): nulo = o formulário não tocou (o servidor não
+        // mexe); true/false registra ou revoga. Na edição parte do estado atual do paciente, mas só VAI ao servidor
+        // quando a pessoa mudou a caixa (ver `outgoing`).
+        care_reminders_consent: null,
         // Endereço
         zipcode: '',
         address: '',
@@ -71,6 +75,28 @@ export function usePatientForm(catalogs) {
         medications: [],
     });
 
+    // A autorização de lembretes como o SERVIDOR a tem: o valor carregado ao abrir o cadastro e, depois de cada
+    // salvamento que deu certo, o que esse salvamento gravou. Autorização é um ATO da pessoa, não um campo do
+    // formulário: o valor carregado voltava em TODO salvamento, então, se o paciente respondesse SAIR com a tela aberta,
+    // salvar outro campo "marcava" de novo a caixa que a tela ainda mostrava (consentimento restaurado em silêncio) — e,
+    // ao contrário, desmarcava uma autorização que outra pessoa acabara de registrar. Só vai ao servidor o que a pessoa
+    // MUDOU em relação a isso; igual = nulo (o servidor não mexe).
+    //
+    // O agendamento salva o paciente ANTES do horário e, se o horário for recusado, a tela continua aberta: sem avançar
+    // a base depois do salvamento, marcar a caixa (gravou true), desmarcá-la e tentar de novo mandava nulo (a base ainda
+    // era "desmarcada"), e a revogação explícita ficava sem efeito. O Inertia (Pacientes) fecha o painel no sucesso, e a
+    // reabertura recarrega do servidor.
+    const loadedCareReminders = ref(null);
+
+    function outgoing(data) {
+        return data.care_reminders_consent === loadedCareReminders.value
+            ? { ...data, care_reminders_consent: null }
+            : data;
+    }
+
+    // Cobre `form.put/post` (Pacientes); `savePatient` (fetch embutido) aplica o mesmo em `form.data()`.
+    form.transform(outgoing);
+
     // Confirmação de homônimo vale para o nome/nascimento confirmados: mudou
     // um dos dois, o servidor reavalia e a recepção confirma de novo.
     watch(
@@ -83,6 +109,7 @@ export function usePatientForm(catalogs) {
     function resetForm() {
         editLoad.cancel();
         loading.value = false;
+        loadedCareReminders.value = null;
         // defaults() pode ter sido movido por loadEditData — restaura o
         // template vazio antes do reset pra não "resetar" pro último paciente.
         form.defaults({
@@ -109,6 +136,7 @@ export function usePatientForm(catalogs) {
             telephone: '',
             cellphone: '',
             whatsapp: false,
+            care_reminders_consent: null,
             zipcode: '',
             address: '',
             number: '',
@@ -141,6 +169,7 @@ export function usePatientForm(catalogs) {
             });
             planOption.value = d.covenant_plan ?? null;
             covenantOption.value = d.covenant_option ?? null;
+            loadedCareReminders.value = typeof d.care_reminders_consent === 'boolean' ? d.care_reminders_consent : null;
             // Baseline = dado carregado: isDirty passa a refletir só edição
             // REAL do usuário (decide se o save do agendamento faz PUT).
             form.defaults(form.data());
@@ -169,6 +198,9 @@ export function usePatientForm(catalogs) {
         const method = patientId ? 'PUT' : 'POST';
 
         try {
+            // O que VAI é um retrato do momento do envio (cópia profunda): a tela pode mudar enquanto a resposta não volta.
+            const sent = JSON.parse(JSON.stringify(form.data()));
+            const payload = outgoing(sent);
             const res = await fetch(url, {
                 method,
                 headers: {
@@ -176,11 +208,22 @@ export function usePatientForm(catalogs) {
                     Accept: 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                 },
-                body: JSON.stringify(form.data()),
+                body: JSON.stringify(payload),
             });
             const json = await res.json();
 
             if (res.ok) {
+                // O servidor passou a ter o que foi enviado; nulo = não mexeu, a base continua a mesma.
+                if (typeof payload.care_reminders_consent === 'boolean') {
+                    loadedCareReminders.value = payload.care_reminders_consent;
+                }
+
+                // E o que a tela mostra agora é o novo "como está salvo": sem isso, voltar um campo ao valor com que o
+                // cadastro abriu (a caixa marcada e desmarcada de novo, depois que o horário foi recusado) parecia "sem
+                // mudança" e o agendamento nem tentava salvar o paciente — a revogação ficava só na tela.
+                // (`isDirty` se recalcula sozinho: o `processing` que volta a false logo abaixo dispara o observador.)
+                form.defaults(sent);
+
                 return {
                     ok: true,
                     patient: {
@@ -256,7 +299,9 @@ export function usePatientForm(catalogs) {
                 k.startsWith('allergies.') ||
                 k.startsWith('medications.'),
         ),
-        contact: Object.keys(form.errors).some((k) => ['telephone', 'cellphone', 'whatsapp'].includes(k)),
+        contact: Object.keys(form.errors).some((k) =>
+            ['telephone', 'cellphone', 'whatsapp', 'care_reminders_consent'].includes(k),
+        ),
         address: Object.keys(form.errors).some((k) =>
             ['zipcode', 'address', 'number', 'complement', 'district', 'city', 'state', 'country'].includes(k),
         ),

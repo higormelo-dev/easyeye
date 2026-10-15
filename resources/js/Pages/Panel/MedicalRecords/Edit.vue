@@ -34,6 +34,8 @@ const props = defineProps({
     draft: { type: Object, default: null },
     // Segurança clínica (Fase 2): alergias/medicações/alertas + uso de LC da última consulta.
     clinicalSafety: { type: Object, default: null },
+    // Sugestão do campo "Retorno" (Fase 6): só o médico, só com protocolo de acompanhamento em uso.
+    followUp: { type: Object, default: null },
     contactLensUsePrevious: { type: Object, default: null },
     ai: { type: Object, default: () => ({ enabled: false }) },
     t: { type: Object, default: () => ({}) },
@@ -140,6 +142,7 @@ function closeView() {
                             :storage="storage"
                             :draft="draft"
                             :clinical-safety="clinicalSafety"
+                            :follow-up="followUp"
                             :safety-store="safety"
                             :contact-lens-use-previous="contactLensUsePrevious"
                             :ai="ai"

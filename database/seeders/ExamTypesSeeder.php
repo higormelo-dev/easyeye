@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domains\Recall\Support\ExamTypeCanonicalKeys;
 use App\Models\ExamType;
 use Illuminate\Database\Seeder;
 
@@ -162,7 +163,8 @@ class ExamTypesSeeder extends Seeder
 
             ExamType::firstOrCreate(
                 ['name' => $normalized, 'category' => $categoryId],
-                ['active' => true],
+                // Sugestão de mapeamento do recall (a clínica confirma o dela): ver ExamTypeCanonicalKeys.
+                ['active' => true, 'canonical_key' => ExamTypeCanonicalKeys::BY_NAME[$normalized] ?? null],
             );
         }
     }

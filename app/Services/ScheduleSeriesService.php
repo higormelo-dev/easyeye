@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 /**
  * Série de sessões — tratamentos seriados da oftalmologia (injeção
@@ -18,9 +19,14 @@ use Illuminate\Support\Str;
  * agendamentos ligados por `series_id`, cada um com `session_number` /
  * `session_total` ("3/10"). Sem pacote financeiro.
  *
- *  - Datas: semanal, mensal (mesmo dia; 31 vira o último dia do mês) ou dias
- *    da semana escolhidos (seg..sáb), terminando em N sessões OU numa data
- *    (inclusive). Nunca mais que MAX_SESSIONS.
+ *  - Datas: semanal, mensal (mesmo dia; 31 vira o último dia do mês), a cada
+ *    N semanas (2 a 16 — o intervalo do "trate e estenda") ou dias da semana
+ *    escolhidos (seg..sáb), terminando em N sessões OU numa data (inclusive).
+ *    Nunca mais que MAX_SESSIONS.
+ *  - Série ABERTA (`session_total` nulo, rótulo "n"): não se sabe quantas
+ *    sessões terá — o intervalo se decide a cada visita. Nasce de um
+ *    agendamento solto (`startOpenSeries`) e cresce uma sessão por vez
+ *    (`addSession`), com a mesma regra de horário do agendamento comum.
  *  - Prévia: cada data passa pela MESMA regra do horário principal
  *    (ScheduleService::validateFor — médico, intervalo, bloqueio, sala; ou a
  *    regra de encaixe) e volta com o motivo do conflito; a recepção remove as
@@ -36,10 +42,18 @@ class ScheduleSeriesService
     /** Teto de sessões de uma série (inclui a 1ª). */
     public const MAX_SESSIONS = 60;
 
-    public const FREQUENCIES = ['weekly', 'monthly', 'weekdays'];
+    public const FREQUENCIES = ['weekly', 'monthly', 'weekdays', 'every_weeks'];
+
+    /** Faixa do intervalo "a cada N semanas" (o mesmo do curso de injeções intravítreas). */
+    public const INTERVAL_WEEKS_MIN = 2;
+
+    public const INTERVAL_WEEKS_MAX = 16;
 
     /** Situações que "Cancelar as futuras" alcança (não chegou, não começou). */
     public const CANCELLABLE_SITUATIONS = [ScheduleSituation::Scheduled, ScheduleSituation::Confirmed];
+
+    /** Situações em que a sessão liberou o horário: não ocupa a data nem conta como duplicata ao acrescentar outra. */
+    public const FREED_SITUATIONS = [ScheduleSituation::Cancelled, ScheduleSituation::NoShow];
 
     public function __construct(private readonly ScheduleService $schedules)
     {
@@ -49,11 +63,12 @@ class ScheduleSeriesService
      * Datas da série a partir da 1ª sessão (inclusive). Gera no máximo
      * MAX_SESSIONS + 1 (a sobra indica que o pedido passou do teto).
      *
-     * @param list<int> $weekdays dias da semana (0 = domingo … 6 = sábado), só para `weekdays`
+     * @param list<int> $weekdays      dias da semana (0 = domingo … 6 = sábado), só para `weekdays`
+     * @param int|null  $intervalWeeks semanas entre as sessões, só para `every_weeks` (2 a 16; fora disso não gera nada além da 1ª)
      *
      * @return list<Carbon>
      */
-    public function generate(Carbon $first, string $frequency, array $weekdays = [], ?int $count = null, ?Carbon $until = null): array
+    public function generate(Carbon $first, string $frequency, array $weekdays = [], ?int $count = null, ?Carbon $until = null, ?int $intervalWeeks = null): array
     {
         $dates  = [$first->copy()];
         $target = $count !== null ? min($count, self::MAX_SESSIONS + 1) : self::MAX_SESSIONS + 1;
@@ -64,10 +79,11 @@ class ScheduleSeriesService
         // Guarda contra laço sem fim (ex.: dias da semana vazios).
         for ($guard = 0; count($dates) < $target && $guard < 800; $guard++) {
             $next = match ($frequency) {
-                'weekly'   => $first->copy()->addWeeks(count($dates)),
-                'monthly'  => $first->copy()->addMonthsNoOverflow(count($dates)),
-                'weekdays' => $this->nextWeekday($cursor, $days),
-                default    => null,
+                'weekly'      => $first->copy()->addWeeks(count($dates)),
+                'every_weeks' => $this->validInterval($intervalWeeks) ? $first->copy()->addWeeks(count($dates) * $intervalWeeks) : null,
+                'monthly'     => $first->copy()->addMonthsNoOverflow(count($dates)),
+                'weekdays'    => $this->nextWeekday($cursor, $days),
+                default       => null,
             };
 
             if ($next === null || ($last !== null && $next->gt($last))) {
@@ -184,6 +200,113 @@ class ScheduleSeriesService
     }
 
     /**
+     * Transforma um agendamento solto na 1ª sessão de uma série ABERTA (sem total): a base do tratamento em que o
+     * intervalo se decide a cada visita. Quem chama já está numa transação. Série já existente não muda.
+     */
+    public function startOpenSeries(Schedule $first): void
+    {
+        if ($first->series_id) {
+            return;
+        }
+
+        $first->forceFill(['series_id' => (string) Str::uuid(), 'session_number' => 1, 'session_total' => null])->save();
+    }
+
+    /**
+     * Acrescenta UMA sessão à série aberta de `$anchor`, copiando os dados dele (médico, paciente, convênio, sala,
+     * encaixe) e conferindo o horário pela MESMA regra do agendamento comum (médico, intervalo, bloqueio, sala; ou o
+     * teto do encaixe sob lock). Quem chama traz a transação; horário recusado volta como exceção e nada é gravado.
+     *
+     * Ordem de locks: cota do encaixe → trava da SÉRIE → linhas da série → INSERT (a mesma de store(): cota →
+     * paciente/dia → linha). A numeração da sessão (máximo + 1) é lida SOB a trava da série: `SELECT … FOR UPDATE` só
+     * trava as linhas que já existem no snapshot do comando, então duas sessões acrescentadas ao mesmo tempo, a segunda
+     * esperando a primeira, não enxergavam a linha que a primeira acabou de inserir e gravavam o MESMO número.
+     *
+     * @throws ScheduleSlotUnavailableException horário que não cabe
+     * @throws InvalidArgumentException         série fechada (com total) ou sem série, ou data que já passou
+     */
+    public function addSession(Schedule $anchor, Carbon $dateTime): Schedule
+    {
+        if (! $anchor->series_id || $anchor->session_total !== null) {
+            throw new InvalidArgumentException(__('schedules.series_add_closed'));
+        }
+
+        if ($dateTime->lte(now())) {
+            throw new InvalidArgumentException(__('schedules.series_add_past'));
+        }
+
+        $resourceIds = $anchor->resources()->pluck('clinic_resources.id')->map(fn ($id) => (string) $id)->all();
+
+        // A MESMA regra do agendamento comum para os dois tipos: escala do médico, bloqueio e sala (e, no encaixe, o teto
+        // do turno como mensagem antecipada). O encaixe ainda confere o teto SOB a trava da cota, que é o que vale.
+        if (($errors = $this->schedules->validateFor((bool) $anchor->is_fit_in, (string) $anchor->doctor_id, $dateTime, null, $resourceIds)) !== []) {
+            throw new ScheduleSlotUnavailableException((string) $errors[0], 'date_time');
+        }
+
+        if ($anchor->is_fit_in) {
+            $this->schedules->assertFitInCapacity((string) $anchor->doctor_id, $dateTime);
+        }
+
+        $this->lockSeries((string) $anchor->entity_id, (string) $anchor->series_id);
+
+        $existing = Schedule::query()
+            ->where('entity_id', $anchor->entity_id)
+            ->where('series_id', $anchor->series_id)
+            ->lockForUpdate()
+            ->get(['id', 'session_number', 'date_time', 'situation']);
+
+        // Sessão cancelada/faltada no mesmo horário não é duplicata: o horário voltou a ser da agenda (o índice único
+        // do médico também a ignora), e remarcar exatamente onde estava é o caso comum.
+        if ($existing->contains(fn (Schedule $session) => ! in_array($session->situation, self::FREED_SITUATIONS, true) && $session->date_time->equalTo($dateTime))) {
+            throw new ScheduleSlotUnavailableException(__('schedules.series_duplicate_date'), 'date_time');
+        }
+
+        try {
+            $session = Schedule::query()->create([
+                ...$this->copyableAttributes($anchor),
+                'date_time'      => $dateTime,
+                'session_number' => (int) $existing->max('session_number') + 1,
+                'session_total'  => null,
+            ]);
+        } catch (UniqueConstraintViolationException $e) {
+            if (! Schedule::isDoctorSlotConflict($e)) {
+                throw $e;
+            }
+
+            throw new ScheduleSlotUnavailableException(__('validation.custom.schedule.doctor_datetime_unique'), 'date_time');
+        }
+
+        if ($resourceIds !== []) {
+            $session->resources()->sync($resourceIds);
+        }
+
+        return $session;
+    }
+
+    /**
+     * Trava a série até o fim da transação corrente. PostgreSQL: advisory lock de transação (só quem acrescenta à
+     * MESMA série espera); demais drivers: lock nas linhas da série (as próprias leituras seguintes já as travam).
+     */
+    private function lockSeries(string $entityId, string $seriesId): void
+    {
+        $connection = DB::connection();
+
+        if ($connection->getDriverName() === 'pgsql') {
+            $connection->select('select pg_advisory_xact_lock(?)', [self::seriesLockKey($entityId, $seriesId)]);
+
+            return;
+        }
+
+        Schedule::query()->where('entity_id', $entityId)->where('series_id', $seriesId)->lockForUpdate()->get(['id']);
+    }
+
+    /** Chave bigint estável da trava da série (60 bits do sha1, sempre positiva). Pública para os testes disputarem o mesmo lock. */
+    public static function seriesLockKey(string $entityId, string $seriesId): int
+    {
+        return (int) hexdec(substr(sha1('schedule_series|' . $entityId . '|' . $seriesId), 0, 15));
+    }
+
+    /**
      * "Cancelar as futuras": sessões da série a partir de agora que ainda não
      * começaram, com o motivo no histórico (ScheduleService::changeSituation).
      *
@@ -247,6 +370,11 @@ class ScheduleSeriesService
             'recurrence_until'    => $first->recurrence_until,
             'active'              => true,
         ];
+    }
+
+    private function validInterval(?int $weeks): bool
+    {
+        return $weeks !== null && $weeks >= self::INTERVAL_WEEKS_MIN && $weeks <= self::INTERVAL_WEEKS_MAX;
     }
 
     /** Próxima data (depois de `$after`) num dos dias da semana pedidos, mesmo horário. */

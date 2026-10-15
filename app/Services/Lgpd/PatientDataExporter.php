@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Lgpd;
 
 use App\Domains\AI\Models\AiRun;
+use App\Domains\CareGuidance\Models\CareGuidanceIssue;
+use App\Domains\Recall\Intravitreal\Models\{IntravitrealApplication, IntravitrealCourse};
+use App\Domains\Recall\Models\{PatientCondition, PatientRecall, PatientRecallBlock, PatientRecallEvent, RecallInvite};
 use App\Domains\Tiss\Models\{TissGlosa, TissGuide, TissGuideItem};
 use App\Models\{
     AdditionType,
@@ -32,6 +35,7 @@ use App\Models\{
     RecordVersion,
     Schedule,
     ScheduleSituationLog,
+    UrgentCareEntry,
     User,
     VisualAcuityType,
     WaitingList
@@ -55,7 +59,7 @@ use Illuminate\Support\Collection;
  */
 final class PatientDataExporter
 {
-    public const FORMAT_VERSION = 4; // 4: alergias, medicações em uso, retrato na consulta e uso de LC (Fase 2)
+    public const FORMAT_VERSION = 5; // 5: retornos/recall e convites por WhatsApp, curso de injeções intravítreas, orientações pós-procedimento e pronto atendimento (Fase 6); 4: alergias, medicações em uso, retrato na consulta e uso de LC (Fase 2)
 
     /** @var array<class-string, array<string, ?string>> nomes de catálogo por id */
     private array $names = [];
@@ -80,6 +84,10 @@ final class PatientDataExporter
             'exams'              => $this->exams($patient),
             'appointments'       => $this->appointments($patient),
             'waiting_list'       => $this->waitingList($patient),
+            'urgent_care'        => $this->urgentCare($patient),
+            'recall'             => $this->recall($patient),
+            'intravitreal'       => $this->intravitreal($patient),
+            'care_guidance'      => $this->careGuidance($patient),
             'messages'           => $this->messages($patient, $scheduleIds),
             'whatsapp_opt_outs'  => $this->whatsappOptOuts($patient, $scheduleIds),
             'panel_calls'        => $this->panelCalls($patient, $scheduleIds),
@@ -535,12 +543,174 @@ final class PatientDataExporter
             ])->all();
     }
 
-    /** Mensagens de WhatsApp trocadas com o paciente (lembretes, confirmações, pesquisas). */
+    /** Pronto atendimento: a chegada espontânea, o motivo (dado de saúde) e o desfecho. */
+    private function urgentCare(Patient $patient): array
+    {
+        return UrgentCareEntry::query()
+            ->where(fn ($q) => $q->where('entity_id', $patient->entity_id)->orWhereNull('entity_id'))
+            ->where('patient_id', $patient->id)
+            ->orderBy('arrived_at')
+            ->get()
+            ->map(fn (UrgentCareEntry $e) => [
+                'reason'         => $this->label($e->reason),
+                'reason_details' => $e->reason_details,
+                'priority'       => $this->label($e->priority),
+                'status'         => $this->label($e->status),
+                'arrived_at'     => $this->iso($e->arrived_at),
+                'called_at'      => $this->iso($e->called_at),
+                'attended_at'    => $this->iso($e->attended_at),
+                'attended_by'    => $this->doctorName($e->attended_by_doctor_id),
+                'closed_at'      => $this->iso($e->closed_at),
+                'closed_reason'  => $e->closed_reason,
+            ])->all();
+    }
+
+    /**
+     * Retornos e recall (Fase 6): as condições acompanhadas, o que falta para o paciente (com o que a clínica fez —
+     * contato, adiamento, "feito fora"), o histórico de cada retorno, os bloqueios de contato e os convites por
+     * WhatsApp (a mensagem em si está em `messages`).
+     */
+    private function recall(Patient $patient): array
+    {
+        $scope = fn ($q) => $q->where('entity_id', $patient->entity_id)->where('patient_id', $patient->id);
+
+        $conditions = PatientCondition::query()->withoutGlobalScopes()->where($scope)->orderBy('created_at')->get();
+        $recalls    = PatientRecall::query()->withoutGlobalScopes()->where($scope)->orderBy('due_at')->get();
+        $events     = PatientRecallEvent::query()->withoutGlobalScopes()->where($scope)->orderBy('created_at')->get()->groupBy('recall_id');
+        $invites    = RecallInvite::query()->withoutGlobalScopes()->where($scope)->with('recalls:id')->orderBy('created_at')->get();
+        $blocks     = PatientRecallBlock::query()->withoutGlobalScopes()->where($scope)->orderBy('created_at')->get();
+
+        return [
+            'conditions' => $conditions->map(fn (PatientCondition $c) => [
+                'protocol'         => $c->protocol_key,
+                'eye'              => $this->label($c->eye),
+                'status'           => $this->label($c->status),
+                'origin'           => $this->label($c->origin),
+                'started_on'       => $this->iso($c->started_on),
+                'evidence'         => $c->evidence,
+                'confirmed_at'     => $this->iso($c->confirmed_at),
+                'discharged_at'    => $this->iso($c->discharged_at),
+                'discharge_reason' => $c->discharge_reason,
+                'rejected_at'      => $this->iso($c->rejected_at),
+            ])->all(),
+            'returns' => $recalls->map(fn (PatientRecall $r) => [
+                'source'               => $r->source,
+                'protocol'             => $r->protocol_key,
+                'task'                 => $r->task_key,
+                'kind'                 => $r->kind,
+                'exam'                 => $r->exam_key,
+                'eye'                  => $this->label($r->eye),
+                'last_done_at'         => $this->iso($r->last_done_at),
+                'due_at'               => $this->iso($r->due_at),
+                'situation'            => $this->label($r->lifecycle),
+                'closed_reason'        => $r->closed_reason,
+                'snoozed_until'        => $this->iso($r->snoozed_until),
+                'dismissed_reason'     => $r->dismissed_reason,
+                'last_contact_at'      => $this->iso($r->last_contact_at),
+                'last_contact_outcome' => $r->last_contact_outcome,
+                'contact_count'        => $r->contact_count,
+                'done_elsewhere_at'    => $this->iso($r->external_done_at),
+                'history'              => ($events[$r->id] ?? collect())->map(fn (PatientRecallEvent $e) => [
+                    'event' => $e->event,
+                    'by'    => $e->actor_label,
+                    'meta'  => $e->meta,
+                    'at'    => $this->iso($e->created_at),
+                ])->values()->all(),
+            ])->all(),
+            'contact_blocks' => $blocks->map(fn (PatientRecallBlock $b) => [
+                'reason'      => $this->label($b->reason),
+                'note'        => $b->note,
+                'created_at'  => $this->iso($b->created_at),
+                'released_at' => $this->iso($b->released_at),
+            ])->all(),
+            'whatsapp_invites' => $invites->map(fn (RecallInvite $i) => [
+                'origin'       => $this->label($i->origin),
+                'day'          => explode(':', (string) $i->wave_key)[0] ?? null,
+                'response'     => $this->label($i->response),
+                'responded_at' => $this->iso($i->responded_at),
+                'sent_at'      => $this->iso($i->created_at),
+                'returns'      => $i->recalls->count(),
+            ])->all(),
+        ];
+    }
+
+    /** Tratamento com injeções intravítreas (Fase 6): um curso por olho, com cada aplicação (lote, autorização, intervalo). */
+    private function intravitreal(Patient $patient): array
+    {
+        $applications = IntravitrealApplication::query()->withoutGlobalScopes()
+            ->where('entity_id', $patient->entity_id)->where('patient_id', $patient->id)
+            ->orderBy('sequence_no')->get()->groupBy('course_id');
+
+        return IntravitrealCourse::query()->withoutGlobalScopes()->withTrashed()
+            ->where('entity_id', $patient->entity_id)->where('patient_id', $patient->id)
+            ->orderBy('started_on')->get()
+            ->map(fn (IntravitrealCourse $c) => [
+                'eye'            => $c->eye,
+                'drug'           => $c->drug_label,
+                'indication'     => $c->indication,
+                'regimen'        => $this->label($c->regimen),
+                'status'         => $this->label($c->status),
+                'started_on'     => $this->iso($c->started_on),
+                'ended_on'       => $this->iso($c->ended_on),
+                'end_reason'     => $c->end_reason,
+                'interval_weeks' => $c->current_interval_weeks,
+                'next_due_on'    => $this->iso($c->next_due_on),
+                'responsible'    => $this->doctorName($c->responsible_doctor_id),
+                'applications'   => ($applications[$c->id] ?? collect())->map(fn (IntravitrealApplication $a) => [
+                    'number'                    => $a->sequence_no,
+                    'phase'                     => $a->phase,
+                    'status'                    => $this->label($a->status),
+                    'planned_for'               => $this->iso($a->planned_for),
+                    'performed_at'              => $this->iso($a->performed_at),
+                    'performed_by'              => $this->doctorName($a->performed_by_doctor_id),
+                    'drug'                      => $a->drug_label,
+                    'lot_number'                => $a->lot_number,
+                    'lot_expiry'                => $this->iso($a->lot_expiry),
+                    'authorization_required'    => (bool) $a->authorization_required,
+                    'authorization_status'      => $this->label($a->authorization_status),
+                    'authorization_number'      => $a->authorization_number,
+                    'authorization_valid_until' => $this->iso($a->authorization_valid_until),
+                    'authorization_notes'       => $a->authorization_notes,
+                    'decided_interval_weeks'    => $a->decided_interval_weeks,
+                    'notes'                     => $a->notes,
+                ])->values()->all(),
+            ])->all();
+    }
+
+    /**
+     * Orientações pós-procedimento entregues (Fase 6): o retrato congelado — título, texto, local, colírios e os PDFs
+     * (só o nome, o tamanho e a impressão digital: o arquivo em si não vai no JSON).
+     */
+    private function careGuidance(Patient $patient): array
+    {
+        return CareGuidanceIssue::query()->withoutGlobalScopes()
+            ->where('entity_id', $patient->entity_id)->where('patient_id', $patient->id)
+            ->orderBy('issued_at')->get()
+            ->map(fn (CareGuidanceIssue $i) => [
+                'title'       => $i->title,
+                'issued_at'   => $this->iso($i->issued_at),
+                'doctor'      => $this->doctorName($i->doctor_id),
+                'eye'         => $i->eye,
+                'location'    => $i->location_label,
+                'text'        => $i->body,
+                'eye_drops'   => $i->eye_drops ?? [],
+                'attachments' => collect($i->attachments ?? [])->map(fn (array $f) => [
+                    'name'       => $f['name'] ?? null,
+                    'size_bytes' => $f['size_bytes'] ?? null,
+                    'sha256'     => $f['sha256'] ?? null,
+                ])->values()->all(),
+                'content_hash' => $i->content_hash,
+            ])->all();
+    }
+
+    /** Mensagens de WhatsApp trocadas com o paciente (lembretes, confirmações, pesquisas, convites de retorno). */
     private function messages(Patient $patient, Collection $scheduleIds): array
     {
         return WhatsAppMessage::query()
             ->where(fn ($q) => $q->where('entity_id', $patient->entity_id)->orWhereNull('entity_id'))
-            ->whereIn('schedule_id', $scheduleIds)
+            // Lembretes/confirmações/pesquisas vêm do agendamento; o convite de retorno (Fase 6) não tem agendamento:
+            // ele é do paciente (`patient_id`), e a resposta do paciente ao convite também.
+            ->where(fn ($q) => $q->whereIn('schedule_id', $scheduleIds)->orWhere('patient_id', $patient->id))
             ->orderBy('created_at')
             ->get()
             ->map(fn (WhatsAppMessage $m) => [

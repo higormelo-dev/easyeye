@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domains\Recall\Services\RecallOutbox;
 use App\Models\Concerns\BelongsToEntity;
 use App\Traits\{Auditable, HasAuditColumns, Signable, Versionable};
 use Closure;
@@ -494,5 +495,15 @@ class MedicalRecord extends Model
     public function signedBy(): BelongsTo
     {
         return $this->belongsTo(EntityUser::class, 'signed_by');
+    }
+
+    /**
+     * A assinatura é gravada sem eventos (Signable::sign usa saveQuietly): o recall depende do que está
+     * ASSINADO (a condição por CID só ativa em prontuário assinado), então a marca é explícita, na mesma
+     * transação da assinatura.
+     */
+    protected function afterSignatureWritten(): void
+    {
+        RecallOutbox::mark((string) $this->entity_id, (string) $this->patient_id, 'record_signed');
     }
 }

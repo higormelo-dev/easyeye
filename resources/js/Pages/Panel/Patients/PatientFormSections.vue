@@ -502,6 +502,29 @@ const showNoPlans = computed(
             </div>
         </div>
 
+        <!-- Autorização de lembretes de retorno por WhatsApp (LGPD): só faz sentido com WhatsApp no celular. -->
+        <div class="mb-3">
+            <div class="form-check">
+                <input
+                    id="chkCareReminders"
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="form.care_reminders_consent === true"
+                    :disabled="!form.whatsapp"
+                    aria-describedby="chkCareRemindersHint"
+                    data-testid="care-reminders-consent"
+                    @change="form.care_reminders_consent = $event.target.checked"
+                />
+                <label class="form-check-label" for="chkCareReminders">{{ ui.care_reminders }}</label>
+            </div>
+            <div id="chkCareRemindersHint" class="form-text">
+                {{ form.whatsapp ? ui.care_reminders_hint : ui.care_reminders_needs_whatsapp }}
+            </div>
+            <div v-if="form.errors.care_reminders_consent" class="text-danger small" role="alert">
+                {{ form.errors.care_reminders_consent }}
+            </div>
+        </div>
+
         <div class="mb-3">
             <label class="form-label">Telefone fixo</label>
             <input

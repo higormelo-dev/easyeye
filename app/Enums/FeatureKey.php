@@ -30,6 +30,11 @@ enum FeatureKey: string
     // compras). Feature paga independente — clínica sem o módulo continua
     // operando normalmente (estoque é opcional, não trava agenda/prontuário).
     case HasInventoryModule = 'has_inventory_module';
+    // Retorno de pacientes crônicos (recall): lista de retornos vencidos por
+    // condição (glaucoma, DMRI...), contato e convite por WhatsApp — Fase 6.
+    // Os protocolos só agem depois de validados por Revisor Clínico (ADR 0002);
+    // o "retorno pedido pelo médico" também vive aqui.
+    case HasPatientRecall = 'has_patient_recall';
 
     // Limites mensais de créditos IA (integer, 0 = ilimitado)
     case AiMonthlyCredits = 'ai_monthly_credits';
@@ -51,6 +56,7 @@ enum FeatureKey: string
             self::HasAiChatAssistant    => __('subscriptions.features.has_ai_chat_assistant'),
             self::HasApiIntegrator      => __('subscriptions.features.has_api_integrator'),
             self::HasInventoryModule    => __('subscriptions.features.has_inventory_module'),
+            self::HasPatientRecall      => __('subscriptions.features.has_patient_recall'),
             self::AiMonthlyCredits      => __('subscriptions.features.ai_monthly_credits'),
             self::ApiMonthlyExamSends   => __('subscriptions.features.api_monthly_exam_sends'),
         };
@@ -67,6 +73,7 @@ enum FeatureKey: string
             self::HasAiChatAssistant,
             self::HasApiIntegrator,
             self::HasInventoryModule,
+            self::HasPatientRecall,
         ]);
     }
 

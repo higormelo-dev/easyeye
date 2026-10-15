@@ -248,6 +248,7 @@ return [
         'schedules'             => 'Agendas',
         'schedules_calendar'    => 'Calendário',
         'urgent_care'           => 'Pronto atendimento',
+        'recall'                => 'Retornos',
         'lenses'                => 'Lentes',
         'iol_lenses'            => 'Lentes de Catarata',
         'product_categories'    => 'Categorias de produto',

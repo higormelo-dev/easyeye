@@ -22,8 +22,12 @@ class Procedure extends Model
         'name',
         'nomo_binocular',
         'treatment',
+        'clinical_kind',
         'active',
     ];
+
+    /** Procedimento do catálogo que é injeção intravítrea (anti-VEGF): a execução dele alimenta o curso do olho. */
+    public const KIND_INTRAVITREAL = 'intravitreal_injection';
 
     protected function casts(): array
     {
@@ -32,6 +36,11 @@ class Procedure extends Model
             'nomo_binocular' => 'integer',
             'treatment'      => 'integer',
         ];
+    }
+
+    public function isIntravitreal(): bool
+    {
+        return $this->clinical_kind === self::KIND_INTRAVITREAL;
     }
 
     public function entity(): BelongsTo

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Domains\Recall\Intravitreal\Exceptions\IntravitrealException;
+use App\Domains\Recall\Intravitreal\Services\IntravitrealApplicationService;
 use App\Enums\MedicalRecordProcedureStatus;
-use App\Models\{EntityProduct, EntityUser, MedicalRecord, MedicalRecordProcedure, StockLot};
+use App\Models\{Doctor, EntityProduct, EntityUser, MedicalRecord, MedicalRecordProcedure, StockLot};
 use App\Services\Stock\StockService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -40,27 +42,40 @@ use InvalidArgumentException;
  * execução/cancelamento ACRESCENTA o seu texto, nunca sobrescreve. Com a
  * origem ainda aberta o texto continua sendo substituído, como sempre foi — e
  * a escrita sobe o clinical_revision dela (GuardedBySignedRecord).
+ *
+ * Injeção intravítrea (procedimento do catálogo com `clinical_kind` = intravitreal_injection): a execução também
+ * registra a APLICAÇÃO do curso do olho (lote e validade, autorização do convênio, intervalo decidido) NA MESMA
+ * transação — depois da trava do prontuário e do procedimento, nesta ordem: prontuário → procedimento → paciente
+ * (recall) → curso → aplicação. Sem os dados da aplicação (ou com lote vencido) nada é gravado: nunca existe
+ * "injeção executada" sem lote. O ciclo de vida do procedimento continua sendo a única escrita em
+ * `medical_record_procedures`; tudo do curso vive nas tabelas do curso.
  */
 class MedicalRecordProcedureExecutionService
 {
     public function __construct(
         private readonly StockService $stockService,
+        private readonly IntravitrealApplicationService $intravitreal,
     ) {
     }
 
     /**
      * @param list<array{entity_product_id: string, quantity: float, stock_lot_id: ?string}> $items
+     * @param array<string, mixed>|null                                                      $intravitreal dados da aplicação (injeção intravítrea); ignorado nos demais procedimentos
+     *
+     * @throws IntravitrealException aplicação recusada (lote, autorização, intervalo)
      */
     public function markDone(
         MedicalRecordProcedure $procedure,
         EntityUser $executedBy,
         array $items = [],
         ?string $notes = null,
+        ?array $intravitreal = null,
+        ?Doctor $performedBy = null,
     ): MedicalRecordProcedure {
         return $this->transitionUnderLock(
             $procedure,
             MedicalRecordProcedureStatus::Done,
-            function (MedicalRecordProcedure $current, bool $originSigned) use ($executedBy, $items, $notes): void {
+            function (MedicalRecordProcedure $current, bool $originSigned) use ($executedBy, $items, $notes, $intravitreal, $performedBy): void {
                 foreach ($items as $item) {
                     $product = EntityProduct::query()
                         ->where('entity_id', $current->entity_id)
@@ -90,6 +105,10 @@ class MedicalRecordProcedureExecutionService
                     'executed_by' => $executedBy->id,
                     'notes'       => $this->resolveNotes($current->notes, $notes, $originSigned),
                 ]);
+
+                if ($current->procedure?->isIntravitreal()) {
+                    $this->intravitreal->recordExecution($current, $intravitreal ?? [], $performedBy);
+                }
             },
         );
     }
@@ -104,6 +123,10 @@ class MedicalRecordProcedureExecutionService
                     'status' => MedicalRecordProcedureStatus::Cancelled,
                     'notes'  => $this->resolveNotes($current->notes, $notes, $originSigned),
                 ]);
+
+                if ($current->procedure?->isIntravitreal()) {
+                    $this->intravitreal->releaseProcedure($current);
+                }
             },
         );
     }

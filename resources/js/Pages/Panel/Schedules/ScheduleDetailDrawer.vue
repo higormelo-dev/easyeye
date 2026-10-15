@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
+import { sessionLabel } from '@/Support/sessionLabel.js';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
 
@@ -21,9 +22,46 @@ const cancelReason = ref('');
 const cancelSaving = ref(false);
 const cancelError = ref('');
 
-const sessionLabel = computed(() =>
-    schedule.value?.session_total ? `${schedule.value.session_number}/${schedule.value.session_total}` : null,
-);
+// ── Série de sessões: acrescentar uma sessão (trate e estenda — o intervalo se decide a cada visita) ──
+const addSessionOpen = ref(false);
+const addSessionDate = ref('');
+const addSessionSaving = ref(false);
+const addSessionError = ref('');
+
+async function addSession() {
+    if (addSessionSaving.value || !addSessionDate.value) return;
+    addSessionSaving.value = true;
+    addSessionError.value = '';
+    try {
+        const res = await fetch(schedule.value.add_session_url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify({ date_time: addSessionDate.value }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            addSessionError.value =
+                json.errors?.date_time?.[0] ??
+                json.message ??
+                props.t.series_add_error ??
+                'Não foi possível acrescentar.';
+            return;
+        }
+        addSessionOpen.value = false;
+        addSessionDate.value = '';
+        if (window.showSuccessToast) window.showSuccessToast(json.message);
+        emit('changed', json);
+        await loadDetail(schedule.value.id);
+    } finally {
+        addSessionSaving.value = false;
+    }
+}
+
+const sessionText = computed(() => sessionLabel(schedule.value?.session_number, schedule.value?.session_total));
 
 function rescheduleSession(session) {
     emit('reschedule', {
@@ -98,6 +136,9 @@ watch(
             cancelSeriesOpen.value = false;
             cancelReason.value = '';
             cancelError.value = '';
+            addSessionOpen.value = false;
+            addSessionDate.value = '';
+            addSessionError.value = '';
         }
     },
 );
@@ -218,9 +259,9 @@ function copyNumericCode(field, code) {
                             <i class="ti ti-urgent me-1" aria-hidden="true"></i
                             >{{ t.urgent_care_badge ?? 'Pronto atendimento' }}
                         </span>
-                        <span v-if="sessionLabel" class="badge rounded-pill drawer-session" data-test="drawer-session">
+                        <span v-if="sessionText" class="badge rounded-pill drawer-session" data-test="drawer-session">
                             <i class="ti ti-repeat me-1" aria-hidden="true"></i
-                            >{{ (t.session_label ?? 'Sessão :session').replace(':session', sessionLabel) }}
+                            >{{ (t.session_label ?? 'Sessão :session').replace(':session', sessionText) }}
                         </span>
                     </div>
                     <div
@@ -519,6 +560,15 @@ function copyNumericCode(field, code) {
                 <div class="detail-section__title d-flex align-items-center justify-content-between gap-2">
                     <span><i class="ti ti-repeat me-1"></i> {{ t.series_title ?? 'Série de sessões' }}</span>
                     <button
+                        v-if="schedule.add_session_url && !addSessionOpen"
+                        type="button"
+                        class="btn btn-xs btn-outline-primary"
+                        data-test="series-add-open"
+                        @click="addSessionOpen = true"
+                    >
+                        <i class="ti ti-calendar-plus me-1"></i>{{ t.series_add ?? 'Acrescentar sessão' }}
+                    </button>
+                    <button
                         v-if="schedule.series_cancellable > 0 && !cancelSeriesOpen"
                         type="button"
                         class="btn btn-xs btn-outline-danger"
@@ -533,6 +583,44 @@ function copyNumericCode(field, code) {
                             )
                         }}
                     </button>
+                </div>
+
+                <div v-if="addSessionOpen" class="border rounded p-2 mb-2" data-test="series-add-box">
+                    <label for="series-add-date" class="form-label small fw-semibold mb-1">
+                        {{ t.series_add_date ?? 'Data e hora da nova sessão' }} <span class="text-danger">*</span>
+                    </label>
+                    <input
+                        id="series-add-date"
+                        v-model="addSessionDate"
+                        type="datetime-local"
+                        class="form-control form-control-sm"
+                        :class="{ 'is-invalid': addSessionError }"
+                        aria-describedby="series-add-hint"
+                    />
+                    <div v-if="addSessionError" class="invalid-feedback d-block" role="alert">
+                        {{ addSessionError }}
+                    </div>
+                    <p id="series-add-hint" class="text-muted small mb-2 mt-1">
+                        {{
+                            t.series_add_hint ??
+                            'Vale a mesma regra do agendamento (médico, intervalo, bloqueio, sala). A série continua aberta.'
+                        }}
+                    </p>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-sm btn-light" @click="addSessionOpen = false">
+                            {{ t.series_cancel_back ?? 'Voltar' }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-primary"
+                            :disabled="addSessionSaving || !addSessionDate"
+                            data-test="series-add-confirm"
+                            @click="addSession"
+                        >
+                            <span v-if="addSessionSaving" class="spinner-border spinner-border-sm me-1"></span>
+                            {{ t.series_add_confirm ?? 'Acrescentar' }}
+                        </button>
+                    </div>
                 </div>
 
                 <div v-if="cancelSeriesOpen" class="border rounded p-2 mb-2 series-cancel-box">
@@ -578,7 +666,7 @@ function copyNumericCode(field, code) {
                         class="d-flex align-items-center gap-2 py-1 series-item"
                         :class="{ 'is-current': session.is_current, 'is-terminal': session.is_terminal }"
                     >
-                        <span class="series-number">{{ session.number }}/{{ session.total }}</span>
+                        <span class="series-number">{{ sessionLabel(session.number, session.total) }}</span>
                         <span class="flex-grow-1 small">
                             {{ session.date_label }}
                             <span v-if="session.is_current" class="text-primary fw-semibold ms-1"
@@ -591,7 +679,7 @@ function copyNumericCode(field, code) {
                             type="button"
                             class="btn btn-xs btn-outline-secondary"
                             :title="t.btn_reschedule ?? 'Reagendar'"
-                            :aria-label="`${t.btn_reschedule ?? 'Reagendar'} ${session.number}/${session.total}`"
+                            :aria-label="`${t.btn_reschedule ?? 'Reagendar'} ${sessionLabel(session.number, session.total)}`"
                             @click="rescheduleSession(session)"
                         >
                             <i class="fas fa-calendar-alt"></i>

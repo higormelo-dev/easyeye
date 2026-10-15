@@ -33,6 +33,7 @@ class ExamType extends Model
         'name',
         'suffix',
         'category',
+        'canonical_key',
         'active',
     ];
 

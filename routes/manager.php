@@ -9,6 +9,7 @@ use App\Http\Controllers\Manager\{
     AiUsageController,
     Cid10CodesController,
     Cid10ImportsController,
+    ClinicalReviewsController,
     CovenantImportsController,
     CovenantPlansController,
     CovenantsController,
@@ -30,6 +31,7 @@ use App\Http\Controllers\Manager\{
     MedicinesController,
     PartnersController,
     PlansController,
+    RecallProtocolsController,
     ReportSettingsController,
     SubscriptionsController,
     WhatsAppController
@@ -374,6 +376,13 @@ Route::group([
     Route::patch('whatsapp/global', [WhatsAppController::class, 'updateGlobal'])
         ->middleware('throttle:manager-destructive')
         ->name('whatsapp.global.update');
+    // Pausa GLOBAL dos convites de retorno (kill-switch do 1º nível): desliga o canal em TODAS as clínicas.
+    Route::post('whatsapp/recall/pause', [WhatsAppController::class, 'pauseRecall'])
+        ->middleware('throttle:manager-destructive')
+        ->name('whatsapp.recall.pause');
+    Route::post('whatsapp/recall/resume', [WhatsAppController::class, 'resumeRecall'])
+        ->middleware('throttle:manager-destructive')
+        ->name('whatsapp.recall.resume');
     // Teste = saúde do app na Gupshup ou mensagem de teste (template pago).
     Route::post('whatsapp/global/test', [WhatsAppController::class, 'testGlobal'])
         ->middleware('throttle:manager-destructive')
@@ -452,6 +461,79 @@ Route::group([
             ->whereUuid('kit')
             ->middleware('throttle:manager-destructive')
             ->name('exam-kits.destroy');
+    });
+
+    // ── Protocolos de retorno (recall) — Fase 6 / ADR 0002 — admin only.
+    // Regras de acompanhamento por condição e suas versões: o Manager edita o
+    // rascunho, congela para revisão e abre a versão seguinte. O ator de cada mudança
+    // fica no log de governança (clinical_governance_events), gravado na transação.
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('recall-protocols', [RecallProtocolsController::class, 'index'])->name('recall-protocols.index');
+        Route::get('recall-protocols/{protocol}', [RecallProtocolsController::class, 'show'])
+            ->whereUuid('protocol')
+            ->name('recall-protocols.show');
+        Route::post('recall-protocols/{protocol}/versions', [RecallProtocolsController::class, 'startRevision'])
+            ->whereUuid('protocol')
+            ->middleware('throttle:manager-destructive')
+            ->name('recall-protocols.versions.store');
+        Route::get('recall-protocols/{protocol}/versions/{version}', [RecallProtocolsController::class, 'version'])
+            ->whereUuid(['protocol', 'version'])
+            ->name('recall-protocols.versions.show');
+        Route::put('recall-protocols/{protocol}/versions/{version}', [RecallProtocolsController::class, 'saveDraft'])
+            ->whereUuid(['protocol', 'version'])
+            ->name('recall-protocols.versions.update');
+        Route::post('recall-protocols/{protocol}/versions/{version}/freeze', [RecallProtocolsController::class, 'freeze'])
+            ->whereUuid(['protocol', 'version'])
+            ->middleware('throttle:manager-destructive')
+            ->name('recall-protocols.versions.freeze');
+
+        // Governança da versão depois da revisão (liberar/suspender/retomar/aposentar/retirar): ação de
+        // impacto — afeta o que as clínicas usam —, com teto 'manager-destructive'.
+        foreach (['release', 'suspend', 'resume', 'retire', 'withdraw'] as $action) {
+            Route::post("recall-protocols/{protocol}/versions/{version}/{$action}", [RecallProtocolsController::class, $action])
+                ->whereUuid(['protocol', 'version'])
+                ->middleware('throttle:manager-destructive')
+                ->name("recall-protocols.versions.{$action}");
+        }
+        // Prévia do rascunho em edição (normaliza, hasheia e calcula exemplos; não grava).
+        Route::post('recall-protocols/{protocol}/preview', [RecallProtocolsController::class, 'preview'])
+            ->whereUuid('protocol')
+            ->middleware('throttle:60,1')
+            ->name('recall-protocols.preview');
+    });
+
+    // ── Revisões clínicas (Fase 6 / ADR 0002) — admin only. Cadastro dos Revisores e
+    // convites de revisão dos protocolos de retorno. Enviar/reenviar/revogar convite é ação
+    // de impacto (e-mail a terceiro, link de acesso): teto 'manager-destructive'.
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('clinical-reviews', [ClinicalReviewsController::class, 'index'])->name('clinical-reviews.index');
+        Route::post('clinical-reviewers', [ClinicalReviewsController::class, 'storeReviewer'])
+            ->middleware('throttle:manager-write')
+            ->name('clinical-reviewers.store');
+        Route::put('clinical-reviewers/{reviewer}', [ClinicalReviewsController::class, 'updateReviewer'])
+            ->whereUuid('reviewer')
+            ->middleware('throttle:manager-write')
+            ->name('clinical-reviewers.update');
+        Route::post('clinical-reviewers/{reviewer}/active', [ClinicalReviewsController::class, 'setReviewerActive'])
+            ->whereUuid('reviewer')
+            ->middleware('throttle:manager-destructive')
+            ->name('clinical-reviewers.active');
+        Route::post('clinical-reviews', [ClinicalReviewsController::class, 'store'])
+            ->middleware('throttle:manager-destructive')
+            ->name('clinical-reviews.store');
+        Route::post('clinical-reviews/{invitation}/resend', [ClinicalReviewsController::class, 'resend'])
+            ->whereUuid('invitation')
+            ->middleware('throttle:manager-destructive')
+            ->name('clinical-reviews.resend');
+        Route::post('clinical-reviews/{invitation}/revoke', [ClinicalReviewsController::class, 'revoke'])
+            ->whereUuid('invitation')
+            ->middleware('throttle:manager-destructive')
+            ->name('clinical-reviews.revoke');
+        // O aceite (conferência do CRM/RQE no portal do CFM) decide se o parecer valida as versões.
+        Route::post('clinical-reviews/{invitation}/acceptance', [ClinicalReviewsController::class, 'accept'])
+            ->whereUuid('invitation')
+            ->middleware('throttle:manager-destructive')
+            ->name('clinical-reviews.acceptance');
     });
 
     // ── Catálogo global da CID-10 (diagnóstico de todas as clínicas) — admin only

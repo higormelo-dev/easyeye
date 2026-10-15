@@ -20,6 +20,7 @@ import { useAttendanceClock, formatDuration } from '@/composables/useAttendanceC
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
 import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
+import FollowUpSuggestion from '@/Components/Panel/Recall/FollowUpSuggestion.vue';
 import ClinicalSafetyModal from '@/Components/Panel/ClinicalSafety/ClinicalSafetyModal.vue';
 import AllergyOverrideModal from '@/Components/Panel/ClinicalSafety/AllergyOverrideModal.vue';
 import { useClinicalSafety } from '@/composables/useClinicalSafety.js';
@@ -84,6 +85,8 @@ const props = defineProps({
     // medicações em uso, alertas de risco e termos da checagem do
     // receituário. null = perfil sem acesso a Pacientes.
     clinicalSafety: { type: Object, default: null },
+    // Sugestão do campo "Retorno" (Fase 6): { suggestions, max_days, t } | null — só o médico, só com protocolo em uso.
+    followUp: { type: Object, default: null },
     // Uso de LC da última consulta ({ value, date } | null) — pré-preenche o novo.
     contactLensUsePrevious: { type: Object, default: null },
     // Estado compartilhado com a página (alerta móvel acima das colunas).
@@ -1512,26 +1515,6 @@ async function openNewDoc() {
     resetDocForm();
     await loadDocTemplates();
     showDocModal.value = true;
-}
-
-/**
- * Abre o modal de Documentação já pré-selecionando o primeiro template do
- * tipo informado (paridade com Alpine `openNewDocByType`).
- *
- * Útil para atalhos clínicos: chamar `openNewDocByType('receituario')`
- * carrega templates, seleciona o primeiro do tipo e pré-popula o conteúdo.
- */
-async function openNewDocByType(type) {
-    await openNewDoc();
-    for (const group of docTemplates.value) {
-        const tpl = (group.contents || []).find((c) => c.type === type);
-        if (tpl) {
-            docSelection.value = tpl.id;
-            docForm.report_setting_content_id = tpl.id;
-            await previewTemplate();
-            break;
-        }
-    }
 }
 
 /**
@@ -3669,6 +3652,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 />
                                 <span class="input-group-text">{{ tt('days', 'dias') }}</span>
                             </div>
+                            <FollowUpSuggestion
+                                v-if="isDoctor && followUp?.suggestions?.length"
+                                :suggestions="followUp.suggestions"
+                                :max-days="followUp.max_days"
+                                :t="followUp.t"
+                                :current="form.follow_up_days"
+                                :disabled="isLocked"
+                                @use="form.follow_up_days = $event"
+                            />
                         </div>
                     </div>
                 </div>

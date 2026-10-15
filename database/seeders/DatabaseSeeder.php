@@ -44,6 +44,10 @@ class DatabaseSeeder extends Seeder
         $this->call(TissReferenceSeeder::class);
         // Kits de exames padrão (pedido de exames — Fase 2 / B2). Idempotente.
         $this->call(ExamKitsSeeder::class);
+        // Protocolos de retorno (recall) propostos — só RASCUNHOS, a validar pelo Revisor Clínico. Idempotente.
+        $this->call(RecallProtocolDraftsSeeder::class);
+        // Declaração do Revisor Clínico (term_versions) — o fluxo também a instala sozinho no 1º uso. Idempotente.
+        $this->call(ClinicalReviewerAttestationSeeder::class);
         $this->call(ReportSettingSeeder::class);
         $this->call(ReportSettingContentSeeder::class);
         $this->call(ReportSettingVariableSeeder::class);

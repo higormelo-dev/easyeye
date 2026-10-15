@@ -12,6 +12,7 @@ import WhatsAppClinicCards from './WhatsAppClinicCards.vue';
 import WhatsAppClinicDrawer from './WhatsAppClinicDrawer.vue';
 import WhatsAppClinicFormModal from './WhatsAppClinicFormModal.vue';
 import WhatsAppGlobalPanel from './WhatsAppGlobalPanel.vue';
+import WhatsAppRecallPause from './WhatsAppRecallPause.vue';
 import WhatsAppTemplates from './WhatsAppTemplates.vue';
 
 /**
@@ -35,6 +36,8 @@ const props = defineProps({
     partner: { type: Object, default: () => ({ configured: false, auth_mode: null }) },
     templates: { type: Array, default: () => [] },
     templateLanguages: { type: Array, default: () => ['pt_BR'] },
+    // Pausa global dos convites de retorno (Fase 6): { paused, impact }.
+    recall: { type: Object, default: () => ({ paused: null, impact: { clinics: 0, recalls: 0 } }) },
     routes: { type: Object, required: true },
     t: { type: Object, required: true },
 });
@@ -432,6 +435,7 @@ const breadcrumbs = [];
             aria-labelledby="wa-tab-global"
             data-test="panel-global"
         >
+            <WhatsAppRecallPause :recall="recall" :routes="routes" :t="t" />
             <WhatsAppGlobalPanel
                 ref="globalPanel"
                 :global="global"

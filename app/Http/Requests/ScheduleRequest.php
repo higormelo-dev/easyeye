@@ -144,9 +144,24 @@ class ScheduleRequest extends FormRequest
             'notes'               => ['nullable', 'string', 'max:2000'],
             'cancellation_reason' => ['nullable', 'string', 'max:2000'],
             'waiting_list_id'     => ['nullable', 'uuid', 'exists:waiting_list,id'],
-            'recurrence_type'     => ['nullable', 'string', 'in:weekly,monthly'],
-            'recurrence_until'    => ['nullable', 'date', 'after:date_time'],
-            'is_fit_in'           => ['nullable', 'boolean'],
+            // Retorno que este agendamento atende (Fase 6): só no cadastro, da clínica, e do MESMO paciente.
+            'recall_id' => $this->isMethod('POST')
+                ? [
+                    'nullable',
+                    'uuid',
+                    Rule::exists('patient_recalls', 'id')->where('entity_id', session()->get('selected_entity_id')),
+                    function ($attribute, $value, $fail) {
+                        $recallPatient = DB::table('patient_recalls')->where('id', $value)->where('entity_id', session()->get('selected_entity_id'))->value('patient_id');
+
+                        if ($recallPatient !== null && (string) $recallPatient !== (string) $this->input('patient_id')) {
+                            $fail(__('schedules.recall_mismatch'));
+                        }
+                    },
+                ]
+                : ['prohibited'],
+            'recurrence_type'  => ['nullable', 'string', 'in:weekly,monthly'],
+            'recurrence_until' => ['nullable', 'date', 'after:date_time'],
+            'is_fit_in'        => ['nullable', 'boolean'],
             // Série de sessões (só no cadastro): as datas 2..N escolhidas na
             // prévia (a 1ª é o próprio date_time). Cada uma é validada como o
             // horário principal em ScheduleSeriesService — tudo ou nada.

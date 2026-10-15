@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domains\Recall\Intravitreal\Enums\{AuthorizationStatus, CourseRegimen};
 use App\Models\{EntityProduct, StockLot};
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -49,7 +50,40 @@ class MarkMedicalRecordProcedureDoneRequest extends FormRequest
             ],
             'items.*.quantity'     => ['required_with:items', 'numeric', 'gt:0'],
             'items.*.stock_lot_id' => ['nullable', 'uuid'],
+
+            // Aplicação intravítrea (anti-VEGF): lote e validade, autorização do convênio por aplicação, o intervalo
+            // que o médico decidiu (ou o encerramento do curso). O serviço da aplicação confere tudo de novo.
+            'intravitreal'                           => ['nullable', 'array'],
+            'intravitreal.lot_number'                => ['nullable', 'string', 'max:60'],
+            'intravitreal.lot_expiry'                => ['nullable', 'date'],
+            'intravitreal.stock_lot_id'              => ['nullable', 'uuid'],
+            'intravitreal.authorization_required'    => ['nullable', 'boolean'],
+            'intravitreal.authorization_status'      => ['nullable', Rule::in(array_map(static fn (AuthorizationStatus $status): string => $status->value, AuthorizationStatus::cases()))],
+            'intravitreal.authorization_number'      => ['nullable', 'string', 'max:60'],
+            'intravitreal.authorization_valid_until' => ['nullable', 'date'],
+            'intravitreal.authorization_override'    => ['nullable', 'boolean'],
+            'intravitreal.authorization_notes'       => ['nullable', 'string', 'max:1000'],
+            'intravitreal.next_interval_weeks'       => ['nullable', 'integer'],
+            'intravitreal.end_course'                => ['nullable', Rule::in(['completed', 'discontinued'])],
+            'intravitreal.end_reason'                => ['nullable', 'string', 'max:500'],
+            'intravitreal.notes'                     => ['nullable', 'string', 'max:1000'],
+            'intravitreal.schedule_at'               => ['nullable', 'date'],
+            // Só usados quando a execução abre o curso (procedimento pedido antes do recurso).
+            'intravitreal.drug_key'   => ['nullable', 'string', 'max:40'],
+            'intravitreal.drug_label' => ['nullable', 'string', 'max:120'],
+            'intravitreal.regimen'    => ['nullable', Rule::in(array_map(static fn (CourseRegimen $regimen): string => $regimen->value, CourseRegimen::cases()))],
+            'intravitreal.indication' => ['nullable', 'string', 'max:120'],
         ];
+    }
+
+    /**
+     * Os dados da aplicação intravítrea (vazio quando o procedimento não é uma injeção).
+     *
+     * @return array<string, mixed>
+     */
+    public function intravitreal(): array
+    {
+        return (array) ($this->validated('intravitreal') ?? []);
     }
 
     /**

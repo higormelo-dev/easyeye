@@ -40,11 +40,14 @@ use App\Http\Controllers\{
     MyPayoutsController,
     NoticesController,
     PatientClinicalSafetyController,
+    PatientConditionController,
     PatientDocumentSharesController,
     PatientImportsController,
     PatientPortalInvitationsController,
     PatientsController,
     ProfileController,
+    RecallController,
+    RecallSettingsController,
     ReportsController,
     ResourceWorkScheduleController,
     ScheduleEventsController,
@@ -57,6 +60,8 @@ use App\Http\Controllers\{
     WaitingListController
 };
 use App\Http\Controllers\{
+    CareGuidanceController,
+    IntravitrealCoursesController,
     MedicalRecordDocumentationsController,
     MedicalRecordDraftsController,
     MedicalRecordEvolutionsController,
@@ -89,7 +94,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     VisitTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController, ScheduleSettingsController};
-use App\Http\Controllers\Setting\{ExamKitsController, ReportSettingsController, SecurityController};
+use App\Http\Controllers\Setting\{CareGuidanceTemplatesController, ExamKitsController, ReportSettingsController, SecurityController};
 use App\Http\Controllers\Stock\{IolLensesController, ProcedureProductsController, ProductCategoriesController, ProductImportsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockCountsController, StockMovementsController, StockReportsController, SuppliersController};
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
@@ -628,6 +633,41 @@ Route::group(
                 [MedicalRecordProceduresController::class, 'bom'],
             )->name('procedures.bom');
 
+            // Orientações pós-procedimento (Fase 6 / S14): ver o que foi entregue e o PDF no grupo do prontuário
+            // (a recepção entrega o papel); emitir e listar os modelos é ato do médico (Gate IssueReport).
+            Route::get(
+                'patients/{patient}/medicalrecord-procedures/{medicalRecordProcedure}/care-guidance',
+                [CareGuidanceController::class, 'procedure'],
+            )->name('patients.medicalrecord-procedures.care-guidance');
+            Route::post(
+                'patients/{patient}/medicalrecord-procedures/{medicalRecordProcedure}/care-guidance',
+                [CareGuidanceController::class, 'issue'],
+            )->name('patients.medicalrecord-procedures.care-guidance.issue');
+            Route::get(
+                'patients/{patient}/care-guidance/{issue}/pdf',
+                [CareGuidanceController::class, 'pdf'],
+            )->whereUuid('issue')->name('patients.care-guidance.pdf');
+            Route::get(
+                'patients/{patient}/care-guidance/{issue}/attachments/{index}',
+                [CareGuidanceController::class, 'attachment'],
+            )->whereUuid('issue')->whereNumber('index')->name('patients.care-guidance.attachment');
+
+            // Cursos de injeções intravítreas (anti-VEGF — Fase 6): leitura no grupo do prontuário; encerrar o curso e
+            // agendar a próxima aplicação são atos do médico (Gate IssueReport no FormRequest). A execução de cada
+            // aplicação entra pelo mark-done do procedimento, acima.
+            Route::get(
+                'patients/{patient}/intravitreal-courses',
+                [IntravitrealCoursesController::class, 'index'],
+            )->name('patients.intravitreal-courses.index');
+            Route::post(
+                'patients/{patient}/intravitreal-courses/{course}/close',
+                [IntravitrealCoursesController::class, 'close'],
+            )->name('patients.intravitreal-courses.close');
+            Route::post(
+                'patients/{patient}/intravitreal-courses/{course}/schedule-next',
+                [IntravitrealCoursesController::class, 'scheduleNext'],
+            )->name('patients.intravitreal-courses.schedule-next');
+
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/exam-template/{exam}',
                 [MedicalRecordQuickActionsController::class, 'examTemplate'],
@@ -749,6 +789,7 @@ Route::group(
             Route::get('schedules/availability', [SchedulesController::class, 'availability'])->name('schedules.availability');
             Route::get('schedules/series/preview', [SchedulesController::class, 'seriesPreview'])->name('schedules.series.preview');
             Route::post('schedules/{schedule}/series/cancel-future', [SchedulesController::class, 'cancelSeriesFuture'])->name('schedules.series.cancel-future');
+            Route::post('schedules/{schedule}/series/add-session', [SchedulesController::class, 'addSeriesSession'])->name('schedules.series.add-session');
             // Impressão: agenda do dia (com os filtros da tela) e ficha do
             // paciente a partir do agendamento — ambas com log de acesso.
             Route::get('schedules/print', [SchedulePrintController::class, 'agenda'])->name('schedules.print');
@@ -763,6 +804,52 @@ Route::group(
             Route::post('urgent-care/{urgentCareEntry}/call', [UrgentCareController::class, 'call'])->name('urgent-care.call');
             Route::post('urgent-care/{urgentCareEntry}/attend', [UrgentCareController::class, 'attend'])->name('urgent-care.attend');
             Route::post('urgent-care/{urgentCareEntry}/close', [UrgentCareController::class, 'close'])->name('urgent-care.close');
+
+            // Retornos (Fase 6): quem precisa voltar à clínica — lista, contato, adiar, dispensar, "feito fora".
+            // Mesmo grupo da Agenda (admin, médico, secretária) atrás da feature `has_patient_recall`. A regra de
+            // quem opera é o Gate OperateRecall (conferido na tela e em cada FormRequest).
+            Route::middleware('feature:has_patient_recall')->prefix('recall')->name('recall.')->group(function () {
+                Route::get('/', [RecallController::class, 'index'])->name('index');
+
+                // Configuração: ativar/desativar protocolos validados (ato do médico), retorno pedido pelo médico e
+                // mapeamento dos exames. Ver é de quem opera o recall; cada ação confere o Gate no FormRequest.
+                Route::get('settings', [RecallSettingsController::class, 'index'])->name('settings.index');
+                Route::middleware('throttle:recall-write')->whereUuid('protocol')->group(function () {
+                    Route::put('settings/general', [RecallSettingsController::class, 'updateGeneral'])->name('settings.general');
+                    Route::put('settings/exam-mappings', [RecallSettingsController::class, 'updateExamMappings'])->name('settings.exam-mappings');
+                    Route::post('settings/protocols/{protocol}/activate', [RecallSettingsController::class, 'activate'])->name('settings.protocols.activate');
+                    Route::post('settings/protocols/{protocol}/deactivate', [RecallSettingsController::class, 'deactivate'])->name('settings.protocols.deactivate');
+                });
+
+                // Convite por WhatsApp (uma pessoa decide): prévia do que sairia e envio; teto próprio por usuário.
+                Route::middleware('throttle:recall-invite')->whereUuid('recall')->group(function () {
+                    Route::get('{recall}/invite-preview', [RecallController::class, 'invitePreview'])->name('invite-preview');
+                    Route::post('{recall}/invite', [RecallController::class, 'invite'])->name('invite');
+                });
+
+                Route::middleware('throttle:recall-write')->whereUuid('recall')->group(function () {
+                    Route::post('{recall}/contacts', [RecallController::class, 'contact'])->name('contact');
+                    Route::post('{recall}/snooze', [RecallController::class, 'snooze'])->name('snooze');
+                    Route::post('{recall}/dismiss', [RecallController::class, 'dismiss'])->name('dismiss');
+                    Route::post('{recall}/reopen', [RecallController::class, 'reopen'])->name('reopen');
+                    Route::post('{recall}/done-elsewhere', [RecallController::class, 'doneElsewhere'])->name('done-elsewhere');
+                });
+            });
+
+            // Condições crônicas do paciente (Fase 6): o médico vê o que o sistema detectou, confirma, descarta, dá alta,
+            // registra à mão e corrige olho/início. JSON para a gaveta do cadastro. Ato clínico: só o médico com cadastro
+            // ativo (Gate DecideRecall, conferido no FormRequest — vale também para ler); atrás da feature do recall.
+            Route::middleware('feature:has_patient_recall')->prefix('patients/{patient}/recall-conditions')->name('patients.recall-conditions.')->group(function () {
+                Route::get('/', [PatientConditionController::class, 'index'])->name('index');
+
+                Route::middleware('throttle:recall-write')->group(function () {
+                    Route::post('/', [PatientConditionController::class, 'store'])->name('store');
+                    Route::put('{condition}', [PatientConditionController::class, 'update'])->whereUuid('condition')->name('update');
+                    Route::post('{condition}/confirm', [PatientConditionController::class, 'confirm'])->whereUuid('condition')->name('confirm');
+                    Route::post('{condition}/reject', [PatientConditionController::class, 'reject'])->whereUuid('condition')->name('reject');
+                    Route::post('{condition}/discharge', [PatientConditionController::class, 'discharge'])->whereUuid('condition')->name('discharge');
+                });
+            });
 
             Route::patch('waiting-list/reorder', [WaitingListController::class, 'reorder'])->name('waiting-list.reorder');
             Route::get('waiting-list', [WaitingListController::class, 'index'])->name('waiting-list.index');
@@ -1114,6 +1201,15 @@ Route::group(
                 Route::put('exam-kits/{kit}', [ExamKitsController::class, 'update'])->whereUuid('kit')->name('exam-kits.update');
                 Route::delete('exam-kits/{kit}', [ExamKitsController::class, 'destroy'])->whereUuid('kit')->name('exam-kits.destroy');
                 Route::post('exam-kits/{kit}/copy', [ExamKitsController::class, 'copy'])->whereUuid('kit')->name('exam-kits.copy');
+
+                // Orientações pós-procedimento (Fase 6 / S14): modelos da clínica, com PDFs anexos.
+                Route::get('care-guidance', [CareGuidanceTemplatesController::class, 'index'])->name('care-guidance.index');
+                Route::post('care-guidance', [CareGuidanceTemplatesController::class, 'store'])->name('care-guidance.store');
+                Route::put('care-guidance/{template}', [CareGuidanceTemplatesController::class, 'update'])->whereUuid('template')->name('care-guidance.update');
+                Route::delete('care-guidance/{template}', [CareGuidanceTemplatesController::class, 'destroy'])->whereUuid('template')->name('care-guidance.destroy');
+                Route::post('care-guidance/{template}/attachments', [CareGuidanceTemplatesController::class, 'storeAttachment'])->whereUuid('template')->name('care-guidance.attachments.store');
+                Route::delete('care-guidance/{template}/attachments/{attachment}', [CareGuidanceTemplatesController::class, 'destroyAttachment'])->whereUuid(['template', 'attachment'])->name('care-guidance.attachments.destroy');
+                Route::get('care-guidance/{template}/attachments/{attachment}', [CareGuidanceTemplatesController::class, 'downloadAttachment'])->whereUuid(['template', 'attachment'])->name('care-guidance.attachments.download');
             });
         });
 
@@ -1303,4 +1399,5 @@ require __DIR__ . '/portal.php';
 require __DIR__ . '/patient-portal-auth.php';
 require __DIR__ . '/patient-portal.php';
 require __DIR__ . '/external-reports.php';
+require __DIR__ . '/clinical-review.php';
 require __DIR__ . '/auth.php';
