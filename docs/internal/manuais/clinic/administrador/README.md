@@ -42,9 +42,10 @@ consulte também:
 12. [Assistente de IA: consumo e créditos](#12-assistente-de-ia-consumo-e-créditos)
 13. [Operação: agenda e pacientes](#13-operação-agenda-e-pacientes)
 14. [Imagens oftálmicas e Portal do Paciente](#14-imagens-oftálmicas-e-portal-do-paciente)
-15. [Minha conta e limites do perfil](#15-minha-conta-e-limites-do-perfil)
-16. [Minha assinatura: plano, faturas e pagamento](#16-minha-assinatura-plano-faturas-e-pagamento)
-17. [Avisos de cobrança: o que acontece em cada etapa](#17-avisos-de-cobrança-o-que-acontece-em-cada-etapa)
+15. [Retornos, protocolos e orientações pós-procedimento](#15-retornos-protocolos-e-orientações-pós-procedimento)
+16. [Minha conta e limites do perfil](#16-minha-conta-e-limites-do-perfil)
+17. [Minha assinatura: plano, faturas e pagamento](#17-minha-assinatura-plano-faturas-e-pagamento)
+18. [Avisos de cobrança: o que acontece em cada etapa](#18-avisos-de-cobrança-o-que-acontece-em-cada-etapa)
 
 ---
 
@@ -276,7 +277,7 @@ registrada em auditoria:
 > Se o acesso da clínica ao EasyEye for **suspenso** por falta de pagamento, a TV passa a
 > mostrar **"Serviço indisponível no momento"** e não exibe chamadas. Ela volta sozinha
 > quando o pagamento é confirmado — não é preciso mexer no aparelho
-> ([detalhes na seção 17](#17-avisos-de-cobrança-o-que-acontece-em-cada-etapa)).
+> ([detalhes na seção 18](#18-avisos-de-cobrança-o-que-acontece-em-cada-etapa)).
 
 ---
 
@@ -337,7 +338,7 @@ crédito** (no cartão, à vista):
   segundos; no boleto, em até 3 dias úteis) e a tela se atualiza sozinha.
 - Créditos comprados **não expiram**.
 - A compra só fica disponível com a assinatura **em dia** — com o pagamento atrasado, a IA
-  fica bloqueada (veja a [seção 17](#17-avisos-de-cobrança-o-que-acontece-em-cada-etapa)).
+  fica bloqueada (veja a [seção 18](#18-avisos-de-cobrança-o-que-acontece-em-cada-etapa)).
 
 ### Pedido de créditos aguardando pagamento
 
@@ -425,7 +426,76 @@ Portal do Paciente:
 
 ---
 
-## 15. Minha conta e limites do perfil
+## 15. Retornos, protocolos e orientações pós-procedimento
+
+O módulo de **Retornos** reduz a perda de pacientes crônicos: o sistema calcula quem precisa
+voltar (glaucoma, DMRI em tratamento, retinopatia diabética, ceratocone, hidroxicloroquina, além
+do retorno pedido pelo médico), a recepção contata, e o médico decide a conduta clínica. Este
+capítulo cobre o que cabe ao administrador.
+
+### Disponibilidade e quem faz o quê
+
+- A funcionalidade **Retorno de pacientes crônicos** é do **plano** da clínica (vem ligada nos
+  planos Pro e Premium). Sem ela, o item **Retornos** não aparece no menu. Confira em **Minha
+  assinatura** (seção 17) ou peça a mudança de plano.
+- **Admin, médico e secretária** operam a lista de Retornos (contatar, agendar, adiar, dispensar).
+- Só o **médico com cadastro de médico ativo** confirma ou dá alta em condição crônica e **ativa
+  ou desativa protocolo**. O administrador **vê** a regra e quem a validou, mas não decide
+  conduta clínica.
+- O administrador configura o **retorno pedido pelo médico**, o **convite por WhatsApp** e a
+  associação dos **exames** (abaixo) e cadastra os **modelos de orientação**.
+
+### Configurar retornos (Retornos → Configurar)
+
+| Bloco | O que faz |
+| --- | --- |
+| **Retorno pedido pelo médico** | Quando o médico pede retorno em dias no prontuário, o paciente entra na lista na data certa. Não depende de protocolo. Pode ser desligado. |
+| **Convite por WhatsApp** | Liga o convite de retorno e define o ritmo (veja abaixo). |
+| **Protocolos de acompanhamento** | Mostra os protocolos liberados pela EasyEye, a versão, quem validou (nome, CRM, RQE) e a situação: *Disponível*, *Ativo*, *Nova versão disponível*, *Parado*. A ativação é do médico. |
+| **Exames** | Diz quais exames da clínica contam como cada exame dos protocolos: um exame feito e registrado adia o próximo retorno daquele exame. |
+
+**Convite por WhatsApp.** Três travas precisam estar liberadas, todas desligadas de fábrica:
+
+1. O **EasyEye** não pode estar com os convites pausados.
+2. O **EasyEye** libera o recurso para a sua clínica (depende de o modelo de mensagem estar
+   aprovado na Meta). Enquanto isso, a tela diz *"Ainda não dá para ligar: …"*.
+3. A **clínica** liga **Enviar convites de retorno por WhatsApp** nesta tela.
+
+Ritmo configurável: **janela de horário** e **dias da semana** (só para o envio automático),
+**dias entre convites do mesmo paciente** (mínimo de 7 dias), **convites automáticos por retorno**,
+**limite de convites por dia** e **parar de convidar após N dias de atraso** (depois disso o
+paciente vai para a busca ativa por telefone). O número de WhatsApp é o mesmo da confirmação de
+consulta: por isso o envio começa devagar e o limite diário sobe nas primeiras semanas.
+
+> **LGPD.** Só recebe convite o paciente que marcou **Autoriza lembretes de retorno por
+> WhatsApp** no cadastro (consentimento registrado com quem coletou, canal, data e versão do
+> texto). A mensagem é neutra e nunca cita condição, exame ou motivo. Quando o paciente responde
+> **SAIR**, a autorização é retirada e ele passa a ser contatado só por ligação.
+
+### Orientações pós-procedimento (Configurações → Orientações pós-procedimento)
+
+Cadastre os **modelos** que o médico entrega ao paciente depois de um procedimento:
+
+1. Clique em **Novo modelo**.
+2. Informe o **título**, o **procedimento** (em branco, o modelo serve a qualquer procedimento;
+   digite 2 letras para buscar no catálogo), o **local** (texto livre, por exemplo "Sala de
+   curativos, 2º andar") e o texto das **orientações**.
+3. Adicione os **colírios** (nome, como usar, vezes ao dia e dias).
+4. **Salve** o modelo e anexe até **5 PDFs de 5 MB** (o botão de anexar só habilita depois de
+   salvar). O arquivo precisa ser um PDF de verdade.
+
+Um modelo pode ser **desativado** ou **excluído**. As orientações **já entregues não mudam**:
+cada emissão guarda uma cópia do texto, dos colírios e dos PDFs no momento da entrega.
+
+### Onde ficam os dados no Compliance
+
+Condições crônicas, retornos, convites, cursos de injeção e orientações emitidas entram na
+**exportação de dados do paciente** (LGPD), como o restante do prontuário. Para o paciente que
+pede a exportação, não é preciso nenhum passo extra.
+
+---
+
+## 16. Minha conta e limites do perfil
 
 **Avatar → Editar perfil** — dados, senha e o seu 2FA pessoal:
 
@@ -443,7 +513,7 @@ Mesmo sendo administrador da clínica, duas fronteiras permanecem:
 
 ---
 
-## 16. Minha assinatura: plano, faturas e pagamento
+## 17. Minha assinatura: plano, faturas e pagamento
 
 **Minha assinatura** (menu lateral) reúne tudo sobre a assinatura da clínica no EasyEye.
 Só o **administrador**, o **financeiro** e o **dono** da clínica veem esta tela — os demais
@@ -535,7 +605,7 @@ em que o teste termina.
 
 ---
 
-## 17. Avisos de cobrança: o que acontece em cada etapa
+## 18. Avisos de cobrança: o que acontece em cada etapa
 
 Quando uma fatura da assinatura vence sem pagamento, o EasyEye avisa e vai restringindo o
 acesso aos poucos. Os avisos vão por **e-mail** e por **WhatsApp** para o administrador, o

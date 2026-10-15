@@ -12,6 +12,8 @@ use App\Domains\Recall\Models\{PatientRecall, RecallClinicProtocol};
  * o paciente (a outbox da governança o chama em poucos minutos). Contatar, adiar, dispensar ou agendar um retorno nessa
  * janela agiria sobre uma regra que a EasyEye já parou — então as ações da equipe e o agendamento conferem a versão VIVA
  * (a mesma conta do avaliador e do guard do convite: adoção ativa, versão em uso, íntegra e igual à adotada), além do flag.
+ * O convite, que não se desfaz, confere ainda a TAREFA ligada na adoção (`RecallClinicProtocol::computesTask`); as ações
+ * da equipe não: registrar contato numa tarefa que a clínica acabou de desligar é inofensivo e a reavaliação a encerra.
  *
  * Retorno do médico e de curso intravítreo não têm protocolo: não há versão a conferir.
  */

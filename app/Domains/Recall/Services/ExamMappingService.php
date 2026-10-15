@@ -6,6 +6,7 @@ namespace App\Domains\Recall\Services;
 
 use App\Domains\Recall\Enums\RecallExamKey;
 use App\Domains\Recall\Models\RecallExamMapping;
+use App\Domains\Recall\Support\RecallLocks;
 use App\Models\{ExamType, User};
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -16,8 +17,8 @@ use InvalidArgumentException;
  * (`exam_types.canonical_key`, preenchido nos exames globais inequívocos).
  *
  * Os tipos aceitos são os ATIVOS da própria clínica ou globais: tipo de outra clínica nunca entra. Salvar troca o
- * conjunto inteiro numa transação (o que saiu é removido, o que entrou é criado); cada mudança marca a clínica
- * inteira para reavaliação (RecallServiceProvider).
+ * conjunto inteiro numa transação, sob a trava estável da clínica (o que saiu é removido, o que entrou é criado); cada
+ * mudança marca a clínica inteira para reavaliação (RecallServiceProvider).
  */
 class ExamMappingService
 {
@@ -104,31 +105,43 @@ class ExamMappingService
      * Troca o mapeamento da clínica pelo conjunto informado (chave canônica → ids). Chave fora da lista fechada ou
      * tipo de exame que a clínica não pode usar é recusado (nada é gravado).
      *
+     * Tudo sob a trava ESTÁVEL da clínica (`RecallLocks::examMappings`), tomada antes de conferir os tipos e de ler o
+     * conjunto atual: o `FOR UPDATE` das linhas não trava nada quando não há nenhuma (a 1ª configuração), então duas
+     * trocas simultâneas partiam do conjunto vazio — iguais: violação do índice único; disjuntas: a UNIÃO gravada, uma
+     * configuração que ninguém enviou e que decide quais exames cumprem os retornos. Com a trava, vence o último a salvar,
+     * inteiro. A conferência dos tipos também fica dentro: "o que já estava mapeado e saiu do catálogo pode ficar" depende
+     * do conjunto que a trava protege.
+     *
      * @param array<string, mixed> $mappings
      *
      * @throws InvalidArgumentException
      */
     public function sync(string $entityId, array $mappings, ?User $actor = null): void
     {
-        // Pode escolher o que está no catálogo agora; o que já estava mapeado e saiu do catálogo pode ficar (ou ser tirado).
-        $allowed = [...array_column($this->availableTypes($entityId), 'id'), ...array_column($this->retiredMapped($entityId), 'id')];
-        $wanted  = [];
-
-        foreach ($mappings as $key => $ids) {
+        // A lista fechada de chaves não depende de banco: entrada inválida é recusada sem pedir trava.
+        foreach (array_keys($mappings) as $key) {
             if (RecallExamKey::tryFrom((string) $key) === null) {
                 throw new InvalidArgumentException("Exame canônico desconhecido: {$key}.");
             }
-
-            foreach ((array) $ids as $id) {
-                if (! in_array((string) $id, $allowed, true)) {
-                    throw new InvalidArgumentException("Tipo de exame indisponível para esta clínica: {$id}.");
-                }
-
-                $wanted[(string) $key][(string) $id] = true;
-            }
         }
 
-        DB::transaction(function () use ($entityId, $wanted, $actor): void {
+        DB::transaction(function () use ($entityId, $mappings, $actor): void {
+            RecallLocks::examMappings($entityId);
+
+            // Pode escolher o que está no catálogo agora; o que já estava mapeado e saiu do catálogo pode ficar (ou ser tirado).
+            $allowed = [...array_column($this->availableTypes($entityId), 'id'), ...array_column($this->retiredMapped($entityId), 'id')];
+            $wanted  = [];
+
+            foreach ($mappings as $key => $ids) {
+                foreach ((array) $ids as $id) {
+                    if (! in_array((string) $id, $allowed, true)) {
+                        throw new InvalidArgumentException("Tipo de exame indisponível para esta clínica: {$id}.");
+                    }
+
+                    $wanted[(string) $key][(string) $id] = true;
+                }
+            }
+
             $existing = RecallExamMapping::query()->withoutGlobalScopes()->where('entity_id', $entityId)->lockForUpdate()->get();
 
             foreach ($existing as $row) {

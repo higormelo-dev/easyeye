@@ -10,9 +10,14 @@ declare(strict_types=1);
  * deste processo.
  *
  * Uso: php ivt_child.php <modo> <id> <arquivo_marcador> <segundos_de_pausa>
- *   modos (id = procedimento): ensure · execute
+ *   modos (id = procedimento): ensure · execute · execute_paused
  *         (id = curso):        close · schedule_next
  * Variáveis: IVT_ENTITY (clínica) e IVT_EU (vínculo do médico, para execute). Em caso de sucesso imprime "OK".
+ *
+ * `execute_paused` é a execução de verdade (`markDone`) com a pausa NO MEIO: logo depois de travar a aplicação
+ * (paciente → aplicação já tomados) e ANTES de pedir o curso, que é o ponto em que um agendamento que trave o curso
+ * primeiro cruza com ela. A pausa mora num ouvinte de consultas, então o código executado é o do produto. É o espelho
+ * de `schedule_next` (que segura o agendar e deixa a execução tentar entrar): aqui quem segura é a execução.
  *
  * `schedule_next` chama o agendar-próxima de verdade e SEGURA a transação dele logo depois de travar a linha do curso
  * (gancho no `DB::listen`: o evento sai depois da consulta, com a trava já tomada) — a janela em que a execução da
@@ -58,6 +63,7 @@ try {
 
     DB::transaction(function () use ($mode, $id, $marker, $holdSeconds): void {
         $entityId = (string) getenv('IVT_ENTITY');
+        $tailHold = (float) $holdSeconds;
 
         switch ($mode) {
             case 'ensure':
@@ -76,6 +82,30 @@ try {
                 );
 
                 break;
+            case 'execute_paused':
+                $paused = false;
+
+                DB::listen(function ($query) use (&$paused, $marker, $holdSeconds): void {
+                    if (! $paused && str_contains($query->sql, 'from "intravitreal_applications"') && str_contains($query->sql, 'for update')) {
+                        $paused = true;
+
+                        file_put_contents($marker, 'holding');
+                        usleep((int) ((float) $holdSeconds * 1_000_000));
+                    }
+                });
+
+                $procedure = MedicalRecordProcedure::query()->withoutGlobalScopes()->findOrFail($id);
+                app(MedicalRecordProcedureExecutionService::class)->markDone(
+                    $procedure,
+                    EntityUser::query()->withoutGlobalScopes()->findOrFail((string) getenv('IVT_EU')),
+                    [],
+                    null,
+                    ['lot_number' => 'LOT-FILHO', 'lot_expiry' => now()->addYear()->toDateString(), 'next_interval_weeks' => 4],
+                );
+
+                $tailHold = 0.0; // a pausa já aconteceu no meio: comita assim que a execução terminar
+
+                break;
             case 'close':
                 app(IntravitrealCourseService::class)->close($entityId, $id, CourseStatus::Discontinued, 'Encerrado pelo processo filho do teste.');
 
@@ -85,7 +115,7 @@ try {
         }
 
         file_put_contents($marker, 'holding');
-        usleep((int) ((float) $holdSeconds * 1_000_000));
+        usleep((int) ($tailHold * 1_000_000));
     });
 
     fwrite(STDOUT, "OK\n");

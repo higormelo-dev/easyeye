@@ -120,7 +120,9 @@ final class IntravitrealApplicationService
             'next_due_on'            => $next->toDateString(),
         ])->save();
 
-        $this->courses->plan($course, null, $next);
+        // A próxima é a aplicação planejada que o curso já tem (outro pedido ainda não executado), com a data nova; só se
+        // não houver nenhuma nasce outra.
+        $this->courses->planNext($course, $next);
 
         return $application->refresh();
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Recall\Models;
 
+use App\Domains\Recall\Engine\RecallCondition;
 use App\Domains\Recall\Support\ProtocolContentSchema;
 use App\Models\Concerns\BelongsToEntity;
 use App\Traits\{Auditable, HasAuditColumns};
@@ -86,5 +87,31 @@ class RecallClinicProtocol extends Model
         $version = $this->version;
 
         return $version->state->isInUse() && $version->integrityOk() && $version->content_hash === $this->adopted_content_hash;
+    }
+
+    /**
+     * Esta adoção CALCULA a tarefa `$taskKey` agora? Versão em uso E a tarefa existe no conteúdo adotado E está ligada
+     * (obrigatória sempre; opcional só se a clínica a ligou) — a mesma conta do motor (`RecallCondition::taskEnabled`).
+     *
+     * Existe porque a linha de retorno (`patient_recalls`) é DERIVADA e chega com atraso: desligar uma tarefa opcional
+     * muda só os parâmetros da adoção, a linha persistida segue aberta até o avaliador reavaliar o paciente (a outbox
+     * o chama em poucos minutos) e quem decide AGORA, sem esperar (o convite por WhatsApp, que não se desfaz), não pode
+     * confiar nela.
+     */
+    public function computesTask(string $taskKey): bool
+    {
+        $content = $this->usableContent();
+
+        if ($content === null) {
+            return false;
+        }
+
+        foreach ((array) ($content['tasks'] ?? []) as $task) {
+            if ((string) ($task['key'] ?? '') === $taskKey) {
+                return RecallCondition::taskEnabled($task, (array) $this->parameters);
+            }
+        }
+
+        return false;
     }
 }

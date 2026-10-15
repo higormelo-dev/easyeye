@@ -142,7 +142,7 @@ const empty = computed(() => !list.value.length);
 
 <template>
     <AppLayout :title="t.settings.title" :breadcrumbs="[]">
-        <div class="container-fluid py-3">
+        <div class="container-fluid py-3 recall-form">
             <PageHeader :title="t.settings.title" :subtitle="t.settings.subtitle">
                 <template #actions>
                     <button
@@ -168,12 +168,8 @@ const empty = computed(() => !list.value.length);
                             <div class="d-flex align-items-start gap-2 mb-1">
                                 <h3 class="h6 mb-0 flex-grow-1 text-break">{{ template.title }}</h3>
                                 <span
-                                    class="badge"
-                                    :class="
-                                        template.active
-                                            ? 'bg-success-subtle text-success-emphasis'
-                                            : 'bg-secondary-subtle text-secondary-emphasis'
-                                    "
+                                    class="recall-tone"
+                                    :class="template.active ? 'recall-tone--success' : 'recall-tone--muted'"
                                     >{{ template.active ? t.settings.active : t.settings.inactive }}</span
                                 >
                             </div>

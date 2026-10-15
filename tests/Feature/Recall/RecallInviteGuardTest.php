@@ -9,7 +9,7 @@ declare(strict_types=1);
  * (30 dias), hoje em atraso e dentro da janela de convite.
  */
 
-use App\Domains\Recall\Enums\{InviteBlocker as Blocker, InviteOrigin};
+use App\Domains\Recall\Enums\{InviteBlocker as Blocker, InviteOrigin, RecallLifecycle as Life};
 use App\Domains\Recall\Models\{PatientRecall, PatientRecallBlock, RecallClinicSettings, RecallInvite};
 use App\Domains\Recall\Services\{ProtocolGovernanceService, RecallInviteGuard, RecallKillSwitch};
 use App\Enums\Eye;
@@ -287,6 +287,108 @@ it('I3: versão do protocolo suspensa depois da adoção — o retorno de protoc
         ->and(rigBlockers(rigDecide($this, InviteOrigin::Auto, $patient)))->toBe(['nothing_to_invite']);
 });
 
+/** Paciente com glaucoma e a tarefa OPCIONAL (OCT de nervo óptico) ligada pela clínica: as três tarefas vencidas e convidáveis. */
+function rigOctPatient(object $test, bool $autoContact = true): array
+{
+    $adoption = rcfAdopt($test->entity, 'glaucoma', ['oct_nervo_optico' => ['enabled' => true]]);
+    $adoption->update(['auto_contact' => $autoContact]);
+
+    $patient = rcfInvitePatient($test->entity, 'JOSE OCT', '11966665544');
+    rcfCondition($test->entity, $patient, 'glaucoma', Eye::Both, '2025-01-15');
+    rcfRecord($test->entity, $patient, $test->doctor, '2025-09-01'); // a consulta (a cada 4 meses) venceu em 01/01/2026
+    rcfEvaluate($test->entity, $patient, '2026-02-01');
+
+    return [$adoption, $patient];
+}
+
+/** As tarefas dos retornos que a decisão cobre. */
+function rigTasks(object $decision): array
+{
+    return collect($decision->recalls)->pluck('task_key')->sort()->values()->all();
+}
+
+/** A clínica liga/desliga a tarefa pelos PARÂMETROS da adoção — o avaliador não roda: a linha persistida segue como estava. */
+function rigSetTask(object $adoption, string $taskKey, bool $enabled): void
+{
+    $fresh      = $adoption->fresh();
+    $parameters = $fresh->parameters;
+
+    $parameters['tasks'][$taskKey]['enabled'] = $enabled;
+    $fresh->update(['parameters' => $parameters]);
+}
+
+it('tarefa OPCIONAL desligada pela clínica sai do convite antes de o avaliador rodar: a linha persistida segue aberta, a regra já não a calcula', function () {
+    [$adoption, $patient] = rigOctPatient($this);
+
+    expect(rigTasks(rigDecide($this, InviteOrigin::Manual, $patient)))->toBe(['campimetria', 'consulta', 'oct_nervo_optico']);
+
+    rigSetTask($adoption, 'oct_nervo_optico', false);
+
+    // O avaliador ainda NÃO reavaliou: a linha do OCT segue "aberta" no espelho — a decisão olha a adoção AGORA.
+    expect(PatientRecall::query()->withoutGlobalScopes()->where('patient_id', $patient->id)->where('task_key', 'oct_nervo_optico')->value('lifecycle'))->toBe(Life::Open);
+
+    foreach ([InviteOrigin::Manual, InviteOrigin::Auto] as $origin) {
+        expect(rigTasks(rigDecide($this, $origin, $patient)))->toBe(['campimetria', 'consulta']);
+    }
+
+    // Ligou de novo antes da reavaliação: a mesma conta, para os dois lados.
+    rigSetTask($adoption, 'oct_nervo_optico', true);
+
+    expect(rigTasks(rigDecide($this, InviteOrigin::Manual, $patient)))->toBe(['campimetria', 'consulta', 'oct_nervo_optico']);
+});
+
+it('desligar a única tarefa convidável deixa o paciente sem nada a convidar (e a prévia diz isso)', function () {
+    [$adoption, $patient] = rigOctPatient($this);
+
+    DB::table('patient_recalls')->where('patient_id', $patient->id)->whereIn('task_key', ['consulta', 'campimetria'])->update(['lifecycle' => 'dismissed']);
+
+    expect(rigTasks(rigDecide($this, InviteOrigin::Manual, $patient)))->toBe(['oct_nervo_optico']);
+
+    rigSetTask($adoption, 'oct_nervo_optico', false);
+
+    $decision = rigDecide($this, InviteOrigin::Manual, $patient);
+
+    expect($decision->allowed())->toBeFalse()
+        ->and($decision->recalls)->toBe([])
+        ->and(rigBlockers($decision))->toBe(['nothing_to_invite']);
+});
+
+it('tarefa OBRIGATÓRIA não depende do parâmetro "enabled": o protocolo a calcula sempre', function () {
+    [$adoption, $patient] = rigOctPatient($this);
+
+    // Parâmetro adulterado/ausente para a tarefa obrigatória: a regra do motor (required) vale, como no avaliador.
+    $fresh      = $adoption->fresh();
+    $parameters = $fresh->parameters;
+
+    $parameters['tasks']['campimetria']['enabled'] = false;
+    unset($parameters['tasks']['consulta']);
+    $fresh->update(['parameters' => $parameters]);
+
+    expect(rigTasks(rigDecide($this, InviteOrigin::Manual, $patient)))->toBe(['campimetria', 'consulta', 'oct_nervo_optico']);
+});
+
+it('retorno de uma tarefa que o conteúdo adotado não tem mais (versão trocada) não entra no convite', function () {
+    [, $patient] = rigOctPatient($this);
+
+    DB::table('patient_recalls')->where('patient_id', $patient->id)->where('task_key', 'oct_nervo_optico')->update(['task_key' => 'tarefa_removida']);
+
+    expect(rigTasks(rigDecide($this, InviteOrigin::Manual, $patient)))->toBe(['campimetria', 'consulta']);
+});
+
+it('no automático, tarefa opcional só vale com o contato automático ligado E a tarefa ligada (as duas chaves)', function () {
+    [$adoption, $patient] = rigOctPatient($this, autoContact: false);
+
+    expect(rigBlockers(rigDecide($this, InviteOrigin::Auto, $patient)))->toBe(['nothing_to_invite']);
+
+    $adoption->fresh()->update(['auto_contact' => true]);
+
+    expect(rigTasks(rigDecide($this, InviteOrigin::Auto, $patient)))->toBe(['campimetria', 'consulta', 'oct_nervo_optico']);
+
+    rigSetTask($adoption, 'oct_nervo_optico', false);
+
+    expect(rigTasks(rigDecide($this, InviteOrigin::Auto, $patient)))->toBe(['campimetria', 'consulta']);
+});
+
 it('no automático, retorno vencido há mais que o limite da clínica sai do convite (vai para a ligação)', function () {
     RecallClinicSettings::query()->withoutGlobalScopes()->where('entity_id', $this->entity->id)->update(['auto_invite_max_overdue_days' => 30]);
 
@@ -476,6 +578,42 @@ it('stillEligible NÃO reconfere o ritmo: intervalo e teto valiam para criar a o
     RecallClinicSettings::query()->withoutGlobalScopes()->where('entity_id', $this->entity->id)->update(['daily_invite_cap' => 1, 'min_days_between_invites' => 365, 'max_auto_invites_per_cycle' => 1]);
 
     expect(app(RecallInviteGuard::class)->stillEligible($message, $this->now))->toBeNull();
+});
+
+it('stillEligible: tarefa opcional desligada depois de enfileirar cancela o envio (a onda só cobria ela)', function () {
+    [$adoption, $patient] = rigOctPatient($this);
+
+    $this->patient = $patient;
+    $this->recall  = PatientRecall::query()->withoutGlobalScopes()->where('patient_id', $patient->id)->where('task_key', 'oct_nervo_optico')->firstOrFail();
+    $message       = rigQueuedMessage($this, 'auto');
+    $message->update(['phone' => '5511966665544']);
+
+    expect(app(RecallInviteGuard::class)->stillEligible($message->fresh(), $this->now))->toBeNull();
+
+    rigSetTask($adoption, 'oct_nervo_optico', false);
+
+    // A linha do OCT continua aberta (o avaliador não rodou), mas a clínica já desligou a tarefa: nada sai.
+    expect(PatientRecall::query()->withoutGlobalScopes()->whereKey($this->recall->id)->value('lifecycle'))->toBe(Life::Open)
+        ->and(app(RecallInviteGuard::class)->stillEligible($message->fresh(), $this->now))->toBe(Blocker::NothingToInvite);
+
+    rigSetTask($adoption, 'oct_nervo_optico', true);
+
+    expect(app(RecallInviteGuard::class)->stillEligible($message->fresh(), $this->now))->toBeNull();
+});
+
+it('stillEligible: com a tarefa desligada, uma onda que também cobre uma tarefa obrigatória ainda pode sair', function () {
+    [$adoption, $patient] = rigOctPatient($this);
+
+    $this->patient = $patient;
+    $this->recall  = PatientRecall::query()->withoutGlobalScopes()->where('patient_id', $patient->id)->where('task_key', 'oct_nervo_optico')->firstOrFail();
+    $message       = rigQueuedMessage($this, 'auto');
+    $message->update(['phone' => '5511966665544']);
+    RecallInvite::query()->withoutGlobalScopes()->findOrFail($message->recall_invite_id)->recalls()
+        ->attach(PatientRecall::query()->withoutGlobalScopes()->where('patient_id', $patient->id)->where('task_key', 'consulta')->value('id'));
+
+    rigSetTask($adoption, 'oct_nervo_optico', false);
+
+    expect(app(RecallInviteGuard::class)->stillEligible($message->fresh(), $this->now))->toBeNull();
 });
 
 it('stillEligible: versão do protocolo suspensa depois de enfileirar cancela o envio (I3)', function () {

@@ -24,6 +24,9 @@ final class RecallItem
     /** Tarefa do retorno pedido pelo médico (não vem de protocolo). */
     public const TASK_DOCTOR_ORDER = 'doctor_order';
 
+    /** A chave de tarefa do retorno de um curso é `course:<id do curso>` — a identidade da linha em `patient_recalls`. */
+    private const TASK_COURSE_PREFIX = 'course:';
+
     /**
      * @param array<string, mixed> $meta o que explica a conta (âncora, intervalo usado, limite aplicado...) — vai para o evento
      */
@@ -48,6 +51,19 @@ final class RecallItem
         public readonly bool $needsInfo = false,
         public readonly array $meta = [],
     ) {
+    }
+
+    public static function courseTaskKey(string $courseId): string
+    {
+        return self::TASK_COURSE_PREFIX . $courseId;
+    }
+
+    /** O curso a que a chave de tarefa pertence; nulo quando a chave não é de curso. */
+    public static function courseIdOf(string $taskKey): ?string
+    {
+        $prefix = self::TASK_COURSE_PREFIX;
+
+        return str_starts_with($taskKey, $prefix) && strlen($taskKey) > strlen($prefix) ? substr($taskKey, strlen($prefix)) : null;
     }
 
     /** Não dá para calcular as datas: a tela pede o dado que falta. */
