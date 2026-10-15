@@ -629,17 +629,52 @@ describe('ImportReturnModal (importar retorno TISS)', () => {
         expect(w.find('#billing-import-file-error').exists()).toBe(false);
     });
 
-    it('trocar o convênio limpa o erro (o veredito depende da operadora)', async () => {
+    it('escolher outro arquivo limpa SÓ o erro do arquivo: o do convênio continua até ele ser trocado', async () => {
         const w = mountImport();
 
+        lastForm().setError('covenant_id', 'Convênio sem operadora TISS vinculada.');
+        lastForm().setError('xml_file', duplicate);
+        await nextTick();
+
+        await chooseFile(w);
+
+        expect(lastForm().errors.xml_file).toBeUndefined();
+        expect(lastForm().errors.covenant_id).toBe('Convênio sem operadora TISS vinculada.');
+        expect(w.find('#billing-import-covenant').classes()).toContain('is-invalid');
+    });
+
+    it('trocar o convênio limpa o erro dele e o veredito do arquivo (que depende da operadora)', async () => {
+        const w = mountImport();
+
+        lastForm().setError('covenant_id', 'Convênio sem operadora TISS vinculada.');
         lastForm().setError('xml_file', duplicate);
         await nextTick();
 
         await w.find('#billing-import-covenant').setValue('cov-2');
 
         expect(lastForm().covenant_id).toBe('cov-2');
-        expect(lastForm().errors.xml_file).toBeUndefined();
+        expect(lastForm().errors).toEqual({});
         expect(w.find('#billing-import-file-error').exists()).toBe(false);
+        expect(w.find('#billing-import-covenant').classes()).not.toContain('is-invalid');
+    });
+
+    it('reabrir depois de uma importação começa limpo: sem convênio, sem arquivo e sem erro', async () => {
+        const w = mountImport();
+
+        await w.find('#billing-import-covenant').setValue('cov-1');
+        await chooseFile(w);
+
+        // O useForm do Inertia grava o que foi enviado como novos "defaults" no sucesso:
+        // sem zerá-los antes do reset(), o convênio e o arquivo anteriores voltariam.
+        lastForm().defaults({ covenant_id: 'cov-1', xml_file: lastForm().xml_file });
+        lastForm().setError('xml_file', duplicate);
+
+        await w.setProps({ open: false });
+        await w.setProps({ open: true });
+
+        expect(lastForm().covenant_id).toBe('');
+        expect(lastForm().xml_file).toBeNull();
+        expect(lastForm().errors).toEqual({});
     });
 
     it('posta o arquivo na URL como multipart preservando a tela e avisa o pai no sucesso', async () => {

@@ -27,11 +27,17 @@ vi.mock('@inertiajs/vue3', async () => {
                 errors: {},
                 processing: false,
                 transformer: null,
+                defaults(values) {
+                    Object.assign(initial, values);
+                },
                 reset() {
                     Object.assign(form, initial);
                 },
-                clearErrors() {
-                    form.errors = {};
+                // Como o Inertia: sem argumentos limpa tudo; com campos, só esses.
+                clearErrors(...fields) {
+                    form.errors = fields.length
+                        ? Object.fromEntries(Object.entries(form.errors).filter(([key]) => !fields.includes(key)))
+                        : {};
                 },
                 setError(key, message) {
                     form.errors = { ...form.errors, [key]: message };

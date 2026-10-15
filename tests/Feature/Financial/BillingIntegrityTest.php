@@ -610,7 +610,7 @@ describe('textos', function (): void {
             'xml_file'    => UploadedFile::fake()->createWithContent('retorno.xml', '<a></a>'),
         ])
             ->assertRedirect()
-            ->assertSessionHas('error', __('financial_billing.errors.import_return_no_operator'));
+            ->assertSessionHasErrors(['covenant_id' => __('financial_billing.errors.import_return_no_operator')]);
 
         expect(__('financial_billing.errors.import_return_no_operator'))->not->toBe('financial_billing.errors.import_return_no_operator')
             ->and(__('financial_billing.flash.import_return_success', ['count' => 2]))->toContain('2')

@@ -384,7 +384,10 @@ it('refuses the same tiss return file imported again: field error with the origi
 
     expect($expected)->not->toContain('import_return_duplicate');
 
-    // Duplo clique, reenvio do formulário, importação repetida no dia seguinte: sempre o mesmo veredito.
+    // Duplo clique, reenvio do formulário, importação repetida dois dias depois: sempre o mesmo
+    // veredito, com a data da importação ORIGINAL (sem o salto, "agora" e "original" coincidem).
+    $this->travel(2)->days();
+
     foreach (range(1, 3) as $attempt) {
         bhtriImport($covenant, $xml)
             ->assertRedirect()
@@ -429,7 +432,12 @@ it('lets the user retry a tiss return import that failed halfway: the same file 
     };
     $this->app->instance(ProcessTissReturnService::class, $flaky);
 
-    bhtriImport($covenant, $xml)->assertRedirect()->assertSessionHas('error', __('financial_billing.errors.import_return_failed'));
+    // Erro de campo, não flash `error`: o flash fecha o modal (onSuccess) e o toast idêntico
+    // não reaparece no "tente novamente".
+    bhtriImport($covenant, $xml)
+        ->assertRedirect()
+        ->assertSessionHasErrors(['xml_file' => __('financial_billing.errors.import_return_failed')])
+        ->assertSessionMissing('error');
 
     expect(TissReturn::query()->sole()->status->value)->toBe('parsed')
         ->and((float) $guide->fresh()->denied_amount)->toBe(0.0);
@@ -466,7 +474,8 @@ it('rejects importing a tiss return for a covenant without a linked tiss operato
     ]);
 
     $response->assertRedirect();
-    $response->assertSessionHas('error');
+    $response->assertSessionHasErrors(['covenant_id' => __('financial_billing.errors.import_return_no_operator')]);
+    $response->assertSessionMissing('error');
 });
 
 it('rejects a non-xml file on the tiss return import endpoint', function (): void {

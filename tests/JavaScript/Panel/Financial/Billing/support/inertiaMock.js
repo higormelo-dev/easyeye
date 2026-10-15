@@ -49,8 +49,11 @@ export function useForm(initial) {
             Object.assign(form, defaults);
             return form;
         },
-        clearErrors() {
-            form.errors = {};
+        // Como o Inertia: sem argumentos limpa tudo; com campos, só esses.
+        clearErrors(...fields) {
+            form.errors = fields.length
+                ? Object.fromEntries(Object.entries(form.errors).filter(([key]) => !fields.includes(key)))
+                : {};
             return form;
         },
         setError(key, message) {

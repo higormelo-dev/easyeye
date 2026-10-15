@@ -31,6 +31,9 @@ watch(
     () => props.open,
     (open) => {
         if (!open) return;
+        // O useForm do Inertia grava os valores enviados como novos "defaults" no sucesso:
+        // sem zerar antes, reset() devolvia o convênio e o arquivo da importação anterior.
+        form.defaults({ covenant_id: '', xml_file: null });
         form.reset();
         form.clearErrors();
     },
@@ -88,7 +91,7 @@ useDialogKeyboard(() => props.open, { onEscape: requestClose, focusRef: rootRef 
                     aria-required="true"
                     :disabled="disabled"
                     :class="{ 'is-invalid': form.errors.covenant_id }"
-                    @change="form.clearErrors('xml_file')"
+                    @change="form.clearErrors('covenant_id', 'xml_file')"
                 >
                     <option value="">{{ t.select }}</option>
                     <option v-for="c in covenantsWithOperator" :key="c.id" :value="c.id">{{ c.name }}</option>

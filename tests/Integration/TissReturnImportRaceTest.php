@@ -321,20 +321,28 @@ it('[CORRIDA] retomada: a 2ª importação espera a chave, relê o retorno `pars
     }
 });
 
-it('[3 SESSÕES] lote ocupado por outra operação: a 1ª importação espera o lote com a chave na mão, a 2ª espera a chave e NINGUÉM sofre deadlock', function () {
+it('[3 SESSÕES] lote ocupado por outra operação: a 1ª importação espera o lote com a chave na mão, a 2ª espera a chave e as três terminam (sem 40P01)', function () {
     config(['tiss.returns.auto_process' => false]);
 
     $f = rtirFixture(true);
 
     DB::statement("set statement_timeout = '30s'");
 
+    // Isto é um COMBOIO (a chave numa mão, o lote na outra, ninguém esperando por quem espera
+    // por ele), não um ciclo: o segurador não pede nada e termina sozinho. Mostra que a espera
+    // atravessada pelas duas travas fecha o resultado certo (1 retorno, glosa 1 vez), NÃO que o
+    // deadlock é impossível — essa garantia é estrutural e está em ReceiveTissResponseDeduplicationTest
+    // ([ORDEM DA TRAVA]: a chave é a 1ª instrução da transação; process() e o despacho ficam
+    // fora dela, sem FOR UPDATE sob a chave).
+    //
     // Sessão 1 (segurador): trava o lote (FOR UPDATE — como o envio, a geração do XML ou o
-    // process() de outro retorno) e o segura por alguns segundos.
+    // process() de outro retorno) e o segura por tempo de sobra: a margem entre a retenção e o
+    // piso do `$waited` absorve a subida lenta de um filho numa máquina carregada.
     $marker = sys_get_temp_dir() . '/rtir-holder-' . Str::uuid();
     $holder = Process::path(base_path())
         ->env(rtirChildEnv())
         ->timeout(60)
-        ->start([PHP_BINARY, 'tests/Integration/Support/tiss_batch_lock_child.php', (string) $f['batch']->id, $marker, '5', '-']);
+        ->start([PHP_BINARY, 'tests/Integration/Support/tiss_batch_lock_child.php', (string) $f['batch']->id, $marker, '8', '-']);
 
     $second        = null;
     $secondBlocked = false;
@@ -373,12 +381,13 @@ it('[3 SESSÕES] lote ocupado por outra operação: a 1ª importação espera o 
         expect($holderResult->successful())->toBeTrue("segurador falhou — stderr: {$holderResult->errorOutput()}")
             ->and($secondResult?->successful())->toBeTrue("2ª importação falhou — stderr: {$secondResult?->errorOutput()}")
             ->and($secondBlocked)->toBeTrue('a 2ª importação deveria esperar a chave da principal')
-            // A principal esperou o lote do segurador (a chave segurada não tirou a espera do caminho dele)...
+            // A principal esperou o lote do segurador (a chave segurada não tirou a espera do caminho dele).
+            // Retenção de 8 s contra piso de 2 s: o piso só falha se a principal nem chegou a esperar.
             ->and($waited)->toBeGreaterThan(2.0);
 
         $retried = rtirParse($secondResult);
 
-        // ...e a 2ª importação, depois da principal, RETOMOU o mesmo retorno (a principal o deixou `parsed`).
+        // A 2ª importação, depois da principal, RETOMOU o mesmo retorno (a principal o deixou `parsed`).
         expect($retried['dup'])->toBeFalse()
             ->and($retried['id'])->toBe((string) $first->return->id)
             ->and($retried['status'])->toBe('processed')

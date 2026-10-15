@@ -725,7 +725,7 @@ class BillingController extends Controller
             ->firstOrFail();
 
         if (blank($covenant->tiss_operator_id)) {
-            return back()->with('error', __('financial_billing.errors.import_return_no_operator'));
+            return back()->withErrors(['covenant_id' => __('financial_billing.errors.import_return_no_operator')]);
         }
 
         $xmlContent = file_get_contents($validated['xml_file']->getRealPath());
@@ -756,7 +756,7 @@ class BillingController extends Controller
                 $e::class,
             )));
 
-            return back()->with('error', __('financial_billing.errors.import_return_failed'));
+            return back()->withErrors(['xml_file' => __('financial_billing.errors.import_return_failed')]);
         }
 
         $return = $received->return;
