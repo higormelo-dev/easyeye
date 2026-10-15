@@ -39,6 +39,12 @@
         <env name="FILESYSTEM_DISK" value="local"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="DB_DATABASE" value="easyeye_test"/>
+        <!-- SSR do Inertia fica DESLIGADO nos testes. O padrão do config/inertia.php é ligado e, com o bundle em
+             bootstrap/ssr (a CI roda `npm run build` antes do Pest; em dev, qualquer build), TODA página tenta
+             POST em 127.0.0.1:13714/render: os testes com Http::preventStrayRequests()/Http::fake() recebem
+             StrayRequestException (500) e reprovam — 32 testes na CI, que passavam só em quem tinha um
+             .env.testing (gitignored) com INERTIA_SSR_ENABLED=false. -->
+        <env name="INERTIA_SSR_ENABLED" value="false"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
