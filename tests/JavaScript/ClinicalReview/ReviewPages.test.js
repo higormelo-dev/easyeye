@@ -988,3 +988,29 @@ describe('ReviewLayout — idioma do documento', () => {
         expect(document.documentElement.lang).toBe('pt-BR');
     });
 });
+
+describe('ReviewLayout — nome do app', () => {
+    it('o nome vem do <html data-app> ao montar (no servidor, onde não há documento, vale o padrão)', async () => {
+        document.documentElement.dataset.app = 'Clínica Vista';
+
+        try {
+            mountShow();
+            await nextTick();
+
+            expect(wrapper.get('header').text()).toContain('Clínica Vista');
+            expect(wrapper.get('footer').text()).toContain('Clínica Vista');
+        } finally {
+            delete document.documentElement.dataset.app;
+        }
+    });
+
+    it('sem data-app vale EasyEye', async () => {
+        delete document.documentElement.dataset.app;
+
+        mountShow();
+        await nextTick();
+
+        expect(wrapper.get('header').text()).toContain('EasyEye');
+        expect(wrapper.get('footer').text()).toContain('EasyEye');
+    });
+});

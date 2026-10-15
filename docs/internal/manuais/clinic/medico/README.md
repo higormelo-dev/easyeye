@@ -30,9 +30,10 @@ pacientes e conta.
 7. [Meus prompts de IA e consumo](#7-meus-prompts-de-ia-e-consumo)
 8. [Pacientes e imagens oftálmicas](#8-pacientes-e-imagens-oftálmicas)
 9. [Portal do Paciente: convite e compartilhamento de documentos](#9-portal-do-paciente-convite-e-compartilhamento-de-documentos)
-10. [Avisos sobre a assinatura da clínica](#10-avisos-sobre-a-assinatura-da-clínica)
-11. [Minha conta](#11-minha-conta)
-12. [O que o perfil de médico NÃO acessa](#12-o-que-o-perfil-de-médico-não-acessa)
+10. [Retornos e acompanhamento de pacientes crônicos](#10-retornos-e-acompanhamento-de-pacientes-crônicos)
+11. [Avisos sobre a assinatura da clínica](#11-avisos-sobre-a-assinatura-da-clínica)
+12. [Minha conta](#12-minha-conta)
+13. [O que o perfil de médico NÃO acessa](#13-o-que-o-perfil-de-médico-não-acessa)
 
 ---
 
@@ -367,7 +368,125 @@ Clicar novamente no mesmo selo **revoga** o acesso do paciente àquele exame.
 
 ---
 
-## 10. Avisos sobre a assinatura da clínica
+## 10. Retornos e acompanhamento de pacientes crônicos
+
+O módulo de **Retornos** (planos com a funcionalidade *Retorno de pacientes crônicos*) ajuda a
+clínica a não perder o paciente que precisa voltar: glaucoma, DMRI em tratamento, retinopatia
+diabética, ceratocone e uso de hidroxicloroquina. O sistema calcula o próximo retorno, a
+recepção contata o paciente, e **você decide a conduta clínica**: confirmar uma condição, ativar
+um protocolo, dar alta, definir o intervalo da próxima injeção.
+
+> Sem a funcionalidade no plano da clínica, o item **Retornos** não aparece no menu e os cartões
+> deste capítulo não são exibidos. Fale com o administrador.
+
+### Condições crônicas na ficha do paciente
+
+Na ficha do paciente (**Pacientes → ícone de visualizar**) o cartão **Condições crônicas**
+reúne o que o sistema detectou e o que você decidiu. Cada condição mostra o olho, a situação, a
+**evidência** (por exemplo, "CID H401 em prontuário assinado desde 12/03/2026") e os **próximos
+retornos** que ela gera.
+
+| Situação | O que significa | O que você pode fazer |
+| --- | --- | --- |
+| **Sugerida** | O sistema achou um indício (CID em prontuário ainda não assinado, medicação não confirmada). **Não gera retorno** até você confirmar. | **Confirmar** ou **Descartar** |
+| **Ativa** | Confirmada por você, ou detectada com CID forte em prontuário **assinado** ou medicação confirmada. Gera retornos. | **Editar**, **Dar alta** |
+| **Alta** | Acompanhamento encerrado. Os retornos dela saem da lista. O paciente continua cadastrado. | Ver o histórico |
+| **Descartada** | Você decidiu que não se aplica. Não gera retorno. | Ver o histórico |
+
+- **Registrar condição**: use quando o sistema não detectou. Escolha o **protocolo**, o **olho**
+  (OD, OE ou AO) e, se souber, o **início do acompanhamento**. Sem a data, alguns retornos ficam
+  em *Falta informação* até você preenchê-la.
+- **Dar alta** exige o **motivo** (fica registrado com seu nome e a data).
+- **Editar** corrige os dados da condição (protocolo, olho, início do acompanhamento). A partir daí
+  a condição passa a ser sua: o sistema deixa de alterá-la.
+- Se o protocolo não está ativo na clínica, o cartão avisa que a condição **não gera retornos**.
+
+> Só o médico com cadastro de médico **ativo** confirma, descarta, dá alta ou ativa protocolo.
+> Administrador e secretária veem a lista de Retornos, mas não decidem conduta clínica.
+
+### Retorno pedido no prontuário
+
+No formulário do prontuário, ao informar o retorno em dias, aparece a **Sugestão dos protocolos
+de acompanhamento**, com o intervalo de cada condição ativa do paciente (por exemplo,
+"Glaucoma (OD): consulta a cada 4 meses"). **Usar N dias** preenche o campo. Você pode digitar
+outro valor. Retorno acima do **máximo validado** do protocolo vale o máximo na lista de
+Retornos, e o aviso aparece ao lado do campo.
+
+### Ativar e ajustar protocolos (Retornos → Configurar)
+
+Cada protocolo é uma regra de retorno **validada por um oftalmologista externo** e liberada pela
+EasyEye. Só protocolos liberados aparecem na tela **Configurar retornos**. Para cada um você vê a
+versão, quem validou (nome, CRM e RQE conferidos), a data e o código da versão, e pode
+**Ver a regra** completa.
+
+1. Clique em **Ativar este protocolo**.
+2. Ajuste os intervalos **dentro da faixa validada** (o sistema recusa valor fora dela). Tarefas
+   obrigatórias não podem ser desligadas; as **opcionais** (ex.: OCT de nervo óptico) você liga e
+   desliga. Ao desligar uma, o convite por WhatsApp daquela tarefa para na hora (inclusive os que já
+   estavam na fila) e o retorno sai da lista nos minutos seguintes.
+3. Marque **Li a regra e a validação e sou responsável por ativá-la nesta clínica** e confirme.
+   Os retornos dos pacientes são calculados nos minutos seguintes.
+
+Quando a EasyEye libera uma **versão nova**, a clínica continua na versão atual até você trocar:
+veja o que mudou e use **Trocar para a versão N**. Se a EasyEye **suspende** uma regra, os retornos
+dela ficam parados (a lista mostra a aba *Regra suspensa*) e voltam sozinhos quando ela é retomada.
+**Desativar** exige um motivo e tira os retornos da lista; as condições dos pacientes continuam
+cadastradas.
+
+Na mesma tela, **Exames** liga cada exame dos protocolos aos exames da clínica: um exame feito e
+registrado adia o próximo retorno daquele exame.
+
+### Tratamento com injeções intravítreas (anti-VEGF)
+
+Para procedimentos de injeção intravítrea, o sistema mantém um **curso por olho**, com cada
+aplicação registrada.
+
+**Ao pedir o procedimento** (modal de procedimentos do prontuário), escolha o **olho** (OD ou OE:
+o curso é de um olho só), a **droga**, o **esquema** (ataque e depois trate e estenda, sob demanda
+ou intervalo fixo) e, se quiser, a **indicação**. O esquema só orienta: a cada aplicação **você**
+decide o intervalo.
+
+**Ao marcar a aplicação como realizada** o formulário *Aplicação intravítrea nº N* exige:
+
+- **Lote e validade** (pelo estoque ou digitados). Lote vencido **não** é aceito.
+- **Autorização do convênio, por aplicação**, quando o convênio exige: situação, número e
+  validade. Se não estiver aprovada, só segue com **Aplicar assim mesmo** e uma **justificativa**,
+  que fica gravada.
+- **Intervalo até a próxima aplicação** (de 2 a 16 semanas), **ou** encerrar o curso
+  (*concluído* ou *interrompido*, com motivo).
+- Opcionalmente, **agendar a próxima já**. Se o horário não couber na agenda, a aplicação fica
+  registrada e a próxima segue planejada, sem agendamento.
+
+Se houver mais de um pedido de injeção no mesmo olho ainda não executado, a próxima aplicação
+continua sendo uma só: executar um pedido dá a data nova ao outro.
+
+A ficha do paciente mostra o painel **Tratamento com injeções intravítreas**: aplicações feitas,
+intervalo decidido, **próxima aplicação** (com atraso, se houver), o último lote e a situação da
+autorização. Dali você usa **Agendar a próxima** e **Encerrar curso**. A aplicação de um curso
+**não** pode ser marcada como "feita em outro serviço": o médico registra a aplicação.
+
+### Orientações pós-procedimento
+
+Em cada procedimento do prontuário, o botão **Orientações** abre os modelos que servem àquele
+procedimento (cadastrados pelo administrador). Escolha o **modelo**, ajuste para o paciente o
+**texto**, o **local** e os **colírios** (nome, como usar, vezes ao dia e dias) e clique em
+**Emitir orientação**. Abra o **PDF** para imprimir ou entregar.
+
+- O que você emite fica **congelado**: mudar ou apagar o modelo depois não altera a orientação já
+  entregue. Em **Já entregues** ficam as emissões anteriores do procedimento.
+- É possível emitir mesmo com o prontuário já assinado: a orientação não altera o prontuário.
+- O PDF acompanha os arquivos anexados ao modelo (até 5 PDFs).
+
+### Séries abertas na agenda
+
+Para tratamentos sem total definido (como as injeções), a agenda aceita série **a cada N semanas**
+e **série aberta**: o intervalo (2 a 16 semanas) é decidido a cada visita e a recepção usa
+**Acrescentar sessão** no agendamento, na data que você determinou. A nova sessão segue a mesma
+regra de horário do agendamento comum (médico, bloqueio, sala).
+
+---
+
+## 11. Avisos sobre a assinatura da clínica
 
 Se o pagamento da assinatura do EasyEye atrasar, um aviso aparece no topo de todas as
 telas. O médico vê o aviso **sem valor nem link de pagamento**, com a orientação de
@@ -390,7 +509,7 @@ assim que perceber o aviso.
 
 ---
 
-## 11. Minha conta
+## 12. Minha conta
 
 Avatar (canto superior direito) → **Editar perfil**: nome, e-mail, foto, senha e
 autenticação em dois fatores (recomendado):
@@ -401,7 +520,7 @@ autenticação em dois fatores (recomendado):
 
 ---
 
-## 12. O que o perfil de médico NÃO acessa
+## 13. O que o perfil de médico NÃO acessa
 
 Por desenho de segurança, estas áreas retornam **acesso negado** ao médico:
 

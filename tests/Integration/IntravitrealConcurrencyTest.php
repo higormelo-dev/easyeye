@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 /**
  * Curso de injeções intravítreas × duas sessões PostgreSQL de verdade (ADR 0002, item 14): dois pedidos para o mesmo
- * olho, a execução de uma aplicação × encerrar o curso, duas execuções ao mesmo tempo (olhos diferentes) e a execução ×
- * agendar a próxima aplicação (a ordem das travas de linha).
+ * olho, a execução de uma aplicação × encerrar o curso, duas execuções ao mesmo tempo (olhos diferentes) e a execução
+ * × agendar a próxima aplicação, nos DOIS sentidos (a ordem das travas de linha): o filho agenda e o principal executa, e o
+ * filho executa (pausado no meio) e o principal agenda.
  *
  * Em cada cenário o processo FILHO faz a operação e SEGURA a transação aberta alguns segundos (com as travas do
  * prontuário, do procedimento e do paciente tomadas); o principal tenta a operação concorrente nessa janela. A operação
@@ -19,10 +20,11 @@ declare(strict_types=1);
 use App\Domains\Recall\Intravitreal\Enums\{ApplicationStatus, CourseStatus};
 use App\Domains\Recall\Intravitreal\Exceptions\IntravitrealException;
 use App\Domains\Recall\Intravitreal\Models\{IntravitrealApplication, IntravitrealCourse};
-use App\Domains\Recall\Intravitreal\Services\IntravitrealCourseService;
-use App\Enums\MedicalRecordProcedureStatus;
-use App\Models\{MedicalRecord, MedicalRecordProcedure, Procedure};
+use App\Domains\Recall\Intravitreal\Services\{IntravitrealApplicationService, IntravitrealCourseService};
+use App\Enums\{MedicalRecordProcedureStatus, ScheduleSituation};
+use App\Models\{DoctorWorkSchedule, MedicalRecord, MedicalRecordProcedure, Procedure, Schedule};
 use App\Services\MedicalRecordProcedureExecutionService;
+use Carbon\{Carbon, CarbonImmutable};
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\{DB, Notification, Process};
@@ -193,6 +195,53 @@ it('[SEM DEADLOCK] duas execuções de olhos diferentes do mesmo paciente ao mes
         ->and(IntravitrealApplication::query()->withoutGlobalScopes()->where('status', ApplicationStatus::Performed->value)->count())->toBe(2)
         ->and(IntravitrealCourse::query()->withoutGlobalScopes()->where('status', CourseStatus::Active->value)->whereNotNull('next_due_on')->count())->toBe(2)
         ->and(MedicalRecordProcedure::query()->where('status', MedicalRecordProcedureStatus::Done->value)->count())->toBe(2);
+});
+
+it('[SEM DEADLOCK] agendar a próxima aplicação × execução dessa aplicação: o agendamento espera a trava do paciente e conclui sobre o estado comitado (achado via revisão adversarial Codex)', function () {
+    // Médico com expediente e o atendimento de referência (a série aberta nasce dele).
+    for ($d = 1; $d <= 6; $d++) {
+        DoctorWorkSchedule::create(['doctor_id' => $this->doctor->id, 'day_of_week' => $d, 'starts_at' => '08:00:00', 'ends_at' => '12:00:00']);
+    }
+    $this->doctor->update(['schedule_interval' => 15]);
+
+    $attendance = Schedule::create([
+        'entity_id' => $this->entity->id, 'doctor_id' => $this->doctor->id, 'patient_id' => $this->patient->id, 'full_name' => 'PACIENTE IVT',
+        'date_time' => CarbonImmutable::now()->subDays(2)->setTime(9, 0), 'situation' => ScheduleSituation::Attended->value, 'active' => true,
+    ]);
+    $this->record->forceFill(['schedule_id' => $attendance->id])->saveQuietly();
+
+    $procedure = ivcProcedure($this, 'right');
+    $this->courses->ensureForProcedure($procedure, 'right', ['drug_key' => 'aflibercept']);
+    $course = IntravitrealCourse::query()->withoutGlobalScopes()->firstOrFail();
+    $when   = CarbonImmutable::parse(Carbon::now()->next(Carbon::MONDAY)->addWeeks(3)->setTime(9, 0));
+    $result = null;
+
+    // O filho é a execução de verdade, pausada DEPOIS de travar a aplicação (paciente → aplicação) e ANTES do curso. O
+    // agendamento que travava o curso primeiro e só então a aplicação ficava no meio do caminho: cada lado segurava o
+    // que o outro queria (40P01) — o PostgreSQL abortava um deles (o filho, que pedia o curso por último).
+    [$waited, $thrown, $child] = ivcRace(
+        'execute_paused',
+        (string) $procedure->id,
+        function () use ($course, $when, &$result): void {
+            $result = app(IntravitrealApplicationService::class)->scheduleNext((string) $this->entity->id, (string) $course->id, $when);
+        },
+        $this->env,
+    );
+
+    $planned = IntravitrealApplication::query()->withoutGlobalScopes()->where('status', ApplicationStatus::Planned->value)->get();
+
+    expect($child->errorOutput())->not->toContain('40P01')
+        ->and($child->successful())->toBeTrue("filho falhou — stderr: {$child->errorOutput()}")
+        ->and($thrown)->toBeNull()
+        // O agendamento ESPEROU a trava do paciente (o filho a segura 2,5 s) e só depois leu o estado comitado.
+        ->and($waited)->toBeGreaterThan(1.0)
+        ->and($result['ok'])->toBeTrue('scheduleNext recusou: ' . json_encode($result))
+        // A aplicação 1 foi executada pelo filho; a que ficou agendada é a PRÓXIMA (a 2), não a que acabou de ser feita.
+        ->and(IntravitrealApplication::query()->withoutGlobalScopes()->where('status', ApplicationStatus::Performed->value)->pluck('sequence_no')->all())->toBe([1])
+        ->and($planned)->toHaveCount(1)
+        ->and($planned->first()->sequence_no)->toBe(2)
+        ->and((string) $planned->first()->schedule_id)->toBe((string) $result['schedule_id'])
+        ->and(MedicalRecordProcedure::query()->find($procedure->id)->status)->toBe(MedicalRecordProcedureStatus::Done);
 });
 
 it('[SEM DEADLOCK] agendar a próxima × executar a MESMA aplicação: a execução espera a trava do paciente e as duas terminam, nenhuma é abortada', function () {

@@ -93,7 +93,7 @@ const overdue = (course) => course.open && course.days_to_next !== null && cours
 </script>
 
 <template>
-    <section v-if="courses.length" class="mb-3" aria-labelledby="ivt-title" data-testid="ivt-panel">
+    <section v-if="courses.length" class="mb-3 recall-form" aria-labelledby="ivt-title" data-testid="ivt-panel">
         <h6 id="ivt-title" class="small text-uppercase text-muted mb-2">
             <i class="fas fa-eye me-1" aria-hidden="true"></i>{{ t.panel.title }}
         </h6>

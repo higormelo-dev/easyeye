@@ -52,7 +52,7 @@ const needsOverride = computed(
 </script>
 
 <template>
-    <fieldset class="border rounded p-2 mb-2" data-testid="ivt-execution">
+    <fieldset class="border rounded p-2 mb-2 recall-form" data-testid="ivt-execution">
         <legend class="small fw-semibold float-none w-auto px-1 mb-1">
             {{ sequence ? tx('exec.title_n', { n: sequence }) : t.exec.title }}
         </legend>

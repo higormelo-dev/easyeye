@@ -80,6 +80,27 @@ it('é a mesma conta que a tela do Revisor mostra nos exemplos (TaskTimeline)', 
         ->toBe([$example['due_at'], $example['invite'], $example['overdue'], $example['lost']]);
 });
 
+it('a prévia do Revisor aplica o início da tarefa (starts_after_months) como o motor: a triagem da hidroxicloroquina só vence aos 60 meses de uso', function () {
+    $examples = array_column(RecallPreview::examples(reContent('hidroxicloroquina'), reDay('2026-01-01')), null, 'key');
+    $items    = reItems(reCondition('hidroxicloroquina', Eye::Both, '2026-01-01'), reFacts(), '2026-06-01');
+
+    // A triagem anual começa 60 meses depois do início do uso: o exemplo vence em 01/01/2031 (e não em 01/01/2027, que
+    // seria 4 anos ANTES de a tarefa valer) e os prazos andam junto. O exame basal vale desde o começo.
+    expect($examples['triagem_campimetria']['due_at'])->toBe('2031-01-01')
+        ->and($examples['triagem_campimetria']['starts_at'])->toBe('2031-01-01')
+        ->and($examples['triagem_campimetria']['invite'])->toBe(reDay('2031-01-01')->subDays(30)->toDateString())
+        ->and($examples['triagem_campimetria']['overdue'])->toBe(reDay('2031-01-01')->addDays(31)->toDateString())
+        ->and($examples['basal_campimetria']['due_at'])->toBe('2027-01-01')
+        ->and($examples['basal_campimetria']['starts_at'])->toBeNull();
+
+    // E é a MESMA conta do motor, tarefa a tarefa e prazo a prazo (o que o Revisor aprova é o que o sistema calcula).
+    $dates = static fn (string $due, string $invite, string $overdue, string $lost): array => compact('due', 'invite', 'overdue', 'lost');
+
+    expect(array_keys($examples))->toEqualCanonicalizing(['basal_campimetria', 'basal_oct_macula', 'triagem_campimetria', 'triagem_oct_macula'])
+        ->and(array_map(static fn (array $example): array => $dates($example['due_at'], $example['invite'], $example['overdue'], $example['lost']), $examples))
+        ->toEqual(array_map(static fn (RecallItem $item): array => $dates($item->dueAt->toDateString(), $item->inviteFrom->toDateString(), $item->overdueFrom->toDateString(), $item->lostFrom->toDateString()), array_intersect_key($items, $examples)));
+});
+
 it('mês sem overflow: 31/10 + 4 meses é 28/02, nunca 03/03', function () {
     $item = reItems(reCondition(start: '2026-10-31'), reFacts(['2026-10-31']), '2026-11-15')['consulta'];
 
@@ -330,4 +351,16 @@ it('o estado do retorno do médico anda com o dia, como o de protocolo', functio
         ->and($item->state(reDay('2026-03-16'))->value)->toBe('due')
         ->and($item->state(reDay('2026-04-16'))->value)->toBe('overdue')
         ->and($item->state(reDay('2026-09-13'))->value)->toBe('lost');
+});
+
+it('a chave de tarefa do retorno de curso vai e volta (course:<id>); chave de outra origem ou sem id não tem curso', function () {
+    $item = (new RecallRuleEngine())->courseItem('curso-123', Eye::Right, 'Aflibercepte', null, reDay('2026-01-01'), reDay('2026-03-01'), 8, ['lead_days' => 7, 'grace_days' => 7, 'lost_after_days' => 60]);
+
+    expect($item->taskKey)->toBe('course:curso-123')
+        ->and(RecallItem::courseTaskKey('curso-123'))->toBe('course:curso-123')
+        ->and(RecallItem::courseIdOf($item->taskKey))->toBe('curso-123')
+        ->and(RecallItem::courseIdOf('campimetria'))->toBeNull()
+        ->and(RecallItem::courseIdOf('doctor_order'))->toBeNull()
+        ->and(RecallItem::courseIdOf('course:'))->toBeNull()
+        ->and(RecallItem::courseIdOf('xcourse:abc'))->toBeNull();
 });

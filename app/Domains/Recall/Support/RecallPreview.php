@@ -9,9 +9,13 @@ use Carbon\CarbonInterface;
 /**
  * Exemplos de datas de um conteúdo de protocolo, para o Manager e para o Revisor:
  * "se o último atendimento foi em 15/01, esta tarefa vence em 15/05, o convite sai em
- * 15/04…". Usa TaskTimeline — o MESMO cálculo do avaliador de recall —, então o
- * exemplo que o Revisor lê é o que o sistema faz. Não depende de paciente nem de
- * clínica e nunca entra no hash.
+ * 15/04…". Usa TaskTimeline — o MESMO cálculo do avaliador de recall, inclusive o
+ * início da tarefa (`starts_after_months`: a triagem da hidroxicloroquina só vence
+ * 60 meses depois do início do uso) —, então o exemplo que o Revisor lê é o que o
+ * sistema faz. Não depende de paciente nem de clínica e nunca entra no hash.
+ *
+ * A data de exemplo vale como o INÍCIO da condição e como a âncora (o primeiro ciclo, sem ato anterior): é onde o
+ * início da tarefa pesa; depois do primeiro ato o vencimento já passa dele.
  */
 final class RecallPreview
 {
@@ -25,8 +29,8 @@ final class RecallPreview
         $examples = [];
 
         foreach ((array) $content['tasks'] as $task) {
-            $timeline = TaskTimeline::from($task, $anchor);
             $starts   = TaskTimeline::startsAt($task, $anchor);
+            $timeline = TaskTimeline::deferToStart(TaskTimeline::from($task, $anchor), $starts)['timeline'];
 
             $examples[] = [
                 'key'        => $task['key'],

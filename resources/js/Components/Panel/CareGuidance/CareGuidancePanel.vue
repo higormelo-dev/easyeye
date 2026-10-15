@@ -124,7 +124,7 @@ onMounted(load);
 </script>
 
 <template>
-    <div class="border rounded p-2 mt-2 bg-light" data-testid="guidance-panel">
+    <div class="border rounded p-2 mt-2 bg-light recall-form" data-testid="guidance-panel">
         <div v-if="state.loading" class="text-muted small">
             <span class="spinner-border spinner-border-sm me-2"></span>…
         </div>

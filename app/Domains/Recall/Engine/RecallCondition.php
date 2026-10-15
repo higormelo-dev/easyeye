@@ -45,10 +45,23 @@ final class RecallCondition
      */
     public function isEnabled(array $task): bool
     {
+        return self::taskEnabled($task, $this->parameters);
+    }
+
+    /**
+     * A MESMA conta, sem precisar de uma condição: quem confere "esta tarefa ainda é calculada?" fora do motor (o guard
+     * do convite, que lê a linha de retorno persistida e não pode confiar nela) usa esta função, não uma cópia. Só o
+     * booleano `true` liga (string "true", 1 ou ausente = desligada).
+     *
+     * @param array<string, mixed> $task       a tarefa do conteúdo normalizado do protocolo
+     * @param array<string, mixed> $parameters `RecallClinicProtocol::$parameters` (`tasks.<chave>.enabled`)
+     */
+    public static function taskEnabled(array $task, array $parameters): bool
+    {
         if (($task['required'] ?? false) === true) {
             return true;
         }
 
-        return ($this->parameters['tasks'][$task['key']]['enabled'] ?? false) === true;
+        return ($parameters['tasks'][$task['key']]['enabled'] ?? false) === true;
     }
 }

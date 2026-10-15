@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Recall\Services;
 
+use App\Domains\Recall\Engine\RecallItem;
 use App\Domains\Recall\Enums\{InviteBlocker, InviteOrigin, RecallLifecycle};
+use App\Domains\Recall\Intravitreal\Enums\CourseStatus;
+use App\Domains\Recall\Intravitreal\Models\IntravitrealCourse;
 use App\Domains\Recall\Models\{PatientRecall, RecallClinicProtocol, RecallClinicSettings, RecallInvite};
 use App\Domains\Recall\Support\InviteDecision;
 use App\Enums\{ConsentType, FeatureKey};
@@ -28,7 +31,9 @@ use Illuminate\Support\Facades\DB;
  *  2. o PACIENTE — cadastro ativo, sem bloqueio de contato, com consentimento de lembretes (CareReminders), celular
  *     marcado como WhatsApp e válido, e que não respondeu SAIR ao número que envia;
  *  3. os RETORNOS — em aberto, sem agendamento, dentro da janela de convite, com a regra ainda em uso (versão liberada
- *     e íntegra) e, no automático, com `auto_contact` ligado no protocolo e o teto por ciclo respeitado;
+ *     e íntegra, e a tarefa ainda ligada na adoção; no curso de injeções, o curso ainda ativo: a linha de retorno é
+ *     derivada e atrasa em relação a quem a muda) e, no automático, com `auto_contact` ligado no protocolo e o teto por
+ *     ciclo respeitado;
  *  4. o RITMO — janela de horário, intervalo mínimo e teto diário com ramp-up (RecallInvitePacing).
  *
  * Nada aqui grava. Com `$lock`, os retornos são lidos sob FOR UPDATE (o chamador já tomou a trava do paciente).
@@ -258,7 +263,9 @@ final class RecallInviteGuard
 
     /**
      * Mantém só os retornos cuja REGRA ainda vale agora (I3): retorno do médico com o recurso ligado; retorno de
-     * protocolo com adoção ativa, versão liberada/substituída, íntegra e igual à adotada — e, no automático,
+     * protocolo com adoção ativa, versão liberada/substituída, íntegra e igual à adotada E a tarefa ainda ligada na
+     * adoção (`computesTask`: a clínica desliga uma tarefa opcional pelos parâmetros e a linha persistida segue aberta
+     * até o avaliador rodar — o convite não pode sair por uma tarefa que ela já desligou) — e, no automático,
      * protocolo com contato automático ligado e teto por ciclo respeitado.
      *
      * @param Collection<int, PatientRecall> $recalls
@@ -286,11 +293,12 @@ final class RecallInviteGuard
                 $ruleOk = $settings->doctor_order_enabled;
             } elseif ($recall->isCourse()) {
                 // Tratamento com injeções: o intervalo é decisão do médico (sem protocolo). Convite manual sempre
-                // pode; o automático segue a mesma chave do retorno pedido pelo médico.
-                $ruleOk = ! $automatic || $settings->doctor_order_enabled;
+                // pode; o automático segue a mesma chave do retorno pedido pelo médico — em ambos, só enquanto o CURSO
+                // desta linha segue ativo com próxima aplicação.
+                $ruleOk = $this->courseIsLive($entityId, $recall) && (! $automatic || $settings->doctor_order_enabled);
             } else {
                 $adoption = $adoptions->get((string) $recall->protocol_key);
-                $ruleOk   = $adoption !== null && $adoption->usableContent() !== null && (! $automatic || $adoption->auto_contact);
+                $ruleOk   = $adoption !== null && $adoption->computesTask((string) $recall->task_key) && (! $automatic || $adoption->auto_contact);
             }
 
             if (! $ruleOk) {
@@ -305,6 +313,27 @@ final class RecallInviteGuard
         }
 
         return $usable;
+    }
+
+    /**
+     * O curso de injeções a que este retorno pertence segue ATIVO e com próxima aplicação? A linha do curso é derivada:
+     * concluir, interromper ou pausar o tratamento não a fecha na hora (o avaliador o faz em poucos minutos), e o convite
+     * ("sua aplicação está próxima") não se desfaz — não pode sair para um tratamento que o médico acabou de encerrar. A
+     * mesma conta de `RecallEvaluator::courseItems` (ativo, com próxima aplicação e não apagado).
+     */
+    private function courseIsLive(string $entityId, PatientRecall $recall): bool
+    {
+        $courseId = RecallItem::courseIdOf((string) $recall->task_key);
+
+        return $courseId !== null
+            && IntravitrealCourse::query()->withoutGlobalScopes()
+                ->where('entity_id', $entityId)
+                ->where('patient_id', $recall->patient_id)
+                ->whereKey($courseId)
+                ->whereNull('deleted_at')
+                ->where('status', CourseStatus::Active->value)
+                ->whereNotNull('next_due_on')
+                ->exists();
     }
 
     /**

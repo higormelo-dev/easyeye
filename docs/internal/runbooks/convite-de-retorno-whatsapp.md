@@ -51,6 +51,9 @@ e, para o envio **automático** de protocolo, o *contato automático* ligado na 
   são afetados). O que já estava na fila é **cancelado** no momento do envio (`suppressed`, `error_code = recall_paused_global`). Fica na auditoria.
 - **Uma clínica:** desligar a chave 2 (Manager) ou a 3 (a clínica). Idem para a fila.
 - **Só um protocolo:** desligar o *contato automático* ou suspender a versão (freio de mão do protocolo) — retorno de regra suspensa não é convidado.
+- **Só uma tarefa opcional** (ex.: OCT de nervo óptico): o médico a desliga em Retornos → *Configurar*; o convite para de sair **na hora**, inclusive o que já estava
+  na fila (`recall_nothing_to_invite`), embora o retorno em si só feche na próxima reavaliação do paciente (poucos minutos). O mesmo vale para o **curso de
+  injeções** concluído, interrompido ou pausado pelo médico: não se convida para um tratamento que acabou.
 - *Liberar* tira só a pausa: cada clínica segue com as próprias chaves.
 
 ## SAIR, VOLTAR e a autorização
