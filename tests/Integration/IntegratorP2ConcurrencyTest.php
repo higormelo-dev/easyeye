@@ -144,7 +144,12 @@ function p2Concurrent(array $jobs, int $waitTimeoutSeconds = 10): array
                     posix_kill($pid, SIGKILL);
                     pcntl_waitpid($pid, $status); // SIGKILL nunca é ignorado — bloqueia só até o kernel reaproveitar o pid, não indefinidamente.
 
-                    throw new RuntimeException("child {$pid} (job {$index}) did not exit within {$waitTimeoutSeconds}s and was killed — check for a hang in the job or a native dependency {$state}");
+                    // Job concluído e filho parado num futex ao sair é a assinatura do libgomp herdado do pai (ForkAfterOpenMpWarmupTest).
+                    $hint = str_contains($state, 'wchan=futex') && str_contains($state, 'resultado_gravado=sim')
+                        ? ' — suspeita: libgomp após fork (OpenMP do Imagick aquecido no pai); rode o Pest com OMP_THREAD_LIMIT=1 no ambiente inicial do PHP'
+                        : '';
+
+                    throw new RuntimeException("child {$pid} (job {$index}) did not exit within {$waitTimeoutSeconds}s and was killed — check for a hang in the job or a native dependency {$state}{$hint}");
                 }
 
                 usleep(10000);
