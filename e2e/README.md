@@ -39,6 +39,25 @@ npx cypress run --browser chrome --spec cypress/e2e/00-smoke.cy.js
 > terminais embutidos em apps Electron, ex.: VS Code). Rode com:
 > `env -u ELECTRON_RUN_AS_NODE npx cypress run --browser chrome`
 
+## Modo sandbox (opt-in)
+
+O spec `cypress/e2e/sandbox/signup-checkout-sandbox.cy.js` homologa o cadastro com pagamento no ato
+contra o **Asaas Sandbox de verdade** (sem `cy.intercept` para cobrança ou webhook) e só é coletado
+com a variável abaixo — sem ela a pasta `sandbox/` fica fora da suíte padrão, e nenhuma execução
+comum toca gateway:
+
+```bash
+cd e2e
+CYPRESS_SANDBOX=1 env -u ELECTRON_RUN_AS_NODE npx cypress run --browser chrome
+```
+
+Ele exige backend local em `localhost`/`127.0.0.1`, `ASAAS_BASE_URL` de sandbox, chave
+`$aact_hmlg_` (a task `asaasSandboxConfigured` confere com `php artisan billing:gateway-environment
+asaas`) e o webhook do sandbox apontando para o túnel (`ngrok http 8085`).
+
+Roteiro completo (pré-requisitos, webhook, Pix/boleto/cartão, cartão recusado e limpeza):
+[`docs/internal/infra/ngrok-sandbox-asaas.md`](../docs/internal/infra/ngrok-sandbox-asaas.md).
+
 ## Credenciais / Perfis (fixtures/profiles.json)
 
 Perfis **com credencial seedada** no banco de dev — usar via `cy.loginAs('<chave>')`:
@@ -142,6 +161,7 @@ e2e/
 │   ├── e2e/                   # specs (*.cy.js)
 │   │   ├── 00-smoke.cy.js     # login page + login/painel + logout
 │   │   ├── profiles/          # um spec por perfil + billing.cy.js (cobrança)
+│   │   ├── sandbox/           # homologação real do Asaas (opt-in: CYPRESS_SANDBOX=1)
 │   │   └── docs/              # geradores de capturas dos manuais (sob demanda)
 │   ├── fixtures/
 │   │   └── profiles.json      # credenciais/perfis (fonte única)
