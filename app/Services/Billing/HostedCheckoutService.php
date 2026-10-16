@@ -155,6 +155,20 @@ class HostedCheckoutService
             throw CheckoutException::make('gateway_error', 502);
         }
 
+        if ($result->success && $result->customerOmitted) {
+            // Sem PII: só os campos que o Asaas disse faltar no cadastro do cliente.
+            $this->billingLog->log(
+                level: 'warning',
+                message: 'Checkout hospedado aberto SEM o cliente: o Asaas recusou o cadastro dele (dados incompletos). A página coleta os dados; o vínculo é pelo externalReference/checkoutSession.',
+                context: ['missing_fields' => $result->omittedReasons, 'external_checkout_id' => $result->externalCheckoutId],
+                entityId: (string) $entity->id,
+                subscription: $subscription,
+                invoice: $invoice,
+                gatewayCode: $gateway->code(),
+                correlationId: $correlation,
+            );
+        }
+
         if (! $result->success || blank($result->externalCheckoutId) || blank($result->url)) {
             $this->billingLog->log(
                 level: 'warning',

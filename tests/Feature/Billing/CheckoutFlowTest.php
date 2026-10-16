@@ -9,8 +9,8 @@ use App\Enums\SaasRule;
 use App\Events\Billing\InvoicePaid;
 use App\Http\Middleware\EnsureBillingContact;
 use App\Jobs\Billing\{ProcessBillingWebhookJob, RenewSubscriptionJob};
+use App\Models\Billing\{BillingLog, WebhookEvent};
 use App\Models\Billing\{FinancialEvent, HostedCheckout, Invoice, Payment, PaymentAttempt};
-use App\Models\Billing\WebhookEvent;
 use App\Models\{Entity, Plan, PlanPrice, Subscription, User};
 use App\Models\EntityUser;
 use App\Models\WhatsApp\WhatsAppSetting;
@@ -1182,6 +1182,34 @@ describe('cadastro no site (signup-checkout)', function () {
 
         $user->forceFill(['phone_verified_at' => now()])->save();
         $expectStep('panel');
+    });
+
+    it('[cliente sem endereço] o Asaas recusa o cliente no Checkout: abre SEM ele, o cartão segue e o billing_log traz só os campos que faltam', function () {
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        $calls = 0;
+        ckoSignupAsaasFake(function () use (&$calls) {
+            $calls++;
+
+            return $calls === 1
+                ? Http::response(['errors' => [['code' => 'invalid_object', 'description' => 'O campo phone deve existir para o customer informado.'], ['code' => 'invalid_object', 'description' => 'O campo postalCode deve existir para o customer informado.']]], 400)
+                : Http::response(['id' => 'chk_sem_cliente', 'status' => 'ACTIVE', 'minutesToExpire' => 60, 'link' => 'https://asaas.com/checkoutSession/show?id=chk_sem_cliente']);
+        });
+
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk()
+            ->assertJsonPath('data.mode', 'hosted')
+            ->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_sem_cliente');
+
+        $bodies = Http::recorded(fn (Request $r) => $r->url() === 'https://api.asaas.com/v3/checkouts')->map(fn (array $pair) => $pair[0]->data())->values()->all();
+        expect($bodies)->toHaveCount(2)
+            ->and(array_key_exists('customer', $bodies[0]))->toBeTrue()
+            ->and(array_key_exists('customer', $bodies[1]))->toBeFalse()
+            ->and(HostedCheckout::query()->sole()->external_checkout_id)->toBe('chk_sem_cliente');
+
+        $log = BillingLog::query()->where('message', 'like', '%SEM o cliente%')->sole();
+        expect($log->level)->toBe('warning')
+            ->and($log->context['missing_fields'])->toBe(['phone', 'postalCode'])
+            ->and(json_encode($log->context))->not->toContain('@')
+            ->and(HostedCheckout::query()->count())->toBe(1);
     });
 
     it('[L2-1] checkout aberto pelo CADASTRO e retomado pelo PAINEL: fecha o link antigo no Asaas ANTES de abrir outro, e o novo volta para Minha assinatura', function () {

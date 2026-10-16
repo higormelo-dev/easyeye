@@ -295,9 +295,40 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
             'email'   => $customer->email,
             'cpfCnpj' => preg_replace('/\D/', '', (string) $customer->document),
             ...$this->phoneFields($customer->phone),
+            ...$this->addressFields($customer->address),
             'externalReference'    => $customer->externalReference,
             'notificationDisabled' => true,
         ], fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
+     * Endereço do cliente no Asaas (address, addressNumber, complement, province, postalCode) — só quando o cadastro
+     * da clínica está COMPLETO (logradouro, número, bairro e CEP de 8 dígitos). Nunca inventa nem manda pela metade:
+     * sem os quatro, nada vai (o Checkout hospedado recusa cliente sem endereço — ver createHostedCheckout). A cidade
+     * o Asaas deriva do CEP (não é gravável no cliente).
+     *
+     * @param array<string, mixed>|null $address chaves de BillingCustomer::address
+     *
+     * @return array<string, string>
+     */
+    private function addressFields(?array $address): array
+    {
+        $street   = trim((string) ($address['street'] ?? ''));
+        $number   = trim((string) ($address['number'] ?? ''));
+        $district = trim((string) ($address['district'] ?? ''));
+        $zipcode  = preg_replace('/\D/', '', (string) ($address['zipcode'] ?? ''));
+
+        if ($street === '' || $number === '' || $district === '' || strlen((string) $zipcode) !== 8) {
+            return [];
+        }
+
+        return array_filter([
+            'address'       => mb_substr($street, 0, 255),
+            'addressNumber' => mb_substr($number, 0, 20),
+            'complement'    => ($complement = trim((string) ($address['complement'] ?? ''))) !== '' ? mb_substr($complement, 0, 255) : null,
+            'province'      => mb_substr($district, 0, 100),
+            'postalCode'    => $zipcode,
+        ], fn ($value) => $value !== null);
     }
 
     /** @return array{mobilePhone?: string, phone?: string} */
@@ -933,6 +964,24 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
             throw GatewayIntegrationException::rateLimited($this->code(), $this->retryAfterSeconds($response));
         }
 
+        // Cliente anexado sem o cadastro que o Checkout exige (telefone, endereço, CEP, bairro, cidade): 400
+        // invalid_object que cita o `customer`. UMA nova tentativa SEM o cliente — a página coleta os dados e o
+        // vínculo com a nossa fatura é pelo externalReference/checkoutSession (nunca pelo cliente).
+        $omittedReasons  = [];
+        $customerOmitted = false;
+
+        if (isset($body['customer']) && $this->rejectsCustomer($response)) {
+            $customerOmitted = true; // setado AQUI, na retentativa — não derivado dos motivos (que podem vir vazios)
+            $omittedReasons  = $this->customerErrorFields($response);
+            unset($body['customer']);
+
+            $response = $this->post('checkouts', $body);
+
+            if ($response->status() === 429) {
+                throw GatewayIntegrationException::rateLimited($this->code(), $this->retryAfterSeconds($response));
+            }
+        }
+
         $json = is_array($response->json()) ? $response->json() : [];
 
         if (! $response->successful() || blank($json['id'] ?? null)) {
@@ -955,7 +1004,54 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
             status: isset($json['status']) ? strtoupper((string) $json['status']) : 'ACTIVE',
             minutesToExpire: isset($json['minutesToExpire']) && is_numeric($json['minutesToExpire']) ? (int) $json['minutesToExpire'] : $minutes,
             rawResponse: $json,
+            customerOmitted: $customerOmitted,
+            omittedReasons: $omittedReasons,
         );
+    }
+
+    /** Campos do cliente que o Checkout pode apontar como faltando — a ÚNICA coisa que sobe para log/contexto. */
+    private const CUSTOMER_FIELDS = ['phone', 'mobilePhone', 'address', 'addressNumber', 'complement', 'province', 'postalCode', 'city', 'cpfCnpj', 'email', 'name'];
+
+    /**
+     * É erro do CLIENTE anexado: 400 com invalid_object cuja descrição está no formato do Asaas para o cadastro do
+     * cliente ("O campo phone deve existir para o customer informado"). A palavra `customer` solta em outro erro
+     * (callback, items, subscription…) NÃO conta: repetir não resolve e esconderia o erro verdadeiro.
+     */
+    private function rejectsCustomer(Response $response): bool
+    {
+        if ($response->status() !== 400) {
+            return false;
+        }
+
+        foreach ((array) $response->json('errors', []) as $error) {
+            if (is_array($error) && ($error['code'] ?? null) === 'invalid_object' && preg_match('/para o customer informado/iu', (string) ($error['description'] ?? '')) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Só os NOMES de campo citados nos erros do cliente e que estão na allowlist fixa (CUSTOMER_FIELDS): nunca o texto
+     * livre, nem número, CPF ou qualquer outro token do corpo.
+     *
+     * @return list<string>
+     */
+    private function customerErrorFields(Response $response): array
+    {
+        $fields = [];
+
+        foreach ((array) $response->json('errors', []) as $error) {
+            $description = is_array($error) ? (string) ($error['description'] ?? '') : '';
+
+            if (($error['code'] ?? null) === 'invalid_object' && preg_match('/para o customer informado/iu', $description) === 1
+                && preg_match('/campo\s+([A-Za-z]+)\s/u', $description, $m) === 1 && in_array($m[1], self::CUSTOMER_FIELDS, true)) {
+                $fields[] = $m[1];
+            }
+        }
+
+        return array_values(array_unique($fields));
     }
 
     /** POST /v3/checkouts/{id}/cancel (https://docs.asaas.com/reference/cancelar-um-checkout). */
