@@ -146,6 +146,16 @@ interface PaymentGatewayInterface
     /** Cancela um checkout hospedado ainda aberto. True = cancelado (ou já não estava aberto). Nunca lança. */
     public function cancelHostedCheckout(string $externalCheckoutId): bool;
 
+    /**
+     * Cancela um checkout hospedado e devolve o estado REAL em que o gateway o deixou: `canceled`, `expired`,
+     * `paid` (o pagador já concluiu — o cancelamento NÃO desfaz o pagamento), `active` (continua aberto) ou
+     * `unknown` (falha, resposta sem estado). Quem decide abrir OUTRO checkout da mesma fatura só pode seguir
+     * com canceled/expired. Nunca lança.
+     *
+     * @return 'canceled'|'expired'|'paid'|'active'|'unknown'
+     */
+    public function cancelHostedCheckoutStatus(string $externalCheckoutId): string;
+
     // ── Estorno ──────────────────────────────────────────────────────────────
 
     /** Estorna pagamento pela API (o manager só mostra "Estornar" quando true). */

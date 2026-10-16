@@ -44,6 +44,11 @@ use Throwable;
  */
 class HostedCheckoutService
 {
+    /** Para onde o gateway devolve o cliente: Minha assinatura (painel, o padrão) ou a volta do cadastro no site. */
+    public const TARGET_PANEL = 'panel';
+
+    public const TARGET_SIGNUP = 'signup';
+
     public function __construct(
         private readonly GatewayRegistry $registry,
         private readonly BillingLogService $billingLog,
@@ -102,7 +107,7 @@ class HostedCheckoutService
      *
      * @return array<string, mixed> resposta do checkout (mode hosted)
      */
-    public function open(Entity $entity, Invoice $invoice, ?Subscription $subscription, PaymentGatewayInterface $gateway, string $customerId, bool $recurrent): array
+    public function open(Entity $entity, Invoice $invoice, ?Subscription $subscription, PaymentGatewayInterface $gateway, string $customerId, bool $recurrent, string $returnTarget = self::TARGET_PANEL): array
     {
         // Já pago num checkout (CHECKOUT_PAID) aguardando a confirmação da
         // cobrança: outro checkout cobraria o cartão de novo (e, no
@@ -112,11 +117,16 @@ class HostedCheckoutService
         }
 
         $kind     = $recurrent ? HostedCheckout::KIND_RECURRENT : HostedCheckout::KIND_DETACHED;
-        $existing = $this->usableFor($invoice, $gateway, $recurrent);
+        $existing = $this->usableFor($invoice, $gateway, $recurrent, $returnTarget);
 
         if ($existing !== null) {
             return $this->response($existing, $gateway);
         }
+
+        // Link aberto da MESMA fatura para OUTRO alvo de retorno (painel × cadastro) não serve: o callback dele
+        // manda o cliente para a tela errada. É fechado no gateway ANTES de abrir o novo — nunca duas cobranças
+        // vivas da mesma fatura.
+        $this->releaseOtherTargets($invoice, $gateway, $returnTarget);
 
         $cycle       = $recurrent ? $subscription?->effectiveCycle() : null;
         $firstDue    = $recurrent ? $this->firstDueDate($invoice) : null;
@@ -132,9 +142,9 @@ class HostedCheckoutService
                 amount: (float) $invoice->amount,
                 itemName: $this->itemName($invoice, $subscription),
                 description: $this->description($invoice, $cycle),
-                successUrl: $this->callbackUrl('success', $invoice),
-                cancelUrl: $this->callbackUrl('cancel', $invoice),
-                expiredUrl: $this->callbackUrl('expired', $invoice),
+                successUrl: $this->callbackUrl('success', $invoice, $returnTarget),
+                cancelUrl: $this->callbackUrl('cancel', $invoice, $returnTarget),
+                expiredUrl: $this->callbackUrl('expired', $invoice, $returnTarget),
                 externalReference: HostedCheckoutReference::make($subscription?->id ? (string) $subscription->id : null, (string) $invoice->id),
                 cycle: $cycle?->value,
                 nextDueDate: $firstDue?->toDateString(),
@@ -176,6 +186,8 @@ class HostedCheckoutService
             'replaces_recurrence_id' => $recurrent ? $subscription?->gateway_subscription_id : null,
             'replaces_charge_id'     => $invoice->external_invoice_id,
             'correlation_id'         => $correlation,
+            // O ALVO (não a URL) do retorno: o reaproveitamento só vale para o mesmo alvo.
+            'metadata' => ['return_target' => $returnTarget],
         ]);
 
         $this->billingLog->log(
@@ -194,8 +206,20 @@ class HostedCheckoutService
         return $this->response($checkout, $gateway);
     }
 
-    /** Checkout já aberto para a fatura, ainda válido por alguns minutos e no mesmo valor. */
-    public function usableFor(Invoice $invoice, PaymentGatewayInterface $gateway, bool $recurrent): ?HostedCheckout
+    /**
+     * Alvo de retorno com que o checkout foi aberto. Sessão LEGADA (aberta antes de o alvo ser guardado, sem
+     * `return_target`) devolveu o cliente a Minha assinatura: vale como painel.
+     */
+    public static function targetOf(HostedCheckout $checkout): string
+    {
+        return data_get($checkout->metadata, 'return_target') === self::TARGET_SIGNUP ? self::TARGET_SIGNUP : self::TARGET_PANEL;
+    }
+
+    /**
+     * Checkout já aberto para a fatura, ainda válido por alguns minutos, no mesmo valor e para o MESMO alvo de
+     * retorno (o callback é fixado na abertura e não muda depois).
+     */
+    public function usableFor(Invoice $invoice, PaymentGatewayInterface $gateway, bool $recurrent, string $returnTarget = self::TARGET_PANEL): ?HostedCheckout
     {
         return HostedCheckout::query()
             ->where('invoice_id', $invoice->id)
@@ -205,8 +229,111 @@ class HostedCheckoutService
             ->latest()
             ->get()
             ->first(fn (HostedCheckout $c) => $c->isUsable()
+                && self::targetOf($c) === $returnTarget
                 && $c->expires_at?->greaterThan(now()->addMinutes(2))
                 && abs((float) $c->amount - (float) $invoice->amount) < 0.005);
+    }
+
+    /**
+     * Fecha os checkouts ABERTOS da fatura que foram abertos para outro alvo de retorno, e SÓ segue para abrir
+     * outro se tem certeza de que nenhum pagamento está a caminho:
+     *
+     *  1. cancela no gateway e lê o estado REAL em que ele ficou. canceled/expired seguem; `paid` (o pagador já
+     *     concluiu — cancelar não desfaz o pagamento) concilia o checkout como pago e interrompe (409
+     *     card_awaiting_confirmation); active/unknown/falha = 502 e NADA muda (fail closed);
+     *  2. relê fatura e checkouts da fatura sob as MESMAS travas do webhook (empresa → checkout, ProcessWebhook
+     *     EventService): se a confirmação chegou no meio (checkout pago/concluído ou fatura paga), interrompe (409)
+     *     sem marcar nada como substituído; senão marca `superseded` (mesmo estado de supersedeForSubscription:
+     *     pagamento tardio por esse link cai nos guardas de checkout invalidado; a recorrência que ele já tenha
+     *     criado é desfeita antes da 1ª cobrança).
+     */
+    private function releaseOtherTargets(Invoice $invoice, PaymentGatewayInterface $gateway, string $returnTarget): void
+    {
+        $others = HostedCheckout::query()
+            ->where('invoice_id', $invoice->id)
+            ->where('gateway_code', $gateway->code())
+            ->where('status', HostedCheckout::STATUS_ACTIVE)
+            ->get()
+            ->filter(fn (HostedCheckout $c) => $c->isUsable() && self::targetOf($c) !== $returnTarget);
+
+        foreach ($others as $old) {
+            try {
+                $gatewayStatus = $gateway->cancelHostedCheckoutStatus((string) $old->external_checkout_id);
+            } catch (Throwable $e) {
+                report($e);
+                $gatewayStatus = 'unknown';
+            }
+
+            if (! in_array($gatewayStatus, ['canceled', 'expired', 'paid'], true)) {
+                Log::warning('Checkout hospedado: não foi possível fechar o link aberto para outro alvo de retorno.', ['invoice_id' => $invoice->id, 'checkout_id' => $old->id, 'gateway' => $gateway->code(), 'gateway_status' => $gatewayStatus]);
+
+                throw CheckoutException::make('gateway_error', 502);
+            }
+
+            $verdict = DB::transaction(function () use ($old, $invoice, $gatewayStatus, $returnTarget): string {
+                // Mesma ordem do webhook: empresa → checkout(s) → fatura.
+                Entity::query()->whereKey($invoice->entity_id)->lockForUpdate()->first();
+                $rows  = HostedCheckout::query()->where('invoice_id', $invoice->id)->lockForUpdate()->get();
+                $fresh = Invoice::query()->whereKey($invoice->id)->first();
+                $row   = $rows->firstWhere('id', $old->id);
+
+                // O pagador concluiu o link que estamos fechando: o pagamento existe, só falta o webhook.
+                if ($gatewayStatus === 'paid') {
+                    if ($row?->status === HostedCheckout::STATUS_ACTIVE) {
+                        $row->update(['status' => HostedCheckout::STATUS_PAID]);
+                    }
+
+                    return 'awaiting_confirmation';
+                }
+
+                // A confirmação chegou durante o cancelamento (checkout pago/concluído ou fatura paga).
+                if ($fresh === null || $fresh->status === InvoiceStatus::Paid || $rows->contains(fn (HostedCheckout $c) => $c->status === HostedCheckout::STATUS_COMPLETED)) {
+                    return 'not_payable';
+                }
+
+                if ($rows->contains(fn (HostedCheckout $c) => $c->status === HostedCheckout::STATUS_PAID)) {
+                    return 'awaiting_confirmation';
+                }
+
+                if ($row?->status === HostedCheckout::STATUS_ACTIVE) {
+                    $row->update([
+                        'status'   => HostedCheckout::STATUS_SUPERSEDED,
+                        'metadata' => [...(array) ($row->metadata ?? []), 'superseded_reason' => 'return_target_changed', 'superseded_for' => $returnTarget],
+                    ]);
+                }
+
+                return 'closed';
+            });
+
+            if ($verdict === 'awaiting_confirmation') {
+                throw CheckoutException::make('card_awaiting_confirmation', 409);
+            }
+
+            if ($verdict === 'not_payable') {
+                throw CheckoutException::make('invoice_not_payable', 409);
+            }
+
+            if ($old->isRecurrent() && filled($old->external_subscription_id)) {
+                try {
+                    ($this->cancelNewRecurrence($old, (string) $old->external_subscription_id, (string) Str::uuid(), 'return_target_changed'))();
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            }
+
+            $this->billingLog->log(
+                level: 'info',
+                message: 'Checkout hospedado aberto para outro alvo de retorno foi fechado no gateway para abrir um novo na mesma fatura.',
+                context: ['checkout_id' => (string) $old->id, 'from' => self::targetOf($old), 'to' => $returnTarget, 'gateway_status' => $gatewayStatus],
+                entityId: (string) $invoice->entity_id,
+                invoice: $invoice,
+                gatewayCode: $gateway->code(),
+            );
+        }
+
+        if ($this->awaitingConfirmation($invoice)) {
+            throw CheckoutException::make('card_awaiting_confirmation', 409);
+        }
     }
 
     /** Pago no checkout (CHECKOUT_PAID), aguardando a confirmação da cobrança. */
@@ -248,9 +375,17 @@ class HostedCheckoutService
         return CarbonImmutable::instance($due)->startOfDay()->max(CarbonImmutable::today());
     }
 
-    private function callbackUrl(string $result, Invoice $invoice): string
+    /**
+     * Quem decide o alvo é o CHAMADOR (a rota do checkout do cadastro), nunca a idade da clínica: o padrão é o
+     * painel — o checkout de uma clínica existente não pode cair na página do cadastro.
+     */
+    private function callbackUrl(string $result, Invoice $invoice, string $returnTarget): string
     {
-        return route('panel.my-subscription.index', ['checkout_return' => $result, 'checkout_invoice' => (string) $invoice->id]);
+        $query = ['checkout_return' => $result, 'checkout_invoice' => (string) $invoice->id];
+
+        return $returnTarget === self::TARGET_SIGNUP
+            ? route('signup-checkout.return', $query)
+            : route('panel.my-subscription.index', $query);
     }
 
     private function itemName(Invoice $invoice, ?Subscription $subscription): string

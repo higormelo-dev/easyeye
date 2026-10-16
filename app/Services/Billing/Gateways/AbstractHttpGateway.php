@@ -447,6 +447,11 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         return false;
     }
 
+    public function cancelHostedCheckoutStatus(string $externalCheckoutId): string
+    {
+        return 'unknown';
+    }
+
     // ── Estorno — padrão: não suporta (o manager não mostra o botão) ────────
 
     public function supportsRefund(): bool

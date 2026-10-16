@@ -7,10 +7,13 @@ use App\Enums\BillingCycle;
 use App\Exceptions\Billing\CheckoutException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Billing\{AiCreditPackPurchaseRequest, CheckoutCardRequest, CheckoutContractRequest};
-use App\Models\{Entity, Plan, PlanPrice};
-use App\Services\Billing\{AiCreditPackCheckoutService, CheckoutFraudGuard, CheckoutService};
+use App\Models\{Entity, Plan, PlanPrice, User};
+use App\Services\Auth\PhoneVerificationService;
+use App\Services\Billing\{AiCreditPackCheckoutService, CheckoutFraudGuard, CheckoutService, HostedCheckoutService};
+use App\Support\Site\SiteContent;
 use Closure;
 use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\{Inertia, Response};
 
@@ -22,6 +25,9 @@ use Inertia\{Inertia, Response};
  */
 class CheckoutController extends Controller
 {
+    /** O que o checkout hospedado devolve em `checkout_return` (HostedCheckoutService::callbackUrl). */
+    private const RETURN_RESULTS = ['success', 'cancel', 'expired'];
+
     public function __construct(
         private readonly CheckoutService $checkout,
         private readonly CheckoutFraudGuard $fraud,
@@ -36,6 +42,47 @@ class CheckoutController extends Controller
             'checkout'  => $this->checkout->summary($this->entity($request)),
             'aiCredits' => $this->aiPacks->options($this->entity($request)),
             't'         => trans('checkout'),
+        ]);
+    }
+
+    /**
+     * Volta do checkout hospedado do cadastro no site: PÁGINA (a summary é JSON). A URL só diz por onde o cliente
+     * voltou; o estado vem do banco (fatura e assinatura da clínica da sessão). Parâmetros inválidos = 404.
+     */
+    public function signupReturn(Request $request): Response
+    {
+        $query = Validator::make($request->query(), [
+            'checkout_return'  => ['required', 'string', Rule::in(self::RETURN_RESULTS)],
+            'checkout_invoice' => ['required', 'uuid'],
+        ]);
+
+        abort_if($query->fails(), 404);
+
+        $state = $this->checkout->signupReturnState($this->entity($request), (string) $query->validated()['checkout_invoice']);
+        $user  = $request->user();
+
+        // A mesma ordem do painel: e-mail (`verified`) → WhatsApp (`phone.verified`) → painel.
+        [$nextStep, $nextUrl] = match (true) {
+            ! $user->hasVerifiedEmail()    => ['verify_email', route('verification.notice', absolute: false)],
+            $this->phoneGateApplies($user) => ['verify_phone', route('phone.verification.notice', absolute: false)],
+            default                        => ['panel', route('panel.dashboard', absolute: false)],
+        };
+
+        return Inertia::render('Auth/SignupCheckoutReturn', [
+            'appName'             => config('app.name', 'EasyEye'),
+            't'                   => SiteContent::translations(),
+            'tCheckout'           => trans('checkout'),
+            'tAuth'               => trans('auth'),
+            'status'              => (string) $query->validated()['checkout_return'],
+            'invoice'             => $state['invoice'],
+            'subscription_active' => $state['subscription_active'],
+            'next_step'           => $nextStep,
+            'next_url'            => $nextUrl,
+            'summary_url'         => route('signup-checkout.summary', absolute: false),
+            'routes'              => [
+                'register' => route('register'),
+                'siteHome' => route('site.home'),
+            ],
         ]);
     }
 
@@ -61,7 +108,7 @@ class CheckoutController extends Controller
     {
         $validated = $request->validate(['method' => ['required', 'string', Rule::in(CheckoutMethod::values())]]);
 
-        return response()->json(['data' => $this->checkout->instructions($this->entity($request), $invoice, CheckoutMethod::from($validated['method']))]);
+        return response()->json(['data' => $this->checkout->instructions($this->entity($request), $invoice, CheckoutMethod::from($validated['method']), $this->returnTarget($request))]);
     }
 
     /** Emite a cobrança da fatura na forma pedida (POST, limite de pagamento). */
@@ -75,12 +122,13 @@ class CheckoutController extends Controller
             $invoice,
             CheckoutMethod::from($validated['method']),
             is_string($key) && $key !== '' ? mb_substr($key, 0, 100) : null,
+            $this->returnTarget($request),
         )]);
     }
 
     public function payWithCard(CheckoutCardRequest $request, string $invoice): JsonResponse
     {
-        return $this->guardCard($request, fn () => $this->checkout->payInvoiceWithCard($this->entity($request), $invoice, $request->cardInput(), $request->idempotencyKey()));
+        return $this->guardCard($request, fn () => $this->checkout->payInvoiceWithCard($this->entity($request), $invoice, $request->cardInput(), $request->idempotencyKey(), $this->returnTarget($request)));
     }
 
     public function replaceCard(CheckoutCardRequest $request): JsonResponse
@@ -97,6 +145,7 @@ class CheckoutController extends Controller
             method: $request->checkoutMethod(),
             card: $request->cardInput(),
             idempotencyKey: $request->idempotencyKey(),
+            returnTarget: $this->returnTarget($request),
         );
 
         return $request->checkoutMethod()?->isCard() && $request->cardInput() !== null
@@ -171,6 +220,30 @@ class CheckoutController extends Controller
 
             throw $e;
         }
+    }
+
+    /**
+     * Para onde o checkout hospedado devolve o cliente: o cadastro no site (rotas signup-checkout.*, que o
+     * billing.contact:signup já restringe a clínica recém-criada que nunca pagou) ou o painel. Decidido pela ROTA
+     * do chamador, nunca pela idade da clínica — o padrão é o painel.
+     */
+    private function returnTarget(Request $request): string
+    {
+        return $request->routeIs('signup-checkout.*') ? HostedCheckoutService::TARGET_SIGNUP : HostedCheckoutService::TARGET_PANEL;
+    }
+
+    /**
+     * O gate `phone.verified` do painel mandaria este usuário confirmar o WhatsApp? Mesma regra do
+     * EnsurePhoneVerified (telefone sem verificação E canal capaz de entregar o código) — apontar para a tela
+     * quando o painel deixaria passar prenderia o cliente numa etapa que o sistema não exige.
+     */
+    private function phoneGateApplies(User $user): bool
+    {
+        if (blank($user->phone) || $user->phone_verified_at !== null) {
+            return false;
+        }
+
+        return PhoneVerificationService::channelAvailable() && ! app(PhoneVerificationService::class)->lastDeliveryFailedPermanently($user);
     }
 
     private function entity(Request $request): Entity

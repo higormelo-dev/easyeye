@@ -18,12 +18,20 @@ use Symfony\Component\HttpFoundation\Response;
  * confirmar e-mail/WhatsApp, fora do grupo /panel): só para clínica recém-
  * criada (até SIGNUP_WINDOW_DAYS) que nunca pagou, para que esse caminho sem
  * as verificações do painel não sirva para mexer na assinatura de uma clínica
- * que já existe. O resumo continua acessível nessa janela após pagar, para
- * a tela conseguir confirmar o primeiro pagamento; novas operações não.
+ * que já existe. O resumo e a volta do checkout hospedado (SIGNUP_PAID_ROUTES) continuam
+ * acessíveis nessa janela após pagar, para a tela conseguir confirmar o primeiro pagamento;
+ * novas operações não.
  */
 class EnsureBillingContact
 {
     public const SIGNUP_WINDOW_DAYS = 7;
+
+    /**
+     * Rotas do cadastro que continuam acessíveis na janela DEPOIS do 1º pagamento (a tela precisa confirmá-lo e
+     * seguir para a verificação). Lista explícita — nunca `signup-checkout.*`: contract/charge/card/options/
+     * instructions seguem 403 `signup_only` depois de pago.
+     */
+    public const SIGNUP_PAID_ROUTES = ['signup-checkout.summary', 'signup-checkout.return'];
 
     public function __construct(
         private readonly SubscriptionNoticeService $notices,
@@ -43,7 +51,7 @@ class EnsureBillingContact
             throw CheckoutException::make('forbidden', 403);
         }
 
-        if ($mode === 'signup' && ! $this->isFreshSignup($entity, allowPaid: $request->routeIs('signup-checkout.summary'))) {
+        if ($mode === 'signup' && ! $this->isFreshSignup($entity, allowPaid: $request->routeIs(...self::SIGNUP_PAID_ROUTES))) {
             throw CheckoutException::make('signup_only', 403);
         }
 

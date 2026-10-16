@@ -128,6 +128,10 @@ Route::middleware('auth')->group(function () {
         ->group(function () {
             Route::get('options', [CheckoutController::class, 'options'])->middleware('throttle:billing-checkout-read')->name('options');
             Route::get('summary', [CheckoutController::class, 'summary'])->middleware('throttle:billing-checkout-read')->name('summary');
+            // PÁGINA (não JSON): para onde o checkout hospedado do cartão devolve o cliente do cadastro
+            // (?checkout_return=success|cancel|expired&checkout_invoice=<id>). checkout.csp: a página
+            // remonta o SDK do cartão para o "pagar de novo" em cancelado/expirado.
+            Route::get('return', [CheckoutController::class, 'signupReturn'])->middleware(['throttle:billing-checkout-read', 'checkout.csp'])->name('return');
             Route::post('contract', [CheckoutController::class, 'contract'])->middleware('throttle:billing-checkout-pay')->name('contract');
             Route::get('invoices/{invoice}/instructions', [CheckoutController::class, 'instructions'])->middleware('throttle:billing-checkout-read')->name('instructions');
             Route::post('invoices/{invoice}/charge', [CheckoutController::class, 'issueCharge'])->middleware('throttle:billing-checkout-pay')->name('charge');

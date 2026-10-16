@@ -961,17 +961,40 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
     /** POST /v3/checkouts/{id}/cancel (https://docs.asaas.com/reference/cancelar-um-checkout). */
     public function cancelHostedCheckout(string $externalCheckoutId): bool
     {
+        $status = $this->cancelHostedCheckoutRaw($externalCheckoutId);
+
+        return $status !== null && in_array($status, ['CANCELED', 'CANCELLED', 'EXPIRED', 'PAID', ''], true);
+    }
+
+    /**
+     * O estado em que o Asaas deixou o checkout. PAID é um estado, não um cancelamento: o link foi concluído e o
+     * pagamento existe (a confirmação financeira chega pelo webhook). Resposta sem estado = unknown.
+     */
+    public function cancelHostedCheckoutStatus(string $externalCheckoutId): string
+    {
+        return match ($this->cancelHostedCheckoutRaw($externalCheckoutId)) {
+            'CANCELED', 'CANCELLED' => 'canceled',
+            'EXPIRED'               => 'expired',
+            'PAID'                  => 'paid',
+            'ACTIVE'                => 'active',
+            default                 => 'unknown',
+        };
+    }
+
+    /** Estado (MAIÚSCULAS) devolvido pelo cancelamento; null = a chamada falhou. */
+    private function cancelHostedCheckoutRaw(string $externalCheckoutId): ?string
+    {
         if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', $externalCheckoutId) !== 1) {
-            return false;
+            return null;
         }
 
         try {
             $response = $this->post('checkout_cancel', [], ['id' => $externalCheckoutId]);
         } catch (GatewayIntegrationException) {
-            return false;
+            return null;
         }
 
-        return $response->successful() && in_array(strtoupper((string) $response->json('status')), ['CANCELED', 'CANCELLED', 'EXPIRED', 'PAID', ''], true);
+        return $response->successful() ? strtoupper((string) $response->json('status')) : null;
     }
 
     /**
