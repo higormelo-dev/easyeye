@@ -6,6 +6,7 @@ use App\Models\{Plan, PlanPrice, Subscription, SubscriptionSetting, TermVersion,
 use App\Services\Auth\PhoneVerificationService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('mantém o plano escolhido na landing até criar o trial com o prazo anunciado', function () {
@@ -233,3 +234,31 @@ it('entrega a prop terms: obrigatória só com versão vigente, com o link de ca
 
     expect(__('auth.register.terms_summary'))->toContain('prestador de pagamento');
 });
+
+it('planos como os do dev (preço só no plano, sem linhas em plan_prices) seguem listados: teste grátis ligado ou desligado', function (int $trialDays) {
+    SubscriptionSetting::setValue('trial_days', $trialDays);
+    $names = ['Básico' => 299.90, 'Pro' => 899.90, 'Premium' => 1799.90];
+    $order = 0;
+
+    foreach ($names as $name => $price) {
+        Plan::factory()->create(['name' => $name, 'slug' => Str::slug($name), 'active' => true, 'price' => $price, 'billing_cycle' => 'monthly', 'sort_order' => ++$order]);
+    }
+
+    expect(PlanPrice::query()->count())->toBe(0);
+
+    $this->get(route('register'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Auth/Register')
+            ->where('trialDays', $trialDays)
+            ->has('plans', 3)
+            ->where('plans.0.name', 'Básico')
+            ->where('plans.0.default_cycle', 'monthly')
+            ->where('plans.0.is_free', false)
+            ->where('plans.0.prices.0.cycle', 'monthly')
+            ->where('plans.0.prices.0.price', fn ($value) => (float) $value === 299.9)
+            ->where('plans.2.prices.0.price', fn ($value) => (float) $value === 1799.9));
+})->with([
+    'trial ligado (7 dias)' => [7],
+    'trial desligado (0)'   => [0],
+]);
