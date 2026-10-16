@@ -698,6 +698,7 @@ describe('Cobrança da clínica — checkout, régua e manager', () => {
                 .within(() => {
                     cy.get('input').eq(0).type('CY-BILL CADASTRO');
                     cy.get('input[type=tel], input').eq(1).type('11987654321');
+                    cy.get('[data-testid="terms-accept-checkbox"]').should('be.visible').check();
                     cy.get('button[type=submit]').click();
                 });
             cy.wait('@register');

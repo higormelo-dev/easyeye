@@ -124,6 +124,7 @@ function createCheckoutSignup(kind) {
     cy.get('[data-testid="register-plan"]').first().should('be.visible').click();
     cy.get('[data-testid="register-company-name"]').type(`Clínica Sandbox ${kind}`);
     cy.get('[data-testid="register-company-phone"]').type('11987654321');
+    cy.get('[data-testid="terms-accept-checkbox"]').should('be.visible').check();
     cy.get('[data-testid="register-submit"]').should('be.enabled').click();
     cy.get('[data-test="signup-checkout"]', { timeout: 20000 }).should('be.visible');
 }
@@ -222,13 +223,15 @@ describe('Sandbox Asaas — cadastro com pagamento no ato', () => {
             fillHostedCard(checkoutUrl, '4444444444444444');
         });
 
-        // TODO(decisão 6): trocar pelo retorno dedicado do cadastro quando ele
-        // existir. Hoje o callback real é /panel/my-subscription, bloqueado pelo
-        // middleware verified e termina na confirmação de e-mail.
-        cy.location('pathname', { timeout: 30000 }).should('eq', '/verify-email');
+        cy.location('pathname', { timeout: 30000 }).should('eq', '/signup-checkout/return');
+        cy.location('search').should('include', 'checkout_return=success');
+        cy.get('[data-testid="checkout-return-status"]').should('contain.text', /Aguardando|Pagamento confirmado/);
 
         maybePauseForManualPayment();
         waitForWebhookActivation();
+        cy.reload();
+        cy.get('[data-testid="checkout-return-status"]').should('contain.text', 'Pagamento confirmado');
+        cy.get('[data-testid="checkout-return-next"]').should('contain.text', 'Verificar e-mail');
     });
 
     it('cartão recusado mostra erro no Checkout hospedado e permite nova tentativa', () => {
@@ -257,8 +260,9 @@ describe('Sandbox Asaas — cadastro com pagamento no ato', () => {
             });
         });
 
-        cy.visit('/verify-email');
         waitForWebhookFailure().then(({ summary, failedInvoice }) => {
+            cy.visit(`/signup-checkout/return?checkout_return=cancel&checkout_invoice=${failedInvoice.id}`);
+            cy.get('[data-testid="checkout-return-status"]').should('contain.text', 'não foi concluído');
             expect(summary.subscription?.is_awaiting_first_payment).to.equal(true);
             expect(summary.subscription?.status).not.to.equal('active');
             expect(failedInvoice.can_pay).to.equal(true);
