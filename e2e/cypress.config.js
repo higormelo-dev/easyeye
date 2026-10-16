@@ -1,4 +1,5 @@
 const { defineConfig } = require('cypress');
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const { spawnSync } = require('child_process');
@@ -148,6 +149,41 @@ async function baseUrlIsLocalApp(baseUrl) {
     });
 }
 
+// Estado da rodada do spec de sandbox: cada e-mail que o spec gera é gravado ANTES do cadastro em
+// cypress/.sandbox-run/<nonce>.json, e a limpeza (e2e/scripts/clean-sandbox-signups.php) apaga SÓ esses — nunca por
+// padrão de e-mail. O nonce e o e-mail são validados aqui (o arquivo fica sempre dentro da pasta).
+const SANDBOX_RUN_DIR = path.resolve(__dirname, 'cypress/.sandbox-run');
+
+function sandboxRunFile(nonce) {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(nonce))) {
+        throw new Error('sandboxRun: nonce inválido');
+    }
+
+    return path.join(SANDBOX_RUN_DIR, `${nonce}.json`);
+}
+
+function recordSandboxEmail({ nonce, email }) {
+    if (!/^cy-sandbox-[a-z0-9._-]+@example\.test$/i.test(String(email))) {
+        throw new Error('sandboxRun: e-mail fora do padrão cy-sandbox-*@example.test');
+    }
+
+    const file = sandboxRunFile(nonce);
+
+    fs.mkdirSync(SANDBOX_RUN_DIR, { recursive: true });
+
+    const state = fs.existsSync(file)
+        ? JSON.parse(fs.readFileSync(file, 'utf8'))
+        : { nonce, startedAt: new Date().toISOString(), emails: [] };
+
+    if (!state.emails.includes(email)) {
+        state.emails.push(email);
+    }
+
+    fs.writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`);
+
+    return file;
+}
+
 module.exports = defineConfig({
     e2e: {
         baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:8085',
@@ -164,6 +200,28 @@ module.exports = defineConfig({
                 // nunca um argumento vindo da página.
                 asaasSandboxConfigured: async () =>
                     (await baseUrlIsLocalApp(config.baseUrl)) && hasAsaasSandboxConfig(),
+                // Registra o e-mail da conta que a rodada vai criar (devolve o caminho do estado) e informa o estado
+                // para o after() da limpeza (null = a rodada não criou conta nenhuma).
+                sandboxRunRecord: (args) => recordSandboxEmail(args),
+                sandboxRunState: ({ nonce }) => {
+                    const file = sandboxRunFile(nonce);
+
+                    return fs.existsSync(file) ? file : null;
+                },
+                // Aviso no TERMINAL do `cypress run` (console.log do navegador não chega lá): é como o caso de cartão
+                // entrega ao humano a URL do checkout. Aceita várias linhas (`\n`); `banner` destaca o bloco.
+                sandboxNotice: ({ message, banner = false }) => {
+                    // \p{Cc}: caracteres de controle por linha (a mensagem vem da página de teste, nunca vai crua ao terminal).
+                    const lines = String(message)
+                        .slice(0, 2000)
+                        .split('\n')
+                        .map((line) => line.replace(/\p{Cc}/gu, ' '));
+                    const body = lines.map((line) => `[sandbox] ${line}`).join('\n');
+
+                    console.log(banner ? `\n${'='.repeat(100)}\n${body}\n${'='.repeat(100)}\n` : `\n${body}\n`);
+
+                    return null;
+                },
             });
         },
         supportFile: 'cypress/support/e2e.js',

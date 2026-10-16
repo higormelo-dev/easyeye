@@ -11,6 +11,13 @@ const CONSOLE_ERROR_ALLOWLIST = [
     // (vazio)
 ];
 
+// Modo túnel do e2e/scripts/sandbox-run.sh (ele exporta CYPRESS_SANDBOX_TUNNEL_HOST): a página é https e o build aponta o
+// Reverb para wss://localhost:8080, que a CSP (connect-src) bloqueia — sem realtime no modo túnel é PREVISTO
+// (e2e/README.md). Entrada SÓ nesse modo, nunca global: fora dele um bloqueio de CSP continua sendo falha.
+if (String(Cypress.env('SANDBOX_TUNNEL_HOST') ?? '').trim() !== '') {
+    CONSOLE_ERROR_ALLOWLIST.push(/^\[CSP\] connect-src bloqueou wss?:\/\/localhost:8080\//);
+}
+
 // Erros de TODAS as páginas carregadas no teste (não só da última): um erro
 // numa tela intermediária (ex.: a que redireciona) sumia com a navegação.
 let testErrors = [];
@@ -96,7 +103,9 @@ Cypress.on('window:before:load', (win) => {
 // Falha o teste se alguma página do teste logou console.error (ou violou a
 // CSP) fora da allowlist.
 afterEach(() => {
-    cy.window({ log: false }).then(() => {
+    // Sem AUT: cy.window() exige que o navegador esteja na origem do spec e explodia quando o caso terminava dentro
+    // do Asaas (cy.origin) — pulando os casos seguintes. Os erros já estão coletados em testErrors.
+    cy.wrap(null, { log: false }).then(() => {
         const offenders = testErrors.filter(
             (msg) =>
                 !CONSOLE_ERROR_ALLOWLIST.some((entry) =>
