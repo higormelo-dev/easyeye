@@ -32,6 +32,9 @@
 // simuladas pelo spec com cy.intercept nas rotas JSON do próprio sistema.
 // Usuários sem telefone (sem WhatsApp a verificar) e com os termos aceitos.
 //
+// CNPJ de cada clínica: gerado de uma base fixa (cyBillCnpj, em clean-billing.php) — válido e próprio do cenário, não
+// o CNPJ "famoso" 11222333000181 que colidia (unique de entities.national_registration) com clínicas de teste do dev.
+//
 // Idempotente: limpa a execução anterior (clean-billing.php) antes de criar.
 // Saída: JSON com ids/tokens que os specs usam.
 
@@ -178,7 +181,7 @@ $overdue = function (Entity $entity, int $days) use ($paid, $invoice): array {
 };
 
 // ── CY-BILL EM DIA ────────────────────────────────────────────────────────────
-$ok   = $clinic('CY-BILL EM DIA', '11222333000181');
+$ok   = $clinic('CY-BILL EM DIA', cyBillCnpj('CY-BILL EM DIA'));
 $okAd = $user($ok, 'admin.emdia@cy-billing.test', 'Ana Admin Em Dia', 'admin', owner: true);
 $user($ok, 'financeiro.emdia@cy-billing.test', 'Fábio Financeiro Em Dia', 'financial');
 $user($ok, 'secretaria.emdia@cy-billing.test', 'Sônia Secretária Em Dia', 'secretary');
@@ -252,14 +255,14 @@ $output['ok'] = [
 ];
 
 // ── CY-BILL ATRASO (D+1: aviso, acesso total) ────────────────────────────────
-$late = $clinic('CY-BILL ATRASO', '77888999000127');
+$late = $clinic('CY-BILL ATRASO', cyBillCnpj('CY-BILL ATRASO'));
 $user($late, 'admin.atraso@cy-billing.test', 'Alice Admin Atraso', 'admin', owner: true);
 $user($late, 'financeiro.atraso@cy-billing.test', 'Fernanda Financeiro Atraso', 'financial');
 [$lateSub, $lateOpen] = $overdue($late, 1);
 $output['overdue']    = ['entity' => (string) $late->id, 'open_invoice' => (string) $lateOpen->id];
 
 // ── CY-BILL LIMITADO (D+4) ───────────────────────────────────────────────────
-$lim = $clinic('CY-BILL LIMITADO', '22333444000172');
+$lim = $clinic('CY-BILL LIMITADO', cyBillCnpj('CY-BILL LIMITADO'));
 $user($lim, 'admin.limitado@cy-billing.test', 'Lia Admin Limitado', 'admin', owner: true);
 $limDr = $user($lim, 'medico.limitado@cy-billing.test', 'Dra. Lúcia Limitado', 'doctor');
 $user($lim, 'secretaria.limitado@cy-billing.test', 'Lara Secretária Limitado', 'secretary');
@@ -270,7 +273,7 @@ $output['limited']  = ['entity' => (string) $lim->id, 'open_invoice' => (string)
 
 // ── CY-BILL BLOQUEADO (D+8) ──────────────────────────────────────────────────
 $callToken = Str::random(40);
-$blk       = $clinic('CY-BILL BLOQUEADO', '33444555000163', [
+$blk       = $clinic('CY-BILL BLOQUEADO', cyBillCnpj('CY-BILL BLOQUEADO'), [
     'call_panel_enabled' => true,
     'call_panel_token'   => $callToken,
 ]);
@@ -305,7 +308,7 @@ $output['blocked'] = [
 ];
 
 // ── CY-BILL RECORRENCIA (alerta no manager) ──────────────────────────────────
-$rec    = $clinic('CY-BILL RECORRENCIA', '44555666000154');
+$rec    = $clinic('CY-BILL RECORRENCIA', cyBillCnpj('CY-BILL RECORRENCIA'));
 $recSub = $paid($rec, [
     'status'              => SubscriptionStatus::Active,
     'billing_state'       => 'active',
@@ -325,7 +328,7 @@ $invoice($rec, $recSub, [
 $output['recurrence'] = ['entity' => (string) $rec->id, 'subscription' => (string) $recSub->id];
 
 // ── CY-BILL TRIAL FIM (teste grátis acaba em 2 dias) ─────────────────────────
-$trialEnd = $clinic('CY-BILL TRIAL FIM', '55666777000145');
+$trialEnd = $clinic('CY-BILL TRIAL FIM', cyBillCnpj('CY-BILL TRIAL FIM'));
 $user($trialEnd, 'admin.trialfim@cy-billing.test', 'Tina Admin Trial', 'admin', owner: true);
 $trialDr = $user($trialEnd, 'medico.trialfim@cy-billing.test', 'Dr. Tiago Trial', 'doctor');
 $doctor($trialEnd, $trialDr, 'TIAGO TRIAL');
@@ -342,7 +345,7 @@ Subscription::query()->create([
 $output['trial_ending'] = ['entity' => (string) $trialEnd->id];
 
 // ── CY-BILL TRIAL VENCIDO (teste grátis acabou ontem — sem dias de graça) ────
-$trialOver = $clinic('CY-BILL TRIAL VENCIDO', '66777888000136');
+$trialOver = $clinic('CY-BILL TRIAL VENCIDO', cyBillCnpj('CY-BILL TRIAL VENCIDO'));
 $user($trialOver, 'admin.trialvencido@cy-billing.test', 'Otávio Admin Trial', 'admin', owner: true);
 Subscription::query()->create([
     'entity_id'       => $trialOver->id,

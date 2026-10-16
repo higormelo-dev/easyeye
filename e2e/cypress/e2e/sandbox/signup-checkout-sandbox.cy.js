@@ -5,9 +5,12 @@
 //   CYPRESS_SANDBOX=1 npx cypress run --browser chrome
 //
 // Pré-requisitos, ANTES de abrir o Cypress:
-// - CYPRESS_BASE_URL obrigatoriamente em localhost/127.0.0.1 (normalmente
-//   http://localhost:8085); host remoto não é permitido porque o comando
-//   Artisan local não consegue comprovar a configuração daquele app;
+// - CYPRESS_BASE_URL em localhost/127.0.0.1 (normalmente http://localhost:8085) OU, só pelo
+//   e2e/scripts/sandbox-run.sh, na URL pública do túnel (CYPRESS_SANDBOX_TUNNEL_HOST): aí a
+//   origem do navegador é a mesma do APP_URL e dos retornos do checkout. Qualquer outro host
+//   é barrado: o comando Artisan local não comprova a configuração de app remoto, e o túnel
+//   só vale se o ngrok local o reportar apontando para a porta do serve do script (a cy.task
+//   confere);
 // - ASAAS_BASE_URL=https://api-sandbox.asaas.com e uma chave Sandbox que começa
 //   com $aact_hmlg_ (nunca grave a chave neste arquivo);
 // - ASAAS_WEBHOOK_SECRET configurado no EasyEye e no webhook do Asaas Sandbox;
@@ -54,10 +57,13 @@ function assertSandboxEnvironment() {
     const baseUrl = Cypress.config('baseUrl');
     const hostname = new URL(baseUrl).hostname;
     const localHost = hostname === 'localhost' || hostname === '127.0.0.1';
+    const tunnelHost = String(Cypress.env('SANDBOX_TUNNEL_HOST') ?? '')
+        .trim()
+        .toLowerCase();
 
-    if (!localHost) {
+    if (!localHost && (tunnelHost === '' || hostname !== tunnelHost)) {
         throw new Error(
-            `Sandbox bloqueado: CYPRESS_BASE_URL usa ${hostname}; somente localhost/127.0.0.1 é permitido.`,
+            `Sandbox bloqueado: CYPRESS_BASE_URL usa ${hostname}; só localhost/127.0.0.1 ou o túnel do sandbox-run.sh é permitido.`,
         );
     }
 
@@ -68,6 +74,26 @@ function assertSandboxEnvironment() {
             );
         }
     });
+}
+
+function installNgrokInterstitialBypass() {
+    const hostname = new URL(Cypress.config('baseUrl')).hostname;
+    const tunnelHost = String(Cypress.env('SANDBOX_TUNNEL_HOST') ?? '')
+        .trim()
+        .toLowerCase();
+
+    if (tunnelHost === '' || hostname !== tunnelHost) return;
+
+    cy.intercept({ hostname: tunnelHost, middleware: true }, (request) => {
+        request.headers['ngrok-skip-browser-warning'] = '1';
+    });
+}
+
+function assertReturnedToCurrentApp() {
+    const appHost = new URL(Cypress.config('baseUrl')).host;
+
+    cy.location('host', { timeout: 30000 }).should('eq', appHost);
+    cy.location('pathname').should('eq', '/signup-checkout/return');
 }
 
 function maybePauseForManualPayment() {
@@ -175,6 +201,10 @@ describe('Sandbox Asaas — cadastro com pagamento no ato', () => {
         assertSandboxEnvironment();
     });
 
+    beforeEach(() => {
+        installNgrokInterstitialBypass();
+    });
+
     it('Pix exibe QR, copia-e-cola e validade; o webhook ativa a assinatura', () => {
         createCheckoutSignup('pix');
         choose('pix');
@@ -223,7 +253,7 @@ describe('Sandbox Asaas — cadastro com pagamento no ato', () => {
             fillHostedCard(checkoutUrl, '4444444444444444');
         });
 
-        cy.location('pathname', { timeout: 30000 }).should('eq', '/signup-checkout/return');
+        assertReturnedToCurrentApp();
         cy.location('search').should('include', 'checkout_return=success');
         cy.get('[data-testid="checkout-return-status"]').should('contain.text', /Aguardando|Pagamento confirmado/);
 
@@ -262,6 +292,7 @@ describe('Sandbox Asaas — cadastro com pagamento no ato', () => {
 
         waitForWebhookFailure().then(({ summary, failedInvoice }) => {
             cy.visit(`/signup-checkout/return?checkout_return=cancel&checkout_invoice=${failedInvoice.id}`);
+            assertReturnedToCurrentApp();
             cy.get('[data-testid="checkout-return-status"]').should('contain.text', 'não foi concluído');
             expect(summary.subscription?.is_awaiting_first_payment).to.equal(true);
             expect(summary.subscription?.status).not.to.equal('active');

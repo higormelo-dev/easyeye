@@ -117,8 +117,8 @@ describe('Cobrança da clínica — checkout, régua e manager', () => {
                 .within(() => {
                     cy.get('[data-test="checkout-amount"]').should('contain.text', '899,90');
                     cy.get('[data-test="checkout-methods"] button[data-method]').should('have.length', 3);
-                    // Cartão no Asaas = página do gateway (avisado no botão).
-                    cy.get('button[data-method="credit_card"] [data-test="method-external"]').should('be.visible');
+                    // Cartão no Asaas = checkout hospedado do gateway.
+                    cy.get('button[data-method="credit_card"] [data-test="method-hosted"]').should('be.visible');
                     cy.get('button[data-method="pix"]').click();
                 });
             cy.wait('@instructions').its('request.query.method').should('eq', 'pix');
@@ -168,17 +168,49 @@ describe('Cobrança da clínica — checkout, régua e manager', () => {
             cy.get('@gatewayPost.all').should('have.length', 0);
         });
 
-        it('Cartão no Asaas: avisa e leva ao link da cobrança (backend real, sem chamar o gateway)', () => {
+        it('Cartão no Asaas: avisa e abre o checkout hospedado (backend real, sem chamar o gateway)', () => {
             cy.visit('/panel/my-subscription');
             cy.expectPanelPage('Minha assinatura');
+            const checkoutUrl = 'https://sandbox.asaas.com/checkoutSession/show?id=chk_cy';
+            cy.intercept(
+                {
+                    method: 'GET',
+                    pathname: `/panel/my-subscription/invoices/${S.ok.open_invoice}/instructions`,
+                    query: { method: 'credit_card' },
+                },
+                { data: { issue_required: true } },
+            ).as('cardInstructions');
+            cy.intercept('POST', `/panel/my-subscription/invoices/${S.ok.open_invoice}/charge`, (req) => {
+                expect(req.body).to.deep.include({ method: 'credit_card' });
+                req.reply({
+                    data: {
+                        mode: 'hosted',
+                        method: 'credit_card',
+                        recurrent: true,
+                        checkout_url: checkoutUrl,
+                        expires_at: inMinutes(30),
+                        invoice: {
+                            id: S.ok.open_invoice,
+                            status: 'pending',
+                            can_pay: true,
+                            amount: 899.9,
+                            currency: 'BRL',
+                        },
+                    },
+                });
+            }).as('hostedCharge');
+            cy.intercept('GET', /^https:\/\/sandbox\.asaas\.com\/checkoutSession\/show\?id=chk_cy$/, (req) => {
+                req.redirect(`${Cypress.config('baseUrl')}/panel/my-subscription`);
+            }).as('asaasHostedRedirect');
             cy.get('[data-test="open-invoice-pay"]').click();
+            cy.get('button[data-method="credit_card"] [data-test="method-hosted"]').should('be.visible');
             cy.get('[role="dialog"] button[data-method="credit_card"]').click();
-            cy.wait('@instructions').its('response.statusCode').should('eq', 200);
-            cy.get('[data-test="checkout-link"]').should('be.visible');
-            cy.get('[data-test="checkout-external-link"]')
-                .should('have.attr', 'href', 'https://sandbox.asaas.com/i/cy_emdia')
-                .and('have.attr', 'rel')
-                .and('include', 'noopener');
+            cy.wait('@cardInstructions');
+            cy.wait('@hostedCharge');
+            cy.get('[data-test="checkout-hosted"]').should('be.visible');
+            cy.get('[data-test="checkout-hosted-go"]').should('be.visible').click();
+            cy.wait('@asaasHostedRedirect');
+            cy.location('pathname').should('eq', '/panel/my-subscription');
         });
 
         it('link de entrada ?invoice= abre o pagamento da fatura direto', () => {
@@ -650,65 +682,300 @@ describe('Cobrança da clínica — checkout, régua e manager', () => {
 
     // ── Cadastro no site: contratar já pagando ──────────────────────────────
     describe('Cadastro — "Contratar agora"', () => {
-        it('escolher contratar agora mostra o checkout (cadastro e pagamento simulados)', () => {
-            const email = `cy-signup-${Date.now()}@cy-billing.test`;
-            const methods = [
-                { method: 'pix', label: 'Pix', mode: 'transparent' },
-                { method: 'boleto', label: 'Boleto', mode: 'transparent' },
-                { method: 'credit_card', label: 'Cartão de crédito', mode: 'link' },
-            ];
-            // O POST /register real criaria clínica + usuário: simulado (contrato do backend).
+        const SIGNUP_INVOICES = {
+            pix: '7d6bc3d2-338e-4d3b-8cf7-5810d643fa61',
+            boleto: 'df686adb-7d8b-4926-8466-9eb8b90ef7e8',
+            card: '36cc9b15-c582-4244-96cc-6191e1e6acf2',
+            cardFailed: '13512c10-dd62-4162-990a-40d080e29aee',
+        };
+        const RETURN_PLAN_ID = 'f3a1c962-08b6-45f7-a4d7-4b3aaf67a70e';
+        const signupMethods = [
+            { method: 'pix', label: 'Pix', mode: 'transparent' },
+            { method: 'boleto', label: 'Boleto', mode: 'transparent' },
+            { method: 'credit_card', label: 'Cartão de crédito', mode: 'hosted' },
+        ];
+
+        function stubSignupStart(method, reply, onRegistration = null) {
+            let registration = null;
             cy.intercept('POST', '/register', (req) => {
                 expect(req.body.start_mode).to.eq('checkout');
                 expect(req.body.billing_cycle).to.be.a('string');
+                expect(req.body.terms_accepted).to.eq(true);
+                expect(req.body.plan_id).to.match(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
+                registration = { planId: req.body.plan_id, cycle: req.body.billing_cycle };
+                onRegistration?.(registration);
                 req.reply({ redirect: '/panel/dashboard', checkout: { contract: true, options: true, summary: true } });
             }).as('register');
-            cy.intercept('GET', '/signup-checkout/options*', {
-                data: {
-                    plan: { id: 'x', name: 'Pro' },
-                    cycle: 'monthly',
-                    amount: 899.9,
-                    gateway: 'asaas',
-                    methods,
-                    mode: 'link',
-                    card: null,
-                    realtime: null,
-                },
+            cy.intercept('GET', '/signup-checkout/options*', (req) => {
+                expect(registration, 'cadastro antes das opções').to.not.be.null;
+                expect(req.query.plan_id).to.eq(registration.planId);
+                expect(req.query.billing_cycle).to.eq(registration.cycle);
+                req.reply({
+                    data: {
+                        plan: { id: registration.planId, name: 'Pro' },
+                        cycle: registration.cycle,
+                        amount: 899.9,
+                        gateway: 'asaas',
+                        methods: signupMethods,
+                        mode: 'hosted',
+                        card: null,
+                        realtime: null,
+                    },
+                });
             }).as('signupOptions');
             cy.intercept('POST', '/signup-checkout/contract', (req) => {
-                expect(req.body.method).to.eq('pix');
-                req.reply(pixInstructions({ id: 'signup-stub', reference: 'CY-SIGNUP' }));
+                expect(registration, 'cadastro antes do contrato').to.not.be.null;
+                expect(req.body.method).to.eq(method);
+                expect(req.body.plan_id).to.eq(registration.planId);
+                expect(req.body.billing_cycle).to.eq(registration.cycle);
+                req.reply(typeof reply === 'function' ? reply(registration) : reply);
             }).as('signupContract');
+        }
+
+        function createSignup(label) {
+            const email = `cy-signup-${label}-${Date.now()}@cy-billing.test`;
 
             cy.visit('/register');
-            cy.get('form input[type=email]').should('be.visible');
-            cy.get('form')
+            cy.get('[data-testid="register-name"]').type('Cypress Cadastro');
+            cy.get('[data-testid="register-email"]').type(email).blur();
+            cy.get('[data-testid="register-password"]').type('Cadastro@2026!', { log: false });
+            cy.get('[data-testid="register-password-confirmation"]').type('Cadastro@2026!', { log: false });
+            cy.get('[data-testid="register-next"]').click();
+            cy.get('[data-testid="register-plan"]', { timeout: 15000 }).should('have.length.at.least', 1);
+            cy.get('.reg-card .reg-fade-enter-active', { timeout: 15000 }).should('not.exist');
+            cy.get('[data-testid="register-plan"]')
                 .first()
-                .within(() => {
-                    cy.get('input').first().type('Cypress Cadastro');
-                    cy.get('input[type=email]').type(email).blur();
-                    cy.get('input[type=password]').eq(0).type('Cadastro@2026!', { log: false });
-                    cy.get('input[type=password]').eq(1).type('Cadastro@2026!', { log: false });
-                    cy.get('button[type=submit]').click();
-                });
-            cy.get('button[data-mode="checkout"]').should('be.visible').click();
-            cy.get('button[data-mode="checkout"]').should('have.attr', 'aria-checked', 'true');
-            cy.get('form')
+                .scrollIntoView({ offset: { top: -100, left: 0 } });
+            cy.get('[data-testid="register-plan"]').first().should('be.visible');
+            cy.get('[data-testid="register-start-checkout"]', { timeout: 15000 }).scrollIntoView({
+                offset: { top: -100, left: 0 },
+            });
+            cy.get('[data-testid="register-start-checkout"]', { timeout: 15000 })
+                .should('be.visible')
+                .click()
+                .should('have.attr', 'aria-checked', 'true');
+            cy.get('[data-testid="register-plan"]')
                 .first()
-                .within(() => {
-                    cy.get('input').eq(0).type('CY-BILL CADASTRO');
-                    cy.get('input[type=tel], input').eq(1).type('11987654321');
-                    cy.get('[data-testid="terms-accept-checkbox"]').should('be.visible').check();
-                    cy.get('button[type=submit]').click();
-                });
+                .scrollIntoView({ offset: { top: -100, left: 0 } });
+            cy.get('[data-testid="register-plan"]').first().should('be.visible').click();
+            cy.get('[data-testid="register-company-name"]').scrollIntoView({ offset: { top: -100, left: 0 } });
+            cy.get('[data-testid="register-company-name"]').should('be.visible').type(`CY-BILL CADASTRO ${label}`);
+            cy.get('[data-testid="register-company-phone"]').scrollIntoView({ offset: { top: -100, left: 0 } });
+            cy.get('[data-testid="register-company-phone"]').should('be.visible').type('11987654321');
+            cy.get('[data-testid="terms-accept-checkbox"]').scrollIntoView({ offset: { top: -100, left: 0 } });
+            cy.get('[data-testid="terms-accept-checkbox"]').should('be.visible').check();
+            cy.get('[data-testid="register-submit"]').scrollIntoView({ offset: { top: -100, left: 0 } });
+            cy.get('[data-testid="register-submit"]').should('be.visible').click();
             cy.wait('@register');
             cy.wait('@signupOptions');
             cy.get('[data-test="signup-checkout"]').should('be.visible');
+        }
+
+        // O POST /register é interceptado, portanto não há sessão/entidade para
+        // pedir a rota real. Reaproveita o HTML Inertia de /register com a page
+        // prop de retorno, mantendo o bundle Vue real e todos os intercepts.
+        function stubSignupReturn(query, props) {
+            return cy.request('/register').then(({ body }) => {
+                const pageScript = body.match(/<script[^>]*data-page="app"[^>]*>(.*?)<\/script>/s);
+                expect(pageScript, 'script data-page Inertia de /register').to.not.be.null;
+                const page = JSON.parse(pageScript[1]);
+                page.component = 'Auth/SignupCheckoutReturn';
+                page.url = `/signup-checkout/return?${query}`;
+                page.props = { ...page.props, ...props };
+                const pageJson = JSON.stringify(page).replaceAll('</', '<\\/');
+                const html = body.replace(
+                    /(<script[^>]*data-page="app"[^>]*>).*?(<\/script>)/s,
+                    (_match, opening, closing) => `${opening}${pageJson}${closing}`,
+                );
+
+                cy.intercept('GET', '/signup-checkout/return*', {
+                    statusCode: 200,
+                    headers: { 'content-type': 'text/html; charset=UTF-8' },
+                    body: html,
+                }).as('signupReturn');
+            });
+        }
+
+        it('escolher contratar agora mostra o checkout (cadastro e pagamento simulados)', () => {
+            stubSignupStart('pix', pixInstructions({ id: SIGNUP_INVOICES.pix, reference: 'CY-SIGNUP' }));
+            createSignup('smoke');
             cy.get('[data-test="signup-checkout"] button[data-method]').should('have.length', 3);
             cy.get('[data-test="signup-pay-later"]').should('be.visible');
             cy.get('[data-test="signup-checkout"] button[data-method="pix"]').click();
             cy.wait('@signupContract');
             cy.get('[data-test="signup-checkout"] [data-test="checkout-pix"]').should('be.visible');
+        });
+
+        it('Pix: QR, copia e cola, validade e ativação simulada liberam o próximo passo', () => {
+            stubSignupStart('pix', pixInstructions({ id: SIGNUP_INVOICES.pix, reference: 'CY-SIGNUP-PIX' }));
+            cy.intercept('GET', '/signup-checkout/summary', {
+                data: { invoices: [{ id: SIGNUP_INVOICES.pix, status: 'paid' }] },
+            }).as('signupSummary');
+            createSignup('pix');
+            stubClipboard();
+
+            cy.get('[data-test="signup-checkout"] button[data-method="pix"]').click();
+            cy.wait('@signupContract');
+            cy.get('[data-test="pix-qr"]')
+                .should('have.attr', 'src')
+                .and('match', /^data:image\/png;base64,/);
+            cy.get('[data-test="checkout-pix"] textarea, [data-test="checkout-pix"] input').should(
+                'have.value',
+                PIX_CODE,
+            );
+            cy.get('[data-test="pix-expires"]').should('be.visible');
+            cy.get('[data-test="checkout-pix"] [data-test="copy-button"]').click();
+            cy.get('@clipboard').should('have.been.calledWith', PIX_CODE);
+            cy.get('[data-test="checkout-check"]').click();
+            cy.wait('@signupSummary');
+            cy.get('[data-test="checkout-paid"]').should('be.visible');
+            cy.get('[data-test="signup-enter-panel"]').should('be.visible');
+        });
+
+        it('Boleto: linha, PDF, vencimento e ativação simulada liberam o próximo passo', () => {
+            stubSignupStart(
+                'boleto',
+                boletoInstructions({ id: SIGNUP_INVOICES.boleto, reference: 'CY-SIGNUP-BOLETO' }),
+            );
+            cy.intercept('GET', '/signup-checkout/summary', {
+                data: { invoices: [{ id: SIGNUP_INVOICES.boleto, status: 'paid' }] },
+            }).as('signupSummary');
+            createSignup('boleto');
+            stubClipboard();
+
+            cy.get('[data-test="signup-checkout"] button[data-method="boleto"]').click();
+            cy.wait('@signupContract');
+            cy.get('[data-test="checkout-boleto"] textarea, [data-test="checkout-boleto"] input').should(
+                'have.value',
+                BOLETO_LINE,
+            );
+            cy.get('[data-test="boleto-pdf"]')
+                .should('have.attr', 'href')
+                .and('match', /^https:/);
+            cy.get('[data-test="boleto-due"]').should('be.visible');
+            cy.get('[data-test="checkout-boleto"] [data-test="copy-button"]').click();
+            cy.get('@clipboard').should('have.been.calledWith', BOLETO_LINE);
+            cy.get('[data-test="checkout-check"]').click();
+            cy.wait('@signupSummary');
+            cy.get('[data-test="checkout-paid"]').should('be.visible');
+            cy.get('[data-test="signup-enter-panel"]').should('be.visible');
+        });
+
+        it('Cartão hospedado volta aguardando e confirma quando a ativação simulada chega', () => {
+            const invoice = { id: SIGNUP_INVOICES.card, status: 'pending', can_pay: true, awaiting_confirmation: true };
+            let selectedPlanId = null;
+            stubSignupStart(
+                'credit_card',
+                {
+                    data: {
+                        invoice,
+                        mode: 'hosted',
+                        checkout_url: 'https://checkout.example.test/hosted/cy-signup-card',
+                    },
+                },
+                ({ planId }) => (selectedPlanId = planId),
+            );
+            createSignup('card');
+            cy.get('[data-test="signup-checkout"] button[data-method="credit_card"]').click();
+            cy.wait('@signupContract');
+            cy.get('[data-test="checkout-hosted"]').should('be.visible');
+            cy.get('[data-test="checkout-hosted-go"]').should('be.visible').and('contain.text', 'pagamento seguro');
+
+            let summaryReads = 0;
+            cy.intercept('GET', '/signup-checkout/summary', (req) => {
+                summaryReads += 1;
+                req.reply({
+                    data: {
+                        invoices: [{ ...invoice, status: summaryReads > 1 ? 'paid' : 'pending' }],
+                        subscription: {
+                            plan: { id: selectedPlanId },
+                            cycle: 'monthly',
+                            status: summaryReads > 1 ? 'active' : 'past_due',
+                        },
+                        realtime: null,
+                    },
+                });
+            }).as('signupSummary');
+            stubSignupReturn(`checkout_return=success&checkout_invoice=${invoice.id}`, {
+                status: 'success',
+                invoice,
+                subscription_active: false,
+                next_step: 'verify_email',
+                next_url: '/verify-email',
+                summary_url: '/signup-checkout/summary',
+            });
+            cy.intercept('GET', 'https://checkout.example.test/hosted/cy-signup-card', (req) => {
+                req.redirect(
+                    `${Cypress.config('baseUrl')}/signup-checkout/return?checkout_return=success&checkout_invoice=${invoice.id}`,
+                );
+            }).as('hostedRedirect');
+            cy.get('[data-test="checkout-hosted-go"]').click();
+            cy.wait('@hostedRedirect');
+            cy.wait('@signupReturn');
+            cy.get('[data-testid="checkout-return-status"]').should('contain.text', 'Aguardando');
+            cy.get('[data-testid="checkout-return-status"]').should('not.contain.text', 'Pagamento confirmado');
+            cy.get('[data-testid="checkout-return-status"]').should('be.visible');
+            cy.get('.signup-return-refresh').click();
+            cy.wait('@signupSummary');
+            cy.get('[data-testid="checkout-return-status"]').should('contain.text', 'Pagamento confirmado');
+            cy.get('[data-testid="checkout-return-next"]').should('contain.text', 'Verificar e-mail');
+        });
+
+        it('Cartão recusado retorna failed/can_pay e permite uma nova tentativa', () => {
+            const failedInvoice = {
+                id: SIGNUP_INVOICES.cardFailed,
+                status: 'failed',
+                can_pay: true,
+                awaiting_confirmation: false,
+            };
+            cy.intercept('GET', '/signup-checkout/summary', {
+                data: {
+                    invoices: [failedInvoice],
+                    subscription: { plan: { id: RETURN_PLAN_ID }, cycle: 'monthly', status: 'past_due' },
+                    realtime: null,
+                },
+            }).as('signupSummary');
+            cy.intercept('GET', '/signup-checkout/options*', (req) => {
+                expect(req.query.plan_id).to.eq(RETURN_PLAN_ID);
+                expect(req.query.billing_cycle).to.eq('monthly');
+                req.reply({
+                    data: {
+                        plan: { id: RETURN_PLAN_ID, name: 'Pro' },
+                        cycle: 'monthly',
+                        amount: 899.9,
+                        gateway: 'asaas',
+                        methods: signupMethods,
+                        realtime: null,
+                    },
+                });
+            }).as('signupOptions');
+            cy.intercept('POST', '/signup-checkout/contract', (req) => {
+                expect(req.body.method).to.eq('credit_card');
+                expect(req.body.plan_id).to.eq(RETURN_PLAN_ID);
+                expect(req.body.billing_cycle).to.eq('monthly');
+                req.reply({
+                    data: {
+                        invoice: failedInvoice,
+                        mode: 'hosted',
+                        checkout_url: 'https://checkout.example.test/hosted/retry',
+                    },
+                });
+            }).as('signupRetry');
+            stubSignupReturn(`checkout_return=cancel&checkout_invoice=${failedInvoice.id}`, {
+                status: 'cancel',
+                invoice: failedInvoice,
+                subscription_active: false,
+                next_step: 'verify_email',
+                next_url: '/verify-email',
+                summary_url: '/signup-checkout/summary',
+            });
+            cy.visit(`/signup-checkout/return?checkout_return=cancel&checkout_invoice=${failedInvoice.id}`);
+            cy.wait('@signupReturn');
+            cy.get('[data-testid="checkout-return-status"]').should('contain.text', 'não foi concluído');
+            cy.wait('@signupOptions');
+            cy.get('[data-test="signup-checkout"] button[data-method="credit_card"]').click();
+            cy.wait('@signupRetry');
+            cy.get('[data-test="checkout-hosted-go"]').should('be.visible').and('contain.text', 'pagamento seguro');
         });
     });
 });
