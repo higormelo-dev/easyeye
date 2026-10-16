@@ -24,7 +24,9 @@ Route::middleware('guest')->group(function () {
         ->middleware('checkout.csp')
         ->name('register');
 
+    // Limite por IP (enumeração de contas) — AppServiceProvider 'register-check-email'.
     Route::get('register/check-email', [RegisteredUserController::class, 'checkEmail'])
+        ->middleware('throttle:register-check-email')
         ->name('register.check-email');
 
     // Limite por IP (card testing por contas em série) — AppServiceProvider 'register'.

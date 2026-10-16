@@ -98,6 +98,8 @@ return [
             'signup_unverified_declines'  => (int) env('BILLING_CHECKOUT_SIGNUP_UNVERIFIED_DECLINES', 1),
             'register_per_ip_hour'        => (int) env('BILLING_REGISTER_PER_IP_HOUR', 10),
             'register_per_ip_day'         => (int) env('BILLING_REGISTER_PER_IP_DAY', 30),
+            // GET /register/check-email (existência da conta): consultas por minuto, por IP.
+            'check_email_per_ip_minute' => (int) env('BILLING_CHECK_EMAIL_PER_IP_MINUTE', 20),
         ],
     ],
 

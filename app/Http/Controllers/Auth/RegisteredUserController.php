@@ -20,10 +20,6 @@ class RegisteredUserController extends Controller
     {
         $trialDays = SubscriptionSetting::trialDays();
 
-        if ($trialDays <= 0) {
-            return redirect()->to(route('site.home') . '#contato');
-        }
-
         $plans = Plan::active()
             ->with(['features' => fn ($q) => $q->orderBy('feature'), 'prices'])
             ->orderBy('sort_order')
@@ -47,6 +43,36 @@ class RegisteredUserController extends Controller
                     'enabled'       => $f->feature->isBoolean() ? $f->boolValue() : true,
                 ])->toArray(),
             ]);
+
+        // Teste grátis desligado: o cadastro segue aberto para CONTRATAR PAGANDO (Pix, boleto ou
+        // cartão na hora) — só some a opção gratuita. Sem plano pago à venda, não há o que
+        // contratar: encaminha ao contato, como antes.
+        if ($trialDays <= 0) {
+            // Por CICLO, não pelo preço do plano: plano com mensal 0 e anual > 0 é vendável (só o ciclo pago fica).
+            $plans = $plans
+                ->map(function (array $plan) {
+                    $plan['prices'] = array_values(array_filter($plan['prices'], static fn (array $row) => (float) $row['price'] > 0));
+
+                    if ($plan['prices'] !== []) {
+                        $cycles = array_column($plan['prices'], 'cycle');
+
+                        if (! in_array($plan['default_cycle'], $cycles, true)) {
+                            $plan['default_cycle'] = $plan['prices'][0]['cycle'];
+                            $plan['price']         = $plan['prices'][0]['price'];
+                        }
+
+                        $plan['is_free'] = false;
+                    }
+
+                    return $plan;
+                })
+                ->reject(fn (array $plan) => $plan['prices'] === [])
+                ->values();
+
+            if ($plans->isEmpty()) {
+                return redirect()->to(route('site.home') . '#contato');
+            }
+        }
 
         // Resolve against the active catalogue, without querying untrusted UUIDs.
         $requestedPlan = $request->query('plan');
@@ -87,7 +113,10 @@ class RegisteredUserController extends Controller
      */
     public function checkEmail(Request $request): JsonResponse
     {
-        $exists = User::where('email', $request->string('email')->lower()->toString())->exists();
+        // Só e-mail de verdade (e curto): nada de array, lixo ou texto enorme indo ao banco.
+        $request->validate(['email' => ['required', 'string', 'email:rfc', 'max:254']]);
+
+        $exists = User::where('email', mb_strtolower(trim((string) $request->input('email'))))->exists();
 
         return response()->json(['available' => ! $exists]);
     }
@@ -119,14 +148,19 @@ class RegisteredUserController extends Controller
             'user_rule'                 => $entityUser->rule,
         ]);
 
+        // O corpo carrega o token CSRF da sessão recém-autenticada: a resposta não pode
+        // ser guardada por navegador/proxy (no-store) e o corpo não vai a log (nada aqui
+        // nem em middleware registra resposta; RegistrationTest fixa os dois).
         return response()->json([
             'redirect' => route('panel.dashboard', absolute: false),
+            // O login renova a sessão; o checkout continua na mesma página.
+            'csrf_token' => $request->session()->token(),
             // Contratar já pagando: o front segue para o checkout do cadastro.
             'checkout' => $checkout ? [
                 'contract' => route('signup-checkout.contract', absolute: false),
                 'options'  => route('signup-checkout.options', absolute: false),
                 'summary'  => route('signup-checkout.summary', absolute: false),
             ] : null,
-        ]);
+        ], headers: ['Cache-Control' => 'no-store, private', 'Pragma' => 'no-cache']);
     }
 }

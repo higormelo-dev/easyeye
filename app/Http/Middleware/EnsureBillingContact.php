@@ -18,7 +18,8 @@ use Symfony\Component\HttpFoundation\Response;
  * confirmar e-mail/WhatsApp, fora do grupo /panel): só para clínica recém-
  * criada (até SIGNUP_WINDOW_DAYS) que nunca pagou, para que esse caminho sem
  * as verificações do painel não sirva para mexer na assinatura de uma clínica
- * que já existe.
+ * que já existe. O resumo continua acessível nessa janela após pagar, para
+ * a tela conseguir confirmar o primeiro pagamento; novas operações não.
  */
 class EnsureBillingContact
 {
@@ -42,7 +43,7 @@ class EnsureBillingContact
             throw CheckoutException::make('forbidden', 403);
         }
 
-        if ($mode === 'signup' && ! $this->isFreshSignup($entity)) {
+        if ($mode === 'signup' && ! $this->isFreshSignup($entity, allowPaid: $request->routeIs('signup-checkout.summary'))) {
             throw CheckoutException::make('signup_only', 403);
         }
 
@@ -51,10 +52,10 @@ class EnsureBillingContact
         return $next($request);
     }
 
-    private function isFreshSignup(Entity $entity): bool
+    private function isFreshSignup(Entity $entity, bool $allowPaid = false): bool
     {
         return $entity->created_at !== null
             && $entity->created_at->greaterThanOrEqualTo(now()->subDays(self::SIGNUP_WINDOW_DAYS))
-            && ! Subscription::query()->forEntity((string) $entity->id)->whereNotNull('last_payment_at')->exists();
+            && ($allowPaid || ! Subscription::query()->forEntity((string) $entity->id)->whereNotNull('last_payment_at')->exists());
     }
 }

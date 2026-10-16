@@ -440,6 +440,14 @@ class CheckoutService
 
             if ($pending !== null && ($invoice = $this->payableInvoices($pending)->first()) !== null) {
                 if ($method->isCard()) {
+                    // A capacidade do gateway vem ANTES do token: no checkout hospedado/link do Asaas o cartão é
+                    // digitado no ambiente do gateway e não existe card_token. Exigi-lo aqui deixava a clínica
+                    // presa em card_token_required para sempre quando a 1ª resposta se perdia (ou a abertura do
+                    // hospedado falhava depois de criar a assinatura): o front repete sem token e com chave nova.
+                    if (! $this->gatewayFor($pending)->supportsTransparent(CheckoutMethod::Card->value)) {
+                        return ['subscription' => $this->subscriptionRow($pending, true), ...$this->instructionsFor($pending, $invoice, $method, issue: true)];
+                    }
+
                     if ($card === null) {
                         throw CheckoutException::make('card_token_required');
                     }
@@ -454,6 +462,21 @@ class CheckoutService
 
             return $this->activate($entity, $plan, $cycle, $method, $card, $amount);
         });
+    }
+
+    /**
+     * Códigos de erro do gateway (ex.: invalid_cpfCnpj) na mensagem da exceção, que traz só "HTTP {status} {códigos}"
+     * (AsaasGateway::errorMessage()) — nunca a descrição.
+     *
+     * @return list<string>
+     */
+    private function gatewayErrorCodes(string $message): array
+    {
+        if (preg_match('/HTTP \d{3} ([A-Za-z0-9_.\-]+(?:, [A-Za-z0-9_.\-]+)*)/', $message, $match) !== 1) {
+            return [];
+        }
+
+        return array_slice(array_values(array_unique(explode(', ', $match[1]))), 0, 5);
     }
 
     /** @return array<string, mixed> */
@@ -488,7 +511,17 @@ class CheckoutService
                 throw $this->declined($checkout->outcome->declineMessage);
             }
 
-            Log::warning('Checkout: contratação falhou no gateway.', ['entity_id' => $entity->id, 'error' => $e->getMessage()]);
+            // Só o que diagnostica: gateway, trigger, status HTTP, código(s) do erro do gateway e a
+            // correlação. NUNCA a mensagem/corpo da resposta: a descrição do gateway pode ecoar o
+            // CPF/CNPJ, e-mail ou telefone que enviamos (dado pessoal no log).
+            Log::warning('Checkout: contratação falhou no gateway.', [
+                'entity_id'      => $entity->id,
+                'gateway'        => $gateway->code(),
+                'trigger'        => $e->getTriggerType(),
+                'http_status'    => $e->httpStatus(),
+                'error_codes'    => $this->gatewayErrorCodes($e->getMessage()),
+                'correlation_id' => app(CorrelationIdService::class)->resolve(),
+            ]);
 
             throw CheckoutException::make('gateway_error', 502);
         } catch (SubscriptionSupersededException) {

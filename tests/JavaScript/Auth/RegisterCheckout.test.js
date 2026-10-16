@@ -7,7 +7,7 @@ import Register from '@/Pages/Auth/Register.vue';
  * Cadastro no site: "Testar grátis" (trial) ou "Contratar agora" (sem trial,
  * segue para o pagamento no próprio site — signup-checkout.*).
  */
-vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn(), defaults: { headers: { common: {} } } } }));
 vi.mock('@/Layouts/SiteLayout.vue', () => ({ default: { template: '<div><slot /></div>' } }));
 vi.mock('@inertiajs/vue3', () => ({ Head: { render: () => null } }));
 vi.mock('@/echo.js', () => ({}));
@@ -93,7 +93,11 @@ async function mountAtCompanyStep(extraProps = {}) {
 }
 
 beforeEach(() => vi.clearAllMocks());
-afterEach(() => wrapper?.unmount());
+afterEach(() => {
+    wrapper?.unmount();
+    document.querySelector('meta[name="csrf-token"]')?.remove();
+    delete axios.defaults.headers.common['X-CSRF-TOKEN'];
+});
 
 describe('Cadastro — como começar', () => {
     it('padrão é o teste grátis (start_mode=trial) e segue para o painel', async () => {
@@ -112,9 +116,15 @@ describe('Cadastro — como começar', () => {
     });
 
     it('"Contratar agora": cria a conta sem trial e abre o pagamento no próprio site', async () => {
+        const meta = document.createElement('meta');
+        meta.name = 'csrf-token';
+        meta.content = 'csrf-anterior-ao-login';
+        document.head.appendChild(meta);
+        axios.defaults.headers.common['X-CSRF-TOKEN'] = meta.content;
         axios.post.mockResolvedValue({
             data: {
                 redirect: '/panel/dashboard',
+                csrf_token: 'csrf-renovado-pelo-login',
                 checkout: { contract: '/signup-checkout/contract', options: '/signup-checkout/options' },
             },
         });
@@ -137,6 +147,8 @@ describe('Cadastro — como começar', () => {
             expect.objectContaining({ start_mode: 'checkout', plan_id: 'pro', billing_cycle: 'yearly' }),
         );
         const checkout = wrapper.getComponent({ name: 'SignupCheckout' });
+        expect(axios.defaults.headers.common['X-CSRF-TOKEN']).toBe('csrf-renovado-pelo-login');
+        expect(meta.content).toBe('csrf-renovado-pelo-login');
         expect(checkout.props()).toMatchObject({ planId: 'pro', cycle: 'yearly', redirect: '/panel/dashboard' });
         expect(wrapper.get('.reg-card-title').text()).toBe('Pagamento da assinatura');
         expect(wrapper.get('.reg-card-subtitle').text()).toBe('Pro — Anual');

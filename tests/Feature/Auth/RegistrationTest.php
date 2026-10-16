@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\{Plan, Subscription, SubscriptionSetting, User};
 use App\Services\TrialService;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\{Cache, Event};
 use Illuminate\Support\Str;
 
@@ -89,6 +90,55 @@ describe('Fluxo de registro', function () {
     });
 
     // ── Cenário 2: sem plan_id → fallback para menor tier ────────────────────
+
+    it('devolve o CSRF renovado pelo login para continuar o checkout sem recarregar', function (string $mode) {
+        $plan     = Plan::factory()->create(['sort_order' => 1]);
+        $oldToken = str_repeat('a', 40);
+
+        $response = $this->withSession(['_token' => $oldToken])->postJson('/register', registrationPayload([
+            'plan_id'    => $plan->id,
+            'start_mode' => $mode,
+        ]));
+
+        $response->assertOk()->assertJsonStructure(['csrf_token']);
+        $newToken = $response->json('csrf_token');
+        expect($newToken)->toBeString()->toHaveLength(40)->not->toBe($oldToken);
+        $response->assertSessionHas('_token', $newToken);
+        $this->assertAuthenticated();
+    })->with(['trial', 'checkout']);
+
+    it('[SEGURANÇA] a resposta que carrega o CSRF da sessão nunca vai para cache (no-store) — nos dois modos', function (string $mode) {
+        $plan = Plan::factory()->create(['sort_order' => 1]);
+
+        $response = $this->postJson('/register', registrationPayload([
+            'plan_id'    => $plan->id,
+            'start_mode' => $mode,
+        ]))->assertOk()->assertJsonStructure(['csrf_token']);
+
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+
+        expect($cacheControl)->toContain('no-store')
+            ->and($cacheControl)->toContain('private');
+    })->with(['trial', 'checkout']);
+
+    it('[SEGURANÇA] o CSRF devolvido no corpo do /register não vai para nenhum log da requisição', function (string $mode) {
+        $plan   = Plan::factory()->create(['sort_order' => 1]);
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged) {
+            $logged[] = $event->message . ' ' . json_encode($event->context, JSON_PARTIAL_OUTPUT_ON_ERROR);
+        });
+
+        $token = $this->postJson('/register', registrationPayload([
+            'plan_id'    => $plan->id,
+            'start_mode' => $mode,
+        ]))->assertOk()->json('csrf_token');
+
+        expect($token)->toBeString()->not->toBeEmpty();
+
+        foreach ($logged as $line) {
+            expect(str_contains($line, $token))->toBeFalse('o token CSRF apareceu num log: ' . substr($line, 0, 200));
+        }
+    })->with(['trial', 'checkout']);
 
     it('cria assinatura usando o menor plano ativo quando nenhum plano é especificado', function () {
         $cheaper = Plan::factory()->create(['sort_order' => 1]);

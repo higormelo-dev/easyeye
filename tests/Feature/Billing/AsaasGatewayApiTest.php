@@ -208,7 +208,7 @@ it('recusa (4xx) devolve o erro no formato errors[].code/description e o status 
 
     expect($result->success)->toBeFalse()
         ->and($result->httpStatus)->toBe(400)
-        ->and($result->errorMessage)->toBe('HTTP 400 invalid_customer: Cliente inválido ou não informado.');
+        ->and($result->errorMessage)->toBe('HTTP 400 invalid_customer');
 });
 
 it('2xx sem id não conta como criada e deixa o status nulo (o orquestrador confere pela referência)', function () {
@@ -337,7 +337,7 @@ it('celular vai em mobilePhone e fixo em phone (fixo em mobilePhone é recusado)
     'sem telefone'    => [null, []],
 ]);
 
-it('falha na criação do cliente vira exceção com a descrição do Asaas', function () {
+it('falha na criação do cliente vira exceção com o CÓDIGO do Asaas (nunca a descrição, que pode ecoar dado pessoal)', function () {
     Http::fake(function (Request $r) {
         return $r->method() === 'GET'
             ? Http::response(['object' => 'list', 'hasMore' => false, 'totalCount' => 0, 'data' => []])
@@ -345,7 +345,7 @@ it('falha na criação do cliente vira exceção com a descrição do Asaas', fu
     });
 
     expect(fn () => agwGateway()->upsertCustomer(agwCustomer()))
-        ->toThrow(GatewayIntegrationException::class, 'O CPF/CNPJ informado é inválido.');
+        ->toThrow(GatewayIntegrationException::class, 'HTTP 400 invalid_cpfCnpj');
 });
 
 // ── DELETE /v3/subscriptions/{id} ────────────────────────────────────────────
@@ -382,7 +382,7 @@ it('404 no DELETE sem confirmação de que foi removida (ex.: URL errada) segue 
     $result = agwCancel();
 
     expect($result->success)->toBeFalse()
-        ->and($result->errorMessage)->toBe('HTTP 404 not_found: Não encontrado.');
+        ->and($result->errorMessage)->toBe('HTTP 404 not_found');
 });
 
 it('5xx no DELETE é falha (o job tenta de novo)', function () {

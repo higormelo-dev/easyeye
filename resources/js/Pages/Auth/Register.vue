@@ -218,6 +218,12 @@ async function submit() {
             ...(props.turnstileSiteKey ? { turnstile_token: turnstileToken.value } : {}),
         };
         const { data } = await axios.post('/register', payload);
+        // O login automático renova o CSRF. Atualiza antes de carregar o
+        // checkout e o Echo, que autenticam sem recarregar esta página.
+        if (data.csrf_token) {
+            axios.defaults.headers.common['X-CSRF-TOKEN'] = data.csrf_token;
+            document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', data.csrf_token);
+        }
         if (startMode.value === 'checkout' && data.checkout && currentOffer.value?.cycle) {
             // Conta criada (e logada): segue para o pagamento sem sair do site.
             signup.value = {
@@ -447,6 +453,7 @@ const showPwd2 = ref(false);
                                             v-model="form.name"
                                             type="text"
                                             class="reg-input"
+                                            data-testid="register-name"
                                             :class="{ 'is-error': errors.name }"
                                             autocomplete="name"
                                             autofocus
@@ -463,6 +470,7 @@ const showPwd2 = ref(false);
                                                 v-model="form.email"
                                                 type="email"
                                                 class="reg-input"
+                                                data-testid="register-email"
                                                 :class="{
                                                     'is-error': errors.email,
                                                     'is-success': emailAvailable === true && !emailChecking,
@@ -503,6 +511,7 @@ const showPwd2 = ref(false);
                                                 v-model="form.password"
                                                 :type="showPwd1 ? 'text' : 'password'"
                                                 class="reg-input"
+                                                data-testid="register-password"
                                                 :class="{ 'is-error': errors.password }"
                                                 autocomplete="new-password"
                                             />
@@ -544,6 +553,7 @@ const showPwd2 = ref(false);
                                                 v-model="form.password_confirmation"
                                                 :type="showPwd2 ? 'text' : 'password'"
                                                 class="reg-input"
+                                                data-testid="register-password-confirmation"
                                                 :class="{ 'is-error': errors.password_confirmation }"
                                                 autocomplete="new-password"
                                             />
@@ -561,7 +571,12 @@ const showPwd2 = ref(false);
                                         }}</span>
                                     </div>
 
-                                    <button type="submit" class="reg-btn reg-btn-primary" style="margin-top: 8px">
+                                    <button
+                                        type="submit"
+                                        class="reg-btn reg-btn-primary"
+                                        style="margin-top: 8px"
+                                        data-testid="register-next"
+                                    >
                                         {{ tAuth.register?.next }}
                                         <i class="ti ti-arrow-right"></i>
                                     </button>
@@ -584,6 +599,7 @@ const showPwd2 = ref(false);
                                             v-model="form.company_name"
                                             type="text"
                                             class="reg-input"
+                                            data-testid="register-company-name"
                                             :class="{ 'is-error': errors.company_name }"
                                             autocomplete="organization"
                                         />
@@ -603,6 +619,7 @@ const showPwd2 = ref(false);
                                             type="tel"
                                             inputmode="numeric"
                                             class="reg-input"
+                                            data-testid="register-company-phone"
                                             :class="{ 'is-error': errors.company_phone }"
                                             autocomplete="tel"
                                             placeholder="(00) 00000-0000"
@@ -643,6 +660,7 @@ const showPwd2 = ref(false);
                                                 :key="plan.id"
                                                 type="button"
                                                 class="plan-grid-card"
+                                                data-testid="register-plan"
                                                 :class="{ selected: selectedPlan === plan.id }"
                                                 :aria-pressed="selectedPlan === plan.id"
                                                 @click="selectPlan(plan.id)"
@@ -755,6 +773,7 @@ const showPwd2 = ref(false);
                                             :class="{ selected: startMode === 'checkout' }"
                                             :aria-checked="startMode === 'checkout'"
                                             data-mode="checkout"
+                                            data-testid="register-start-checkout"
                                             @click="startMode = 'checkout'"
                                         >
                                             <i class="ti ti-credit-card" aria-hidden="true"></i>
@@ -782,7 +801,12 @@ const showPwd2 = ref(false);
                                         <button type="button" class="reg-btn reg-btn-secondary" @click="prevStep">
                                             <i class="ti ti-arrow-left"></i> {{ tAuth.register?.back }}
                                         </button>
-                                        <button type="submit" class="reg-btn reg-btn-primary" :disabled="loading">
+                                        <button
+                                            type="submit"
+                                            class="reg-btn reg-btn-primary"
+                                            :disabled="loading"
+                                            data-testid="register-submit"
+                                        >
                                             <span v-if="!loading && startMode === 'checkout'">
                                                 {{ tAuth.register?.create_and_pay }}
                                                 <i class="ti ti-arrow-right"></i>

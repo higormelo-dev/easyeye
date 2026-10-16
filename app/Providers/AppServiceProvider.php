@@ -292,6 +292,19 @@ class AppServiceProvider extends ServiceProvider
         // série para testar cartões (card testing) pelo checkout do cadastro.
         $signupTooMany = static fn () => response()->json(['message' => __('auth.register.too_many_signups')], 429);
 
+        // GET /register/check-email devolve se o e-mail já tem conta (o passo do wizard precisa):
+        // sem limite, qualquer um enumeraria contas. Por IP, por minuto.
+        // ATENÇÃO: "IP" aqui é Request::ip(), e bootstrap/app.php confia em TODOS os proxies — então o limite
+        // segue o X-Forwarded-For e é contornável por quem rotaciona o cabeçalho (vale para todo throttle do app,
+        // login/OTP inclusive). Restringir trustProxies ao nginx/CDN (TRUSTED_PROXIES) é DECISÃO DO USUÁRIO/infra,
+        // pendente; o comportamento atual está documentado em RegistrationPageTest ([S2-b]).
+        RateLimiter::for(
+            'register-check-email',
+            static fn (Request $r) => Limit::perMinute(max(1, (int) config('billing.checkout.fraud.check_email_per_ip_minute', 20)))
+                ->by('register:check-email:' . $r->ip())
+                ->response($signupTooMany),
+        );
+
         RateLimiter::for(
             'register',
             static fn (Request $r) => [

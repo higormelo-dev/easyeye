@@ -65,7 +65,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         $response = $this->post('customers', $payload);
 
         if (! $response->successful()) {
-            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $response->body());
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->failureMessage($response));
         }
 
         return (string) $this->extractString($response->json(), ['id', 'customer.id', 'data.id']);
@@ -83,7 +83,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
                 externalCustomerId: null,
                 status: null,
                 rawResponse: $response->json() ?? [],
-                errorMessage: mb_substr($response->body(), 0, 1000),
+                errorMessage: $this->failureMessage($response),
                 httpStatus: $response->status(),
             );
         }
@@ -119,7 +119,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
                 success: false,
                 status: null,
                 rawResponse: $response->json() ?? [],
-                errorMessage: mb_substr($response->body(), 0, 1000),
+                errorMessage: $this->failureMessage($response),
             );
         }
 
@@ -148,7 +148,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
                 amount: null,
                 rawResponse: $this->sanitizePayload($response->json() ?? []),
                 errorCode: (string) $response->status(),
-                errorMessage: mb_substr($response->body(), 0, 1000),
+                errorMessage: $this->failureMessage($response),
             );
         }
 
@@ -168,7 +168,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
         $response = $this->request('GET', 'payments', [], ['id' => $externalPaymentId]);
 
         if (! $response->successful()) {
-            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $response->body());
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->failureMessage($response));
         }
 
         return $this->sanitizePayload($response->json() ?? []);
@@ -708,6 +708,15 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
     }
 
     // ── Resolução de credenciais ─────────────────────────────────────────────
+
+    /**
+     * Texto de uma resposta de erro do gateway para exceção, log e billing_logs. Único ponto de saída: por
+     * padrão o corpo (limitado); gateway cuja resposta pode ecoar dado pessoal sobrescreve (AsaasGateway).
+     */
+    protected function failureMessage(Response $response): string
+    {
+        return mb_substr($response->body(), 0, 1000);
+    }
 
     protected function resolveSecret(): ?string
     {

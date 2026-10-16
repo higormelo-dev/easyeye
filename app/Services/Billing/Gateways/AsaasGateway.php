@@ -356,7 +356,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
                 externalCustomerId: null,
                 status: null,
                 rawResponse: is_array($json) ? $json : [],
-                errorMessage: 'Resposta do Asaas sem o id da assinatura: ' . mb_substr($response->body(), 0, 500),
+                errorMessage: 'Resposta do Asaas sem o id da assinatura: ' . $this->errorMessage($response),
                 httpStatus: null,
             );
         }
@@ -424,7 +424,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         }
 
         if (! $response->successful()) {
-            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $response->body());
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
         }
 
         $json   = $response->json() ?? [];
@@ -448,7 +448,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         $response = $this->get('subscriptions', ['externalReference' => $externalReference, 'limit' => 100]);
 
         if (! $response->successful()) {
-            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $response->body());
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
         }
 
         return collect((array) $response->json('data', []))
@@ -497,7 +497,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
             $response = $this->get('subscription_payments', ['limit' => 100, 'offset' => $offset], ['id' => $externalSubscriptionId]);
 
             if (! $response->successful()) {
-                throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $response->body());
+                throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
             }
 
             foreach ((array) $response->json('data', []) as $row) {
@@ -1637,13 +1637,13 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
     private function normalizeAsaasPaymentStatus(string $status): string
     {
         return match (strtoupper($status)) {
-            'RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED' => 'paid',
+            'RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED'               => 'paid',
             'PENDING', 'AWAITING_RISK_ANALYSIS', 'REFUND_REQUESTED', 'REFUND_IN_PROGRESS' => 'pending',
-            'OVERDUE', 'DUNNING_REQUESTED' => 'failed',
-            'REFUNDED' => 'refunded',
-            'CHARGEBACK_REQUESTED', 'CHARGEBACK_DISPUTE' => 'chargeback',
-            'CANCELLED', 'DELETED' => 'cancelled',
-            default => strtolower($status),
+            'OVERDUE', 'DUNNING_REQUESTED'                                                => 'failed',
+            'REFUNDED'                                                                    => 'refunded',
+            'CHARGEBACK_REQUESTED', 'CHARGEBACK_DISPUTE'                                  => 'chargeback',
+            'CANCELLED', 'DELETED'                                                        => 'cancelled',
+            default                                                                       => strtolower($status),
         };
     }
 
@@ -1665,14 +1665,41 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
     {
         $errors = $response->json('errors');
 
-        $message = collect(is_array($errors) ? $errors : [])
-            ->map(fn ($error) => is_array($error)
-                ? implode(': ', array_filter([(string) ($error['code'] ?? ''), (string) ($error['description'] ?? '')], 'strlen'))
-                : '')
-            ->filter()
-            ->implode('; ');
+        // SÓ o status e os CÓDIGOS do erro (ex.: invalid_cpfCnpj). Nunca a descrição nem o corpo: ambos podem
+        // ecoar o que enviamos (nome, endereço, CPF/CNPJ, e-mail, telefone) e não há regex que pegue nome ou
+        // endereço. Também é o ÚNICO ponto de saída de texto de erro do Asaas (failureMessage() aponta para cá).
+        $codes = collect(is_array($errors) ? $errors : [])
+            ->map(fn ($error) => is_array($error) ? (string) ($error['code'] ?? '') : '')
+            ->filter(fn (string $code) => preg_match('/^[A-Za-z0-9_.\-]{1,60}$/', $code) === 1)
+            ->unique()
+            ->take(5)
+            ->implode(', ');
 
-        return mb_substr($message !== '' ? "HTTP {$response->status()} {$message}" : $response->body(), 0, 1000);
+        return $this->scrubPersonalData("HTTP {$response->status()}" . ($codes !== '' ? " {$codes}" : ''));
+    }
+
+    protected function failureMessage(Response $response): string
+    {
+        return $this->errorMessage($response);
+    }
+
+    /**
+     * A descrição do erro do Asaas pode ecoar o que enviamos (CPF/CNPJ, e-mail, telefone). Esta
+     * mensagem vira texto de exceção e entra em log e em billing_logs: sai sem o dado pessoal, só
+     * com o código e a parte técnica da descrição.
+     */
+    private function scrubPersonalData(string $text): string
+    {
+        return (string) preg_replace(
+            [
+                '/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i',   // e-mail
+                '/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/', // CNPJ
+                '/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/',          // CPF
+                '/(?<![\w])\+?\d[\d ().\-]{8,}\d(?![\w])/',      // telefone / número longo
+            ],
+            ['[e-mail]', '[cnpj]', '[cpf]', '[número]'],
+            $text,
+        );
     }
 
     /**
