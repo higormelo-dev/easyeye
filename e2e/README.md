@@ -50,9 +50,26 @@ comum toca gateway:
 
 ```bash
 e2e/scripts/sandbox-run.sh                      # roda o spec de sandbox
-CYPRESS_SANDBOX_PAUSE=1 e2e/scripts/sandbox-run.sh   # pausa para pagar à mão no Asaas
+CYPRESS_SANDBOX_PAUSE=1 e2e/scripts/sandbox-run.sh   # pagamento à mão no Asaas: inclui o cartão (a URL sai no terminal)
 e2e/scripts/sandbox-run.sh --spec cypress/e2e/sandbox/signup-checkout-sandbox.cy.js   # argumentos vão ao `cypress run`
 ```
+
+**O cartão é pago fora do Cypress.** O "Pagar" do Asaas Checkout é protegido por **reCAPTCHA Enterprise**, que pontua o
+navegador: a janela do Cypress (`navigator.webdriver`, flags de automação e o User-Agent `EasyEye-E2E-Sandbox` do modo
+túnel) é recusada — também com o clique de uma pessoa nela (`POST /checkoutSession/pay` → "Tente novamente e verifique o
+recaptcha." e a página recarrega vazia). Por isso os dois casos de cartão (aprovado e recusado) **só rodam com
+`CYPRESS_SANDBOX_PAUSE=1`**: o spec cadastra, escolhe cartão, abre a sessão do Asaas só para **ler** (afirma que a página
+abre com o valor da fatura), **imprime a URL do checkout em destaque no terminal** (bloco entre linhas `====`) e espera o
+webhook por até **5 minutos** sem preencher nada. Você abre a URL **no seu navegador** (não na janela do Cypress) e paga
+com o cartão de teste: **`4444 4444 4444 4444` (aprovado)** ou **`5184 0197 4037 3151` (recusado)**, validade futura,
+CVV `123`. A página do Asaas vem **vazia** (o Checkout só aceita cliente com endereço completo e o cadastro da clínica não
+tem endereço): digite e-mail, nome, CPF/CNPJ, celular e endereço (ex.: CEP `01310-100`, número `1000`). Não precisa de
+`--headed`: o Cypress só espera. Depois do webhook o spec **visita a página de retorno** que o Asaas usaria na
+`successUrl` — `/signup-checkout/return?checkout_return=success` (ou `cancel`) `&checkout_invoice=<uuid da fatura>`, sem
+token assinado (vale pela sessão do cadastro) — e afirma o status; o **redirecionamento** do Asaas para ela, no seu
+navegador, é só UX e o spec **não o exercita**. Sem `PAUSE=1` os dois casos de cartão são **pulados** (antes de
+cadastrar qualquer coisa; Pix e boleto rodam normalmente). `PAUSE=1` **não pausa** o teste (sem `cy.pause()`): o spec
+instrui no terminal e no log, o polling do webhook corre enquanto você paga e o teto da espera sobe de 3 para 5 minutos.
 
 Ele confere `billing:gateway-environment asaas` == `sandbox` (credencial efetiva: a do Manager vence o `.env`) e que
 **não há config em cache** nem `APP_ENV` fora de local/testing (lidos pelo bootstrap do próprio Laravel, só leitura, então
@@ -60,7 +77,8 @@ vale também `APP_CONFIG_CACHE` definido no `.env`: com cache o Laravel ignora o
 manda rodar `php artisan config:clear`, sem limpar o cache por você), sobe `ngrok http 8086`
 numa instância própria (config temporário com a interface web numa porta livre: a URL vem só do ngrok que ele iniciou,
 do túnel https cujo `config.addr` aponta para `:8086`; sem esse túnel, aborta), exporta `APP_URL=<url do túnel>` (serve,
-webhook e Cypress leem a mesma configuração; o `.env` não é tocado e o `composer dev` da 8085 segue como está), sobe
+webhook e Cypress leem a mesma configuração; o `.env` não é tocado e o `composer dev` da 8085 segue de pé), **move o
+`public/hot` do Vite dev** para o diretório temporário do script (veja abaixo), sobe
 `php artisan serve --port=8086 --no-reload`, registra o webhook com
 `php artisan billing:asaas-webhook register --url=<url do túnel>` (só sandbox; `--url` só aceita
 `https://<rótulo>.<domínio de config('billing.sandbox_webhook_hosts')>` — ngrok — sem porta, IP, localhost, caminho nem
@@ -70,16 +88,55 @@ destino numérico em loopback (o script sobe `ngrok http 127.0.0.1:8086`), porqu
 viaja como `authToken` para o host cadastrado e `*.ngrok-free.app` é domínio de qualquer pessoa; o comando só roda com
 `APP_ENV` local/testing), roda o Cypress **pela URL pública
 do túnel** (a origem do navegador é a mesma do `APP_URL` e dos retornos do checkout; um User-Agent próprio evita a página
-de aviso do ngrok free) e, na saída, remove o webhook (3 tentativas; se ainda falhar, sai com código 3 e imprime o
-comando manual) e mata serve e ngrok. Precisa de: authtoken do ngrok válido (`ngrok config add-authtoken <token>`), `jq`
-e do **worker da fila rodando** (o `composer dev` sobe um) — é ele que processa o webhook do Asaas. A suíte padrão
-continua sem tocar gateway.
+de aviso do ngrok free) e, na saída, restaura o `public/hot`, remove o webhook (3 tentativas; se ainda falhar, sai com
+código 3 e imprime o comando manual; se o `public/hot` não voltar, código 4 — veja abaixo) e mata serve e ngrok. Precisa de: authtoken do ngrok válido
+(`ngrok config add-authtoken <token>`), `jq`, do **worker da fila rodando** (o `composer dev` sobe um) — é ele que
+processa o webhook do Asaas — e do **build do front** (`npm run build`). A suíte padrão continua sem tocar gateway.
+
+- **`public/hot` e build:** com o Vite dev rodando (`composer dev`) o Blade injeta `http://localhost:5173/…`, que o Chrome
+  bloqueia numa página `https://` do túnel (mixed content: `/register` em branco). O script move o `public/hot` antes do
+  serve e o restaura na saída (normal, erro, Ctrl+C/TERM) sempre que o backup existir — arquivo ou symlink, inclusive
+  symlink pendente, e mesmo se o sinal chegar no meio do `mv` —, a não ser que o `public/hot` tenha reaparecido (aí
+  mantém o atual); sem o hot o Laravel serve `public/build`, e a 8085 também (sem HMR) durante a rodada — não precisa parar
+  o `composer dev`. O caminho temporário sai no log (`public/hot movido para …`). Aborta sem `public/build/manifest.json`
+  e **avisa, sem abortar,** se o manifest for mais velho que algum arquivo de `resources/js`/`resources/css`
+  (`build desatualizado, front antigo no teste` → `npm run build`). `kill -9` não roda o trap e deixa o hot movido:
+  `mv <tmp>/hot.easyeye-e2e public/hot` (caminho no log; `composer dev`/`npm run dev` também recriam o arquivo).
+- **Limpeza das contas do spec:** cada e-mail que o spec gera é registrado (antes do cadastro) em
+  `e2e/cypress/.sandbox-run/<nonce>.json` (ignorado pelo git) e o `after()` roda `e2e/scripts/clean-sandbox-signups.php`
+  com esse estado: apaga do Asaas sandbox (clientes por `externalReference` = id da clínica, assinaturas e sessões do
+  Checkout hospedado, tudo paginado e com cada remoção confirmada) e do banco de DEV **só** os usuários da rodada e as
+  clínicas `Clínica Sandbox …` cujos usuários são todos dela — uma conta anterior que só combine com o padrão não é
+  tocada. Guardas (aborta com exit 1 antes de qualquer chamada ao Asaas): `APP_ENV` local/testing, **todo destino do banco
+  efetivo** (`DB_URL`, host, database, `read[]`/`write[]`) local e da lista `E2E_ALLOWED_DATABASES`, e credencial efetiva
+  do Asaas em sandbox. O script trava (`FOR UPDATE`) clínicas e usuários ANTES de tocar no Asaas e segura a trava até o commit (um vínculo novo espera; só clínica elegível sob a trava chega ao Asaas), com revalidação final.
+  Incerteza no Asaas mantém a clínica (exit 2; o estado fica e a próxima execução retoma). À mão:
+  `SANDBOX_CLEAN_STATE=e2e/cypress/.sandbox-run/<nonce>.json php artisan tinker --execute="require 'e2e/scripts/clean-sandbox-signups.php';"`;
+  restos de rodadas mortas, sem estado: `SANDBOX_CLEAN_ALL=1` (varredura por padrão, **opt-in**); `SANDBOX_CLEAN_DRY_RUN=1`
+  só lista. `CYPRESS_SANDBOX_KEEP=1` mantém tudo de pé para investigar uma falha. Cobranças já pagas no painel ficam
+  manuais ([§6 do roteiro](../docs/internal/infra/ngrok-sandbox-asaas.md)).
+- **Códigos de saída:** o do Cypress; `1` aborto antes do teste (inclui `public/hot` reaparecido, abaixo); `3` Cypress
+  passou mas o **webhook não foi removido**; `4` Cypress (e webhook) passaram mas o **`public/hot` não foi restaurado** (o
+  HMR do `composer dev` segue fora; o backup fica no diretório temporário e a mensagem traz o `mv` manual). Status
+  não-zero anterior é preservado; com `3` e `4` juntos vale o `3`.
+- **Não reinicie o `npm run dev`/`composer dev` durante a rodada:** o Vite recria o `public/hot` e o Blade volta a
+  injetar `http://localhost:5173` (página em branco no `https://`). Não há vigia em background: o script confere o
+  `public/hot` **uma vez** logo antes do `cypress run` (reapareceu → aborta com status 1 e mantém o novo) e no cleanup
+  (reapareceu → avisa e mantém o novo). Reiniciar o Vite depois dessa checagem derruba só aquela rodada.
+- **Sem realtime no modo túnel:** o build aponta o Reverb para `localhost:8080` e o túnel só expõe a 8086; numa página
+  `https://` o `ws://` é bloqueado (mixed content) e não há `wss://` — falha em silêncio no console, e
+  `VITE_REVERB_SCHEME=http` não resolve. O spec espera o webhook pela API (`waitForWebhook`), então só se perde o update ao
+  vivo da tela. O bloqueio da CSP que isso causa (`[CSP] connect-src bloqueou wss://localhost:8080/…`) é tolerado pelo
+  `cypress/support/e2e.js` **só** com `CYPRESS_SANDBOX_TUNNEL_HOST` setado (o script exporta); fora do modo túnel um
+  bloqueio de CSP continua reprovando o caso. Futuro (fora do escopo): 2º túnel para a 8080 + `VITE_REVERB_*` no build.
 
 O Cypress isolado (ambiente já montado à mão, §1–§3 do roteiro) continua valendo:
 
 ```bash
 cd e2e
 CYPRESS_SANDBOX=1 env -u ELECTRON_RUN_AS_NODE npx cypress run --browser chrome
+# com cartão (pago à mão, fora do Cypress: a URL do checkout sai no terminal):
+CYPRESS_SANDBOX=1 CYPRESS_SANDBOX_PAUSE=1 env -u ELECTRON_RUN_AS_NODE npx cypress run --browser chrome
 ```
 
 O spec exige `CYPRESS_BASE_URL` em `localhost`/`127.0.0.1` — ou, só pelo script, na URL pública do túnel
