@@ -3,6 +3,12 @@
 return [
     'default_gateway' => env('BILLING_DEFAULT_GATEWAY', 'asaas'),
 
+    // billing:asaas-webhook (E2E do sandbox): o webhook_secret viaja como authToken
+    // para o host que o comando cadastra no Asaas, então só domínios de túnel
+    // daqui (sufixos exatos, sem porta/IP/localhost) são aceitos em --url.
+    // Sem env de propósito: ampliar a lista é uma mudança de código revisada.
+    'sandbox_webhook_hosts' => ['.ngrok-free.app', '.ngrok.app', '.ngrok.io', '.ngrok-free.dev'],
+
     // Bloqueia o painel da clínica sem assinatura com acesso (trial vencido,
     // período encerrado, cancelada). Chave de emergência: false libera todas
     // (ex.: ambiente de homologação com clínicas de teste vencidas).

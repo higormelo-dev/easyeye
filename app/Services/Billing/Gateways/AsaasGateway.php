@@ -71,6 +71,8 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         'payment_bankslip_refund' => '/v3/payments/{id}/bankSlip/refund',
         'checkouts'               => '/v3/checkouts',
         'checkout_cancel'         => '/v3/checkouts/{id}/cancel',
+        'webhooks'                => '/v3/webhooks',
+        'webhook_show'            => '/v3/webhooks/{id}',
         'account_status'          => '/v3/myAccount/status/',
     ];
 
@@ -1052,6 +1054,75 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         }
 
         return array_values(array_unique($fields));
+    }
+
+    // ── Webhooks da conta (sandbox E2E: comando billing:asaas-webhook) ────────────────────────────────────────────────
+
+    /**
+     * Eventos do Asaas que o app trata (chaves do mapa de eventos) e que fazem sentido assinar num webhook de
+     * cobrança: PAYMENT_*, SUBSCRIPTION_* e CHECKOUT_* (os ACCESS_TOKEN_* são da gestão de chaves, não de cobrança).
+     *
+     * @return list<string>
+     */
+    public function handledWebhookEvents(): array
+    {
+        return array_values(array_filter(
+            array_keys($this->eventTypeMap()),
+            static fn (string $event) => preg_match('/^(PAYMENT|SUBSCRIPTION|CHECKOUT)_/', $event) === 1,
+        ));
+    }
+
+    /**
+     * GET /v3/webhooks (https://docs.asaas.com/reference/listar-webhooks): os webhooks da conta, sem o authToken.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listWebhooks(): array
+    {
+        $response = $this->get('webhooks', ['limit' => 100]);
+
+        if (! $response->successful()) {
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
+        }
+
+        return collect((array) $response->json('data', []))
+            ->filter(fn ($row) => is_array($row) && filled($row['id'] ?? null))
+            ->map(fn (array $row) => Arr::except($row, ['authToken']))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Cria (POST /v3/webhooks) ou atualiza (PUT /v3/webhooks/{id}) um webhook
+     * (https://docs.asaas.com/reference/criar-novo-webhook). Devolve o cadastro SEM o authToken.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
+     */
+    public function saveWebhook(?string $id, array $payload): array
+    {
+        $response = $id === null
+            ? $this->post('webhooks', $payload)
+            : $this->request('PUT', 'webhook_show', $payload, ['id' => $id]);
+
+        if (! $response->successful() || blank($response->json('id'))) {
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
+        }
+
+        return Arr::except((array) $response->json(), ['authToken']);
+    }
+
+    /** DELETE /v3/webhooks/{id}: true = removido (ou já não existia). */
+    public function deleteWebhook(string $id): bool
+    {
+        if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', $id) !== 1) {
+            return false;
+        }
+
+        $response = $this->request('DELETE', 'webhook_show', [], ['id' => $id]);
+
+        return $response->status() === 404 || ($response->successful() && $response->json('deleted') !== false);
     }
 
     /** POST /v3/checkouts/{id}/cancel (https://docs.asaas.com/reference/cancelar-um-checkout). */
