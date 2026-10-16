@@ -76,7 +76,7 @@ watch(termsVersionIds, () => {
     termsChanged.value = false;
 });
 
-// Máscaras BR (WhatsApp e CNPJ): diretiva global v-mask nos inputs — o
+// Máscaras BR (WhatsApp e CPF/CNPJ): diretiva global v-mask nos inputs — o
 // backend re-normaliza para dígitos (RegisterRequest::prepareForValidation).
 
 // ── Email availability ─────────────────────────────────────────
@@ -188,6 +188,7 @@ function selectPlan(id) {
 
 // ── Validation ─────────────────────────────────────────────────
 const required = props.tAuth.register?.field_required ?? 'Campo obrigatório.';
+const documentRequired = props.tAuth.register?.document_required ?? required;
 const mismatch = props.tAuth.register?.passwords_mismatch ?? 'As senhas não conferem.';
 
 function validateStep1() {
@@ -204,6 +205,9 @@ function validateStep1() {
 function validateStep2() {
     const e = {};
     if (!form.value.company_name) e.company_name = required;
+    // O período de teste não precisa do documento agora. Já no checkout, ele
+    // identifica o pagador exigido pelo gateway antes de criar a cobrança.
+    if (startMode.value === 'checkout' && !form.value.company_cnpj.trim()) e.company_cnpj = documentRequired;
 
     // WhatsApp do responsável: obrigatório — 10-11 dígitos (DDD + número).
     // Backend valida de novo (RegisterRequest) e envia código OTP após o registro.
@@ -677,14 +681,21 @@ const showPwd2 = ref(false);
 
                                     <div class="reg-field">
                                         <label class="reg-label">
-                                            {{ tAuth.register?.cnpj }}
-                                            <span class="opt">({{ tAuth.register?.optional }})</span>
+                                            {{
+                                                startMode === 'checkout'
+                                                    ? (tAuth.register?.document ?? 'CPF ou CNPJ')
+                                                    : tAuth.register?.cnpj
+                                            }}
+                                            <span v-if="startMode !== 'checkout'" class="opt"
+                                                >({{ tAuth.register?.optional }})</span
+                                            >
                                         </label>
                                         <input
                                             v-model="form.company_cnpj"
-                                            v-mask="'cnpj'"
+                                            v-mask="'cpfCnpj'"
+                                            data-testid="register-company-cnpj"
                                             type="text"
-                                            autocapitalize="characters"
+                                            inputmode="text"
                                             class="reg-input"
                                             :class="{ 'is-error': errors.company_cnpj }"
                                             placeholder="00.000.000/0000-00"

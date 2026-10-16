@@ -15,6 +15,8 @@
 // link do cartão no Asaas, descartar pedido, prévia/troca de plano no manager,
 // "Marcar como visto") vai ao backend de verdade.
 
+/* global require */
+
 const {
     PIX_CODE,
     BOLETO_LINE,
@@ -695,12 +697,37 @@ describe('Cobrança da clínica — checkout, régua e manager', () => {
             { method: 'credit_card', label: 'Cartão de crédito', mode: 'hosted' },
         ];
 
+        // Documento numérico válido e novo para não colidir com os CNPJs das
+        // clínicas semeadas no banco de desenvolvimento.
+        function generateCnpj() {
+            const digits = [
+                Cypress._.random(1, 9),
+                ...Array.from({ length: 7 }, () => Cypress._.random(0, 9)),
+                0,
+                0,
+                0,
+                1,
+            ];
+
+            [
+                [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
+                [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
+            ].forEach((weights) => {
+                const rest = weights.reduce((sum, weight, index) => sum + digits[index] * weight, 0) % 11;
+
+                digits.push(rest < 2 ? 0 : 11 - rest);
+            });
+
+            return digits.join('');
+        }
+
         function stubSignupStart(method, reply, onRegistration = null) {
             let registration = null;
             cy.intercept('POST', '/register', (req) => {
                 expect(req.body.start_mode).to.eq('checkout');
                 expect(req.body.billing_cycle).to.be.a('string');
                 expect(req.body.terms_accepted).to.eq(true);
+                expect(req.body.company_cnpj.replace(/\D/g, '')).to.match(/^\d{14}$/);
                 expect(req.body.plan_id).to.match(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
                 registration = { planId: req.body.plan_id, cycle: req.body.billing_cycle };
                 onRegistration?.(registration);
@@ -734,6 +761,7 @@ describe('Cobrança da clínica — checkout, régua e manager', () => {
 
         function createSignup(label) {
             const email = `cy-signup-${label}-${Date.now()}@cy-billing.test`;
+            const cnpj = generateCnpj();
 
             cy.visit('/register');
             cy.get('[data-testid="register-name"]').type('Cypress Cadastro');
@@ -762,6 +790,8 @@ describe('Cobrança da clínica — checkout, régua e manager', () => {
             cy.get('[data-testid="register-company-name"]').should('be.visible').type(`CY-BILL CADASTRO ${label}`);
             cy.get('[data-testid="register-company-phone"]').scrollIntoView({ offset: { top: -100, left: 0 } });
             cy.get('[data-testid="register-company-phone"]').should('be.visible').type('11987654321');
+            cy.get('[data-testid="register-company-cnpj"]').scrollIntoView({ offset: { top: -100, left: 0 } });
+            cy.get('[data-testid="register-company-cnpj"]').should('be.visible').type(cnpj);
             cy.get('[data-testid="terms-accept-checkbox"]').scrollIntoView({ offset: { top: -100, left: 0 } });
             cy.get('[data-testid="terms-accept-checkbox"]').should('be.visible').check();
             cy.get('[data-testid="register-submit"]').scrollIntoView({ offset: { top: -100, left: 0 } });

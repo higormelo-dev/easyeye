@@ -56,6 +56,11 @@ const tAuth = {
         start_mode_label: 'Como você quer começar?',
         mode_trial: 'Testar grátis por :days dias',
         mode_checkout: 'Contratar agora',
+        cnpj: 'CNPJ',
+        document: 'CPF ou CNPJ',
+        document_required: 'Informe o CPF ou CNPJ para contratar agora.',
+        optional: 'opcional',
+        field_required: 'Campo obrigatório.',
         create_and_pay: 'Criar conta e ir para o pagamento',
         start_trial: 'Iniciar período grátis',
         step_payment: 'Pagamento',
@@ -111,8 +116,27 @@ describe('Cadastro — como começar', () => {
         await wrapper.get('form').trigger('submit');
         await flushPromises();
 
-        expect(axios.post).toHaveBeenCalledWith('/register', expect.objectContaining({ start_mode: 'trial' }));
+        expect(axios.post).toHaveBeenCalledWith(
+            '/register',
+            expect.objectContaining({ start_mode: 'trial', company_cnpj: '' }),
+        );
         expect(window.location.href).toBe('/panel/dashboard');
+    });
+
+    it('"Contratar agora" exige CPF ou CNPJ antes do POST e mostra o erro no campo', async () => {
+        await mountAtCompanyStep();
+
+        await wrapper.get('[data-mode="checkout"]').trigger('click');
+        await wrapper.get('form').trigger('submit');
+
+        expect(axios.post).not.toHaveBeenCalled();
+        expect(wrapper.get('[data-testid="register-company-cnpj"]').classes()).toContain('is-error');
+        expect(wrapper.get('[data-testid="register-company-cnpj"]').element.parentElement.textContent).toContain(
+            'Informe o CPF ou CNPJ para contratar agora.',
+        );
+        expect(
+            wrapper.get('[data-testid="register-company-cnpj"]').element.previousElementSibling.textContent,
+        ).toContain('CPF ou CNPJ');
     });
 
     it('"Contratar agora": cria a conta sem trial e abre o pagamento no próprio site', async () => {
@@ -136,6 +160,9 @@ describe('Cadastro — como começar', () => {
         expect(wrapper.get('.reg-btn-primary').text()).toContain('Criar conta e ir para o pagamento');
         expect(wrapper.find('.reg-quick-start').exists()).toBe(false);
 
+        // O CNPJ é o documento do pagador no gateway (o Asaas recusa a assinatura sem CPF/CNPJ): o E2E do sandbox
+        // preenche pelo data-testid, e o valor segue no POST /register.
+        await wrapper.get('[data-testid="register-company-cnpj"]').setValue('68292482000134');
         await wrapper.get('form').trigger('submit');
         await flushPromises();
         // Checkout carregado sob demanda (chunk separado, com o Echo).
@@ -144,7 +171,12 @@ describe('Cadastro — como começar', () => {
 
         expect(axios.post).toHaveBeenCalledWith(
             '/register',
-            expect.objectContaining({ start_mode: 'checkout', plan_id: 'pro', billing_cycle: 'yearly' }),
+            expect.objectContaining({
+                start_mode: 'checkout',
+                plan_id: 'pro',
+                billing_cycle: 'yearly',
+                company_cnpj: '68292482000134',
+            }),
         );
         const checkout = wrapper.getComponent({ name: 'SignupCheckout' });
         expect(axios.defaults.headers.common['X-CSRF-TOKEN']).toBe('csrf-renovado-pelo-login');
