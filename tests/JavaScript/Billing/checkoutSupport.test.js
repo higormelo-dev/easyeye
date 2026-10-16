@@ -34,10 +34,12 @@ describe('checkoutApi', () => {
             '/_routes/panel.my-subscription.instructions?invoice=inv-1&method=pix',
         );
         expect(panel.card('inv-1')).toBe('/_routes/panel.my-subscription.card?invoice=inv-1');
+        expect(panel.payerDocument()).toBe('/_routes/panel.my-subscription.payer-document');
         expect(createCheckoutApi(panel).canReplaceCard).toBe(true);
 
         const signup = signupEndpoints();
         expect(signup.contract()).toBe('/_routes/signup-checkout.contract');
+        expect(signup.payerDocument()).toBe('/_routes/signup-checkout.payer-document');
         expect(createCheckoutApi(signup).canReplaceCard).toBe(false);
     });
 
@@ -53,6 +55,19 @@ describe('checkoutApi', () => {
         expect(body).toEqual({ card_token: 'tok_1', installments: 3 });
         expect(config.headers['Idempotency-Key']).toBe('key-123');
         expect(config.headers.Accept).toBe('application/json');
+    });
+
+    it('salva o documento do pagador na rota do contexto sem chave de cobrança', async () => {
+        const http = { put: vi.fn().mockResolvedValue({ data: { data: { document: '52998224725' } } }) };
+        const api = createCheckoutApi(panelEndpoints(), http);
+
+        await expect(api.payerDocument('529.982.247-25')).resolves.toEqual({ document: '52998224725' });
+
+        expect(http.put).toHaveBeenCalledWith(
+            '/_routes/panel.my-subscription.payer-document',
+            { document: '529.982.247-25' },
+            { headers: { Accept: 'application/json' } },
+        );
     });
 
     it('gera chaves de idempotência diferentes a cada pedido', () => {

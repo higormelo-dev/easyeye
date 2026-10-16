@@ -6,10 +6,10 @@ use App\Enums\Billing\CheckoutMethod;
 use App\Enums\BillingCycle;
 use App\Exceptions\Billing\CheckoutException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Billing\{AiCreditPackPurchaseRequest, CheckoutCardRequest, CheckoutContractRequest};
+use App\Http\Requests\Billing\{AiCreditPackPurchaseRequest, CheckoutCardRequest, CheckoutContractRequest, PayerDocumentRequest};
 use App\Models\{Entity, Plan, PlanPrice, User};
 use App\Services\Auth\PhoneVerificationService;
-use App\Services\Billing\{AiCreditPackCheckoutService, CheckoutFraudGuard, CheckoutService, HostedCheckoutService};
+use App\Services\Billing\{AiCreditPackCheckoutService, CheckoutFraudGuard, CheckoutService, HostedCheckoutService, PayerDocumentService};
 use App\Support\Site\SiteContent;
 use Closure;
 use Illuminate\Http\{JsonResponse, Request};
@@ -32,6 +32,7 @@ class CheckoutController extends Controller
         private readonly CheckoutService $checkout,
         private readonly CheckoutFraudGuard $fraud,
         private readonly AiCreditPackCheckoutService $aiPacks,
+        private readonly PayerDocumentService $payerDocument,
     ) {
     }
 
@@ -151,6 +152,16 @@ class CheckoutController extends Controller
         return $request->checkoutMethod()?->isCard() && $request->cardInput() !== null
             ? $this->guardCard($request, $call)
             : response()->json(['data' => $call()]);
+    }
+
+    /**
+     * Informa o CPF/CNPJ da clínica quando ela não tem documento utilizável (o `document_required` do checkout).
+     * Só preenche: clínica com documento válido recusa (`document_already_set`); trocar fica com o Manager.
+     * Resposta: {data: {document (canônico), formatted}}.
+     */
+    public function payerDocument(PayerDocumentRequest $request): JsonResponse
+    {
+        return response()->json(['data' => $this->payerDocument->fill($this->entity($request), $request->document())]);
     }
 
     /**

@@ -133,6 +133,7 @@ Route::middleware('auth')->group(function () {
             // remonta o SDK do cartão para o "pagar de novo" em cancelado/expirado.
             Route::get('return', [CheckoutController::class, 'signupReturn'])->middleware(['throttle:billing-checkout-read', 'checkout.csp'])->name('return');
             Route::post('contract', [CheckoutController::class, 'contract'])->middleware('throttle:billing-checkout-pay')->name('contract');
+            Route::put('payer-document', [CheckoutController::class, 'payerDocument'])->middleware('throttle:billing-checkout-pay')->name('payer-document');
             Route::get('invoices/{invoice}/instructions', [CheckoutController::class, 'instructions'])->middleware('throttle:billing-checkout-read')->name('instructions');
             Route::post('invoices/{invoice}/charge', [CheckoutController::class, 'issueCharge'])->middleware('throttle:billing-checkout-pay')->name('charge');
             Route::post('invoices/{invoice}/card', [CheckoutController::class, 'payWithCard'])->middleware('throttle:billing-checkout-pay')->name('card');

@@ -32,6 +32,8 @@ const t = {
         gateway_error: 'Não foi possível falar com o meio de pagamento agora.',
         charge_pending: 'A cobrança ainda está sendo gerada.',
         card_declined_generic: 'Pagamento recusado pelo emissor do cartão.',
+        document_required: 'Informe o CPF ou CNPJ da clínica antes de pagar.',
+        document_already_set: 'O documento já foi informado.',
         unknown: 'Algo deu errado.',
     },
     methods: { pix: 'Pix', boleto: 'Boleto', credit_card: 'Cartão de crédito' },
@@ -83,6 +85,9 @@ const t = {
         paid_title: 'Pagamento confirmado!',
         paid_body: 'Obrigado!',
         continue: 'Continuar',
+        payer_document_label: 'CPF ou CNPJ da clínica',
+        payer_document_hint: 'O gateway exige o documento para emitir a cobrança.',
+        payer_document_save: 'Salvar e continuar',
         link_title: 'Pagar no site de :gateway',
         link_body: 'Concluído no site de :gateway, em nova aba.',
         link_button: 'Abrir a página de pagamento',
@@ -117,6 +122,7 @@ function fakeApi(overrides = {}) {
         instructions: vi.fn(),
         payInvoice: vi.fn(),
         replaceCard: vi.fn(),
+        payerDocument: vi.fn(),
         contract: vi.fn(),
         ...overrides,
     };
@@ -131,6 +137,7 @@ function render(props) {
     wrapper = mount(CheckoutFlow, {
         props: { t, payment: payment(), invoice, amount: invoice.amount, realtime, ...props },
         attachTo: document.body,
+        global: { directives: { mask: {} } },
     });
 
     return wrapper;
@@ -328,6 +335,98 @@ describe('CheckoutFlow — boleto, link e erros', () => {
         await wrapper.get('[data-test="checkout-retry"]').trigger('click');
         await flushPromises();
         expect(wrapper.attributes('data-step')).toBe('pix');
+    });
+
+    it('documento obrigatório mostra o campo de CPF ou CNPJ da clínica', async () => {
+        const api = fakeApi({
+            instructions: vi.fn().mockRejectedValue({
+                response: { status: 422, data: { code: 'document_required', message: 'x' } },
+            }),
+        });
+        render({ api });
+
+        await pick('pix');
+
+        const alert = wrapper.get('[data-test="checkout-error"]');
+        expect(alert.attributes('data-code')).toBe('document_required');
+        expect(alert.text()).toContain('Informe o CPF ou CNPJ da clínica antes de pagar.');
+        expect(wrapper.get('[data-testid="payer-document-input"]').attributes('aria-invalid')).toBeUndefined();
+        expect(wrapper.get('[data-testid="payer-document-save"]').text()).toContain('Salvar e continuar');
+        expect(wrapper.find('[data-test="checkout-retry"]').exists()).toBe(false);
+    });
+
+    it('salva o documento e repete a contratação sem recarregar a página', async () => {
+        const api = fakeApi({
+            contract: vi
+                .fn()
+                .mockRejectedValueOnce({ response: { status: 422, data: { code: 'document_required' } } })
+                .mockResolvedValueOnce({
+                    mode: 'transparent',
+                    method: 'pix',
+                    instructions: { pix: { copy_paste: 'PIX', qr_code_base64: 'AAA=' } },
+                }),
+            payerDocument: vi.fn().mockResolvedValue({ document: '52998224725', formatted: '529.982.247-25' }),
+        });
+        render({ api, invoice: null, contract: { plan_id: 'pro', billing_cycle: 'monthly' } });
+
+        await pick('pix');
+        await wrapper.get('[data-testid="payer-document-input"]').setValue('52998224725');
+        await wrapper.get('[data-test="payer-document-form"]').trigger('submit');
+        await flushPromises();
+
+        expect(api.payerDocument).toHaveBeenCalledWith('52998224725');
+        expect(api.contract).toHaveBeenCalledTimes(2);
+        expect(wrapper.attributes('data-step')).toBe('pix');
+        expect(wrapper.find('[data-testid="payer-document-input"]').exists()).toBe(false);
+    });
+
+    it('mantém o erro de validação do documento no campo', async () => {
+        const api = fakeApi({
+            instructions: vi.fn().mockRejectedValue({
+                response: { status: 422, data: { code: 'document_required' } },
+            }),
+            payerDocument: vi.fn().mockRejectedValue({
+                response: {
+                    status: 422,
+                    data: { errors: { document: ['O CPF ou CNPJ informado não é válido.'] } },
+                },
+            }),
+        });
+        render({ api });
+
+        await pick('pix');
+        await wrapper.get('[data-testid="payer-document-input"]').setValue('123');
+        await wrapper.get('[data-test="payer-document-form"]').trigger('submit');
+        await flushPromises();
+
+        expect(wrapper.get('#payer-document-error').text()).toBe('O CPF ou CNPJ informado não é válido.');
+        expect(wrapper.get('[data-testid="payer-document-input"]').attributes('aria-invalid')).toBe('true');
+        expect(api.instructions).toHaveBeenCalledTimes(1);
+    });
+
+    it('documento já salvo por outra sessão apenas repete a contratação', async () => {
+        const api = fakeApi({
+            instructions: vi
+                .fn()
+                .mockRejectedValueOnce({ response: { status: 422, data: { code: 'document_required' } } })
+                .mockResolvedValueOnce({
+                    mode: 'transparent',
+                    method: 'pix',
+                    instructions: { pix: { copy_paste: 'PIX', qr_code_base64: 'AAA=' } },
+                }),
+            payerDocument: vi.fn().mockRejectedValue({
+                response: { status: 422, data: { code: 'document_already_set' } },
+            }),
+        });
+        render({ api });
+
+        await pick('pix');
+        await wrapper.get('[data-test="payer-document-form"]').trigger('submit');
+        await flushPromises();
+
+        expect(api.instructions).toHaveBeenCalledTimes(2);
+        expect(wrapper.attributes('data-step')).toBe('pix');
+        expect(wrapper.find('[data-testid="payer-document-input"]').exists()).toBe(false);
     });
 
     it('contratar com Pix e a cobrança ainda sendo gerada (charge_pending): tenta de novo sozinho', async () => {

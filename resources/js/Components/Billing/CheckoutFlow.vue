@@ -69,6 +69,9 @@ const paymentUrl = ref(null);
 const hosted = ref({ url: null, expiresAt: null, recurrent: false, firstChargeOn: null });
 const error = ref(null);
 const notice = ref('');
+const payerDocument = ref('');
+const payerDocumentError = ref('');
+const savingPayerDocument = ref(false);
 const checking = ref(false);
 const currentInvoice = ref(props.invoice);
 const retryState = ref({ count: 0, seconds: 0 });
@@ -274,9 +277,30 @@ async function handleFailure(e) {
     step.value = method.value === 'credit_card' && cardConfig.value ? 'card' : 'choose';
 }
 
+async function savePayerDocument() {
+    payerDocumentError.value = '';
+    savingPayerDocument.value = true;
+
+    try {
+        await props.api.payerDocument(payerDocument.value);
+        await load();
+    } catch (e) {
+        const err = checkoutError(e, props.t);
+
+        if (err.code === 'document_already_set') {
+            await load();
+        } else {
+            payerDocumentError.value = e.response?.data?.errors?.document?.[0] ?? err.message;
+        }
+    } finally {
+        savingPayerDocument.value = false;
+    }
+}
+
 async function load() {
     error.value = null;
     notice.value = '';
+    payerDocumentError.value = '';
     step.value = 'loading';
 
     try {
@@ -482,6 +506,55 @@ defineExpose({ choose, step });
                 <i class="ti ti-refresh me-1" aria-hidden="true"></i>{{ ui.retry }}
             </button>
         </div>
+
+        <form
+            v-if="error?.code === 'document_required'"
+            class="border border-danger-subtle rounded p-3 mb-3"
+            data-test="payer-document-form"
+            @submit.prevent="savePayerDocument"
+        >
+            <label for="payer-document-input" class="form-label fw-semibold">{{ ui.payer_document_label }}</label>
+            <p class="small text-muted mb-2">{{ ui.payer_document_hint }}</p>
+            <div class="d-flex flex-column flex-sm-row gap-2 align-items-sm-start">
+                <div class="flex-grow-1">
+                    <input
+                        id="payer-document-input"
+                        v-model="payerDocument"
+                        v-mask="'cpfCnpj'"
+                        type="text"
+                        inputmode="text"
+                        autocomplete="off"
+                        class="form-control"
+                        data-testid="payer-document-input"
+                        :class="{ 'is-invalid': payerDocumentError }"
+                        :aria-invalid="payerDocumentError ? 'true' : undefined"
+                        aria-describedby="payer-document-hint payer-document-error"
+                    />
+                    <span id="payer-document-hint" class="visually-hidden">{{ ui.payer_document_hint }}</span>
+                    <span
+                        v-if="payerDocumentError"
+                        id="payer-document-error"
+                        class="invalid-feedback d-block"
+                        role="alert"
+                    >
+                        {{ payerDocumentError }}
+                    </span>
+                </div>
+                <button
+                    type="submit"
+                    class="btn btn-danger text-nowrap"
+                    data-testid="payer-document-save"
+                    :disabled="savingPayerDocument"
+                >
+                    <span
+                        v-if="savingPayerDocument"
+                        class="spinner-border spinner-border-sm me-1"
+                        aria-hidden="true"
+                    ></span>
+                    {{ ui.payer_document_save }}
+                </button>
+            </div>
+        </form>
 
         <!-- Escolha da forma de pagamento -->
         <fieldset v-if="step === 'choose'" data-test="checkout-methods">

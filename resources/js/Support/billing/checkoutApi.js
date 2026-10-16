@@ -22,6 +22,7 @@ export function panelEndpoints() {
         card: (invoice) => route('panel.my-subscription.card', { invoice }),
         replaceCard: () => route('panel.my-subscription.replace-card'),
         contract: () => route('panel.my-subscription.contract'),
+        payerDocument: () => route('panel.my-subscription.payer-document'),
         aiPackOptions: (params) => route('panel.my-subscription.ai-credits.options', params),
         aiPack: () => route('panel.my-subscription.ai-credits.purchase'),
         aiPackDiscard: (invoice) => route('panel.my-subscription.ai-credits.discard', { invoice }),
@@ -38,6 +39,7 @@ export function signupEndpoints() {
         card: (invoice) => route('signup-checkout.card', { invoice }),
         replaceCard: null,
         contract: () => route('signup-checkout.contract'),
+        payerDocument: () => route('signup-checkout.payer-document'),
     };
 }
 
@@ -69,6 +71,8 @@ export function createCheckoutApi(endpoints, http = axios) {
         payInvoice: async (invoiceId, payload, key) =>
             unwrap(await http.post(endpoints.card(invoiceId), payload, withKey(key))),
         replaceCard: async (payload, key) => unwrap(await http.put(endpoints.replaceCard(), payload, withKey(key))),
+        payerDocument: async (document) =>
+            unwrap(await http.put(endpoints.payerDocument(), { document }, { headers: JSON_HEADERS })),
         contract: async (payload, key) => unwrap(await http.post(endpoints.contract(), payload, withKey(key))),
         /** Pacote de créditos de IA: opções (com o valor do pacote) e compra já pagando. */
         aiPackOptions: async (packageCode = null) =>

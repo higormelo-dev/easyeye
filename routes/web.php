@@ -231,6 +231,8 @@ Route::group(
                 Route::post('invoices/{invoice}/card', [CheckoutController::class, 'payWithCard'])->middleware('throttle:billing-checkout-pay')->name('card');
                 Route::put('card', [CheckoutController::class, 'replaceCard'])->middleware('throttle:billing-checkout-pay')->name('replace-card');
                 Route::post('contract', [CheckoutController::class, 'contract'])->middleware('throttle:billing-checkout-pay')->name('contract');
+                // CPF/CNPJ da clínica sem documento (o 422 document_required do contract): só PREENCHE, nunca troca.
+                Route::put('payer-document', [CheckoutController::class, 'payerDocument'])->middleware('throttle:billing-checkout-pay')->name('payer-document');
                 // Pacote de créditos de IA no mesmo checkout (só com acesso total — AiCreditPackCheckoutService).
                 Route::get('ai-credits', [CheckoutController::class, 'aiCreditOptions'])->middleware('throttle:billing-checkout-read')->name('ai-credits.options');
                 Route::post('ai-credits', [CheckoutController::class, 'aiCreditPurchase'])->middleware('throttle:billing-checkout-pay')->name('ai-credits.purchase');
