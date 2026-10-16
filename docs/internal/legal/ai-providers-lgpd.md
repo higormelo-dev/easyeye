@@ -123,7 +123,32 @@ revisão jurídica, com a lista de provedores efetivamente usados, os países (B
 EUA) e os mecanismos (adequação da UE; cláusulas-padrão da ANPD). Não afirme retenção zero
 ou não uso para treino sem o compromisso contratual correspondente.
 
-## 8. Manutenção
+## 8. Ditado por voz do laudo (transcrição de áudio)
+
+Decisão (15/10/2026): o ditado do laudo é transcrito **no servidor, por provedor desta
+política** — nunca pelo reconhecimento de voz do navegador, que no Chrome/Edge manda o
+áudio ao Google (transferência internacional de dado de saúde, sem contrato). Quem tentar
+"economizar" voltando ao `SpeechRecognition` do navegador reabre exatamente esse problema.
+
+| Salvaguarda | Onde |
+|---|---|
+| Desligado de fábrica (`AI_TRANSCRIPTION_ENABLED`); o dono liga depois de conferir o contrato do provedor | `config/ai.php` → `transcription` |
+| Só provedor que aceita dado de paciente e tem o endpoint de transcrição: Mistral (Voxtral, UE), Azure OpenAI (Whisper), OpenAI e Groq; Gemini, Anthropic, xAI e Maritaca ficam de fora | `SpeechTranscriptionService::PROVIDERS` + `ProviderDataPolicy` |
+| O provedor tem de estar **habilitado no Manager** (a fonte de verdade, lida a cada transcrição): a chave no `.env` não habilita nada, e retirar o provedor no Manager corta o envio do áudio na hora | `AiProviderSettings::enabledCodes()` em `SpeechTranscriptionService::resolve()` |
+| Fora do Brasil sem adequação (OpenAI, Groq, Azure `global`): só com o mecanismo de transferência registrado no painel — a mesma regra dos papéis do assistente. UE (Mistral, Azure `eu`) e Brasil não exigem | `SpeechTranscriptionService::resolve()` |
+| O áudio não é gravado: lido do arquivo temporário do upload, enviado e descartado. O texto devolvido também não é guardado nem logado — vira conteúdo do laudo na tela do médico | `SpeechTranscriptionService`, `EyeImageReportDictationController` |
+| WAV PCM validado no servidor: cabeçalho coerente (taxa × canais × bits × alinhamento × byteRate) e duração medida pelos **frames reais**, incluindo o que vem depois do chunk `data` — não pelo byteRate que o arquivo declara (inflado, escondia 180 s como 90 s), com teto de duração (`AI_TRANSCRIPTION_MAX_SECONDS`) = teto de custo por chamada; limite por minuto por usuário + clínica | `WavInspector`, rate limiter `report-dictation` |
+| Trilha de auditoria: `eye_images.report.dictation` com provedor, modelo, duração, tamanho e SHA-256 do áudio — nunca o áudio nem o texto. É gravada **antes** de o áudio sair (transação comitada, `outcome=sending`) e **falha fechada**: se não gravou, o áudio não é enviado e a resposta é 503 (o `AuditLogger` comum engole erro de banco; aqui isso entregaria dado de saúde sem registro). O resultado (`transcribed`, `no_speech`, `provider_failed`) completa a mesma linha depois | `AuditLogger::recordAdminActionOrFail()` / `completeAdminAction()`, `audit_logs` |
+| Falha do provedor: o log traz só provedor e status; a tela mostra mensagem genérica (o corpo da resposta pode ecoar o áudio) | `SpeechTranscriptionService::logFailure()` |
+| Aviso na tela ao lado do editor: o áudio vai a um provedor aprovado, não é guardado, não cite o nome do paciente (o áudio não dá para redigir como o texto) | `EyeImageReportModal.vue` |
+
+**Pendências do jurídico/negócio** (o código não resolve): confirmar no contrato do
+provedor a retenção do áudio e do texto (provedores costumam guardar entradas por até
+30 dias para monitoramento de abuso, salvo retenção zero contratada — confira cada um) e
+registrar o ditado como operação de tratamento. O ditado não consome créditos de IA nem entra no
+painel de uso (custo por minuto, no provedor) — decidir se haverá franquia por plano.
+
+## 9. Manutenção
 
 Mudou o termo, a DPA ou a região de um provedor: atualize `ProviderDataPolicy` (perfil,
 fontes e `CHECKED_AT`), este documento e, se for o caso, a Política de Privacidade.
