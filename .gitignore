@@ -43,6 +43,9 @@ yarn-error.log
 # Claude Code agent worktrees (artefatos de runtime)
 .claude/worktrees/
 
+# Maestri: papéis e estado do time de agentes (local, não entra no repo)
+/.maestri/
+
 
 # Ignorar arquivos env
 .env.bak.*
