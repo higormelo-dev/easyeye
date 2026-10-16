@@ -3,21 +3,26 @@
 declare(strict_types=1);
 
 use App\Broadcasting\ClinicBillingChannel;
-use App\Enums\Billing\{InvoiceStatus, PaymentStatus, SubscriptionCancelledReason};
-use App\Enums\{BillingCycle, ClientRule, SubscriptionStatus};
+use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentStatus, SubscriptionCancelledReason, WebhookEventStatus};
+use App\Enums\{BillingCycle, ClientRule, SubscriptionBillingMode, SubscriptionStatus};
 use App\Enums\SaasRule;
 use App\Events\Billing\InvoicePaid;
-use App\Jobs\Billing\RenewSubscriptionJob;
-use App\Models\Billing\{Invoice, Payment, PaymentAttempt};
-use App\Models\Billing\WebhookEvent;
+use App\Http\Middleware\EnsureBillingContact;
+use App\Jobs\Billing\{ProcessBillingWebhookJob, RenewSubscriptionJob};
+use App\Models\Billing\{BillingLog, WebhookEvent};
+use App\Models\Billing\{FinancialEvent, HostedCheckout, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Plan, PlanPrice, Subscription, User};
 use App\Models\EntityUser;
+use App\Models\WhatsApp\WhatsAppSetting;
 use App\Services\Billing\{CheckoutService, CircuitBreakerService, ProcessWebhookEventService};
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Client\Request;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\{Cache, Event, Http, Queue, RateLimiter};
+use Illuminate\Support\Facades\{Cache, DB, Event, Http, Queue, RateLimiter};
+use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia as Assert;
 
 /**
  * Checkout transparente pelos endpoints do painel (/panel/my-subscription)
@@ -127,6 +132,162 @@ function ckoOverdueMp(array $subscription = [], array $invoice = []): array
 function ckoMpCustomerSearch(): array
 {
     return ['https://api.mercadopago.com/v1/customers/search*' => Http::response(['results' => [['id' => '1234567-cus']]])];
+}
+
+/** Asaas no cadastro: cliente, recorrência (1ª parcela), QR Pix, linha do boleto e Asaas Checkout (sandbox falso). */
+function ckoSignupAsaasFake(?callable $checkoutResponse = null): void
+{
+    Http::fake(function (Request $request) use ($checkoutResponse) {
+        $url    = $request->url();
+        $method = $request->method();
+
+        if (str_starts_with($url, 'https://api.asaas.com/v3/customers')) {
+            return $method === 'GET' ? Http::response(['data' => []]) : Http::response(['id' => 'cus_signup1']);
+        }
+
+        if ($url === 'https://api.asaas.com/v3/subscriptions' && $method === 'POST') {
+            return Http::response(['id' => 'sub_signup1', 'customer' => 'cus_signup1', 'status' => 'ACTIVE', 'billingType' => 'UNDEFINED', 'cycle' => $request['cycle'], 'value' => $request['value'], 'nextDueDate' => $request['nextDueDate'], 'externalReference' => $request['externalReference']]);
+        }
+
+        if (str_starts_with($url, 'https://api.asaas.com/v3/subscriptions/sub_signup1/payments')) {
+            return Http::response(['hasMore' => false, 'data' => [ckoSignupAsaasPayment()]]);
+        }
+
+        if ($url === 'https://api.asaas.com/v3/subscriptions/sub_signup1') {
+            return Http::response(['id' => 'sub_signup1', 'status' => 'ACTIVE', 'cycle' => 'MONTHLY', 'value' => 299.9]);
+        }
+
+        if ($url === 'https://api.asaas.com/v3/payments/pay_signup1/pixQrCode') {
+            return Http::response(['encodedImage' => 'iVBORw0KGgoAAAA=', 'payload' => '00020101021226pix-signup-1', 'expirationDate' => '2026-10-08 23:59:59']);
+        }
+
+        if ($url === 'https://api.asaas.com/v3/payments/pay_signup1/identificationField') {
+            return Http::response(['identificationField' => '23793.38128 60082.000006 00000.000000 1 97890000029990', 'nossoNumero' => '1', 'barCode' => '23791978900000299903812860082000000000000000']);
+        }
+
+        if ($url === 'https://api.asaas.com/v3/payments/pay_signup1') {
+            return Http::response(ckoSignupAsaasPayment());
+        }
+
+        if ($url === 'https://api.asaas.com/v3/checkouts' && $method === 'POST') {
+            return $checkoutResponse !== null
+                ? $checkoutResponse($request)
+                : Http::response(['id' => 'chk_signup1', 'status' => 'ACTIVE', 'minutesToExpire' => 60, 'link' => 'https://asaas.com/checkoutSession/show?id=chk_signup1']);
+        }
+
+        return Http::response(['errors' => [['code' => 'not_faked', 'description' => $method . ' ' . $url]]], 404);
+    });
+}
+
+/** 1ª parcela da recorrência do cadastro, como o Asaas devolve na listagem e no PAYMENT_*. */
+function ckoSignupAsaasPayment(array $overrides = []): array
+{
+    return array_merge([
+        'object'            => 'payment',
+        'id'                => 'pay_signup1',
+        'customer'          => 'cus_signup1',
+        'subscription'      => 'sub_signup1',
+        'value'             => 299.9,
+        'netValue'          => 297.91,
+        'billingType'       => 'UNDEFINED',
+        'status'            => 'PENDING',
+        'dueDate'           => '2026-10-08',
+        'originalDueDate'   => '2026-10-08',
+        'paymentDate'       => null,
+        'clientPaymentDate' => null,
+        'invoiceUrl'        => 'https://www.asaas.com/i/signup1',
+        'bankSlipUrl'       => 'https://www.asaas.com/b/pdf/signup1',
+        'deleted'           => false,
+    ], $overrides);
+}
+
+/** Cliente do cadastro: usuário que ainda não confirmou e-mail/WhatsApp, na clínica recém-criada. */
+function ckoSignupUser(): array
+{
+    $user   = User::factory()->unverified()->create();
+    $member = createEntityUser(test()->clinic, $user, ClientRule::Admin->value, isOwner: true);
+
+    return [$user, $member];
+}
+
+/** Cadastro que contratou no CARTÃO (Asaas Checkout aberto): [usuário, vínculo, assinatura, fatura aberta]. */
+function ckoSignupHostedCard(): array
+{
+    config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+    ckoSignupAsaasFake();
+    [$user, $member] = ckoSignupUser();
+
+    $response = ckoAs($user, $member)->postJson(route('signup-checkout.contract'), [
+        'plan_id'       => test()->plan->id,
+        'billing_cycle' => 'monthly',
+        'method'        => 'credit_card',
+        'card_token'    => 'nao-usado',
+    ])->assertOk()->assertJsonPath('data.mode', 'hosted');
+
+    $subscription = Subscription::query()->find($response->json('data.subscription.id'));
+
+    return [$user, $member, $subscription, $subscription->currentInvoice];
+}
+
+/**
+ * Asaas com Asaas Checkout onde cada abertura devolve um id NOVO (chk_n1, chk_n2…) e o cancelamento responde
+ * CANCELED (ou 404 com $cancelFails) — para provar a troca de alvo de retorno na mesma fatura.
+ */
+function ckoHostedSwapFake(bool $cancelFails = false, string|Closure|null $cancel = null): void
+{
+    $n = 0;
+    config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+
+    // $cancel: null = CANCELED; string = o estado que o Asaas devolve (PAID, EXPIRED, ACTIVE…); Closure = o próprio corpo/efeito.
+    Http::fake(['https://api.asaas.com/v3/checkouts/*/cancel' => match (true) {
+        $cancelFails               => Http::response(['errors' => [['code' => 'not_found', 'description' => 'checkout não encontrado']]], 404),
+        $cancel instanceof Closure => $cancel,
+        default                    => Http::response(['status' => $cancel ?? 'CANCELED']),
+    }]);
+
+    ckoSignupAsaasFake(function () use (&$n) {
+        $n++;
+
+        return Http::response(['id' => "chk_n{$n}", 'status' => 'ACTIVE', 'minutesToExpire' => 60, 'link' => "https://asaas.com/checkoutSession/show?id=chk_n{$n}"]);
+    });
+}
+
+/** Contrata no cartão (Asaas Checkout) pela rota do cadastro ou do painel, como o usuário padrão (e-mail confirmado). */
+function ckoOpenHostedCard(string $route): TestResponse
+{
+    return ckoAs()->postJson(route($route), [
+        'plan_id'       => test()->plan->id,
+        'billing_cycle' => 'monthly',
+        'method'        => 'credit_card',
+        'card_token'    => 'nao-usado',
+    ]);
+}
+
+/** Corpos das aberturas de checkout (POST /v3/checkouts) enviadas ao Asaas, na ordem. */
+function ckoSentCheckoutBodies(): array
+{
+    return Http::recorded(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://api.asaas.com/v3/checkouts')
+        ->map(fn (array $pair) => $pair[0]->data())->values()->all();
+}
+
+/** Checkouts cancelados no Asaas (POST /v3/checkouts/{id}/cancel), por id, na ordem. */
+function ckoSentCancels(): array
+{
+    return Http::recorded(fn (Request $r) => $r->method() === 'POST' && str_ends_with($r->url(), '/cancel') && str_contains($r->url(), '/v3/checkouts/'))
+        ->map(fn (array $pair) => basename(dirname($pair[0]->url())))->values()->all();
+}
+
+/** POST do webhook do Asaas pela rota real (token no header); devolve o WebhookEvent gravado. */
+function ckoSignupAsaasWebhook(string $event, array $payment, string $eventId): WebhookEvent
+{
+    $response = test()->postJson('/api/billing/webhooks/asaas', [
+        'id'          => $eventId,
+        'event'       => $event,
+        'dateCreated' => now()->format('Y-m-d H:i:s'),
+        'payment'     => ckoSignupAsaasPayment($payment),
+    ], ['asaas-access-token' => 'whsec_asaas_signup'])->assertOk();
+
+    return WebhookEvent::query()->findOrFail($response->json('event_id'));
 }
 
 describe('autorização e isolamento', function () {
@@ -711,6 +872,707 @@ describe('cadastro no site (signup-checkout)', function () {
             ->assertJsonPath('code', 'signup_only');
     });
 
+    it('permite confirmar o primeiro pagamento no resumo sem reabrir a contratação', function () {
+        [$subscription, $invoice] = ckoOverdueMp();
+        $subscription->update(['status' => SubscriptionStatus::Active, 'last_payment_at' => now()]);
+        $invoice->update(['status' => InvoiceStatus::Paid, 'paid_at' => now()]);
+
+        ckoAs()->getJson(route('signup-checkout.summary'))
+            ->assertOk()
+            ->assertJsonPath('data.invoices.0.status', 'paid');
+
+        ckoAs()->postJson(route('signup-checkout.contract'), [
+            'plan_id'       => $this->plan->id,
+            'billing_cycle' => 'monthly',
+        ])->assertForbidden()->assertJsonPath('code', 'signup_only');
+    });
+
+    it('[SEGURANÇA] depois de pagar, SÓ o resumo continua liberado: instruções, emissão de cobrança, cartão e contratação seguem 403 (signup_only)', function () {
+        [$subscription, $invoice] = ckoOverdueMp();
+        $subscription->update(['status' => SubscriptionStatus::Active, 'last_payment_at' => now()]);
+        $invoice->update(['status' => InvoiceStatus::Paid, 'paid_at' => now()]);
+        Http::fake(); // nada pode chegar ao gateway
+
+        ckoAs()->getJson(route('signup-checkout.summary'))->assertOk();
+
+        ckoAs()->getJson(route('signup-checkout.options', ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly']))
+            ->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs()->getJson(route('signup-checkout.instructions', ['invoice' => $invoice->id, 'method' => 'pix']))
+            ->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs()->postJson(route('signup-checkout.charge', ['invoice' => $invoice->id]), ['method' => 'pix'])
+            ->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs()->postJson(route('signup-checkout.charge', ['invoice' => $invoice->id]), ['method' => 'boleto'])
+            ->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs()->postJson(route('signup-checkout.card', ['invoice' => $invoice->id]), ['card_token' => 'token_abc', 'installments' => 1])
+            ->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs()->postJson(route('signup-checkout.contract'), ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly'])
+            ->assertForbidden()->assertJsonPath('code', 'signup_only');
+
+        Http::assertNothingSent();
+        expect(PaymentAttempt::query()->where('invoice_id', $invoice->id)->count())->toBe(0);
+    });
+
+    it('Pix no cadastro (Asaas): devolve o QR (pixQrCode), o copia-e-cola e a validade; só o webhook ativa a assinatura', function () {
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        ckoSignupAsaasFake();
+        [$user, $member] = ckoSignupUser();
+
+        $response = ckoAs($user, $member)->postJson(route('signup-checkout.contract'), [
+            'plan_id'       => $this->plan->id,
+            'billing_cycle' => 'monthly',
+            'method'        => 'pix',
+        ])->assertOk()
+            ->assertJsonPath('data.mode', 'transparent')
+            ->assertJsonPath('data.method', 'pix')
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.instructions.pix.copy_paste', '00020101021226pix-signup-1')
+            ->assertJsonPath('data.instructions.pix.qr_code_base64', 'iVBORw0KGgoAAAA=')
+            ->assertJsonPath('data.subscription.is_awaiting_first_payment', true);
+
+        expect(Carbon::parse($response->json('data.instructions.pix.expires_at'))->toDateString())->toBe('2026-10-08');
+
+        $subscription = Subscription::query()->find($response->json('data.subscription.id'));
+        $invoice      = $subscription->currentInvoice;
+
+        // Recorrência no Asaas com a nossa referência e o 1º vencimento; o Pix vem da 1ª parcela.
+        Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://api.asaas.com/v3/subscriptions'
+            && $r['billingType'] === 'UNDEFINED' && $r['cycle'] === 'MONTHLY' && $r['nextDueDate'] === '2026-10-08'
+            && $r['externalReference'] === $subscription->id);
+        Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r->url() === 'https://api.asaas.com/v3/payments/pay_signup1/pixQrCode');
+
+        // Mostrar o QR não paga nada: a assinatura só vira ativa pelo webhook.
+        expect($subscription->gateway)->toBe('asaas')
+            ->and($subscription->status)->not->toBe(SubscriptionStatus::Active)
+            ->and($subscription->last_payment_at)->toBeNull()
+            ->and($invoice->status)->toBe(InvoiceStatus::Pending);
+
+        $event = ckoSignupAsaasWebhook('PAYMENT_RECEIVED', ['status' => 'RECEIVED', 'billingType' => 'PIX', 'paymentDate' => '2026-10-05', 'externalReference' => $subscription->id], 'evt_signup_pix_received');
+        Queue::assertPushed(ProcessBillingWebhookJob::class, 1);
+        expect($subscription->fresh()->status)->not->toBe(SubscriptionStatus::Active); // o job ainda não rodou
+
+        app(ProcessWebhookEventService::class)->process($event);
+
+        expect($subscription->fresh()->status)->toBe(SubscriptionStatus::Active)
+            ->and($subscription->fresh()->last_payment_at)->not->toBeNull()
+            ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Paid);
+    });
+
+    it('boleto no cadastro (Asaas): devolve a linha digitável, o PDF e o vencimento; só o webhook ativa a assinatura', function () {
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        ckoSignupAsaasFake();
+        [$user, $member] = ckoSignupUser();
+
+        $response = ckoAs($user, $member)->postJson(route('signup-checkout.contract'), [
+            'plan_id'       => $this->plan->id,
+            'billing_cycle' => 'monthly',
+            'method'        => 'boleto',
+        ])->assertOk()
+            ->assertJsonPath('data.mode', 'transparent')
+            ->assertJsonPath('data.method', 'boleto')
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.instructions.boleto.digitable_line', '23793.38128 60082.000006 00000.000000 1 97890000029990')
+            ->assertJsonPath('data.instructions.boleto.pdf_url', 'https://www.asaas.com/b/pdf/signup1');
+
+        expect(Carbon::parse($response->json('data.instructions.boleto.due_date'))->toDateString())->toBe('2026-10-08');
+
+        $subscription = Subscription::query()->find($response->json('data.subscription.id'));
+
+        Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r->url() === 'https://api.asaas.com/v3/payments/pay_signup1/identificationField');
+        expect($subscription->status)->not->toBe(SubscriptionStatus::Active);
+
+        $event = ckoSignupAsaasWebhook('PAYMENT_RECEIVED', ['status' => 'RECEIVED', 'billingType' => 'BOLETO', 'paymentDate' => '2026-10-07', 'externalReference' => $subscription->id], 'evt_signup_boleto_received');
+        app(ProcessWebhookEventService::class)->process($event);
+
+        expect($subscription->fresh()->status)->toBe(SubscriptionStatus::Active)
+            ->and($subscription->currentInvoice->fresh()->status)->toBe(InvoiceStatus::Paid);
+    });
+
+    it('cartão no cadastro (Asaas): abre o Asaas Checkout RECORRENTE com validade e retornos; o retorno do pagador não ativa nada — só o webhook', function () {
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        ckoSignupAsaasFake();
+        [$user, $member] = ckoSignupUser();
+
+        $response = ckoAs($user, $member)->postJson(route('signup-checkout.contract'), [
+            'plan_id'       => $this->plan->id,
+            'billing_cycle' => 'monthly',
+            'method'        => 'credit_card',
+            'card_token'    => 'nao-usado',
+        ])->assertOk()
+            ->assertJsonPath('data.mode', 'hosted')
+            ->assertJsonPath('data.recurrent', true)
+            ->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_signup1');
+
+        $subscription = Subscription::query()->find($response->json('data.subscription.id'));
+        $invoice      = $subscription->currentInvoice;
+
+        Http::assertSent(function (Request $r) use ($invoice, $subscription) {
+            if ($r->url() !== 'https://api.asaas.com/v3/checkouts') {
+                return false;
+            }
+
+            $callback = $r['callback'];
+
+            return $r['chargeTypes'] === ['RECURRENT'] && $r['billingTypes'] === ['CREDIT_CARD']
+                && $r['customer'] === 'cus_signup1'
+                && $r['subscription']['cycle'] === 'MONTHLY'
+                && $r['minutesToExpire'] >= 10 && $r['minutesToExpire'] <= 1440
+                && str_contains((string) $callback['successUrl'], 'checkout_return=success')
+                && str_contains((string) $callback['cancelUrl'], 'checkout_return=cancel')
+                && str_contains((string) $callback['expiredUrl'], 'checkout_return=expired')
+                && str_contains((string) $callback['successUrl'], 'checkout_invoice=' . $invoice->id)
+                && str_starts_with((string) $callback['successUrl'], 'http')
+                // O cadastro volta para a PÁGINA do cadastro (não para Minha assinatura, que exige e-mail/WhatsApp confirmados).
+                && str_starts_with((string) $callback['successUrl'], route('signup-checkout.return'))
+                && str_starts_with((string) $callback['cancelUrl'], route('signup-checkout.return'))
+                && str_starts_with((string) $callback['expiredUrl'], route('signup-checkout.return'))
+                && ! str_contains((string) $callback['successUrl'], '/panel/')
+                && str_contains((string) $r['externalReference'], $subscription->id);
+        });
+
+        $checkout = HostedCheckout::query()->where('invoice_id', $invoice->id)->sole();
+        expect($checkout->kind)->toBe(HostedCheckout::KIND_RECURRENT)
+            ->and($checkout->status)->toBe(HostedCheckout::STATUS_ACTIVE)
+            ->and($checkout->external_checkout_id)->toBe('chk_signup1')
+            ->and($checkout->expires_at->toDateTimeString())->toBe(now()->addMinutes(60)->toDateTimeString())
+            // Nada de cartão no nosso servidor.
+            ->and($subscription->gateway_card_id)->toBeNull();
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'creditCard'));
+
+        // O pagador voltou do Asaas (successUrl) mas o pagamento ainda não foi confirmado:
+        // a assinatura não ativa pela volta — só pelo webhook.
+        ckoAs($user, $member)->getJson(route('signup-checkout.summary'))->assertOk();
+        expect($subscription->fresh()->status)->not->toBe(SubscriptionStatus::Active)
+            ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Pending);
+
+        $event = ckoSignupAsaasWebhook('PAYMENT_CONFIRMED', ['status' => 'CONFIRMED', 'billingType' => 'CREDIT_CARD', 'checkoutSession' => 'chk_signup1', 'paymentDate' => '2026-10-05', 'externalReference' => $subscription->id], 'evt_signup_card_confirmed');
+        app(ProcessWebhookEventService::class)->process($event);
+
+        expect($subscription->fresh()->status)->toBe(SubscriptionStatus::Active)
+            ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Paid);
+    });
+
+    it('volta do checkout hospedado do cadastro (success/cancel/expired): PÁGINA Auth/SignupCheckoutReturn com o estado real da fatura; a URL não ativa nada', function (string $result) {
+        [$user, $member, $subscription, $invoice] = ckoSignupHostedCard();
+
+        ckoAs($user, $member)->get(route('signup-checkout.return', ['checkout_return' => $result, 'checkout_invoice' => $invoice->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Auth/SignupCheckoutReturn')
+                ->where('status', $result)
+                ->where('invoice.id', $invoice->id)
+                ->where('invoice.status', 'pending')
+                ->where('invoice.can_pay', true)
+                ->where('subscription_active', false)
+                ->where('next_step', 'verify_email')
+                ->where('next_url', route('verification.notice', absolute: false))
+                ->where('summary_url', route('signup-checkout.summary', absolute: false))
+                ->has('tCheckout.page.checkout_return_success'));
+
+        // Voltar com "success" não paga: o estado real continua o do banco até o webhook.
+        expect($subscription->fresh()->status)->not->toBe(SubscriptionStatus::Active)
+            ->and($subscription->fresh()->last_payment_at)->toBeNull()
+            ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Pending);
+    })->with(['success', 'cancel', 'expired']);
+
+    it('cancel/expired antes de pagar: a página responde 200 e o cliente pode tentar de novo (contrato reaproveita a fatura aberta)', function (string $result) {
+        [$user, $member, $subscription, $invoice] = ckoSignupHostedCard();
+
+        ckoAs($user, $member)->get(route('signup-checkout.return', ['checkout_return' => $result, 'checkout_invoice' => $invoice->id]))->assertOk();
+
+        ckoAs($user, $member)->postJson(route('signup-checkout.contract'), [
+            'plan_id'       => $this->plan->id,
+            'billing_cycle' => 'monthly',
+            'method'        => 'credit_card',
+            'card_token'    => 'nao-usado',
+        ])->assertOk()
+            ->assertJsonPath('data.mode', 'hosted')
+            ->assertJsonPath('data.subscription.id', $subscription->id)
+            ->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_signup1');
+
+        expect(Subscription::query()->count())->toBe(1);
+    })->with(['cancel', 'expired']);
+
+    it('depois de pago, a volta continua 200 com o estado real (assinatura ativa, fatura paga) e as demais rotas do cadastro seguem 403 (signup_only)', function () {
+        [$user, $member, $subscription, $invoice] = ckoSignupHostedCard();
+
+        $event = ckoSignupAsaasWebhook('PAYMENT_CONFIRMED', ['status' => 'CONFIRMED', 'billingType' => 'CREDIT_CARD', 'checkoutSession' => 'chk_signup1', 'paymentDate' => '2026-10-05', 'externalReference' => $subscription->id], 'evt_signup_return_paid');
+        app(ProcessWebhookEventService::class)->process($event);
+        Http::fake(); // daqui para frente nada pode chegar ao gateway
+
+        ckoAs($user, $member)->get(route('signup-checkout.return', ['checkout_return' => 'success', 'checkout_invoice' => $invoice->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Auth/SignupCheckoutReturn')
+                ->where('status', 'success')
+                ->where('invoice.status', 'paid')
+                ->where('invoice.can_pay', false)
+                ->where('subscription_active', true));
+
+        // [SEGURANÇA] só o resumo e a volta ficam liberados; novas operações de pagamento continuam barradas.
+        ckoAs($user, $member)->getJson(route('signup-checkout.summary'))->assertOk();
+        ckoAs($user, $member)->getJson(route('signup-checkout.options', ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly']))->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs($user, $member)->getJson(route('signup-checkout.instructions', ['invoice' => $invoice->id, 'method' => 'pix']))->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs($user, $member)->postJson(route('signup-checkout.charge', ['invoice' => $invoice->id]), ['method' => 'pix'])->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs($user, $member)->postJson(route('signup-checkout.card', ['invoice' => $invoice->id]), ['card_token' => 'token_abc', 'installments' => 1])->assertForbidden()->assertJsonPath('code', 'signup_only');
+        ckoAs($user, $member)->postJson(route('signup-checkout.contract'), ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly', 'method' => 'credit_card', 'card_token' => 'x'])->assertForbidden()->assertJsonPath('code', 'signup_only');
+
+        Http::assertNothingSent();
+    });
+
+    it('a volta do cadastro respeita a janela de 7 dias: clínica criada há mais de 7 dias não usa o caminho do cadastro (403 signup_only)', function () {
+        [$user, $member, , $invoice] = ckoSignupHostedCard();
+        $query                       = ['checkout_return' => 'success', 'checkout_invoice' => $invoice->id];
+
+        // Dentro da janela (até o 7º dia): vale.
+        $this->clinic->forceFill(['created_at' => now()->subDays(EnsureBillingContact::SIGNUP_WINDOW_DAYS)])->saveQuietly();
+        ckoAs($user, $member)->get(route('signup-checkout.return', $query))->assertOk();
+
+        $this->clinic->forceFill(['created_at' => now()->subDays(EnsureBillingContact::SIGNUP_WINDOW_DAYS + 1)])->saveQuietly();
+        ckoAs($user, $member)->get(route('signup-checkout.return', $query))->assertForbidden();
+        ckoAs($user, $member)->getJson(route('signup-checkout.summary'))->assertForbidden()->assertJsonPath('code', 'signup_only');
+    });
+
+    it('a volta do cadastro valida a query (404) e nunca mostra a fatura de outra clínica (invoice nulo)', function () {
+        [$user, $member, , $invoice] = ckoSignupHostedCard();
+        [, $foreignInvoice]          = ckoOverdueMp(); // fatura da $this->clinic (outra clínica para o usuário abaixo)
+
+        foreach ([
+            [],
+            ['checkout_return' => 'success'],
+            ['checkout_invoice' => $invoice->id],
+            ['checkout_return' => 'paid', 'checkout_invoice' => $invoice->id],
+            ['checkout_return' => 'success', 'checkout_invoice' => 'nao-e-uuid'],
+            ['checkout_return' => ['success'], 'checkout_invoice' => $invoice->id],
+        ] as $query) {
+            ckoAs($user, $member)->get(route('signup-checkout.return', $query))->assertNotFound();
+        }
+
+        // Outro cadastro recém-criado olhando a fatura da primeira clínica: 200, mas sem nenhum dado dela.
+        $other                = Entity::factory()->make(['is_client' => true, 'active' => true]);
+        $other->skipAutoTrial = true;
+        $other->save();
+        $otherUser   = User::factory()->unverified()->create();
+        $otherMember = createEntityUser($other, $otherUser, ClientRule::Admin->value, isOwner: true);
+
+        ckoAs($otherUser, $otherMember)->get(route('signup-checkout.return', ['checkout_return' => 'success', 'checkout_invoice' => $foreignInvoice->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('invoice', null)
+                ->where('subscription_active', false));
+    });
+
+    it('próximo passo da volta segue o painel: e-mail → WhatsApp (só se o gate do painel exigiria) → painel', function () {
+        [$user, $member, , $invoice] = ckoSignupHostedCard();
+        $query                       = ['checkout_return' => 'success', 'checkout_invoice' => $invoice->id];
+        $expectStep                  = fn (string $expected) => ckoAs($user->fresh(), $member)
+            ->get(route('signup-checkout.return', $query))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('next_step', $expected));
+
+        $user->forceFill(['phone' => '11988887777', 'phone_verified_at' => null, 'email_verified_at' => null])->save();
+        $expectStep('verify_email');
+
+        // E-mail confirmado, WhatsApp não: só pede o WhatsApp se o canal consegue entregar o código (mesma regra do gate).
+        $user->forceFill(['email_verified_at' => now()])->save();
+        $expectStep('panel');
+
+        WhatsAppSetting::create(['entity_id' => null, 'active' => true, 'webhook_token' => WhatsAppSetting::generateWebhookToken(), 'app_id' => 'global-app-otp']);
+        config(['whatsapp.driver' => 'mock', 'whatsapp.mock_requires_code' => true]);
+        $expectStep('verify_phone');
+
+        $user->forceFill(['phone_verified_at' => now()])->save();
+        $expectStep('panel');
+    });
+
+    it('[cliente sem endereço] o Asaas recusa o cliente no Checkout: abre SEM ele, o cartão segue e o billing_log traz só os campos que faltam', function () {
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        $calls = 0;
+        ckoSignupAsaasFake(function () use (&$calls) {
+            $calls++;
+
+            return $calls === 1
+                ? Http::response(['errors' => [['code' => 'invalid_object', 'description' => 'O campo phone deve existir para o customer informado.'], ['code' => 'invalid_object', 'description' => 'O campo postalCode deve existir para o customer informado.']]], 400)
+                : Http::response(['id' => 'chk_sem_cliente', 'status' => 'ACTIVE', 'minutesToExpire' => 60, 'link' => 'https://asaas.com/checkoutSession/show?id=chk_sem_cliente']);
+        });
+
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk()
+            ->assertJsonPath('data.mode', 'hosted')
+            ->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_sem_cliente');
+
+        $bodies = Http::recorded(fn (Request $r) => $r->url() === 'https://api.asaas.com/v3/checkouts')->map(fn (array $pair) => $pair[0]->data())->values()->all();
+        expect($bodies)->toHaveCount(2)
+            ->and(array_key_exists('customer', $bodies[0]))->toBeTrue()
+            ->and(array_key_exists('customer', $bodies[1]))->toBeFalse()
+            ->and(HostedCheckout::query()->sole()->external_checkout_id)->toBe('chk_sem_cliente');
+
+        $log = BillingLog::query()->where('message', 'like', '%SEM o cliente%')->sole();
+        expect($log->level)->toBe('warning')
+            ->and($log->context['missing_fields'])->toBe(['phone', 'postalCode'])
+            ->and(json_encode($log->context))->not->toContain('@')
+            ->and(HostedCheckout::query()->count())->toBe(1);
+    });
+
+    it('[L2-1] checkout aberto pelo CADASTRO e retomado pelo PAINEL: fecha o link antigo no Asaas ANTES de abrir outro, e o novo volta para Minha assinatura', function () {
+        ckoHostedSwapFake();
+
+        $first = ckoOpenHostedCard('signup-checkout.contract')->assertOk()->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_n1');
+        $old   = HostedCheckout::query()->sole();
+        expect($old->metadata['return_target'])->toBe('signup');
+
+        ckoOpenHostedCard('panel.my-subscription.contract')->assertOk()
+            ->assertJsonPath('data.subscription.id', $first->json('data.subscription.id'))
+            ->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_n2');
+
+        $checkouts = HostedCheckout::query()->orderBy('created_at')->orderBy('external_checkout_id')->get()->keyBy('external_checkout_id');
+        expect($checkouts)->toHaveCount(2)
+            ->and($checkouts['chk_n1']->status)->toBe(HostedCheckout::STATUS_SUPERSEDED)
+            ->and($checkouts['chk_n1']->metadata['superseded_reason'])->toBe('return_target_changed')
+            ->and($checkouts['chk_n2']->status)->toBe(HostedCheckout::STATUS_ACTIVE)
+            ->and($checkouts['chk_n2']->metadata['return_target'])->toBe('panel')
+            // NUNCA duas cobranças vivas da mesma fatura.
+            ->and(HostedCheckout::query()->where('invoice_id', $old->invoice_id)->where('status', HostedCheckout::STATUS_ACTIVE)->count())->toBe(1);
+
+        expect(ckoSentCancels())->toBe(['chk_n1']);
+        [$signupOpen, $panelOpen] = ckoSentCheckoutBodies();
+        expect($signupOpen['callback']['successUrl'])->toStartWith(route('signup-checkout.return'))
+            ->and($panelOpen['callback']['successUrl'])->toStartWith(route('panel.my-subscription.index'))
+            ->and($panelOpen['callback']['cancelUrl'])->toStartWith(route('panel.my-subscription.index'))
+            ->and($panelOpen['callback']['expiredUrl'])->toStartWith(route('panel.my-subscription.index'));
+
+        // O cancelamento saiu ANTES da abertura do novo.
+        $order = Http::recorded()->map(fn (array $pair) => $pair[0]->method() . ' ' . $pair[0]->url())->values()->all();
+        expect(array_search('POST https://api.asaas.com/v3/checkouts/chk_n1/cancel', $order, true))
+            ->toBeLessThan(array_keys(array_filter($order, fn (string $line) => $line === 'POST https://api.asaas.com/v3/checkouts'))[1]);
+    });
+
+    it('[L2-1] e o inverso (painel → cadastro): o link do painel é fechado e o novo volta para a página do cadastro', function () {
+        ckoHostedSwapFake();
+
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk();
+        ckoOpenHostedCard('panel.my-subscription.contract')->assertOk()->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_n2');
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk()->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_n3');
+
+        $checkouts = HostedCheckout::query()->get()->keyBy('external_checkout_id');
+        expect($checkouts)->toHaveCount(3)
+            ->and($checkouts['chk_n1']->status)->toBe(HostedCheckout::STATUS_SUPERSEDED)
+            ->and($checkouts['chk_n2']->status)->toBe(HostedCheckout::STATUS_SUPERSEDED)
+            ->and($checkouts['chk_n3']->status)->toBe(HostedCheckout::STATUS_ACTIVE)
+            ->and($checkouts['chk_n3']->metadata['return_target'])->toBe('signup')
+            ->and(ckoSentCancels())->toBe(['chk_n1', 'chk_n2']);
+        expect(ckoSentCheckoutBodies()[2]['callback']['successUrl'])->toStartWith(route('signup-checkout.return'))->not->toContain('/panel/');
+    });
+
+    it('[L2-1] mesmo alvo: o link aberto é REAPROVEITADO (nada cancelado, nenhuma nova abertura)', function (string $route) {
+        ckoHostedSwapFake();
+
+        $a = ckoOpenHostedCard($route)->assertOk();
+        $b = ckoOpenHostedCard($route)->assertOk();
+
+        expect($b->json('data.checkout_url'))->toBe($a->json('data.checkout_url'))->toBe('https://asaas.com/checkoutSession/show?id=chk_n1')
+            ->and(HostedCheckout::query()->count())->toBe(1)
+            ->and(HostedCheckout::query()->sole()->status)->toBe(HostedCheckout::STATUS_ACTIVE)
+            ->and(ckoSentCheckoutBodies())->toHaveCount(1)
+            ->and(ckoSentCancels())->toBe([]);
+    })->with(['signup-checkout.contract', 'panel.my-subscription.contract']);
+
+    it('[L2-1] sessão LEGADA (sem return_target) vale como painel: o painel a reaproveita, o cadastro a fecha e abre outra', function () {
+        ckoHostedSwapFake();
+
+        ckoOpenHostedCard('panel.my-subscription.contract')->assertOk();
+        HostedCheckout::query()->update(['metadata' => null]); // aberta antes de o alvo ser guardado
+
+        // Painel: mesmo alvo (legado = painel) → reaproveita.
+        ckoOpenHostedCard('panel.my-subscription.contract')->assertOk()->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_n1');
+        expect(ckoSentCheckoutBodies())->toHaveCount(1)->and(ckoSentCancels())->toBe([]);
+
+        // Cadastro: alvo diferente → o legado é fechado e um novo (com o alvo gravado) é aberto.
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk()->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_n2');
+
+        $checkouts = HostedCheckout::query()->get()->keyBy('external_checkout_id');
+        expect($checkouts['chk_n1']->status)->toBe(HostedCheckout::STATUS_SUPERSEDED)
+            ->and($checkouts['chk_n2']->metadata['return_target'])->toBe('signup')
+            ->and(ckoSentCancels())->toBe(['chk_n1'])
+            ->and(ckoSentCheckoutBodies()[1]['callback']['successUrl'])->toStartWith(route('signup-checkout.return'));
+    });
+
+    it('[L2-1] falha ao fechar o link antigo no Asaas: 502, NADA muda e nenhum checkout novo é aberto (nunca duas cobranças vivas)', function () {
+        ckoHostedSwapFake(cancelFails: true);
+
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk();
+
+        ckoOpenHostedCard('panel.my-subscription.contract')->assertStatus(502)->assertJsonPath('code', 'gateway_error');
+
+        $only = HostedCheckout::query()->sole();
+        expect($only->external_checkout_id)->toBe('chk_n1')
+            ->and($only->status)->toBe(HostedCheckout::STATUS_ACTIVE)
+            ->and($only->metadata['return_target'])->toBe('signup')
+            ->and(ckoSentCheckoutBodies())->toHaveCount(1);
+    });
+
+    it('[L2-1] o Asaas responde PAID ao cancelar o link antigo (pago, webhook ainda não chegou): 409 aguardando confirmação, NENHUM novo checkout, o antigo fica conciliado como pago', function () {
+        ckoHostedSwapFake(cancel: 'PAID');
+
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk();
+
+        ckoOpenHostedCard('panel.my-subscription.contract')->assertStatus(409)->assertJsonPath('code', 'card_awaiting_confirmation');
+
+        $only = HostedCheckout::query()->sole();
+        expect($only->external_checkout_id)->toBe('chk_n1')
+            ->and($only->status)->toBe(HostedCheckout::STATUS_PAID) // conciliado: a fatura já aparece como aguardando
+            ->and(ckoSentCheckoutBodies())->toHaveCount(1)
+            ->and(ckoSentCancels())->toBe(['chk_n1']);
+
+        // Tentar de novo (qualquer alvo) segue barrado, sem nem chamar o gateway outra vez.
+        ckoOpenHostedCard('panel.my-subscription.contract')->assertStatus(409)->assertJsonPath('code', 'card_awaiting_confirmation');
+        ckoOpenHostedCard('signup-checkout.contract')->assertStatus(409)->assertJsonPath('code', 'card_awaiting_confirmation');
+        expect(ckoSentCheckoutBodies())->toHaveCount(1)->and(ckoSentCancels())->toBe(['chk_n1']);
+    });
+
+    it('[L2-1] a confirmação chega DURANTE o cancelamento (checkout completed + fatura paga): 409, nada é marcado como substituído e nenhum novo é aberto', function (string $scenario) {
+        ckoHostedSwapFake(cancel: function () use ($scenario) {
+            // O que o webhook faz enquanto a chamada de cancelamento está no ar.
+            if ($scenario === 'completed') {
+                HostedCheckout::query()->update(['status' => HostedCheckout::STATUS_COMPLETED, 'completed_at' => now()]);
+                Invoice::query()->update(['status' => InvoiceStatus::Paid->value, 'paid_at' => now()]);
+            } else {
+                HostedCheckout::query()->update(['status' => HostedCheckout::STATUS_PAID]);
+            }
+
+            return Http::response(['status' => 'CANCELED']);
+        });
+
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk();
+
+        $response = ckoOpenHostedCard('panel.my-subscription.contract')->assertStatus(409);
+
+        expect($response->json('code'))->toBe($scenario === 'completed' ? 'invoice_not_payable' : 'card_awaiting_confirmation');
+
+        $only = HostedCheckout::query()->sole();
+        expect($only->status)->toBe($scenario === 'completed' ? HostedCheckout::STATUS_COMPLETED : HostedCheckout::STATUS_PAID)
+            ->and($only->status)->not->toBe(HostedCheckout::STATUS_SUPERSEDED)
+            ->and(ckoSentCheckoutBodies())->toHaveCount(1);
+    })->with(['completed', 'paid']);
+
+    it('[L2-1] estado do cancelamento: EXPIRED segue (abre o novo); ACTIVE ou resposta sem estado = 502 e nada muda', function (string $cancelStatus, bool $opens) {
+        ckoHostedSwapFake(cancel: $cancelStatus);
+
+        ckoOpenHostedCard('signup-checkout.contract')->assertOk();
+        $second = ckoOpenHostedCard('panel.my-subscription.contract');
+
+        if ($opens) {
+            $second->assertOk()->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_n2');
+            expect(HostedCheckout::query()->where('external_checkout_id', 'chk_n1')->sole()->status)->toBe(HostedCheckout::STATUS_SUPERSEDED)
+                ->and(ckoSentCheckoutBodies())->toHaveCount(2);
+
+            return;
+        }
+
+        $second->assertStatus(502)->assertJsonPath('code', 'gateway_error');
+        expect(HostedCheckout::query()->sole()->status)->toBe(HostedCheckout::STATUS_ACTIVE)
+            ->and(ckoSentCheckoutBodies())->toHaveCount(1);
+    })->with([
+        'expired'      => ['EXPIRED', true],
+        'canceled'     => ['CANCELED', true],
+        'active'       => ['ACTIVE', false],
+        'sem estado'   => ['', false],
+        'desconhecido' => ['QUALQUER', false],
+    ]);
+
+    it('[L2-1] a leitura (GET instructions) só mostra o link aberto para o MESMO alvo; para o outro pede a emissão', function () {
+        ckoHostedSwapFake();
+
+        $response = ckoOpenHostedCard('signup-checkout.contract')->assertOk();
+        $invoice  = $response->json('data.invoice.id');
+
+        ckoAs()->getJson(route('signup-checkout.instructions', ['invoice' => $invoice, 'method' => 'credit_card']))
+            ->assertOk()->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_n1');
+
+        $panel = ckoAs()->getJson(route('panel.my-subscription.instructions', ['invoice' => $invoice, 'method' => 'credit_card']))->assertOk();
+        expect($panel->json('data.checkout_url'))->toBeNull()
+            ->and($panel->json('data.issue_required'))->toBeTrue()
+            ->and(HostedCheckout::query()->sole()->status)->toBe(HostedCheckout::STATUS_ACTIVE) // ler não fecha nada
+            ->and(ckoSentCancels())->toBe([]);
+    });
+
+    it('entrega DUPLICADA do webhook no fluxo de cadastro: um só evento, um só pagamento, nenhum efeito duplo', function () {
+        Event::fake([InvoicePaid::class]);
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        ckoSignupAsaasFake();
+        [$user, $member] = ckoSignupUser();
+
+        $subscription = Subscription::query()->find(
+            ckoAs($user, $member)->postJson(route('signup-checkout.contract'), ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly', 'method' => 'pix'])
+                ->assertOk()->json('data.subscription.id'),
+        );
+
+        $payment = ['status' => 'RECEIVED', 'billingType' => 'PIX', 'paymentDate' => '2026-10-05', 'externalReference' => $subscription->id];
+
+        // O Asaas reenvia o MESMO evento (mesmo id): mesma linha, dois jobs na fila.
+        $first  = ckoSignupAsaasWebhook('PAYMENT_RECEIVED', $payment, 'evt_signup_dup');
+        $second = ckoSignupAsaasWebhook('PAYMENT_RECEIVED', $payment, 'evt_signup_dup');
+
+        expect($second->id)->toBe($first->id)
+            ->and(WebhookEvent::query()->where('external_event_id', 'evt_signup_dup')->count())->toBe(1);
+        Queue::assertPushed(ProcessBillingWebhookJob::class, 2);
+
+        // Os dois jobs rodam (mesmo worker ou em paralelo, um depois do outro).
+        app(ProcessWebhookEventService::class)->process($first->fresh());
+        $endsAt = $subscription->fresh()->ends_at;
+        app(ProcessWebhookEventService::class)->process($first->fresh());
+
+        // O mesmo pagamento chega de novo com OUTRO id de evento (CONFIRMED seguido de RECEIVED, como o Asaas faz no cartão/Pix).
+        $other = ckoSignupAsaasWebhook('PAYMENT_CONFIRMED', ['status' => 'CONFIRMED'] + $payment, 'evt_signup_dup_confirmed');
+        app(ProcessWebhookEventService::class)->process($other);
+
+        $subscription->refresh();
+        $invoice = $subscription->currentInvoice;
+
+        expect($subscription->status)->toBe(SubscriptionStatus::Active)
+            ->and($subscription->ends_at->toDateTimeString())->toBe($endsAt->toDateTimeString()) // o período não foi estendido de novo
+            ->and($invoice->status)->toBe(InvoiceStatus::Paid)
+            ->and(Payment::query()->where('invoice_id', $invoice->id)->where('external_payment_id', 'pay_signup1')->count())->toBe(1)
+            ->and(FinancialEvent::query()->where('event_type', BillingEventType::InvoicePaid->value)->where('invoice_id', $invoice->id)->count())->toBe(1)
+            ->and(FinancialEvent::query()->where('event_type', BillingEventType::SubscriptionActivated->value)->where('subscription_id', $subscription->id)->count())->toBe(1)
+            ->and($first->fresh()->status)->toBe(WebhookEventStatus::Processed);
+
+        Event::assertDispatchedTimes(InvoicePaid::class, 1);
+    });
+
+    it('[S3] falha do Asaas na contratação do cadastro: log e billing_logs só com código/status/correlação — nunca CPF, CNPJ, e-mail, telefone, NOME nem ENDEREÇO do corpo (JSON ou bruto)', function (string $scenario) {
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        [$user, $member] = ckoSignupUser();
+        $pii             = ['123.456.789-09', '12345678909', '11.222.333/0001-81', 'maria.pessoal@clinica.test', '11987654321', 'Maria da Silva Pessoal', 'Rua das Flores, 123'];
+        $echo            = "O CPF {$pii[0]} ({$pii[1]}), CNPJ {$pii[2]}, e-mail {$pii[3]}, telefone {$pii[4]}, nome {$pii[5]} e endereço {$pii[6]} informados são inválidos.";
+
+        Http::fake(function (Request $request) use ($echo, $scenario) {
+            $url = $request->url();
+
+            if (str_starts_with($url, 'https://api.asaas.com/v3/customers')) {
+                if ($request->method() === 'GET') {
+                    return Http::response(['data' => []]);
+                }
+
+                return $scenario === 'customer_json'
+                    ? Http::response(['errors' => [['code' => 'invalid_cpfCnpj', 'description' => $echo]]], 400)
+                    : Http::response(['id' => 'cus_signup1']);
+            }
+
+            if ($url === 'https://api.asaas.com/v3/subscriptions' && $request->method() === 'POST') {
+                // Corpo BRUTO (não é o formato {"errors": …}): HTML/texto de um proxy ou do gateway, ecoando o que enviamos.
+                return Http::response("<html><body>Bad Request: {$echo}</body></html>", 400);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged) {
+            $logged[] = $event->message . ' ' . json_encode($event->context, JSON_PARTIAL_OUTPUT_ON_ERROR);
+        });
+
+        ckoAs($user, $member)->postJson(route('signup-checkout.contract'), ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly', 'method' => 'pix'])
+            ->assertStatus(502)->assertJsonPath('code', 'gateway_error');
+
+        $failure = collect($logged)->first(fn (string $line) => str_contains($line, 'contratação falhou no gateway'));
+        expect($failure)->not->toBeNull()
+            ->and($failure)->toContain('"trigger":')
+            ->and($failure)->toContain('correlation_id')
+            ->and($failure)->not->toContain('"error":'); // a mensagem da exceção nunca vai ao log
+
+        if ($scenario === 'customer_json') {
+            expect($failure)->toContain('invalid_cpfCnpj'); // o código continua à vista
+        }
+
+        // Nenhum log da requisição, nenhum registro de cobrança no banco e nenhuma tentativa guardada carrega o dado.
+        $everything = implode("\n", $logged)
+            . "\n" . json_encode(DB::table('billing_logs')->get(), JSON_PARTIAL_OUTPUT_ON_ERROR)
+            . "\n" . json_encode(DB::table('payment_attempts')->get(), JSON_PARTIAL_OUTPUT_ON_ERROR);
+
+        foreach ($pii as $value) {
+            expect(str_contains($everything, $value))->toBeFalse("o valor pessoal '{$value}' apareceu num log/registro");
+        }
+        expect(str_contains($everything, '<html>'))->toBeFalse('o corpo bruto da resposta foi gravado');
+    })->with(['erro JSON do cliente' => ['customer_json'], 'corpo bruto na criação da assinatura' => ['subscription_raw']]);
+
+    it('[L2] cartão Asaas no cadastro: repetir o POST da contratação SEM card_token (chave nova) reabre o mesmo checkout hospedado — nunca card_token_required', function () {
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        ckoSignupAsaasFake();
+        [$user, $member] = ckoSignupUser();
+        $body            = ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly', 'method' => 'credit_card'];
+
+        $first = ckoAs($user, $member)->postJson(route('signup-checkout.contract'), $body + ['card_token' => 'nao-usado', 'idempotency_key' => 'k-1'])
+            ->assertOk()->assertJsonPath('data.mode', 'hosted');
+
+        // A 1ª resposta se perdeu: o front repete, agora sem token (o cartão é digitado no ambiente do Asaas) e com chave nova.
+        $second = ckoAs($user, $member)->postJson(route('signup-checkout.contract'), $body + ['idempotency_key' => 'k-2'])
+            ->assertOk()
+            ->assertJsonPath('data.mode', 'hosted')
+            ->assertJsonPath('data.recurrent', true)
+            ->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_signup1');
+
+        expect($second->json('data.subscription.id'))->toBe($first->json('data.subscription.id'))
+            ->and(Subscription::query()->forEntity((string) $this->clinic->id)->count())->toBe(1)
+            ->and(HostedCheckout::query()->count())->toBe(1);
+
+        // Nada foi criado duas vezes no Asaas: uma recorrência, um checkout.
+        expect(Http::recorded(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://api.asaas.com/v3/subscriptions')->count())->toBe(1)
+            ->and(Http::recorded(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://api.asaas.com/v3/checkouts')->count())->toBe(1);
+    });
+
+    it('[L2] a abertura do checkout hospedado falhou DEPOIS de criar a assinatura (502): repetir sem token abre o hospedado e não pede card_token', function () {
+        config(['billing.default_gateway' => 'asaas', 'billing.gateways.asaas.webhook_secret' => 'whsec_asaas_signup']);
+        $opened = 0;
+        ckoSignupAsaasFake(function () use (&$opened) {
+            return ++$opened === 1
+                ? Http::response(['errors' => [['code' => 'internal_error', 'description' => 'tente de novo']]], 500)
+                : Http::response(['id' => 'chk_signup2', 'status' => 'ACTIVE', 'minutesToExpire' => 60, 'link' => 'https://asaas.com/checkoutSession/show?id=chk_signup2']);
+        });
+        [$user, $member] = ckoSignupUser();
+        $body            = ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly', 'method' => 'credit_card'];
+
+        ckoAs($user, $member)->postJson(route('signup-checkout.contract'), $body + ['card_token' => 'nao-usado', 'idempotency_key' => 'k-1'])
+            ->assertStatus(502)->assertJsonPath('code', 'gateway_error');
+
+        ckoAs($user, $member)->postJson(route('signup-checkout.contract'), $body + ['idempotency_key' => 'k-2'])
+            ->assertOk()
+            ->assertJsonPath('data.mode', 'hosted')
+            ->assertJsonPath('data.checkout_url', 'https://asaas.com/checkoutSession/show?id=chk_signup2');
+
+        expect(Subscription::query()->forEntity((string) $this->clinic->id)->count())->toBe(1);
+    });
+
+    it('[L2] gateway com cartão transparente (Pagar.me) continua exigindo o token na repetição de uma contratação pendente', function () {
+        config(['billing.default_gateway' => 'pagarme']);
+        [$user, $member] = ckoSignupUser();
+        $trialLess       = Subscription::factory()->gateway('pagarme')->for($this->clinic)->for($this->plan)->create([
+            'status'                  => SubscriptionStatus::PastDue,
+            'billing_mode'            => SubscriptionBillingMode::Gateway,
+            'billing_cycle'           => BillingCycle::Monthly,
+            'amount'                  => 299.90,
+            'last_payment_at'         => null,
+            'next_billing_at'         => '2026-10-08 23:59:59',
+            'gateway_subscription_id' => null,
+        ]);
+        $invoice = Invoice::query()->create([
+            'entity_id' => $this->clinic->id, 'subscription_id' => $trialLess->id, 'plan_id' => $this->plan->id, 'gateway_code' => 'pagarme',
+            'reference' => 'INV-L2', 'period_start' => '2026-10-05', 'period_end' => '2026-11-05', 'due_at' => '2026-10-08 23:59:59',
+            'amount'    => 299.90, 'currency' => 'BRL', 'status' => InvoiceStatus::Pending->value,
+        ]);
+        $trialLess->update(['current_invoice_id' => $invoice->id]);
+        Http::fake();
+
+        ckoAs($user, $member)->postJson(route('signup-checkout.contract'), ['plan_id' => $this->plan->id, 'billing_cycle' => 'monthly', 'method' => 'credit_card'])
+            ->assertStatus(422)->assertJsonPath('code', 'card_token_required');
+    });
+
+    it('o resumo do cadastro continua bloqueado para clínica fora da janela inicial', function () {
+        $this->clinic->forceFill(['created_at' => now()->subDays(8)])->save();
+
+        ckoAs()->getJson(route('signup-checkout.summary'))
+            ->assertForbidden()
+            ->assertJsonPath('code', 'signup_only');
+    });
+
     it('cadastro com start_mode=checkout: cria a clínica sem trial e devolve as rotas do checkout', function () {
         Event::fake([Registered::class]);
         Http::fake();
@@ -725,6 +1587,7 @@ describe('cadastro no site (signup-checkout)', function () {
             'plan_id'               => $this->plan->id,
             'billing_cycle'         => 'yearly',
             'start_mode'            => 'checkout',
+            'company_cnpj'          => '52998224725', // CPF do responsável: "Contratar agora" exige documento
         ])->assertOk()
             ->assertJsonPath('checkout.contract', '/signup-checkout/contract');
 

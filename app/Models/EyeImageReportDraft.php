@@ -62,6 +62,9 @@ class EyeImageReportDraft extends Model
         'image_report_payload',
         'status',
         'submitted_at',
+        'return_reason',
+        'returned_at',
+        'returned_by',
         'issued_at',
         'issued_documentation_id',
     ];
@@ -74,6 +77,7 @@ class EyeImageReportDraft extends Model
             'document_date'        => 'date',
             'status'               => DraftStatus::class,
             'submitted_at'         => 'datetime',
+            'returned_at'          => 'datetime',
             'issued_at'            => 'datetime',
         ];
     }
@@ -98,15 +102,49 @@ class EyeImageReportDraft extends Model
         return $this->belongsTo(Doctor::class, 'resolved_doctor_id');
     }
 
-    /** Rascunho/enviado ainda podem ser editados; emitido/descartado não. */
-    public function isEditable(): bool
+    public function returnedBy(): BelongsTo
     {
-        return in_array($this->status, [DraftStatus::Draft, DraftStatus::Submitted], true);
+        return $this->belongsTo(User::class, 'returned_by');
     }
 
+    /** Rascunho/enviado/devolvido ainda podem ser editados; emitido/descartado não. */
+    public function isEditable(): bool
+    {
+        return in_array($this->status, [DraftStatus::Draft, DraftStatus::Submitted, DraftStatus::Returned], true);
+    }
+
+    /** O técnico pode (re)enviar ao médico: rascunho novo ou devolvido. */
+    public function canBeSubmitted(): bool
+    {
+        return in_array($this->status, [DraftStatus::Draft, DraftStatus::Returned], true);
+    }
+
+    /** Reenviar limpa o motivo da devolução anterior (o histórico fica na auditoria). */
     public function markSubmitted(): void
     {
-        $this->update(['status' => DraftStatus::Submitted, 'submitted_at' => now()]);
+        $this->update([
+            'status'        => DraftStatus::Submitted,
+            'submitted_at'  => now(),
+            'return_reason' => null,
+            'returned_at'   => null,
+            'returned_by'   => null,
+        ]);
+    }
+
+    /**
+     * O médico devolve o rascunho ao técnico. Sobe a revisão: quem estava com
+     * o rascunho aberto (ainda "Enviado") não salva por cima sem ver o motivo.
+     * Sempre chamado DENTRO do lockForUpdate() do controller.
+     */
+    public function markReturned(string $reason, string $userId): void
+    {
+        $this->update([
+            'status'        => DraftStatus::Returned,
+            'return_reason' => $reason,
+            'returned_at'   => now(),
+            'returned_by'   => $userId,
+        ]);
+        $this->incrementRevision();
     }
 
     public function markIssued(string $documentationId): void

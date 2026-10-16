@@ -208,7 +208,7 @@ it('recusa (4xx) devolve o erro no formato errors[].code/description e o status 
 
     expect($result->success)->toBeFalse()
         ->and($result->httpStatus)->toBe(400)
-        ->and($result->errorMessage)->toBe('HTTP 400 invalid_customer: Cliente inválido ou não informado.');
+        ->and($result->errorMessage)->toBe('HTTP 400 invalid_customer');
 });
 
 it('2xx sem id não conta como criada e deixa o status nulo (o orquestrador confere pela referência)', function () {
@@ -313,6 +313,29 @@ it('sem documento procura pela externalReference antes de criar', function () {
     Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r['externalReference'] === '9f1c2d3e-0000-4000-8000-000000000001');
 });
 
+it('o cpfCnpj do cliente vai CANÔNICO, sem pontuação: CPF/CNPJ numérico e CNPJ alfanumérico com as LETRAS', function (string $document, string $sent) {
+    agwFakeCustomers([]);
+
+    agwGateway()->upsertCustomer(agwCustomer(document: $document));
+
+    // A busca por documento e a criação do cliente mandam o MESMO valor.
+    Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r['cpfCnpj'] === $sent);
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r['cpfCnpj'] === $sent);
+})->with([
+    'CNPJ mascarado'          => ['12.345.678/0001-95', '12345678000195'],
+    'CPF mascarado'           => ['529.982.247-25', '52998224725'],
+    'CNPJ alfanumérico'       => ['HC.HGX.N73/0001-70', 'HCHGXN73000170'],
+    'alfanumérico minúsculas' => ['hchgxn73000170', 'HCHGXN73000170'],
+]);
+
+it('valor que não tem forma de CPF/CNPJ cai no comportamento antigo (só dígitos) — o Asaas recusa e o erro aparece como sempre', function () {
+    agwFakeCustomers([]);
+
+    agwGateway()->upsertCustomer(agwCustomer(document: 'n/a 123'));
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r['cpfCnpj'] === '123');
+});
+
 it('celular vai em mobilePhone e fixo em phone (fixo em mobilePhone é recusado)', function (?string $phone, array $expected) {
     agwFakeCustomers([]);
 
@@ -337,7 +360,7 @@ it('celular vai em mobilePhone e fixo em phone (fixo em mobilePhone é recusado)
     'sem telefone'    => [null, []],
 ]);
 
-it('falha na criação do cliente vira exceção com a descrição do Asaas', function () {
+it('falha na criação do cliente vira exceção com o CÓDIGO do Asaas (nunca a descrição, que pode ecoar dado pessoal)', function () {
     Http::fake(function (Request $r) {
         return $r->method() === 'GET'
             ? Http::response(['object' => 'list', 'hasMore' => false, 'totalCount' => 0, 'data' => []])
@@ -345,7 +368,7 @@ it('falha na criação do cliente vira exceção com a descrição do Asaas', fu
     });
 
     expect(fn () => agwGateway()->upsertCustomer(agwCustomer()))
-        ->toThrow(GatewayIntegrationException::class, 'O CPF/CNPJ informado é inválido.');
+        ->toThrow(GatewayIntegrationException::class, 'HTTP 400 invalid_cpfCnpj');
 });
 
 // ── DELETE /v3/subscriptions/{id} ────────────────────────────────────────────
@@ -382,7 +405,7 @@ it('404 no DELETE sem confirmação de que foi removida (ex.: URL errada) segue 
     $result = agwCancel();
 
     expect($result->success)->toBeFalse()
-        ->and($result->errorMessage)->toBe('HTTP 404 not_found: Não encontrado.');
+        ->and($result->errorMessage)->toBe('HTTP 404 not_found');
 });
 
 it('5xx no DELETE é falha (o job tenta de novo)', function () {

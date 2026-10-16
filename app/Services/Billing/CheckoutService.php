@@ -10,7 +10,7 @@ use App\Events\Billing\InvoicePaid;
 use App\Exceptions\Billing\{CheckoutException, GatewayIntegrationException, GatewayResolutionException, SubscriptionSupersededException};
 use App\Models\Billing\{Gateway, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
-use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PlanPricing};
+use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PayerDocument, PlanPricing};
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -125,6 +125,35 @@ class CheckoutService
     }
 
     /**
+     * Volta do checkout hospedado do CADASTRO (signup-checkout.return): o estado REAL da fatura e da assinatura da
+     * clínica. O parâmetro da URL (success/cancel/expired) só diz por onde o cliente voltou — quem confirma o
+     * pagamento é o webhook. Fatura de outra clínica (ou inexistente) volta como null: nada vaza.
+     *
+     * @return array{invoice: array{id: string, status: ?string, can_pay: bool, awaiting_confirmation: bool}|null, subscription_active: bool}
+     */
+    public function signupReturnState(Entity $entity, string $invoiceId): array
+    {
+        $this->assertClient($entity);
+
+        $current  = $this->currentSubscription($entity);
+        $billable = $current && $this->isBillable($current) ? $current : null;
+        $invoice  = Invoice::query()->where('entity_id', $entity->id)->whereKey($invoiceId)->first();
+        $payable  = $invoice !== null && $billable !== null && $this->payableInvoices($billable)->contains('id', $invoice->id);
+
+        return [
+            'invoice' => $invoice === null ? null : [
+                'id'                    => (string) $invoice->id,
+                'status'                => $invoice->status?->value,
+                'can_pay'               => $payable,
+                'awaiting_confirmation' => $payable && $this->hosted->awaitingConfirmation($invoice),
+            ],
+            'subscription_active' => $current !== null
+                && $current->status === SubscriptionStatus::Active
+                && $current->hasBeenPaid(),
+        ];
+    }
+
+    /**
      * Formas de pagamento para contratar (plano/ciclo): gateway que será
      * usado, o que é transparente, a configuração do cartão e as parcelas.
      * Quem já tem um plano pago e vigente vê a troca (`change`): upgrade com
@@ -184,7 +213,7 @@ class CheckoutService
      *
      * @return array<string, mixed>
      */
-    public function instructions(Entity $entity, string $invoiceId, CheckoutMethod $method): array
+    public function instructions(Entity $entity, string $invoiceId, CheckoutMethod $method, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
     {
         if (($pack = $this->aiPackInvoice($entity, $invoiceId)) !== null) {
             return $this->aiPacks->instructions($entity, $pack, $method, issue: false);
@@ -192,7 +221,7 @@ class CheckoutService
 
         [$subscription, $invoice] = $this->payableInvoiceOf($entity, $invoiceId);
 
-        return $this->instructionsFor($subscription, $invoice, $method, issue: false);
+        return $this->instructionsFor($subscription, $invoice, $method, issue: false, returnTarget: $returnTarget);
     }
 
     /**
@@ -202,28 +231,28 @@ class CheckoutService
      *
      * @return array<string, mixed>
      */
-    public function issueCharge(Entity $entity, string $invoiceId, CheckoutMethod $method, ?string $idempotencyKey = null): array
+    public function issueCharge(Entity $entity, string $invoiceId, CheckoutMethod $method, ?string $idempotencyKey = null, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
     {
         if (($pack = $this->aiPackInvoice($entity, $invoiceId)) !== null) {
             return $this->aiPacks->instructions($entity, $pack, $method, issue: true, idempotencyKey: $idempotencyKey);
         }
 
-        return $this->exclusive($entity, 'issue:' . $invoiceId . ':' . $method->value, $idempotencyKey, function () use ($entity, $invoiceId, $method): array {
+        return $this->exclusive($entity, 'issue:' . $invoiceId . ':' . $method->value, $idempotencyKey, function () use ($entity, $invoiceId, $method, $returnTarget): array {
             [$subscription, $invoice] = $this->payableInvoiceOf($entity, $invoiceId);
 
-            return $this->instructionsFor($subscription, $invoice, $method, issue: true);
+            return $this->instructionsFor($subscription, $invoice, $method, issue: true, returnTarget: $returnTarget);
         });
     }
 
     /** @return array<string, mixed> */
-    private function instructionsFor(Subscription $subscription, Invoice $invoice, CheckoutMethod $method, bool $issue): array
+    private function instructionsFor(Subscription $subscription, Invoice $invoice, CheckoutMethod $method, bool $issue, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
     {
         $gateway = $this->gatewayFor($subscription);
 
         if ($method->isCard()) {
             if (! $gateway->supportsTransparent($method->value)) {
                 if ($gateway->supportsHostedCardCheckout()) {
-                    return $this->hostedFor($subscription, $invoice, $gateway, $issue);
+                    return $this->hostedFor($subscription, $invoice, $gateway, $issue, $returnTarget);
                 }
 
                 if (! $gateway->supportsCardLink()) {
@@ -271,27 +300,27 @@ class CheckoutService
      *
      * @return array<string, mixed>
      */
-    public function payInvoiceWithCard(Entity $entity, string $invoiceId, CheckoutCardInput $card, ?string $idempotencyKey = null): array
+    public function payInvoiceWithCard(Entity $entity, string $invoiceId, CheckoutCardInput $card, ?string $idempotencyKey = null, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
     {
         if (($pack = $this->aiPackInvoice($entity, $invoiceId)) !== null) {
             return $this->aiPacks->payWithCard($entity, $pack, $card, $idempotencyKey);
         }
 
-        return $this->exclusive($entity, 'card:' . $invoiceId, $idempotencyKey, function () use ($entity, $invoiceId, $card): array {
+        return $this->exclusive($entity, 'card:' . $invoiceId, $idempotencyKey, function () use ($entity, $invoiceId, $card, $returnTarget): array {
             [$subscription, $invoice] = $this->payableInvoiceOf($entity, $invoiceId);
 
-            return $this->chargeInvoiceCard($entity, $subscription, $invoice, $card);
+            return $this->chargeInvoiceCard($entity, $subscription, $invoice, $card, $returnTarget);
         });
     }
 
     /** @return array<string, mixed> */
-    private function chargeInvoiceCard(Entity $entity, Subscription $subscription, Invoice $invoice, CheckoutCardInput $card): array
+    private function chargeInvoiceCard(Entity $entity, Subscription $subscription, Invoice $invoice, CheckoutCardInput $card, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
     {
         $gateway = $this->gatewayFor($subscription);
 
         if (! $gateway->supportsTransparent(CheckoutMethod::Card->value)) {
             if ($gateway->supportsHostedCardCheckout()) {
-                return $this->hostedFor($subscription, $invoice, $gateway, issue: true);
+                return $this->hostedFor($subscription, $invoice, $gateway, issue: true, returnTarget: $returnTarget);
             }
 
             if (! $gateway->supportsCardLink()) {
@@ -416,12 +445,12 @@ class CheckoutService
      *
      * @return array<string, mixed>
      */
-    public function contract(Entity $entity, Plan $plan, BillingCycle $cycle, ?CheckoutMethod $method, ?CheckoutCardInput $card = null, ?string $idempotencyKey = null): array
+    public function contract(Entity $entity, Plan $plan, BillingCycle $cycle, ?CheckoutMethod $method, ?CheckoutCardInput $card = null, ?string $idempotencyKey = null, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
     {
         $this->assertClient($entity);
         $amount = $this->priceOrFail($plan, $cycle);
 
-        return $this->exclusive($entity, 'contract', $idempotencyKey, function () use ($entity, $plan, $cycle, $method, $card, $amount): array {
+        return $this->exclusive($entity, 'contract', $idempotencyKey, function () use ($entity, $plan, $cycle, $method, $card, $amount, $returnTarget): array {
             $current = $this->currentSubscription($entity);
 
             if (PlanChangeService::isPaidInForce($current)) {
@@ -440,25 +469,52 @@ class CheckoutService
 
             if ($pending !== null && ($invoice = $this->payableInvoices($pending)->first()) !== null) {
                 if ($method->isCard()) {
+                    // A capacidade do gateway vem ANTES do token: no checkout hospedado/link do Asaas o cartão é
+                    // digitado no ambiente do gateway e não existe card_token. Exigi-lo aqui deixava a clínica
+                    // presa em card_token_required para sempre quando a 1ª resposta se perdia (ou a abertura do
+                    // hospedado falhava depois de criar a assinatura): o front repete sem token e com chave nova.
+                    if (! $this->gatewayFor($pending)->supportsTransparent(CheckoutMethod::Card->value)) {
+                        return ['subscription' => $this->subscriptionRow($pending, true), ...$this->instructionsFor($pending, $invoice, $method, issue: true, returnTarget: $returnTarget)];
+                    }
+
                     if ($card === null) {
                         throw CheckoutException::make('card_token_required');
                     }
 
-                    return ['subscription' => $this->subscriptionRow($pending, true), ...$this->chargeInvoiceCard($entity, $pending, $invoice, $card)];
+                    return ['subscription' => $this->subscriptionRow($pending, true), ...$this->chargeInvoiceCard($entity, $pending, $invoice, $card, $returnTarget)];
                 }
 
-                return ['subscription' => $this->subscriptionRow($pending, true), ...$this->instructionsFor($pending, $invoice, $method, issue: true)];
+                return ['subscription' => $this->subscriptionRow($pending, true), ...$this->instructionsFor($pending, $invoice, $method, issue: true, returnTarget: $returnTarget)];
             }
 
             $this->assertNotAlreadyActive($entity, $plan, $cycle);
 
-            return $this->activate($entity, $plan, $cycle, $method, $card, $amount);
+            return $this->activate($entity, $plan, $cycle, $method, $card, $amount, $returnTarget);
         });
     }
 
-    /** @return array<string, mixed> */
-    private function activate(Entity $entity, Plan $plan, BillingCycle $cycle, CheckoutMethod $method, ?CheckoutCardInput $card, float $amount): array
+    /**
+     * Códigos de erro do gateway (ex.: invalid_cpfCnpj) na mensagem da exceção, que traz só "HTTP {status} {códigos}"
+     * (AsaasGateway::errorMessage()) — nunca a descrição.
+     *
+     * @return list<string>
+     */
+    private function gatewayErrorCodes(string $message): array
     {
+        if (preg_match('/HTTP \d{3} ([A-Za-z0-9_.\-]+(?:, [A-Za-z0-9_.\-]+)*)/', $message, $match) !== 1) {
+            return [];
+        }
+
+        return array_slice(array_values(array_unique(explode(', ', $match[1]))), 0, 5);
+    }
+
+    /** @return array<string, mixed> */
+    private function activate(Entity $entity, Plan $plan, BillingCycle $cycle, CheckoutMethod $method, ?CheckoutCardInput $card, float $amount, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
+    {
+        // Antes de tudo (e do gateway): a assinatura nasce com o NOSSO cliente no gateway, inclusive no cartão do
+        // checkout hospedado — o Asaas recusa a assinatura de cliente sem CPF/CNPJ (hoje um 502 genérico).
+        PayerDocument::assertFor($entity);
+
         $gateway = $this->newPurchaseGateway($entity, $plan);
         $useCard = $method->isCard() && $gateway->supportsTransparent($method->value);
 
@@ -488,7 +544,17 @@ class CheckoutService
                 throw $this->declined($checkout->outcome->declineMessage);
             }
 
-            Log::warning('Checkout: contratação falhou no gateway.', ['entity_id' => $entity->id, 'error' => $e->getMessage()]);
+            // Só o que diagnostica: gateway, trigger, status HTTP, código(s) do erro do gateway e a
+            // correlação. NUNCA a mensagem/corpo da resposta: a descrição do gateway pode ecoar o
+            // CPF/CNPJ, e-mail ou telefone que enviamos (dado pessoal no log).
+            Log::warning('Checkout: contratação falhou no gateway.', [
+                'entity_id'      => $entity->id,
+                'gateway'        => $gateway->code(),
+                'trigger'        => $e->getTriggerType(),
+                'http_status'    => $e->httpStatus(),
+                'error_codes'    => $this->gatewayErrorCodes($e->getMessage()),
+                'correlation_id' => app(CorrelationIdService::class)->resolve(),
+            ]);
 
             throw CheckoutException::make('gateway_error', 502);
         } catch (SubscriptionSupersededException) {
@@ -516,7 +582,7 @@ class CheckoutService
         // Cartão no checkout hospedado (Asaas Checkout): a 1ª fatura é paga na
         // página do Asaas e vira a assinatura no cartão.
         if ($invoice !== null && $method->isCard() && ! $resolved->supportsTransparent($method->value) && $resolved->supportsHostedCardCheckout()) {
-            return [...$result, ...$this->hostedFor($subscription->loadMissing(['entity', 'plan']), $invoice, $resolved, issue: true)];
+            return [...$result, ...$this->hostedFor($subscription->loadMissing(['entity', 'plan']), $invoice, $resolved, issue: true, returnTarget: $returnTarget)];
         }
 
         if ($invoice === null || ! $resolved->supportsTransparent($method->value)) {
@@ -574,6 +640,9 @@ class CheckoutService
         if ($method === null) {
             throw CheckoutException::make('method_unavailable');
         }
+
+        // Upgrade com cobrança nova no gateway (o downgrade agendado acima não cobra nada): mesma pré-condição.
+        PayerDocument::assertFor($entity);
 
         $gateway = $this->gatewayFor($current);
 
@@ -1474,11 +1543,11 @@ class CheckoutService
      *
      * @return array<string, mixed>
      */
-    private function hostedFor(Subscription $subscription, Invoice $invoice, PaymentGatewayInterface $gateway, bool $issue): array
+    private function hostedFor(Subscription $subscription, Invoice $invoice, PaymentGatewayInterface $gateway, bool $issue, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
     {
         $recurrent = $this->hosted->qualifiesForRecurrence($subscription, $invoice, $gateway);
 
-        if (! $issue && ($open = $this->hosted->usableFor($invoice, $gateway, $recurrent)) !== null) {
+        if (! $issue && ($open = $this->hosted->usableFor($invoice, $gateway, $recurrent, $returnTarget)) !== null) {
             return ['invoice' => $this->invoiceRow($invoice, true), ...$this->hosted->response($open, $gateway)];
         }
 
@@ -1497,7 +1566,7 @@ class CheckoutService
 
         return [
             'invoice' => $this->invoiceRow($invoice, true),
-            ...$this->hosted->open($entity, $invoice, $subscription, $gateway, $this->customerId($gateway, $subscription, $entity), $recurrent),
+            ...$this->hosted->open($entity, $invoice, $subscription, $gateway, $this->customerId($gateway, $subscription, $entity), $recurrent, $returnTarget),
         ];
     }
 

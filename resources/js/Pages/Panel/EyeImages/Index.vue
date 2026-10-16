@@ -2,6 +2,7 @@
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { latestRequest } from '@/Support/latestRequest.js';
 import { fill } from '@/Support/clinicalDocuments.js';
+import { SHEET_SIZES, buildSheets } from '@/Support/printSheets.js';
 import { useUserPreferences } from '@/composables/useUserPreferences.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -45,6 +46,9 @@ const props = defineProps({
     // Rascunho de laudo (Fase 5) — ver EyeImageReportDraftController.
     canDraftReports: { type: Boolean, default: false },
     draftReportsPendingCount: { type: Number, default: 0 },
+    draftReportsReturnedCount: { type: Number, default: 0 },
+    // Ditado por voz do laudo (Fase 5) — ver EyeImageReportDictationController.
+    dictation: { type: Object, default: () => ({ available: false, max_seconds: 120 }) },
     // Captura pela câmera (Fase 5 / 6a) — ver ImportExternalExamModal.vue.
     max_video_seconds: { type: Number, default: 20 },
     // Pedal USB (Fase 5 / 7a/7b) — allowlist + default da tecla "avançar"
@@ -175,6 +179,9 @@ const printOrientation = ref('portrait');
 // verdade da galeria) com OD antes de OE antes de AO dentro do grupo. Some
 // as setas de reordenar manual enquanto ativo (a ordem some de ser manual).
 const printGroupOdOe = ref(false);
+// N imagens por folha (Fase 5): null = grade contínua por colunas (printCols);
+// 1/2/4/6 = folhas A4 com N imagens e quebra de página (Support/printSheets).
+const printPerSheet = ref(null);
 // Legenda ad hoc por imagem (Fase 5) — só nesta impressão, nunca persistida
 // (reseta a cada abertura do modal, ver openPrintModal()).
 const printCaptions = reactive({});
@@ -1060,6 +1067,7 @@ function openPrintModal(exams, autoPrint = false) {
     // exames do paciente/galeria — mesma referência seria afetada sem isso.
     printExams.value = [...(exams ?? [])];
     printGroupOdOe.value = false;
+    printPerSheet.value = null;
     for (const key of Object.keys(printCaptions)) delete printCaptions[key];
     showPrintModal.value = true;
     if (autoPrint) {
@@ -1067,8 +1075,29 @@ function openPrintModal(exams, autoPrint = false) {
     }
 }
 
+// O navegador só respeita o tamanho/orientação do papel pelo @page: sem ele,
+// "Paisagem" só mudava a prévia e a impressão saía no padrão do diálogo. O
+// <style> existe só durante a impressão (window.print() é síncrono no
+// Chrome/Firefox; afterprint cobre os que devolvem antes).
 function printReport() {
-    window.print();
+    const style = document.createElement('style');
+    style.setAttribute('data-ei-print-page', '');
+    style.textContent = `@page { size: A4 ${printOrientation.value}; margin: 0; }`;
+    document.head.appendChild(style);
+
+    const cleanup = () => {
+        style.remove();
+        window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+
+    try {
+        window.print();
+    } finally {
+        // Se o navegador não disparar afterprint, não deixa o @page vazar
+        // para as outras impressões da sessão.
+        setTimeout(cleanup, 1000);
+    }
 }
 
 // Ordem exibida/impressa: manual (setas, ordem crua de printExams) ou
@@ -1097,6 +1126,43 @@ const printExamsDisplay = computed(() => {
         .map((g) => g.slice().sort((a, b) => (printEyeOrder[a.laterality] ?? 2) - (printEyeOrder[b.laterality] ?? 2)))
         .flat();
 });
+
+// Folhas do modo "N por folha" (null → grade contínua por colunas). Com
+// "Agrupar OD/OE" cada linha da grade é um par OD | OE; sem ele, a ordem é a
+// de printExamsDisplay (manual).
+const printSheetLayout = computed(() => {
+    if (!printPerSheet.value) return null;
+
+    return buildSheets(printPrintableExams.value, {
+        perSheet: printPerSheet.value,
+        orientation: printOrientation.value,
+        pairOdOe: printGroupOdOe.value,
+        groupKeyOf: (exam) => examGroupKey(exam).key,
+    });
+});
+
+// Uma "página" por item: o modo contínuo é uma página só (todas as imagens,
+// colunas = printCols, altura livre); o modo por folha traz uma página por
+// folha, com grade e altura fixas. O template renderiza os dois do mesmo jeito.
+const printPages = computed(() => {
+    const layout = printSheetLayout.value;
+    if (!layout) {
+        return [{ key: 'all', cells: printExamsDisplay.value, cols: printCols.value, rows: null, number: 1, total: 1 }];
+    }
+
+    return layout.sheets.map((cells, index) => ({
+        key: `sheet-${index}`,
+        cells,
+        cols: layout.grid.cols,
+        rows: layout.grid.rows,
+        number: index + 1,
+        total: layout.sheets.length,
+    }));
+});
+
+function printExamIndex(exam) {
+    return printExamsDisplay.value.indexOf(exam);
+}
 
 // Pula vídeo(s) escondido(s) na busca do vizinho pra trocar — sem isso, um
 // vídeo entre duas fotos "absorve" o clique: o array cru muda, mas a
@@ -1709,6 +1775,8 @@ const reportUrls = computed(() => ({
     draftStore: props.urls?.report_drafts_store ?? '',
     draftUpdate: props.urls?.report_drafts_update ?? '', // template __ID__
     draftSubmit: props.urls?.report_drafts_submit ?? '', // template __ID__
+    draftReturn: props.urls?.report_drafts_return ?? '', // template __ID__
+    dictate: props.urls?.report_dictate ?? '',
     draftDestroy: props.urls?.report_drafts_destroy ?? '', // template __ID__
     draftShow: props.urls?.report_drafts_show ?? '', // template __ID__
     patientExams: props.urls?.patient_exams ?? '', // template __ID__
@@ -1745,6 +1813,8 @@ const draftsModalOpen = ref(false);
 // Cópia local do prop (carregado 1x no load da página) — decrementada na
 // hora quando o médico emite/descarta um rascunho, sem precisar reload.
 const pendingDraftsCount = ref(props.draftReportsPendingCount);
+// Devolvidos pelo médico ao técnico (só para quem prepara, não para o médico).
+const returnedDraftsCount = ref(props.draftReportsReturnedCount);
 
 function openDraftsModal() {
     draftsModalOpen.value = true;
@@ -1843,6 +1913,9 @@ function onDraftRemovedFromPending(status) {
     if (status === 'submitted' && pendingDraftsCount.value > 0) {
         pendingDraftsCount.value -= 1;
     }
+    if (status === 'returned' && returnedDraftsCount.value > 0) {
+        returnedDraftsCount.value -= 1;
+    }
 }
 
 function onReportSaved() {
@@ -1851,9 +1924,16 @@ function onReportSaved() {
     if (activeDraft.value) onDraftRemovedFromPending(activeDraft.value.status);
 }
 
-function onDraftSaved({ submitted }) {
+function onDraftSaved({ submitted, wasReturned = false }) {
     reportAnySaved.value = true;
     if (submitted) pendingDraftsCount.value += 1;
+    // Reenviou um devolvido: sai do selo "devolvidos" e entra nos pendentes.
+    if (submitted && wasReturned) onDraftRemovedFromPending('returned');
+}
+
+// O médico devolveu o rascunho ao técnico: deixa de estar pendente de liberação.
+function onDraftReturned() {
+    onDraftRemovedFromPending('submitted');
 }
 
 function onDraftDiscarded({ status }) {
@@ -1999,9 +2079,11 @@ function applySessionIdToSelection(sessionId) {
 }
 
 async function confirmMerge(count) {
-    const message = tt(
-        'merge_confirm_text',
-        `As ${count} imagens selecionadas vão passar a aparecer como um único exame.`,
+    const message = fill(
+        tt('merge_confirm_text', 'As :count imagens selecionadas vão passar a aparecer como um único exame.'),
+        {
+            count,
+        },
     );
     if (window.Swal) {
         const result = await window.Swal.fire({
@@ -2111,6 +2193,14 @@ const printEntity = computed(() => props.entity ?? {});
                     <span class="fw-medium">{{ tt('drafts_button', 'Rascunhos') }}</span>
                     <span v-if="isDoctor && pendingDraftsCount > 0" class="badge bg-danger rounded-pill ms-1">
                         {{ pendingDraftsCount }}
+                    </span>
+                    <span
+                        v-if="!isDoctor && returnedDraftsCount > 0"
+                        class="badge bg-warning text-dark rounded-pill ms-1"
+                        data-testid="drafts-returned-badge"
+                        :title="tt('drafts_returned_badge_hint', 'Rascunhos devolvidos pelo médico para ajuste')"
+                    >
+                        {{ returnedDraftsCount }}
                     </span>
                 </button>
             </div>
@@ -2379,6 +2469,7 @@ const printEntity = computed(() => props.entity ?? {});
                                 :key="patient.id"
                                 class="d-flex align-items-center gap-2 px-1 py-1 rounded mb-1 patient-item"
                                 :class="{ 'patient-item-active': selectedPatient?.id === patient.id }"
+                                data-testid="eye-images-patient"
                                 @click="selectPatient(patient)"
                             >
                                 <div
@@ -2604,6 +2695,7 @@ const printEntity = computed(() => props.entity ?? {});
                         <button
                             type="button"
                             class="btn btn-sm btn-outline-dark"
+                            data-testid="print-open-button"
                             @click="openPrintModal(selectedPatient.exams, false)"
                         >
                             <i class="fa fa-print me-1"></i>Imprimir
@@ -2626,6 +2718,7 @@ const printEntity = computed(() => props.entity ?? {});
                             v-if="isDoctor"
                             type="button"
                             class="btn btn-sm btn-outline-primary"
+                            data-testid="report-open-button"
                             @click="openReportModal"
                         >
                             <i class="ti ti-file-text me-1"></i
@@ -2640,6 +2733,7 @@ const printEntity = computed(() => props.entity ?? {});
                             v-else-if="canDraftReports"
                             type="button"
                             class="btn btn-sm btn-outline-primary"
+                            data-testid="report-open-button"
                             @click="openReportModal"
                         >
                             <i class="ti ti-file-text me-1"></i
@@ -3584,11 +3678,14 @@ const printEntity = computed(() => props.entity ?? {});
         <!-- ── Modal de impressão ────────────────────────────────────────────── -->
         <Teleport to="body">
             <div
-                v-show="showPrintModal"
+                v-if="showPrintModal"
+                class="ei-print-root"
+                :class="{ 'ei-print-paged': printPerSheet }"
                 style="position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column"
             >
                 <div
-                    class="d-flex align-items-center gap-1 px-3 py-2 flex-shrink-0"
+                    class="ei-print-toolbar d-print-none d-flex flex-wrap align-items-center gap-1 px-3 py-2 flex-shrink-0"
+                    data-testid="print-toolbar"
                     style="background: #2c2c2c; color: #fff"
                 >
                     <div class="btn-group btn-group-sm me-2" role="group">
@@ -3600,6 +3697,31 @@ const printEntity = computed(() => props.entity ?? {});
                             :class="printCols === n ? 'btn-light' : 'btn-outline-secondary'"
                             style="font-size: 0.72rem; min-width: 28px"
                             @click="printCols = n"
+                        >
+                            {{ n }}
+                        </button>
+                    </div>
+
+                    <div class="vr opacity-25 mx-1"></div>
+
+                    <!-- Imagens por folha (Fase 5): folhas A4 com N imagens e quebra de
+                         página. Clicar de novo no valor ativo volta para a grade contínua. -->
+                    <span class="small me-1" style="font-size: 0.72rem">{{ tt('print_per_sheet', 'Por folha') }}</span>
+                    <div class="btn-group btn-group-sm me-2" role="group" data-testid="print-per-sheet">
+                        <button
+                            v-for="n in SHEET_SIZES"
+                            :key="n"
+                            type="button"
+                            class="btn btn-sm"
+                            :class="printPerSheet === n ? 'btn-light' : 'btn-outline-secondary'"
+                            style="font-size: 0.72rem; min-width: 28px"
+                            :aria-pressed="printPerSheet === n"
+                            :title="
+                                fill(tt('print_per_sheet_hint', ':count imagem(ns) por folha, com quebra de página'), {
+                                    count: n,
+                                })
+                            "
+                            @click="printPerSheet = printPerSheet === n ? null : n"
                         >
                             {{ n }}
                         </button>
@@ -3636,7 +3758,7 @@ const printEntity = computed(() => props.entity ?? {});
                         :title="
                             tt(
                                 'print_group_od_oe_hint',
-                                'Agrupa cada exame com OD antes de OE; some a reordenação manual',
+                                'Agrupa cada exame com OD antes de OE (lado a lado no modo por folha); some a reordenação manual',
                             )
                         "
                         @click="printGroupOdOe = !printGroupOdOe"
@@ -3650,122 +3772,157 @@ const printEntity = computed(() => props.entity ?? {});
                         type="button"
                         class="btn btn-sm btn-warning text-dark fw-semibold"
                         style="font-size: 0.72rem"
+                        data-testid="print-run-button"
                         @click="printReport"
                     >
                         <i class="fa fa-print me-1"></i>Imprimir
                     </button>
                     <button
                         type="button"
-                        class="btn btn-sm btn-outline-secondary ms-auto"
+                        class="ei-print-close btn btn-sm btn-outline-secondary ms-auto"
                         style="font-size: 0.72rem"
+                        data-testid="print-close"
                         @click="showPrintModal = false"
                     >
                         <i class="fa fa-times me-1"></i>Fechar
                     </button>
                 </div>
 
-                <div class="flex-grow-1 overflow-auto" style="background: #888">
+                <div class="ei-print-scroll flex-grow-1 overflow-auto" style="background: #888">
                     <div
                         id="ei-print-content"
-                        :class="printOrientation === 'landscape' ? 'ei-landscape' : 'ei-portrait'"
-                        class="mx-auto my-3 bg-white shadow"
-                        style="width: 210mm; min-height: 297mm; padding: 12mm; box-sizing: border-box"
+                        :class="[
+                            printOrientation === 'landscape' ? 'ei-landscape' : 'ei-portrait',
+                            printPerSheet ? 'ei-paged' : 'ei-continuous bg-white shadow',
+                        ]"
+                        class="mx-auto my-3"
                     >
-                        <!-- Cabeçalho da clínica -->
-                        <div
-                            class="d-flex justify-content-between align-items-start mb-3 pb-2"
-                            style="border-bottom: 2px solid #1a6fc4"
+                        <!-- Uma "página" no modo contínuo; uma por folha no modo N por folha -->
+                        <section
+                            v-for="sheet in printPages"
+                            :key="sheet.key"
+                            :class="{ 'ei-sheet': printPerSheet }"
+                            :data-sheet="printPerSheet ? sheet.number : null"
                         >
-                            <div>
-                                <div style="font-size: 1.1rem; font-weight: 700; color: #1a6fc4">
-                                    {{ printEntity.name }}
-                                </div>
-                                <div v-if="printEntity.address" style="font-size: 0.72rem; color: #555">
-                                    {{ printEntity.address }}
-                                </div>
-                                <div v-if="printEntity.email" style="font-size: 0.72rem; color: #555">
-                                    {{ printEntity.email }}
-                                </div>
-                                <div
-                                    v-if="printEntity.telephone || printEntity.cellphone"
-                                    style="font-size: 0.72rem; color: #555"
-                                >
-                                    {{ [printEntity.telephone, printEntity.cellphone].filter(Boolean).join(' | ') }}
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <div style="font-size: 0.72rem; color: #555">Data do relatório</div>
-                                <div style="font-size: 0.85rem; font-weight: 600">
-                                    {{ date(new Date()) }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Dados do paciente -->
-                        <div
-                            v-if="selectedPatient"
-                            class="mb-3 p-2 rounded"
-                            style="background: #f0f4ff; font-size: 0.78rem"
-                        >
-                            <strong>{{ selectedPatient.person?.full_name ?? selectedPatient.full_name }}</strong>
-                            <span class="ms-2 text-muted">{{ selectedPatient.code }}</span>
-                        </div>
-
-                        <!-- Vídeo nunca entra na impressão (Fase 5 / 6c) — nota textual, nunca
-                             some em silêncio. d-print-none: não aparece no papel impresso. -->
-                        <div
-                            v-if="printExcludedVideoCount > 0"
-                            class="alert alert-warning d-print-none py-2 px-3 small mb-3"
-                        >
-                            {{
-                                fill(
-                                    tt(
-                                        'print_video_excluded',
-                                        ':count vídeo(s) não entram na impressão (abra no painel principal pra assistir).',
-                                    ),
-                                    { count: printExcludedVideoCount },
-                                )
-                            }}
-                        </div>
-
-                        <!-- Grade de imagens -->
-                        <div :style="`display:grid;grid-template-columns:repeat(${printCols},1fr);gap:8px;`">
-                            <div v-for="(exam, idx) in printExamsDisplay" :key="exam.id" style="break-inside: avoid">
-                                <!-- Reordenar manual (Fase 5) — some do papel impresso (d-print-none) e
-                                     some também quando "Agrupar OD/OE" decide a ordem. -->
-                                <div
-                                    v-if="!printGroupOdOe"
-                                    class="d-print-none d-flex justify-content-center gap-1 mb-1"
-                                >
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                        style="font-size: 0.65rem"
-                                        :disabled="idx === 0"
-                                        :title="tt('print_move_up', 'Mover para cima')"
-                                        @click="movePrintExam(exam, -1)"
+                            <!-- Cabeçalho da clínica -->
+                            <div
+                                class="d-flex justify-content-between align-items-start mb-3 pb-2"
+                                style="border-bottom: 2px solid #1a6fc4"
+                            >
+                                <div>
+                                    <div style="font-size: 1.1rem; font-weight: 700; color: #1a6fc4">
+                                        {{ printEntity.name }}
+                                    </div>
+                                    <div v-if="printEntity.address" style="font-size: 0.72rem; color: #555">
+                                        {{ printEntity.address }}
+                                    </div>
+                                    <div v-if="printEntity.email" style="font-size: 0.72rem; color: #555">
+                                        {{ printEntity.email }}
+                                    </div>
+                                    <div
+                                        v-if="printEntity.telephone || printEntity.cellphone"
+                                        style="font-size: 0.72rem; color: #555"
                                     >
-                                        <i class="ti ti-arrow-up"></i>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                        style="font-size: 0.65rem"
-                                        :disabled="idx === printExamsDisplay.length - 1"
-                                        :title="tt('print_move_down', 'Mover para baixo')"
-                                        @click="movePrintExam(exam, 1)"
-                                    >
-                                        <i class="ti ti-arrow-down"></i>
-                                    </button>
-                                </div>
-                                <div class="text-center mb-1" style="font-size: 0.65rem; color: #333; font-weight: 600">
-                                    {{ exam.exam_type?.name ?? 'Exame' }} - {{ latLabel(exam.laterality) }} -
-                                    {{ dateTime(exam.exam_performed_at ?? exam.created_at) }}
-                                    <div v-if="exam.observation" style="font-weight: 400; white-space: pre-line">
-                                        {{ exam.observation }}
+                                        {{ [printEntity.telephone, printEntity.cellphone].filter(Boolean).join(' | ') }}
                                     </div>
                                 </div>
-                                <!-- Legenda ad hoc (Fase 5) — só nesta impressão, nunca persistida.
+                                <div class="text-end">
+                                    <div style="font-size: 0.72rem; color: #555">Data do relatório</div>
+                                    <div style="font-size: 0.85rem; font-weight: 600">
+                                        {{ date(new Date()) }}
+                                    </div>
+                                    <div v-if="sheet.total > 1" style="font-size: 0.72rem; color: #555">
+                                        {{
+                                            fill(tt('print_sheet_of', 'Folha :n de :total'), {
+                                                n: sheet.number,
+                                                total: sheet.total,
+                                            })
+                                        }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Dados do paciente -->
+                            <div
+                                v-if="selectedPatient"
+                                class="mb-3 p-2 rounded"
+                                style="background: #f0f4ff; font-size: 0.78rem"
+                            >
+                                <strong>{{ selectedPatient.person?.full_name ?? selectedPatient.full_name }}</strong>
+                                <span class="ms-2 text-muted">{{ selectedPatient.code }}</span>
+                            </div>
+
+                            <!-- Vídeo nunca entra na impressão (Fase 5 / 6c) — nota textual, nunca
+                             some em silêncio. d-print-none: não aparece no papel impresso. -->
+                            <div
+                                v-if="printExcludedVideoCount > 0 && sheet.number === 1"
+                                class="alert alert-warning d-print-none py-2 px-3 small mb-3"
+                            >
+                                {{
+                                    fill(
+                                        tt(
+                                            'print_video_excluded',
+                                            ':count vídeo(s) não entram na impressão (abra no painel principal pra assistir).',
+                                        ),
+                                        { count: printExcludedVideoCount },
+                                    )
+                                }}
+                            </div>
+
+                            <!-- Grade de imagens -->
+                            <div
+                                :class="{ 'ei-sheet-grid': printPerSheet }"
+                                :style="
+                                    `display:grid;gap:8px;grid-template-columns:repeat(${sheet.cols},minmax(0,1fr));` +
+                                    (sheet.rows ? `grid-template-rows:repeat(${sheet.rows},minmax(0,1fr));` : '')
+                                "
+                            >
+                                <template
+                                    v-for="(exam, cellIdx) in sheet.cells"
+                                    :key="exam ? exam.id : `empty-${cellIdx}`"
+                                >
+                                    <div v-if="exam" class="ei-cell" style="break-inside: avoid">
+                                        <!-- Reordenar manual (Fase 5) — some do papel impresso (d-print-none) e
+                                     some também quando "Agrupar OD/OE" decide a ordem. -->
+                                        <div
+                                            v-if="!printGroupOdOe"
+                                            class="d-print-none d-flex justify-content-center gap-1 mb-1"
+                                        >
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                style="font-size: 0.65rem"
+                                                :disabled="printExamIndex(exam) === 0"
+                                                :title="tt('print_move_up', 'Mover para cima')"
+                                                @click="movePrintExam(exam, -1)"
+                                            >
+                                                <i class="ti ti-arrow-up"></i>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                style="font-size: 0.65rem"
+                                                :disabled="printExamIndex(exam) === printExamsDisplay.length - 1"
+                                                :title="tt('print_move_down', 'Mover para baixo')"
+                                                @click="movePrintExam(exam, 1)"
+                                            >
+                                                <i class="ti ti-arrow-down"></i>
+                                            </button>
+                                        </div>
+                                        <div
+                                            class="text-center mb-1"
+                                            style="font-size: 0.65rem; color: #333; font-weight: 600"
+                                        >
+                                            {{ exam.exam_type?.name ?? 'Exame' }} - {{ latLabel(exam.laterality) }} -
+                                            {{ dateTime(exam.exam_performed_at ?? exam.created_at) }}
+                                            <div
+                                                v-if="exam.observation"
+                                                style="font-weight: 400; white-space: pre-line"
+                                            >
+                                                {{ exam.observation }}
+                                            </div>
+                                        </div>
+                                        <!-- Legenda ad hoc (Fase 5) — só nesta impressão, nunca persistida.
                                      rows="1" + resize:none trava a altura: legenda longa ou com
                                      quebra de linha ficava cortada no PAPEL impresso (na tela ainda
                                      dava pra rolar dentro do campo, mas impressão captura só a
@@ -3773,43 +3930,54 @@ const printEntity = computed(() => props.entity ?? {});
                                      esconde o campo editável no papel; o <div> abaixo (d-print-block,
                                      some na tela) mostra o texto INTEIRO, com quebra de linha
                                      natural (pre-wrap), só na hora de imprimir. -->
-                                <textarea
-                                    v-model="printCaptions[exam.id]"
-                                    rows="1"
-                                    :placeholder="tt('print_caption_placeholder', 'Adicionar legenda (opcional)')"
-                                    class="d-block d-print-none w-100 text-center mb-1"
-                                    style="
-                                        font-size: 0.65rem;
-                                        color: #333;
-                                        border: none;
-                                        background: transparent;
-                                        resize: none;
-                                        font-family: inherit;
-                                    "
-                                ></textarea>
-                                <div
-                                    v-if="printCaptions[exam.id]"
-                                    class="d-none d-print-block text-center mb-1"
-                                    style="font-size: 0.65rem; color: #333; white-space: pre-wrap"
-                                >
-                                    {{ printCaptions[exam.id] }}
-                                </div>
-                                <img
-                                    v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
-                                    :src="examUrls[exam.id]"
-                                    :alt="examAlt(exam)"
-                                    style="width: 100%; height: auto; display: block; border: 1px solid #ddd"
-                                    @error="brokenUrls = { ...brokenUrls, [exam.id]: true }"
-                                />
-                                <div
-                                    v-else
-                                    class="d-flex align-items-center justify-content-center"
-                                    style="width: 100%; aspect-ratio: 4/3; background: #eee; border: 1px solid #ddd"
-                                >
-                                    <i class="ti ti-photo-off" style="font-size: 2rem; color: #aaa"></i>
-                                </div>
+                                        <textarea
+                                            v-model="printCaptions[exam.id]"
+                                            rows="1"
+                                            :placeholder="
+                                                tt('print_caption_placeholder', 'Adicionar legenda (opcional)')
+                                            "
+                                            class="d-block d-print-none w-100 text-center mb-1"
+                                            style="
+                                                font-size: 0.65rem;
+                                                color: #333;
+                                                border: none;
+                                                background: transparent;
+                                                resize: none;
+                                                font-family: inherit;
+                                            "
+                                        ></textarea>
+                                        <div
+                                            v-if="printCaptions[exam.id]"
+                                            class="d-none d-print-block text-center mb-1"
+                                            style="font-size: 0.65rem; color: #333; white-space: pre-wrap"
+                                        >
+                                            {{ printCaptions[exam.id] }}
+                                        </div>
+                                        <img
+                                            v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
+                                            :src="examUrls[exam.id]"
+                                            :alt="examAlt(exam)"
+                                            style="width: 100%; height: auto; display: block; border: 1px solid #ddd"
+                                            @error="brokenUrls = { ...brokenUrls, [exam.id]: true }"
+                                        />
+                                        <div
+                                            v-else
+                                            class="d-flex align-items-center justify-content-center"
+                                            style="
+                                                width: 100%;
+                                                aspect-ratio: 4/3;
+                                                background: #eee;
+                                                border: 1px solid #ddd;
+                                            "
+                                        >
+                                            <i class="ti ti-photo-off" style="font-size: 2rem; color: #aaa"></i>
+                                        </div>
+                                    </div>
+                                    <!-- Célula vazia: mantém a posição (OD | OE) e o tamanho das demais -->
+                                    <div v-else aria-hidden="true"></div>
+                                </template>
                             </div>
-                        </div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -4094,11 +4262,13 @@ const printEntity = computed(() => props.entity ?? {});
             :date-config="document_date_config"
             :draft="activeDraft"
             :is-doctor="isDoctor"
+            :dictation="dictation"
             :docked="!activeDraft"
             @close="onReportModalClosed"
             @saved="onReportSaved"
             @draft-saved="onDraftSaved"
             @draft-discarded="onDraftDiscarded"
+            @draft-returned="onDraftReturned"
         />
 
         <!-- Rascunhos de laudo (Fase 5) -->
@@ -4300,11 +4470,100 @@ const printEntity = computed(() => props.entity ?? {});
         box-shadow: none !important;
     }
 }
-.ei-landscape {
+
+/* Papel (prévia): contínuo = uma folha que cresce; por folha = uma folha A4 por
+   página, cada uma com a própria grade. */
+.ei-continuous {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 12mm;
+    box-sizing: border-box;
+}
+.ei-continuous.ei-landscape {
     width: 297mm;
     min-height: 210mm;
 }
+.ei-paged {
+    width: 210mm;
+}
+.ei-paged.ei-landscape {
+    width: 297mm;
+}
+.ei-sheet {
+    width: 100%;
+    height: 296mm;
+    padding: 12mm;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+.ei-sheet + .ei-sheet {
+    margin-top: 12px;
+}
+.ei-paged.ei-landscape .ei-sheet {
+    height: 209mm;
+}
+.ei-sheet-grid {
+    flex: 1 1 0;
+    min-height: 0;
+}
+.ei-sheet-grid .ei-cell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+.ei-sheet-grid .ei-cell img {
+    flex: 1 1 0;
+    min-height: 0;
+    object-fit: contain;
+}
 
+@media (max-width: 575.98px) {
+    .ei-print-toolbar .vr {
+        display: none;
+    }
+    .ei-print-close {
+        margin-left: 0 !important;
+    }
+}
+
+/* N por folha: o conteúdo precisa FLUIR entre páginas, o que um elemento
+   position:fixed (modo contínuo, acima) não faz — ele é cortado na 1ª página.
+   Então, só nesse modo, esconde o app todo e solta o modal para o fluxo normal;
+   o tamanho/orientação do papel vem do @page injetado por printReport(). */
+@media print {
+    :global(body:has(.ei-print-paged) > *:not(.ei-print-root)) {
+        display: none !important;
+    }
+    .ei-print-paged {
+        position: static !important;
+        display: block !important;
+        inset: auto !important;
+    }
+    .ei-print-paged .ei-print-scroll {
+        overflow: visible !important;
+        background: #fff !important;
+    }
+    .ei-print-paged :deep(#ei-print-content) {
+        position: static !important;
+        width: auto !important;
+        margin: 0 !important;
+    }
+    .ei-print-paged .ei-sheet {
+        width: 100%;
+        margin: 0 !important;
+        box-shadow: none;
+        break-after: page;
+        break-inside: avoid;
+    }
+    .ei-print-paged .ei-sheet:last-child {
+        break-after: auto;
+    }
+}
 :deep(#viewImages::-webkit-scrollbar),
 :deep(.ei-scroll::-webkit-scrollbar) {
     width: 10px;

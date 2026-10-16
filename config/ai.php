@@ -144,6 +144,31 @@ return [
         'cooldown_seconds' => (int) env('AI_BREAKER_COOLDOWN_SECONDS', 120),
     ],
 
+    // Ditado por voz do laudo (Fase 5): o áudio vai ao backend e é transcrito por
+    // um provedor da política LGPD (docs/internal/legal/ai-providers-lgpd.md) — NUNCA
+    // pelo reconhecimento de voz do navegador, que manda o áudio ao Google
+    // (transferência internacional de dado de saúde sem contrato). Desligado de
+    // fábrica: o dono do SaaS liga depois de conferir o contrato do provedor
+    // (retenção/ZDR). Só entra provedor que aceita dado de paciente, está ligado no
+    // painel e — se processa fora do Brasil sem adequação — tem o mecanismo de
+    // transferência registrado (SpeechTranscriptionService::resolve()).
+    'transcription' => [
+        'enabled' => filter_var(env('AI_TRANSCRIPTION_ENABLED', false), FILTER_VALIDATE_BOOL),
+        // mistral (Voxtral, UE — adequação), azure_openai (Whisper, conforme a região
+        // declarada), openai ou groq (EUA — exigem o mecanismo registrado).
+        'provider' => env('AI_TRANSCRIPTION_PROVIDER', 'mistral'),
+        // Modelo de transcrição (nome do deployment, no Azure).
+        'model'           => env('AI_TRANSCRIPTION_MODEL', 'voxtral-mini-latest'),
+        'language'        => env('AI_TRANSCRIPTION_LANGUAGE', 'pt'),
+        'timeout_seconds' => (int) env('AI_TRANSCRIPTION_TIMEOUT_SECONDS', 60),
+        // Teto por ditado: duração e tamanho (WAV 16 kHz mono ≈ 32 KB/s). O custo é por
+        // minuto de áudio, então o teto de duração é também o teto de custo por chamada.
+        'max_seconds' => (int) env('AI_TRANSCRIPTION_MAX_SECONDS', 120),
+        'max_kb'      => (int) env('AI_TRANSCRIPTION_MAX_KB', 6144),
+        // Ditados por minuto, por (usuário + clínica).
+        'per_minute' => (int) env('AI_TRANSCRIPTION_PER_MINUTE', 10),
+    ],
+
     'rate_limits' => [
         // Per (user_id + entity_id). estimate é leve, store dispara job, approve/reject
         // são pontuais. show/index herdam padrão Laravel.

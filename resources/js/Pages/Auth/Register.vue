@@ -1,5 +1,5 @@
 <script setup>
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { ref, computed, watch, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import SiteLayout from '@/Layouts/SiteLayout.vue';
@@ -26,6 +26,11 @@ const props = defineProps({
     locale: { type: String, default: 'pt_BR' },
     // Cloudflare Turnstile: só com TURNSTILE_SITE_KEY/SECRET_KEY no servidor.
     turnstileSiteKey: { type: String, default: null },
+    // A versão vigente é resolvida no servidor; o navegador só declara o aceite.
+    terms: {
+        type: Object,
+        default: () => ({ required: false, version_id: null, title: '', url: '', summary: '' }),
+    },
 });
 
 // ── Captcha (Turnstile) ────────────────────────────────────────
@@ -45,12 +50,33 @@ const form = ref({
     company_phone: '',
     company_cnpj: '',
     plan_id: '',
+    terms_accepted: false,
 });
 
 const errors = ref({});
 const loading = ref(false);
+const termsChanged = ref(false);
+const reloadingTerms = ref(false);
+const termsRequired = computed(() => props.terms?.required === true);
+const termsDocuments = computed(() => {
+    const documents = Array.isArray(props.terms?.documents) ? props.terms.documents : [];
 
-// Máscaras BR (WhatsApp e CNPJ): diretiva global v-mask nos inputs — o
+    if (documents.length) return documents.filter((document) => document?.type && document?.url && document?.title);
+    if (!props.terms?.url) return [];
+
+    return [{ type: 'terms_of_service', url: props.terms.url, title: props.terms.title }];
+});
+const termsVersionIds = computed(() => termsDocuments.value.map((document) => document.version_id).filter(Boolean));
+const termsRequiredMessage = computed(
+    () => props.tAuth.register?.terms_required ?? 'Você precisa aceitar os termos para continuar.',
+);
+
+watch(termsVersionIds, () => {
+    form.value.terms_accepted = false;
+    termsChanged.value = false;
+});
+
+// Máscaras BR (WhatsApp e CPF/CNPJ): diretiva global v-mask nos inputs — o
 // backend re-normaliza para dígitos (RegisterRequest::prepareForValidation).
 
 // ── Email availability ─────────────────────────────────────────
@@ -162,6 +188,7 @@ function selectPlan(id) {
 
 // ── Validation ─────────────────────────────────────────────────
 const required = props.tAuth.register?.field_required ?? 'Campo obrigatório.';
+const documentRequired = props.tAuth.register?.document_required ?? required;
 const mismatch = props.tAuth.register?.passwords_mismatch ?? 'As senhas não conferem.';
 
 function validateStep1() {
@@ -178,6 +205,9 @@ function validateStep1() {
 function validateStep2() {
     const e = {};
     if (!form.value.company_name) e.company_name = required;
+    // O período de teste não precisa do documento agora. Já no checkout, ele
+    // identifica o pagador exigido pelo gateway antes de criar a cobrança.
+    if (startMode.value === 'checkout' && !form.value.company_cnpj.trim()) e.company_cnpj = documentRequired;
 
     // WhatsApp do responsável: obrigatório — 10-11 dígitos (DDD + número).
     // Backend valida de novo (RegisterRequest) e envia código OTP após o registro.
@@ -187,6 +217,7 @@ function validateStep2() {
     } else if (phoneDigits.length < 10 || phoneDigits.length > 11) {
         e.company_phone = props.tAuth.register?.whatsapp_invalid ?? 'Informe um número válido com DDD.';
     }
+    if (termsRequired.value && !form.value.terms_accepted) e.terms_accepted = termsRequiredMessage.value;
 
     errors.value = e;
     return Object.keys(e).length === 0;
@@ -209,15 +240,23 @@ const signup = ref(null); // { redirect, planId, cycle, planName, cycleLabel } �
 async function submit() {
     if (!validateStep2()) return;
     loading.value = true;
+    termsChanged.value = false;
     try {
         const payload = {
             ...form.value,
+            terms_version_ids: termsVersionIds.value,
             plan_id: selectedPlan.value,
             billing_cycle: currentOffer.value?.cycle,
             start_mode: startMode.value,
             ...(props.turnstileSiteKey ? { turnstile_token: turnstileToken.value } : {}),
         };
         const { data } = await axios.post('/register', payload);
+        // O login automático renova o CSRF. Atualiza antes de carregar o
+        // checkout e o Echo, que autenticam sem recarregar esta página.
+        if (data.csrf_token) {
+            axios.defaults.headers.common['X-CSRF-TOKEN'] = data.csrf_token;
+            document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', data.csrf_token);
+        }
         if (startMode.value === 'checkout' && data.checkout && currentOffer.value?.cycle) {
             // Conta criada (e logada): segue para o pagamento sem sair do site.
             signup.value = {
@@ -244,6 +283,12 @@ async function submit() {
             errors.value = Object.fromEntries(
                 Object.entries(err.response.data.errors).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]),
             );
+            if (errors.value.terms_accepted) {
+                form.value.terms_accepted = false;
+                termsChanged.value = /(termos?|terms?).{0,40}(atualiz|updat)/i.test(
+                    String(errors.value.terms_accepted),
+                );
+            }
             if (
                 errors.value.name ||
                 errors.value.email ||
@@ -256,6 +301,13 @@ async function submit() {
     } finally {
         loading.value = false;
     }
+}
+
+function reloadTerms() {
+    if (reloadingTerms.value) return;
+    form.value.terms_accepted = false;
+    reloadingTerms.value = true;
+    router.reload({ onFinish: () => (reloadingTerms.value = false) });
 }
 
 async function quickStart() {
@@ -447,6 +499,7 @@ const showPwd2 = ref(false);
                                             v-model="form.name"
                                             type="text"
                                             class="reg-input"
+                                            data-testid="register-name"
                                             :class="{ 'is-error': errors.name }"
                                             autocomplete="name"
                                             autofocus
@@ -463,6 +516,7 @@ const showPwd2 = ref(false);
                                                 v-model="form.email"
                                                 type="email"
                                                 class="reg-input"
+                                                data-testid="register-email"
                                                 :class="{
                                                     'is-error': errors.email,
                                                     'is-success': emailAvailable === true && !emailChecking,
@@ -503,6 +557,7 @@ const showPwd2 = ref(false);
                                                 v-model="form.password"
                                                 :type="showPwd1 ? 'text' : 'password'"
                                                 class="reg-input"
+                                                data-testid="register-password"
                                                 :class="{ 'is-error': errors.password }"
                                                 autocomplete="new-password"
                                             />
@@ -544,6 +599,7 @@ const showPwd2 = ref(false);
                                                 v-model="form.password_confirmation"
                                                 :type="showPwd2 ? 'text' : 'password'"
                                                 class="reg-input"
+                                                data-testid="register-password-confirmation"
                                                 :class="{ 'is-error': errors.password_confirmation }"
                                                 autocomplete="new-password"
                                             />
@@ -561,7 +617,12 @@ const showPwd2 = ref(false);
                                         }}</span>
                                     </div>
 
-                                    <button type="submit" class="reg-btn reg-btn-primary" style="margin-top: 8px">
+                                    <button
+                                        type="submit"
+                                        class="reg-btn reg-btn-primary"
+                                        style="margin-top: 8px"
+                                        data-testid="register-next"
+                                    >
                                         {{ tAuth.register?.next }}
                                         <i class="ti ti-arrow-right"></i>
                                     </button>
@@ -584,6 +645,7 @@ const showPwd2 = ref(false);
                                             v-model="form.company_name"
                                             type="text"
                                             class="reg-input"
+                                            data-testid="register-company-name"
                                             :class="{ 'is-error': errors.company_name }"
                                             autocomplete="organization"
                                         />
@@ -603,6 +665,7 @@ const showPwd2 = ref(false);
                                             type="tel"
                                             inputmode="numeric"
                                             class="reg-input"
+                                            data-testid="register-company-phone"
                                             :class="{ 'is-error': errors.company_phone }"
                                             autocomplete="tel"
                                             placeholder="(00) 00000-0000"
@@ -618,14 +681,21 @@ const showPwd2 = ref(false);
 
                                     <div class="reg-field">
                                         <label class="reg-label">
-                                            {{ tAuth.register?.cnpj }}
-                                            <span class="opt">({{ tAuth.register?.optional }})</span>
+                                            {{
+                                                startMode === 'checkout'
+                                                    ? (tAuth.register?.document ?? 'CPF ou CNPJ')
+                                                    : tAuth.register?.cnpj
+                                            }}
+                                            <span v-if="startMode !== 'checkout'" class="opt"
+                                                >({{ tAuth.register?.optional }})</span
+                                            >
                                         </label>
                                         <input
                                             v-model="form.company_cnpj"
-                                            v-mask="'cnpj'"
+                                            v-mask="'cpfCnpj'"
+                                            data-testid="register-company-cnpj"
                                             type="text"
-                                            autocapitalize="characters"
+                                            inputmode="text"
                                             class="reg-input"
                                             :class="{ 'is-error': errors.company_cnpj }"
                                             placeholder="00.000.000/0000-00"
@@ -643,6 +713,7 @@ const showPwd2 = ref(false);
                                                 :key="plan.id"
                                                 type="button"
                                                 class="plan-grid-card"
+                                                data-testid="register-plan"
                                                 :class="{ selected: selectedPlan === plan.id }"
                                                 :aria-pressed="selectedPlan === plan.id"
                                                 @click="selectPlan(plan.id)"
@@ -755,6 +826,7 @@ const showPwd2 = ref(false);
                                             :class="{ selected: startMode === 'checkout' }"
                                             :aria-checked="startMode === 'checkout'"
                                             data-mode="checkout"
+                                            data-testid="register-start-checkout"
                                             @click="startMode = 'checkout'"
                                         >
                                             <i class="ti ti-credit-card" aria-hidden="true"></i>
@@ -778,11 +850,77 @@ const showPwd2 = ref(false);
                                         }}</span>
                                     </div>
 
+                                    <div v-if="termsRequired" class="reg-field reg-terms">
+                                        <div class="reg-check-row">
+                                            <input
+                                                id="terms-accept"
+                                                v-model="form.terms_accepted"
+                                                class="reg-check"
+                                                type="checkbox"
+                                                data-testid="terms-accept-checkbox"
+                                                :disabled="reloadingTerms"
+                                                :aria-invalid="!!errors.terms_accepted"
+                                                :aria-describedby="
+                                                    errors.terms_accepted ? 'register-terms-error' : undefined
+                                                "
+                                            />
+                                            <label for="terms-accept">
+                                                {{ terms.summary }}
+                                                <span
+                                                    v-if="termsDocuments.length"
+                                                    class="reg-terms-links"
+                                                    data-testid="terms-link"
+                                                >
+                                                    <template
+                                                        v-for="(document, index) in termsDocuments"
+                                                        :key="document.type"
+                                                    >
+                                                        <span v-if="index === 0"> (</span>
+                                                        <span v-else>{{
+                                                            index === termsDocuments.length - 1 ? ' e ' : ', '
+                                                        }}</span>
+                                                        <a
+                                                            :href="document.url"
+                                                            target="_blank"
+                                                            rel="noopener"
+                                                            :data-testid="`terms-link-${document.type}`"
+                                                            >{{ document.title }}</a
+                                                        >
+                                                        <span v-if="index === termsDocuments.length - 1">)</span>
+                                                    </template>
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <span
+                                            v-if="errors.terms_accepted"
+                                            id="register-terms-error"
+                                            class="reg-error"
+                                            role="alert"
+                                            data-testid="register-terms-error"
+                                            >{{ errors.terms_accepted }}</span
+                                        >
+                                        <button
+                                            v-if="termsChanged"
+                                            type="button"
+                                            class="reg-terms-reload"
+                                            data-testid="register-terms-reload"
+                                            :disabled="reloadingTerms"
+                                            @click="reloadTerms"
+                                        >
+                                            {{ reloadingTerms ? 'Recarregando…' : 'Recarregar a página' }}
+                                        </button>
+                                    </div>
+
                                     <div class="reg-btn-row">
                                         <button type="button" class="reg-btn reg-btn-secondary" @click="prevStep">
                                             <i class="ti ti-arrow-left"></i> {{ tAuth.register?.back }}
                                         </button>
-                                        <button type="submit" class="reg-btn reg-btn-primary" :disabled="loading">
+                                        <button
+                                            type="submit"
+                                            class="reg-btn reg-btn-primary"
+                                            :disabled="loading"
+                                            data-testid="register-submit"
+                                        >
                                             <span v-if="!loading && startMode === 'checkout'">
                                                 {{ tAuth.register?.create_and_pay }}
                                                 <i class="ti ti-arrow-right"></i>
@@ -1212,6 +1350,45 @@ const showPwd2 = ref(false);
     font-size: 12px;
     color: #ef4444;
     margin-top: 5px;
+}
+.reg-check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+}
+.reg-check {
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    accent-color: var(--teal);
+    flex: 0 0 auto;
+}
+.reg-check:focus-visible {
+    outline: 3px solid var(--teal);
+    outline-offset: 2px;
+}
+.reg-check-row a {
+    color: #006d83;
+    font-weight: 600;
+    text-decoration: underline;
+}
+.reg-terms-reload {
+    background: transparent;
+    border: 0;
+    color: #006d83;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 8px;
+    padding: 0;
+    text-decoration: underline;
+}
+.reg-terms-reload:focus-visible {
+    outline: 3px solid var(--teal);
+    outline-offset: 2px;
 }
 .reg-input-group {
     display: flex;

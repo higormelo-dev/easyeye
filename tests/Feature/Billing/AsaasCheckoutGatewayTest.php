@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-use App\DTOs\Billing\{GatewayWebhookInputDTO, HostedCheckoutDTO};
+use App\DTOs\Billing\{CustomerDTO, GatewayWebhookInputDTO, HostedCheckoutDTO};
 use App\Enums\Billing\CheckoutMethod;
+use App\Models\Entity;
 use App\Services\Billing\CheckoutService;
 use App\Services\Billing\Gateways\AsaasGateway;
 use Illuminate\Http\Client\Request;
@@ -64,6 +65,174 @@ it('DETACHED: só cartão, limites de tamanho da doc, sem subscription e com o c
             && ! array_key_exists('imageBase64', $item)
             && $r['callback']['expiredUrl'] === 'https://app.easyeye.app/panel/my-subscription?checkout_return=expired';
     });
+});
+
+it('item do checkout: quantity (obrigatório no Asaas — sem ele o sandbox responde 400 parse_error) e value com o valor da fatura, no avulso e no recorrente', function (?string $cycle) {
+    Http::fake(['https://api.asaas.com/v3/checkouts' => Http::response(['id' => 'chk_1', 'status' => 'ACTIVE'])]);
+
+    app(AsaasGateway::class)->createHostedCheckout(acgDto([
+        'amount'      => 899.90,
+        'itemName'    => 'Assinatura Pro',
+        'description' => 'Fatura INV-20261015-ABC · Mensal',
+        'cycle'       => $cycle,
+        'nextDueDate' => $cycle !== null ? '2026-10-17' : null,
+    ]));
+
+    Http::assertSent(function (Request $r) use ($cycle) {
+        $item = $r['items'][0];
+
+        return count($r['items']) === 1
+            && $item['name'] === 'Assinatura Pro'
+            && $item['quantity'] === 1                // int, não "1" nem ausente
+            && $item['value'] === 899.9               // o valor que a página do Asaas exibe (Subtotal/Total/"Pagar R$")
+            && $r['chargeTypes'] === [$cycle !== null ? 'RECURRENT' : 'DETACHED']
+            && ($cycle === null
+                ? ! array_key_exists('subscription', $r->data())
+                : $r['subscription'] === ['cycle' => 'MONTHLY', 'nextDueDate' => '2026-10-17']);
+    });
+})->with([
+    'avulso (DETACHED)'    => [null],
+    'recorrente (MONTHLY)' => ['monthly'],
+]);
+
+function acgCustomerError(string ...$fields): array
+{
+    return ['errors' => array_map(fn (string $f) => ['code' => 'invalid_object', 'description' => "O campo {$f} deve existir para o customer informado."], $fields)];
+}
+
+// ── (a) endereço do cliente ──────────────────────────────────────────────────────────────────────────────────────────
+
+it('(a) cliente novo leva phone, address, addressNumber, complement, province e postalCode quando o cadastro da clínica está completo', function () {
+    Http::fake([
+        'https://api.asaas.com/v3/customers?*' => Http::response(['data' => []]),
+        'https://api.asaas.com/v3/customers'   => Http::response(['id' => 'cus_1', 'notificationDisabled' => true]),
+    ]);
+
+    app(AsaasGateway::class)->upsertCustomer(new CustomerDTO(
+        entityId: (string) Entity::factory()->create()->id,
+        name: 'Clínica Olhar Ltda',
+        email: 'financeiro@olhar.test',
+        document: '11222333000181',
+        phone: '11987654321',
+        externalReference: 'e1',
+        address: ['zipcode' => '01310100', 'street' => 'Avenida Paulista', 'number' => '1000', 'complement' => 'Sala 12', 'district' => 'Bela Vista', 'city' => 'São Paulo', 'state' => 'SP'],
+    ));
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://api.asaas.com/v3/customers'
+        && $r['mobilePhone'] === '11987654321'
+        && $r['address'] === 'Avenida Paulista'
+        && $r['addressNumber'] === '1000'
+        && $r['complement'] === 'Sala 12'
+        && $r['province'] === 'Bela Vista'
+        && $r['postalCode'] === '01310100');
+});
+
+it('(a) endereço INCOMPLETO (falta logradouro, número, bairro ou CEP de 8 dígitos) não vai pela metade nem é inventado', function (array $address) {
+    Http::fake([
+        'https://api.asaas.com/v3/customers?*' => Http::response(['data' => []]),
+        'https://api.asaas.com/v3/customers'   => Http::response(['id' => 'cus_1', 'notificationDisabled' => true]),
+    ]);
+
+    app(AsaasGateway::class)->upsertCustomer(new CustomerDTO((string) Entity::factory()->create()->id, 'Clínica Olhar Ltda', null, '11222333000181', '11987654321', 'e1', address: $address));
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r->url() === 'https://api.asaas.com/v3/customers'
+        && ! array_key_exists('address', $r->data())
+        && ! array_key_exists('addressNumber', $r->data())
+        && ! array_key_exists('province', $r->data())
+        && ! array_key_exists('postalCode', $r->data())
+        && ! array_key_exists('complement', $r->data()));
+})->with([
+    'sem número'     => [['zipcode' => '01310100', 'street' => 'Avenida Paulista', 'district' => 'Bela Vista', 'complement' => 'Sala 12']],
+    'sem bairro'     => [['zipcode' => '01310100', 'street' => 'Avenida Paulista', 'number' => '1000']],
+    'CEP curto'      => [['zipcode' => '0131010', 'street' => 'Avenida Paulista', 'number' => '1000', 'district' => 'Bela Vista']],
+    'sem logradouro' => [['zipcode' => '01310100', 'number' => '1000', 'district' => 'Bela Vista']],
+    'só cidade/UF'   => [['city' => 'São Paulo', 'state' => 'SP']],
+]);
+
+// ── (b) cliente recusado no Checkout: UMA nova tentativa sem o cliente ──────────────────────────────────────────────
+
+it('(b) 400 invalid_object do customer: repete UMA vez SEM o customer e o PAYLOAD INTEIRO da 2ª chamada é o da 1ª menos o customer (avulso e recorrente)', function (?string $cycle) {
+    Http::fake(['https://api.asaas.com/v3/checkouts' => Http::sequence()
+        ->push(acgCustomerError('phone', 'address', 'postalCode'), 400)
+        ->push(['id' => 'chk_2', 'status' => 'ACTIVE', 'link' => 'https://asaas.com/checkoutSession/show?id=chk_2', 'minutesToExpire' => 60])]);
+
+    $result = app(AsaasGateway::class)->createHostedCheckout(acgDto(['cycle' => $cycle, 'nextDueDate' => $cycle !== null ? '2026-10-17' : null, 'minutesToExpire' => 45]));
+
+    expect($result->success)->toBeTrue()
+        ->and($result->externalCheckoutId)->toBe('chk_2')
+        ->and($result->customerOmitted)->toBeTrue()
+        ->and($result->omittedReasons)->toBe(['phone', 'address', 'postalCode']);
+
+    $sent = Http::recorded()->map(fn (array $pair) => $pair[0]->data())->values()->all();
+
+    expect($sent)->toHaveCount(2)
+        ->and($sent[0]['customer'])->toBe('cus_000005219613')
+        ->and(array_key_exists('customer', $sent[1]))->toBeFalse()
+        // Tudo o mais é idêntico (items, billingTypes, chargeTypes, subscription, minutesToExpire, callback, externalReference).
+        ->and($sent[1])->toBe(array_diff_key($sent[0], ['customer' => true]))
+        ->and($sent[1]['minutesToExpire'])->toBe(45)
+        ->and(array_key_exists('subscription', $sent[1]))->toBe($cycle !== null);
+})->with([
+    'avulso (DETACHED)'    => [null],
+    'recorrente (MONTHLY)' => ['monthly'],
+]);
+
+it('(b) descrição GENÉRICA do erro do cliente: repete mesmo assim, customerOmitted vale true (flag da retentativa) e os motivos ficam vazios', function () {
+    Http::fake(['https://api.asaas.com/v3/checkouts' => Http::sequence()
+        ->push(['errors' => [['code' => 'invalid_object', 'description' => 'Dados insuficientes para o customer informado.']]], 400)
+        ->push(['id' => 'chk_2', 'status' => 'ACTIVE'])]);
+
+    $result = app(AsaasGateway::class)->createHostedCheckout(acgDto());
+
+    expect($result->success)->toBeTrue()
+        ->and($result->customerOmitted)->toBeTrue()
+        ->and($result->omittedReasons)->toBe([])
+        ->and(Http::recorded())->toHaveCount(2);
+});
+
+it('(b) os motivos guardam SÓ nomes de campo da allowlist, só dos erros do cliente: número, CPF e campos desconhecidos nunca entram', function () {
+    Http::fake(['https://api.asaas.com/v3/checkouts' => Http::sequence()
+        ->push(['errors' => [
+            ['code' => 'invalid_object', 'description' => 'O campo phone deve existir para o customer informado.'],
+            ['code' => 'invalid_object', 'description' => 'O campo 11222333000181 deve existir para o customer informado.'],
+            ['code' => 'invalid_object', 'description' => 'O campo segredoInterno deve existir para o customer informado.'],
+            ['code' => 'invalid_object', 'description' => 'O campo callback deve ser informado.'],
+            ['code' => 'parse_error', 'description' => 'O campo email deve existir para o customer informado.'],
+            ['code' => 'invalid_object', 'description' => 'O campo postalCode deve existir para o customer informado.'],
+        ]], 400)
+        ->push(['id' => 'chk_2', 'status' => 'ACTIVE'])]);
+
+    $result = app(AsaasGateway::class)->createHostedCheckout(acgDto());
+
+    expect($result->customerOmitted)->toBeTrue()
+        ->and($result->omittedReasons)->toBe(['phone', 'postalCode']);
+});
+
+it('(b) outro 400 NÃO repete: invalid_object de outro campo, outro código, 5xx, ou pedido que já não tinha cliente', function (array $responses, ?string $customerId) {
+    Http::fake(['https://api.asaas.com/v3/checkouts' => Http::sequence()->push(...$responses[0])->push(['id' => 'chk_nao_deveria', 'status' => 'ACTIVE'])]);
+
+    $result = app(AsaasGateway::class)->createHostedCheckout(acgDto(['customerId' => $customerId]));
+
+    expect($result->success)->toBeFalse()
+        ->and($result->customerOmitted)->toBeFalse()
+        ->and(Http::recorded())->toHaveCount(1);
+})->with([
+    'invalid_object do callback'    => [[[['errors' => [['code' => 'invalid_object', 'description' => 'O campo callback deve ser informado.']]], 400]], 'cus_000005219613'],
+    'callback citando customer'     => [[[['errors' => [['code' => 'invalid_object', 'description' => 'O campo callback contem customer e e invalido.']]], 400]], 'cus_000005219613'],
+    'outro código citando customer' => [[[['errors' => [['code' => 'parse_error', 'description' => 'O campo customer é inválido.']]], 400]], 'cus_000005219613'],
+    'erro 500'                      => [[[['errors' => [['code' => 'invalid_object', 'description' => 'O campo phone deve existir para o customer informado.']]], 500]], 'cus_000005219613'],
+    'sem cliente no pedido'         => [[[['errors' => [['code' => 'invalid_object', 'description' => 'O campo phone deve existir para o customer informado.']]], 400]], null],
+]);
+
+it('(b) a nova tentativa que também falha devolve a falha (2 chamadas no máximo)', function () {
+    Http::fake(['https://api.asaas.com/v3/checkouts' => Http::sequence()
+        ->push(acgCustomerError('phone'), 400)
+        ->push(['errors' => [['code' => 'invalid_object', 'description' => 'O campo callback deve ser informado.']]], 400)
+        ->push(['id' => 'chk_3'])]);
+
+    $result = app(AsaasGateway::class)->createHostedCheckout(acgDto());
+
+    expect($result->success)->toBeFalse()->and($result->httpStatus)->toBe(400)->and(Http::recorded())->toHaveCount(2);
 });
 
 it('minutesToExpire fica entre 10 e 1440 (doc)', function (int $asked, int $sent) {

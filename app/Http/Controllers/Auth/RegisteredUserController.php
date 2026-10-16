@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\{Plan, PlanPrice, SubscriptionSetting, User};
 use App\Services\Security\TurnstileVerifier;
+use App\Services\TermsService;
 use App\Support\Billing\PlanPricing;
 use App\Support\Site\SiteContent;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -19,10 +20,6 @@ class RegisteredUserController extends Controller
     public function create(Request $request): RedirectResponse|Response
     {
         $trialDays = SubscriptionSetting::trialDays();
-
-        if ($trialDays <= 0) {
-            return redirect()->to(route('site.home') . '#contato');
-        }
 
         $plans = Plan::active()
             ->with(['features' => fn ($q) => $q->orderBy('feature'), 'prices'])
@@ -48,6 +45,36 @@ class RegisteredUserController extends Controller
                 ])->toArray(),
             ]);
 
+        // Teste grátis desligado: o cadastro segue aberto para CONTRATAR PAGANDO (Pix, boleto ou
+        // cartão na hora) — só some a opção gratuita. Sem plano pago à venda, não há o que
+        // contratar: encaminha ao contato, como antes.
+        if ($trialDays <= 0) {
+            // Por CICLO, não pelo preço do plano: plano com mensal 0 e anual > 0 é vendável (só o ciclo pago fica).
+            $plans = $plans
+                ->map(function (array $plan) {
+                    $plan['prices'] = array_values(array_filter($plan['prices'], static fn (array $row) => (float) $row['price'] > 0));
+
+                    if ($plan['prices'] !== []) {
+                        $cycles = array_column($plan['prices'], 'cycle');
+
+                        if (! in_array($plan['default_cycle'], $cycles, true)) {
+                            $plan['default_cycle'] = $plan['prices'][0]['cycle'];
+                            $plan['price']         = $plan['prices'][0]['price'];
+                        }
+
+                        $plan['is_free'] = false;
+                    }
+
+                    return $plan;
+                })
+                ->reject(fn (array $plan) => $plan['prices'] === [])
+                ->values();
+
+            if ($plans->isEmpty()) {
+                return redirect()->to(route('site.home') . '#contato');
+            }
+        }
+
         // Resolve against the active catalogue, without querying untrusted UUIDs.
         $requestedPlan = $request->query('plan');
         $selectedPlan  = is_string($requestedPlan)
@@ -72,6 +99,7 @@ class RegisteredUserController extends Controller
             'selectedCycle'  => $selectedCycle,
             // Captcha (Cloudflare Turnstile): só com as duas chaves configuradas.
             'turnstileSiteKey' => TurnstileVerifier::siteKey(),
+            'terms'            => $this->termsProp(),
             'routes'           => [
                 'siteHome'     => route('site.home'),
                 'go'           => route('go'),
@@ -83,11 +111,54 @@ class RegisteredUserController extends Controller
     }
 
     /**
+     * Aceite dos Termos de Uso + Política de Privacidade no cadastro. `required` só com versão VIGENTE (sem ela o
+     * campo é ignorado — falha aberta, ver RegisterRequest::after); o cliente manda só o boolean `terms_accepted`,
+     * a versão é resolvida no servidor. `version_id`/`url` são do documento principal (Termos de Uso; sem ele, a
+     * Política); `documents` lista os dois (cada um com o próprio link) para o texto citar ambos.
+     *
+     * @return array{required: bool, version_id: ?string, title: string, url: ?string, summary: string, documents: list<array<string, mixed>>}
+     */
+    private function termsProp(): array
+    {
+        $current   = app(TermsService::class)->currentRequired();
+        $primary   = $current['terms_of_service'] ?? ($current['privacy_policy'] ?? null);
+        $documents = [];
+
+        // Ordem da tela (Termos, depois Política), não a de TermsService::REQUIRED_TYPES.
+        foreach (['terms_of_service', 'privacy_policy'] as $type) {
+            if (! isset($current[$type])) {
+                continue;
+            }
+
+            $version     = $current[$type];
+            $documents[] = [
+                'type'       => $type,
+                'version_id' => (string) $version->id,
+                'version'    => $version->version,
+                'title'      => __($type === 'privacy_policy' ? 'auth.register.terms_doc_privacy_policy' : 'auth.register.terms_doc_terms_of_service'),
+                'url'        => route($type === 'privacy_policy' ? 'site.privacy' : 'site.terms'),
+            ];
+        }
+
+        return [
+            'required'   => $primary !== null,
+            'version_id' => $primary !== null ? (string) $primary->id : null,
+            'title'      => __('auth.register.terms_title'),
+            'url'        => $primary !== null ? route($primary->type === 'privacy_policy' ? 'site.privacy' : 'site.terms') : null,
+            'summary'    => __('auth.register.terms_summary'),
+            'documents'  => $documents,
+        ];
+    }
+
+    /**
      * Check if an e-mail address is available (AJAX — called by the wizard).
      */
     public function checkEmail(Request $request): JsonResponse
     {
-        $exists = User::where('email', $request->string('email')->lower()->toString())->exists();
+        // Só e-mail de verdade (e curto): nada de array, lixo ou texto enorme indo ao banco.
+        $request->validate(['email' => ['required', 'string', 'email:rfc', 'max:254']]);
+
+        $exists = User::where('email', mb_strtolower(trim((string) $request->input('email'))))->exists();
 
         return response()->json(['available' => ! $exists]);
     }
@@ -119,14 +190,19 @@ class RegisteredUserController extends Controller
             'user_rule'                 => $entityUser->rule,
         ]);
 
+        // O corpo carrega o token CSRF da sessão recém-autenticada: a resposta não pode
+        // ser guardada por navegador/proxy (no-store) e o corpo não vai a log (nada aqui
+        // nem em middleware registra resposta; RegistrationTest fixa os dois).
         return response()->json([
             'redirect' => route('panel.dashboard', absolute: false),
+            // O login renova a sessão; o checkout continua na mesma página.
+            'csrf_token' => $request->session()->token(),
             // Contratar já pagando: o front segue para o checkout do cadastro.
             'checkout' => $checkout ? [
                 'contract' => route('signup-checkout.contract', absolute: false),
                 'options'  => route('signup-checkout.options', absolute: false),
                 'summary'  => route('signup-checkout.summary', absolute: false),
             ] : null,
-        ]);
+        ], headers: ['Cache-Control' => 'no-store, private', 'Pragma' => 'no-cache']);
     }
 }

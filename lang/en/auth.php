@@ -79,6 +79,9 @@ return [
         'whatsapp_hint'      => 'We will send a confirmation code via WhatsApp.',
         'whatsapp_invalid'   => 'Enter a valid number with area code.',
         'cnpj'               => 'CNPJ',
+        'document'           => 'CPF or CNPJ',
+        'document_required'  => "Enter the owner's CPF or CNPJ to subscribe now.",
+        'document_invalid'   => 'Enter a valid CPF or CNPJ (check the digits).',
         'optional'           => 'optional',
         'choose_plan'        => 'Choose a plan',
         'choose_cycle'       => 'Billing cycle',
@@ -129,6 +132,14 @@ return [
         'strength_fair'        => 'Fair',
         'strength_strong'      => 'Strong',
         'strength_very_strong' => 'Very strong',
+
+        /* terms acceptance (sign-up) */
+        'terms_title'                => 'Terms of Use and Privacy Policy',
+        'terms_summary'              => 'I have read and accept the Terms of Use and the Privacy Policy, including subscription billing and the handling of payment data by a payment provider (billing gateway).',
+        'terms_required'             => 'To create your account, accept the Terms of Use and the Privacy Policy.',
+        'terms_changed'              => 'The terms were updated while you were filling in the sign-up. Read the documents again and accept them.',
+        'terms_doc_terms_of_service' => 'Terms of Use',
+        'terms_doc_privacy_policy'   => 'Privacy Policy',
     ],
 
     'forgot_password' => [

@@ -15,6 +15,7 @@ use App\Http\Controllers\{
     EyeImageExamActionsController,
     EyeImageMontageController,
     EyeImageReportController,
+    EyeImageReportDictationController,
     EyeImageReportDraftController,
     EyeImageReportResendController,
     EyeImagesController,
@@ -230,6 +231,8 @@ Route::group(
                 Route::post('invoices/{invoice}/card', [CheckoutController::class, 'payWithCard'])->middleware('throttle:billing-checkout-pay')->name('card');
                 Route::put('card', [CheckoutController::class, 'replaceCard'])->middleware('throttle:billing-checkout-pay')->name('replace-card');
                 Route::post('contract', [CheckoutController::class, 'contract'])->middleware('throttle:billing-checkout-pay')->name('contract');
+                // CPF/CNPJ da clínica sem documento (o 422 document_required do contract): só PREENCHE, nunca troca.
+                Route::put('payer-document', [CheckoutController::class, 'payerDocument'])->middleware('throttle:billing-checkout-pay')->name('payer-document');
                 // Pacote de créditos de IA no mesmo checkout (só com acesso total — AiCreditPackCheckoutService).
                 Route::get('ai-credits', [CheckoutController::class, 'aiCreditOptions'])->middleware('throttle:billing-checkout-read')->name('ai-credits.options');
                 Route::post('ai-credits', [CheckoutController::class, 'aiCreditPurchase'])->middleware('throttle:billing-checkout-pay')->name('ai-credits.purchase');
@@ -317,6 +320,11 @@ Route::group(
         Route::post('/eye-images/reports/extract-pdf-text', [EyeImageReportController::class, 'extractPdfText'])
             ->middleware('entity.role:admin,doctor,secretary')
             ->name('eye-images.reports.extract-pdf-text');
+        // Ditado por voz do laudo (Fase 5): transcrição no servidor, por provedor da
+        // política LGPD — Gate::DraftImageReport checado dentro do controller.
+        Route::post('/eye-images/reports/dictate', EyeImageReportDictationController::class)
+            ->middleware(['entity.role:admin,doctor,secretary', 'throttle:report-dictation'])
+            ->name('eye-images.reports.dictate');
         // Reenvio ao médico solicitante (Fase 5) — Gate::SendReportToExternalDoctor
         // (admin/doctor) checado dentro do controller, mesmo padrão do bloco acima.
         Route::post('/eye-images/reports/{documentation}/resend', EyeImageReportResendController::class)
@@ -342,6 +350,11 @@ Route::group(
         Route::post('/eye-images/report-drafts/{draft}/submit', [EyeImageReportDraftController::class, 'submit'])
             ->middleware('entity.role:admin,doctor,secretary')
             ->name('eye-images.report-drafts.submit');
+        // Médico devolve o rascunho enviado ao técnico, com o motivo — Gate
+        // IssueReport (médico com cadastro ativo) checado dentro do controller.
+        Route::post('/eye-images/report-drafts/{draft}/return', [EyeImageReportDraftController::class, 'returnToTechnician'])
+            ->middleware('entity.role:doctor')
+            ->name('eye-images.report-drafts.return');
         Route::delete('/eye-images/report-drafts/{draft}', [EyeImageReportDraftController::class, 'destroy'])
             ->middleware('entity.role:admin,doctor,secretary')
             ->name('eye-images.report-drafts.destroy');

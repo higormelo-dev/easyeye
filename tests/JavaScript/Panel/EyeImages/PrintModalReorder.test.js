@@ -151,3 +151,135 @@ describe('EyeImages — modal de impressão: reordenar / agrupar OD-OE / legenda
         expect(wrapper.vm.printGroupOdOe).toBe(false);
     });
 });
+
+describe('EyeImages — modal de impressão: N imagens por folha (Fase 5)', () => {
+    const odA = { id: 'a-od', laterality: 1, exam_session_id: 'sess-a', created_at: '2026-02-12T12:00:00Z' };
+    const oeA = { id: 'a-oe', laterality: 2, exam_session_id: 'sess-a', created_at: '2026-02-12T12:00:00Z' };
+    const odB = { id: 'b-od', laterality: 1, exam_session_id: 'sess-b', created_at: '2026-02-12T12:00:00Z' };
+    const oeB = { id: 'b-oe', laterality: 2, exam_session_id: 'sess-b', created_at: '2026-02-12T12:00:00Z' };
+    const sheetIds = (wrapper) => wrapper.vm.printPages.map((page) => page.cells.map((cell) => cell?.id ?? null));
+
+    it('padrão: modo contínuo, uma página só, colunas = printCols', async () => {
+        const wrapper = await render();
+        wrapper.vm.openPrintModal([odA, oeA, odB], false);
+
+        expect(wrapper.vm.printPerSheet).toBeNull();
+        expect(wrapper.vm.printPages).toHaveLength(1);
+        expect(wrapper.vm.printPages[0]).toMatchObject({ cols: 2, rows: null });
+        expect(sheetIds(wrapper)).toEqual([['a-od', 'a-oe', 'b-od']]);
+        expect(wrapper.find('.ei-sheet').exists()).toBe(false);
+    });
+
+    it('2 por folha parte em folhas de 2 com a última completada por célula vazia', async () => {
+        const wrapper = await render();
+        wrapper.vm.openPrintModal([odA, oeA, odB], false);
+        wrapper.vm.printPerSheet = 2;
+        await flushPromises();
+
+        expect(sheetIds(wrapper)).toEqual([
+            ['a-od', 'a-oe'],
+            ['b-od', null],
+        ]);
+        expect(wrapper.findAll('.ei-sheet')).toHaveLength(2);
+        expect(wrapper.vm.printPages.map((p) => p.total)).toEqual([2, 2]);
+    });
+
+    it('"Agrupar OD/OE" no modo por folha põe OD | OE lado a lado, par por linha', async () => {
+        const wrapper = await render();
+        // Ordem crua embaralhada de propósito: OE antes de OD, grupos intercalados.
+        wrapper.vm.openPrintModal([oeA, oeB, odA, odB], false);
+        wrapper.vm.printPerSheet = 4;
+        wrapper.vm.printGroupOdOe = true;
+        await flushPromises();
+
+        expect(wrapper.vm.printPages[0]).toMatchObject({ cols: 2, rows: 2 });
+        expect(sheetIds(wrapper)).toEqual([['a-od', 'a-oe', 'b-od', 'b-oe']]);
+    });
+
+    it('vídeo nunca ocupa posição na folha', async () => {
+        const wrapper = await render();
+        const video = { id: 'v', laterality: 1, archive: 'exames/clip.mp4', exam_session_id: 'sess-a' };
+        wrapper.vm.openPrintModal([odA, video, oeA], false);
+        wrapper.vm.printPerSheet = 2;
+        await flushPromises();
+
+        expect(sheetIds(wrapper)).toEqual([['a-od', 'a-oe']]);
+    });
+
+    it('reabrir o modal volta ao modo contínuo', async () => {
+        const wrapper = await render();
+        wrapper.vm.openPrintModal([odA], false);
+        wrapper.vm.printPerSheet = 4;
+
+        wrapper.vm.openPrintModal([odA], false);
+
+        expect(wrapper.vm.printPerSheet).toBeNull();
+    });
+
+    it('clicar de novo no valor ativo desliga o modo por folha', async () => {
+        const wrapper = await render();
+        wrapper.vm.openPrintModal([odA, oeA], false);
+        await flushPromises();
+
+        const buttons = wrapper.findAll('[data-testid="print-per-sheet"] button');
+        expect(buttons.map((b) => b.text())).toEqual(['1', '2', '4', '6']);
+
+        await buttons[1].trigger('click');
+        expect(wrapper.vm.printPerSheet).toBe(2);
+        await buttons[1].trigger('click');
+        expect(wrapper.vm.printPerSheet).toBeNull();
+    });
+
+    it('printReport injeta o @page do papel escolhido e remove depois da impressão', async () => {
+        const wrapper = await render();
+        wrapper.vm.openPrintModal([odA], false);
+        wrapper.vm.printOrientation = 'landscape';
+        let during = '';
+        vi.stubGlobal('print', () => {
+            during = document.head.querySelector('style[data-ei-print-page]')?.textContent ?? '';
+        });
+
+        wrapper.vm.printReport();
+        window.dispatchEvent(new Event('afterprint'));
+
+        expect(during).toContain('size: A4 landscape');
+        expect(document.head.querySelector('style[data-ei-print-page]')).toBeNull();
+    });
+
+    it('[F1] fechar desmonta a impressão paginada; ao abrir para outro paciente não sobra folha anterior', async () => {
+        const wrapper = await render();
+        const patientA = { code: 'A-001', person: { full_name: 'Paciente anterior' }, exams: [] };
+        const patientB = { code: 'B-002', person: { full_name: 'Paciente atual' }, exams: [] };
+
+        wrapper.vm.selectedPatient = patientA;
+        wrapper.vm.openPrintModal([odA], false);
+        wrapper.vm.printPerSheet = 1;
+        await flushPromises();
+        expect(wrapper.find('.ei-print-paged').exists()).toBe(true);
+        expect(wrapper.text()).toContain('Paciente anterior');
+
+        wrapper.vm.showPrintModal = false;
+        await flushPromises();
+        expect(wrapper.find('.ei-print-root').exists()).toBe(false);
+
+        wrapper.vm.selectedPatient = patientB;
+        wrapper.vm.openPrintModal([oeB], false);
+        wrapper.vm.printPerSheet = 1;
+        await flushPromises();
+
+        expect(wrapper.find('.ei-print-paged').exists()).toBe(true);
+        expect(wrapper.text()).toContain('Paciente atual');
+        expect(wrapper.text()).not.toContain('Paciente anterior');
+    });
+
+    it.each([320, 375])('[F2] em %ipx a barra quebra linhas e mantém Fechar acessível', async (viewport) => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: viewport });
+        const wrapper = await render();
+        wrapper.vm.openPrintModal([odA], false);
+        await flushPromises();
+
+        const toolbar = wrapper.find('[data-testid="print-toolbar"]');
+        expect(toolbar.classes()).toContain('flex-wrap');
+        expect(toolbar.find('[data-testid="print-close"]').exists()).toBe(true);
+    });
+});

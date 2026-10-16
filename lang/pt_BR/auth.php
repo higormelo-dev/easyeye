@@ -77,6 +77,9 @@ return [
         'whatsapp_hint'      => 'Enviaremos um código de confirmação por WhatsApp.',
         'whatsapp_invalid'   => 'Informe um número válido com DDD.',
         'cnpj'               => 'CNPJ',
+        'document'           => 'CPF ou CNPJ',
+        'document_required'  => 'Informe o CPF ou CNPJ do responsável para contratar agora.',
+        'document_invalid'   => 'Informe um CPF ou CNPJ válido (confira os dígitos).',
         'optional'           => 'opcional',
         'choose_plan'        => 'Escolha um plano',
         'choose_cycle'       => 'Ciclo de cobrança',
@@ -127,6 +130,14 @@ return [
         'strength_fair'        => 'Razoável',
         'strength_strong'      => 'Forte',
         'strength_very_strong' => 'Muito forte',
+
+        /* aceite dos termos (cadastro) */
+        'terms_title'                => 'Termos de Uso e Política de Privacidade',
+        'terms_summary'              => 'Li e aceito os Termos de Uso e a Política de Privacidade, inclusive a cobrança da assinatura e o tratamento dos dados de pagamento por prestador de pagamento (gateway de cobrança).',
+        'terms_required'             => 'Para criar a conta, aceite os Termos de Uso e a Política de Privacidade.',
+        'terms_changed'              => 'Os termos foram atualizados enquanto você preenchia o cadastro. Releia os documentos e aceite novamente.',
+        'terms_doc_terms_of_service' => 'Termos de Uso',
+        'terms_doc_privacy_policy'   => 'Política de Privacidade',
     ],
 
     'forgot_password' => [

@@ -452,6 +452,7 @@ return [
         'quantity_max'          => 'Period too long to add at once.',
         'nothing_to_cancel'     => 'No current subscription (trial, active or past due) found.',
         'gateway_failed'        => 'The gateway refused the activation: :error',
+        'document_required'     => 'The company has no valid CPF or CNPJ on file, and the gateway refuses a subscription for a customer without a tax ID. Fill in the document in the company record and try again — no charge was created.',
         'activation_superseded' => 'Another subscription change for this company was made while the charge was being issued. That change was kept and the automatic billing for this one was undone.',
 
         'gateway_subscription_failed'    => '[:gateway] Could not create the subscription at the gateway: :error',

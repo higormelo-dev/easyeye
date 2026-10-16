@@ -39,10 +39,10 @@ it('o código do impedimento gravado em error_code (recall_<código>) é o mesmo
 });
 
 it('a linha da lista fala de toda situação de entrega que o servidor produz', function () {
-    $statuses = array_unique(array_map(
+    $statuses = array_values(array_unique(array_map(
         static fn (array $args): string => RecallInviteOverview::deliveryStatus(...$args),
         [['pending', null, null], ['sending', null, null], ['sent', null, null], ['sent', '2026-01-01', null], ['sent', '2026-01-01', '2026-01-02'], ['answered', null, null], ['failed', null, null], ['skipped', null, null], ['suppressed', null, null], [null, null, null]],
-    ));
+    )));
 
     foreach (['pt_BR', 'en'] as $locale) {
         $texts = ritTexts($locale, 'recall_list')['row']['invite'];

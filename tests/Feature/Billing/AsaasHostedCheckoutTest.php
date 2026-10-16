@@ -245,6 +245,10 @@ describe('abertura do checkout', function () {
                 && str_contains($r['callback']['cancelUrl'], 'checkout_return=cancel')
                 && str_contains($r['callback']['expiredUrl'], 'checkout_return=expired')
                 && str_contains($r['callback']['successUrl'], (string) $invoice->id)
+                // Painel: o padrão continua sendo Minha assinatura (a volta do cadastro é só das rotas signup-checkout.*).
+                && str_starts_with($r['callback']['successUrl'], route('panel.my-subscription.index'))
+                && str_starts_with($r['callback']['cancelUrl'], route('panel.my-subscription.index'))
+                && str_starts_with($r['callback']['expiredUrl'], route('panel.my-subscription.index'))
                 && ! array_key_exists('creditCard', $r->data());
         });
 
@@ -258,6 +262,19 @@ describe('abertura do checkout', function () {
         // Abrir de novo (ainda válido) reaproveita — não cria outro no Asaas.
         hcOpenCard($invoice);
         Http::assertSentCount(1);
+    });
+
+    it('clínica SEM CPF/CNPJ no cadastro: a fatura de uma assinatura que já existe ainda abre o checkout hospedado (a página do Asaas coleta o documento) — a pré-condição de documento só vale para CRIAR a assinatura', function () {
+        $this->clinic->forceFill(['national_registration' => null])->save();
+        [, $invoice] = hcPaying();
+
+        $data = hcOpenCard($invoice);
+
+        expect($data['mode'])->toBe('hosted')
+            ->and($data['checkout_url'])->toBe('https://asaas.com/checkoutSession/show?id=chk_1');
+
+        Http::assertSent(fn (Request $r) => $r->url() === 'https://api.asaas.com/v3/checkouts' && $r['customer'] === 'cus_000005219613');
+        Http::assertNotSent(fn (Request $r) => $r->method() === 'POST' && in_array($r->url(), ['https://api.asaas.com/v3/customers', 'https://api.asaas.com/v3/subscriptions'], true));
     });
 
     it('a leitura (GET) nunca abre checkout; o já aberto é devolvido', function () {
@@ -363,7 +380,7 @@ describe('troca segura da recorrência', function () {
 
     it('pagou atrasado: a recorrência nova nasce hoje e o próximo vencimento é alinhado ao período no Asaas', function () {
         [$subscription, $invoice] = hcPaying(
-            ['status'       => SubscriptionStatus::PastDue, 'ends_at' => '2026-10-01 23:59:59', 'next_billing_at' => '2026-10-01 23:59:59', 'past_due_at' => '2026-10-01 23:59:59'],
+            ['status' => SubscriptionStatus::PastDue, 'ends_at' => '2026-10-01 23:59:59', 'next_billing_at' => '2026-10-01 23:59:59', 'past_due_at' => '2026-10-01 23:59:59'],
             ['period_start' => '2026-10-01', 'period_end' => '2026-11-01', 'due_at' => '2026-10-01 23:59:59', 'status' => InvoiceStatus::Overdue->value],
         );
         hcFake(['PUT https://api.asaas.com/v3/subscriptions/sub_new' => Http::response(['id' => 'sub_new', 'nextDueDate' => '2026-11-01'])]);
@@ -384,7 +401,7 @@ describe('troca segura da recorrência', function () {
 
     it('sem como alinhar pela API (tokenização desabilitada): o time é avisado para ajustar no painel', function () {
         [, $invoice] = hcPaying(
-            ['status'       => SubscriptionStatus::PastDue, 'ends_at' => '2026-10-01 23:59:59', 'next_billing_at' => '2026-10-01 23:59:59', 'past_due_at' => '2026-10-01 23:59:59'],
+            ['status' => SubscriptionStatus::PastDue, 'ends_at' => '2026-10-01 23:59:59', 'next_billing_at' => '2026-10-01 23:59:59', 'past_due_at' => '2026-10-01 23:59:59'],
             ['period_start' => '2026-10-01', 'period_end' => '2026-11-01', 'due_at' => '2026-10-01 23:59:59', 'status' => InvoiceStatus::Overdue->value],
         );
         hcFake(['PUT https://api.asaas.com/v3/subscriptions/sub_new' => Http::response(['errors' => [['code' => 'invalid_action', 'description' => 'Tokenização não habilitada']]], 400)]);

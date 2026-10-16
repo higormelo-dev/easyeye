@@ -35,7 +35,7 @@ it('push, PR de efeito amplo e PR sem base emitem a MESMA matriz completa de 6 j
 
 it('a suíte inteira continua sendo Feature + Unit + Integration (Integration não sai por conveniência)', function () {
     $out  = CiHarness::select('push', '');
-    $dirs = array_unique(array_merge(...array_map(fn (array $job) => explode(' ', $job['pest_args']), $out['matrix']['include'])));
+    $dirs = array_values(array_unique(array_merge(...array_map(fn (array $job) => explode(' ', $job['pest_args']), $out['matrix']['include']))));
 
     expect($out['pest_args'])->toBe('tests/Feature tests/Unit tests/Integration')
         ->and($dirs)->toEqualCanonicalizing(explode(' ', $out['pest_args']));

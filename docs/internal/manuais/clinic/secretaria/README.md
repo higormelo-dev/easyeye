@@ -394,6 +394,32 @@ para alinhar) ou **Lado a lado**:
 > **Novo laudo** (emitir laudo do exame) é ato médico exclusivo — não aparece pra
 > secretária, mesmo com acesso total ao restante do módulo.
 
+### Preparar, corrigir e reenviar rascunhos de laudo
+
+Depois de selecionar o paciente e os exames, clique em **Preparar rascunho**. Preencha
+o conteúdo e use **Enviar para o médico** quando ele estiver pronto para revisão. O
+botão **Rascunhos** no topo reúne os itens da clínica. Se um médico devolver um deles,
+o selo amarelo mostra a quantidade pendente e o filtro **Devolvido ao técnico** encontra
+esses itens rapidamente.
+
+Abra o rascunho devolvido, leia o aviso no topo com o motivo informado pelo médico,
+faça a correção e escolha **Reenviar para o médico**. O reenvio remove o motivo da tela
+e devolve o item à fila de revisão; a secretária não emite o laudo final.
+
+O ditado vem **desligado de fábrica** (`AI_TRANSCRIPTION_ENABLED`). Quando a plataforma
+EasyEye o habilita no **Manager**, o editor mostra o botão **Ditar**, que grava a fala e
+insere a transcrição no cursor. O áudio é enviado a um provedor de IA aprovado para virar
+texto e não fica guardado no EasyEye. Se o botão não aparecer, peça essa habilitação ao
+suporte EasyEye. Não cite nome, CPF, telefone ou outro identificador do paciente; revise
+o texto transcrito antes de salvar ou reenviar.
+
+### Imprimir exames por folha
+
+Com o paciente selecionado, clique em **Imprimir**. Em **Por folha**, escolha **1**,
+**2**, **4** ou **6** imagens para organizar páginas A4 separadas. Ajuste **Retrato** ou
+**Paisagem**, confira a prévia e clique em **Imprimir**. Vídeos não aparecem no papel;
+abra-os no painel quando precisar assisti-los.
+
 ---
 
 ## 11. Portal do Paciente: convite e compartilhamento de exame

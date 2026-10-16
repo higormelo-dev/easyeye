@@ -295,6 +295,30 @@ do exame de imagem sem depender de um atendimento em andamento:
 > exclusivo do médico, mesmo quando administrador/secretária têm acesso ao módulo de
 > Imagens Oftálmicas para as demais operações (upload, organização, comparação).
 
+### Revisar rascunhos, devolver para ajuste e ditar
+
+Quando a equipe prepara um rascunho, o botão **Rascunhos** mostra os que aguardam sua
+revisão. Abra um item, confira os exames, o texto e o profissional responsável antes de
+emitir. Se faltar uma informação ou houver algo a corrigir, clique em **Devolver ao
+técnico**, informe um motivo objetivo e confirme. O rascunho volta para a pessoa que o
+preparou; ele não é emitido nessa etapa.
+
+O ditado vem **desligado de fábrica** (`AI_TRANSCRIPTION_ENABLED`). Quando a plataforma
+EasyEye o habilita no **Manager**, o campo de conteúdo mostra o botão **Ditar**. Use-o
+para gravar uma fala e inseri-la no ponto atual do editor. O navegador pede acesso ao
+microfone. Ao parar a gravação, o áudio é enviado a um provedor de IA aprovado para virar
+texto e não é guardado pelo EasyEye. Se o botão não aparecer, peça essa habilitação ao
+suporte EasyEye. Não dite o nome, CPF, telefone ou outro identificador do paciente. Leia
+e revise a transcrição antes de salvar ou emitir o laudo.
+
+### Imprimir exames por folha
+
+Com o paciente selecionado, clique em **Imprimir**. Na barra superior da prévia, em
+**Por folha**, escolha **1**, **2**, **4** ou **6** imagens. Cada opção organiza folhas
+A4 separadas; a última folha mantém a grade mesmo quando sobra uma imagem. Use
+**Retrato** ou **Paisagem** conforme o exame e confirme a prévia antes de imprimir.
+Vídeos não entram no papel e são sinalizados na tela.
+
 ### Comparar exames
 
 Selecione **exatamente 2 exames** nas miniaturas do paciente — o botão **Comparar** só

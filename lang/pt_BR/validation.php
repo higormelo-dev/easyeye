@@ -360,7 +360,7 @@ return [
         'clinical_conduct'                          => 'conduta clínica',
         'color_vision_type_id'                      => 'tipo de visão cromática',
         'commission_rate'                           => 'taxa de comissão',
-        'company_cnpj'                              => 'CNPJ da empresa',
+        'company_cnpj'                              => 'CPF ou CNPJ do responsável',
         'company_name'                              => 'nome da empresa',
         'company_phone'                             => 'WhatsApp do responsável',
         'confirmation_enabled'                      => 'confirmação automática',
@@ -577,6 +577,9 @@ return [
         'generic' => [
             'required' => 'É obrigatória a indicação de um valor para o campo :attribute.',
         ],
+        'company_cnpj' => [
+            'required_if' => 'Informe o CPF ou CNPJ do responsável para contratar agora.',
+        ],
         'company_phone' => [
             'invalid' => 'Informe um número de WhatsApp válido com DDD (10 ou 11 dígitos).',
         ],
@@ -633,5 +636,6 @@ return [
         ],
     ],
     'at_least_one_required'   => 'Pelo menos um dos campos :fields deve ser selecionado.',
-    'cnpj_already_registered' => 'Este CNPJ já está cadastrado.',
+    'cnpj_already_registered' => 'Este CPF ou CNPJ já está cadastrado.',
+    'cpf_cnpj_invalid'        => 'O CPF ou CNPJ informado não é válido. Confira os dígitos.',
 ];

@@ -27,6 +27,7 @@ use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Models\Billing\GatewayCustomer;
 use App\Services\Billing\GatewayAlertService;
 use App\Support\Billing\{HostedCheckoutReference, PaymentUrl};
+use App\Support\BrazilianFormat;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
@@ -71,6 +72,8 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         'payment_bankslip_refund' => '/v3/payments/{id}/bankSlip/refund',
         'checkouts'               => '/v3/checkouts',
         'checkout_cancel'         => '/v3/checkouts/{id}/cancel',
+        'webhooks'                => '/v3/webhooks',
+        'webhook_show'            => '/v3/webhooks/{id}',
         'account_status'          => '/v3/myAccount/status/',
     ];
 
@@ -160,7 +163,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
      */
     public function upsertCustomer(CustomerDTO $customer): string
     {
-        $cpfCnpj = preg_replace('/\D/', '', (string) $customer->document);
+        $cpfCnpj = $this->payerDocument($customer);
 
         $existing = $this->findExistingCustomer($cpfCnpj, $customer->externalReference);
 
@@ -293,11 +296,59 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         return array_filter([
             'name'    => $customer->name,
             'email'   => $customer->email,
-            'cpfCnpj' => preg_replace('/\D/', '', (string) $customer->document),
+            'cpfCnpj' => $this->payerDocument($customer),
             ...$this->phoneFields($customer->phone),
+            ...$this->addressFields($customer->address),
             'externalReference'    => $customer->externalReference,
             'notificationDisabled' => true,
         ], fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
+     * CPF/CNPJ que vai ao Asaas: o canônico SEM pontuação e COM as letras do CNPJ alfanumérico (IN RFB 2.229/2024) — tirar
+     * tudo que não é dígito mandaria um número errado (o sandbox aceita o alfanumérico válido e recusa o de DV errado).
+     * Valor que não tem a forma de CPF (11 dígitos) nem de CNPJ (12 alfanuméricos + 2 dígitos) cai no comportamento
+     * antigo, só dígitos (o gateway recusa e o erro aparece como sempre).
+     */
+    private function payerDocument(CustomerDTO $customer): string
+    {
+        $chars = BrazilianFormat::documentChars((string) $customer->document);
+
+        if ($chars !== null && preg_match('/^(\d{11}|[A-Z0-9]{12}\d{2})$/', $chars) === 1) {
+            return $chars;
+        }
+
+        return (string) preg_replace('/\D/', '', (string) $customer->document);
+    }
+
+    /**
+     * Endereço do cliente no Asaas (address, addressNumber, complement, province, postalCode) — só quando o cadastro
+     * da clínica está COMPLETO (logradouro, número, bairro e CEP de 8 dígitos). Nunca inventa nem manda pela metade:
+     * sem os quatro, nada vai (o Checkout hospedado recusa cliente sem endereço — ver createHostedCheckout). A cidade
+     * o Asaas deriva do CEP (não é gravável no cliente).
+     *
+     * @param array<string, mixed>|null $address chaves de BillingCustomer::address
+     *
+     * @return array<string, string>
+     */
+    private function addressFields(?array $address): array
+    {
+        $street   = trim((string) ($address['street'] ?? ''));
+        $number   = trim((string) ($address['number'] ?? ''));
+        $district = trim((string) ($address['district'] ?? ''));
+        $zipcode  = preg_replace('/\D/', '', (string) ($address['zipcode'] ?? ''));
+
+        if ($street === '' || $number === '' || $district === '' || strlen((string) $zipcode) !== 8) {
+            return [];
+        }
+
+        return array_filter([
+            'address'       => mb_substr($street, 0, 255),
+            'addressNumber' => mb_substr($number, 0, 20),
+            'complement'    => ($complement = trim((string) ($address['complement'] ?? ''))) !== '' ? mb_substr($complement, 0, 255) : null,
+            'province'      => mb_substr($district, 0, 100),
+            'postalCode'    => $zipcode,
+        ], fn ($value) => $value !== null);
     }
 
     /** @return array{mobilePhone?: string, phone?: string} */
@@ -356,7 +407,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
                 externalCustomerId: null,
                 status: null,
                 rawResponse: is_array($json) ? $json : [],
-                errorMessage: 'Resposta do Asaas sem o id da assinatura: ' . mb_substr($response->body(), 0, 500),
+                errorMessage: 'Resposta do Asaas sem o id da assinatura: ' . $this->errorMessage($response),
                 httpStatus: null,
             );
         }
@@ -424,7 +475,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         }
 
         if (! $response->successful()) {
-            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $response->body());
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
         }
 
         $json   = $response->json() ?? [];
@@ -448,7 +499,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         $response = $this->get('subscriptions', ['externalReference' => $externalReference, 'limit' => 100]);
 
         if (! $response->successful()) {
-            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $response->body());
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
         }
 
         return collect((array) $response->json('data', []))
@@ -497,7 +548,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
             $response = $this->get('subscription_payments', ['limit' => 100, 'offset' => $offset], ['id' => $externalSubscriptionId]);
 
             if (! $response->successful()) {
-                throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $response->body());
+                throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
             }
 
             foreach ((array) $response->json('data', []) as $row) {
@@ -933,6 +984,24 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
             throw GatewayIntegrationException::rateLimited($this->code(), $this->retryAfterSeconds($response));
         }
 
+        // Cliente anexado sem o cadastro que o Checkout exige (telefone, endereço, CEP, bairro, cidade): 400
+        // invalid_object que cita o `customer`. UMA nova tentativa SEM o cliente — a página coleta os dados e o
+        // vínculo com a nossa fatura é pelo externalReference/checkoutSession (nunca pelo cliente).
+        $omittedReasons  = [];
+        $customerOmitted = false;
+
+        if (isset($body['customer']) && $this->rejectsCustomer($response)) {
+            $customerOmitted = true; // setado AQUI, na retentativa — não derivado dos motivos (que podem vir vazios)
+            $omittedReasons  = $this->customerErrorFields($response);
+            unset($body['customer']);
+
+            $response = $this->post('checkouts', $body);
+
+            if ($response->status() === 429) {
+                throw GatewayIntegrationException::rateLimited($this->code(), $this->retryAfterSeconds($response));
+            }
+        }
+
         $json = is_array($response->json()) ? $response->json() : [];
 
         if (! $response->successful() || blank($json['id'] ?? null)) {
@@ -955,23 +1024,162 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
             status: isset($json['status']) ? strtoupper((string) $json['status']) : 'ACTIVE',
             minutesToExpire: isset($json['minutesToExpire']) && is_numeric($json['minutesToExpire']) ? (int) $json['minutesToExpire'] : $minutes,
             rawResponse: $json,
+            customerOmitted: $customerOmitted,
+            omittedReasons: $omittedReasons,
         );
+    }
+
+    /** Campos do cliente que o Checkout pode apontar como faltando — a ÚNICA coisa que sobe para log/contexto. */
+    private const CUSTOMER_FIELDS = ['phone', 'mobilePhone', 'address', 'addressNumber', 'complement', 'province', 'postalCode', 'city', 'cpfCnpj', 'email', 'name'];
+
+    /**
+     * É erro do CLIENTE anexado: 400 com invalid_object cuja descrição está no formato do Asaas para o cadastro do
+     * cliente ("O campo phone deve existir para o customer informado"). A palavra `customer` solta em outro erro
+     * (callback, items, subscription…) NÃO conta: repetir não resolve e esconderia o erro verdadeiro.
+     */
+    private function rejectsCustomer(Response $response): bool
+    {
+        if ($response->status() !== 400) {
+            return false;
+        }
+
+        foreach ((array) $response->json('errors', []) as $error) {
+            if (is_array($error) && ($error['code'] ?? null) === 'invalid_object' && preg_match('/para o customer informado/iu', (string) ($error['description'] ?? '')) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Só os NOMES de campo citados nos erros do cliente e que estão na allowlist fixa (CUSTOMER_FIELDS): nunca o texto
+     * livre, nem número, CPF ou qualquer outro token do corpo.
+     *
+     * @return list<string>
+     */
+    private function customerErrorFields(Response $response): array
+    {
+        $fields = [];
+
+        foreach ((array) $response->json('errors', []) as $error) {
+            $description = is_array($error) ? (string) ($error['description'] ?? '') : '';
+
+            if (($error['code'] ?? null) === 'invalid_object' && preg_match('/para o customer informado/iu', $description) === 1
+                && preg_match('/campo\s+([A-Za-z]+)\s/u', $description, $m) === 1 && in_array($m[1], self::CUSTOMER_FIELDS, true)) {
+                $fields[] = $m[1];
+            }
+        }
+
+        return array_values(array_unique($fields));
+    }
+
+    // ── Webhooks da conta (sandbox E2E: comando billing:asaas-webhook) ────────────────────────────────────────────────
+
+    /**
+     * Eventos do Asaas que o app trata (chaves do mapa de eventos) e que fazem sentido assinar num webhook de
+     * cobrança: PAYMENT_*, SUBSCRIPTION_* e CHECKOUT_* (os ACCESS_TOKEN_* são da gestão de chaves, não de cobrança).
+     *
+     * @return list<string>
+     */
+    public function handledWebhookEvents(): array
+    {
+        return array_values(array_filter(
+            array_keys($this->eventTypeMap()),
+            static fn (string $event) => preg_match('/^(PAYMENT|SUBSCRIPTION|CHECKOUT)_/', $event) === 1,
+        ));
+    }
+
+    /**
+     * GET /v3/webhooks (https://docs.asaas.com/reference/listar-webhooks): os webhooks da conta, sem o authToken.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listWebhooks(): array
+    {
+        $response = $this->get('webhooks', ['limit' => 100]);
+
+        if (! $response->successful()) {
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
+        }
+
+        return collect((array) $response->json('data', []))
+            ->filter(fn ($row) => is_array($row) && filled($row['id'] ?? null))
+            ->map(fn (array $row) => Arr::except($row, ['authToken']))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Cria (POST /v3/webhooks) ou atualiza (PUT /v3/webhooks/{id}) um webhook
+     * (https://docs.asaas.com/reference/criar-novo-webhook). Devolve o cadastro SEM o authToken.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
+     */
+    public function saveWebhook(?string $id, array $payload): array
+    {
+        $response = $id === null
+            ? $this->post('webhooks', $payload)
+            : $this->request('PUT', 'webhook_show', $payload, ['id' => $id]);
+
+        if (! $response->successful() || blank($response->json('id'))) {
+            throw GatewayIntegrationException::fromHttpStatus($this->code(), $response->status(), $this->errorMessage($response));
+        }
+
+        return Arr::except((array) $response->json(), ['authToken']);
+    }
+
+    /** DELETE /v3/webhooks/{id}: true = removido (ou já não existia). */
+    public function deleteWebhook(string $id): bool
+    {
+        if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', $id) !== 1) {
+            return false;
+        }
+
+        $response = $this->request('DELETE', 'webhook_show', [], ['id' => $id]);
+
+        return $response->status() === 404 || ($response->successful() && $response->json('deleted') !== false);
     }
 
     /** POST /v3/checkouts/{id}/cancel (https://docs.asaas.com/reference/cancelar-um-checkout). */
     public function cancelHostedCheckout(string $externalCheckoutId): bool
     {
+        $status = $this->cancelHostedCheckoutRaw($externalCheckoutId);
+
+        return $status !== null && in_array($status, ['CANCELED', 'CANCELLED', 'EXPIRED', 'PAID', ''], true);
+    }
+
+    /**
+     * O estado em que o Asaas deixou o checkout. PAID é um estado, não um cancelamento: o link foi concluído e o
+     * pagamento existe (a confirmação financeira chega pelo webhook). Resposta sem estado = unknown.
+     */
+    public function cancelHostedCheckoutStatus(string $externalCheckoutId): string
+    {
+        return match ($this->cancelHostedCheckoutRaw($externalCheckoutId)) {
+            'CANCELED', 'CANCELLED' => 'canceled',
+            'EXPIRED'               => 'expired',
+            'PAID'                  => 'paid',
+            'ACTIVE'                => 'active',
+            default                 => 'unknown',
+        };
+    }
+
+    /** Estado (MAIÚSCULAS) devolvido pelo cancelamento; null = a chamada falhou. */
+    private function cancelHostedCheckoutRaw(string $externalCheckoutId): ?string
+    {
         if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', $externalCheckoutId) !== 1) {
-            return false;
+            return null;
         }
 
         try {
             $response = $this->post('checkout_cancel', [], ['id' => $externalCheckoutId]);
         } catch (GatewayIntegrationException) {
-            return false;
+            return null;
         }
 
-        return $response->successful() && in_array(strtoupper((string) $response->json('status')), ['CANCELED', 'CANCELLED', 'EXPIRED', 'PAID', ''], true);
+        return $response->successful() ? strtoupper((string) $response->json('status')) : null;
     }
 
     /**
@@ -1637,13 +1845,13 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
     private function normalizeAsaasPaymentStatus(string $status): string
     {
         return match (strtoupper($status)) {
-            'RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED' => 'paid',
+            'RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED'               => 'paid',
             'PENDING', 'AWAITING_RISK_ANALYSIS', 'REFUND_REQUESTED', 'REFUND_IN_PROGRESS' => 'pending',
-            'OVERDUE', 'DUNNING_REQUESTED' => 'failed',
-            'REFUNDED' => 'refunded',
-            'CHARGEBACK_REQUESTED', 'CHARGEBACK_DISPUTE' => 'chargeback',
-            'CANCELLED', 'DELETED' => 'cancelled',
-            default => strtolower($status),
+            'OVERDUE', 'DUNNING_REQUESTED'                                                => 'failed',
+            'REFUNDED'                                                                    => 'refunded',
+            'CHARGEBACK_REQUESTED', 'CHARGEBACK_DISPUTE'                                  => 'chargeback',
+            'CANCELLED', 'DELETED'                                                        => 'cancelled',
+            default                                                                       => strtolower($status),
         };
     }
 
@@ -1665,14 +1873,41 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
     {
         $errors = $response->json('errors');
 
-        $message = collect(is_array($errors) ? $errors : [])
-            ->map(fn ($error) => is_array($error)
-                ? implode(': ', array_filter([(string) ($error['code'] ?? ''), (string) ($error['description'] ?? '')], 'strlen'))
-                : '')
-            ->filter()
-            ->implode('; ');
+        // SÓ o status e os CÓDIGOS do erro (ex.: invalid_cpfCnpj). Nunca a descrição nem o corpo: ambos podem
+        // ecoar o que enviamos (nome, endereço, CPF/CNPJ, e-mail, telefone) e não há regex que pegue nome ou
+        // endereço. Também é o ÚNICO ponto de saída de texto de erro do Asaas (failureMessage() aponta para cá).
+        $codes = collect(is_array($errors) ? $errors : [])
+            ->map(fn ($error) => is_array($error) ? (string) ($error['code'] ?? '') : '')
+            ->filter(fn (string $code) => preg_match('/^[A-Za-z0-9_.\-]{1,60}$/', $code) === 1)
+            ->unique()
+            ->take(5)
+            ->implode(', ');
 
-        return mb_substr($message !== '' ? "HTTP {$response->status()} {$message}" : $response->body(), 0, 1000);
+        return $this->scrubPersonalData("HTTP {$response->status()}" . ($codes !== '' ? " {$codes}" : ''));
+    }
+
+    protected function failureMessage(Response $response): string
+    {
+        return $this->errorMessage($response);
+    }
+
+    /**
+     * A descrição do erro do Asaas pode ecoar o que enviamos (CPF/CNPJ, e-mail, telefone). Esta
+     * mensagem vira texto de exceção e entra em log e em billing_logs: sai sem o dado pessoal, só
+     * com o código e a parte técnica da descrição.
+     */
+    private function scrubPersonalData(string $text): string
+    {
+        return (string) preg_replace(
+            [
+                '/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i',   // e-mail
+                '/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/', // CNPJ
+                '/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/',          // CPF
+                '/(?<![\w])\+?\d[\d ().\-]{8,}\d(?![\w])/',      // telefone / número longo
+            ],
+            ['[e-mail]', '[cnpj]', '[cpf]', '[número]'],
+            $text,
+        );
     }
 
     /**
