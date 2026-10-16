@@ -223,6 +223,11 @@ class AppServiceProvider extends ServiceProvider
             'ai-store',
             fn (Request $r) => Limit::perMinute((int) config('ai.rate_limits.store_per_minute', 10))->by($aiKey($r)),
         );
+        // Ditado do laudo (Fase 5): cada chamada gasta minutos de transcrição no provedor.
+        RateLimiter::for(
+            'report-dictation',
+            fn (Request $r) => Limit::perMinute((int) config('ai.transcription.per_minute', 10))->by($aiKey($r)),
+        );
         RateLimiter::for(
             'ai-decision',
             fn (Request $r) => Limit::perMinute((int) config('ai.rate_limits.decision_per_minute', 30))->by($aiKey($r)),

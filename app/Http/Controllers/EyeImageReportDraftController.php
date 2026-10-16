@@ -6,8 +6,10 @@ namespace App\Http\Controllers;
 
 use App\Enums\{DataAccessPurpose, DraftStatus, EntityGate};
 use App\Http\Controllers\Concerns\AuthorizesEyeImageExams;
-use App\Models\{Entity, EyeImageReportDraft, Patient, ReportSettingContent};
+use App\Models\{Entity, EyeImageReportDraft, Patient, ReportSettingContent, User};
+use App\Notifications\ImageReportDraftNotification;
 use App\Services\MedicalRecordDocumentationService;
+use App\Support\CurrentDoctor;
 use App\Support\Documents\DocumentDate;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request};
@@ -43,11 +45,35 @@ class EyeImageReportDraftController extends Controller
     {
         $entityId = $this->authorizeDraft();
 
+        // Status desconhecido era repassado cru ao where (lista vazia sem
+        // explicação): fila da tela só aceita os status do enum.
+        $request->validate([
+            'status' => ['nullable', Rule::in(array_column(DraftStatus::cases(), 'value'))],
+            'mine'   => ['nullable', 'boolean'],
+        ]);
+
         $status = $request->query('status');
-        $query  = EyeImageReportDraft::query()->where('entity_id', $entityId)->with('patient.person')->latest('updated_at');
+        $query  = EyeImageReportDraft::query()
+            ->where('entity_id', $entityId)
+            ->with(['patient.person', 'resolvedDoctor.person'])
+            ->latest('updated_at');
 
         if ($status !== null) {
             $query->where('status', $status);
+        }
+
+        // "Só os meus": para o médico, o que está endereçado a ele (o médico da
+        // pré-visualização — resolved_doctor_id — ou sem destinatário); para
+        // quem prepara, o que ele mesmo preparou. Não esconde nada por padrão:
+        // a contagem do selo continua sendo a da clínica inteira.
+        if ($request->boolean('mine')) {
+            $doctor = CurrentDoctor::activeFor($request->user(), $entityId);
+
+            if ($doctor !== null) {
+                $query->where(fn ($q) => $q->whereNull('resolved_doctor_id')->orWhere('resolved_doctor_id', $doctor->id));
+            } else {
+                $query->where('created_by', $request->user()->getKey());
+            }
         }
 
         // paginate() (não um limit() fixo): numa clínica com mais de 100
@@ -184,7 +210,7 @@ class EyeImageReportDraftController extends Controller
     {
         $entityId = $this->authorizeDraft();
         $this->assertDraftOwnership($draft, $entityId);
-        abort_if($draft->status !== DraftStatus::Draft, 422, __('eye_images.draft_not_editable'));
+        abort_if(! $draft->canBeSubmitted(), 422, __('eye_images.draft_not_editable'));
         abort_if(trim(strip_tags((string) $draft->content)) === '', 422, __('eye_images.report_content_required'));
 
         // required, nunca nullable (mesmo motivo de update()/
@@ -202,7 +228,7 @@ class EyeImageReportDraftController extends Controller
         // novo (achado via revisão Codex).
         $draft = DB::transaction(function () use ($draft, $validated) {
             $locked = EyeImageReportDraft::query()->whereKey($draft->id)->lockForUpdate()->first();
-            abort_if(! $locked || $locked->status !== DraftStatus::Draft, 422, __('eye_images.draft_not_editable'));
+            abort_if(! $locked || ! $locked->canBeSubmitted(), 422, __('eye_images.draft_not_editable'));
             // Mesma checagem da linha 148, agora contra $locked (relido sob
             // lock), não contra o $draft capturado antes dele: uma edição
             // concorrente (update(), que permite conteúdo vazio) podia
@@ -227,7 +253,54 @@ class EyeImageReportDraftController extends Controller
             return $locked;
         });
 
+        $this->notifyDoctorAboutSubmission($draft, $entityId);
+
         return response()->json($this->serialize($draft));
+    }
+
+    /**
+     * O médico devolve o rascunho enviado ao técnico, com o motivo. Só quem
+     * emite (Gate IssueReport — médico com cadastro ativo) decide devolver: é
+     * a mesma pessoa que responderia pelo laudo. O técnico corrige e reenvia
+     * (submit()); enquanto isso o rascunho segue editável e FORA da fila de
+     * "aguardando liberação".
+     */
+    public function returnToTechnician(Request $request, EyeImageReportDraft $draft): JsonResponse
+    {
+        $entityId = $this->authorizeDraft();
+        $this->assertDraftOwnership($draft, $entityId);
+        Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail($entityId));
+        abort_if($draft->status !== DraftStatus::Submitted, 422, __('eye_images.draft_return_not_submitted'));
+
+        $validated = $request->validate([
+            'draft_revision' => ['required', 'integer', 'min:1'],
+            'reason'         => ['required', 'string', 'max:1000'],
+        ]);
+
+        // Texto puro: a tela mostra com interpolação, mas o que é gravado
+        // também não carrega marcação (vai a e-mail/relatórios no futuro).
+        $reason = trim(strip_tags($validated['reason']));
+        abort_if($reason === '', 422, __('eye_images.draft_return_reason_required'));
+
+        $draft = DB::transaction(function () use ($draft, $validated, $reason, $request) {
+            $locked = EyeImageReportDraft::query()->whereKey($draft->id)->lockForUpdate()->first();
+            // Relê o status sob a trava: o técnico pode ter reenviado, o outro
+            // médico já ter emitido ou devolvido entre a checagem de fora e aqui.
+            abort_if(! $locked || $locked->status !== DraftStatus::Submitted, 422, __('eye_images.draft_return_not_submitted'));
+            abort_if(
+                $locked->revision !== (int) $validated['draft_revision'],
+                409,
+                __('eye_images.draft_revision_conflict'),
+            );
+
+            $locked->markReturned($reason, (string) $request->user()->getKey());
+
+            return $locked;
+        });
+
+        $this->notifyPreparerAboutReturn($draft, $request->user());
+
+        return response()->json($this->serialize($draft, withContent: true));
     }
 
     public function destroy(Request $request, EyeImageReportDraft $draft): JsonResponse
@@ -264,6 +337,50 @@ class EyeImageReportDraftController extends Controller
         });
 
         return response()->json(['discarded' => true]);
+    }
+
+    /**
+     * Médico endereçado (o da pré-visualização), se houver — sem destinatário, só o
+     * selo da tela avisa. Só recebe quem tem vínculo ATIVO nesta clínica agora
+     * (ImageReportDraftNotification::recipientIsActive); o job enfileirado revalida na saída.
+     */
+    private function notifyDoctorAboutSubmission(EyeImageReportDraft $draft, string $entityId): void
+    {
+        $doctor     = $draft->resolvedDoctor;
+        $entityUser = $doctor && $doctor->active ? $doctor->entityUser : null;
+        $user       = $entityUser && (string) $entityUser->entity_id === $entityId ? $entityUser->user : null;
+
+        if ($user === null || blank($user->email) || ! ImageReportDraftNotification::recipientIsActive($user, $entityId)) {
+            return;
+        }
+
+        $user->notify(new ImageReportDraftNotification(
+            ImageReportDraftNotification::SUBMITTED,
+            (string) (Entity::find($entityId)?->name ?? config('app.name')),
+            route('panel.eye-images.index'),
+            $entityId,
+        ));
+    }
+
+    /** Avisa quem preparou o rascunho (created_by) — nunca a quem devolveu. */
+    private function notifyPreparerAboutReturn(EyeImageReportDraft $draft, User $returner): void
+    {
+        if (blank($draft->created_by) || (string) $draft->created_by === (string) $returner->getKey()) {
+            return;
+        }
+
+        $preparer = User::query()->find($draft->created_by);
+
+        if ($preparer === null || blank($preparer->email) || ! ImageReportDraftNotification::recipientIsActive($preparer, (string) $draft->entity_id)) {
+            return;
+        }
+
+        $preparer->notify(new ImageReportDraftNotification(
+            ImageReportDraftNotification::RETURNED,
+            (string) (Entity::find($draft->entity_id)?->name ?? config('app.name')),
+            route('panel.eye-images.index'),
+            (string) $draft->entity_id,
+        ));
     }
 
     private function validatePayload(Request $request, bool $forUpdate = false): array
@@ -368,6 +485,11 @@ class EyeImageReportDraftController extends Controller
             'revision'     => $draft->revision,
             'updated_at'   => $draft->updated_at?->format('d/m/Y H:i'),
             'submitted_at' => $draft->submitted_at?->format('d/m/Y H:i'),
+            // Devolução ao técnico: motivo e quando; só existem com status
+            // `returned` (reenviar limpa). Quem devolveu fica na auditoria.
+            'return_reason'        => $draft->return_reason,
+            'returned_at'          => $draft->returned_at?->format('d/m/Y H:i'),
+            'resolved_doctor_name' => $draft->resolvedDoctor?->person?->full_name,
             ...($withContent ? [
                 'content'                 => $draft->content,
                 'clinical_indication'     => $draft->clinical_indication,

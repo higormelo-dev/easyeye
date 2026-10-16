@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, DB, Log};
 use Illuminate\Support\Str;
 use JsonException;
+use LogicException;
 use Throwable;
 
 /**
@@ -110,7 +111,131 @@ class AuditLogger
         Request $request,
         ?array $oldValues = null,
     ): void {
-        $this->insert([
+        $this->insert($this->adminActionRow(
+            $event,
+            $targetEntityId,
+            $targetUserId,
+            $auditableType,
+            $auditableId,
+            $reason,
+            $newValues,
+            $request,
+            $oldValues,
+            strict: false,
+        ));
+    }
+
+    /**
+     * Como recordAdminAction(), mas FALHA ALTO e devolve o id da linha: para a
+     * trilha que precisa existir ANTES de uma transferência que não dá para
+     * desfazer (ex.: áudio de saúde saindo para um provedor de IA) — se não
+     * gravou, quem chama não pode seguir. Ao contrário de recordAdminAction(),
+     * que engole a exceção para não derrubar a requisição, aqui qualquer erro
+     * sobe — inclusive valor que não serializa em JSON (UTF-8 inválido, por
+     * exemplo: recordAdminAction() gravaria a linha SEM new_values) e new_values
+     * vazio (a trilha sem o que saiu não prova nada).
+     *
+     * Só vale COMITADA antes da transferência: o chamador abre UMA transação
+     * (DB::transaction), grava e fecha antes de enviar. Com transação externa
+     * aberta a gravação viraria savepoint, sem commit real até depois do envio —
+     * então é recusada: o nível tem de ser o de base (config audit.durable_
+     * transaction_baseline, 0 em produção) + 1, o da transação do próprio chamador.
+     *
+     * @param array<string, mixed> $newValues
+     */
+    public function recordAdminActionOrFail(
+        string $event,
+        ?string $targetEntityId,
+        ?string $targetUserId,
+        string $auditableType,
+        string $auditableId,
+        string $reason,
+        array $newValues,
+        Request $request,
+        ?array $oldValues = null,
+    ): string {
+        if (DB::transactionLevel() !== (int) config('audit.durable_transaction_baseline', 0) + 1) {
+            throw new LogicException('A trilha durável é gravada numa transação do próprio chamador e sem transação externa: só assim o commit acontece antes da transferência.');
+        }
+
+        if ($newValues === []) {
+            throw new LogicException('A trilha durável exige new_values: sem o que saiu, ela não prova nada.');
+        }
+
+        $id = Str::orderedUuid()->toString();
+
+        DB::table('audit_logs')->insert(array_merge(['id' => $id], $this->adminActionRow(
+            $event,
+            $targetEntityId,
+            $targetUserId,
+            $auditableType,
+            $auditableId,
+            $reason,
+            $newValues,
+            $request,
+            $oldValues,
+            strict: true,
+        )));
+
+        return $id;
+    }
+
+    /**
+     * Completa o resultado de uma ação gravada por recordAdminActionOrFail()
+     * (funde em new_values). Melhor esforço: a intenção já está comitada, então
+     * falhar aqui só deixa a linha com o último estado conhecido, e não derruba
+     * a requisição.
+     *
+     * @param array<string, mixed> $newValues
+     */
+    public function completeAdminAction(string $id, array $newValues): void
+    {
+        try {
+            // Savepoint (transação aninhada): no PostgreSQL um erro de SQL sem ele deixa a
+            // transação CORRENTE abortada, e qualquer consulta seguinte da requisição (ou
+            // do teste) falha com "current transaction is aborted".
+            DB::transaction(function () use ($id, $newValues): void {
+                $current = json_decode((string) DB::table('audit_logs')->where('id', $id)->value('new_values'), true);
+
+                DB::table('audit_logs')->where('id', $id)->update([
+                    'new_values' => json_encode(
+                        array_merge(is_array($current) ? $current : [], $newValues),
+                        JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE,
+                    ),
+                ]);
+            });
+        } catch (Throwable $e) {
+            Log::warning('AuditLogger: falha ao completar o resultado do evento.', [
+                'audit_log_id' => $id,
+                'error'        => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $newValues
+     *
+     * @return array<string, mixed>
+     */
+    private function adminActionRow(
+        string $event,
+        ?string $targetEntityId,
+        ?string $targetUserId,
+        string $auditableType,
+        string $auditableId,
+        string $reason,
+        array $newValues,
+        Request $request,
+        ?array $oldValues,
+        bool $strict,
+    ): array {
+        // strict: a serialização falha ALTO (JsonException) em vez de gravar a linha sem o
+        // valor — usado pela trilha que precisa existir antes de uma transferência.
+        $encode = $strict
+            ? static fn (?array $data): ?string => $data === null || $data === [] ? null : json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)
+            : fn (?array $data): ?string => $this->jsonOrNull($data);
+
+        return [
             'entity_id'        => session('selected_entity_id'),
             'target_entity_id' => $targetEntityId,
             'user_id'          => Auth::id(),
@@ -120,13 +245,13 @@ class AuditLogger
             'event'            => $event,
             'status_code'      => 200,
             'route_name'       => $request->route()?->getName(),
-            'old_values'       => $this->jsonOrNull($oldValues),
-            'new_values'       => $this->jsonOrNull($newValues),
+            'old_values'       => $encode($oldValues),
+            'new_values'       => $encode($newValues),
             'reason'           => $reason,
             'ip_address'       => $request->ip(),
             'user_agent'       => mb_substr((string) $request->userAgent(), 0, 1000),
             'created_at'       => now(),
-        ]);
+        ];
     }
 
     /**

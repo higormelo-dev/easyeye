@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
+import { fill } from '@/Support/clinicalDocuments.js';
 
 /**
  * Lista de rascunhos de laudo (Fase 5 — fluxo secretária-rascunha /
@@ -33,8 +34,11 @@ const hasMore = ref(false);
 // Médico quer ver primeiro o que está esperando revisão; secretária/admin
 // acompanham o próprio trabalho em qualquer estágio.
 const statusFilter = ref('');
+// "Só os meus": médico vê o que está endereçado a ele; quem prepara, o que
+// preparou (o servidor decide pelo perfil). Desligado = a clínica inteira.
+const onlyMine = ref(false);
 
-const EDITABLE_STATUSES = ['draft', 'submitted'];
+const EDITABLE_STATUSES = ['draft', 'submitted', 'returned'];
 const isEditableStatus = (status) => EDITABLE_STATUSES.includes(status);
 
 // Incrementado a cada chamada — identifica a MAIS NOVA. Trocar o filtro de
@@ -53,7 +57,11 @@ async function fetchDrafts({ reset = true, page: requestedPage = 1 } = {}) {
     error.value = '';
     try {
         const { data } = await window.axios.get(props.urls.index, {
-            params: { ...(statusFilter.value ? { status: statusFilter.value } : {}), page: requestedPage },
+            params: {
+                ...(statusFilter.value ? { status: statusFilter.value } : {}),
+                ...(onlyMine.value ? { mine: 1 } : {}),
+                page: requestedPage,
+            },
         });
         if (requestId !== draftsRequestId) return; // resposta desatualizada — um filtro/página mais nova já venceu
         const rows = data?.data ?? [];
@@ -85,11 +93,12 @@ watch(
     (isOpen) => {
         if (!isOpen) return;
         statusFilter.value = props.isDoctor ? 'submitted' : '';
+        onlyMine.value = false;
         fetchDrafts();
     },
 );
 
-watch(statusFilter, () => {
+watch([statusFilter, onlyMine], () => {
     if (props.open) fetchDrafts();
 });
 
@@ -99,7 +108,7 @@ function openDraft(draft) {
 
 async function discardDraft(draft) {
     const message = tt('draft_discard_text', 'O rascunho será descartado e não poderá mais ser editado ou emitido.');
-    let confirmed = false;
+    let confirmed;
     if (window.Swal) {
         const result = await window.Swal.fire({
             icon: 'warning',
@@ -140,6 +149,7 @@ const statusBadgeClass = (status) =>
     ({
         draft: 'bg-secondary-subtle text-secondary-emphasis',
         submitted: 'bg-warning-subtle text-warning-emphasis',
+        returned: 'bg-info-subtle text-info-emphasis',
         issued: 'bg-success-subtle text-success-emphasis',
         discarded: 'bg-danger-subtle text-danger-emphasis',
     })[status] ?? 'bg-secondary-subtle text-secondary-emphasis';
@@ -148,6 +158,7 @@ const statusOptions = computed(() => [
     { value: '', label: tt('drafts_filter_all', 'Todos') },
     { value: 'draft', label: tt('draft_status_draft', 'Rascunho') },
     { value: 'submitted', label: tt('draft_status_submitted', 'Enviado para o médico') },
+    { value: 'returned', label: tt('draft_status_returned', 'Devolvido ao técnico') },
     { value: 'issued', label: tt('draft_status_issued', 'Emitido') },
     { value: 'discarded', label: tt('draft_status_discarded', 'Descartado') },
 ]);
@@ -170,6 +181,20 @@ const statusOptions = computed(() => [
             >
                 <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
+            <div class="form-check form-check-inline ms-2 mb-0">
+                <input
+                    id="drafts-only-mine"
+                    v-model="onlyMine"
+                    type="checkbox"
+                    class="form-check-input"
+                    data-testid="drafts-only-mine"
+                />
+                <label class="form-check-label small" for="drafts-only-mine">{{
+                    isDoctor
+                        ? tt('drafts_only_mine_doctor', 'Só os meus')
+                        : tt('drafts_only_mine_preparer', 'Só os que preparei')
+                }}</label>
+            </div>
         </template>
 
         <div v-if="error" class="alert alert-danger py-2 small">{{ error }}</div>
@@ -199,12 +224,26 @@ const statusOptions = computed(() => [
                     <div class="text-muted text-truncate" style="font-size: 0.74rem">
                         {{ draft.title || tt('report_template_blank', 'Em branco') }}
                         <span class="mx-1">·</span>{{ draft.updated_at }}
+                        <template v-if="draft.resolved_doctor_name">
+                            <span class="mx-1">·</span
+                            >{{ fill(tt('draft_for_doctor', 'Para :doctor'), { doctor: draft.resolved_doctor_name }) }}
+                        </template>
+                    </div>
+                    <div
+                        v-if="draft.status === 'returned' && draft.return_reason"
+                        class="text-truncate"
+                        style="font-size: 0.74rem"
+                        :title="draft.return_reason"
+                        data-testid="draft-row-return-reason"
+                    >
+                        <i class="ti ti-arrow-back-up me-1"></i>{{ draft.return_reason }}
                     </div>
                 </div>
                 <button
                     v-if="isEditableStatus(draft.status)"
                     type="button"
                     class="btn btn-outline-primary btn-sm flex-shrink-0"
+                    data-testid="draft-open-button"
                     @click="openDraft(draft)"
                 >
                     {{ tt('draft_review_issue_open', 'Abrir') }}

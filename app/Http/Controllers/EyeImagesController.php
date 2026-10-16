@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService, EyeImageAttachmentService};
+use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService, EyeImageAttachmentService, SpeechTranscriptionService};
 use App\DTOs\EyeImageFilters;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\{DraftStatus, EntityGate, FeatureKey};
@@ -33,6 +33,7 @@ class EyeImagesController extends Controller
         private readonly AiCreditWalletService $walletService,
         private readonly AiQuotaService $quotaService,
         private readonly AiPaywallService $paywall,
+        private readonly SpeechTranscriptionService $speechTranscription,
     ) {
     }
 
@@ -45,9 +46,12 @@ class EyeImagesController extends Controller
             ->whereHas('entityUser', fn ($q) => $q->where('entity_id', $entityId))
             ->get(['id', 'person_id']);
 
-        $filters          = EyeImageFilters::fromRequest($request);
-        $paginator        = $this->queryPatients($entityId, $filters);
-        $entity           = Entity::find($entityId, ['id', 'name', 'address', 'telephone', 'cellphone', 'email', 'logo']);
+        $filters   = EyeImageFilters::fromRequest($request);
+        $paginator = $this->queryPatients($entityId, $filters);
+        // is_client precisa vir na seleção: os Gates (DraftImageReport etc.) começam
+        // por Entity::isClient(), que lê esta coluna — sem ela o Gate negava sempre e
+        // o botão/selo de Rascunhos nunca aparecia para ninguém.
+        $entity           = Entity::find($entityId, ['id', 'name', 'address', 'telephone', 'cellphone', 'email', 'logo', 'is_client']);
         $hasExamAssistant = $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant);
         $canEyeImage      = $this->featureGate->can($entityId, FeatureKey::HasAiEyeImageAnalysis);
         $canConsensus     = $this->providerSettings->isModeAvailable(AiRunMode::Consensus)
@@ -60,6 +64,16 @@ class EyeImagesController extends Controller
         $canDraftReports = (bool) ($entity && Gate::allows(EntityGate::DraftImageReport->value, $entity));
         $pendingDrafts   = $canDraftReports
             ? EyeImageReportDraft::query()->where('entity_id', $entityId)->where('status', DraftStatus::Submitted)->count()
+            : 0;
+
+        // Devolvidos pelo médico ao técnico (Fase 5): só para quem prepara —
+        // o selo é "o que eu preciso ajustar", então conta o que ELE preparou.
+        $returnedDrafts = $canDraftReports && ! CurrentDoctor::canIssue()
+            ? EyeImageReportDraft::query()
+                ->where('entity_id', $entityId)
+                ->where('status', DraftStatus::Returned)
+                ->where('created_by', $request->user()?->getKey())
+                ->count()
             : 0;
 
         // Modos disponíveis escalam com o nº de provedores ativos (Gemini-only
@@ -114,6 +128,13 @@ class EyeImagesController extends Controller
             // Rascunho de laudo (Fase 5) — ver EyeImageReportDraftController.
             'canDraftReports'          => $canDraftReports,
             'draftReportsPendingCount' => $pendingDrafts,
+            // Ditado por voz do laudo (Fase 5): só aparece com o recurso ligado E o
+            // provedor dentro da política LGPD (SpeechTranscriptionService::resolve()).
+            'dictation' => [
+                'available'   => $canDraftReports && $this->speechTranscription->isAvailable(),
+                'max_seconds' => (int) config('ai.transcription.max_seconds', 120),
+            ],
+            'draftReportsReturnedCount' => $returnedDrafts,
             // Captura pela câmera (Fase 5 / 6a) — auto-stop client-side da
             // gravação; o teto que de fato vale é max_video_kb, validado no
             // backend em ImportExternalExamRequest.
@@ -151,6 +172,8 @@ class EyeImagesController extends Controller
                 'report_drafts_show'    => route('panel.eye-images.report-drafts.show', ['draft' => '__ID__']),
                 'report_drafts_update'  => route('panel.eye-images.report-drafts.update', ['draft' => '__ID__']),
                 'report_drafts_submit'  => route('panel.eye-images.report-drafts.submit', ['draft' => '__ID__']),
+                'report_drafts_return'  => route('panel.eye-images.report-drafts.return', ['draft' => '__ID__']),
+                'report_dictate'        => route('panel.eye-images.reports.dictate'),
                 'report_drafts_destroy' => route('panel.eye-images.report-drafts.destroy', ['draft' => '__ID__']),
                 // Frases rápidas do médico (benchmark 18/09/2026) — ver
                 // DoctorReportPhrasesController.
@@ -259,6 +282,7 @@ class EyeImagesController extends Controller
                     'estimate_failed'             => __('ai.estimate_failed'),
                     'estimate_network_error'      => __('ai.estimate_network_error'),
                     'run_create_failed'           => __('ai.run_create_failed'),
+                    'run_needs_images'            => __('eye_images.ai_run_needs_images'),
                     'run_network_error'           => __('ai.run_network_error'),
                     'workflow_exam_assistant'     => __('ai.workflow_exam_assistant'),
                     'workflow_consensus_review'   => __('ai.workflow_consensus_review'),

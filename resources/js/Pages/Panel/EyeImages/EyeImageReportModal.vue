@@ -2,7 +2,9 @@
 import { reactive, ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
 import DocumentDateField from '@/Components/Panel/Documents/DocumentDateField.vue';
+import DictationButton from '@/Components/Panel/DictationButton.vue';
 import { documentDatePayload, fill } from '@/Support/clinicalDocuments.js';
+import { dictationToHtml } from '@/Support/dictation.js';
 import { useEscapeToClose } from '@/Support/useEscapeToClose.js';
 
 /**
@@ -50,9 +52,12 @@ const props = defineProps({
     // Quem está emitindo de fato (Gate::IssueReport) decide o rodapé: só
     // médico emite; secretária/admin só rascunham (Fase 5).
     isDoctor: { type: Boolean, default: false },
+    // Ditado por voz (Fase 5) — { available, max_seconds } de EyeImagesController;
+    // `available` já considera o recurso ligado e o provedor dentro da política LGPD.
+    dictation: { type: Object, default: () => ({ available: false, max_seconds: 120 }) },
 });
 
-const emit = defineEmits(['close', 'saved', 'draft-saved', 'draft-discarded']);
+const emit = defineEmits(['close', 'saved', 'draft-saved', 'draft-discarded', 'draft-returned']);
 
 // Rascunho em andamento nesta sessão do modal — do prop `draft` (continuando
 // um existente) OU criado no meio do caminho pelo primeiro "Salvar
@@ -86,7 +91,12 @@ let draftSaveSessionId = 0;
 
 // Rascunho em Draft OU Submitted ainda pode ser editado/descartado (mesma
 // regra do EyeImageReportDraft::isEditable() no backend).
-const draftIsEditable = computed(() => draftStatus.value === 'draft' || draftStatus.value === 'submitted');
+const draftIsEditable = computed(() => ['draft', 'submitted', 'returned'].includes(draftStatus.value));
+
+// Motivo da devolução ao técnico (status `returned`): vem do servidor e some
+// quando o técnico reenvia. A tela mostra no topo até lá.
+const draftReturnReason = ref('');
+const returningDraft = ref(false);
 
 // Olhos marcados pelo médico em "Exames neste laudo" ("grupo|olho"). Abre
 // com os olhos que têm imagem em examIds; exame que aparecer depois
@@ -302,7 +312,7 @@ async function savePhraseFromSelection() {
         return;
     }
 
-    let label = '';
+    let label;
     if (window.Swal) {
         const result = await window.Swal.fire({
             title: tt('report_phrases_label_title', 'Rótulo da frase'),
@@ -336,6 +346,23 @@ async function savePhraseFromSelection() {
 // simples que o front adivinhar extensão de arquivo, e um 422 "sem texto"
 // é um resultado normal (imagem, não PDF), não um erro de verdade.
 const extractingPdf = ref(false);
+
+// Ditado por voz (Fase 5): escritor ASSÍNCRONO do conteúdo, como a extração de
+// PDF — grava/transcreve em segundo plano e o texto entra no cursor. Por isso:
+// (a) enquanto grava/transcreve, os botões de salvar/emitir ficam travados (o
+// texto que ainda vai chegar não estaria no que foi enviado) e (b) texto que
+// chega depois que a emissão começou (ou terminou — o sucesso esconde o editor)
+// é descartado, nunca inserido numa tela que já não corresponde ao enviado.
+const dictationBusy = ref(false);
+
+function onDictated(text) {
+    if (saving.value || savingDraft.value || returningDraft.value || savedResult.value) return;
+    editorRef.value?.insertContent(dictationToHtml(text));
+}
+
+function onDictationError(message) {
+    if (window.showErrorToast) window.showErrorToast(message);
+}
 
 async function extractPdfText() {
     if (!props.urls.extractPdfText || !selectedExamIds.value.length || extractingPdf.value) return;
@@ -453,6 +480,7 @@ function reset() {
     savedResult.value = null;
     draftId.value = props.draft?.id ?? null;
     draftStatus.value = props.draft?.status ?? null;
+    draftReturnReason.value = props.draft?.status === 'returned' ? (props.draft?.return_reason ?? '') : '';
     draftRevision.value = props.draft?.revision ?? null;
     hydrateImageReport(props.draft?.image_report_payload ?? null);
     // Começa "sem preview ainda" DE PROPÓSITO, mesmo com draft.content
@@ -470,6 +498,7 @@ function reset() {
     // ganhou o MESMO guard de sessão na 4ª rodada de revisão adversarial).
     savingDraft.value = false;
     saving.value = false;
+    returningDraft.value = false;
     // Mesmo motivo do draftSaveSessionId acima, aplicado ao preview de
     // modelo: abrir o rascunho NÃO dispara onTemplateChange() de novo, então
     // um preview do paciente/sessão ANTERIOR ainda em voo continuava batendo
@@ -867,6 +896,9 @@ async function saveDraft(submit = false) {
     // adversarial Codex: "preserve dirty status... while a save request is
     // pending").
     const payload = draftPayload();
+    // Reenvio de um rascunho devolvido: a tela pai troca o selo "devolvidos"
+    // por "pendentes" (ver onDraftSaved em Index.vue).
+    const wasReturned = draftStatus.value === 'returned';
     savingDraft.value = true;
     error.value = '';
 
@@ -883,6 +915,7 @@ async function saveDraft(submit = false) {
             if (sessionId !== draftSaveSessionId) return; // modal fechado/reaberto (outro paciente) — resposta obsoleta
             draftStatus.value = data.status;
             draftRevision.value = data.revision;
+            draftReturnReason.value = data.status === 'returned' ? (data.return_reason ?? '') : '';
         } else {
             const { data } = await window.axios.post(props.urls.draftStore, {
                 patient_id: props.patient.id,
@@ -900,6 +933,7 @@ async function saveDraft(submit = false) {
             });
             if (sessionId !== draftSaveSessionId) return;
             draftStatus.value = data.status;
+            draftReturnReason.value = ''; // reenviar limpa o motivo (o servidor também)
             // NUNCA draftRevision.value = data.revision aqui: submit() não
             // escreve conteúdo (só troca status), então o revision de
             // verdade é o que a ATUALIZAÇÃO anterior (update()/store(),
@@ -925,7 +959,7 @@ async function saveDraft(submit = false) {
                     : tt('draft_saved', 'Rascunho salvo.'),
             );
         }
-        emit('draft-saved', { id: draftId.value, submitted: submit });
+        emit('draft-saved', { id: draftId.value, submitted: submit, wasReturned });
         if (submit) {
             // isDirty() compara o form ATUAL contra lastSavedDraftSnapshot,
             // já atualizado acima pro `payload` ENVIADO (não um
@@ -966,6 +1000,77 @@ async function saveDraft(submit = false) {
                 : tt('report_save_failed', 'Não foi possível salvar o laudo.'));
     } finally {
         if (sessionId === draftSaveSessionId) savingDraft.value = false;
+    }
+}
+
+// Médico devolve o rascunho enviado ao técnico, com o motivo (Fase 5). O
+// motivo é obrigatório: devolver sem dizer o que ajustar só gera idas e vindas.
+async function askReturnReason() {
+    const unsaved = isDirty()
+        ? tt('draft_return_unsaved', 'As alterações feitas nesta tela não serão enviadas ao técnico.')
+        : '';
+    if (window.Swal) {
+        const result = await window.Swal.fire({
+            icon: 'question',
+            title: tt('draft_return_title', 'Devolver ao técnico?'),
+            text: unsaved,
+            input: 'textarea',
+            inputLabel: tt('draft_return_reason_label', 'O que precisa ser ajustado?'),
+            inputPlaceholder: tt(
+                'draft_return_reason_placeholder',
+                'Ex.: falta a imagem do OE; revisar a lateralidade.',
+            ),
+            inputAttributes: { maxlength: 1000 },
+            showCancelButton: true,
+            confirmButtonText: tt('draft_return_confirm', 'Devolver'),
+            cancelButtonText: tt('cancel', 'Cancelar'),
+            inputValidator: (value) =>
+                !value || !value.trim()
+                    ? tt('draft_return_reason_required', 'Informe o motivo da devolução.')
+                    : undefined,
+        });
+        return result.isConfirmed ? String(result.value).trim() : null;
+    }
+    const typed = window.prompt(tt('draft_return_reason_label', 'O que precisa ser ajustado?'));
+    return typed && typed.trim() ? typed.trim() : null;
+}
+
+async function returnDraft() {
+    if (!draftId.value || returningDraft.value || dictationBusy.value || !props.urls.draftReturn) return;
+
+    // Mesmo raciocínio de discardDraft(): o diálogo espera o usuário e o modal
+    // pode fechar/reabrir em outro rascunho enquanto isso.
+    const sessionId = draftSaveSessionId;
+    const returnedId = draftId.value;
+    const returnedRevision = draftRevision.value;
+
+    const reason = await askReturnReason();
+    if (reason === null) return;
+    // O diálogo fica aberto enquanto o usuário decide. Nesse intervalo a
+    // sessão pode ter sido fechada e reaberta para outro rascunho; nunca
+    // deixe a decisão antiga alterar ou travar a sessão nova.
+    if (sessionId !== draftSaveSessionId || !props.open) return;
+
+    returningDraft.value = true;
+    error.value = '';
+    try {
+        await window.axios.post(props.urls.draftReturn.replace('__ID__', returnedId), {
+            draft_revision: returnedRevision,
+            reason,
+        });
+        if (window.showSuccessToast) {
+            window.showSuccessToast(tt('draft_returned', 'Rascunho devolvido ao técnico.'));
+        }
+        emit('draft-returned', { id: returnedId });
+        if (sessionId === draftSaveSessionId) emit('close');
+    } catch (e) {
+        if (sessionId !== draftSaveSessionId) return;
+        error.value =
+            e?.response?.data?.errors?.reason?.[0] ??
+            e?.response?.data?.message ??
+            tt('draft_return_failed', 'Não foi possível devolver o rascunho.');
+    } finally {
+        if (sessionId === draftSaveSessionId) returningDraft.value = false;
     }
 }
 
@@ -1106,6 +1211,9 @@ async function confirmDiscard() {
 }
 
 async function close() {
+    // A devolução só pode fechar depois que seu POST terminar. Além do botão
+    // no rodapé, esta guarda cobre X, Escape e o clique no backdrop.
+    if (returningDraft.value) return;
     if (isDirty() && !(await confirmDiscard())) return;
     emit('close');
 }
@@ -1135,6 +1243,7 @@ defineExpose({ close });
             tabindex="-1"
             :style="docked ? null : 'background: rgba(0, 0, 0, 0.55)'"
             role="dialog"
+            data-testid="eye-image-report-modal"
             :aria-modal="docked ? 'false' : 'true'"
             aria-labelledby="eyeReportModalTitle"
             @click.self="docked || close()"
@@ -1148,7 +1257,13 @@ defineExpose({ close });
                                 — {{ patient.name }}
                             </span>
                         </h6>
-                        <button type="button" class="btn-close" @click="close"></button>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            :disabled="returningDraft"
+                            data-testid="report-close-button"
+                            @click="close"
+                        ></button>
                     </div>
 
                     <div v-if="examGroups.length && !savedResult" class="px-3 py-2 border-bottom small">
@@ -1200,6 +1315,15 @@ defineExpose({ close });
                     </div>
 
                     <div class="modal-body" :class="{ 'overflow-auto': docked }">
+                        <div
+                            v-if="draftStatus === 'returned' && draftReturnReason"
+                            class="alert alert-warning py-2 small"
+                            role="status"
+                            data-testid="draft-return-banner"
+                        >
+                            <strong>{{ tt('draft_returned_banner', 'Devolvido pelo médico:') }}</strong>
+                            {{ draftReturnReason }}
+                        </div>
                         <div v-if="error" class="alert alert-danger py-2 small">{{ error }}</div>
 
                         <template v-if="!savedResult">
@@ -1210,7 +1334,11 @@ defineExpose({ close });
                                  adversarial Codex, 21ª rodada). O fieldset desabilita todo controle nativo
                                  daqui (campos, seletores, botões, ordem/legenda das imagens); o TinyMCE
                                  recebe o mesmo bloqueio pelo :disabled abaixo. -->
-                            <fieldset :disabled="saving" class="border-0 p-0 m-0" data-testid="report-form-fieldset">
+                            <fieldset
+                                :disabled="saving || returningDraft"
+                                class="border-0 p-0 m-0"
+                                data-testid="report-form-fieldset"
+                            >
                                 <div class="mb-3">
                                     <label class="form-label small fw-semibold">{{
                                         tt('report_templates', 'Modelos')
@@ -1439,6 +1567,17 @@ defineExpose({ close });
                                                 </div>
                                             </span>
 
+                                            <DictationButton
+                                                v-if="dictation.available && urls.dictate"
+                                                :url="urls.dictate"
+                                                :max-seconds="dictation.max_seconds"
+                                                :disabled="saving || savingDraft || returningDraft || previewing"
+                                                :t="t"
+                                                @text="onDictated"
+                                                @error="onDictationError"
+                                                @busy="dictationBusy = $event"
+                                            />
+
                                             <button
                                                 v-if="selectedExamIds.length"
                                                 type="button"
@@ -1478,10 +1617,24 @@ defineExpose({ close });
                                     <TinyMceEditor
                                         ref="editorRef"
                                         v-model="form.content"
+                                        data-testid="report-editor"
                                         :height="360"
-                                        :disabled="previewing || saving"
+                                        :disabled="previewing || saving || returningDraft"
                                         :placeholder="tt('report_content_label', 'Conteúdo do laudo')"
                                     />
+                                    <div
+                                        v-if="dictation.available && urls.dictate"
+                                        class="form-text"
+                                        data-testid="dictation-notice"
+                                    >
+                                        <i class="ti ti-shield-lock me-1"></i
+                                        >{{
+                                            tt(
+                                                'dictation_notice',
+                                                'O áudio é enviado a um provedor de IA aprovado para virar texto e não é guardado. Não cite o nome do paciente.',
+                                            )
+                                        }}
+                                    </div>
                                 </div>
 
                                 <!-- Imagens no laudo (Fase 5 / 5b) — bloco opcional embutido no PDF
@@ -1716,7 +1869,12 @@ defineExpose({ close });
                     </div>
 
                     <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="close">
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            :disabled="returningDraft"
+                            @click="close"
+                        >
                             {{ tt('close', 'Fechar') }}
                         </button>
 
@@ -1724,10 +1882,22 @@ defineExpose({ close });
                             <!-- Médico: emite direto OU revisa/emite um rascunho (Fase 5) -->
                             <template v-if="isDoctor">
                                 <button
+                                    v-if="draftId && draftStatus === 'submitted'"
+                                    type="button"
+                                    class="btn btn-outline-warning btn-sm"
+                                    :disabled="saving || returningDraft || dictationBusy"
+                                    data-testid="draft-return-button"
+                                    @click="returnDraft"
+                                >
+                                    <span v-if="returningDraft" class="spinner-border spinner-border-sm me-1"></span>
+                                    <i v-else class="ti ti-arrow-back-up me-1"></i>
+                                    {{ tt('draft_return', 'Devolver ao técnico') }}
+                                </button>
+                                <button
                                     v-if="draftId && draftIsEditable"
                                     type="button"
                                     class="btn btn-outline-danger btn-sm"
-                                    :disabled="saving"
+                                    :disabled="saving || returningDraft"
                                     @click="discardDraft"
                                 >
                                     {{ tt('draft_discard', 'Descartar rascunho') }}
@@ -1735,7 +1905,15 @@ defineExpose({ close });
                                 <button
                                     type="button"
                                     class="btn btn-primary btn-sm"
-                                    :disabled="saving || previewing || extractingPdf || noExamChecked"
+                                    data-testid="report-issue-button"
+                                    :disabled="
+                                        saving ||
+                                        returningDraft ||
+                                        previewing ||
+                                        extractingPdf ||
+                                        dictationBusy ||
+                                        noExamChecked
+                                    "
                                     @click="save(false)"
                                 >
                                     <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
@@ -1754,7 +1932,7 @@ defineExpose({ close });
                                     v-if="draftId && draftIsEditable"
                                     type="button"
                                     class="btn btn-outline-danger btn-sm"
-                                    :disabled="savingDraft"
+                                    :disabled="savingDraft || returningDraft"
                                     @click="discardDraft"
                                 >
                                     {{ tt('draft_discard', 'Descartar rascunho') }}
@@ -1762,7 +1940,9 @@ defineExpose({ close });
                                 <button
                                     type="button"
                                     class="btn btn-outline-primary btn-sm"
-                                    :disabled="savingDraft || previewing || noExamChecked"
+                                    :disabled="
+                                        savingDraft || returningDraft || previewing || dictationBusy || noExamChecked
+                                    "
                                     @click="saveDraft(false)"
                                 >
                                     <span v-if="savingDraft" class="spinner-border spinner-border-sm me-1"></span>
@@ -1772,10 +1952,17 @@ defineExpose({ close });
                                     v-if="draftStatus !== 'submitted'"
                                     type="button"
                                     class="btn btn-primary btn-sm"
-                                    :disabled="savingDraft || previewing || noExamChecked"
+                                    data-testid="draft-submit-button"
+                                    :disabled="
+                                        savingDraft || returningDraft || previewing || dictationBusy || noExamChecked
+                                    "
                                     @click="saveDraft(true)"
                                 >
-                                    {{ tt('draft_submit', 'Enviar para o médico') }}
+                                    {{
+                                        draftStatus === 'returned'
+                                            ? tt('draft_resubmit', 'Reenviar para o médico')
+                                            : tt('draft_submit', 'Enviar para o médico')
+                                    }}
                                 </button>
                             </template>
                         </template>
