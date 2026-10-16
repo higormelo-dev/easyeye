@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auth;
 
 use App\Models\PlanPrice;
+use App\Rules\CpfCnpj;
 use App\Services\Security\TurnstileVerifier;
 use App\Services\TermsService;
 use App\Support\BrazilianFormat;
@@ -45,10 +46,15 @@ class RegisterRequest extends FormRequest
             // 10-11 dígitos = DDD + fixo/celular BR (DDI 55 é normalizado
             // pelo WhatsAppService no envio).
             'company_phone' => ['required', 'string', 'regex:/^\d{10,11}$/'],
-            'company_cnpj'  => [
+            // CPF (11) ou CNPJ (14, inclusive alfanumérico) do responsável pela cobrança, em entities.national_registration.
+            // Obrigatório em "Contratar agora" (start_mode=checkout): o Asaas recusa a assinatura de cliente sem
+            // documento. No teste grátis segue opcional, mas, se vier, tem de ser válido.
+            'company_cnpj' => [
+                'required_if:start_mode,checkout',
                 'nullable',
                 'string',
                 'max:14',
+                new CpfCnpj(),
                 Rule::unique('entities', 'national_registration')->whereNotNull('national_registration'),
             ],
             'plan_id' => ['nullable', 'uuid', 'exists:plans,id'],

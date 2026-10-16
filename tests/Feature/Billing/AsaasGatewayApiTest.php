@@ -313,6 +313,29 @@ it('sem documento procura pela externalReference antes de criar', function () {
     Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r['externalReference'] === '9f1c2d3e-0000-4000-8000-000000000001');
 });
 
+it('o cpfCnpj do cliente vai CANÔNICO, sem pontuação: CPF/CNPJ numérico e CNPJ alfanumérico com as LETRAS', function (string $document, string $sent) {
+    agwFakeCustomers([]);
+
+    agwGateway()->upsertCustomer(agwCustomer(document: $document));
+
+    // A busca por documento e a criação do cliente mandam o MESMO valor.
+    Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r['cpfCnpj'] === $sent);
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r['cpfCnpj'] === $sent);
+})->with([
+    'CNPJ mascarado'          => ['12.345.678/0001-95', '12345678000195'],
+    'CPF mascarado'           => ['529.982.247-25', '52998224725'],
+    'CNPJ alfanumérico'       => ['HC.HGX.N73/0001-70', 'HCHGXN73000170'],
+    'alfanumérico minúsculas' => ['hchgxn73000170', 'HCHGXN73000170'],
+]);
+
+it('valor que não tem forma de CPF/CNPJ cai no comportamento antigo (só dígitos) — o Asaas recusa e o erro aparece como sempre', function () {
+    agwFakeCustomers([]);
+
+    agwGateway()->upsertCustomer(agwCustomer(document: 'n/a 123'));
+
+    Http::assertSent(fn (Request $r) => $r->method() === 'POST' && $r['cpfCnpj'] === '123');
+});
+
 it('celular vai em mobilePhone e fixo em phone (fixo em mobilePhone é recusado)', function (?string $phone, array $expected) {
     agwFakeCustomers([]);
 

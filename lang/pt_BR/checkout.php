@@ -14,6 +14,8 @@ return [
         'card_declined_generic'            => 'Pagamento recusado pelo emissor do cartão. Confira os dados ou use outro cartão.',
         'installments_invalid'             => 'Número de parcelas indisponível para este plano.',
         'gateway_error'                    => 'Não foi possível falar com o meio de pagamento agora. Tente de novo em instantes.',
+        'document_required'                => 'Para gerar a cobrança, informe o CPF ou CNPJ da clínica. O meio de pagamento exige o documento — nada foi cobrado.',
+        'document_already_set'             => 'A clínica já tem um CPF ou CNPJ válido no cadastro. Para trocá-lo, fale com o suporte.',
         'charge_pending'                   => 'A cobrança ainda está sendo gerada. Tente de novo em alguns segundos.',
         'card_change_unsupported'          => 'Este meio de pagamento não troca o cartão sem um pagamento. O novo cartão fica salvo no próximo pagamento com cartão.',
         'already_active'                   => 'A clínica já tem este plano e ciclo ativos.',
@@ -82,6 +84,10 @@ return [
 
     // Componente de checkout (Pix, boleto, cartão e link externo).
     'ui' => [
+        'complete_profile'       => 'Completar o cadastro da clínica',
+        'payer_document_label'   => 'CPF ou CNPJ da clínica',
+        'payer_document_hint'    => 'O meio de pagamento exige o documento de quem paga para emitir a cobrança.',
+        'payer_document_save'    => 'Salvar e continuar',
         'choose_method'          => 'Como você quer pagar?',
         'method_hint_pix'        => 'Confirmação em segundos; o acesso libera sozinho.',
         'method_hint_boleto'     => 'Compensa em até 3 dias úteis após o pagamento.',

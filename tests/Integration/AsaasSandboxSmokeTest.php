@@ -54,7 +54,8 @@ declare(strict_types=1);
  * tests/Integration só roda por caminho explícito ou na suíte completa; sem a trava, este arquivo apenas pula.
  */
 
-use App\DTOs\Billing\{CreateChargeDTO, CustomerDTO, HostedCheckoutDTO, PaymentInstructionsDTO};
+use App\DTOs\Billing\{CancelSubscriptionDTO, CreateChargeDTO, CreateSubscriptionDTO, CustomerDTO, HostedCheckoutDTO, PaymentInstructionsDTO};
+use App\Rules\CpfCnpj;
 use App\Services\Billing\{GatewayAlertService, GatewayCredentialResolver};
 use App\Services\Billing\Gateways\AsaasGateway;
 use App\Support\Billing\HostedCheckoutReference;
@@ -90,6 +91,38 @@ function asaasSmokeCpf(): string
     }
 
     return implode('', $digits);
+}
+
+/**
+ * CNPJ ALFANUMÉRICO válido (IN RFB 2.229/2024): 8 posições A–Z/0–9 + filial 0001 + 2 DVs numéricos (valor de cada
+ * caractere = ord(c) − 48, mesmos pesos, módulo 11). Pelo menos uma letra na raiz.
+ */
+function asaasSmokeAlnumCnpj(): string
+{
+    $alphabet = array_merge(range('0', '9'), range('A', 'Z'));
+
+    do {
+        $root = '';
+
+        for ($i = 0; $i < 8; $i++) {
+            $root .= $alphabet[random_int(0, 35)];
+        }
+    } while (preg_match('/[A-Z]/', $root) !== 1);
+
+    $chars = $root . '0001';
+
+    foreach ([[5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]] as $weights) {
+        $sum = 0;
+
+        foreach ($weights as $i => $weight) {
+            $sum += (ord($chars[$i]) - 48) * $weight;
+        }
+
+        $rest = $sum % 11;
+        $chars .= $rest < 2 ? '0' : (string) (11 - $rest);
+    }
+
+    return $chars;
 }
 
 /** Troca a chave (e qualquer coisa com cara de chave Asaas) por [chave] — nada com a credencial sai em mensagem. */
@@ -628,6 +661,167 @@ it('contrato real do Asaas no sandbox: cliente → Pix → boleto → Checkout h
         }
 
         // Sem encadear o erro original: a mensagem mascarada é a única saída (nada com a chave vai para o relatório).
+        throw new RuntimeException(asaasSmokeMask($message, $secret));
+    }
+});
+
+it('CNPJ alfanumérico: o cliente e a assinatura do sandbox aceitam o canônico COM as letras (e recusam o de DV errado) — limpeza no fim', function () {
+    if (($reason = asaasSmokeLocks()) !== null) {
+        $this->markTestSkipped($reason);
+    }
+
+    $resolver = app(GatewayCredentialResolver::class);
+    $this->mock(GatewayAlertService::class, fn ($mock) => $mock->shouldReceive('credentialRejected')->andReturnNull());
+
+    Http::globalOptions(['allow_redirects' => false]);
+    Http::globalResponseMiddleware(function (ResponseInterface $response): ResponseInterface {
+        if ($response->getStatusCode() >= 300 && $response->getStatusCode() < 400) {
+            throw new RuntimeException('smoke Asaas: redirecionamento recusado (HTTP ' . $response->getStatusCode() . ') — o smoke nunca segue redirects.');
+        }
+
+        return $response;
+    });
+
+    $secret  = trim((string) ($resolver->resolveSecret('asaas') ?: config('billing.gateways.asaas.secret')));
+    $gateway = asaasSmokeGateway($resolver);
+
+    $uuid           = (string) Str::uuid();
+    $ref            = "smoke-alnum-{$uuid}";
+    $cnpj           = asaasSmokeAlnumCnpj();
+    $masked         = substr($cnpj, 0, 2) . '.' . substr($cnpj, 2, 3) . '.' . substr($cnpj, 5, 3) . '/' . substr($cnpj, 8, 4) . '-' . substr($cnpj, 12, 2);
+    $wrong          = substr($cnpj, 0, 12) . (substr($cnpj, 12, 2) === '00' ? '11' : '00'); // DV errado de propósito
+    $objects        = [];
+    $subscriptionId = null;
+    $current        = 'início';
+    $failure        = null;
+    $problems       = [];
+
+    try {
+        // ── 1. A regra do app concorda com o Asaas ──────────────────────────────────────────────────────────────────
+        $current = '1. CpfCnpj do app aceita o gerado e recusa o de DV errado';
+        expect(CpfCnpj::isValid($cnpj))->toBeTrue("CNPJ alfanumérico gerado {$cnpj} deveria ser válido")
+            ->and(CpfCnpj::isValid($masked))->toBeTrue()
+            ->and(CpfCnpj::isValid($wrong))->toBeFalse();
+
+        // ── 2. Payload do cliente: canônico, sem pontuação, COM as letras ────────────────────────────────────────────
+        $current  = '2. payload do cliente (buildCustomerPayload) com o CNPJ mascarado';
+        $customer = new CustomerDTO(entityId: 'smoke', name: 'Smoke Alnum ' . substr($uuid, 0, 8), email: 'smoke+' . substr($uuid, 0, 8) . '@example.com', document: $masked, phone: '11987654321', externalReference: $ref);
+        $body     = $gateway->customerBody($customer);
+
+        expect($body['cpfCnpj'])->toBe($cnpj)->and($body['cpfCnpj'])->toMatch('/[A-Z]/');
+
+        // ── 3. O Asaas aceita e devolve o alfanumérico; a busca por cpfCnpj (findExistingCustomer) o acha ────────────
+        $current                     = '3. POST /customers com o alfanumérico, busca por cpfCnpj e cadastro';
+        $customerKey                 = count($objects);
+        $objects[]                   = ['kind' => 'customer', 'reference' => $ref, 'id' => null, 'done' => false];
+        $created                     = $gateway->raw('POST', 'customers', $body);
+        $customerId                  = (string) ($created->json('id') ?? '');
+        $objects[$customerKey]['id'] = $customerId !== '' ? $customerId : null;
+
+        expect($created->successful())->toBeTrue("POST /customers HTTP {$created->status()} com o CNPJ alfanumérico")
+            ->and($customerId)->toStartWith('cus_')
+            ->and(strtoupper((string) $created->json('cpfCnpj')))->toBe($cnpj);
+
+        $search = $gateway->raw('GET', 'customers', ['cpfCnpj' => $cnpj]);
+        $row    = collect((array) $search->json('data', []))->first(fn ($item) => is_array($item) && ($item['id'] ?? null) === $customerId);
+
+        expect($search->successful())->toBeTrue("GET /customers?cpfCnpj HTTP {$search->status()}")
+            ->and($row)->toBeArray()
+            ->and($row['externalReference'] ?? null)->toBe($ref);
+
+        // ── 4. DV errado: o Asaas recusa (a regra do app existe para o usuário ver isso ANTES) ───────────────────────
+        $current = '4. POST /customers com DV errado é recusado';
+        // Registrado ANTES do POST (referência): se o Asaas aceitar e a resposta se perder, a limpeza o acha por externalReference
+        // (ou reporta INCERTO). Só a recusa conclusiva (HTTP 400) o dá por não criado.
+        $wrongKey  = count($objects);
+        $objects[] = ['kind' => 'customer', 'reference' => "{$ref}-errado", 'id' => null, 'done' => false];
+        $refused   = $gateway->raw('POST', 'customers', [...$body, 'cpfCnpj' => $wrong, 'externalReference' => "{$ref}-errado"]);
+
+        if ($refused->successful() && filled($refused->json('id'))) {
+            $objects[$wrongKey]['id'] = (string) $refused->json('id'); // limpa mesmo assim
+
+            throw new RuntimeException('o Asaas ACEITOU um CNPJ alfanumérico de DV errado — a premissa da regra mudou.');
+        }
+
+        expect($refused->status())->toBe(400);
+        $objects[$wrongKey]['done'] = true; // recusa conclusiva: nada foi criado
+
+        // ── 5. A ASSINATURA (o que o cadastro cria) nasce com esse cliente ──────────────────────────────────────────
+        $current      = '5. createSubscription com o cliente de CNPJ alfanumérico';
+        $subscription = $gateway->createSubscription(new CreateSubscriptionDTO(
+            entityId: 'smoke',
+            subscriptionId: $ref,
+            planId: 'smoke-plan',
+            customerId: $customerId,
+            amount: 10.0,
+            currency: 'BRL',
+            interval: 'month',
+            intervalCount: 1,
+            description: "Smoke Asaas alfanumérico {$ref}",
+            firstDueDate: CarbonImmutable::now('America/Sao_Paulo')->addDays(3)->toDateString(),
+        ));
+        $subscriptionId = $subscription->externalSubscriptionId;
+
+        expect($subscription->success)->toBeTrue("createSubscription: {$subscription->errorMessage}")
+            ->and($subscriptionId)->toStartWith('sub_');
+    } catch (Throwable $e) {
+        $failure = $e;
+    } finally {
+        $current = '6. limpeza (assinatura e clientes)';
+
+        // 1) A assinatura e 2) os clientes são tentativas INDEPENDENTES: uma exceção na busca/cancelamento/conferência da
+        //    assinatura nunca pula a limpeza dos objetos — todas as falhas são agregadas.
+        try {
+            // Assinatura: pelo id; se a resposta se perdeu, pela referência (externalReference = $ref).
+            if ($subscriptionId === null) {
+                $found = $gateway->raw('GET', 'subscriptions', ['externalReference' => $ref, 'limit' => 100]);
+
+                foreach ((array) $found->json('data') as $row) {
+                    if (is_array($row) && ($row['externalReference'] ?? null) === $ref && ($row['deleted'] ?? false) !== true && filled($row['id'] ?? null)) {
+                        $subscriptionId = (string) $row['id'];
+                    }
+                }
+            }
+
+            if ($subscriptionId !== null) {
+                $canceled = $gateway->cancelSubscription(new CancelSubscriptionDTO(entityId: 'smoke', subscriptionId: $ref, externalSubscriptionId: $subscriptionId));
+
+                // O Asaas confirma a remoção com atraso (a 1ª leitura logo depois do DELETE já devolveu deleted:false): até 5 leituras.
+                $removed = false;
+
+                for ($attempt = 1; $attempt <= 5 && ! $removed; $attempt++) {
+                    $show    = $gateway->raw('GET', 'subscription_show', [], ['id' => $subscriptionId]);
+                    $removed = $show->status() === 404 || ($show->successful() && $show->json('deleted') === true);
+
+                    if (! $removed) {
+                        sleep(1);
+                    }
+                }
+
+                if (! $removed) {
+                    $problems[] = "assinatura {$subscriptionId} continua ativa (cancelSubscription success=" . var_export($canceled->success, true) . ", HTTP {$show->status()})";
+                }
+            }
+        } catch (Throwable $subscriptionError) {
+            $problems[] = 'limpeza da assinatura falhou (' . class_basename($subscriptionError) . ')' . ($subscriptionId !== null ? " — confira {$subscriptionId}" : " — confira a referência {$ref}");
+        }
+
+        try {
+            $problems = [...$problems, ...asaasSmokeCleanup($gateway, $objects)];
+        } catch (Throwable $cleanupError) {
+            $problems[] = 'limpeza dos clientes interrompida (' . class_basename($cleanupError) . '): confira no sandbox tudo com a referência ' . $ref;
+        }
+    }
+
+    if ($failure !== null || $problems !== []) {
+        $message = $failure !== null
+            ? "[passo: {$current}] " . class_basename($failure) . ': ' . $failure->getMessage() . ' (' . basename($failure->getFile()) . ':' . $failure->getLine() . ')'
+            : '';
+
+        if ($problems !== []) {
+            $message .= ($message !== '' ? ' ' : '[passo: 6. limpeza] ') . 'SANDBOX NÃO ESTÁ LIMPO (referência ' . $ref . '; apague à mão o que restar): ' . implode('; ', $problems) . '.';
+        }
+
         throw new RuntimeException(asaasSmokeMask($message, $secret));
     }
 });

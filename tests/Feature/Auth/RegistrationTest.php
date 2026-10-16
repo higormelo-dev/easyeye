@@ -97,8 +97,9 @@ describe('Fluxo de registro', function () {
         $oldToken = str_repeat('a', 40);
 
         $response = $this->withSession(['_token' => $oldToken])->postJson('/register', registrationPayload([
-            'plan_id'    => $plan->id,
-            'start_mode' => $mode,
+            'plan_id'      => $plan->id,
+            'start_mode'   => $mode,
+            'company_cnpj' => $mode === 'checkout' ? '11222333000181' : null,
         ]));
 
         $response->assertOk()->assertJsonStructure(['csrf_token']);
@@ -112,8 +113,9 @@ describe('Fluxo de registro', function () {
         $plan = Plan::factory()->create(['sort_order' => 1]);
 
         $response = $this->postJson('/register', registrationPayload([
-            'plan_id'    => $plan->id,
-            'start_mode' => $mode,
+            'plan_id'      => $plan->id,
+            'start_mode'   => $mode,
+            'company_cnpj' => $mode === 'checkout' ? '11222333000181' : null,
         ]))->assertOk()->assertJsonStructure(['csrf_token']);
 
         $cacheControl = (string) $response->headers->get('Cache-Control');
@@ -130,8 +132,9 @@ describe('Fluxo de registro', function () {
         });
 
         $token = $this->postJson('/register', registrationPayload([
-            'plan_id'    => $plan->id,
-            'start_mode' => $mode,
+            'plan_id'      => $plan->id,
+            'start_mode'   => $mode,
+            'company_cnpj' => $mode === 'checkout' ? '11222333000181' : null,
         ]))->assertOk()->json('csrf_token');
 
         expect($token)->toBeString()->not->toBeEmpty();
@@ -639,4 +642,101 @@ describe('Aceite dos termos no cadastro', function () {
             ->and(app(TermsService::class)->hasAcceptedAll($existing))->toBeFalse() // sem retroação: a prova não foi inventada
             ->and(UserTermAcceptance::count())->toBe(2);
     });
+});
+
+// ── CPF/CNPJ do responsável pela cobrança ─────────────────────────────────────
+
+describe('Documento do responsável (CPF ou CNPJ) em "Contratar agora"', function () {
+    beforeEach(function () {
+        Event::fake([Registered::class]);
+        setTrialDays(14);
+        app()->setLocale('pt_BR');
+        $this->plan = Plan::factory()->create(['sort_order' => 1]);
+    });
+
+    it('checkout SEM documento: 422 em company_cnpj com a mensagem clara e nada é criado', function (mixed $document) {
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'checkout', 'company_cnpj' => $document]))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.company_cnpj.0', 'Informe o CPF ou CNPJ do responsável para contratar agora.');
+
+        expect(User::count())->toBe(0)->and(Entity::count())->toBe(0);
+    })->with([
+        'ausente' => [null],
+        'vazio'   => [''],
+    ]);
+
+    it('checkout sem documento: a mensagem sai em inglês no idioma en', function () {
+        app()->setLocale('en');
+
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'checkout']))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.company_cnpj.0', "Enter the owner's CPF or CNPJ to subscribe now.");
+    });
+
+    it('checkout com CPF válido cria a conta e grava o CPF canônico em national_registration', function (string $cpf) {
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'checkout', 'company_cnpj' => $cpf]))
+            ->assertOk()
+            ->assertJsonPath('checkout.contract', '/signup-checkout/contract');
+
+        expect(Entity::query()->value('national_registration'))->toBe('52998224725');
+    })->with([
+        'só dígitos' => ['52998224725'],
+        'mascarado'  => ['529.982.247-25'],
+    ]);
+
+    it('checkout com CNPJ válido (numérico, mascarado ou alfanumérico) cria a conta com o documento canônico', function (string $cnpj, string $canonical) {
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'checkout', 'company_cnpj' => $cnpj]))->assertOk();
+
+        expect(Entity::query()->value('national_registration'))->toBe($canonical);
+    })->with([
+        'numérico'     => ['11222333000181', '11222333000181'],
+        'mascarado'    => ['11.222.333/0001-81', '11222333000181'],
+        'alfanumérico' => ['HCHGXN73000170', 'HCHGXN73000170'],
+        'minúsculas'   => ['hchgxn73000170', 'HCHGXN73000170'],
+    ]);
+
+    it('checkout com documento de dígito verificador errado: 422 com a mensagem de documento inválido', function (string $document) {
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'checkout', 'company_cnpj' => $document]))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.company_cnpj.0', __('validation.cpf_cnpj_invalid'));
+
+        expect(User::count())->toBe(0)->and(Entity::count())->toBe(0);
+    })->with([
+        'CNPJ DV errado'         => ['11222333000182'],
+        'CPF DV errado'          => ['52998224724'],
+        'alfanumérico DV errado' => ['HCHGXN73000171'],
+        'todos iguais'           => ['11111111111'],
+        'tamanho errado'         => ['1122233300018'],
+    ]);
+
+    it('teste grátis continua sem documento (campo opcional)', function () {
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'trial']))->assertOk();
+        $this->assertDatabaseHas('entities', ['national_registration' => null]);
+    });
+
+    it('sem start_mode (o padrão é o teste grátis) também segue sem documento', function () {
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id]))->assertOk();
+
+        expect(Entity::query()->value('national_registration'))->toBeNull();
+    });
+
+    it('no teste grátis o documento, se vier, também tem de ser válido', function () {
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'trial', 'company_cnpj' => '11222333000182']))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.company_cnpj.0', __('validation.cpf_cnpj_invalid'));
+
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'trial', 'company_cnpj' => '529.982.247-25']))->assertOk();
+        expect(Entity::query()->value('national_registration'))->toBe('52998224725');
+    });
+
+    it('documento já cadastrado (CPF ou CNPJ): 422 com a mensagem de duplicidade', function (string $document) {
+        Entity::factory()->create(['national_registration' => $document]);
+
+        $this->postJson('/register', registrationPayload(['plan_id' => $this->plan->id, 'start_mode' => 'checkout', 'company_cnpj' => $document]))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.company_cnpj.0', 'Este CPF ou CNPJ já está cadastrado.');
+    })->with([
+        'CNPJ' => ['11222333000181'],
+        'CPF'  => ['52998224725'],
+    ]);
 });

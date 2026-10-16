@@ -14,6 +14,8 @@ return [
         'card_declined_generic'            => 'Payment declined by the card issuer. Check the details or use another card.',
         'installments_invalid'             => 'Number of installments not available for this plan.',
         'gateway_error'                    => 'We could not reach the payment provider right now. Please try again shortly.',
+        'document_required'                => 'To create the charge, enter the clinic CPF or CNPJ. The payment provider requires the payer document — nothing was charged.',
+        'document_already_set'             => 'The clinic already has a valid CPF or CNPJ on file. To change it, contact support.',
         'charge_pending'                   => 'The charge is still being created. Please try again in a few seconds.',
         'card_change_unsupported'          => 'This payment provider cannot change the card without a payment. The new card is saved on the next card payment.',
         'already_active'                   => 'The clinic already has this plan and cycle active.',
@@ -82,6 +84,10 @@ return [
 
     // Checkout component (Pix, boleto, card and external link).
     'ui' => [
+        'complete_profile'       => 'Complete the clinic profile',
+        'payer_document_label'   => 'Clinic CPF or CNPJ',
+        'payer_document_hint'    => 'The payment provider requires the payer document to issue the charge.',
+        'payer_document_save'    => 'Save and continue',
         'choose_method'          => 'How would you like to pay?',
         'method_hint_pix'        => 'Confirmed in seconds; access is released automatically.',
         'method_hint_boleto'     => 'Clears within 3 business days after payment.',

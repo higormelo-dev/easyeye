@@ -14,7 +14,7 @@ use App\Exceptions\Billing\{CheckoutException, GatewayIntegrationException, Gate
 use App\Models\Billing\{Gateway, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Subscription, User};
 use App\Services\SubscriptionService;
-use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PaymentUrl};
+use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PayerDocument, PaymentUrl};
 use Carbon\CarbonImmutable;
 use Closure;
 use DomainException;
@@ -1289,6 +1289,10 @@ class AiCreditPackCheckoutService
         if ($reason !== null) {
             throw CheckoutException::make($reason, $reason === 'not_client' ? 404 : 403);
         }
+
+        // O Asaas recusa a cobrança de cliente sem CPF/CNPJ (400 invalid_object): 422 claro ANTES do pedido e de
+        // qualquer chamada ao gateway (compra, emissão da cobrança do pedido e cartão do pedido passam por aqui).
+        PayerDocument::assertFor($entity);
     }
 
     private function assertMethod(PaymentGatewayInterface $gateway, CheckoutMethod $method, ?CheckoutCardInput $card, bool $requireCard = true): void

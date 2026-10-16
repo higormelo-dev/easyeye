@@ -10,7 +10,7 @@ use App\Events\Billing\InvoicePaid;
 use App\Exceptions\Billing\{CheckoutException, GatewayIntegrationException, GatewayResolutionException, SubscriptionSupersededException};
 use App\Models\Billing\{Gateway, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
-use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PlanPricing};
+use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PayerDocument, PlanPricing};
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -511,6 +511,10 @@ class CheckoutService
     /** @return array<string, mixed> */
     private function activate(Entity $entity, Plan $plan, BillingCycle $cycle, CheckoutMethod $method, ?CheckoutCardInput $card, float $amount, string $returnTarget = HostedCheckoutService::TARGET_PANEL): array
     {
+        // Antes de tudo (e do gateway): a assinatura nasce com o NOSSO cliente no gateway, inclusive no cartão do
+        // checkout hospedado — o Asaas recusa a assinatura de cliente sem CPF/CNPJ (hoje um 502 genérico).
+        PayerDocument::assertFor($entity);
+
         $gateway = $this->newPurchaseGateway($entity, $plan);
         $useCard = $method->isCard() && $gateway->supportsTransparent($method->value);
 
@@ -636,6 +640,9 @@ class CheckoutService
         if ($method === null) {
             throw CheckoutException::make('method_unavailable');
         }
+
+        // Upgrade com cobrança nova no gateway (o downgrade agendado acima não cobra nada): mesma pré-condição.
+        PayerDocument::assertFor($entity);
 
         $gateway = $this->gatewayFor($current);
 

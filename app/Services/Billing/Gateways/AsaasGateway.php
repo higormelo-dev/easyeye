@@ -27,6 +27,7 @@ use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Models\Billing\GatewayCustomer;
 use App\Services\Billing\GatewayAlertService;
 use App\Support\Billing\{HostedCheckoutReference, PaymentUrl};
+use App\Support\BrazilianFormat;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
@@ -162,7 +163,7 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
      */
     public function upsertCustomer(CustomerDTO $customer): string
     {
-        $cpfCnpj = preg_replace('/\D/', '', (string) $customer->document);
+        $cpfCnpj = $this->payerDocument($customer);
 
         $existing = $this->findExistingCustomer($cpfCnpj, $customer->externalReference);
 
@@ -295,12 +296,29 @@ class AsaasGateway extends AbstractHttpGateway implements QueriesGatewayRecurren
         return array_filter([
             'name'    => $customer->name,
             'email'   => $customer->email,
-            'cpfCnpj' => preg_replace('/\D/', '', (string) $customer->document),
+            'cpfCnpj' => $this->payerDocument($customer),
             ...$this->phoneFields($customer->phone),
             ...$this->addressFields($customer->address),
             'externalReference'    => $customer->externalReference,
             'notificationDisabled' => true,
         ], fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
+     * CPF/CNPJ que vai ao Asaas: o canônico SEM pontuação e COM as letras do CNPJ alfanumérico (IN RFB 2.229/2024) — tirar
+     * tudo que não é dígito mandaria um número errado (o sandbox aceita o alfanumérico válido e recusa o de DV errado).
+     * Valor que não tem a forma de CPF (11 dígitos) nem de CNPJ (12 alfanuméricos + 2 dígitos) cai no comportamento
+     * antigo, só dígitos (o gateway recusa e o erro aparece como sempre).
+     */
+    private function payerDocument(CustomerDTO $customer): string
+    {
+        $chars = BrazilianFormat::documentChars((string) $customer->document);
+
+        if ($chars !== null && preg_match('/^(\d{11}|[A-Z0-9]{12}\d{2})$/', $chars) === 1) {
+            return $chars;
+        }
+
+        return (string) preg_replace('/\D/', '', (string) $customer->document);
     }
 
     /**

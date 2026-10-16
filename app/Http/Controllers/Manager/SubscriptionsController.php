@@ -14,7 +14,7 @@ use App\Models\{Entity, Plan, PlanPrice, Subscription, SubscriptionSetting, User
 use App\Services\Audit\AuditLogger;
 use App\Services\Billing\{BillingCancellationService, BillingSubscriptionOrchestrator, GatewayRecurrenceLossService, InvoiceChargeNoticeService, PlanChangeService, RefundService, SubscriptionCycleService, SubscriptionManagementService};
 use App\Services\SubscriptionService;
-use App\Support\Billing\{DunningSchedule, PlanPricing};
+use App\Support\Billing\{DunningSchedule, PayerDocument, PlanPricing};
 use App\Support\BrazilianFormat;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -305,6 +305,14 @@ class SubscriptionsController extends Controller
         }
 
         if ($mode === 'gateway') {
+            // O gateway recusa a assinatura de cliente sem CPF/CNPJ válido: o time SaaS vê o motivo certo (422), não o
+            // 502 genérico — e nenhuma chamada ao gateway sai.
+            try {
+                PayerDocument::assertFor($entity);
+            } catch (CheckoutException) {
+                return response()->json(['message' => __('manager_subscriptions.errors.document_required')], 422);
+            }
+
             try {
                 $subscription = $this->billingSubscriptionOrchestrator->activateWithGateway(
                     entity: $entity,

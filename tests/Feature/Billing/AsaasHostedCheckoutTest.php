@@ -264,6 +264,19 @@ describe('abertura do checkout', function () {
         Http::assertSentCount(1);
     });
 
+    it('clínica SEM CPF/CNPJ no cadastro: a fatura de uma assinatura que já existe ainda abre o checkout hospedado (a página do Asaas coleta o documento) — a pré-condição de documento só vale para CRIAR a assinatura', function () {
+        $this->clinic->forceFill(['national_registration' => null])->save();
+        [, $invoice] = hcPaying();
+
+        $data = hcOpenCard($invoice);
+
+        expect($data['mode'])->toBe('hosted')
+            ->and($data['checkout_url'])->toBe('https://asaas.com/checkoutSession/show?id=chk_1');
+
+        Http::assertSent(fn (Request $r) => $r->url() === 'https://api.asaas.com/v3/checkouts' && $r['customer'] === 'cus_000005219613');
+        Http::assertNotSent(fn (Request $r) => $r->method() === 'POST' && in_array($r->url(), ['https://api.asaas.com/v3/customers', 'https://api.asaas.com/v3/subscriptions'], true));
+    });
+
     it('a leitura (GET) nunca abre checkout; o já aberto é devolvido', function () {
         [, $invoice] = hcPaying();
 

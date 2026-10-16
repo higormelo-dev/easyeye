@@ -385,6 +385,7 @@ function crfRegisterPayload(array $overrides = []): array
         'plan_id'               => test()->plan->id,
         'billing_cycle'         => 'monthly',
         'start_mode'            => 'checkout',
+        'company_cnpj'          => '52998224725', // "Contratar agora" exige CPF/CNPJ do responsável (a clínica do teste já usa o CNPJ 11222333000181)
         ...$overrides,
     ];
 }

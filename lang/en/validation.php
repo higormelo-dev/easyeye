@@ -360,7 +360,7 @@ return [
         'clinical_conduct'                          => 'clinical conduct',
         'color_vision_type_id'                      => 'color vision type',
         'commission_rate'                           => 'commission rate',
-        'company_cnpj'                              => 'company tax ID',
+        'company_cnpj'                              => "owner's CPF or CNPJ",
         'company_name'                              => 'company name',
         'company_phone'                             => 'company WhatsApp',
         'confirmation_enabled'                      => 'confirmation enabled',
@@ -577,6 +577,9 @@ return [
         'generic' => [
             'required' => 'The :attribute field is required.',
         ],
+        'company_cnpj' => [
+            'required_if' => "Enter the owner's CPF or CNPJ to subscribe now.",
+        ],
         'company_phone' => [
             'invalid' => 'Enter a valid WhatsApp number with area code (10 or 11 digits).',
         ],
@@ -624,5 +627,6 @@ return [
         ],
     ],
     'at_least_one_required'   => 'At least one of the fields :fields must be selected.',
-    'cnpj_already_registered' => 'This CNPJ is already registered.',
+    'cnpj_already_registered' => 'This CPF or CNPJ is already registered.',
+    'cpf_cnpj_invalid'        => 'The CPF or CNPJ entered is not valid. Check the digits.',
 ];

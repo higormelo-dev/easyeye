@@ -123,7 +123,8 @@ it('[S1] trial_days=0: contratar pagando (start_mode=checkout) cria a conta; o t
         'plan_id'               => $plan->id,
     ];
 
-    $this->postJson(route('register'), $payload + ['start_mode' => 'checkout'])
+    // "Contratar agora" exige CPF/CNPJ do responsável (o Asaas recusa a assinatura sem documento).
+    $this->postJson(route('register'), $payload + ['start_mode' => 'checkout', 'company_cnpj' => '11222333000181'])
         ->assertOk()
         ->assertJsonPath('checkout.contract', '/signup-checkout/contract');
     expect(User::query()->where('email', 'maria@clinica-s1.test')->exists())->toBeTrue();

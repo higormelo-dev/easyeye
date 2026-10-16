@@ -1587,6 +1587,7 @@ describe('cadastro no site (signup-checkout)', function () {
             'plan_id'               => $this->plan->id,
             'billing_cycle'         => 'yearly',
             'start_mode'            => 'checkout',
+            'company_cnpj'          => '52998224725', // CPF do responsável: "Contratar agora" exige documento
         ])->assertOk()
             ->assertJsonPath('checkout.contract', '/signup-checkout/contract');
 

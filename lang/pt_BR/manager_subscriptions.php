@@ -452,6 +452,7 @@ return [
         'quantity_max'          => 'Período longo demais para adicionar de uma vez.',
         'nothing_to_cancel'     => 'Nenhuma assinatura vigente (trial, ativa ou em atraso) encontrada.',
         'gateway_failed'        => 'O gateway recusou a ativação: :error',
+        'document_required'     => 'A empresa não tem um CPF ou CNPJ válido no cadastro, e o gateway recusa a assinatura de cliente sem documento. Preencha o documento no cadastro da empresa e tente de novo — nenhuma cobrança foi criada.',
         'activation_superseded' => 'Outra alteração de assinatura desta empresa foi feita enquanto a cobrança era emitida. Ela foi mantida e a cobrança automática desta contratação foi desfeita.',
 
         'gateway_subscription_failed'    => '[:gateway] Não foi possível criar a assinatura no gateway: :error',
