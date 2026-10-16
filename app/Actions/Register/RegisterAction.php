@@ -2,9 +2,12 @@
 
 namespace App\Actions\Register;
 
+use App\Models\User;
 use App\Services\Auth\PhoneVerificationService;
+use App\Services\TermsService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class RegisterAction
@@ -14,6 +17,7 @@ class RegisterAction
         private readonly CreateEntityAction $createEntity,
         private readonly CreateEntityUserAction $createEntityUser,
         private readonly StartTrialAction $startTrial,
+        private readonly TermsService $terms,
     ) {
     }
 
@@ -25,10 +29,12 @@ class RegisterAction
      *  2. Cria Entity (observer suprimido para evitar trial duplicado)
      *  3. Cria EntityUser (user = admin da empresa)
      *  4. Inicia trial com o plano escolhido (start_mode=checkout: sem trial)
+     *  5. Confere os termos e grava o aceite dos documentos vigentes, na MESMA transação — ônus da prova do
+     *     consentimento (LGPD art. 8º, §5º): ou nasce tudo, ou nada. A conferência roda SEMPRE (ver acceptTerms).
      *
      * Jobs de e-mail são disparados FORA da transação para não bloqueá-la.
      *
-     * @return array{user, entity, entityUser, subscription}
+     * @return array{User, entity, entityUser, subscription}
      */
     public function execute(array $data): array
     {
@@ -41,6 +47,8 @@ class RegisterAction
             $subscription = ($data['start_mode'] ?? 'trial') === 'checkout'
                 ? null
                 : $this->startTrial->execute($entity, $data['plan_id'] ?? null, $data['billing_cycle'] ?? null);
+
+            $this->acceptTerms($user, (array) ($data['terms_version_ids'] ?? []), $data['terms_accepted'] ?? false);
 
             return compact('user', 'entity', 'entityUser', 'subscription');
         });
@@ -60,5 +68,41 @@ class RegisterAction
         }
 
         return $result;
+    }
+
+    /**
+     * Confere os termos DENTRO da transação (a validação do request é anterior e a publicação de uma versão não
+     * é atômica com a leitura) e grava o aceite. A conferência roda SEMPRE, também sem versão vigente e também com
+     * terms_accepted falso: o conjunto de versões exibido (terms_version_ids, possivelmente vazio) tem de ser
+     * EXATAMENTE o vigente agora. Qualquer diferença — inclusive de/para vazio ([v1]→[] quando a versão é
+     * trocada, []→[v1] quando uma surge depois do request) — é 422 terms_changed e a transação desfaz usuário,
+     * clínica e aceites. Com versão vigente, exige terms_accepted verdadeiro. Grava só as versões exibidas que
+     * são as vigentes.
+     *
+     * @param array<int, mixed> $shownIds
+     */
+    private function acceptTerms(User $user, array $shownIds, mixed $accepted): void
+    {
+        $current = $this->terms->currentRequired();
+
+        if (! TermsService::sameVersionSet($shownIds, $current)) {
+            throw ValidationException::withMessages(['terms_accepted' => __('auth.register.terms_changed')]);
+        }
+
+        if ($current === []) {
+            return;
+        }
+
+        if (filter_var($accepted, FILTER_VALIDATE_BOOLEAN) !== true) {
+            throw ValidationException::withMessages(['terms_accepted' => __('auth.register.terms_required')]);
+        }
+
+        $shown = array_map(fn ($id) => strtolower((string) $id), $shownIds);
+
+        foreach ($current as $version) {
+            if (in_array(strtolower((string) $version->id), $shown, true)) {
+                $this->terms->accept($user, $version);
+            }
+        }
     }
 }

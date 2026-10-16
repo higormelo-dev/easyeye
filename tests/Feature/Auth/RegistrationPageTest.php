@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\{Plan, PlanPrice, Subscription, SubscriptionSetting, User};
+use App\Models\{Plan, PlanPrice, Subscription, SubscriptionSetting, TermVersion, User};
 use App\Services\Auth\PhoneVerificationService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Event;
@@ -201,4 +201,35 @@ it('[S1-b] trial_days=0 e plano de ciclos mistos (mensal 0, anual > 0): continua
             ->has('plans.0.prices', 1)
             ->where('plans.0.prices.0.cycle', 'yearly')
             ->where('plans.0.is_free', false));
+});
+
+it('entrega a prop terms: obrigatória só com versão vigente, com o link de cada documento', function () {
+    $this->get(route('register'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Auth/Register')
+            ->where('terms.required', false)
+            ->where('terms.version_id', null)
+            ->where('terms.url', null)
+            ->where('terms.documents', []));
+
+    $terms = TermVersion::query()->create(['type' => 'terms_of_service', 'version' => '1.0', 'content' => 'x', 'effective_from' => now()->subDay()->toDateString(), 'active' => true]);
+    $priv  = TermVersion::query()->create(['type' => 'privacy_policy', 'version' => '1.0', 'content' => 'y', 'effective_from' => now()->subDay()->toDateString(), 'active' => true]);
+
+    $this->get(route('register'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('terms.required', true)
+            ->where('terms.version_id', $terms->id)
+            ->where('terms.title', __('auth.register.terms_title'))
+            ->where('terms.url', route('site.terms'))
+            ->where('terms.summary', __('auth.register.terms_summary'))
+            ->where('terms.documents.0.type', 'terms_of_service')
+            ->where('terms.documents.0.version_id', $terms->id)
+            ->where('terms.documents.0.url', route('site.terms'))
+            ->where('terms.documents.1.type', 'privacy_policy')
+            ->where('terms.documents.1.version_id', $priv->id)
+            ->where('terms.documents.1.url', route('site.privacy')));
+
+    expect(__('auth.register.terms_summary'))->toContain('prestador de pagamento');
 });

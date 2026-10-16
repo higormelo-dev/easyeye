@@ -129,6 +129,14 @@ return [
         'strength_fair'        => 'Fair',
         'strength_strong'      => 'Strong',
         'strength_very_strong' => 'Very strong',
+
+        /* terms acceptance (sign-up) */
+        'terms_title'                => 'Terms of Use and Privacy Policy',
+        'terms_summary'              => 'I have read and accept the Terms of Use and the Privacy Policy, including subscription billing and the handling of payment data by a payment provider (billing gateway).',
+        'terms_required'             => 'To create your account, accept the Terms of Use and the Privacy Policy.',
+        'terms_changed'              => 'The terms were updated while you were filling in the sign-up. Read the documents again and accept them.',
+        'terms_doc_terms_of_service' => 'Terms of Use',
+        'terms_doc_privacy_policy'   => 'Privacy Policy',
     ],
 
     'forgot_password' => [

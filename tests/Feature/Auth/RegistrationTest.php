@@ -3,12 +3,13 @@
 use App\Actions\Register\RegisterAction;
 use App\Enums\SubscriptionStatus;
 use App\Models\AuditLog;
-use App\Models\{Plan, Subscription, SubscriptionSetting, User};
-use App\Services\TrialService;
+use App\Models\{Entity, Plan, Subscription, SubscriptionSetting, TermVersion, User, UserTermAcceptance};
+use App\Services\{TermsService, TrialService};
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\{Cache, Event};
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -317,5 +318,325 @@ describe('Fluxo de registro', function () {
 
         expect($log)->not->toBeNull();
         expect($log->entity_id)->toBeNull();
+    });
+});
+
+// ── Aceite dos Termos de Uso e da Política de Privacidade ────────────────────
+
+/**
+ * Publica a versão de um documento obrigatório (term_versions). Os testes rodam sem seed (tests/Pest.php): o que
+ * está "vigente" é decidido aqui. Padrão: v1.0 de cada tipo, em vigor desde ontem.
+ */
+function publishTerms(string $type, string $version = '1.0', ?string $effectiveFrom = null): TermVersion
+{
+    return TermVersion::query()->create([
+        'type'           => $type,
+        'version'        => $version,
+        'content'        => "Texto oficial de {$type} v{$version}",
+        'effective_from' => $effectiveFrom ?? now()->subDay()->toDateString(),
+        'active'         => true,
+    ]);
+}
+
+/** UUIDs das versões que a tela exibiu (o que o POST manda em terms_version_ids). */
+function termsIds(TermVersion ...$versions): array
+{
+    return array_map(fn (TermVersion $version) => (string) $version->id, $versions);
+}
+
+describe('Aceite dos termos no cadastro', function () {
+    beforeEach(function () {
+        Event::fake([Registered::class]);
+        setTrialDays(14);
+        Plan::factory()->create(['sort_order' => 1]);
+    });
+
+    it('com termos publicados e terms_accepted=true: grava 1 aceite por documento vigente, com versão, data, IP e navegador', function () {
+        $this->travelTo(now()->setDate(2026, 10, 15)->setTime(10, 30));
+        $terms   = publishTerms('terms_of_service');
+        $privacy = publishTerms('privacy_policy');
+
+        $this->withHeader('User-Agent', 'EasyEyeTest/1.0')
+            ->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
+            ->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($terms, $privacy)]))
+            ->assertOk();
+
+        $user = User::where('email', 'joao@example.com')->firstOrFail();
+
+        expect(UserTermAcceptance::query()->count())->toBe(2);
+
+        foreach ([$terms, $privacy] as $version) {
+            $acceptance = UserTermAcceptance::query()->where('user_id', $user->id)->where('term_version_id', $version->id)->sole();
+
+            expect($acceptance->accepted_at->toDateTimeString())->toBe('2026-10-15 10:30:00')
+                ->and($acceptance->ip_address)->toBe('203.0.113.7')
+                ->and($acceptance->user_agent)->toBe('EasyEyeTest/1.0');
+        }
+
+        expect(app(TermsService::class)->hasAcceptedAll($user))->toBeTrue();
+    });
+
+    it('[RESSALVA] com termos PUBLICADOS, cadastro sem aceite (ausente, false ou null) é 422 em terms_accepted e não cria NADA', function (array $extra) {
+        publishTerms('terms_of_service');
+        publishTerms('privacy_policy');
+
+        $this->postJson('/register', registrationPayload($extra))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('terms_accepted')
+            ->assertJsonPath('errors.terms_accepted.0', __('auth.register.terms_required'));
+
+        expect(User::count())->toBe(0)
+            ->and(Entity::count())->toBe(0)
+            ->and(UserTermAcceptance::count())->toBe(0);
+    })->with([
+        'ausente' => [[]],
+        'false'   => [['terms_accepted' => false]],
+        'null'    => [['terms_accepted' => null]],
+        'zero'    => [['terms_accepted' => 0]],
+    ]);
+
+    it('com só um documento vigente (a política), o aceite dele já é exigido e gravado', function () {
+        $privacy = publishTerms('privacy_policy');
+
+        $this->postJson('/register', registrationPayload())->assertUnprocessable()->assertJsonValidationErrors('terms_accepted');
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($privacy)]))->assertOk();
+
+        expect(UserTermAcceptance::query()->sole()->term_version_id)->toBe($privacy->id);
+    });
+
+    it('sem versão vigente publicada: o cadastro NÃO é bloqueado, nada é gravado e o aviso terms.required_version_missing vai ao log', function () {
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged) {
+            $logged[] = [$event->level, $event->message, $event->context['type'] ?? null];
+        });
+
+        // terms_accepted é ignorado quando não há o que aceitar (marcado ou não).
+        $this->postJson('/register', registrationPayload())->assertOk();
+
+        // Um aviso POR tipo obrigatório ausente.
+        expect(User::count())->toBe(1)
+            ->and(UserTermAcceptance::count())->toBe(0)
+            ->and($logged)->toContain(['warning', 'terms.required_version_missing', 'privacy_policy'])
+            ->and($logged)->toContain(['warning', 'terms.required_version_missing', 'terms_of_service']);
+
+        auth()->logout();
+        $this->postJson('/register', registrationPayload(['email' => 'outro@example.com', 'terms_accepted' => true, 'company_phone' => '11977776666']))->assertOk();
+
+        expect(User::count())->toBe(2)->and(UserTermAcceptance::count())->toBe(0);
+    });
+
+    it('versão com vigência futura não conta: o aceite aponta a versão VIGENTE anterior', function () {
+        $current = publishTerms('terms_of_service', '1.0');
+        publishTerms('terms_of_service', '2.0', now()->addDays(10)->toDateString());
+        publishTerms('privacy_policy', '1.0', now()->addDay()->toDateString()); // só futura: sem versão vigente
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($current)]))->assertOk();
+
+        expect(UserTermAcceptance::query()->sole()->term_version_id)->toBe($current->id);
+    });
+
+    it('o aceite nasce na MESMA transação do cadastro: falha no 2º aceite desfaz usuário, clínica e o 1º aceite', function () {
+        $terms   = publishTerms('terms_of_service');
+        $privacy = publishTerms('privacy_policy');
+
+        $calls = 0;
+        $this->partialMock(TermsService::class, function ($mock) use (&$calls) {
+            $mock->shouldReceive('accept')->andReturnUsing(function (User $user, TermVersion $version) use (&$calls) {
+                if (++$calls === 2) {
+                    throw new RuntimeException('falha no 2º aceite');
+                }
+
+                return UserTermAcceptance::query()->create(['user_id' => $user->id, 'term_version_id' => $version->id, 'accepted_at' => now()]);
+            });
+        });
+        $this->withoutExceptionHandling();
+
+        expect(fn () => $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($terms, $privacy)])))
+            ->toThrow(RuntimeException::class, 'falha no 2º aceite');
+
+        expect($calls)->toBe(2)
+            ->and(User::count())->toBe(0)
+            ->and(Entity::count())->toBe(0)
+            ->and(UserTermAcceptance::count())->toBe(0);
+    });
+
+    it('[S2-1] com UM dos documentos sem versão vigente: aviso para o tipo ausente, aceite do que existe, cadastro não bloqueado', function () {
+        $terms  = publishTerms('terms_of_service');
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged) {
+            if ($event->message === 'terms.required_version_missing') {
+                $logged[] = [$event->level, $event->context['type'] ?? null];
+            }
+        });
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($terms)]))->assertOk();
+
+        expect($logged)->toBe([['warning', 'privacy_policy']]) // só o tipo que falta
+            ->and(UserTermAcceptance::query()->sole()->term_version_id)->toBe($terms->id);
+    });
+
+    it('[S2-1] com os dois documentos vigentes não há aviso', function () {
+        $terms   = publishTerms('terms_of_service');
+        $privacy = publishTerms('privacy_policy');
+        $logged  = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged) {
+            $logged[] = $event->message;
+        });
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($terms, $privacy)]))->assertOk();
+
+        expect($logged)->not->toContain('terms.required_version_missing');
+    });
+
+    it('[S2-2] GET /register mostra a v1, a v2 é publicada, o POST com os ids da v1 é 422 (terms_changed) e NADA é gravado', function () {
+        $v1Terms   = publishTerms('terms_of_service', '1.0');
+        $v1Privacy = publishTerms('privacy_policy', '1.0');
+
+        $shown = collect(AssertableInertia::fromTestResponse($this->get(route('register')))->toArray()['props']['terms']['documents'])->pluck('version_id')->all();
+        expect($shown)->toEqualCanonicalizing(termsIds($v1Terms, $v1Privacy));
+
+        $this->travel(1)->day();
+        $v2 = app(TermsService::class)->publish('terms_of_service', '2.0', 'Texto novo', now()->toDateString(), User::factory()->create());
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => $shown]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('terms_accepted')
+            ->assertJsonPath('errors.terms_accepted.0', __('auth.register.terms_changed'));
+
+        expect(User::where('email', 'joao@example.com')->count())->toBe(0)
+            ->and(Entity::count())->toBe(0)
+            ->and(UserTermAcceptance::count())->toBe(0);
+
+        // Com os ids que a tela passa a mostrar (v2 + política), o aceite vale e grava as versões vigentes.
+        $shownNow = collect(AssertableInertia::fromTestResponse($this->get(route('register')))->toArray()['props']['terms']['documents'])->pluck('version_id')->all();
+        expect($shownNow)->toEqualCanonicalizing([$v2->id, (string) $v1Privacy->id]);
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => $shownNow]))->assertOk();
+
+        expect(UserTermAcceptance::query()->pluck('term_version_id')->all())->toEqualCanonicalizing([$v2->id, (string) $v1Privacy->id])
+            ->and(UserTermAcceptance::query()->where('term_version_id', $v1Terms->id)->count())->toBe(0);
+    });
+
+    it('[S2-2] terms_version_ids tem de ser EXATAMENTE o conjunto vigente: ausente, parcial ou com id extra é 422 terms_changed; ordem e repetição não importam', function (string $case) {
+        $terms   = publishTerms('terms_of_service');
+        $privacy = publishTerms('privacy_policy');
+
+        $ids = match ($case) {
+            'ausente'    => [],
+            'parcial'    => termsIds($terms),
+            'extra'      => [...termsIds($terms, $privacy), (string) Str::uuid()],
+            'outro'      => [(string) Str::uuid(), (string) Str::uuid()],
+            'ordem'      => array_reverse(termsIds($terms, $privacy)),
+            'repetidos'  => [...termsIds($terms, $privacy), ...termsIds($terms)],
+            'maiusculas' => array_map('strtoupper', termsIds($terms, $privacy)),
+        };
+        $payload = registrationPayload(['terms_accepted' => true] + ($case === 'ausente' ? [] : ['terms_version_ids' => $ids]));
+
+        if (in_array($case, ['ordem', 'repetidos', 'maiusculas'], true)) {
+            $this->postJson('/register', $payload)->assertOk();
+            expect(UserTermAcceptance::count())->toBe(2);
+
+            return;
+        }
+
+        // A barreira é a do request: o RegisterAction nem chega a rodar (a 2ª conferência, dentro da transação, é só para a corrida).
+        $this->mock(RegisterAction::class)->shouldNotReceive('execute');
+
+        $this->postJson('/register', $payload)
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.terms_accepted.0', __('auth.register.terms_changed'));
+
+        expect(User::count())->toBe(0)->and(UserTermAcceptance::count())->toBe(0);
+    })->with(['ausente', 'parcial', 'extra', 'outro', 'ordem', 'repetidos', 'maiusculas']);
+
+    it('[S2-2] terms_version_ids malformado (não é lista de UUIDs) é 422 de validação e nada é gravado', function (mixed $ids) {
+        publishTerms('terms_of_service');
+        publishTerms('privacy_policy');
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => $ids]))->assertUnprocessable();
+
+        expect(User::count())->toBe(0)->and(UserTermAcceptance::count())->toBe(0);
+    })->with([
+        'texto'        => ['nao-e-lista'],
+        'nao uuid'     => [['abc']],
+        'objeto'       => [['a' => ['b']]],
+        'lista enorme' => [array_fill(0, 11, '11111111-1111-4111-8111-111111111111')],
+    ]);
+
+    it('[S2-2] versão publicada ENTRE a validação e a gravação (corrida): o aceite é conferido de novo na transação — 422 e nada fica', function () {
+        $v1Terms   = publishTerms('terms_of_service', '1.0');
+        $v1Privacy = publishTerms('privacy_policy', '1.0');
+        $v2Terms   = publishTerms('terms_of_service', '2.0');
+
+        $viewV1 = ['terms_of_service' => $v1Terms, 'privacy_policy' => $v1Privacy];
+        $nowV2  = ['terms_of_service' => $v2Terms, 'privacy_policy' => $v1Privacy];
+
+        // 1ª leitura (a validação do request) ainda vê a v1; a 2ª (dentro da transação) já vê a v2.
+        $this->partialMock(TermsService::class, fn ($mock) => $mock->shouldReceive('currentRequired')->twice()->andReturn($viewV1, $nowV2));
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($v1Terms, $v1Privacy)]))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.terms_accepted.0', __('auth.register.terms_changed'));
+
+        expect(User::count())->toBe(0)->and(Entity::count())->toBe(0)->and(UserTermAcceptance::count())->toBe(0);
+    });
+
+    it('[S2-2 re] corrida [v1] → [] (a versão é trocada e o request viu a v1, a transação já vê NADA): 422 terms_changed e nada fica', function () {
+        $v1 = publishTerms('terms_of_service');
+
+        $this->partialMock(TermsService::class, fn ($mock) => $mock->shouldReceive('currentRequired')->twice()->andReturn(['terms_of_service' => $v1], []));
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($v1)]))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.terms_accepted.0', __('auth.register.terms_changed'));
+
+        expect(User::count())->toBe(0)->and(Entity::count())->toBe(0)->and(UserTermAcceptance::count())->toBe(0);
+    });
+
+    it('[S2-2 re] corrida [] → [v1] (o request viu NADA publicado, a versão surge antes da transação): 422 terms_changed e nada fica — com ou sem terms_accepted', function (array $extra) {
+        $v1 = publishTerms('terms_of_service');
+
+        $this->partialMock(TermsService::class, fn ($mock) => $mock->shouldReceive('currentRequired')->twice()->andReturn([], ['terms_of_service' => $v1]));
+
+        $this->postJson('/register', registrationPayload($extra))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.terms_accepted.0', __('auth.register.terms_changed'));
+
+        expect(User::count())->toBe(0)->and(Entity::count())->toBe(0)->and(UserTermAcceptance::count())->toBe(0);
+    })->with([
+        'sem aceite'   => [[]],
+        'false'        => [['terms_accepted' => false]],
+        'true sem ids' => [['terms_accepted' => true]],
+    ]);
+
+    it('[S2-2 re] corrida [] → [v1] com os ids certos mas SEM aceite: 422 terms_required (a transação exige terms_accepted verdadeiro) e nada fica', function () {
+        $v1 = publishTerms('terms_of_service');
+
+        $this->partialMock(TermsService::class, fn ($mock) => $mock->shouldReceive('currentRequired')->twice()->andReturn([], ['terms_of_service' => $v1]));
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => false, 'terms_version_ids' => termsIds($v1)]))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.terms_accepted.0', __('auth.register.terms_required'));
+
+        expect(User::count())->toBe(0)->and(Entity::count())->toBe(0)->and(UserTermAcceptance::count())->toBe(0);
+    });
+
+    it('[S2-2 re] sem versão publicada nos dois momentos, o cadastro segue normal (conferência de vazio == vazio)', function () {
+        $this->postJson('/register', registrationPayload())->assertOk();
+
+        expect(User::count())->toBe(1)->and(UserTermAcceptance::count())->toBe(0);
+    });
+
+    it('usuários que já existiam ficam intocados: publicar os termos e cadastrar alguém não cria aceite para eles', function () {
+        $existing = User::factory()->create();
+        $terms    = publishTerms('terms_of_service');
+        $privacy  = publishTerms('privacy_policy');
+
+        $this->postJson('/register', registrationPayload(['terms_accepted' => true, 'terms_version_ids' => termsIds($terms, $privacy)]))->assertOk();
+
+        expect(UserTermAcceptance::query()->where('user_id', $existing->id)->count())->toBe(0)
+            ->and(app(TermsService::class)->hasAcceptedAll($existing))->toBeFalse() // sem retroação: a prova não foi inventada
+            ->and(UserTermAcceptance::count())->toBe(2);
     });
 });

@@ -1,5 +1,5 @@
 <script setup>
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { ref, computed, watch, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import SiteLayout from '@/Layouts/SiteLayout.vue';
@@ -26,6 +26,11 @@ const props = defineProps({
     locale: { type: String, default: 'pt_BR' },
     // Cloudflare Turnstile: só com TURNSTILE_SITE_KEY/SECRET_KEY no servidor.
     turnstileSiteKey: { type: String, default: null },
+    // A versão vigente é resolvida no servidor; o navegador só declara o aceite.
+    terms: {
+        type: Object,
+        default: () => ({ required: false, version_id: null, title: '', url: '', summary: '' }),
+    },
 });
 
 // ── Captcha (Turnstile) ────────────────────────────────────────
@@ -45,10 +50,31 @@ const form = ref({
     company_phone: '',
     company_cnpj: '',
     plan_id: '',
+    terms_accepted: false,
 });
 
 const errors = ref({});
 const loading = ref(false);
+const termsChanged = ref(false);
+const reloadingTerms = ref(false);
+const termsRequired = computed(() => props.terms?.required === true);
+const termsDocuments = computed(() => {
+    const documents = Array.isArray(props.terms?.documents) ? props.terms.documents : [];
+
+    if (documents.length) return documents.filter((document) => document?.type && document?.url && document?.title);
+    if (!props.terms?.url) return [];
+
+    return [{ type: 'terms_of_service', url: props.terms.url, title: props.terms.title }];
+});
+const termsVersionIds = computed(() => termsDocuments.value.map((document) => document.version_id).filter(Boolean));
+const termsRequiredMessage = computed(
+    () => props.tAuth.register?.terms_required ?? 'Você precisa aceitar os termos para continuar.',
+);
+
+watch(termsVersionIds, () => {
+    form.value.terms_accepted = false;
+    termsChanged.value = false;
+});
 
 // Máscaras BR (WhatsApp e CNPJ): diretiva global v-mask nos inputs — o
 // backend re-normaliza para dígitos (RegisterRequest::prepareForValidation).
@@ -187,6 +213,7 @@ function validateStep2() {
     } else if (phoneDigits.length < 10 || phoneDigits.length > 11) {
         e.company_phone = props.tAuth.register?.whatsapp_invalid ?? 'Informe um número válido com DDD.';
     }
+    if (termsRequired.value && !form.value.terms_accepted) e.terms_accepted = termsRequiredMessage.value;
 
     errors.value = e;
     return Object.keys(e).length === 0;
@@ -209,9 +236,11 @@ const signup = ref(null); // { redirect, planId, cycle, planName, cycleLabel } �
 async function submit() {
     if (!validateStep2()) return;
     loading.value = true;
+    termsChanged.value = false;
     try {
         const payload = {
             ...form.value,
+            terms_version_ids: termsVersionIds.value,
             plan_id: selectedPlan.value,
             billing_cycle: currentOffer.value?.cycle,
             start_mode: startMode.value,
@@ -250,6 +279,12 @@ async function submit() {
             errors.value = Object.fromEntries(
                 Object.entries(err.response.data.errors).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]),
             );
+            if (errors.value.terms_accepted) {
+                form.value.terms_accepted = false;
+                termsChanged.value = /(termos?|terms?).{0,40}(atualiz|updat)/i.test(
+                    String(errors.value.terms_accepted),
+                );
+            }
             if (
                 errors.value.name ||
                 errors.value.email ||
@@ -262,6 +297,13 @@ async function submit() {
     } finally {
         loading.value = false;
     }
+}
+
+function reloadTerms() {
+    if (reloadingTerms.value) return;
+    form.value.terms_accepted = false;
+    reloadingTerms.value = true;
+    router.reload({ onFinish: () => (reloadingTerms.value = false) });
 }
 
 async function quickStart() {
@@ -797,6 +839,67 @@ const showPwd2 = ref(false);
                                         }}</span>
                                     </div>
 
+                                    <div v-if="termsRequired" class="reg-field reg-terms">
+                                        <div class="reg-check-row">
+                                            <input
+                                                id="terms-accept"
+                                                v-model="form.terms_accepted"
+                                                class="reg-check"
+                                                type="checkbox"
+                                                data-testid="terms-accept-checkbox"
+                                                :disabled="reloadingTerms"
+                                                :aria-invalid="!!errors.terms_accepted"
+                                                :aria-describedby="
+                                                    errors.terms_accepted ? 'register-terms-error' : undefined
+                                                "
+                                            />
+                                            <label for="terms-accept">
+                                                {{ terms.summary }}
+                                                <span
+                                                    v-if="termsDocuments.length"
+                                                    class="reg-terms-links"
+                                                    data-testid="terms-link"
+                                                >
+                                                    <template
+                                                        v-for="(document, index) in termsDocuments"
+                                                        :key="document.type"
+                                                    >
+                                                        <span v-if="index === 0"> (</span>
+                                                        <span v-else>{{
+                                                            index === termsDocuments.length - 1 ? ' e ' : ', '
+                                                        }}</span>
+                                                        <a
+                                                            :href="document.url"
+                                                            target="_blank"
+                                                            rel="noopener"
+                                                            :data-testid="`terms-link-${document.type}`"
+                                                            >{{ document.title }}</a
+                                                        >
+                                                        <span v-if="index === termsDocuments.length - 1">)</span>
+                                                    </template>
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <span
+                                            v-if="errors.terms_accepted"
+                                            id="register-terms-error"
+                                            class="reg-error"
+                                            role="alert"
+                                            data-testid="register-terms-error"
+                                            >{{ errors.terms_accepted }}</span
+                                        >
+                                        <button
+                                            v-if="termsChanged"
+                                            type="button"
+                                            class="reg-terms-reload"
+                                            data-testid="register-terms-reload"
+                                            :disabled="reloadingTerms"
+                                            @click="reloadTerms"
+                                        >
+                                            {{ reloadingTerms ? 'Recarregando…' : 'Recarregar a página' }}
+                                        </button>
+                                    </div>
+
                                     <div class="reg-btn-row">
                                         <button type="button" class="reg-btn reg-btn-secondary" @click="prevStep">
                                             <i class="ti ti-arrow-left"></i> {{ tAuth.register?.back }}
@@ -1236,6 +1339,45 @@ const showPwd2 = ref(false);
     font-size: 12px;
     color: #ef4444;
     margin-top: 5px;
+}
+.reg-check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+}
+.reg-check {
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    accent-color: var(--teal);
+    flex: 0 0 auto;
+}
+.reg-check:focus-visible {
+    outline: 3px solid var(--teal);
+    outline-offset: 2px;
+}
+.reg-check-row a {
+    color: #006d83;
+    font-weight: 600;
+    text-decoration: underline;
+}
+.reg-terms-reload {
+    background: transparent;
+    border: 0;
+    color: #006d83;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 8px;
+    padding: 0;
+    text-decoration: underline;
+}
+.reg-terms-reload:focus-visible {
+    outline: 3px solid var(--teal);
+    outline-offset: 2px;
 }
 .reg-input-group {
     display: flex;
