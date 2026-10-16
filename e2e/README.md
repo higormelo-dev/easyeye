@@ -46,14 +46,46 @@ contra o **Asaas Sandbox de verdade** (sem `cy.intercept` para cobrança ou webh
 com a variável abaixo — sem ela a pasta `sandbox/` fica fora da suíte padrão, e nenhuma execução
 comum toca gateway:
 
+**Um comando só** (ngrok + app na 8086 + webhook do sandbox + Cypress + limpeza, mesmo em erro ou Ctrl+C):
+
+```bash
+e2e/scripts/sandbox-run.sh                      # roda o spec de sandbox
+CYPRESS_SANDBOX_PAUSE=1 e2e/scripts/sandbox-run.sh   # pausa para pagar à mão no Asaas
+e2e/scripts/sandbox-run.sh --spec cypress/e2e/sandbox/signup-checkout-sandbox.cy.js   # argumentos vão ao `cypress run`
+```
+
+Ele confere `billing:gateway-environment asaas` == `sandbox` (credencial efetiva: a do Manager vence o `.env`) e que
+**não há config em cache** nem `APP_ENV` fora de local/testing (lidos pelo bootstrap do próprio Laravel, só leitura, então
+vale também `APP_CONFIG_CACHE` definido no `.env`: com cache o Laravel ignora o `APP_URL` do ambiente — o script aborta e
+manda rodar `php artisan config:clear`, sem limpar o cache por você), sobe `ngrok http 8086`
+numa instância própria (config temporário com a interface web numa porta livre: a URL vem só do ngrok que ele iniciou,
+do túnel https cujo `config.addr` aponta para `:8086`; sem esse túnel, aborta), exporta `APP_URL=<url do túnel>` (serve,
+webhook e Cypress leem a mesma configuração; o `.env` não é tocado e o `composer dev` da 8085 segue como está), sobe
+`php artisan serve --port=8086 --no-reload`, registra o webhook com
+`php artisan billing:asaas-webhook register --url=<url do túnel>` (só sandbox; `--url` só aceita
+`https://<rótulo>.<domínio de config('billing.sandbox_webhook_hosts')>` — ngrok — sem porta, IP, localhost, caminho nem
+credenciais, **e** o `register` exige prova de túnel local: consulta `--ngrok-api` — só IP numérico `127.0.0.1`/`[::1]`, a porta do `web_addr` do
+ngrok do script, sem proxy nem redirecionamento — e só aceita a url que for o `public_url` de um túnel (lista JSON) com
+destino numérico em loopback (o script sobe `ngrok http 127.0.0.1:8086`), porque o `webhook_secret`
+viaja como `authToken` para o host cadastrado e `*.ngrok-free.app` é domínio de qualquer pessoa; o comando só roda com
+`APP_ENV` local/testing), roda o Cypress **pela URL pública
+do túnel** (a origem do navegador é a mesma do `APP_URL` e dos retornos do checkout; um User-Agent próprio evita a página
+de aviso do ngrok free) e, na saída, remove o webhook (3 tentativas; se ainda falhar, sai com código 3 e imprime o
+comando manual) e mata serve e ngrok. Precisa de: authtoken do ngrok válido (`ngrok config add-authtoken <token>`), `jq`
+e do **worker da fila rodando** (o `composer dev` sobe um) — é ele que processa o webhook do Asaas. A suíte padrão
+continua sem tocar gateway.
+
+O Cypress isolado (ambiente já montado à mão, §1–§3 do roteiro) continua valendo:
+
 ```bash
 cd e2e
 CYPRESS_SANDBOX=1 env -u ELECTRON_RUN_AS_NODE npx cypress run --browser chrome
 ```
 
-Ele exige backend local em `localhost`/`127.0.0.1`, `ASAAS_BASE_URL` de sandbox, chave
-`$aact_hmlg_` (a task `asaasSandboxConfigured` confere com `php artisan billing:gateway-environment
-asaas`) e o webhook do sandbox apontando para o túnel (`ngrok http 8085`).
+O spec exige `CYPRESS_BASE_URL` em `localhost`/`127.0.0.1` — ou, só pelo script, na URL pública do túnel
+(`CYPRESS_SANDBOX_TUNNEL_HOST`, que a task confere na API local do ngrok apontando para a porta do serve) —,
+`ASAAS_BASE_URL` de sandbox, chave `$aact_hmlg_` (a task `asaasSandboxConfigured` confere com
+`php artisan billing:gateway-environment asaas` — o mesmo comando do script) e o webhook do sandbox apontando para o túnel.
 
 Roteiro completo (pré-requisitos, webhook, Pix/boleto/cartão, cartão recusado e limpeza):
 [`docs/internal/infra/ngrok-sandbox-asaas.md`](../docs/internal/infra/ngrok-sandbox-asaas.md).

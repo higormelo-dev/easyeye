@@ -14,7 +14,58 @@ Configuração do Asaas no painel, eventos e variáveis: [Asaas — guia de conf
 |---|---|
 | Spec (opt-in) | `e2e/cypress/e2e/sandbox/signup-checkout-sandbox.cy.js` — modo no §7 |
 | Fora da suíte padrão | sim: sem `CYPRESS_SANDBOX=1` a pasta `sandbox/` não é coletada (§7) |
-| Limpeza | manual nos dois lados — marcadores e passos no §6 (não há script de limpeza) |
+| Limpeza | o `sandbox-run.sh` remove o webhook e encerra serve/ngrok; os objetos criados pelo spec (clientes, cobranças, checkouts) são manuais — marcadores e passos no §6 |
+
+## Atalho: um comando só
+
+```bash
+e2e/scripts/sandbox-run.sh                          # ngrok + app 8086 + webhook + Cypress + limpeza
+CYPRESS_SANDBOX_PAUSE=1 e2e/scripts/sandbox-run.sh  # pausa antes da espera, para pagar à mão (Pix/boleto/cartão)
+```
+
+O script automatiza §1–§3 e §6 deste roteiro: confere que a credencial **efetiva** (Manager vence o `.env`) é de
+sandbox (`php artisan billing:gateway-environment asaas`) e que **não há config em cache** nem `APP_ENV` fora de local/testing (lidos pelo bootstrap do próprio Laravel, só
+leitura — vale também um `APP_CONFIG_CACHE` definido só no `.env`) — com cache o Laravel ignora o `APP_URL` do ambiente,
+então ele aborta e manda rodar `php artisan config:clear` (não limpa por você: o cache é compartilhado com o `composer dev`); sobe `ngrok http 8086`
+numa **instância própria** (config temporário mesclado ao seu, com a interface web numa porta livre — a 4040 se estiver
+livre — para a URL nunca vir de outro agente ngrok já rodando; vale só o túnel https cujo `config.addr` termina em
+`:8086`, teto de 30 s, e sem ele aborta); exporta `APP_URL=<url>` para tudo o que roda depois e sobe
+`php artisan serve --port=8086 --no-reload` (não altera o `.env`; `--no-reload` é o que faz o serve repassar o
+`APP_URL`; o `composer dev` da 8085 não é tocado); registra o webhook do sandbox; roda o Cypress **pela URL pública do
+túnel** (`CYPRESS_BASE_URL=https://<túnel>`: a origem do navegador é a mesma do `APP_URL`, então os retornos do
+checkout voltam para a mesma sessão) e, ao sair — por erro ou Ctrl+C —, remove o webhook (3 tentativas; se ainda falhar
+sai com **código 3** e imprime o comando manual) e encerra serve e ngrok.
+
+- **Guard do spec:** `CYPRESS_BASE_URL` em `localhost`/`127.0.0.1` ou no host do túnel que o script exporta em
+  `CYPRESS_SANDBOX_TUNNEL_HOST`; a task `asaasSandboxConfigured` só aprova o host do túnel se a API local do ngrok
+  **desta** instância (`CYPRESS_SANDBOX_NGROK_API`) o reportar apontando para a porta do serve
+  (`CYPRESS_SANDBOX_PORT`). No modo túnel o Cypress usa o User-Agent `EasyEye-E2E-Sandbox`: o plano free do ngrok
+  serve uma página de aviso a User-Agent de navegador, que quebraria o fluxo.
+- **Pré-requisitos:** ngrok instalado com authtoken válido (`ngrok config add-authtoken <token>`; token inválido → o
+  script aborta com essa dica), `jq` e `curl` e o **worker da fila rodando** (`composer dev` sobe um) — ele processa o webhook que o
+  Asaas envia ao túnel; o script avisa se não achar `queue:work`.
+- **Webhook:** `php artisan billing:asaas-webhook {register|remove|list} --url=<url do túnel>` — **só sandbox** (aborta
+  em produção/credencial desconhecida, sem chamar a API). `register` cria ou atualiza (idempotente) o webhook
+  `<url>/api/billing/webhooks/asaas` com o `authToken` = `webhook_secret` do Manager (mín. 32 caracteres; nunca
+  impresso) — por isso `--url` é restrita: só `https://<rótulo>.<sufixo de config('billing.sandbox_webhook_hosts')>`
+  (`.ngrok-free.app`, `.ngrok.app`, `.ngrok.io`, `.ngrok-free.dev`), sem porta, IP, localhost/rede privada, userinfo,
+  caminho, query nem fragmento (exit 2, nada enviado à API). A allowlist é só a 2ª camada: `*.ngrok-free.app` é
+  domínio de qualquer pessoa, então o `register` também exige **prova de túnel local** — consulta a API do ngrok em
+  `--ngrok-api` (padrão `http://127.0.0.1:4040`; o `sandbox-run.sh` passa a porta do seu `web_addr`; só IP numérico
+  `127.0.0.1`/`[::1]` — `localhost` é nome resolvível e não vale —, sem redirecionamento e sem proxy do ambiente) e só
+  segue se a url for o `public_url` exato de um túnel (item de uma LISTA JSON `tunnels`) cujo `config.addr` aponta para
+  `127.0.0.1`/`[::1]` (por isso o script sobe `ngrok http 127.0.0.1:8086`); API
+  fora do ar, resposta inválida ou túnel de outro dono = exit 2, nada enviado ao Asaas. `remove` e `list` não pedem a
+  prova (não enviam segredo; o `remove` roda na limpeza, com o ngrok possivelmente caído). O comando também só roda com
+  `APP_ENV` local/testing (exit 1 antes de qualquer chamada). O webhook é achado pela url com esquema/host sem diferença de
+  caixa e caminho exato, `enabled`, não interrompido, `apiVersion` 3, `SEQUENTIALLY` e os eventos `PAYMENT_*`, `SUBSCRIPTION_*` e
+  `CHECKOUT_*` que o app trata; `remove` apaga só o webhook dessa url; `list` mostra os webhooks sem o token. Webhooks
+  que não são os da sua url (ex.: um antigo apontando para outro túnel) não são tocados.
+- **Cliente sem endereço:** o Asaas Checkout exige telefone e endereço no cadastro do cliente; o app envia o endereço da
+  clínica quando está completo e, se o Asaas recusar o cliente, abre o Checkout **sem** ele (a página coleta os dados) e
+  registra o aviso em `billing_logs`.
+
+O roteiro manual abaixo continua valendo para conferir cada passo à mão.
 
 ## 1. Pré-requisitos
 
@@ -175,7 +226,7 @@ no passo 3 (`data-test="signup-checkout"`). A confirmação é **sempre pelo web
 - **No EasyEye**: fatura/assinatura da clínica nova (Manager → Assinaturas, ou a tela do painel
   da clínica), e `audit_logs`/`webhook_events` pelos eventos recebidos (`webhook_events` é
   idempotente pelo `id` do evento do Asaas — reentrega não duplica).
-- **No ngrok**: `http://127.0.0.1:4040` mostra cada POST do Asaas e a resposta que o EasyEye deu.
+- **No ngrok**: `http://127.0.0.1:4040` mostra cada POST do Asaas e a resposta que o EasyEye deu (pelo `sandbox-run.sh` a porta é a que ele imprime em "API de túneis em …": a 4040 só se estiver livre).
   Um 429 aqui é ruim: o Asaas conta como falha e pausa a fila depois de 15 seguidas.
 
 ## 6. Limpeza
@@ -220,7 +271,8 @@ CYPRESS_SANDBOX=1 CYPRESS_SANDBOX_PAUSE=1 env -u ELECTRON_RUN_AS_NODE npx cypres
 ```
 
 - **Guardas antes de cadastrar/cobrar** (o spec aborta explicando o que falta): `CYPRESS_SANDBOX=1`;
-  `CYPRESS_BASE_URL` em `localhost`/`127.0.0.1` (host remoto **não** é aceito); e a task
+  `CYPRESS_BASE_URL` em `localhost`/`127.0.0.1` (a única exceção é o host do túnel que o
+  `sandbox-run.sh` exporta, provado na API local do ngrok dele; qualquer outro host remoto **não** é aceito); e a task
   `asaasSandboxConfigured`, que chama `php artisan billing:gateway-environment asaas` e só deixa
   passar quando a credencial efetiva é **sandbox** (endereço de sandbox **e** chave `$aact_hmlg_`).
 - **Espere pelo webhook**: o spec faz polling no resumo por até **3 minutos**; no Pix e no boleto,
