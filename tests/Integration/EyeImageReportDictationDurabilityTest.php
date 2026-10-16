@@ -12,18 +12,21 @@ declare(strict_types=1);
  * antes do envio fosse removido. Aqui o nível de transação é 0 (a produção), os dados são comitados e a
  * limpeza é na mão. Roda por caminho explícito (tests/Integration), como os demais testes de banco real:
  *   ./vendor/bin/pest tests/Integration/EyeImageReportDictationDurabilityTest.php
- * Pressupõe o esquema já migrado (não migra nem recria nada).
+ * O esquema vem de DatabaseMigrations (migrate:fresh sem transação, como os vizinhos): os outros testes de
+ * tests/Integration fazem migrate:rollback ao terminar, então "pressupor o esquema migrado" quebrava na CI
+ * sempre que este arquivo rodava depois de um deles na mesma fatia (relation "system_settings" does not exist).
  */
 
 use App\Domains\AI\Services\AiProviderSettings;
 use App\Enums\ClientRule;
 use App\Models\{Entity, User};
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\{DB, Http};
 use Tests\TestCase;
 
-uses(TestCase::class);
+uses(TestCase::class, DatabaseMigrations::class);
 
 /** WAV PCM 16 kHz mono 16 bits de silêncio, 2 s. */
 function ddWav(): string
