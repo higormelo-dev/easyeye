@@ -8,6 +8,7 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
  * Renderiza qualquer combinação de campos declarada em `fields` do controller:
  *   - text     : input texto
  *   - numeric  : input number (com step opcional)
+ *   - date     : input date
  *   - color    : input color
  *   - checkbox : switch on/off
  *   - select   : dropdown (com options [{value, label}])
@@ -45,11 +46,8 @@ function reset() {
 async function loadEditData() {
     loading.value = true;
     try {
-        const url = props.urlTemplates.update.replace('__ID__', props.itemId).replace('/update', '/edit'); // legacy: edit é GET sem sufixo na route resource
-        // Como a rota edit do resource Laravel é `panel.setting.X.edit` (GET .../edit),
-        // urlTemplates.update aponta para o PATCH (sem /edit). Vamos reconstruir:
-        const editUrl = props.urlTemplates.update.replace('__ID__', props.itemId);
-        // Simpler: usar o show endpoint que existe e tem o mesmo formato.
+        // O show endpoint retorna o mesmo formato do edit e evita depender de
+        // variações de URL entre resources antigos.
         const showUrl = props.urlTemplates.show.replace('__ID__', props.itemId);
         const res = await fetch(showUrl, { headers: { Accept: 'application/json' } });
         const json = await res.json();
@@ -58,7 +56,9 @@ async function loadEditData() {
         const next = { ...props.crudFields };
         for (const key of Object.keys(props.crudFields)) {
             if (json.data && key in json.data) {
-                next[key] = json.data[key];
+                const field = props.fields.find((item) => item.key === key);
+                next[key] =
+                    field?.type === 'date' && json.data[key] ? String(json.data[key]).slice(0, 10) : json.data[key];
             }
         }
         form.value = next;
@@ -171,6 +171,15 @@ function firstError(field) {
                                     :min="field.min ?? undefined"
                                     :required="field.required ?? false"
                                     autocomplete="off"
+                                />
+
+                                <input
+                                    v-else-if="field.type === 'date'"
+                                    v-model="form[field.key]"
+                                    type="date"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': hasError(field.key) }"
+                                    :required="field.required ?? false"
                                 />
 
                                 <!-- color -->

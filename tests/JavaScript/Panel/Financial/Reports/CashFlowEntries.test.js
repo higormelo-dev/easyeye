@@ -116,6 +116,7 @@ const ROWS = [
         category_name: 'CONSULTAS',
         covenant_name: null,
         payment_method_label: null,
+        card_brand_label: 'Visa',
         type: 'income',
         status: 'paid',
         amount: 50,
@@ -230,6 +231,7 @@ describe('Financial/Reports/CashFlow — lista paginada', () => {
         // Sem código (legado): rótulo genérico, link para o dia do lançamento.
         expect(rows[1].find('[data-test="entry-open"]').attributes('aria-label')).toBe('Open in cash flow');
         expect(rows[1].find('[data-test="entry-open"]').attributes('href')).toBe(ROWS[1].cash_flow_url);
+        expect(rows[0].find('[data-test="entry-payment-method"]').text()).toBe('— · Visa');
 
         const pagination = w.find('[data-test="entries-pagination"]');
         expect(pagination.find('nav').attributes('aria-label')).toBe('Entries pagination');

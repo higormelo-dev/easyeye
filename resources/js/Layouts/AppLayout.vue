@@ -6,9 +6,10 @@ import logoSmallSvg from '@img/system/logo-small.svg';
 import logoWhiteSvg from '@img/system/logo-white.svg';
 import AiFloatingAssistant from '@/Components/Panel/AiFloatingAssistant.vue';
 import SubscriptionBanner from '@/Components/Panel/SubscriptionBanner.vue';
+import SupportButton from '@/Components/Panel/SupportButton.vue';
 import { usePanelTour } from '@/composables/usePanelTour.js';
 
-const props = defineProps({
+defineProps({
     title: { type: String, default: '' },
     breadcrumbs: { type: Array, default: () => [] },
 });
@@ -22,6 +23,7 @@ const locales = computed(() => page.props.locales ?? []);
 const flash = computed(() => page.props.flash ?? {});
 const entities = computed(() => auth.value.entities ?? []);
 const aiAssistant = computed(() => page.props.aiAssistant ?? { enabled: false });
+const support = computed(() => page.props.support ?? null);
 // Situação da assinatura (pagamento pendente/em atraso, acesso limitado,
 // trial terminando) — só empresa cliente no painel; null no resto.
 const subscriptionBanner = computed(() => page.props.subscriptionBanner ?? null);
@@ -72,10 +74,10 @@ function resetTimers() {
 }
 
 function showSessionWarning() {
-    if (warningShown || typeof Swal === 'undefined') return;
+    if (warningShown || typeof window.Swal === 'undefined') return;
     warningShown = true;
     let remaining = 120;
-    Swal.fire({
+    window.Swal.fire({
         title: window.translations?.messages?.session_expiring_title ?? 'Sessão expirando',
         icon: 'warning',
         showCancelButton: true,
@@ -86,10 +88,10 @@ function showSessionWarning() {
                 remaining--;
                 if (remaining <= 0) clearInterval(interval);
             }, 1000);
-            Swal.getPopup().__countdownInterval = interval;
+            window.Swal.getPopup().__countdownInterval = interval;
         },
         willClose() {
-            clearInterval(Swal.getPopup().__countdownInterval);
+            clearInterval(window.Swal.getPopup().__countdownInterval);
         },
     }).then((result) => {
         if (result.isConfirmed) {
@@ -350,6 +352,10 @@ onUnmounted(() => panelTour.stop());
                     <!-- Contextual top actions (ex.: IA em páginas clínicas) -->
                     <slot name="top-actions" />
 
+                    <div v-if="support" class="header-item me-2">
+                        <SupportButton :support="support" />
+                    </div>
+
                     <!-- Tour guiado: rever quando quiser -->
                     <div v-if="tourAvailable" class="header-item me-2" data-tour="help">
                         <button
@@ -600,6 +606,9 @@ onUnmounted(() => panelTour.stop());
                                         >
                                             <i :class="item.icon"></i>
                                             <span>{{ item.label }}</span>
+                                            <span v-if="item.badge" class="badge text-bg-danger rounded-pill ms-auto">{{
+                                                item.badge
+                                            }}</span>
                                             <span class="menu-arrow"></span>
                                         </a>
                                         <ul :style="isMenuOpen(item) ? 'display:block;' : ''">
@@ -624,6 +633,9 @@ onUnmounted(() => panelTour.stop());
                                         >
                                             <i :class="item.icon"></i>
                                             <span>{{ item.label }}</span>
+                                            <span v-if="item.badge" class="badge text-bg-danger rounded-pill ms-auto">{{
+                                                item.badge
+                                            }}</span>
                                         </a>
                                     </li>
                                 </template>

@@ -128,7 +128,10 @@ const sortTitle = (column) => tx('sort_by', { column });
                         </td>
                         <td class="d-none d-xl-table-cell small text-muted">{{ entry.category_name || '—' }}</td>
                         <td class="d-none d-lg-table-cell small text-nowrap" data-test="payment-method">
-                            {{ entry.payment_method_label || '—' }}
+                            {{ entry.payment_method_label || '—'
+                            }}<span v-if="entry.card_brand_label" class="text-muted">
+                                · {{ entry.card_brand_label }}</span
+                            >
                         </td>
                         <td class="d-none d-xl-table-cell text-nowrap" data-test="origin">
                             <span class="badge rounded badge-soft-secondary border fs-11 fw-medium">

@@ -12,6 +12,7 @@ import StockAlerts from './Dashboard/StockAlerts.vue';
 import SurgeryCard from './Dashboard/SurgeryCard.vue';
 import NextPatient from './Dashboard/NextPatient.vue';
 import DoctorPending from './Dashboard/DoctorPending.vue';
+import CovenantContractAlerts from './Dashboard/CovenantContractAlerts.vue';
 import WaitingRoom from './Dashboard/WaitingRoom.vue';
 import DoctorsToday from './Dashboard/DoctorsToday.vue';
 import ConfirmationsPanel from './Dashboard/ConfirmationsPanel.vue';
@@ -43,6 +44,7 @@ const props = defineProps({
     sections: { type: Array, default: () => ['kpis', 'trends', 'agenda', 'shortcuts', 'patients', 'stock'] },
     // Usuário médico sem cadastro de médico: painel vazio + aviso.
     doctorMissing: { type: Boolean, default: false },
+    covenantContracts: { type: Object, default: null },
     stats: { type: Object, required: true },
     scheduleToday: { type: Array, default: () => [] },
     recentPatients: { type: Array, default: () => [] },
@@ -284,6 +286,8 @@ function onRefresh() {
                     {{ t.doctor_missing_text }}
                 </div>
             </div>
+
+            <CovenantContractAlerts v-if="covenantContracts" :data="covenantContracts" :t="t" />
 
             <!-- ── Configure sua clínica (só com etapas obrigatórias pendentes) ── -->
             <Activation

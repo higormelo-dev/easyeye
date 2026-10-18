@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Setting;
 use App\DTOs\ActionPolicy;
 use App\Http\Controllers\Controller;
 use App\Services\BaseSettingService;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\{Builder, Model};
 use Illuminate\Foundation\Http\FormRequest;
@@ -223,10 +224,10 @@ abstract class BaseSettingController extends Controller
         $record = $this->service->findByIdOrCode($id);
 
         return response()->json([
-            'data' => array_intersect_key(
+            'data' => $this->dateOnlyValues($record, array_intersect_key(
                 $record->only(array_keys($this->crudFields)) + ['id' => $record->id, 'code' => $record->code],
                 array_flip(array_merge(array_keys($this->crudFields), ['id', 'code'])),
-            ),
+            )),
         ]);
     }
 
@@ -407,9 +408,33 @@ abstract class BaseSettingController extends Controller
             $data[$key] = $record->{$key};
         }
 
+        $data = $this->dateOnlyValues($record, $data);
+
         $data['deleted']    = $record->deleted_at !== null;
         $data['created_at'] = $record->created_at?->format('d/m/Y H:i');
         $data['is_global']  = $record->entity_id === null;
+
+        return $data;
+    }
+
+    /**
+     * Colunas com cast `date` saem como 'Y-m-d' no JSON (alimentam
+     * `<input type="date">`). Um Carbon cru serializaria em ISO 8601 UTC e o
+     * dia deslocaria em fusos a leste de UTC.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, mixed>
+     */
+    protected function dateOnlyValues(Model $record, array $data): array
+    {
+        foreach ($data as $key => $value) {
+            $cast = (string) ($record->getCasts()[$key] ?? '');
+
+            if ($value instanceof CarbonInterface && ($cast === 'date' || str_starts_with($cast, 'date:'))) {
+                $data[$key] = $value->format('Y-m-d');
+            }
+        }
 
         return $data;
     }

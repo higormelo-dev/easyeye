@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Financial;
 
-use App\Enums\{CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType, PaymentMethod};
+use App\Enums\{CardBrand, CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType, PaymentMethod};
 use App\Models\FinancialCashEntry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\{Rule, Validator};
@@ -55,6 +55,8 @@ class CashEntryRequest extends FormRequest
                 }),
             ],
             'payment_method' => ['nullable', Rule::enum(PaymentMethod::class)],
+            // Opcional mesmo com cartão; só aceita quando a forma usa cartão (after()).
+            'card_brand' => ['nullable', Rule::enum(CardBrand::class)],
             // Vínculo de sistema (App\Enums\CashEntryReferenceType): só o backend
             // define (recebimento de agendamento, guia, compra). Antes era
             // string livre + uuid sem escopo de clínica, gravados crus.
@@ -80,7 +82,7 @@ class CashEntryRequest extends FormRequest
      */
     public function after(): array
     {
-        return [function (Validator $validator): void {
+        return [$this->validateCardBrand(...), function (Validator $validator): void {
             $entry = $this->route('entry');
 
             if (! $entry instanceof FinancialCashEntry || ! self::isScheduleSplit($entry)) {
@@ -99,6 +101,26 @@ class CashEntryRequest extends FormRequest
                 $validator->errors()->add('payment_method', $message);
             }
         }];
+    }
+
+    /**
+     * Bandeira só com forma de pagamento de cartão. Num update sem `payment_method`
+     * vale a forma já gravada. Campo já recusado pela regra não ganha segundo erro.
+     */
+    private function validateCardBrand(Validator $validator): void
+    {
+        if (! $this->filled('card_brand') || $validator->errors()->hasAny(['card_brand', 'payment_method'])) {
+            return;
+        }
+
+        $entry  = $this->route('entry');
+        $method = $this->has('payment_method')
+            ? PaymentMethod::tryFrom((string) $this->input('payment_method'))
+            : ($entry instanceof FinancialCashEntry ? $entry->payment_method : null);
+
+        if ($method?->usesCard() !== true) {
+            $validator->errors()->add('card_brand', __('financial_cash_flow.card_brand_only_card'));
+        }
     }
 
     /** Lançamento da agenda com pagamento dividido entre dinheiro e cartão. */
@@ -139,7 +161,7 @@ class CashEntryRequest extends FormRequest
             }
         }
 
-        foreach (['type', 'status', 'payment_method'] as $field) {
+        foreach (['type', 'status', 'payment_method', 'card_brand'] as $field) {
             if ($this->has($field) && is_string($this->input($field))) {
                 $merge[$field] = mb_strtolower(trim($this->input($field)));
             }
@@ -165,9 +187,9 @@ class CashEntryRequest extends FormRequest
         }
 
         return match (mb_strtolower(trim($value))) {
-            '1', 'true', 'on', 'yes' => true,
+            '1', 'true', 'on', 'yes'  => true,
             '0', 'false', 'off', 'no' => false,
-            default => $value,
+            default                   => $value,
         };
     }
 }

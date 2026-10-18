@@ -147,8 +147,8 @@ it('as exportações HTTP entregam exatamente o que o SpreadsheetWriter gera', f
     ]);
 
     $rows = [
-        ['Data', 'Código', 'Descrição', 'Tipo', 'Status', 'Categoria', 'Convênio', 'Valor'],
-        ['10/08/2026', $entry->code, '=Consulta', 'Receita', 'Pago', 'Sem categoria', 'Sem convênio', 150.5],
+        ['Data', 'Código', 'Descrição', 'Tipo', 'Status', 'Categoria', 'Convênio', 'Valor', 'Forma de pagamento', 'Bandeira'],
+        ['10/08/2026', $entry->code, '=Consulta', 'Receita', 'Pago', 'Sem categoria', 'Sem convênio', 150.5, '', ''],
     ];
 
     $writer = app(SpreadsheetWriter::class);

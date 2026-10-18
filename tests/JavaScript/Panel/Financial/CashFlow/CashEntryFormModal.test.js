@@ -57,6 +57,8 @@ const t = {
     form_cancel: 'Cancel',
     form_payment_method: 'Payment method',
     form_payment_method_none: 'Not informed',
+    form_card_brand: 'Card brand',
+    form_card_brand_none: 'Not informed',
     form_covenant: 'Insurance',
     form_covenant_none: 'None',
     form_required: 'required',
@@ -83,9 +85,9 @@ const categories = [
 const covenants = [{ id: 'cov-1', name: 'UNIMED' }];
 
 const paymentMethods = [
-    { value: 'cash', label: 'À Vista' },
-    { value: 'credit', label: 'Crédito' },
-    { value: 'credit_cash', label: 'Crédito e Dinheiro' },
+    { value: 'cash', label: 'À Vista', uses_card: false },
+    { value: 'credit', label: 'Crédito', uses_card: true },
+    { value: 'credit_cash', label: 'Crédito e Dinheiro', uses_card: true },
 ];
 
 const row = {
@@ -219,6 +221,7 @@ describe('CashFlow/CashEntryFormModal — campos', () => {
             description: 'Consulta Maria',
             entry_date: '2026-06-10',
             payment_method: 'credit',
+            card_brand: '',
             category_id: 'cat-in',
             status: 'paid',
             covenant_id: 'cov-1',
@@ -523,5 +526,21 @@ describe('CashFlow/CashEntryFormModal — datas e erros', () => {
         await w.find('form').trigger('submit');
         await flushPromises();
         expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('mostra bandeira apenas para cartão e a limpa ao trocar a forma', async () => {
+        const w = mountModal({ cardBrands: [{ value: 'visa', label: 'Visa' }] });
+        await paymentSelect(w).setValue('credit');
+        expect(w.get('[data-test="card-brand-input"]').exists()).toBe(true);
+        await w.get('[data-test="card-brand-input"]').setValue('visa');
+        await paymentSelect(w).setValue('cash');
+        expect(w.find('[data-test="card-brand-input"]').exists()).toBe(false);
+
+        await amountInput(w).setValue('10');
+        await descriptionInput(w).setValue('Sem cartão');
+        await w.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(sentBody()).not.toHaveProperty('card_brand');
     });
 });
