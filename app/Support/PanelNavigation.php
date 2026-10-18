@@ -748,6 +748,13 @@ class PanelNavigation
                 'match' => ['manager.gateways.*'],
             ],
             [
+                'key'   => 'nfse',
+                'route' => 'manager.nfse.index',
+                'icon'  => 'ti ti-receipt',
+                'label' => __('actions.sidemenu.nfse'),
+                'match' => ['manager.nfse.*'],
+            ],
+            [
                 'key'   => 'report-settings',
                 'route' => 'manager.report-settings.index',
                 'icon'  => 'ti ti-file-description',

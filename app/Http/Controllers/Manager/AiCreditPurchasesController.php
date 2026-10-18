@@ -9,8 +9,10 @@ use App\Domains\AI\Services\{AiCreditPurchaseService, AiCreditWalletService, AiP
 use App\Enums\AI\{AiCreditPurchaseStatus, AiProvider};
 use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
+use App\Models\Billing\Invoice;
 use App\Models\Entity;
 use App\Services\Audit\AuditLogger;
+use App\Support\Fiscal\NfseManagerPresenter;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\{JsonResponse, Request};
@@ -153,7 +155,10 @@ class AiCreditPurchasesController extends Controller
                     'plan_name' => $purchase->subscription->plan?->name,
                 ] : null,
                 'wallet_after' => $this->walletService->balance((string) $purchase->entity_id),
+                // NFS-e do SaaS (contrato 13.3): a nota mais recente da fatura do pacote, com as ações permitidas.
+                'nfse' => $purchase->invoice_id ? (app(NfseManagerPresenter::class)->forInvoices(Invoice::query()->whereKey($purchase->invoice_id)->get())[(string) $purchase->invoice_id] ?? null) : null,
             ]),
+            't' => ['nfse' => trans('fiscal')],
         ]);
     }
 

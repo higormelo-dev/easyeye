@@ -9,7 +9,7 @@ use App\DTOs\Billing\{CardChargeDTO, CheckoutCardInput, CreateChargeDTO, CreateC
 use App\Enums\AI\AiCreditPurchaseStatus;
 use App\Enums\Billing\{BillingEventType, CheckoutMethod, InvoiceStatus, PaymentAttemptStatus, PaymentStatus};
 use App\Enums\{SubscriptionAccessLevel, SubscriptionBillingMode};
-use App\Events\Billing\InvoicePaid;
+use App\Events\Billing\{InvoiceFullyReversed, InvoicePaid};
 use App\Exceptions\Billing\{CheckoutException, GatewayIntegrationException, GatewayResolutionException};
 use App\Models\Billing\{Gateway, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Subscription, User};
@@ -1116,6 +1116,9 @@ class AiCreditPackCheckoutService
                 gatewayCode: $n->gatewayCode,
                 correlationId: $correlationId,
             );
+
+            // NFS-e do SaaS: pacote devolvido por inteiro (estorno ou chargeback) cancela a nota.
+            event(new InvoiceFullyReversed((string) $invoice->id, $refund ? InvoiceFullyReversed::REFUND : InvoiceFullyReversed::CHARGEBACK, $correlationId));
 
             return [$invoice, $payment, $refund ? 'ai_credits_refunded' : 'ai_credits_chargeback', []];
         }

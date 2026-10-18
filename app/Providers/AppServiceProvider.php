@@ -9,6 +9,7 @@ use App\Domains\AI\Repositories\{EloquentAiModelPriceRepository, EloquentAiRunPr
 use App\Domains\AI\Services\{AiCircuitBreakerService, AiProviderManager, AiProviderSettings};
 use App\Enums\AI\AiProvider;
 use App\Models\{Doctor, DoctorWorkSchedule, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, ScheduleBlock, Subscription};
+use App\Models\Fiscal\NfseCredential;
 use App\Models\WhatsApp\WhatsAppSetting;
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
@@ -358,6 +359,35 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(max(1, (int) config('whatsapp.webhook.rate_limit_per_minute', 1200)))
                 ->by('whatsapp-webhook:' . sha1($token));
+        });
+
+        // Webhook da Focus NFe (NFS-e do SaaS): balde por TOKEN da URL. Só a requisição com token E segredo certos conta no
+        // balde da credencial (a Focus retenta tudo que não for 2xx — um flood falso nunca pode gerar 429 para ela); token
+        // certo com segredo errado cai num balde pequeno por token; token desconhecido, num balde global fixo (o IP atrás
+        // do proxy é forjável, então não serve de chave).
+        RateLimiter::for('fiscal-webhook', static function (Request $r) {
+            $token = (string) $r->route('token');
+            $match = null;
+
+            foreach (NfseCredential::query()->get() as $credential) {
+                if (hash_equals((string) $credential->webhook_token, $token)) {
+                    $match = $credential;
+                }
+            }
+
+            if ($match === null) {
+                return Limit::perMinute(max(1, (int) config('fiscal.webhook.unknown_rate_limit_per_minute', 60)))
+                    ->by('fiscal-webhook:unknown');
+            }
+
+            $sent = (string) $r->header((string) config('fiscal.webhook.header', 'X-FocusNfe-Secret'), '');
+
+            if ((string) $match->webhook_secret === '' || ! hash_equals((string) $match->webhook_secret, $sent)) {
+                return Limit::perMinute(30)->by('fiscal-webhook:invalid:' . sha1($token));
+            }
+
+            return Limit::perMinute(max(1, (int) config('fiscal.webhook.rate_limit_per_minute', 120)))
+                ->by('fiscal-webhook:' . sha1($token));
         });
 
         RateLimiter::for(

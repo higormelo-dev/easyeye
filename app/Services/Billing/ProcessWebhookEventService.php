@@ -6,6 +6,7 @@ use App\Contracts\Billing\PaymentGatewayInterface;
 use App\DTOs\Billing\{GatewayWebhookInputDTO, NormalizedWebhookEventDTO};
 use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentStatus, WebhookEventStatus};
 use App\Enums\{BillingCycle, SubscriptionBillingMode, SubscriptionStatus};
+use App\Events\Billing\InvoiceFullyReversed;
 use App\Jobs\Billing\CancelGatewayChargeJob;
 use App\Models\Billing\{HostedCheckout, Invoice, Payment, WebhookEvent};
 use App\Models\{Entity, Subscription};
@@ -463,8 +464,17 @@ class ProcessWebhookEventService
             if ($payment !== null) {
                 $this->refunds->markFullyRefunded($payment);
             }
+
+            // NFS-e do SaaS: estorno total cancela a nota (fila, depois do commit — o webhook não depende da Focus).
+            if ($invoice !== null) {
+                event(new InvoiceFullyReversed((string) $invoice->id, InvoiceFullyReversed::REFUND, $correlationId));
+            }
         } elseif (in_array($eventType, self::CHARGEBACK_TYPES, true)) {
             $outcome = $this->applyChargeback($subscription, $invoice, $payment, $governed, $correlationId);
+
+            if ($invoice !== null) {
+                event(new InvoiceFullyReversed((string) $invoice->id, InvoiceFullyReversed::CHARGEBACK, $correlationId));
+            }
         } elseif (in_array($eventType, self::CHARGE_CREATED_TYPES, true)) {
             $outcome = $invoice ? 'charge_synced' : 'ignored';
         }

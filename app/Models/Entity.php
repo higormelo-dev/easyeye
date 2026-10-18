@@ -41,6 +41,8 @@ class Entity extends Model
         'district',
         'city',
         'state',
+        // Código IBGE (7 dígitos) do município — endereço do tomador na NFS-e do SaaS.
+        'ibge_code',
         'country',
         'national_registration',
         'cnes',
@@ -91,6 +93,7 @@ class Entity extends Model
     protected array $numericOnlyFields = [
         'telephone',
         'cellphone',
+        'ibge_code',
     ];
 
     /**

@@ -85,3 +85,13 @@ ou em revisão. Divergência suspende (ou retira) a versão e faz o comando falh
 
 **Vencimento** — datas persistidas de uma tarefa: `invite_from` (começa a poder convidar),
 `due_at` (devido), `overdue_from` (vencido, após a tolerância) e `lost_from` (perdido de vista).
+
+**NFS-e** — Nota Fiscal de Serviço Eletrônica. No EasyEye só a dona do SaaS emite (via Focus NFe) para cada fatura paga de uma clínica; padrão **municipal** (`/v2/nfse`) ou **nacional** (`/v2/nfsen`, DPS).
+
+**DPS** — Declaração de Prestação de Serviço: o pedido de emissão do padrão nacional. Leva `serie_dps` e `numero_dps`, reservados pelo EasyEye sob trava e congelados na nota.
+
+**Prestador / tomador** — prestador é a empresa dona do SaaS (global, configurada em Manager → Nota fiscal); tomador é a clínica que pagou a fatura (dados congelados na nota em `payer_snapshot`).
+
+**Ref (NFS-e)** — identificador da nota na Focus: UUID da linha `nfse_documents` sem hífens, em maiúsculas; nasce uma vez e vale no envio, na consulta, no cancelamento e no e-mail. Reemissão depois de erro cria linha e ref novas.
+
+**Nota "ocupando" a fatura** — nota a caminho (`pending_send`, `processando_autorizacao`) ou valendo (`autorizado`). No máximo uma por fatura (índice único parcial); erro, falha de envio e cancelada não ocupam.

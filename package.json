@@ -14,7 +14,10 @@
         "format:check": "prettier --check .",
         "tinymce:install": "rm -rf public/vendor/tinymce public/vendor/tinymce-langs && mkdir -p public/vendor/tinymce public/vendor/tinymce-langs/langs7 && cp -r node_modules/tinymce/. public/vendor/tinymce/ && cp node_modules/tinymce-i18n/langs7/pt_BR.js public/vendor/tinymce-langs/langs7/",
         "postinstall": "npm run tinymce:install",
-        "prepare": "lefthook install --force"
+        "prepare": "lefthook install --force",
+        "quality:rules": "node scripts/verify-quality-rules.mjs ./eslint-rules/index.cjs",
+        "lint:quality": "eslint . --config eslint.quality.config.js",
+        "verify": "npm run lint && npm run quality:rules && npm test && npm run build"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

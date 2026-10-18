@@ -11,6 +11,7 @@ use App\Exceptions\Billing\{CheckoutException, GatewayIntegrationException, Gate
 use App\Models\Billing\{Gateway, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
 use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PayerDocument, PlanPricing};
+use App\Support\Fiscal\NfseManagerPresenter;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -101,6 +102,8 @@ class CheckoutService
             ->get();
 
         $open = $billable ? $this->payableInvoices($billable) : collect();
+        // `nfse` por fatura (NFS-e do SaaS): só autorizada/cancelada, com PDF e XML (rota autenticada da clínica).
+        $nfse = app(NfseManagerPresenter::class)->clinicBlocks($invoices);
 
         // Pedidos de pacote de créditos de IA em aberto (fatura sem
         // assinatura): pagos pelo mesmo checkout, com as formas do gateway do
@@ -116,7 +119,7 @@ class CheckoutService
             'subscription'  => $current ? $this->subscriptionRow($current, $billable !== null) : null,
             'open_invoices' => $open->map(fn (Invoice $invoice) => $row($invoice, true))->values()->all(),
             'open_ai_packs' => $openPacks->map(fn (Invoice $invoice) => $row($invoice, true))->values()->all(),
-            'invoices'      => $invoices->map(fn (Invoice $invoice) => $row($invoice, $open->contains('id', $invoice->id) || $openPacks->contains('id', $invoice->id)))->values()->all(),
+            'invoices'      => $invoices->map(fn (Invoice $invoice) => $row($invoice, $open->contains('id', $invoice->id) || $openPacks->contains('id', $invoice->id)) + ['nfse' => $nfse[(string) $invoice->id] ?? null])->values()->all(),
             'payment'       => $gateway ? $this->gatewayOptions($gateway, $billable) : null,
             'plans'         => $this->sellablePlans(),
             'checkout'      => $this->checkoutSettings(),

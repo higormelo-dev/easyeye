@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\{ClinicResourcesController,
 use App\Http\Controllers\Api\{EquipmentOperationReceiptController, OfflineSnapshotController};
 use App\Http\Controllers\Api\{GupshupWebhookController, ReceiptReconciliationController};
 use App\Http\Controllers\Billing\WebhookController;
+use App\Http\Controllers\Fiscal\FocusNfeWebhookController;
 use App\Http\Middleware\IntegratorEquipmentOperation;
 use Illuminate\Support\Facades\Route;
 
@@ -89,3 +90,10 @@ Route::post('billing/webhooks/{gateway}', WebhookController::class)
 Route::post('whatsapp/gupshup/webhook/{token}', GupshupWebhookController::class)
     ->name('whatsapp.gupshup.webhook')
     ->middleware('throttle:whatsapp-webhook');
+
+// Webhook da Focus NFe (NFS-e do SaaS): avisos de mudança de status da nota. Rota pública idempotente, sem sessão — token
+// aleatório na URL + segredo no cabeçalho (comparados em tempo constante), 2xx imediato e processamento na fila. Limite
+// por TOKEN (não por IP), ver RateLimiter "fiscal-webhook" no AppServiceProvider e FocusNfeWebhookController.
+Route::post('fiscal/focusnfe/webhook/{token}', FocusNfeWebhookController::class)
+    ->name('fiscal.focusnfe.webhook')
+    ->middleware('throttle:fiscal-webhook');

@@ -1,0 +1,36 @@
+{
+    "data_emissao": "2026-10-18T14:30:00-03:00",
+    "natureza_operacao": "1",
+    "optante_simples_nacional": true,
+    "prestador": {
+        "cnpj": "11222333000181",
+        "inscricao_municipal": "12345678",
+        "codigo_municipio": "3550308"
+    },
+    "tomador": {
+        "cnpj": "11444777000161",
+        "razao_social": "CLINICA OFTALMO TESTE",
+        "email": "financeiro@clinica.test",
+        "telefone": "11999998888",
+        "endereco": {
+            "logradouro": "AVENIDA PAULISTA",
+            "numero": "1000",
+            "complemento": "SALA 12",
+            "bairro": "BELA VISTA",
+            "codigo_municipio": "3550308",
+            "uf": "SP",
+            "cep": "01310100"
+        }
+    },
+    "servico": {
+        "valor_servicos": 199.9,
+        "iss_retido": false,
+        "item_lista_servico": "01.07",
+        "discriminacao": "Assinatura do plano Plano Pro (Mensal) — período 01/10/2026 a 31/10/2026 — fatura INV-001",
+        "codigo_municipio": "3550308",
+        "codigo_tributario_municipio": "62015",
+        "codigo_cnae": "6201501",
+        "aliquota": 0.05,
+        "base_calculo": 199.9
+    }
+}

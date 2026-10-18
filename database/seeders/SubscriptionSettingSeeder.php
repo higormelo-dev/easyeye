@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\SubscriptionSetting;
+use App\Support\Fiscal\NfseSettings;
 use Illuminate\Database\Seeder;
 
 class SubscriptionSettingSeeder extends Seeder
@@ -31,5 +32,8 @@ class SubscriptionSettingSeeder extends Seeder
                 $setting,
             );
         }
+
+        // NFS-e do SaaS (Manager → Nota fiscal): só cria o que falta, nunca sobrescreve o que o dono já digitou.
+        NfseSettings::ensureDefaults();
     }
 }

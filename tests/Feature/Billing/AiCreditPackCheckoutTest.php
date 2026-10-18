@@ -7,7 +7,7 @@ use App\Domains\AI\Services\{AiCreditPurchaseService, AiCreditWalletService};
 use App\Enums\AI\AiCreditPurchaseStatus;
 use App\Enums\Billing\{InvoiceStatus, PaymentStatus};
 use App\Enums\{BillingCycle, ClientRule, FeatureKey, SubscriptionBillingMode, SubscriptionStatus};
-use App\Events\Billing\InvoicePaid;
+use App\Events\Billing\{InvoiceFullyReversed, InvoicePaid};
 use App\Models\Billing\{BillingLog, FinancialEvent};
 use App\Models\Billing\{Invoice, Payment, WebhookEvent};
 use App\Models\{Entity, Plan, PlanFeature, PlanPrice, Subscription, User};
@@ -337,6 +337,19 @@ describe('estorno, chargeback e pedido cancelado pelo manager', function () {
             ->and(packBalance())->toBe(0)
             ->and($event->fresh()->normalized_payload['outcome'])->toBe('ai_credits_chargeback');
     });
+
+    it('estorno e chargeback do pacote anunciam a devolução da fatura (NFS-e do SaaS cancela a nota)', function (string $gatewayStatus, string $reason) {
+        Event::fake([InvoiceFullyReversed::class]);
+
+        [$invoice] = packPaidByWebhook($gatewayStatus);
+
+        Event::assertNotDispatched(InvoiceFullyReversed::class);
+
+        app(ProcessWebhookEventService::class)->process(packWebhook('901', 'evt-reversal'));
+
+        Event::assertDispatchedTimes(InvoiceFullyReversed::class, 1);
+        Event::assertDispatched(InvoiceFullyReversed::class, fn ($e) => $e->invoiceId === $invoice->id && $e->reason === $reason);
+    })->with([['refunded', 'refund'], ['charged_back', 'chargeback']]);
 
     it('pedido cancelado pelo manager e depois pago: o dinheiro entrou — reabre e credita', function () {
         packPaidSubscription();

@@ -55,10 +55,17 @@ def reasons(command: str) -> list[str]:
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError, RecursionError):
         return 0
 
-    command = (payload.get("tool_input") or {}).get("command") or ""
+    # `null`, listas e strings são JSON válido, mas não são um evento de hook.
+    if not isinstance(payload, dict):
+        return 0
+
+    tool_input = payload.get("tool_input")
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    if not isinstance(command, str):
+        return 0
     found = reasons(command)
     if not found:
         return 0

@@ -38,6 +38,17 @@ return [
         'network'         => 'Sem conexão com o servidor. Verifique a internet e tente de novo.',
         'unknown'         => 'Algo deu errado. Tente de novo.',
     ],
+
+    'nfse' => [
+        'title'      => 'Nota fiscal (NFS-e)',
+        'number'     => 'Número',
+        'pdf'        => 'Baixar PDF',
+        'xml'        => 'Baixar XML',
+        'cancel_xml' => 'Baixar XML do cancelamento',
+        'cancelled'  => 'Cancelada',
+        'download'   => 'Baixar nota fiscal',
+        'error'      => 'Não foi possível carregar a nota fiscal agora.',
+    ],
     // Motivo da recusa do cartão (gateways → card_declined :reason).
     'decline' => [
         'insufficient_funds'     => 'Cartão sem limite suficiente.',

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue';
+import NfseBlock from '@/Pages/Panel/Manager/Subscriptions/NfseBlock.vue';
 
 /**
  * Modal de detalhes do pedido de compra de créditos IA (painel manager).
@@ -333,6 +334,7 @@ function close() {
                                         </dd>
                                     </template>
                                 </dl>
+                                <NfseBlock :nfse="source.nfse" :t="t?.nfse ?? {}" @updated="loadDetail" />
                             </div>
 
                             <!-- Tab: Linha do tempo -->

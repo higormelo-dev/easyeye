@@ -36,6 +36,7 @@ use App\Http\Controllers\Manager\{
     SubscriptionsController,
     WhatsAppController
 };
+use App\Http\Controllers\Manager\{NfseDocumentsController, NfseSettingsController};
 use Illuminate\Support\Facades\Route;
 
 // ── Painel administrativo do SaaS ─────────────────────────────────────────────
@@ -275,6 +276,46 @@ Route::group([
         // Sem "acesso por clínica": os gateways são só do dono do SaaS, para
         // cobrar as clínicas (assinatura e pacotes de IA). Clínica não tem
         // gateway próprio nem recebe pagamento por eles.
+    });
+
+    // ── Nota fiscal (NFS-e do SaaS via Focus NFe) ────────────────────────────────
+    // Página e consultas: admin e financial (as seções de configuração só aparecem a quem tem can_settings). Cada ação
+    // confere o Gate dela (saas.financial emite/reenvia/consulta; saas.admin-panel configura, cancela e mexe em credencial).
+    Route::middleware('saas.role:admin,financial')->group(function () {
+        Route::get('nfse', [NfseSettingsController::class, 'index'])->name('nfse.index');
+        Route::get('nfse/municipality', [NfseSettingsController::class, 'municipality'])
+            ->middleware('throttle:manager-read')
+            ->name('nfse.municipality');
+        Route::get('nfse/municipalities', [NfseSettingsController::class, 'searchMunicipalities'])
+            ->middleware('throttle:manager-read')
+            ->name('nfse.municipalities.search');
+        Route::get('nfse/documents/{document}/xml', [NfseDocumentsController::class, 'xml'])
+            ->whereUuid('document')->middleware('throttle:manager-read')->name('nfse.documents.xml');
+        Route::get('nfse/documents/{document}/cancel-xml', [NfseDocumentsController::class, 'cancelXml'])
+            ->whereUuid('document')->middleware('throttle:manager-read')->name('nfse.documents.cancel-xml');
+        Route::post('nfse/invoices/{invoice}/issue', [NfseDocumentsController::class, 'issue'])
+            ->whereUuid('invoice')->middleware('throttle:manager-destructive')->name('nfse.invoices.issue');
+        Route::post('nfse/documents/{document}/resend-email', [NfseDocumentsController::class, 'resendEmail'])
+            ->whereUuid('document')->middleware('throttle:manager-destructive')->name('nfse.documents.resend-email');
+        Route::post('nfse/documents/{document}/sync', [NfseDocumentsController::class, 'sync'])
+            ->whereUuid('document')->middleware('throttle:manager-destructive')->name('nfse.documents.sync');
+    });
+
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::put('nfse/settings', [NfseSettingsController::class, 'update'])->middleware('throttle:manager-destructive')->name('nfse.settings.update');
+        Route::post('nfse/credentials/{environment}', [NfseSettingsController::class, 'storeCredential'])
+            ->whereIn('environment', ['homologacao', 'producao'])->middleware('throttle:manager-destructive')->name('nfse.credentials.store');
+        Route::post('nfse/credentials/{environment}/test', [NfseSettingsController::class, 'testCredential'])
+            ->whereIn('environment', ['homologacao', 'producao'])->middleware('throttle:manager-destructive')->name('nfse.credentials.test');
+        Route::post('nfse/hooks', [NfseSettingsController::class, 'storeHook'])->middleware('throttle:manager-destructive')->name('nfse.hooks.store');
+        Route::delete('nfse/hooks/{environment}', [NfseSettingsController::class, 'destroyHook'])
+            ->whereIn('environment', ['homologacao', 'producao'])->middleware('throttle:manager-destructive')->name('nfse.hooks.destroy');
+        Route::put('nfse/entities/{entity}/ibge-code', [NfseSettingsController::class, 'updateEntityIbgeCode'])
+            ->whereUuid('entity')->middleware('throttle:manager-destructive')->name('nfse.entities.ibge-code');
+        Route::post('nfse/documents/{document}/cancel', [NfseDocumentsController::class, 'cancel'])
+            ->whereUuid('document')->middleware('throttle:manager-destructive')->name('nfse.documents.cancel');
+        Route::post('nfse/documents/{document}/mark-cancelled-externally', [NfseDocumentsController::class, 'markCancelledExternally'])
+            ->whereUuid('document')->middleware('throttle:manager-destructive')->name('nfse.documents.mark-cancelled-externally');
     });
 
     // ── Assinaturas — admin ou financial (operação de cobrança) ────────────────

@@ -160,8 +160,9 @@ return Application::configure(basePath: dirname(__DIR__))
             Integration::handles($exceptions);
         }
 
-        // Token/cartão criptografado do checkout nunca volta para a sessão.
-        $exceptions->dontFlash(['card_token']);
+        // Token/cartão criptografado do checkout e as credenciais da Focus NFe (Manager → Nota fiscal) nunca voltam para a sessão
+        // (a sessão não é cifrada em todos os drivers e a validação falha com redirect + input flashed).
+        $exceptions->dontFlash(['card_token', 'token', 'master_token', 'webhook_secret']);
 
         // Link do Revisor Clínico adulterado ou com a assinatura vencida: a MESMA página
         // genérica de qualquer outro problema do link (id, token, prazo, revogação) — a

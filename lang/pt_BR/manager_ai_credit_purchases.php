@@ -236,6 +236,20 @@ return [
         'empty'     => 'Sem eventos registrados.',
     ],
 
+    'nfse' => [
+        'title'                  => 'Nota fiscal (NFS-e)', 'number' => 'Número', 'status' => 'Situação',
+        'download_pdf'           => 'Baixar PDF', 'download_xml' => 'Baixar XML',
+        'download_cancel_xml'    => 'Baixar XML do cancelamento', 'view_mirror' => 'Ver espelho da nota',
+        'issue'                  => 'Emitir nota fiscal',
+        'cancel'                 => 'Cancelar nota fiscal', 'mark_cancelled' => 'Marcar como cancelada externamente',
+        'resend_email'           => 'Reenviar por e-mail', 'sync' => 'Sincronizar situação',
+        'partial_refund_warning' => 'Este estorno parcial não cancela a NFS-e já emitida.',
+        'justification'          => 'Justificativa', 'reason' => 'Motivo', 'emails' => 'E-mails destinatários',
+        'emails_hint'            => 'Separe os e-mails por vírgula.', 'save' => 'Salvar', 'close' => 'Fechar',
+        'cancel_validation'      => 'A justificativa deve ter entre 15 e 255 caracteres.',
+        'reason_validation'      => 'O motivo deve ter entre 20 e 255 caracteres.',
+    ],
+
     'errors' => [
         'ai_credit_purchase_not_creditable'  => 'Pedido não está em estado pendente — não pode ser creditado.',
         'ai_credit_purchase_not_cancellable' => 'Pedido não está em estado pendente — não pode ser cancelado.',
