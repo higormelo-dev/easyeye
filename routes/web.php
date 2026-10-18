@@ -75,7 +75,7 @@ use App\Http\Controllers\{
     SiteLegalController,
     SubscriptionExpiredController,
 };
-use App\Http\Controllers\Billing\CheckoutController;
+use App\Http\Controllers\Billing\{CheckoutController, NfseDownloadController};
 use App\Http\Controllers\{CallPanelDisplayController, DoctorDocumentTemplatesController, MedicalRecordExamKitsController, MedicationPresetsController};
 use App\Http\Controllers\{Cid10SearchController, CovenantPlanSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
@@ -238,6 +238,9 @@ Route::group(
                 Route::post('ai-credits', [CheckoutController::class, 'aiCreditPurchase'])->middleware('throttle:billing-checkout-pay')->name('ai-credits.purchase');
                 // Descartar o pedido de pacote ainda não pago (cancela a cobrança no gateway quando possível).
                 Route::delete('ai-credits/{invoice}', [CheckoutController::class, 'aiCreditDiscard'])->middleware('throttle:billing-checkout-pay')->name('ai-credits.discard');
+                // NFS-e do SaaS emitida para a clínica: XML pela rota autenticada (nunca URL pública nem token no navegador).
+                Route::get('nfse/{document}/xml', [NfseDownloadController::class, 'xml'])->whereUuid('document')->middleware('throttle:billing-checkout-read')->name('nfse.xml');
+                Route::get('nfse/{document}/cancel-xml', [NfseDownloadController::class, 'cancelXml'])->whereUuid('document')->middleware('throttle:billing-checkout-read')->name('nfse.cancel-xml');
             });
 
         Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');

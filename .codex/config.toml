@@ -1,0 +1,6 @@
+# Configuração do Codex neste projeto (carregada só em projeto confiável).
+# Context7 fornece documentação atual de bibliotecas; nunca envie segredos,
+# código privado nem dados de pacientes nas consultas.
+# Autenticação, modelo e permissões da máquina ficam no ~/.codex/config.toml.
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"

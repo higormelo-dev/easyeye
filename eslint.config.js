@@ -86,6 +86,31 @@ export default defineConfig([
         },
     },
 
+    // The e2e package has no type:module; these files use bundled CommonJS.
+    // Keep this precise: other specs declare their own globals inline.
+    {
+        name: 'easyeye/cypress-commonjs',
+        files: [
+            'e2e/cypress/support/e2e.js',
+            'e2e/cypress/support/commands.js',
+            'e2e/cypress/support/billing.js',
+            'e2e/cypress/e2e/docs/billing-manual.cy.js',
+        ],
+        languageOptions: {
+            globals: globals.node,
+        },
+    },
+
+    // Local Node rule modules and their self-check use the same recommended gate.
+    {
+        name: 'easyeye/quality-tooling',
+        files: ['eslint-rules/**/*.cjs', 'scripts/verify-quality-rules.mjs'],
+        extends: [js.configs.recommended],
+        languageOptions: {
+            globals: globals.node,
+        },
+    },
+
     // Node: configs e scripts.
     {
         name: 'easyeye/node',

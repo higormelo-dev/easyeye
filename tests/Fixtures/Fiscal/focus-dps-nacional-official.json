@@ -1,0 +1,20 @@
+{
+    "data_emissao": "2025-01-01T07:30:00-0300",
+    "serie_dps": 1,
+    "numero_dps": 1,
+    "data_competencia": "2025-01-01",
+    "emitente_dps": 1,
+    "codigo_municipio_emissora": 4106902,
+    "cnpj_prestador": "12345678000123",
+    "nif_prestador": "123456789",
+    "codigo_opcao_simples_nacional": 1,
+    "regime_especial_tributacao": 0,
+    "cnpj_tomador": "12345678000123",
+    "cpf_tomador": "12345678000123",
+    "nif_tomador": "1234567890",
+    "codigo_municipio_prestacao": 4106902,
+    "codigo_tributacao_nacional_iss": "010701",
+    "descricao_servico": "Nota emitida em caráter de TESTE",
+    "valor_servico": 1,
+    "tributacao_iss": 1
+}

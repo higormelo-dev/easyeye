@@ -9,6 +9,7 @@ import { choice } from '@/utils/billingPeriods.js';
 import SubscriptionHistory from './SubscriptionHistory.vue';
 import ReasonField from '@/Components/Panel/ReasonField.vue';
 import PaymentRefundModal from './PaymentRefundModal.vue';
+import NfseBlock from './NfseBlock.vue';
 import { useSubscriptionPresenter } from './useSubscriptionPresenter.js';
 
 const props = defineProps({
@@ -231,6 +232,11 @@ function openRefund(payment, invoice) {
 
 async function onRefunded(msg) {
     refund.value = { ...refund.value, open: false, done: msg };
+    invoicesLoaded.value = false;
+    await loadInvoices();
+}
+
+async function refreshInvoicesAfterNfse() {
     invoicesLoaded.value = false;
     await loadInvoices();
 }
@@ -788,6 +794,13 @@ const tabs = computed(() => [
                                     charge.error
                                 }}</span>
                             </div>
+
+                            <NfseBlock
+                                v-if="inv.nfse"
+                                :nfse="inv.nfse"
+                                :t="t.nfse ?? {}"
+                                @updated="refreshInvoicesAfterNfse"
+                            />
 
                             <div v-if="inv.payments && inv.payments.length > 0" class="mt-2 border-top pt-2">
                                 <div class="fw-semibold text-body mb-1">{{ t.invoice_payments }}</div>

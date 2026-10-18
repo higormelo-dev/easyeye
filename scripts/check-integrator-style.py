@@ -2,6 +2,9 @@
 import os
 import subprocess
 
+# Always exercise the local rules, even when this revision changes no JS/Vue.
+subprocess.run(['node', 'scripts/verify-quality-rules.mjs', './eslint-rules/index.cjs'], check=True)
+
 base = os.environ.get('CI_BASE_SHA', '')
 if not base or set(base) == {'0'}:
     base = 'HEAD^'

@@ -7,6 +7,7 @@ import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import CheckoutFlow from '@/Components/Billing/CheckoutFlow.vue';
 import ReplaceCardFlow from '@/Components/Billing/ReplaceCardFlow.vue';
 import AiCreditPackCheckout from '@/Components/Billing/AiCreditPackCheckout.vue';
+import NfseInvoiceLinks from '@/Components/Billing/NfseInvoiceLinks.vue';
 import { checkoutError, createCheckoutApi, newIdempotencyKey, panelEndpoints } from '@/Support/billing/checkoutApi.js';
 import { useBillingRealtime } from '@/composables/useBillingRealtime.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
@@ -853,6 +854,7 @@ watch(
                                             data-test="history-ai-pack"
                                             >{{ invoiceLabel(invoice) }}</span
                                         >
+                                        <NfseInvoiceLinks :nfse="invoice.nfse" :t="t.nfse ?? {}" />
                                     </td>
                                     <td class="small">
                                         <template v-if="invoice.period_start">{{
@@ -902,6 +904,7 @@ watch(
                             <div v-if="invoice.paid_at" class="small text-muted">
                                 {{ pt.col_paid_at }}: {{ dateTime(invoice.paid_at) }}
                             </div>
+                            <NfseInvoiceLinks :nfse="invoice.nfse" :t="t.nfse ?? {}" />
                             <button
                                 v-if="canPay(invoice)"
                                 type="button"

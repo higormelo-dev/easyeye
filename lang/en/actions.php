@@ -293,6 +293,7 @@ return [
         'subscriptions'            => 'Subscriptions',
         'plans_subscriptions'      => 'Plans & subscriptions',
         'gateways'                 => 'Gateways',
+        'nfse'                     => 'Invoices (NFS-e)',
         'users'                    => 'Users',
         'ai_assistant'             => 'AI Assistant',
         'ai_usage'                 => 'Usage & dashboard',

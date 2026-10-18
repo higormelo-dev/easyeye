@@ -1,0 +1,64 @@
+# Nunca indexar segredos, dependências, gerados nem material de agentes.
+# Adaptado de templates/project/.graphifyignore.example para Laravel + Vue.
+.git/
+node_modules/
+vendor/
+coverage/
+graphify-out/
+
+# Segredos e credenciais
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+auth.json
+credentials.json
+.aws/
+.mcp.json
+*.env.bak*
+*.sql
+*.dump
+*.sqlite
+*.sqlite3
+*.csv
+
+# Gerados, caches e dados de execução
+storage/
+bootstrap/cache/
+bootstrap/ssr/
+public/build/
+public/vendor/
+public/storage/
+public/system/
+public/site/
+_ide_helper.php
+_ide_helper_models.php
+*.log
+*.tsbuildinfo
+e2e/cypress/results/
+e2e/cypress/.sandbox-run/
+e2e/results/
+
+# Lockfiles
+composer.lock
+package-lock.json
+e2e/package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Instruções, skills e estado local de agentes (não são código do produto)
+.agent/
+.agents/
+.claude/
+.codex/
+.cursor/
+.maestri/
+.impeccable/
+.rtk/
+.github/skills/
+openspec/
+
+# Evidências e relatórios volumosos
+docs/internal/auditorias/**/evidencias/

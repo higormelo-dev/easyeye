@@ -232,6 +232,20 @@ return [
         'empty'     => 'No events recorded.',
     ],
 
+    'nfse' => [
+        'title'                  => 'Service invoice (NFS-e)', 'number' => 'Number', 'status' => 'Status',
+        'download_pdf'           => 'Download PDF', 'download_xml' => 'Download XML',
+        'download_cancel_xml'    => 'Download cancellation XML', 'view_mirror' => 'View invoice copy',
+        'issue'                  => 'Issue service invoice',
+        'cancel'                 => 'Cancel service invoice', 'mark_cancelled' => 'Mark as externally cancelled',
+        'resend_email'           => 'Resend by e-mail', 'sync' => 'Synchronize status',
+        'partial_refund_warning' => 'This partial refund does not cancel the service invoice already issued.',
+        'justification'          => 'Justification', 'reason' => 'Reason', 'emails' => 'Recipient e-mails',
+        'emails_hint'            => 'Separate e-mail addresses with commas.', 'save' => 'Save', 'close' => 'Close',
+        'cancel_validation'      => 'The justification must have between 15 and 255 characters.',
+        'reason_validation'      => 'The reason must have between 20 and 255 characters.',
+    ],
+
     'errors' => [
         'ai_credit_purchase_not_creditable'  => 'Purchase is not in pending state — cannot be credited.',
         'ai_credit_purchase_not_cancellable' => 'Purchase is not in pending state — cannot be cancelled.',

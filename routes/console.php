@@ -282,3 +282,18 @@ Schedule::command('surgery:expire-authorizations')
     ->dailyAt('00:25')
     ->name('surgery:expire-authorizations')
     ->withoutOverlapping();
+
+// NFS-e do SaaS (Manager → Nota fiscal): emite a nota das faturas pagas que ficaram sem ela (listener que falhou,
+// emissão automática ligada depois do pagamento, cadastro corrigido). Só age com a emissão automática ligada; no máximo
+// 3 notas por fatura e nunca nota cancelada. `--dry-run` mostra o que faria.
+Schedule::command('fiscal:nfse-reissue')
+    ->dailyAt('05:10')
+    ->name('fiscal:nfse-reissue')
+    ->withoutOverlapping();
+
+// NFS-e do SaaS: rede de segurança do webhook da Focus. Consulta as notas paradas em "processando" e reenfileira o envio
+// das que nunca saíram (job perdido). A Focus retenta o webhook por até 48 h; depois disso só a consulta direta resolve.
+Schedule::command('fiscal:nfse-sync')
+    ->everyTenMinutes()
+    ->name('fiscal:nfse-sync')
+    ->withoutOverlapping();

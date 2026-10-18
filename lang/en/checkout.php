@@ -38,6 +38,17 @@ return [
         'network'         => 'No connection to the server. Check your internet and try again.',
         'unknown'         => 'Something went wrong. Please try again.',
     ],
+
+    'nfse' => [
+        'title'      => 'Service invoice (NFS-e)',
+        'number'     => 'Number',
+        'pdf'        => 'Download PDF',
+        'xml'        => 'Download XML',
+        'cancel_xml' => 'Download cancellation XML',
+        'cancelled'  => 'Cancelled',
+        'download'   => 'Download service invoice',
+        'error'      => 'The service invoice could not be loaded right now.',
+    ],
     // Card decline reason (gateways → card_declined :reason).
     'decline' => [
         'insufficient_funds'     => 'Insufficient card limit.',

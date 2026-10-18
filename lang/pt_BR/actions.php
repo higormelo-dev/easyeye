@@ -293,6 +293,7 @@ return [
         'subscriptions'         => 'Assinaturas',
         'plans_subscriptions'   => 'Planos e assinaturas',
         'gateways'              => 'Gateways',
+        'nfse'                  => 'Nota fiscal (NFS-e)',
         'users'                 => 'Usuários',
         'ai_assistant'          => 'Assistente de IA',
         'ai_usage'              => 'Consumo & dashboard',

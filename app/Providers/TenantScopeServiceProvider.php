@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Domains\AI\Models\{AiCircuitBreaker, AiCreditLedgerEntry, AiCreditPurchase, AiCreditWallet, AiDoctorPrompt, AiRunFeedback};
 use App\Models\{AdditionType, AuditLog, BillingBatch, BillingClaim, CashClose, ClinicResource, ColorVisionType, Covenant, CovenantPlan, CoverTestType, DataAccessLog, EntityActivation, ExamType, FeatureUsage, FinancialCashEntry, FinancialCategory, Indication, IrisType, Lense, LgpdRequest, Medicine, MedicinePresentation, NearPointConvergence, Notice, PartnerCommission, PartnerLead, PatientConsent, PatientImport, Procedure, ProcedurePrice, RecordVersion, ReferralCode, ReportSetting, ScheduleEvent, SkinType, Subscription, SurgeryType, VisitType, VisualAcuityType, WaitingList};
 use App\Models\Billing\{BillingLog, BillingRetrySchedule, Cancellation, FinancialEvent, GatewayCircuitBreaker, GatewayFallbackRule, Invoice, Payment, PaymentAttempt, SubscriptionChange, TenantGatewaySetting, WebhookEvent};
+use App\Models\Fiscal\NfseDocument;
 use App\Models\Scopes\EntityScope;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Model;
@@ -66,6 +67,9 @@ class TenantScopeServiceProvider extends ServiceProvider
 
         // Assinatura
         Subscription::class,
+
+        // NFS-e do SaaS: a clínica só enxerga as notas dela (o download também confere o entity_id)
+        NfseDocument::class,
 
         // Compliance / auditoria
         AuditLog::class,

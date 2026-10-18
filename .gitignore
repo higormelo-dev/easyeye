@@ -50,3 +50,8 @@ yarn-error.log
 # Ignorar arquivos env
 .env.bak.*
 *.env.bak*
+
+# Grafo local: pode conter estrutura e trechos privados do projeto.
+/graphify-out/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

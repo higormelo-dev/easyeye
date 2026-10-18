@@ -16,6 +16,7 @@ use App\Services\Billing\{BillingCancellationService, BillingSubscriptionOrchest
 use App\Services\SubscriptionService;
 use App\Support\Billing\{DunningSchedule, PayerDocument, PlanPricing};
 use App\Support\BrazilianFormat;
+use App\Support\Fiscal\NfseManagerPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, Request};
@@ -699,12 +700,18 @@ class SubscriptionsController extends Controller
 
     public function invoices(Subscription $subscription): JsonResponse
     {
-        $invoices = Invoice::query()
+        $rows = Invoice::query()
             ->with(['payments.refunds.requester'])
             ->where('subscription_id', $subscription->id)
             ->orderByDesc('created_at')
-            ->get()
+            ->get();
+
+        // NFS-e do SaaS: a nota mais recente de cada fatura, com as ações que o Gate de quem olha permite.
+        $nfse = app(NfseManagerPresenter::class)->forInvoices($rows);
+
+        $invoices = $rows
             ->map(fn (Invoice $inv) => [
+                'nfse'      => $nfse[(string) $inv->id] ?? null,
                 'id'        => $inv->id,
                 'reference' => $inv->reference,
                 // "Enviar cobrança à clínica": só a que ela paga agora em Minha assinatura.

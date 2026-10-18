@@ -1,7 +1,10 @@
-**Runtime:** PHP 8.4 (ambiente atual) / requisito Composer `^8.2`  
-**Framework:** Laravel 12.x  
-**Frontend:** Vue 3 (Composition API) + Inertia.js + Vite + Bootstrap 5 + Tailwind CSS  
-**Banco:** SQLite (default local/test) com suporte a PostgreSQL/MySQL/MariaDB/SQL Server
+**Runtime:** PHP 8.4 (ambiente atual) / requisito Composer `^8.4`
+
+**Framework:** Laravel 12.x
+
+**Frontend:** Vue 3 (Composition API) + Inertia.js 3 + Vite + Bootstrap 5 + Tailwind CSS
+
+**Banco:** PostgreSQL no fluxo local documentado e nos testes (`phpunit.xml`: `easyeye_test`). `config/database.php` conserva fallback SQLite quando `DB_CONNECTION` está ausente; isso não autoriza trocar o banco de testes. Outros drivers permanecem configurados, sem alegação de validação equivalente.
 
 ---
 
@@ -31,9 +34,9 @@ Arquitetura modular em monólito Laravel, orientada a domínio de negócio (clí
 
 ## 3. Mapa de Rotas e Contextos
 
-### 3.1 Volumetria Atual
-1. Total de rotas registradas: **367**.
-2. Principais blocos: `panel/setting`, `panel/manager`, `panel/patients`, `panel/financial`, `api/integrators`, `portal`.
+### 3.1 Organização
+
+A antiga contagem fixa de rotas foi retirada; confirme o inventário no checkout atual. Principais blocos: `panel/setting`, `panel/manager`, `panel/patients`, `panel/financial`, `api/integrators`, `portal`.
 
 ### 3.2 Contextos
 1. **`/panel`**: operação clínica e administrativa da entidade selecionada.
@@ -156,11 +159,16 @@ Arquitetura modular em monólito Laravel, orientada a domínio de negócio (clí
 2. Estrutura de requests/validators por contexto de domínio.
 
 ### 9.3 Execução Local
-1. `composer dev` para servidor, queue listener, logs e Vite concorrentes.
-2. Docker Compose com app/nginx/queue/redis.
-3. Queue default em `database` no `.env.example`.
+1. `rtk proxy composer dev` inicia servidor na porta 8085, queue listener, logs, Vite e Reverb; exige preflight dos efeitos de workers.
+2. Docker Compose inclui app, nginx, worker e Reverb; o entrypoint do app executa migrations quando `RUN_MIGRATIONS=true` (configuração atual). Consulte [onboarding](docs/onboarding.md) antes de iniciar.
+3. Fila e cache dependem da configuração efetiva. Não inferir o destino a partir de um exemplo de ambiente.
 
 ## 10. Riscos Técnicos Atuais
 1. Transição recente para Vue/Inertia requer vigilância para garantir que componentes legados do Bootstrap não quebrem a reatividade.
 2. Alta superfície de domínio (clínico + billing + TISS) exige disciplina de regressão em releases.
 3. Multi-tenancy por sessão requer atenção especial em jobs, logs e autorizações fora de request web.
+
+
+## 11. Fontes e limites de validação
+
+Manifests e lockfiles definem versões; [AGENTS.md](AGENTS.md) define operação e limites. Consulte [invariantes detalhadas](docs/internal/engineering/domain-invariants.md) para cirurgia, recall, assinaturas, concorrência, billing e TISS, e [qualidade](docs/quality.md) para comandos e dívida medida. O inventário funcional acima é contexto existente, sem revalidação integral de cada capacidade nesta adoção. Não equivale a uma declaração de conformidade.
