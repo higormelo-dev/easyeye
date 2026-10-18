@@ -429,6 +429,7 @@ class FinancialReportsController extends Controller
             'category_name'        => $entry->category?->name,
             'covenant_name'        => $entry->covenant?->name,
             'payment_method_label' => $entry->payment_method?->label(),
+            'card_brand_label'     => $entry->card_brand?->label(),
             'type'                 => $entry->type instanceof BackedEnum ? $entry->type->value : $entry->type,
             'status'               => $entry->status instanceof BackedEnum ? $entry->status->value : $entry->status,
             'amount'               => (float) $entry->amount,
@@ -638,6 +639,8 @@ class FinancialReportsController extends Controller
             __('financial_reports.cashflow.col_category'),
             __('financial_reports.cashflow.col_covenant'),
             __('financial_reports.cashflow.col_value'),
+            __('financial_reports.cashflow.col_payment_method'),
+            __('financial_reports.cashflow.col_card_brand'),
         ];
 
         foreach ($entries as $entry) {
@@ -650,6 +653,8 @@ class FinancialReportsController extends Controller
                 $entry->category?->name ?? __('financial_reports.no_category'),
                 $entry->covenant?->name ?? __('financial_reports.no_covenant'),
                 (float) $entry->amount,
+                $entry->payment_method?->label() ?? '',
+                $entry->card_brand?->label() ?? '',
             ];
         }
 

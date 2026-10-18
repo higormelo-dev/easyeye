@@ -7,7 +7,7 @@ use App\Domains\Recall\Services\RecallListService;
 use App\Enums\AI\AiRunStatus;
 use App\Enums\{ClientRule, EntityGate, FeatureKey, Permission, ScheduleSituation};
 use App\Enums\Surgery\SurgicalCaseStatus;
-use App\Models\{Doctor, Entity, EntityProduct, MedicalRecord, Patient, PatientExam, Schedule};
+use App\Models\{Covenant, Doctor, Entity, EntityProduct, MedicalRecord, Patient, PatientExam, Schedule};
 use App\Models\Surgery\SurgicalCase;
 use App\Services\{ActivationService, FeatureGateService};
 use App\Services\Dashboard\{ClinicOperationsService, DashboardInsightsService};
@@ -57,6 +57,12 @@ class PanelDashboardController extends Controller
 
     /** Itens das listas curtas do médico (IA a revisar, prontuários sem assinatura). */
     public const int PENDING_LIST_LIMIT = 5;
+
+    /** Antecedência do aviso de contrato de convênio a vencer (vencidos entram sempre). */
+    public const int COVENANT_CONTRACT_WINDOW_DAYS = 30;
+
+    /** Convênios listados no aviso; o excedente vira "+ N convênios". */
+    public const int COVENANT_CONTRACT_LIMIT = 10;
 
     /** "Atualizar" do painel: recalcula os números de gestão (descarta o cache). */
     public const string REFRESH_HEADER = 'X-Dashboard-Refresh';
@@ -173,6 +179,12 @@ class PanelDashboardController extends Controller
             // E feature has_inventory_module) — se o menu Estoque não
             // aparece pro usuário, o card também não aparece.
             'stockAlerts' => fn () => $this->buildStockAlerts($entityId),
+            // Contratos de convênio vencidos ou a vencer: aviso (não bloqueia
+            // atendimento nem TISS) só para quem cuida do contrato — administração
+            // e financeiro. Demais perfis não recebem o prop.
+            'covenantContracts' => fn () => in_array($profile, [ClientRule::Admin, ClientRule::Financial], true)
+                ? $this->buildCovenantContracts($entityId)
+                : null,
             // Módulo cirúrgico (Fase 4): cartão resumido para admin e médico, só com o recurso do plano.
             'surgeryCard' => fn () => $surgery ? $this->buildSurgeryCard($entityId, $doctor) : null,
             // Quais atalhos do Dashboard levam a telas que o usuário pode abrir
@@ -340,6 +352,55 @@ class PanelDashboardController extends Controller
             'awaiting'  => $awaiting,
             'url'       => route('panel.surgery.indicators'),
             'labels'    => (array) trans('surgery_indicators.card'),
+        ];
+    }
+
+    /**
+     * Convênios PRÓPRIOS da clínica (os globais/ANS não têm contrato dela) ativos
+     * cujo contrato já venceu ou vence na janela. null quando não há nenhum — o
+     * card some. O link para Configurações só vai a quem abre a tela
+     * (`settings.manage`; o financeiro sem essa permissão só lê o aviso).
+     */
+    private function buildCovenantContracts(string $entityId): ?array
+    {
+        $today = now()->startOfDay();
+
+        $covenants = Covenant::query()
+            ->where('entity_id', $entityId)
+            ->where('active', true)
+            ->whereNotNull('contract_ends_at')
+            ->whereDate('contract_ends_at', '<=', $today->copy()->addDays(self::COVENANT_CONTRACT_WINDOW_DAYS)->toDateString())
+            ->orderBy('contract_ends_at')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'contract_ends_at']);
+
+        if ($covenants->isEmpty()) {
+            return null;
+        }
+
+        $entity    = $this->entity($entityId);
+        $canManage = $entity !== null
+            && (auth()->user()?->hasPermissionInEntity($entity, Permission::SettingsManage) ?? false);
+
+        return [
+            'window_days' => self::COVENANT_CONTRACT_WINDOW_DAYS,
+            'can_manage'  => $canManage,
+            'url'         => $canManage ? route('panel.setting.covenants.index') : null,
+            'items'       => $covenants->take(self::COVENANT_CONTRACT_LIMIT)->map(function (Covenant $covenant) use ($today): array {
+                $endsAt    = $covenant->contract_ends_at->copy()->startOfDay();
+                $daysUntil = (int) round($today->diffInDays($endsAt, false));
+
+                return [
+                    'id'            => $covenant->id,
+                    'name'          => $covenant->name,
+                    'ends_at'       => $endsAt->toDateString(),
+                    'ends_at_label' => $endsAt->locale(app()->getLocale())->isoFormat('LL'),
+                    'days_until'    => $daysUntil,
+                    'expired'       => $daysUntil < 0,
+                ];
+            })->values()->all(),
+            'overflow' => max(0, $covenants->count() - self::COVENANT_CONTRACT_LIMIT),
         ];
     }
 
@@ -836,9 +897,9 @@ class PanelDashboardController extends Controller
     public static function summaryGroupOf(?ScheduleSituation $situation): string
     {
         return match ($situation) {
-            ScheduleSituation::Attended => 'attended',
+            ScheduleSituation::Attended                             => 'attended',
             ScheduleSituation::NoShow, ScheduleSituation::Cancelled => 'cancelled',
-            default => 'pending',
+            default                                                 => 'pending',
         };
     }
 

@@ -110,6 +110,7 @@ return [
         'col_description'    => 'Descrição',
         'col_covenant'       => 'Convênio',
         'col_payment_method' => 'Forma de pagamento',
+        'col_card_brand'     => 'Bandeira',
         'col_type'           => 'Tipo',
         'col_status'         => 'Status',
         'col_value'          => 'Valor',

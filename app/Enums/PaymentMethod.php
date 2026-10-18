@@ -30,6 +30,12 @@ enum PaymentMethod: string
         return $this === self::Courtesy;
     }
 
+    /** Pagamento passa por cartão (crédito, crédito + dinheiro, débito + dinheiro): aceita bandeira. */
+    public function usesCard(): bool
+    {
+        return in_array($this, [self::Credit, self::CreditCash, self::DebitCash], true);
+    }
+
     /** Exibe o campo de parcelas (crédito puro ou crédito + dinheiro). */
     public function usesInstallments(): bool
     {

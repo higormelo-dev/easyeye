@@ -15,9 +15,11 @@ class CovenantService extends BaseSettingService
     protected function getCreateData(FormRequest $request): array
     {
         return [
-            'name'  => $request->name,
-            'color' => $request->color,
-            'table' => (bool) $request->table,
+            'name'               => $request->name,
+            'color'              => $request->color,
+            'table'              => (bool) $request->table,
+            'contract_starts_at' => $request->input('contract_starts_at'),
+            'contract_ends_at'   => $request->input('contract_ends_at'),
         ];
     }
 
@@ -31,6 +33,13 @@ class CovenantService extends BaseSettingService
 
         if ($request->has('table')) {
             $data['table'] = $request->boolean('table');
+        }
+
+        // has() (não filled()): enviar vazio limpa a vigência.
+        foreach (['contract_starts_at', 'contract_ends_at'] as $field) {
+            if ($request->has($field)) {
+                $data[$field] = $request->input($field);
+            }
         }
 
         return $data;

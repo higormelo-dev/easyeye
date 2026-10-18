@@ -366,6 +366,8 @@ return [
         'confirmation_enabled'                      => 'confirmação automática',
         'confirmation_hours_before'                 => 'horas de antecedência da confirmação',
         'contents'                                  => 'conteúdos',
+        'contract_ends_at'                          => 'fim do contrato',
+        'contract_starts_at'                        => 'início do contrato',
         'context'                                   => 'contexto',
         'conversation_id'                           => 'conversa',
         'cover_test_type_id'                        => 'tipo de cover test',

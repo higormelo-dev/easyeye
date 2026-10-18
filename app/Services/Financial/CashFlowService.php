@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Financial;
 
-use App\Enums\{CashEntryNature, CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType};
+use App\Enums\{CashEntryNature, CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType, PaymentMethod};
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Models\{CashClose, DoctorPayoutReceiptAllocation, FinancialCashEntry, Schedule};
 use DateTimeInterface;
@@ -106,7 +106,21 @@ class CashFlowService
                 $this->assertDateNotClosed($entityId, $data['entry_date']);
             }
 
-            $entry->update(Arr::except($data, self::SYSTEM_MANAGED_ATTRIBUTES));
+            $changes = Arr::except($data, self::SYSTEM_MANAGED_ATTRIBUTES);
+
+            // A bandeira acompanha a forma: trocar para uma forma sem cartão não
+            // deixa a bandeira anterior presa no lançamento.
+            if (array_key_exists('payment_method', $changes)) {
+                $method = $changes['payment_method'] instanceof PaymentMethod
+                    ? $changes['payment_method']
+                    : PaymentMethod::tryFrom((string) $changes['payment_method']);
+
+                if ($method?->usesCard() !== true) {
+                    $changes['card_brand'] = null;
+                }
+            }
+
+            $entry->update($changes);
 
             return $entry->fresh();
         });

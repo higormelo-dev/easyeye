@@ -73,7 +73,12 @@ const { date, typeLabel, statusLabel, originLabel, typeBadge, statusBadge, origi
                         </div>
                         <div class="d-flex gap-1">
                             <dt class="fw-semibold text-muted">{{ t.col_payment_method }}:</dt>
-                            <dd class="mb-0">{{ entry.payment_method_label || '—' }}</dd>
+                            <dd class="mb-0">
+                                {{ entry.payment_method_label || '—'
+                                }}<span v-if="entry.card_brand_label" class="text-muted">
+                                    · {{ entry.card_brand_label }}</span
+                                >
+                            </dd>
                         </div>
                         <div class="d-flex gap-1">
                             <dt class="fw-semibold text-muted">{{ t.col_category }}:</dt>

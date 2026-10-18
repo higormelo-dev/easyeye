@@ -394,6 +394,15 @@ return [
     'glosas_open_count'          => 'Open (:count)',
     'glosas_appealed'            => 'Under appeal (:count)',
 
+    // Covenant contracts (notice for administration/finance)
+    'covenant_contracts_title'         => 'Insurance contracts',
+    'covenant_contracts_expired'       => 'Expired on :date',
+    'covenant_contracts_today'         => 'Expires today (:date)',
+    'covenant_contracts_expiring'      => 'Expires in :days day(s) (:date)',
+    'covenant_contracts_more'          => '+ :count insurance plans',
+    'covenant_contracts_open'          => 'View insurance plans',
+    'covenant_contracts_expired_badge' => 'Expired',
+
     // Shortcuts
     'module_patients'   => 'Patients',
     'module_glosas'     => 'Claim denials',

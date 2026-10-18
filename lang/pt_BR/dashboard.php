@@ -394,6 +394,15 @@ return [
     'glosas_open_count'          => 'Em aberto (:count)',
     'glosas_appealed'            => 'Em recurso (:count)',
 
+    // Contratos de convênio (aviso para administração/financeiro)
+    'covenant_contracts_title'         => 'Contratos de convênio',
+    'covenant_contracts_expired'       => 'Venceu em :date',
+    'covenant_contracts_today'         => 'Vence hoje (:date)',
+    'covenant_contracts_expiring'      => 'Vence em :days dia(s) (:date)',
+    'covenant_contracts_more'          => '+ :count convênios',
+    'covenant_contracts_open'          => 'Ver convênios',
+    'covenant_contracts_expired_badge' => 'Vencido',
+
     // Atalhos
     'module_patients'   => 'Pacientes',
     'module_glosas'     => 'Glosas',

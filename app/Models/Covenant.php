@@ -26,6 +26,8 @@ class Covenant extends Model
 
     protected $fillable = [
         'entity_id', 'code', 'name', 'color', 'table', 'active', 'tiss_operator_id',
+        // Vigência do contrato da clínica com o convênio (só datas).
+        'contract_starts_at', 'contract_ends_at',
         // Dados oficiais da operadora (ANS) — preenchidos pelo manager
         // (Manager\CovenantsController) e pela importação da ANS.
         'company_name', 'trade_name', 'national_registry', 'ans_registry', 'ans_modality', 'city', 'uf',
@@ -37,13 +39,15 @@ class Covenant extends Model
     protected function casts(): array
     {
         return [
-            'created_at'        => 'datetime',
-            'updated_at'        => 'datetime',
-            'deleted_at'        => 'datetime',
-            'ans_registered_at' => 'date',
-            'ans_cancelled_at'  => 'date',
-            'source_synced_at'  => 'datetime',
-            'source'            => CovenantSource::class,
+            'created_at'         => 'datetime',
+            'updated_at'         => 'datetime',
+            'deleted_at'         => 'datetime',
+            'ans_registered_at'  => 'date',
+            'ans_cancelled_at'   => 'date',
+            'contract_starts_at' => 'date:Y-m-d',
+            'contract_ends_at'   => 'date:Y-m-d',
+            'source_synced_at'   => 'datetime',
+            'source'             => CovenantSource::class,
         ];
     }
 

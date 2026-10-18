@@ -172,6 +172,10 @@ return [
     'schedule_split_locked'   => 'This payment came from the schedule split between cash and card: amount and payment method can only be changed in the schedule.',
 
     'reference_managed_by_system' => 'The entry link (appointment, insurance claim or purchase) is set by the system and cannot be provided.',
+    'form_card_brand'             => 'Card brand',
+    'form_card_brand_none'        => 'Not informed',
+    'card_brand_only_card'        => 'The card brand can only be used with card payments.',
+    'card_brands'                 => ['visa' => 'Visa', 'mastercard' => 'Mastercard', 'elo' => 'Elo', 'amex' => 'American Express', 'hipercard' => 'Hipercard', 'diners' => 'Diners Club', 'others' => 'Other'],
 
     'attributes' => [
         'entry_date'     => 'date',
@@ -183,6 +187,7 @@ return [
         'covenant_id'    => 'insurance',
         'notes'          => 'notes',
         'payment_method' => 'payment method',
+        'card_brand'     => 'card brand',
         'reference_type' => 'link type',
         'reference_id'   => 'link',
     ],
