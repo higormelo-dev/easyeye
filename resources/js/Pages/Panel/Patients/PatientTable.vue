@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
@@ -8,12 +8,16 @@ import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
 import { useColumnOrder } from '@/composables/useColumnOrder.js';
 import { formatPatientCode } from '@/utils/formatPatientCode.js';
 
+const page = usePage();
+const t = computed(() => page.props.t_ui?.patient_merge ?? {});
+
+// patients.data[].can_merge: boolean, concedido pelo servidor apenas ao admin.
 const props = defineProps({
     patients: { type: Object, required: true },
     filters: { type: Object, default: () => ({}) },
 });
 
-const emit = defineEmits(['sort', 'edit', 'view', 'delete', 'toggleActive', 'restore']);
+const emit = defineEmits(['sort', 'edit', 'view', 'delete', 'toggleActive', 'restore', 'merge']);
 
 const currentSort = computed(() => props.filters.sort ?? 'created_at');
 const currentDir = computed(() => props.filters.direction ?? 'desc');
@@ -185,6 +189,16 @@ const orderedColumns = computed(() =>
                                             {{ p.active ? 'Desativar' : 'Ativar' }}
                                         </button>
                                     </li>
+                                    <li v-if="p.can_merge">
+                                        <button
+                                            type="button"
+                                            class="dropdown-item rounded-1"
+                                            data-testid="patient-merge-action"
+                                            @click="$emit('merge', { id: p.id, code: p.code, full_name: p.full_name })"
+                                        >
+                                            <i class="ti ti-git-merge me-1" aria-hidden="true"></i>{{ t.title }}
+                                        </button>
+                                    </li>
                                     <li><hr class="dropdown-divider" /></li>
                                     <li>
                                         <button
@@ -217,13 +231,9 @@ const orderedColumns = computed(() =>
                 </li>
                 <template v-for="link in patients.links.slice(1, -1)" :key="link.label">
                     <li class="page-item" :class="{ active: link.active, disabled: !link.url }">
-                        <Link
-                            class="page-link"
-                            :href="link.url ?? '#'"
-                            preserve-scroll
-                            preserve-state
-                            v-html="link.label"
-                        />
+                        <Link class="page-link" :href="link.url ?? '#'" preserve-scroll preserve-state>{{
+                            link.label
+                        }}</Link>
                     </li>
                 </template>
                 <li class="page-item" :class="{ disabled: patients.current_page === patients.last_page }">

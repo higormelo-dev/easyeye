@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\DTOs\ActionPolicy;
+use App\Enums\{ClientRule, ConsentType, EntityGate, FeatureKey};
 use App\Enums\ClinicalSafety\AllergyCategory;
-use App\Enums\{ConsentType, EntityGate, FeatureKey};
 use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\PatientResource;
 use App\Models\{Covenant, Entity, IrisType, Patient, People, SkinType};
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
-use App\Services\{ConsentService, FeatureGateService, PatientDuplicateFinder, PatientService};
+use App\Services\{ConsentService, FeatureGateService, PatientDuplicateFinder, PatientMergeService, PatientService};
 use App\Services\WhatsApp\WhatsAppService;
 use App\Support\{BrazilianFormat, CurrentDoctor};
 use Carbon\Carbon;
@@ -82,8 +82,12 @@ class PatientsController extends Controller
 
         $patients = $query->paginate(15)->withQueryString();
 
+        // "Mesclar cadastro" é ação de administrador da clínica (a rota também exige).
+        $entity  = Entity::query()->find($entityId);
+        $isAdmin = $entity !== null && (bool) $request->user()?->hasAnyRoleInEntity($entity, [ClientRule::Admin]);
+
         return Inertia::render('Panel/Patients/Index', [
-            'patients'      => $patients->through(fn ($p) => $this->toTableRow($p, $entityId)),
+            'patients'      => $patients->through(fn ($p) => $this->toTableRow($p, $entityId, $isAdmin)),
             'totalPatients' => fn () => Patient::where('entity_id', $entityId)->count(),
             // Só ativos, como na Agenda: vínculo novo com convênio inativo é
             // recusado (App\Rules\ActiveCovenant). O inativo que o paciente
@@ -115,7 +119,7 @@ class PatientsController extends Controller
             && app(FeatureGateService::class)->can($entityId, FeatureKey::HasPatientRecall);
     }
 
-    private function toTableRow(Patient $p, string $entityId): array
+    private function toTableRow(Patient $p, string $entityId, bool $isAdmin = false): array
     {
         $policy   = ActionPolicy::from($p, $entityId);
         $photoUrl = ($p->photo && Storage::disk('public')->exists('images/patient/' . $p->photo))
@@ -139,6 +143,7 @@ class PatientsController extends Controller
             'is_owned'            => $policy->isOwned,
             'is_global'           => $policy->isGlobal,
             'deleted'             => $policy->deleted,
+            'can_merge'           => $isAdmin && ! $p->trashed(),
         ];
     }
 
@@ -283,6 +288,8 @@ class PatientsController extends Controller
                 'city'                   => $person->city,
                 'state'                  => $person->state,
                 'medical_records_url'    => route('panel.patients.medicalrecords.index', $record->id),
+                // Cadastro mesclado em outro (PatientMergeService): código do destino, só leitura.
+                'merged_into_code' => $record->merged_into_id !== null ? $record->mergedInto?->code : null,
             ],
         ]);
     }
@@ -532,6 +539,50 @@ class PatientsController extends Controller
     }
 
     /**
+     * Cadastros que podem receber a mesclagem deste (mesma clínica, mesmo nome,
+     * não excluídos nem mesclados). Só admin (rota); tenant checado aqui.
+     */
+    public function mergeCandidates(Patient $patient, PatientMergeService $merge): JsonResponse
+    {
+        abort_unless(
+            (string) $patient->entity_id === (string) session('selected_entity_id'),
+            404,
+        );
+
+        return response()->json(['data' => $merge->candidates($patient)]);
+    }
+
+    /**
+     * Mescla ESTE cadastro (origem) no escolhido (destino): move tudo e exclui a
+     * origem. Sem desfazer. Só admin (rota); os dois cadastros são conferidos
+     * contra a clínica da sessão e o destino tem de estar entre os candidatos
+     * (PatientMergeService) — não se mescla por UUID adivinhado.
+     */
+    public function merge(Request $request, Patient $patient, PatientMergeService $merge): JsonResponse
+    {
+        $entityId = (string) session('selected_entity_id');
+        abort_unless((string) $patient->entity_id === $entityId, 404);
+
+        $validated = $request->validate([
+            'target_id' => ['required', 'uuid'],
+            'confirm'   => ['accepted'],
+        ]);
+
+        $target = Patient::query()->withTrashed()->find($validated['target_id']);
+        abort_unless($target !== null && (string) $target->entity_id === $entityId, 404);
+
+        $result = $merge->merge($patient, $target);
+
+        return response()->json([
+            'message'    => __('actions.patient_merge_success', ['count' => $result['moved']]),
+            'source'     => ['id' => (string) $patient->id, 'code' => $patient->code],
+            'target'     => ['id' => (string) $target->id, 'code' => $target->code],
+            'moved'      => $result['moved'],
+            'renumbered' => $result['renumbered'],
+        ]);
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     // BUG-FIX (achado pelo E2E Cypress): o tipo de retorno não incluía
@@ -575,6 +626,17 @@ class PatientsController extends Controller
     public function restore(string $id, PatientDuplicateFinder $duplicates): JsonResponse|RedirectResponse
     {
         $record = $this->service->findByIdOrCode($id);
+
+        // Cadastro mesclado não volta: ressuscitaria o duplicado que o merge acabou de eliminar.
+        if ($record->merged_into_id !== null) {
+            $error = __('validation.custom.patient.merged', ['code' => (string) $record->mergedInto?->code]);
+
+            if (request()->wantsJson()) {
+                return response()->json(['message' => $error, 'errors' => ['name' => [$error]]], 422);
+            }
+
+            return back()->with('error', $error);
+        }
 
         if ($record->trashed()) {
             $person = People::query()->withTrashed()->find($record->person_id);

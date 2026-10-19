@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ClientRule;
-use App\Models\{Doctor, Entity, Patient, PatientDocumentShare, PatientExam, People, User};
+use App\Models\{AuditLog, Doctor, Entity, Patient, PatientDocumentShare, PatientExam, People, User};
 use Illuminate\Support\Str;
 
 /**
@@ -196,6 +196,84 @@ describe('toggleActive()', function () {
             route('panel.eye-images.exams.active.update', $this->otherExam),
             ['active' => false],
         )->assertForbidden();
+    });
+});
+
+describe('updateUrgent()', function () {
+    it('médico marca e desmarca o exame como urgente', function () {
+        expect($this->exam->fresh()->urgent)->toBeFalse();
+
+        actingAsDoctorEic($this)->putJson(
+            route('panel.eye-images.exams.urgent.update', $this->exam),
+            ['urgent' => true],
+        )->assertOk()->assertJson(['id' => (string) $this->exam->id, 'urgent' => true]);
+
+        expect($this->exam->refresh()->urgent)->toBeTrue();
+
+        actingAsDoctorEic($this)->putJson(
+            route('panel.eye-images.exams.urgent.update', $this->exam),
+            ['urgent' => false],
+        )->assertOk()->assertJson(['urgent' => false]);
+
+        expect($this->exam->refresh()->urgent)->toBeFalse();
+    });
+
+    it('admin recebe 403 (Gate::IssueReport é doctor-only)', function () {
+        actingAsAdminEic($this)->putJson(
+            route('panel.eye-images.exams.urgent.update', $this->exam),
+            ['urgent' => true],
+        )->assertForbidden();
+
+        expect($this->exam->refresh()->urgent)->toBeFalse();
+    });
+
+    it('secretária nem chega no controller (middleware entity.role)', function () {
+        actingAsSecretaryEic($this)->putJson(
+            route('panel.eye-images.exams.urgent.update', $this->exam),
+            ['urgent' => true],
+        )->assertForbidden();
+
+        expect($this->exam->refresh()->urgent)->toBeFalse();
+    });
+
+    it('exame de outra clínica: 403 e nada muda', function () {
+        actingAsDoctorEic($this)->putJson(
+            route('panel.eye-images.exams.urgent.update', $this->otherExam),
+            ['urgent' => true],
+        )->assertForbidden();
+
+        expect($this->otherExam->refresh()->urgent)->toBeFalse();
+    });
+
+    it('payload ausente ou inválido é rejeitado (422)', function () {
+        foreach ([[], ['urgent' => null], ['urgent' => 'talvez'], ['urgent' => [1]]] as $payload) {
+            actingAsDoctorEic($this)->putJson(
+                route('panel.eye-images.exams.urgent.update', $this->exam),
+                $payload,
+            )->assertStatus(422);
+        }
+
+        expect($this->exam->refresh()->urgent)->toBeFalse();
+    });
+
+    it('a alteração é auditada (entra no Histórico do paciente)', function () {
+        actingAsDoctorEic($this)->putJson(
+            route('panel.eye-images.exams.urgent.update', $this->exam),
+            ['urgent' => true],
+        )->assertOk();
+
+        $log = AuditLog::query()
+            ->where('auditable_type', PatientExam::class)
+            ->where('auditable_id', $this->exam->id)
+            ->where('event', 'updated')
+            ->latest('created_at')
+            ->first();
+
+        expect($log)->not->toBeNull()
+            ->and($log->user_id)->toBe($this->doctorUserModel->id)
+            ->and($log->new_values)->toHaveKey('urgent')
+            ->and((bool) $log->new_values['urgent'])->toBeTrue()
+            ->and((bool) $log->old_values['urgent'])->toBeFalse();
     });
 });
 

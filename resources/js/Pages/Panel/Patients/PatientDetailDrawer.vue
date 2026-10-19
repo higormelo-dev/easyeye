@@ -4,12 +4,13 @@ import { router, usePage } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
 import PatientConditionsCard from '@/Components/Panel/Recall/PatientConditionsCard.vue';
-import { clinicalTexts, tc, requestJson } from '@/Support/clinicalSafety.js';
+import { clinicalTexts, tc, requestJson, fill } from '@/Support/clinicalSafety.js';
 import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 
 // Rótulo compartilhado (lang/<locale>/ui.php → patient_form).
 const page = usePage();
 const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
+const mergeUi = computed(() => page?.props?.t_ui?.patient_merge ?? {});
 
 const props = defineProps({
     open: { type: Boolean, required: true },
@@ -152,6 +153,14 @@ function invitePortal() {
 
         <!-- ── Body ───────────────────────────────────────────────────────── -->
         <template v-if="patient">
+            <p
+                v-if="patient.merged_into_code"
+                class="alert alert-warning"
+                role="status"
+                data-testid="patient-merged-warning"
+            >
+                {{ fill(mergeUi.merged_into ?? '', { code: patient.merged_into_code }) }}
+            </p>
             <!-- Segurança clínica (Fase 2): alergias + alertas das medicações em uso -->
             <div v-if="safety" class="detail-section" data-testid="patient-drawer-safety">
                 <ClinicalAlertBanner :summary="safety" class="mb-2" />

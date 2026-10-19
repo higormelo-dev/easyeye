@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SHEET_SIZES, buildSheets, paginate, pairRows, sheetGrid } from '@/Support/printSheets.js';
+import { SHEET_SIZES, buildSheets, canPairOdOe, paginate, pairRows, sheetGrid } from '@/Support/printSheets.js';
 
 const od = (id, session = 's1') => ({ id, laterality: 1, session });
 const oe = (id, session = 's1') => ({ id, laterality: 2, session });
@@ -8,8 +8,8 @@ const groupKeyOf = (exam) => exam.session;
 const ids = (cells) => cells.map((c) => c?.id ?? null);
 
 describe('printSheets — grade da folha', () => {
-    it('oferece 1, 2, 4 e 6 imagens por folha', () => {
-        expect(SHEET_SIZES).toEqual([1, 2, 4, 6]);
+    it('oferece todos os tamanhos de 1 a 16 aprovados', () => {
+        expect(SHEET_SIZES).toEqual([1, 2, 4, 6, 8, 9, 12, 15, 16]);
     });
 
     it('retrato empilha, paisagem aproveita a largura', () => {
@@ -17,10 +17,20 @@ describe('printSheets — grade da folha', () => {
         expect(sheetGrid(2, 'portrait')).toEqual({ cols: 1, rows: 2 });
         expect(sheetGrid(4, 'portrait')).toEqual({ cols: 2, rows: 2 });
         expect(sheetGrid(6, 'portrait')).toEqual({ cols: 2, rows: 3 });
+        expect(sheetGrid(8, 'portrait')).toEqual({ cols: 2, rows: 4 });
+        expect(sheetGrid(9, 'portrait')).toEqual({ cols: 3, rows: 3 });
+        expect(sheetGrid(12, 'portrait')).toEqual({ cols: 3, rows: 4 });
+        expect(sheetGrid(15, 'portrait')).toEqual({ cols: 3, rows: 5 });
+        expect(sheetGrid(16, 'portrait')).toEqual({ cols: 4, rows: 4 });
 
         expect(sheetGrid(2, 'landscape')).toEqual({ cols: 2, rows: 1 });
         expect(sheetGrid(4, 'landscape')).toEqual({ cols: 2, rows: 2 });
         expect(sheetGrid(6, 'landscape')).toEqual({ cols: 3, rows: 2 });
+        expect(sheetGrid(8, 'landscape')).toEqual({ cols: 4, rows: 2 });
+        expect(sheetGrid(9, 'landscape')).toEqual({ cols: 3, rows: 3 });
+        expect(sheetGrid(12, 'landscape')).toEqual({ cols: 4, rows: 3 });
+        expect(sheetGrid(15, 'landscape')).toEqual({ cols: 5, rows: 3 });
+        expect(sheetGrid(16, 'landscape')).toEqual({ cols: 4, rows: 4 });
     });
 
     it('com OD/OE lado a lado são sempre 2 colunas (OD | OE), nas duas orientações', () => {
@@ -28,9 +38,19 @@ describe('printSheets — grade da folha', () => {
             expect(sheetGrid(2, orientation, true)).toEqual({ cols: 2, rows: 1 });
             expect(sheetGrid(4, orientation, true)).toEqual({ cols: 2, rows: 2 });
             expect(sheetGrid(6, orientation, true)).toEqual({ cols: 2, rows: 3 });
+            expect(sheetGrid(8, orientation, true)).toEqual({ cols: 2, rows: 4 });
+            expect(sheetGrid(12, orientation, true)).toEqual({ cols: 2, rows: 6 });
+            expect(sheetGrid(16, orientation, true)).toEqual({ cols: 2, rows: 8 });
         }
         // 1 imagem por folha não tem par.
         expect(sheetGrid(1, 'portrait', true)).toEqual({ cols: 1, rows: 1 });
+    });
+
+    it('não pareia folhas ímpares, preservando a grade e a ordem linear', () => {
+        expect(canPairOdOe(9)).toBe(false);
+        expect(canPairOdOe(15)).toBe(false);
+        expect(sheetGrid(9, 'portrait', true)).toEqual({ cols: 3, rows: 3 });
+        expect(sheetGrid(15, 'landscape', true)).toEqual({ cols: 5, rows: 3 });
     });
 
     it('valor fora da lista cai em 1 por folha', () => {
@@ -130,5 +150,16 @@ describe('printSheets — paginação', () => {
 
         expect(grid).toEqual({ cols: 1, rows: 1 });
         expect(sheets.map(ids)).toEqual([['a'], ['b']]);
+    });
+
+    it('folhas ímpares com pedido de pares preservam a ordem e completam a última folha', () => {
+        const exams = [oe('oe1'), od('od1'), oe('oe2')];
+
+        for (const perSheet of [9, 15]) {
+            const { sheets } = buildSheets(exams, { perSheet, pairOdOe: true, groupKeyOf });
+            expect(ids(sheets[0]).slice(0, 3)).toEqual(['oe1', 'od1', 'oe2']);
+            expect(sheets[0]).toHaveLength(perSheet);
+            expect(sheets[0].at(-1)).toBeNull();
+        }
     });
 });

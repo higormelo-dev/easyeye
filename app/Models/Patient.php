@@ -217,6 +217,15 @@ class Patient extends Model
         return $this->belongsTo(People::class, 'person_id');
     }
 
+    /**
+     * Cadastro para onde este foi mesclado (PatientMergeService) — nulo se não
+     * foi. Inclui o excluído: o destino pode ter sido removido depois.
+     */
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'merged_into_id')->withTrashed();
+    }
+
     public function covenant(): BelongsTo
     {
         return $this->belongsTo(Covenant::class, 'covenant_id');

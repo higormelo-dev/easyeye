@@ -616,6 +616,17 @@ return [
             'duplicate_cpf'    => 'There is already an active patient with this CPF in this clinic (:codes) — use the existing record instead.',
             'duplicate_import' => 'Duplicate: there is already a patient with the same name and date of birth (:codes) — row not imported.',
             'homonym_import'   => 'Warning: there is already a patient with the same name (:codes) and a different or missing date of birth — imported as a different person; check it is not a duplicate.',
+            // Merge records (PatientMergeService): each reason names the blocking area.
+            'merged'                      => 'This record was merged into :code and cannot be restored.',
+            'merge_target_invalid'        => 'The chosen record cannot receive the merge (it must be another active record of this clinic with the same name).',
+            'merge_conflict'              => 'The records could not be merged: :items.',
+            'merge_conflict_signed'       => ':count signed medical record(s) on the source record — merge from the other record instead, which becomes the destination',
+            'merge_conflict_surgery'      => 'surgical case on the source record — merge from the other record instead, which becomes the destination',
+            'merge_conflict_conditions'   => 'chronic condition under follow-up on both records (:detail)',
+            'merge_conflict_recalls'      => 'doctor-ordered return on both records',
+            'merge_conflict_blocks'       => 'active contact block on both records (:detail)',
+            'merge_conflict_intravitreal' => 'intravitreal treatment in progress on both records (:detail)',
+            'merge_conflict_drafts'       => 'medical record draft by the same user on both records (:detail)',
         ],
         'visit_type' => [
             'inactive' => 'The selected visit type is inactive. Choose an active one.',

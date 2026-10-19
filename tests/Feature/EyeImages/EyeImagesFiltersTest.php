@@ -2,8 +2,8 @@
 
 use App\Domains\AI\Models\AiRun;
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
-use App\Enums\ClientRule;
-use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator, ExamType, Patient, PatientExam, People, User};
+use App\Enums\{ClientRule, DocumentationType};
+use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator, ExamType, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, People, User};
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
@@ -255,4 +255,183 @@ it('period=custom com date_from em formato invalido nao quebra (ignora e cai no 
 
     searchEyeImages($this, ['period' => 'custom', 'date_from' => 'DROP TABLE patients;--'])
         ->assertOk();
+});
+
+it('filtro urgent=1 traz só os exames marcados como urgentes', function () {
+    $urgent = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'urgent' => true]);
+    PatientExam::factory()->create(['patient_id' => $this->patient->id, 'urgent' => false]);
+
+    $res = searchEyeImages($this, ['urgent' => 1])->assertOk();
+
+    expect(collect($res->json('patients.0.exams'))->pluck('id')->all())->toBe([(string) $urgent->id])
+        ->and($res->json('total_exams'))->toBe(1);
+});
+
+it('urgent fora de "1/true" não filtra, e o payload devolve urgent por exame', function () {
+    $urgent = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'urgent' => true]);
+    $normal = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'urgent' => false]);
+
+    $res = searchEyeImages($this, ['urgent' => '0'])->assertOk();
+
+    $byId = collect($res->json('patients.0.exams'))->keyBy('id');
+    expect($byId)->toHaveCount(2)
+        ->and($byId[(string) $urgent->id]['urgent'])->toBeTrue()
+        ->and($byId[(string) $normal->id]['urgent'])->toBeFalse();
+});
+
+it('exames urgentes vêm primeiro dentro do paciente, mesmo sendo os mais antigos', function () {
+    $old = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'urgent' => true, 'created_at' => now()->subHours(3)]);
+    $new = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'urgent' => false, 'created_at' => now()->subHour()]);
+
+    $ids = collect(searchEyeImages($this)->assertOk()->json('patients.0.exams'))->pluck('id')->all();
+
+    expect($ids)->toBe([(string) $old->id, (string) $new->id]);
+});
+
+it('paciente com exame urgente sobe na lista, mesmo com o cadastro menos recente', function () {
+    $recent = Patient::factory()->create(['entity_id' => $this->entity->id, 'updated_at' => now()]);
+    $older  = Patient::factory()->create(['entity_id' => $this->entity->id, 'updated_at' => now()->subDays(2)]);
+    PatientExam::factory()->create(['patient_id' => $recent->id, 'urgent' => false]);
+    PatientExam::factory()->create(['patient_id' => $older->id, 'urgent' => true]);
+
+    $ids = collect(searchEyeImages($this)->assertOk()->json('patients'))->pluck('id')->all();
+
+    expect(array_slice($ids, 0, 2))->toBe([(string) $older->id, (string) $recent->id]);
+});
+
+it('o urgente fora do filtro atual não promove o paciente (a contagem respeita o período)', function () {
+    $recent = Patient::factory()->create(['entity_id' => $this->entity->id, 'updated_at' => now()]);
+    $older  = Patient::factory()->create(['entity_id' => $this->entity->id, 'updated_at' => now()->subDays(2)]);
+    PatientExam::factory()->create(['patient_id' => $recent->id, 'urgent' => false]);
+    PatientExam::factory()->create(['patient_id' => $older->id, 'urgent' => false]);
+    // Urgente de 60 dias atrás: fora do período "hoje" — não aparece, então não pode promover.
+    PatientExam::factory()->create(['patient_id' => $older->id, 'urgent' => true, 'created_at' => now()->subDays(60)]);
+
+    $ids = collect(searchEyeImages($this)->assertOk()->json('patients'))->pluck('id')->all();
+
+    expect(array_slice($ids, 0, 2))->toBe([(string) $recent->id, (string) $older->id]);
+});
+
+/**
+ * Laudo salvo (com médico solicitante em texto livre) vinculando os exames —
+ * mesmo caminho do EyeImageReportController (documentação + pivot com entity_id).
+ */
+function reportRequestedBy($test, ?string $requester, array $exams, ?Entity $entity = null, ?Patient $patient = null): MedicalRecordDocumentation
+{
+    $entity ??= $test->entity;
+    $patient ??= $test->patient;
+    $doctor = createDoctorForEntity($entity);
+
+    $record = MedicalRecord::query()->create([
+        'entity_id'  => $entity->id,
+        'patient_id' => $patient->id,
+        'doctor_id'  => $doctor->id,
+    ]);
+
+    $doc = MedicalRecordDocumentation::query()->create([
+        'medical_record_id'      => $record->id,
+        'patient_id'             => $patient->id,
+        'doctor_id'              => $doctor->id,
+        'type'                   => DocumentationType::Report,
+        'title'                  => 'Retinografia',
+        'content'                => '<p>Achados normais.</p>',
+        'requesting_doctor_name' => $requester,
+    ]);
+    $doc->syncExams(array_map(fn (PatientExam $e) => (string) $e->id, $exams), (string) $entity->id);
+
+    return $doc;
+}
+
+describe('filtro por médico solicitante (requesting_doctor)', function () {
+    it('casa parcial, sem diferença de caixa nem de acento, e só traz o exame do laudo', function () {
+        $matching = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        $other    = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        PatientExam::factory()->create(['patient_id' => $this->patient->id]); // sem laudo
+        reportRequestedBy($this, 'Dr. José Álvares Souza', [$matching]);
+        reportRequestedBy($this, 'Dra. Marta Lima', [$other]);
+
+        foreach (['jose alvares', 'JOSÉ', 'souza', '  Álvares  '] as $term) {
+            $res = searchEyeImages($this, ['requesting_doctor' => $term])->assertOk();
+
+            expect(collect($res->json('patients.0.exams'))->pluck('id')->all())->toBe([(string) $matching->id])
+                ->and($res->json('total_exams'))->toBe(1);
+        }
+    });
+
+    it('exame sem laudo, laudo sem solicitante e termo que não bate ficam de fora', function () {
+        $semSolicitante = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        PatientExam::factory()->create(['patient_id' => $this->patient->id]); // sem laudo algum
+        reportRequestedBy($this, null, [$semSolicitante]);
+
+        $res = searchEyeImages($this, ['requesting_doctor' => 'carlos'])->assertOk();
+
+        expect($res->json('patients'))->toBe([])
+            ->and($res->json('total_exams'))->toBe(0);
+    });
+
+    it('laudo excluído (soft delete) não conta', function () {
+        $exam = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        $doc  = reportRequestedBy($this, 'Dr. Carlos Souza', [$exam]);
+
+        expect(searchEyeImages($this, ['requesting_doctor' => 'carlos'])->json('total_exams'))->toBe(1);
+
+        $doc->delete();
+
+        expect(searchEyeImages($this, ['requesting_doctor' => 'carlos'])->json('total_exams'))->toBe(0);
+    });
+
+    it('não vaza outra clínica: exame/laudo de lá com o mesmo solicitante não aparece aqui', function () {
+        $otherEntity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
+        $otherPatient = Patient::factory()->create(['entity_id' => $otherEntity->id]);
+        $otherExam    = PatientExam::factory()->create(['patient_id' => $otherPatient->id]);
+        reportRequestedBy($this, 'Dr. Carlos Souza', [$otherExam], $otherEntity, $otherPatient);
+
+        $mine = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        reportRequestedBy($this, 'Dr. Carlos Souza', [$mine]);
+
+        $res = searchEyeImages($this, ['requesting_doctor' => 'carlos'])->assertOk();
+
+        expect(collect($res->json('patients'))->pluck('id')->all())->toBe([(string) $this->patient->id])
+            ->and(collect($res->json('patients.0.exams'))->pluck('id')->all())->toBe([(string) $mine->id]);
+    });
+
+    it('combina com os outros filtros mantendo o AND (olho + solicitante)', function () {
+        $od = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'laterality' => 1]);
+        $oe = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'laterality' => 2]);
+        reportRequestedBy($this, 'Dr. Carlos Souza', [$od, $oe]);
+
+        $res = searchEyeImages($this, ['requesting_doctor' => 'carlos', 'eye' => 'od'])->assertOk();
+
+        expect(collect($res->json('patients.0.exams'))->pluck('id')->all())->toBe([(string) $od->id]);
+
+        $none = searchEyeImages($this, ['requesting_doctor' => 'marta', 'eye' => 'od'])->assertOk();
+
+        expect($none->json('patients'))->toBe([]);
+    });
+
+    it('%, _ e \\ valem como texto, não como curinga', function () {
+        $exam = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        reportRequestedBy($this, 'Dr. Carlos Souza', [$exam]);
+
+        foreach (['%', '_', 'C_rlos', 'Car%os', '\\'] as $term) {
+            expect(searchEyeImages($this, ['requesting_doctor' => $term])->assertOk()->json('total_exams'))->toBe(0);
+        }
+    });
+
+    it('array no query string não vira filtro nem erro', function () {
+        $exam = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+        reportRequestedBy($this, 'Dr. Carlos Souza', [$exam]);
+
+        expect(searchEyeImages($this, ['requesting_doctor' => ['carlos']])->assertOk()->json('total_exams'))->toBe(1);
+    });
+
+    it('a tela devolve o eco do filtro (filters.requesting_doctor), nulo quando vazio', function () {
+        $page = fn (array $query) => $this->actingAs($this->authUser)->withSession(panelSession($this->authEntityUser))
+            ->get(route('panel.eye-images.index', $query));
+
+        $page(['requesting_doctor' => '  Dr. Carlos  '])->assertOk()->assertInertia(fn ($p) => $p->where('filters.requesting_doctor', 'Dr. Carlos'));
+        $page(['requesting_doctor' => '   '])->assertOk()->assertInertia(fn ($p) => $p->where('filters.requesting_doctor', null));
+        // Teto de 80 caracteres (o mesmo do maxlength do input).
+        $page(['requesting_doctor' => str_repeat('a', 100)])->assertOk()->assertInertia(fn ($p) => $p->where('filters.requesting_doctor', str_repeat('a', 80)));
+    });
 });

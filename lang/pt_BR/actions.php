@@ -219,6 +219,7 @@ return [
     'arrived'                => 'Chegou',
     'mark_arrival'           => 'Marcar chegada',
     'patient_record'         => 'Ficha do Paciente',
+    'patient_merge_success'  => 'Cadastros mesclados. :count registro(s) transferido(s).',
     'register_record'        => 'Cadastrar ficha',
     'no_records'             => 'Nenhum registro encontrado',
     'records_found'          => 'registros encontrados',
@@ -1135,4 +1136,6 @@ return [
     'fit_in_shift_afternoon' => 'Tarde',
     'fit_in_shift_evening'   => 'Noite',
     'fit_in_limits_hint'     => 'Quantos encaixes o médico aceita por dia em cada turno, além da grade. 0 = não aceita encaixe.',
+    'patient_merge'          => 'Mesclar cadastro',
+    'patient_merged_into'    => 'Mesclado em :code',
 ];

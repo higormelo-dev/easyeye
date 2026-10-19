@@ -625,6 +625,17 @@ return [
             'duplicate_cpf'    => 'Já existe paciente ativo com este CPF nesta clínica (:codes) — restaure ou edite o cadastro existente.',
             'duplicate_import' => 'Duplicado: já existe paciente com o mesmo nome e data de nascimento (:codes) — linha não importada.',
             'homonym_import'   => 'Aviso: já existe paciente com o mesmo nome (:codes), com data de nascimento diferente ou não informada — importado como outra pessoa; confira se não é duplicado.',
+            // Mesclar cadastro (PatientMergeService): cada motivo diz a área que impede.
+            'merged'                      => 'Este cadastro foi mesclado ao :code e não pode ser restaurado.',
+            'merge_target_invalid'        => 'O cadastro escolhido não pode receber a mesclagem (precisa ser outro cadastro ativo desta clínica, com o mesmo nome).',
+            'merge_conflict'              => 'Não foi possível mesclar os cadastros: :items.',
+            'merge_conflict_signed'       => ':count prontuário(s) assinado(s) no cadastro de origem — mescle a partir do outro cadastro, que passa a ser o destino',
+            'merge_conflict_surgery'      => 'caso cirúrgico no cadastro de origem — mescle a partir do outro cadastro, que passa a ser o destino',
+            'merge_conflict_conditions'   => 'condição crônica em acompanhamento nos dois cadastros (:detail)',
+            'merge_conflict_recalls'      => 'retorno por ordem médica nos dois cadastros',
+            'merge_conflict_blocks'       => 'bloqueio de contato ativo nos dois cadastros (:detail)',
+            'merge_conflict_intravitreal' => 'tratamento intravítreo em andamento nos dois cadastros (:detail)',
+            'merge_conflict_drafts'       => 'rascunho de prontuário do mesmo usuário nos dois cadastros (:detail)',
         ],
         'visit_type' => [
             'inactive' => 'O tipo de consulta selecionado está inativo. Escolha um tipo ativo.',

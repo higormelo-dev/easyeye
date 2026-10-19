@@ -14,8 +14,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
  * lentes — o concorrente tem, mas exigem redesenhar o agrupamento de exames.
  *
  * Auto-contido: recebe `exam` (referência viva do array de patients.value —
- * mutar campos nele aqui reflete direto nos badges do thumbnail, mesmo
- * padrão de toggleExamShare() no componente pai) + `urls` (templates com
+ * emite `updated` para o pai aplicar os campos nos badges do thumbnail) + `urls` (templates com
  * __ID__, mesma convenção de exam_diagnosis_update).
  */
 const props = defineProps({
@@ -33,7 +32,7 @@ const props = defineProps({
     isDoctor: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['close', 'report', 'compare', 'share', 'download']);
+const emit = defineEmits(['close', 'report', 'compare', 'share', 'download', 'updated']);
 
 function tt(key, fallback = '') {
     return props.t?.[key] ?? fallback;
@@ -97,7 +96,7 @@ async function patchExam(urlTemplate, payload, applyLocal) {
 
 function setLaterality(value) {
     patchExam(props.urls.laterality, { laterality: value }, (data) => {
-        props.exam.laterality = data.laterality;
+        emit('updated', { exam: props.exam, changes: { laterality: data.laterality } });
     });
 }
 
@@ -105,7 +104,13 @@ function setQualityRating(value) {
     // Clicar na mesma estrela já marcada cancela a avaliação (toggle).
     const next = props.exam.quality_rating === value ? 0 : value;
     patchExam(props.urls.quality_rating, { quality_rating: next }, (data) => {
-        props.exam.quality_rating = data.quality_rating;
+        emit('updated', { exam: props.exam, changes: { quality_rating: data.quality_rating } });
+    });
+}
+
+function setUrgent(value) {
+    patchExam(props.urls.urgent, { urgent: value }, (data) => {
+        emit('updated', { exam: props.exam, changes: { urgent: data.urgent } });
     });
 }
 
@@ -134,7 +139,7 @@ async function confirmDisable() {
 async function setActive(value) {
     if (!value && !(await confirmDisable())) return;
     patchExam(props.urls.active, { active: value }, (data) => {
-        props.exam.active = data.active;
+        emit('updated', { exam: props.exam, changes: { active: data.active } });
     });
 }
 </script>
@@ -272,6 +277,22 @@ async function setActive(value) {
                     </button>
                     <span v-if="exam.quality_rating" class="text-muted small ms-1">({{ exam.quality_rating }}/5)</span>
                 </div>
+
+                <button
+                    type="button"
+                    role="menuitem"
+                    class="eic-menu__item"
+                    :disabled="busy"
+                    data-testid="exam-urgent-toggle"
+                    @click="setUrgent(!exam.urgent)"
+                >
+                    <i :class="exam.urgent ? 'ti ti-flag-off' : 'ti ti-flag'" class="text-danger"></i>
+                    {{
+                        exam.urgent
+                            ? tt('context_menu_urgent_clear', 'Remover urgência')
+                            : tt('context_menu_urgent_mark', 'Marcar como urgente')
+                    }}
+                </button>
 
                 <div class="eic-menu__sep"></div>
 

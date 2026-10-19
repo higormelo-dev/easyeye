@@ -1,11 +1,20 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { ref, computed, watch, onMounted } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PatientTable from './PatientTable.vue';
 import PatientCards from './PatientCards.vue';
 import PatientFormModal from './PatientFormModal.vue';
 import PatientDetailDrawer from './PatientDetailDrawer.vue';
+import PatientMergeModal from './PatientMergeModal.vue';
+
+const page = usePage();
+const mergeLabels = computed(() => page.props.t_ui?.patient_merge ?? {});
+const mergePatient = ref(null);
+function onMerged() {
+    mergePatient.value = null;
+    router.reload({ preserveScroll: true });
+}
 
 const props = defineProps({
     patients: { type: Object, required: true },
@@ -22,7 +31,14 @@ const props = defineProps({
 });
 
 // ── View toggle ──────────────────────────────────────────────────────────────
-const view = ref(localStorage.getItem('patients_view') ?? 'table');
+const view = ref('table');
+onMounted(() => {
+    try {
+        view.value = localStorage.getItem('patients_view') ?? 'table';
+    } catch {
+        /* Preferência opcional. */
+    }
+});
 
 function setView(v) {
     view.value = v;
@@ -230,6 +246,7 @@ const breadcrumbs = [
                 v-if="view === 'table'"
                 :patients="patients"
                 :filters="filters"
+                @merge="mergePatient = $event"
                 @sort="onSort"
                 @edit="openEdit"
                 @view="onView"
@@ -264,6 +281,14 @@ const breadcrumbs = [
             :marital-statuses="maritalStatuses"
             :states-of-brazil="statesOfBrazil"
             @close="closeModal"
+        />
+
+        <PatientMergeModal
+            :open="!!mergePatient"
+            :patient="mergePatient"
+            :labels="mergeLabels"
+            @close="mergePatient = null"
+            @merged="onMerged"
         />
 
         <!-- ── Patient Detail Drawer ─────────────────────────────────────── -->
