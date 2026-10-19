@@ -222,12 +222,23 @@ describe('EyeImages — modal de impressão: N imagens por folha (Fase 5)', () =
         await flushPromises();
 
         const buttons = wrapper.findAll('[data-testid="print-per-sheet"] button');
-        expect(buttons.map((b) => b.text())).toEqual(['1', '2', '4', '6']);
+        expect(buttons.map((b) => b.text())).toEqual(['1', '2', '4', '6', '8', '9', '12', '15', '16']);
 
         await buttons[1].trigger('click');
         expect(wrapper.vm.printPerSheet).toBe(2);
         await buttons[1].trigger('click');
         expect(wrapper.vm.printPerSheet).toBeNull();
+    });
+
+    it('folha ímpar com agrupamento OD/OE mostra o aviso e preserva a ordem', async () => {
+        const wrapper = await render();
+        wrapper.vm.openPrintModal([oeA, odA, oeB], false);
+        wrapper.vm.printPerSheet = 9;
+        wrapper.vm.printGroupOdOe = true;
+        await flushPromises();
+
+        expect(wrapper.find('[data-testid="print-pair-odd-hint"]').exists()).toBe(true);
+        expect(sheetIds(wrapper)[0].slice(0, 3)).toEqual(['a-oe', 'a-od', 'b-oe']);
     });
 
     it('printReport injeta o @page do papel escolhido e remove depois da impressão', async () => {

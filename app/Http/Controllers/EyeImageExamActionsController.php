@@ -101,6 +101,24 @@ class EyeImageExamActionsController extends Controller
     }
 
     /**
+     * Marca/desmarca o exame como urgente (laudo com prioridade). Ato do
+     * médico, como as demais ações rápidas (Gate::IssueReport). Vai pelo model
+     * — a mudança é auditada e aparece no Histórico do paciente.
+     */
+    public function updateUrgent(Request $request, PatientExam $exam): JsonResponse
+    {
+        $this->authorizeExam($exam);
+
+        $validated = $request->validate([
+            'urgent' => ['required', 'boolean'],
+        ]);
+
+        $exam->update(['urgent' => (bool) $validated['urgent']]);
+
+        return response()->json(['id' => (string) $exam->id, 'urgent' => (bool) $exam->urgent]);
+    }
+
+    /**
      * Mesclar exames — força 2+ imagens (mesmo paciente) a caírem no MESMO
      * grupo visual do Gerenciador de Imagens, mesmo que data/equipamento/
      * tipo reais sejam diferentes. Nunca mexe em exam_performed_at/

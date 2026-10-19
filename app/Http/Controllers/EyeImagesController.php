@@ -8,7 +8,7 @@ use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService, EyeImageAttachmentService, SpeechTranscriptionService};
 use App\DTOs\EyeImageFilters;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
-use App\Enums\{DraftStatus, EntityGate, FeatureKey};
+use App\Enums\{ClientRule, DraftStatus, EntityGate, FeatureKey, Permission};
 use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, EyeImageReportDraft, Patient, PatientDocumentShare, PatientExam};
 use App\Services\FeatureGateService;
 use App\Support\{BrazilianFormat, CurrentDoctor};
@@ -122,6 +122,9 @@ class EyeImagesController extends Controller
             'isDoctor'          => CurrentDoctor::canIssue(),
             'doctorMissing'     => CurrentDoctor::issuerMissing(),
             'doctorMissingText' => CurrentDoctor::missingMessage(),
+            // Histórico do paciente (somente leitura): espelha o middleware da rota
+            // eye-images.patients.audit (mesmo grupo de Pacientes).
+            'can_view_patient_audit' => $this->canViewPatientAudit($request, $entity),
             // Data alternativa do laudo manual (Fase 5) — mesma faixa/config
             // já usada em MedicalRecordsController (documents.date).
             'document_date_config' => DocumentDate::clientConfig(),
@@ -156,6 +159,10 @@ class EyeImagesController extends Controller
                 // memória). Mesmo endpoint já usado pelo painel do prontuário.
                 'patient_exams' => route('panel.eye-images.patient-exams', ['patient' => '__ID__']),
                 'image_url'     => route('panel.eye-images.image-url', ['exam' => '__ID__']),
+                // Histórico (auditoria) do paciente — ver EyeImagePatientAuditController.
+                'patient_audit' => route('panel.eye-images.patients.audit', ['patient' => '__ID__']),
+                // Visto/não visto — marcado ao exibir o exame no visualizador.
+                'exam_viewed_update' => route('panel.eye-images.exams.viewed', ['exam' => '__ID__']),
                 // Portal do Paciente (Fase 2) — toggle "compartilhar com paciente".
                 'document_share_store'   => route('panel.document-shares.store'),
                 'document_share_destroy' => route('panel.document-shares.destroy', ['share' => '__ID__']),
@@ -193,6 +200,7 @@ class EyeImagesController extends Controller
                 'exam_laterality_update'     => route('panel.eye-images.exams.laterality.update', ['exam' => '__ID__']),
                 'exam_quality_rating_update' => route('panel.eye-images.exams.quality-rating.update', ['exam' => '__ID__']),
                 'exam_active_update'         => route('panel.eye-images.exams.active.update', ['exam' => '__ID__']),
+                'exam_urgent_update'         => route('panel.eye-images.exams.urgent.update', ['exam' => '__ID__']),
                 // Estrela de prioridade/triagem do PACIENTE (benchmark 18/09/2026) —
                 // PatientsController::updatePriority, não é ação de exame.
                 'patient_priority_update' => route('panel.patients.priority.update', ['patient' => '__ID__']),
@@ -423,6 +431,40 @@ class EyeImagesController extends Controller
         ]);
     }
 
+    /**
+     * Mesma regra do middleware `permission:patients.manage,admin,financial,doctor,secretary`
+     * da rota do histórico — a tela só mostra o botão a quem a rota deixa passar.
+     */
+    private function canViewPatientAudit(Request $request, ?Entity $entity): bool
+    {
+        $user = $request->user();
+
+        return $entity !== null && $user !== null
+            && ($user->hasPermissionInEntity($entity, Permission::PatientsManage)
+                || $user->hasAnyRoleInEntity($entity, [ClientRule::Admin, ClientRule::Financial, ClientRule::Doctor, ClientRule::Secretary]));
+    }
+
+    /**
+     * Marca o exame como visto (primeira exibição no visualizador). UPDATE
+     * atômico `whereNull`: idempotente (a 2ª chamada mantém o instante
+     * original) e sem evento de model — não gera linha de auditoria nem mexe
+     * em updated_at. Guarda QUANDO, não quem viu. Qualquer perfil que abre o
+     * Gerenciador de Imagens marca; o tenant é checado pelo paciente do exame.
+     */
+    public function markExamViewed(PatientExam $exam): JsonResponse
+    {
+        $entityId = (string) session('selected_entity_id');
+        abort_unless($entityId !== '' && (string) $exam->patient?->entity_id === $entityId, 404);
+
+        // toBase(): o update do Eloquent acrescentaria updated_at sozinho.
+        PatientExam::query()->whereKey($exam->getKey())->whereNull('viewed_at')->toBase()->update(['viewed_at' => now()]);
+
+        return response()->json([
+            'id'        => (string) $exam->id,
+            'viewed_at' => $exam->fresh()?->viewed_at?->toIso8601String(),
+        ]);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     private function reviewTarget(Request $request, string $entityId): ?array
@@ -475,6 +517,8 @@ class EyeImagesController extends Controller
                 // migration 2026_09_09_110000 e Index.vue::groupedExams.
                 'exam_session_id'                => $e->exam_session_id !== null ? (string) $e->exam_session_id : null,
                 'active'                         => (bool) $e->active,
+                'viewed_at'                      => $e->viewed_at?->toIso8601String(),
+                'urgent'                         => (bool) $e->urgent,
                 'archive'                        => $e->archive,
                 'has_archive'                    => $e->archive !== null,
                 'created_at'                     => optional($e->created_at)->toIso8601String(),
@@ -569,6 +613,11 @@ class EyeImagesController extends Controller
 
         return $this->patientBaseQuery($entityId, $f)
             ->whereHas('exams', $examFilter)
+            // Urgentes primeiro: paciente com exame urgente (dentro do filtro atual) sobe na lista.
+            ->withCount(['exams as urgent_exams_count' => function (Builder|Relation $q) use ($examFilter): void {
+                $examFilter($q);
+                $q->where('urgent', true);
+            }])
             ->with([
                 'person',
                 'exams' => function (Builder|Relation $q) use ($examFilter): void {
@@ -580,9 +629,10 @@ class EyeImagesController extends Controller
                         // .documentation: id do MedicalRecordDocumentation gravado na
                         // aprovação — monta o link de PDF do laudo (examAiReport()).
                         'aiRuns' => fn ($r) => $r->orderByDesc('ai_runs.created_at')->with('documentation:id,ai_run_id,medical_record_id'),
-                    ])->orderByDesc('created_at');
+                    ])->orderByDesc('urgent')->orderByDesc('created_at');
                 },
             ])
+            ->orderByDesc('urgent_exams_count')
             ->orderByDesc('updated_at')
             ->paginate(perPage: $f->perPage, page: $f->page);
     }
@@ -670,6 +720,33 @@ class EyeImagesController extends Controller
 
             if ($f->source) {
                 $q->where('source', $f->source);
+            }
+
+            // "Só urgentes" — marcação do médico (EyeImageExamActionsController::updateUrgent).
+            if ($f->urgent) {
+                $q->where('urgent', true);
+            }
+
+            // Médico SOLICITANTE (quem pediu o laudo — texto livre no laudo salvo, não o
+            // médico interno do exame): parcial, sem caixa e sem acento; só laudo vigente
+            // da própria clínica (documentação excluída e rascunhos não contam).
+            if ($f->requestingDoctor !== null) {
+                $needle = addcslashes($f->requestingDoctor, '\\%_');
+
+                $q->whereExists(fn ($sub) => $sub->selectRaw('1')
+                    ->from('medical_record_documentation_exams as mrde')
+                    ->join('medical_record_documentations as mrd', 'mrd.id', '=', 'mrde.medical_record_documentation_id')
+                    ->whereColumn('mrde.patient_exam_id', 'patient_exams.id')
+                    ->where('mrde.entity_id', $entityId)
+                    ->whereNull('mrd.deleted_at')
+                    ->whereLikeUnaccent('mrd.requesting_doctor_name', $needle));
+            }
+
+            // Visto/não visto (primeira exibição no visualizador) — ver markExamViewed().
+            if ($f->viewed === 'vistos') {
+                $q->whereNotNull('viewed_at');
+            } elseif ($f->viewed === 'nao_vistos') {
+                $q->whereNull('viewed_at');
             }
 
             // "Laudado" = laudo manual/conjunto vigente OU laudo de IA aprovado

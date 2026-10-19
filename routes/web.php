@@ -14,6 +14,7 @@ use App\Http\Controllers\{
     ExternalExamImportController,
     EyeImageExamActionsController,
     EyeImageMontageController,
+    EyeImagePatientAuditController,
     EyeImageReportController,
     EyeImageReportDictationController,
     EyeImageReportDraftController,
@@ -254,6 +255,14 @@ Route::group(
         // Exames com metadados p/ o painel do PRONTUÁRIO (leitura logada — LGPD).
         Route::get('/eye-images/patient-exams/{patient}', [EyeImagesController::class, 'patientExamsForRecord'])->name('eye-images.patient-exams');
         Route::get('/eye-images/image-url/{exam}', [EyeImagesController::class, 'imageUrl'])->name('eye-images.image-url');
+        // Visto/não visto: quem abre o Gerenciador marca ao exibir o exame (sem entity.role;
+        // tenant checado no controller). Não é ato clínico nem gera auditoria.
+        Route::put('/eye-images/exams/{exam}/viewed', [EyeImagesController::class, 'markExamViewed'])->name('eye-images.exams.viewed');
+        // Histórico (somente leitura) do cadastro e dos exames do paciente — ACL espelha o grupo
+        // Pacientes; o Gerenciador de Imagens em si não tem entity.role (financeiro também entra).
+        Route::get('/eye-images/patients/{patient}/audit', EyeImagePatientAuditController::class)
+            ->middleware('permission:patients.manage,admin,financial,doctor,secretary')
+            ->name('eye-images.patients.audit');
         // Duplicata dedicada da busca de CID-10 (mesmo Cid10SearchController) sem a
         // restrição de role de `cid10.search` (admin,doctor,secretary) — o Gerenciador
         // de Imagens não tem entity.role e não vamos afrouxar a rota usada no
@@ -289,6 +298,9 @@ Route::group(
         Route::put('/eye-images/exams/{exam}/active', [EyeImageExamActionsController::class, 'toggleActive'])
             ->middleware('entity.role:admin,doctor')
             ->name('eye-images.exams.active.update');
+        Route::put('/eye-images/exams/{exam}/urgent', [EyeImageExamActionsController::class, 'updateUrgent'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.exams.urgent.update');
         // Mesclar/Dividir são em lote (N exam_ids no corpo) — nunca RESTful
         // de um recurso só, por isso sem {exam} na URL.
         Route::post('/eye-images/exams/merge', [EyeImageExamActionsController::class, 'mergeExams'])
@@ -459,6 +471,14 @@ Route::group(
             // Restaurar paciente excluído (a listagem mostra "Restaurar") —
             // mesmo grupo de permissão da exclusão.
             Route::patch('patients/{patient}/restore', [PatientsController::class, 'restore'])->name('patients.restore');
+            // Mesclar cadastro (dedup): só administrador da clínica. As duas rotas antes do
+            // Route::resource; o tenant e a regra de candidatos são conferidos no controller/service.
+            Route::get('patients/{patient}/merge-candidates', [PatientsController::class, 'mergeCandidates'])
+                ->middleware('entity.role:admin')
+                ->name('patients.merge-candidates');
+            Route::post('patients/{patient}/merge', [PatientsController::class, 'merge'])
+                ->middleware('entity.role:admin')
+                ->name('patients.merge');
             // Segurança clínica (Fase 2 / A1-A2): alergias, "nega alergias" e
             // medicações em uso. Mesma regra de acesso a Pacientes (recepção
             // registra como informado); confirmar/descartar/suspender exige o

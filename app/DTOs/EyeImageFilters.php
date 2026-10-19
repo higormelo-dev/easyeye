@@ -18,6 +18,10 @@ final readonly class EyeImageFilters
 
     private const array STATUSES = ['laudado', 'pendente'];
 
+    private const array VIEWED = ['vistos', 'nao_vistos'];
+
+    private const int REQUESTING_DOCTOR_MAX = 80;
+
     public function __construct(
         public string $period = 'hoje',
         public string $search = '',
@@ -31,6 +35,9 @@ final readonly class EyeImageFilters
         public ?string $customDiagnosisId = null,
         public ?string $status = null,
         public ?string $source = null,
+        public ?string $viewed = null,
+        public bool $urgent = false,
+        public ?string $requestingDoctor = null,
         public int $page = 1,
         public int $perPage = 25,
     ) {
@@ -41,6 +48,11 @@ final readonly class EyeImageFilters
         $eye    = $request->string('eye')->trim()->lower()->value();
         $status = $request->string('status')->trim()->lower()->value();
         $source = $request->string('source')->trim()->lower()->value();
+        $viewed = $request->string('viewed')->trim()->lower()->value();
+
+        // Texto livre (nome do solicitante): array no query string não vira "Array".
+        $requester = $request->input('requesting_doctor');
+        $requester = is_string($requester) ? mb_substr(trim($requester), 0, self::REQUESTING_DOCTOR_MAX) : '';
 
         return new self(
             period: $request->string('period', 'hoje')->trim()->value() ?: 'hoje',
@@ -55,6 +67,9 @@ final readonly class EyeImageFilters
             customDiagnosisId: $request->string('custom_diagnosis_id')->trim()->value() ?: null,
             status: in_array($status, self::STATUSES, true) ? $status : null,
             source: ExamSource::tryFrom($source) !== null ? $source : null,
+            viewed: in_array($viewed, self::VIEWED, true) ? $viewed : null,
+            urgent: $request->boolean('urgent'),
+            requestingDoctor: $requester !== '' ? $requester : null,
             page: max(1, $request->integer('page', 1)),
             perPage: min(100, max(10, $request->integer('per_page', 25))),
         );
@@ -87,6 +102,9 @@ final readonly class EyeImageFilters
             'custom_diagnosis_id' => $this->customDiagnosisId,
             'status'              => $this->status,
             'source'              => $this->source,
+            'viewed'              => $this->viewed,
+            'urgent'              => $this->urgent,
+            'requesting_doctor'   => $this->requestingDoctor,
             'page'                => $this->page,
             'per_page'            => $this->perPage,
         ];

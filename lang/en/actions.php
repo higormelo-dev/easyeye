@@ -194,6 +194,7 @@ return [
     'arrived'                => 'Arrived',
     'mark_arrival'           => 'Mark Arrival',
     'patient_record'         => 'Patient Record',
+    'patient_merge_success'  => 'Records merged. :count record(s) transferred.',
     'register_record'        => 'Register Record',
     'skin'                   => 'Skin',
     'skintype'               => 'Skin Type',
@@ -1129,4 +1130,6 @@ return [
     'fit_in_shift_afternoon' => 'Afternoon',
     'fit_in_shift_evening'   => 'Evening',
     'fit_in_limits_hint'     => 'How many fit-ins the doctor accepts per day in each shift, on top of the grid. 0 = no fit-ins.',
+    'patient_merge'          => 'Merge records',
+    'patient_merged_into'    => 'Merged into :code',
 ];

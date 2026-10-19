@@ -5,13 +5,14 @@
  * navegador quiser), aqui o médico escolhe quantas imagens cabem numa folha.
  *
  * Com "OD/OE lado a lado" cada linha da grade é um par — OD na coluna da
- * esquerda, OE na da direita —, então a folha nunca mistura os olhos nem
- * troca a ordem entre uma folha e outra.
+ * esquerda, OE na da direita. O pareamento vale apenas para tamanhos pares:
+ * nas folhas ímpares a ordem atual é preservada para não deslocar olhos entre
+ * folhas.
  *
  * Funções puras (sem DOM): a tela só renderiza o que sai daqui.
  */
 
-export const SHEET_SIZES = [1, 2, 4, 6];
+export const SHEET_SIZES = [1, 2, 4, 6, 8, 9, 12, 15, 16];
 
 const EYE_OD = 1;
 const EYE_OE = 2;
@@ -24,19 +25,41 @@ const EYE_OE = 2;
  * - Com pares OD/OE: 2 colunas sempre (OD | OE), as linhas são os pares — uma
  *   folha de 1 imagem não tem par e fica 1×1.
  */
+export function canPairOdOe(perSheet) {
+    return perSheet > 1 && perSheet % 2 === 0;
+}
+
 export function sheetGrid(perSheet, orientation = 'portrait', pairOdOe = false) {
     const n = SHEET_SIZES.includes(perSheet) ? perSheet : 1;
     if (n === 1) return { cols: 1, rows: 1 };
 
-    if (pairOdOe) return { cols: 2, rows: n / 2 };
+    if (pairOdOe && canPairOdOe(n)) return { cols: 2, rows: n / 2 };
 
     if (orientation === 'landscape') {
-        return { 1: { cols: 1, rows: 1 }, 2: { cols: 2, rows: 1 }, 4: { cols: 2, rows: 2 }, 6: { cols: 3, rows: 2 } }[
-            n
-        ];
+        return {
+            1: { cols: 1, rows: 1 },
+            2: { cols: 2, rows: 1 },
+            4: { cols: 2, rows: 2 },
+            6: { cols: 3, rows: 2 },
+            8: { cols: 4, rows: 2 },
+            9: { cols: 3, rows: 3 },
+            12: { cols: 4, rows: 3 },
+            15: { cols: 5, rows: 3 },
+            16: { cols: 4, rows: 4 },
+        }[n];
     }
 
-    return { 1: { cols: 1, rows: 1 }, 2: { cols: 1, rows: 2 }, 4: { cols: 2, rows: 2 }, 6: { cols: 2, rows: 3 } }[n];
+    return {
+        1: { cols: 1, rows: 1 },
+        2: { cols: 1, rows: 2 },
+        4: { cols: 2, rows: 2 },
+        6: { cols: 2, rows: 3 },
+        8: { cols: 2, rows: 4 },
+        9: { cols: 3, rows: 3 },
+        12: { cols: 3, rows: 4 },
+        15: { cols: 3, rows: 5 },
+        16: { cols: 4, rows: 4 },
+    }[n];
 }
 
 /**
@@ -99,7 +122,7 @@ export function paginate(cells, perSheet) {
  * @returns {{grid:{cols:number,rows:number}, sheets:Array<Array<object|null>>}}
  */
 export function buildSheets(exams, { perSheet, orientation = 'portrait', pairOdOe = false, groupKeyOf }) {
-    const paired = pairOdOe && perSheet > 1;
+    const paired = pairOdOe && canPairOdOe(perSheet);
     const grid = sheetGrid(perSheet, orientation, paired);
     const cells = paired ? pairRows(exams, groupKeyOf).flat() : exams.slice();
 

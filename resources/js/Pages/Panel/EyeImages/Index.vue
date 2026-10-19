@@ -2,7 +2,7 @@
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { latestRequest } from '@/Support/latestRequest.js';
 import { fill } from '@/Support/clinicalDocuments.js';
-import { SHEET_SIZES, buildSheets } from '@/Support/printSheets.js';
+import { SHEET_SIZES, buildSheets, canPairOdOe } from '@/Support/printSheets.js';
 import { useUserPreferences } from '@/composables/useUserPreferences.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -16,6 +16,7 @@ import EyeImageReportModal from './EyeImageReportModal.vue';
 import EyeImageReportDraftsModal from './EyeImageReportDraftsModal.vue';
 import EyeImageCompareModal from './EyeImageCompareModal.vue';
 import EyeImageContextMenu from './EyeImageContextMenu.vue';
+import EyeImagePatientAuditModal from './EyeImagePatientAuditModal.vue';
 
 /**
  * Eye Images — porta fiel da implementação Alpine.js original.
@@ -38,6 +39,7 @@ const props = defineProps({
     urls: { type: Object, required: true },
     ai: { type: Object, default: () => ({}) },
     isDoctor: { type: Boolean, default: false },
+    can_view_patient_audit: { type: Boolean, default: false },
     // Perfil médico sem cadastro de médico ativo (CurrentDoctor): laudo/diagnóstico barrados.
     doctorMissing: { type: Boolean, default: false },
     doctorMissingText: { type: String, default: '' },
@@ -101,6 +103,7 @@ function isNativeActivationTarget(el, key) {
 // ── Estado principal ──────────────────────────────────────────────────────
 const patients = ref(props.patients || []);
 const selectedPatient = ref(null);
+const auditPatient = ref(null);
 const examUrls = ref({}); // {examId: presignedUrl} — JPEG de exibição (fallback: original)
 const examThumbUrls = ref({}); // {examId: presignedUrl} — miniatura para o grid
 const brokenUrls = ref({}); // {examId: true}
@@ -127,13 +130,26 @@ const equipmentId = ref(props.filters?.equipment_id ?? '');
 const cidCode = ref(props.filters?.cid_code ?? '');
 const examStatus = ref(props.filters?.status ?? ''); // '' | 'laudado' | 'pendente'
 const examSource = ref(props.filters?.source ?? ''); // '' | 'integrator' | 'external_import'
+const examViewed = ref(props.filters?.viewed ?? '');
+const onlyUrgent = ref(!!props.filters?.urgent);
+const requestingDoctor = ref(props.filters?.requesting_doctor ?? '');
+const viewedRequests = new Set();
 // Abre a barra de filtros quando a página já chega filtrada (ex.: card
 // "Exames pendentes" do Dashboard → ?status=pendente) — senão o filtro
 // ativo fica escondido e a lista parece incompleta.
 const showFilters = ref(
-    ['eye', 'exam_type_id', 'equipment_id', 'cid_code', 'doctor_id', 'status', 'source'].some(
-        (key) => !!props.filters?.[key],
-    ),
+    [
+        'eye',
+        'exam_type_id',
+        'equipment_id',
+        'cid_code',
+        'doctor_id',
+        'status',
+        'source',
+        'viewed',
+        'urgent',
+        'requesting_doctor',
+    ].some((key) => !!props.filters?.[key]),
 );
 
 // Opções de select — vêm prontas do servidor (filtros server-side não podem
@@ -180,7 +196,7 @@ const printOrientation = ref('portrait');
 // as setas de reordenar manual enquanto ativo (a ordem some de ser manual).
 const printGroupOdOe = ref(false);
 // N imagens por folha (Fase 5): null = grade contínua por colunas (printCols);
-// 1/2/4/6 = folhas A4 com N imagens e quebra de página (Support/printSheets).
+// 1..16 (SHEET_SIZES) = folhas A4 com N imagens e quebra de página (Support/printSheets).
 const printPerSheet = ref(null);
 // Legenda ad hoc por imagem (Fase 5) — só nesta impressão, nunca persistida
 // (reseta a cada abertura do modal, ver openPrintModal()).
@@ -607,6 +623,9 @@ function clearFilters() {
     doctorId.value = '';
     examStatus.value = '';
     examSource.value = '';
+    examViewed.value = '';
+    onlyUrgent.value = false;
+    requestingDoctor.value = '';
 }
 
 /**
@@ -639,6 +658,9 @@ async function fetchPatients({ reset = true, page: requestedPage = 1 } = {}) {
         if (doctorId.value) params.append('doctor_id', doctorId.value);
         if (examStatus.value) params.append('status', examStatus.value);
         if (examSource.value) params.append('source', examSource.value);
+        if (examViewed.value) params.append('viewed', examViewed.value);
+        if (onlyUrgent.value) params.append('urgent', '1');
+        if (requestingDoctor.value.trim()) params.append('requesting_doctor', requestingDoctor.value.trim());
 
         const res = await fetch(`${props.urls.search}?${params}`, {
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
@@ -679,6 +701,9 @@ watch(
         doctorId,
         examStatus,
         examSource,
+        examViewed,
+        onlyUrgent,
+        requestingDoctor,
         customDateFrom,
         customDateTo,
     ],
@@ -755,7 +780,30 @@ function setPanelExam(pi, exam) {
     viewerPanelUrls.value = urls;
     viewerPanelLoading.value = loadingArr;
     viewerPanelBroken.value = broken;
+    markExamViewed(exam);
     _loadPanelUrl(pi, exam);
+}
+
+function applyViewedAt(examId, viewedAt) {
+    for (const patient of patients.value) {
+        for (const item of patient.exams ?? []) {
+            if (item.id === examId) item.viewed_at = viewedAt;
+        }
+    }
+    for (const item of viewerExams.value) {
+        if (item.id === examId) item.viewed_at = viewedAt;
+    }
+}
+
+async function markExamViewed(exam) {
+    if (!exam || exam.viewed_at || viewedRequests.has(exam.id) || !props.urls.exam_viewed_update) return;
+    viewedRequests.add(exam.id);
+    try {
+        const { data } = await window.axios.put(props.urls.exam_viewed_update.replace('__ID__', exam.id));
+        applyViewedAt(exam.id, data.viewed_at);
+    } catch {
+        viewedRequests.delete(exam.id);
+    }
 }
 
 function _loadPanelUrl(pi, exam) {
@@ -1996,6 +2044,7 @@ const contextMenuUrls = computed(() => ({
     laterality: props.urls?.exam_laterality_update ?? '',
     quality_rating: props.urls?.exam_quality_rating_update ?? '',
     active: props.urls?.exam_active_update ?? '',
+    urgent: props.urls?.exam_urgent_update ?? '',
 }));
 
 function openContextMenu(event, exam) {
@@ -2044,6 +2093,10 @@ function onContextMenuDownload() {
     if (!exam) return;
     const url = examUrls.value[exam.id];
     if (url) window.open(url, '_blank');
+}
+
+function onContextMenuUpdated({ exam, changes }) {
+    Object.assign(exam, changes);
 }
 
 /**
@@ -2380,6 +2433,47 @@ const printEntity = computed(() => props.entity ?? {});
 
                     <div class="col-12 col-sm-6 col-lg-4 col-xxl">
                         <SearchSelect
+                            v-model="examViewed"
+                            :aria-label="tt('filter_viewed')"
+                            data-testid="exam-viewed-filter"
+                            :options="[
+                                { value: 'vistos', label: tt('viewed_yes', 'Vistas') },
+                                { value: 'nao_vistos', label: tt('viewed_no', 'Não vistas') },
+                            ]"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :placeholder="tt('all_viewed', 'Todas')"
+                        />
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl d-flex align-items-center">
+                        <label class="form-check mb-0">
+                            <input
+                                v-model="onlyUrgent"
+                                data-testid="exam-urgent-filter"
+                                class="form-check-input"
+                                type="checkbox"
+                            />
+                            <span class="form-check-label">{{ tt('filter_urgent_only', 'Só urgentes') }}</span>
+                        </label>
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl">
+                        <input
+                            v-model="requestingDoctor"
+                            data-testid="exam-requester-filter"
+                            class="form-control"
+                            type="text"
+                            maxlength="80"
+                            :placeholder="
+                                tt('filter_requesting_doctor_placeholder', 'Nome do médico que pediu o laudo...')
+                            "
+                            :aria-label="tt('filter_requesting_doctor', 'Médico solicitante')"
+                        />
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl">
+                        <SearchSelect
                             v-model="equipmentId"
                             :options="equipmentOptions"
                             :placeholder="'Todos equipamentos'"
@@ -2610,6 +2704,15 @@ const printEntity = computed(() => props.entity ?? {});
                             >
                                 <i class="fa fa-stethoscope me-1"></i>
                                 <span class="d-none d-sm-inline">Diagnóstico</span>
+                            </button>
+                            <button
+                                v-if="can_view_patient_audit"
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                data-testid="patient-audit-open"
+                                @click="auditPatient = selectedPatient"
+                            >
+                                <i class="ti ti-history me-1" aria-hidden="true"></i>{{ tt('audit_button') }}
                             </button>
                             <a
                                 :href="`/panel/patients/${selectedPatient.id}/medicalrecords`"
@@ -2982,6 +3085,16 @@ const printEntity = computed(() => props.entity ?? {});
                                                         style="z-index: 1; margin: 3px; max-width: 70px"
                                                     >
                                                         <span
+                                                            v-if="exam.urgent"
+                                                            class="badge bg-danger"
+                                                            style="font-size: 0.5rem; white-space: nowrap"
+                                                            :title="
+                                                                tt('urgent_badge_title', 'Exame marcado como urgente')
+                                                            "
+                                                            data-testid="exam-urgent-badge"
+                                                            >{{ tt('urgent_badge', 'Urgente') }}</span
+                                                        >
+                                                        <span
                                                             v-if="primaryDiagnosisLabel(exam)"
                                                             class="badge bg-success-subtle text-success-emphasis"
                                                             style="
@@ -3045,6 +3158,14 @@ const printEntity = computed(() => props.entity ?? {});
                                                     >
                                                         {{ latLabel(exam.laterality) }}
                                                     </span>
+
+                                                    <span
+                                                        v-if="!exam.viewed_at"
+                                                        class="position-absolute end-0 rounded-circle bg-primary"
+                                                        style="width: 7px; height: 7px; bottom: 4px; z-index: 1"
+                                                        :title="tt('unviewed_dot_title', 'Não visualizada')"
+                                                        data-testid="exam-unviewed-dot"
+                                                    ></span>
 
                                                     <!-- Checkbox seleção -->
                                                     <span
@@ -3726,6 +3847,20 @@ const printEntity = computed(() => props.entity ?? {});
                             {{ n }}
                         </button>
                     </div>
+                    <small
+                        v-if="printGroupOdOe && printPerSheet && !canPairOdOe(printPerSheet)"
+                        class="text-white-50"
+                        data-testid="print-pair-odd-hint"
+                        >{{
+                            fill(
+                                tt(
+                                    'print_pair_odd_hint',
+                                    'Pareamento OD/OE não se aplica a folhas com :count imagens (ímpar) — as imagens saem na ordem atual.',
+                                ),
+                                { count: printPerSheet },
+                            )
+                        }}</small
+                    >
 
                     <div class="vr opacity-25 mx-1"></div>
 
@@ -4291,6 +4426,13 @@ const printEntity = computed(() => props.entity ?? {});
         />
 
         <!-- Menu de contexto (botão direito na miniatura) -->
+        <EyeImagePatientAuditModal
+            :open="!!auditPatient"
+            :patient="auditPatient"
+            :url="urls.patient_audit"
+            :t="t"
+            @close="auditPatient = null"
+        />
         <EyeImageContextMenu
             :open="contextMenuOpen"
             :exam="contextMenuExam"
@@ -4304,6 +4446,7 @@ const printEntity = computed(() => props.entity ?? {});
             @compare="onContextMenuCompare"
             @share="onContextMenuShare"
             @download="onContextMenuDownload"
+            @updated="onContextMenuUpdated"
         />
     </AppLayout>
 </template>
