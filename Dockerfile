@@ -29,6 +29,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         xfonts-base \
         supervisor \
         netcat-openbsd \
+        # Panorama (stitching de imagens de retina — benchmark Ger Exames/
+        # iWayBrasil, aba "Montage") — python3-opencv traz libopencv já
+        # compilada; evita build from source do pip opencv-python no runtime.
+        python3 \
+        python3-opencv \
+        python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
 # wkhtmltopdf com patches Qt — usa .deb oficial Bookworm (glibc nativo)
