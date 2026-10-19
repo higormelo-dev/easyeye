@@ -20,4 +20,14 @@ return [
         'country' => env('SAAS_OWNER_COUNTRY', 'BR'),
         'locale'  => env('SAAS_OWNER_LOCALE', 'pt_BR'),
     ],
+
+    /*
+     * Suporte ao cliente no topo do painel da clínica (App\Support\SupportContact).
+     * WhatsApp oficial: DDI + DDD + número, só dígitos (ex.: 5561999999999);
+     * pontuação é ignorada. Vazio/inválido cai no e-mail de suporte
+     * (mail.support_address) e, sem ele, o botão some.
+     */
+    'support' => [
+        'whatsapp' => env('SUPPORT_WHATSAPP'),
+    ],
 ];

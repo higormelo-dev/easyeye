@@ -366,6 +366,8 @@ return [
         'confirmation_enabled'                      => 'confirmation enabled',
         'confirmation_hours_before'                 => 'confirmation hours in advance',
         'contents'                                  => 'contents',
+        'contract_ends_at'                          => 'contract end',
+        'contract_starts_at'                        => 'contract start',
         'context'                                   => 'context',
         'conversation_id'                           => 'conversation',
         'cover_test_type_id'                        => 'cover test type',

@@ -301,6 +301,17 @@ class PanelNavigation
             ];
         }
 
+        // Novidades: o que mudou em cada versão (todos os perfis). O badge
+        // "novo" vale até o usuário abrir a página (users.changelog_seen_version).
+        $nav[] = [
+            'key'   => 'news',
+            'route' => 'panel.news.index',
+            'icon'  => 'ti ti-speakerphone',
+            'label' => __('actions.sidemenu.news'),
+            'match' => ['panel.news.*'],
+            'badge' => Changelog::hasUnseen(auth()->user()) ? __('actions.sidemenu.news_badge') : null,
+        ];
+
         if ($isAdmin) {
             // ── Configurações reorganizadas em 5 categorias (era 1 grupo
             // flat com 12+ itens soltos + "Controle de acesso" à parte).

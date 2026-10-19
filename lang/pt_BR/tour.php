@@ -144,6 +144,10 @@ return [
                 'title'       => 'Alertas de estoque',
                 'description' => 'Aparece quando há produtos abaixo do estoque mínimo ou com lote vencido ou vencendo nos próximos 30 dias. Clique num alerta para ver os produtos dele ou em "Ver estoque" para a lista completa.',
             ],
+            'dashboard-covenant-contracts' => [
+                'title'       => 'Contratos de convênio',
+                'description' => 'Só para a gestão e o financeiro: convênios cujo contrato vence nos próximos 30 dias ou já venceu, com a data de fim. O link abre o cadastro de convênios, onde você ajusta as datas do contrato.',
+            ],
             'dashboard-shortcuts-customize' => [
                 'title'       => 'Escolher atalhos',
                 'description' => 'Escolha os atalhos abaixo: o olho mostra ou oculta cada um; arraste pela alça ou use as setas para mudar a ordem. "Restaurar padrão" volta ao original. A escolha fica salva para você.',

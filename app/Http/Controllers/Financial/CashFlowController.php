@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Financial;
 
-use App\Enums\{CashEntryReferenceType, EntityGate, FinancialEntryStatus, FinancialEntryType, PaymentMethod};
+use App\Enums\{CardBrand, CashEntryReferenceType, EntityGate, FinancialEntryStatus, FinancialEntryType, PaymentMethod};
 use App\Exceptions\Financial\CashPeriodClosedException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Financial\CashEntryRequest;
@@ -114,7 +114,11 @@ class CashFlowController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'payment_methods' => fn () => collect(PaymentMethod::cases())
-                ->map(fn (PaymentMethod $m) => ['value' => $m->value, 'label' => $m->label()])
+                ->map(fn (PaymentMethod $m) => ['value' => $m->value, 'label' => $m->label(), 'uses_card' => $m->usesCard()])
+                ->values()
+                ->all(),
+            'card_brands' => fn () => collect(CardBrand::cases())
+                ->map(fn (CardBrand $b) => ['value' => $b->value, 'label' => $b->label()])
                 ->values()
                 ->all(),
             // KPIs e rodapé com os MESMOS filtros da tabela (cancelados fora).
@@ -183,6 +187,8 @@ class CashFlowController extends Controller
             'patient_name'         => $e->patient?->person?->full_name,
             'payment_method'       => $e->payment_method?->value,
             'payment_method_label' => $e->payment_method?->label(),
+            'card_brand'           => $e->card_brand?->value,
+            'card_brand_label'     => $e->card_brand?->label(),
             'origin'               => $origin,
             'schedule_date'        => $origin === self::ORIGIN_SCHEDULE ? ($scheduleDates[(string) $e->reference_id] ?? null) : null,
             // Recebimento da agenda com dinheiro + cartão: valor e forma só pela agenda.

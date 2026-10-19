@@ -5,7 +5,8 @@ namespace App\Http\Requests;
 use App\Models\Covenant;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\{Carbon, Str};
+use Illuminate\Validation\{Rule, Validator};
 
 class CovenantRequest extends FormRequest
 {
@@ -47,7 +48,14 @@ class CovenantRequest extends FormRequest
                             ->whereNull('deleted_at');
                     }),
             ],
-            'table' => 'required_without:type_method|boolean',
+            'table'              => 'required_without:type_method|boolean',
+            'contract_starts_at' => ['nullable', 'date'],
+            // after_or_equal contra um início vazio falharia mesmo com o fim válido.
+            'contract_ends_at' => array_values(array_filter([
+                'nullable',
+                'date',
+                $this->filled('contract_starts_at') ? 'after_or_equal:contract_starts_at' : null,
+            ])),
         ];
 
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
@@ -55,6 +63,69 @@ class CovenantRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * Vigência do contrato no update PARCIAL: o campo omitido mantém a data
+     * gravada, então o par EFETIVO (enviado + gravado) é que não pode ficar
+     * invertido. Null enviado é "limpar" e não compara. Par completo é coberto
+     * pela regra after_or_equal de contract_ends_at; nenhum dos dois, nada muda.
+     *
+     * @return list<callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [$this->validateEffectiveContractRange(...)];
+    }
+
+    private function validateEffectiveContractRange(Validator $validator): void
+    {
+        $sendsStart = $this->has('contract_starts_at');
+        $sendsEnd   = $this->has('contract_ends_at');
+
+        if (! ($this->isMethod('PUT') || $this->isMethod('PATCH'))
+            || $sendsStart === $sendsEnd
+            || $validator->errors()->hasAny(['contract_starts_at', 'contract_ends_at'])) {
+            return;
+        }
+
+        $covenant = $this->persistedCovenant();
+
+        if ($covenant === null) {
+            return;
+        }
+
+        $start = $sendsStart ? $this->input('contract_starts_at') : $covenant->contract_starts_at;
+        $end   = $sendsEnd ? $this->input('contract_ends_at') : $covenant->contract_ends_at;
+
+        if (blank($start) || blank($end) || Carbon::parse($start)->startOfDay()->lte(Carbon::parse($end)->startOfDay())) {
+            return;
+        }
+
+        $startLabel = __('validation.attributes.contract_starts_at');
+        $endLabel   = __('validation.attributes.contract_ends_at');
+
+        if ($sendsEnd) {
+            $validator->errors()->add('contract_ends_at', __('validation.after_or_equal', ['attribute' => $endLabel, 'date' => $startLabel]));
+        } else {
+            $validator->errors()->add('contract_starts_at', __('validation.before_or_equal', ['attribute' => $startLabel, 'date' => $endLabel]));
+        }
+    }
+
+    /** Convênio da rota, só se for da clínica da sessão (id ou código, como o controller resolve). */
+    private function persistedCovenant(): ?Covenant
+    {
+        $key = $this->route('covenant');
+
+        if (! is_string($key) || $key === '') {
+            return null;
+        }
+
+        return Covenant::query()
+            ->withTrashed()
+            ->where('entity_id', session('selected_entity_id'))
+            ->where(Str::isUuid($key) ? 'id' : 'code', $key)
+            ->first();
     }
 
     /**
@@ -126,9 +197,9 @@ class CovenantRequest extends FormRequest
         }
 
         return match (mb_strtolower(trim($value))) {
-            '1', 'true', 'on', 'yes' => true,
+            '1', 'true', 'on', 'yes'  => true,
             '0', 'false', 'off', 'no' => false,
-            default => $value,
+            default                   => $value,
         };
     }
 }

@@ -110,6 +110,7 @@ return [
         'col_description'    => 'Description',
         'col_covenant'       => 'Insurer',
         'col_payment_method' => 'Payment method',
+        'col_card_brand'     => 'Card brand',
         'col_type'           => 'Type',
         'col_status'         => 'Status',
         'col_value'          => 'Amount',

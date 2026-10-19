@@ -152,6 +152,7 @@ const rows = [
         patient_name: 'MARIA DA SILVA',
         payment_method: 'cash',
         payment_method_label: 'À Vista',
+        card_brand_label: 'Visa',
         origin: 'schedule',
         category_name: null,
         covenant_name: null,
@@ -320,7 +321,7 @@ describe('Financial/CashFlow/Index — tabela e cards', () => {
 
         expect(row.find('[data-test="code"]').text()).toBe('FLC-0000000003');
         expect(row.find('[data-test="patient"]').text()).toBe('MARIA DA SILVA');
-        expect(row.find('[data-test="payment-method"]').text()).toBe('À Vista');
+        expect(row.find('[data-test="payment-method"]').text()).toBe('À Vista · Visa');
         expect(row.find('[data-test="origin"]').text()).toBe('Schedule');
         expect(row.text()).toContain('10/09/2026');
         expect(row.find('[data-test="amount"]').text()).toBe(brl(180, true));
@@ -370,7 +371,7 @@ describe('Financial/CashFlow/Index — tabela e cards', () => {
         expect(card.text()).toContain('Consulta particular');
         expect(card.text()).toContain('FLC-0000000003');
         expect(card.text()).toContain('MARIA DA SILVA');
-        expect(card.text()).toContain('À Vista');
+        expect(card.text()).toContain('À Vista · Visa');
         expect(card.find('[data-test="amount"]').text()).toBe(brl(180, true));
         expect(w.find('[data-test="card-claim"] [data-test="lock-badge"]').exists()).toBe(true);
 

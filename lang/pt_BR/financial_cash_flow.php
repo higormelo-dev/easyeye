@@ -172,6 +172,10 @@ return [
     'schedule_split_locked'   => 'Este recebimento veio da agenda com pagamento dividido (dinheiro e cartão): valor e forma de pagamento só podem ser alterados pela agenda.',
 
     'reference_managed_by_system' => 'O vínculo do lançamento (agendamento, guia ou compra) é definido pelo sistema e não pode ser informado.',
+    'form_card_brand'             => 'Bandeira do cartão',
+    'form_card_brand_none'        => 'Não informada',
+    'card_brand_only_card'        => 'A bandeira só pode ser informada para pagamentos com cartão.',
+    'card_brands'                 => ['visa' => 'Visa', 'mastercard' => 'Mastercard', 'elo' => 'Elo', 'amex' => 'American Express', 'hipercard' => 'Hipercard', 'diners' => 'Diners Club', 'others' => 'Outros'],
 
     'attributes' => [
         'entry_date'     => 'data',
@@ -183,6 +187,7 @@ return [
         'covenant_id'    => 'convênio',
         'notes'          => 'observações',
         'payment_method' => 'forma de pagamento',
+        'card_brand'     => 'bandeira do cartão',
         'reference_type' => 'tipo de vínculo',
         'reference_id'   => 'vínculo',
     ],

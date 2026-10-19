@@ -6,7 +6,7 @@ use App\Domains\AI\Services\AiAssistantWidgetPropsBuilder;
 use App\Models\{Entity, Partner};
 use App\Services\Billing\SubscriptionNoticeService;
 use App\Services\SubscriptionService;
-use App\Support\{PanelNavigation, PanelTour};
+use App\Support\{PanelNavigation, PanelTour, SupportContact};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Storage, Vite};
 use Inertia\Middleware;
@@ -123,6 +123,13 @@ class HandleInertiaRequests extends Middleware
                     session('selected_entity_user_rule'),
                 )
                 : ['enabled' => false],
+
+            // Botão de suporte (WhatsApp oficial ou e-mail) no topo do painel da
+            // clínica. Null fora do painel (manager.*, site, visitante) e quando
+            // não há contato configurado — ver App\Support\SupportContact.
+            'support' => fn () => $request->routeIs('panel.*') && $request->user()
+                ? SupportContact::props()
+                : null,
 
             // Aviso da situação da assinatura no topo do painel da clínica
             // (pagamento pendente/em atraso, acesso limitado, trial

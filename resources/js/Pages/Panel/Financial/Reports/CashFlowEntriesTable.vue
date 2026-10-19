@@ -184,7 +184,10 @@ function openLabel(entry) {
                             class="d-none d-xl-table-cell small text-body-secondary text-nowrap"
                             data-test="entry-payment-method"
                         >
-                            {{ entry.payment_method_label || '—' }}
+                            {{ entry.payment_method_label || '—'
+                            }}<span v-if="entry.card_brand_label" class="text-muted">
+                                · {{ entry.card_brand_label }}</span
+                            >
                         </td>
                         <td class="text-center">
                             <span

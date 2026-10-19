@@ -144,6 +144,10 @@ return [
                 'title'       => 'Stock alerts',
                 'description' => 'Shows up when products are below the minimum stock or have lots that are expired or expiring in the next 30 days. Click an alert to see its products or "View stock" for the full list.',
             ],
+            'dashboard-covenant-contracts' => [
+                'title'       => 'Covenant contracts',
+                'description' => 'Management and finance only: covenants whose contract expires within the next 30 days or has already expired, with the end date. The link opens the covenants registry, where you adjust the contract dates.',
+            ],
             'dashboard-shortcuts-customize' => [
                 'title'       => 'Choose shortcuts',
                 'description' => 'Choose the shortcuts below: the eye shows or hides each one; drag by the handle or use the arrows to change the order. "Restore default" goes back to the original. Your choice is saved for you.',

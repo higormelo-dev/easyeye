@@ -78,7 +78,7 @@ it('CSV do fluxo de caixa sai com BOM UTF-8, cabeçalhos e vírgula decimal em p
     $rows = reportsExportCsvRows($body);
 
     expect(str_starts_with($body, REPORTS_EXPORT_BOM))->toBeTrue()
-        ->and($rows[0])->toBe(['Data', 'Código', 'Descrição', 'Tipo', 'Status', 'Categoria', 'Convênio', 'Valor'])
+        ->and($rows[0])->toBe(['Data', 'Código', 'Descrição', 'Tipo', 'Status', 'Categoria', 'Convênio', 'Valor', 'Forma de pagamento', 'Bandeira'])
         ->and($rows[1][0])->toBe(now()->format('d/m/Y'))
         ->and($rows[1][2])->toBe('Consulta João')
         ->and($rows[1][3])->toBe('Receita')

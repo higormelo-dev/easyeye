@@ -77,7 +77,7 @@ use App\Http\Controllers\{
 };
 use App\Http\Controllers\Billing\{CheckoutController, NfseDownloadController};
 use App\Http\Controllers\{CallPanelDisplayController, DoctorDocumentTemplatesController, MedicalRecordExamKitsController, MedicationPresetsController};
-use App\Http\Controllers\{Cid10SearchController, CovenantPlanSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
+use App\Http\Controllers\{ChangelogController, Cid10SearchController, CovenantPlanSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
 use App\Http\Controllers\{PanelDashboardController, PreferencesController};
 use App\Http\Controllers\Security\TwoFactorController;
@@ -211,6 +211,11 @@ Route::group(
         // Preferências pessoais (item MELHORIA "mais humano") — endpoint único,
         // ver PreferencesController.
         Route::patch('/preferences', [PreferencesController::class, 'update'])->name('preferences.update');
+
+        // Novidades: o que mudou em cada versão. Qualquer usuário do painel;
+        // o POST marca a versão atual como vista (badge do menu).
+        Route::get('/novidades', [ChangelogController::class, 'index'])->name('news.index');
+        Route::post('/novidades/visto', [ChangelogController::class, 'markSeen'])->name('news.seen');
 
         // Módulo cirúrgico (Fase 4) — ver routes/surgery.php.
         require __DIR__ . '/surgery.php';

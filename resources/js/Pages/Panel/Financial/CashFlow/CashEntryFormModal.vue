@@ -28,6 +28,7 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
     covenants: { type: Array, default: () => [] },
     paymentMethods: { type: Array, default: () => [] }, // [{ value, label }]
+    cardBrands: { type: Array, default: () => [] },
     today: { type: String, default: '' }, // Y-m-d no fuso da clínica (servidor)
     canEditSchedule: { type: Boolean, default: false },
     t: { type: Object, default: () => ({}) },
@@ -42,6 +43,7 @@ const FORM_FIELDS = [
     'description',
     'entry_date',
     'payment_method',
+    'card_brand',
     'category_id',
     'status',
     'covenant_id',
@@ -59,6 +61,7 @@ const ids = {
     description: `cash-entry-description-${uid}`,
     date: `cash-entry-date-${uid}`,
     paymentMethod: `cash-entry-payment-method-${uid}`,
+    cardBrand: `cash-entry-card-brand-${uid}`,
     paymentError: `cash-entry-payment-method-error-${uid}`,
     category: `cash-entry-category-${uid}`,
     status: `cash-entry-status-${uid}`,
@@ -129,6 +132,7 @@ function blankForm(keep = {}) {
         description: '',
         entry_date: keep.entry_date ?? defaultEntryDate(),
         payment_method: keep.payment_method ?? '',
+        card_brand: keep.card_brand ?? '',
         category_id: '',
         status: 'paid',
         covenant_id: '',
@@ -143,6 +147,7 @@ function formFromEntry(entry) {
         description: entry.description ?? '',
         entry_date: entry.entry_date || defaultEntryDate(),
         payment_method: entry.payment_method ?? '',
+        card_brand: entry.card_brand ?? '',
         category_id: entry.category_id ?? '',
         status: entry.status ?? 'paid',
         covenant_id: entry.covenant_id ?? '',
@@ -151,6 +156,15 @@ function formFromEntry(entry) {
 }
 
 const form = ref(blankForm());
+const usesCard = computed(
+    () => props.paymentMethods.find((method) => method.value === form.value.payment_method)?.uses_card === true,
+);
+watch(
+    () => form.value.payment_method,
+    () => {
+        if (!usesCard.value) form.value.card_brand = '';
+    },
+);
 
 const isDirty = computed(() => JSON.stringify(form.value) !== initialSnapshot.value);
 
@@ -295,6 +309,9 @@ function applyErrorResponse(status, json) {
 
 function buildPayload() {
     const data = { ...form.value };
+
+    // Formas sem cartão não devem receber um campo vazio no contrato HTTP.
+    if (!usesCard.value) delete data.card_brand;
 
     // Travado pela agenda: não reenvia a forma (evita apagar um valor legado).
     if (isScheduleSplit.value) delete data.payment_method;
@@ -563,6 +580,24 @@ const paymentDescribedBy = computed(() => describedBy('payment_method', ids.paym
                     </option>
                 </select>
                 <div :id="ids.paymentError" class="invalid-feedback">{{ firstError('payment_method') }}</div>
+            </div>
+
+            <div v-if="usesCard" class="col-md-6">
+                <label :for="ids.cardBrand" class="form-label">{{ t.form_card_brand }}</label>
+                <select
+                    :id="ids.cardBrand"
+                    v-model="form.card_brand"
+                    class="form-select"
+                    :class="{ 'is-invalid': hasError('card_brand') }"
+                    :disabled="isLocked"
+                    data-test="card-brand-input"
+                >
+                    <option value="">{{ t.form_card_brand_none }}</option>
+                    <option v-for="brand in cardBrands" :key="brand.value" :value="brand.value">
+                        {{ brand.label }}
+                    </option>
+                </select>
+                <div v-if="hasError('card_brand')" class="invalid-feedback d-block">{{ firstError('card_brand') }}</div>
             </div>
 
             <!-- 6. Categoria -->

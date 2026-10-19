@@ -28,6 +28,7 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
     covenants: { type: Array, default: () => [] },
     payment_methods: { type: Array, default: () => [] },
+    card_brands: { type: Array, default: () => [] },
     // Fechamentos ativos que cruzam o período filtrado ([{ period_start, period_end }]).
     closed_periods: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
@@ -576,6 +577,7 @@ const deletingId = computed(() => (deleteBusy.value ? deleting.value?.id : null)
                 :categories="categories"
                 :covenants="covenants"
                 :payment-methods="payment_methods"
+                :card-brands="card_brands"
                 :today="today"
                 :can-edit-schedule="can_edit_schedule"
                 :t="t"

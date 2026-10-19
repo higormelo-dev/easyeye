@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Casts\PaymentMethodCast;
 use App\Concerns\HasEntityCode;
-use App\Enums\{CashEntryNature, CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType};
+use App\Enums\{CardBrand, CashEntryNature, CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType};
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\{Builder, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -44,6 +44,7 @@ class FinancialCashEntry extends Model
         'amount_debit',
         'installments',
         'payment_method',
+        'card_brand',
         'nature',
         'reference_type',
         'reference_id',
@@ -58,6 +59,7 @@ class FinancialCashEntry extends Model
             'type'           => FinancialEntryType::class,
             'status'         => FinancialEntryStatus::class,
             'payment_method' => PaymentMethodCast::class,
+            'card_brand'     => CardBrand::class,
             'nature'         => CashEntryNature::class,
             'amount'         => 'decimal:2',
             'amount_cash'    => 'decimal:2',
