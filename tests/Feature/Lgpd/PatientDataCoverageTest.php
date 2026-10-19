@@ -92,7 +92,7 @@ it('toda tabela com chave estrangeira para pacientes está classificada (coberta
     $tables = collect(DB::select(
         "select distinct tc.table_name as t from information_schema.table_constraints tc
          join information_schema.constraint_column_usage ccu on ccu.constraint_name = tc.constraint_name and ccu.table_schema = tc.table_schema
-         where tc.constraint_type = 'FOREIGN KEY' and ccu.table_name = 'patients' and tc.table_schema = current_schema()",
+         where tc.constraint_type = 'FOREIGN KEY' and ccu.table_name = 'patients' and tc.table_name <> 'patients' and tc.table_schema = current_schema()",
     ))->pluck('t')->all();
 
     $classified = [...array_keys(PDC_COVERED), ...array_keys(PDC_EXCLUDED), ...array_keys(PDC_KNOWN_GAPS)];

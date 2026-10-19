@@ -231,13 +231,9 @@ const orderedColumns = computed(() =>
                 </li>
                 <template v-for="link in patients.links.slice(1, -1)" :key="link.label">
                     <li class="page-item" :class="{ active: link.active, disabled: !link.url }">
-                        <Link
-                            class="page-link"
-                            :href="link.url ?? '#'"
-                            preserve-scroll
-                            preserve-state
-                            v-html="link.label"
-                        />
+                        <Link class="page-link" :href="link.url ?? '#'" preserve-scroll preserve-state>{{
+                            link.label
+                        }}</Link>
                     </li>
                 </template>
                 <li class="page-item" :class="{ disabled: patients.current_page === patients.last_page }">
