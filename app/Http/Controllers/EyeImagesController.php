@@ -10,6 +10,7 @@ use App\DTOs\EyeImageFilters;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, DraftStatus, EntityGate, FeatureKey, Permission};
 use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, EyeImageReportDraft, Patient, PatientDocumentShare, PatientExam};
+use App\Services\EyeImages\BoundedVisionProcess;
 use App\Services\FeatureGateService;
 use App\Support\{BrazilianFormat, CurrentDoctor};
 use App\Support\Documents\DocumentDate;
@@ -56,6 +57,10 @@ class EyeImagesController extends Controller
         $canEyeImage      = $this->featureGate->can($entityId, FeatureKey::HasAiEyeImageAnalysis);
         $canConsensus     = $this->providerSettings->isModeAvailable(AiRunMode::Consensus)
             && $this->featureGate->can($entityId, FeatureKey::HasAiConsensus);
+        // Panorama/Auto-alinhar rodam Python+OpenCV em processo isolado: sem o
+        // isolamento do SO a UI nem os oferece (a disponibilidade do cv2 em si
+        // é tratada pelo 422 do endpoint, sem checagem por request).
+        $vision = app(BoundedVisionProcess::class)->isAvailable();
 
         // Rascunho de laudo (Fase 5 — secretária-rascunha/médico-emite):
         // contagem só quando o papel atual pode rascunhar, pra não gastar
@@ -205,7 +210,11 @@ class EyeImagesController extends Controller
                 // PatientsController::updatePriority, não é ação de exame.
                 'patient_priority_update' => route('panel.patients.priority.update', ['patient' => '__ID__']),
                 // Montage (benchmark 18/09/2026) — ver EyeImageMontageController.
-                'montage'       => route('panel.eye-images.montage.store'),
+                'montage' => route('panel.eye-images.montage.store'),
+                // Panorama e Auto-alinhar (OpenCV em processo isolado): sem
+                // isolamento no servidor a UI nem oferece (null).
+                'panorama'      => $vision ? route('panel.eye-images.panorama.store') : null,
+                'align'         => $vision ? route('panel.eye-images.align.store') : null,
                 'exams_merge'   => route('panel.eye-images.exams.merge'),
                 'exams_split'   => route('panel.eye-images.exams.split'),
                 'exams_ungroup' => route('panel.eye-images.exams.ungroup'),

@@ -280,6 +280,9 @@ it('urgent fora de "1/true" não filtra, e o payload devolve urgent por exame', 
 });
 
 it('exames urgentes vêm primeiro dentro do paciente, mesmo sendo os mais antigos', function () {
+    // Meio-dia: subHours(3) não pode cair no dia anterior (período padrão = hoje).
+    $this->travelTo(now()->setTime(12, 0));
+
     $old = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'urgent' => true, 'created_at' => now()->subHours(3)]);
     $new = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'urgent' => false, 'created_at' => now()->subHour()]);
 
