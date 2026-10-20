@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Panorama stitching worker — Panorama (benchmark Ger Exames/iWayBrasil,
-aba "Montage"). Invoked only by App\\Services\\EyeImages\\BoundedPanoramaProcess
+aba "Montage"). Invoked only by App\\Services\\EyeImages\\BoundedVisionProcess
 (never directly from request input) with fixed, caller-assembled argv.
 
 Usage: exam-panorama-stitch.py <out_path.png> <image1> <image2> [imageN...]
@@ -8,7 +8,10 @@ Usage: exam-panorama-stitch.py <out_path.png> <image1> <image2> [imageN...]
 Prints a single JSON line to stdout ({"ok": true} or {"ok": false, "reason":
 str}); the PNG bytes themselves are written to <out_path>, never to stdout
 (binary-safe — avoids corrupting output through a text-bounded pipe).
-Exit code 0 on success, 1 on any failure (including partial stitch).
+Exit code is 0 for every outcome the script handles, failures included (the
+reason travels in the JSON, so the PHP side can map it to a message). A
+non-zero exit is reserved for a real crash (rlimit, segfault, missing
+interpreter), which the caller reports as a generic worker failure.
 """
 import json
 import sys
@@ -16,7 +19,7 @@ import sys
 
 def fail(reason: str) -> None:
     print(json.dumps({"ok": False, "reason": reason}))
-    sys.exit(1)
+    sys.exit(0)
 
 
 def main() -> None:
@@ -32,6 +35,10 @@ def main() -> None:
     except ImportError:
         fail("cv2_unavailable")
         return
+
+    # Server worker: no OpenCL runtime/driver (it reserves a large address
+    # range the caller's rlimit does not allow, and a GPU is not expected).
+    cv2.ocl.setUseOpenCL(False)
 
     images = []
     for path in image_paths:
@@ -52,8 +59,16 @@ def main() -> None:
         fail(f"stitch_failed:{int(status)}")
         return
 
-    ok = cv2.imwrite(out_path, result)
-    if not ok:
+    # Encode in memory instead of cv2.imwrite(): the caller's output path is a
+    # tempnam() without extension, from which imwrite cannot pick the encoder.
+    try:
+        encoded, buffer = cv2.imencode(".png", result)
+        if not encoded:
+            fail("write_failed")
+            return
+        with open(out_path, "wb") as handle:
+            handle.write(buffer.tobytes())
+    except (cv2.error, OSError):
         fail("write_failed")
         return
 

@@ -1234,66 +1234,108 @@ function movePrintExam(exam, direction) {
 // médico já escolheu essa preferência ao usar Imprimir, sem exigir mais uma
 // tela só pra repetir a mesma escolha.
 const montageBusy = ref(false);
+const panoramaBusy = ref(false);
+const selectedImageExamIds = computed(() => {
+    const examsById = new Map(groupedExams.value.flatMap((group) => group.exams).map((exam) => [exam.id, exam]));
+    return selectedExamIds.value.filter((id) => !isVideoExam(examsById.get(id)));
+});
 
-async function downloadMontage() {
-    if (selectedExamIds.value.length < 2 || montageBusy.value || !props.urls.montage) return;
-
-    // Vídeo nunca entra na colagem (Fase 5 / 6c) — Imagick não lê bytes de
-    // vídeo como imagem (MontageService já pula silenciosamente); aqui
-    // filtra ANTES de mandar, pra avisar com nota em vez de só "sobrar
-    // menos tile que o esperado" sem explicação.
-    const examsById = new Map(groupedExams.value.flatMap((g) => g.exams).map((e) => [e.id, e]));
-    const examIds = selectedExamIds.value.filter((id) => !isVideoExam(examsById.get(id)));
+async function downloadGeneratedImage({
+    url,
+    filename,
+    minCount,
+    maxCount,
+    busy,
+    selectionMessage,
+    failureMessage,
+    rateLimitMessage = null,
+    extraPayload = {},
+    onSuccessExtra,
+}) {
+    if (busy.value || !url) return;
+    // Mantém a ordem da seleção e exclui vídeos antes de validar os limites.
+    const examIds = [...selectedImageExamIds.value];
     const excludedVideos = selectedExamIds.value.length - examIds.length;
-
-    if (examIds.length < 2) {
-        if (window.showErrorToast) {
-            window.showErrorToast(tt('montage_select_two', 'Selecione 2 ou mais imagens para montar a colagem.'));
-        }
+    if (examIds.length < minCount || examIds.length > maxCount) {
+        window.showErrorToast?.(selectionMessage);
         return;
     }
-
-    montageBusy.value = true;
+    busy.value = true;
     try {
-        const res = await window.axios.post(
-            props.urls.montage,
-            {
-                exam_ids: examIds,
-                columns: printCols.value,
-            },
-            { responseType: 'blob' },
-        );
-
-        if (excludedVideos > 0 && window.showSuccessToast) {
-            window.showSuccessToast(
-                fill(tt('montage_video_excluded', ':count vídeo(s) não entraram na colagem.'), {
-                    count: excludedVideos,
-                }),
-            );
-        }
-
-        const url = URL.createObjectURL(res.data);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'montage.png';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    } catch (e) {
-        // Erro vem como Blob (responseType) mesmo em falha — precisa ler
-        // como texto/JSON antes de extrair a mensagem.
-        let message = 'Não foi possível gerar a colagem.';
+        const res = await window.axios.post(url, { exam_ids: examIds, ...extraPayload }, { responseType: 'blob' });
+        const objectUrl = URL.createObjectURL(res.data);
+        const anchor = document.createElement('a');
         try {
-            const text = await e?.response?.data?.text?.();
+            anchor.href = objectUrl;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+        } finally {
+            anchor.remove();
+            URL.revokeObjectURL(objectUrl);
+        }
+        onSuccessExtra?.(excludedVideos);
+    } catch (error) {
+        if (error?.response?.status === 429 && rateLimitMessage) {
+            window.showErrorToast?.(rateLimitMessage);
+            return;
+        }
+        // Axios mantém responseType blob também nas respostas de erro JSON.
+        let message = failureMessage;
+        try {
+            const text = await error?.response?.data?.text?.();
             message = JSON.parse(text)?.message ?? message;
         } catch {
-            /* mantém a mensagem default */
+            /* Mantém a mensagem traduzida quando o corpo não é JSON. */
         }
-        if (window.showErrorToast) window.showErrorToast(message);
+        window.showErrorToast?.(message);
     } finally {
-        montageBusy.value = false;
+        busy.value = false;
     }
+}
+
+function downloadMontage() {
+    return downloadGeneratedImage({
+        url: props.urls.montage,
+        filename: 'montage.png',
+        minCount: 2,
+        maxCount: 50,
+        busy: montageBusy,
+        selectionMessage: tt('montage_select_two', 'Selecione 2 ou mais imagens para montar a colagem.'),
+        failureMessage: tt('montage_failed', 'Não foi possível gerar a colagem.'),
+        extraPayload: { columns: printCols.value },
+        onSuccessExtra: (excludedVideos) => {
+            if (excludedVideos > 0)
+                window.showSuccessToast?.(
+                    fill(tt('montage_video_excluded', ':count vídeo(s) não entraram na colagem.'), {
+                        count: excludedVideos,
+                    }),
+                );
+        },
+    });
+}
+
+function downloadPanorama() {
+    return downloadGeneratedImage({
+        url: props.urls.panorama,
+        filename: 'panorama.png',
+        minCount: 2,
+        maxCount: 6,
+        busy: panoramaBusy,
+        selectionMessage: tt('panorama_select_range', 'Selecione de 2 a 6 imagens para montar o panorama.'),
+        failureMessage: tt('panorama_failed', 'Não foi possível gerar o panorama.'),
+        rateLimitMessage: tt(
+            'panorama_busy',
+            'O servidor está ocupado gerando outra imagem; tente de novo em instantes.',
+        ),
+        onSuccessExtra: () =>
+            window.showSuccessToast?.(
+                tt(
+                    'panorama_approximate_notice',
+                    'Composição aproximada gerada automaticamente — não é uma medida; confira sobreposição e bordas.',
+                ),
+            ),
+    });
 }
 
 // ── Keyboard nav ──────────────────────────────────────────────────────────
@@ -2816,6 +2858,33 @@ const printEntity = computed(() => props.entity ?? {});
                                 style="width: 0.7rem; height: 0.7rem"
                             ></span>
                             <i v-else class="ti ti-layout-grid me-1"></i>{{ tt('montage_action', 'Montage') }}
+                        </button>
+                        <button
+                            v-if="urls.panorama"
+                            type="button"
+                            class="btn btn-sm btn-outline-dark"
+                            data-testid="panorama-button"
+                            :disabled="
+                                selectedImageExamIds.length < 2 || selectedImageExamIds.length > 6 || panoramaBusy
+                            "
+                            :aria-busy="panoramaBusy"
+                            :title="
+                                tt('panorama_select_range', 'Selecione de 2 a 6 imagens para montar o panorama.') +
+                                ' ' +
+                                tt(
+                                    'panorama_approximate_notice',
+                                    'Composição aproximada gerada automaticamente — não é uma medida; confira sobreposição e bordas.',
+                                )
+                            "
+                            @click="downloadPanorama"
+                        >
+                            <span
+                                v-if="panoramaBusy"
+                                class="spinner-border spinner-border-sm me-1"
+                                aria-hidden="true"
+                            ></span>
+                            <i v-else class="ti ti-panorama-horizontal me-1" aria-hidden="true"></i
+                            >{{ tt('panorama_action', 'Panorama') }}
                         </button>
                         <button
                             v-if="isDoctor"
@@ -4421,6 +4490,7 @@ const printEntity = computed(() => props.entity ?? {});
         <EyeImageCompareModal
             :open="compareModalOpen"
             :images="compareImages"
+            :align-url="urls.align"
             :t="t"
             @close="compareModalOpen = false"
         />

@@ -12,8 +12,10 @@ use App\Http\Controllers\{
     DoctorsController,
     ExamDiagnosisController,
     ExternalExamImportController,
+    EyeImageAlignController,
     EyeImageExamActionsController,
     EyeImageMontageController,
+    EyeImagePanoramaController,
     EyeImagePatientAuditController,
     EyeImageReportController,
     EyeImageReportDictationController,
@@ -319,6 +321,16 @@ Route::group(
         Route::post('/eye-images/montage', [EyeImageMontageController::class, 'store'])
             ->middleware('entity.role:admin,doctor,secretary')
             ->name('eye-images.montage.store');
+
+        // Panorama automático (OpenCV, processo isolado) e Auto-alinhar do
+        // Comparar — mesma regra do Montage: conveniência de visualização, não
+        // ato clínico. Ver EyeImagePanoramaController / EyeImageAlignController.
+        Route::post('/eye-images/panorama', [EyeImagePanoramaController::class, 'store'])
+            ->middleware(['entity.role:admin,doctor,secretary', 'throttle:eye-images-vision'])
+            ->name('eye-images.panorama.store');
+        Route::post('/eye-images/align', [EyeImageAlignController::class, 'store'])
+            ->middleware(['entity.role:admin,doctor,secretary', 'throttle:eye-images-vision'])
+            ->name('eye-images.align.store');
 
         // Laudo manual do Gerenciador de Imagens (Modelos + editor livre) — ver
         // EyeImageReportController. templates()/previewTemplate() são leitura

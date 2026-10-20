@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch, onBeforeUnmount } from 'vue';
 import { useEscapeToClose } from '@/Support/useEscapeToClose.js';
 
 /**
@@ -7,8 +7,8 @@ import { useEscapeToClose } from '@/Support/useEscapeToClose.js';
  * acompanhar evolução de uma patologia (vídeo de referência do ticket:
  * aba "Align" do gerenciador de imagens de terceiros).
  *
- * Sem registro automático de imagem (visão computacional) — o médico
- * arrasta a imagem de cima pra alinhar pontos de referência manualmente.
+ * O médico pode arrastar a imagem de cima ou aplicar a translação
+ * sugerida pelo servidor, quando o auto-alinhamento está disponível.
  * Dois modos: lado a lado (comparação visual direta) e sobreposição com
  * opacidade (evidencia diferenças sutis entre os dois exames).
  */
@@ -16,6 +16,7 @@ const props = defineProps({
     open: { type: Boolean, required: true },
     images: { type: Array, default: () => [] }, // [{ id, url, label }, { id, url, label }]
     t: { type: Object, default: () => ({}) },
+    alignUrl: { type: String, default: null },
 });
 
 const emit = defineEmits(['close']);
@@ -27,6 +28,9 @@ function tt(key, fallback = '') {
 const mode = ref('overlay'); // 'overlay' | 'side'
 const opacity = ref(60);
 const offset = reactive({ x: 0, y: 0 });
+const baseImg = ref(null);
+const alignBusy = ref(false);
+let alignVersion = 0;
 
 const dragging = ref(false);
 const dragStart = reactive({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
@@ -47,6 +51,57 @@ watch(
     },
 );
 
+// Uma resposta de outro par/abertura não pode mover as imagens atuais.
+watch(
+    () => [
+        props.open,
+        props.images[0]?.id,
+        props.images[0]?.url,
+        props.images[1]?.id,
+        props.images[1]?.url,
+        props.alignUrl,
+        mode.value,
+    ],
+    () => {
+        alignVersion += 1;
+        alignBusy.value = false;
+    },
+);
+onBeforeUnmount(() => {
+    alignVersion += 1;
+    onDragEnd();
+});
+
+async function autoAlign() {
+    if (!props.open || mode.value !== 'overlay' || !props.alignUrl || props.images.length !== 2 || alignBusy.value)
+        return;
+    const mine = ++alignVersion;
+    alignBusy.value = true;
+    try {
+        const { data } = await window.axios.post(props.alignUrl, {
+            exam_id_a: props.images[0].id,
+            exam_id_b: props.images[1].id,
+        });
+        if (mine !== alignVersion) return;
+        const image = baseImg.value;
+        const scale = image?.clientWidth / image?.naturalWidth;
+        if (!Number.isFinite(scale) || scale <= 0 || !Number.isFinite(data?.dx) || !Number.isFinite(data?.dy))
+            throw new Error();
+        offset.x = data.dx * scale;
+        offset.y = data.dy * scale;
+    } catch (error) {
+        if (mine === alignVersion)
+            window.showErrorToast?.(
+                error?.response?.status === 429
+                    ? tt('align_busy', 'O servidor está ocupado gerando outra imagem; tente de novo em instantes.')
+                    : (error?.response?.data?.message ??
+                          tt('align_failed', 'Não foi possível alinhar automaticamente.')),
+            );
+    } finally {
+        if (mine === alignVersion) alignBusy.value = false;
+    }
+}
+
 // Mouse e touch no mesmo handler (lê touches[0] quando presente) — tablet é
 // o dispositivo real de uso em consultório, e o modo Sobrepor é o default
 // ao abrir o modal, então arraste tem que funcionar sem mouse.
@@ -58,6 +113,7 @@ function pointFromEvent(event) {
 }
 
 function onDragStart(event) {
+    if (alignBusy.value) return;
     const p = pointFromEvent(event);
     dragging.value = true;
     dragStart.x = p.x;
@@ -94,6 +150,8 @@ const overlayStyle = computed(() => ({
 }));
 
 function close() {
+    alignVersion += 1;
+    alignBusy.value = false;
     onDragEnd();
     emit('close');
 }
@@ -150,9 +208,31 @@ useEscapeToClose(() => props.open, close);
                                 <input v-model.number="opacity" type="range" min="0" max="100" style="width: 120px" />
                                 <span style="min-width: 2.5em">{{ opacity }}%</span>
                             </label>
-                            <button type="button" class="btn btn-outline-light btn-sm" @click="resetOffset">
+                            <button
+                                type="button"
+                                class="btn btn-outline-light btn-sm"
+                                :disabled="alignBusy"
+                                @click="resetOffset"
+                            >
                                 <i class="ti ti-relation-one-to-one me-1"></i
                                 >{{ tt('compare_reset', 'Redefinir posição') }}
+                            </button>
+                            <button
+                                v-if="alignUrl"
+                                type="button"
+                                class="btn btn-outline-light btn-sm"
+                                data-testid="compare-auto-align"
+                                :disabled="alignBusy || images.length !== 2"
+                                :aria-busy="alignBusy"
+                                @click="autoAlign"
+                            >
+                                <span
+                                    v-if="alignBusy"
+                                    class="spinner-border spinner-border-sm me-1"
+                                    aria-hidden="true"
+                                ></span>
+                                <i v-else class="ti ti-focus-2 me-1" aria-hidden="true"></i
+                                >{{ tt('align_auto_button', 'Auto-alinhar') }}
                             </button>
                         </template>
 
@@ -198,6 +278,7 @@ useEscapeToClose(() => props.open, close);
                             style="max-width: 820px; overflow: hidden; border-radius: 4px; background: #111"
                         >
                             <img
+                                ref="baseImg"
                                 :src="images[0].url"
                                 :alt="images[0].label"
                                 style="width: 100%; height: auto; display: block; user-select: none"

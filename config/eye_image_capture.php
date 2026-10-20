@@ -13,6 +13,14 @@
 
 return [
     /*
+    | Interpretador dos scripts de visão (Panorama/Auto-alinhar). Servidor sem
+    | root para instalar OpenCV no Python do sistema: aponte para o python de
+    | um venv (ex.: /var/lib/nginx/vision-venv/bin/python). `-I` do script
+    | ignora PYTHONPATH/site do usuário, então precisa ser o python do venv.
+    */
+    'vision_python' => env('EYE_IMAGE_VISION_PYTHON', 'python3'),
+
+    /*
     | Captura de foto/vídeo curto da lâmpada de fenda direto pelo navegador
     | (getUserMedia/MediaRecorder) — vira um exame pelo MESMO pipeline da
     | importação manual (ExternalExamImportService).

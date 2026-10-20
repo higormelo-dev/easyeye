@@ -120,6 +120,18 @@ return [
     'montage_failed'         => 'Could not build the montage.',
     'montage_video_excluded' => ':count video(s) were not included in the montage.',
 
+    // Automatic panorama (OpenCV in an isolated process) — built on demand, never saved.
+    'panorama_action'             => 'Panorama',
+    'panorama_select_range'       => 'Select 2 to 6 images to build the panorama.',
+    'panorama_approximate_notice' => 'Approximate composition generated automatically — not a measurement; check the overlap and the edges.',
+    'panorama_video_not_allowed'  => 'Videos cannot be part of the panorama — unselect them and try again.',
+    'panorama_unavailable'        => 'Panorama unavailable in this environment (image processing not installed on the server).',
+    'panorama_unreadable_image'   => 'One of the selected images could not be read to build the panorama.',
+    'panorama_stitch_failed'      => 'Could not combine the images (not enough overlap or low contrast) — try exams of the same eye with areas in common.',
+    'panorama_timeout'            => 'The panorama took too long to build. Try with fewer images.',
+    'panorama_failed'             => 'Could not build the panorama.',
+    'panorama_busy'               => 'The server is busy building another image; try again in a moment.',
+
     // Printing: reorder/group OD-OE/ad hoc caption (Phase 5).
     'print_group_od_oe'                    => 'Group OD/OE',
     'print_group_od_oe_hint'               => 'Groups each exam with OD before OE (side by side in per-sheet mode); removes manual reordering',
@@ -193,6 +205,15 @@ return [
     'compare_opacity'           => 'Opacity',
     'compare_reset'             => 'Reset position',
     'compare_hint'              => 'Drag the top image to align reference points.',
+    'align_auto_button'         => 'Auto-align',
+    'align_video_not_allowed'   => 'Videos cannot be auto-aligned.',
+    'align_unavailable'         => 'Auto-align unavailable in this environment (image processing not installed on the server).',
+    'align_unreadable_image'    => 'One of the images could not be read for auto-align.',
+    'align_no_matches'          => 'Not enough common points were found between the images.',
+    'align_low_confidence'      => 'Auto-align was not reliable — adjust manually.',
+    'align_timeout'             => 'Auto-align took too long. Adjust manually.',
+    'align_failed'              => 'Could not auto-align.',
+    'align_busy'                => 'The server is busy building another image; try again in a moment.',
 
     // Import external exam
     'import' => [

@@ -191,8 +191,8 @@ describe('atestado de aptidão visual', function () {
 
         fb1Issue($this, 'visual-fitness-certificate', [
             'conclusion' => 'fit_with_correction', 'purpose' => 'public_exam',
-            // A tela não manda AV; se mandar, é ignorada.
-            'visual_acuity' => ['with' => ['right' => '20/10']],
+            // A tela não manda AV; se mandar, é ignorada. "20/15" nunca é data (mês 15): "20/10" colidia com a emissão em 20/10.
+            'visual_acuity' => ['with' => ['right' => '20/15']],
         ])->assertCreated()->assertJsonPath('title', 'Atestado de Aptidão Visual');
 
         $doc = MedicalRecordDocumentation::query()->firstOrFail();
@@ -201,7 +201,7 @@ describe('atestado de aptidão visual', function () {
             // Data do EXAME = a do prontuário (não a do papel).
             ->and($doc->content)->toContain('exame oftalmológico em ' . $this->record->created_at->format('d/m/Y'))
             ->and($doc->content)->toContain('20/40')->toContain('20/50')->toContain('20/20')
-            ->and($doc->content)->not->toContain('20/10')
+            ->and($doc->content)->not->toContain('20/15')
             ->and($doc->content)->toContain('APTO(A) COM USO DE CORREÇÃO ÓPTICA')
             ->and($doc->metadata['visual_acuity'])->toBe([
                 'without' => ['right' => '20/40', 'left' => '20/50'],

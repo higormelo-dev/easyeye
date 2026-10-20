@@ -120,6 +120,18 @@ return [
     'montage_failed'         => 'Não foi possível gerar a colagem.',
     'montage_video_excluded' => ':count vídeo(s) não entraram na colagem.',
 
+    // Panorama automático (OpenCV em processo isolado) — gerado sob demanda, nunca salvo.
+    'panorama_action'             => 'Panorama',
+    'panorama_select_range'       => 'Selecione de 2 a 6 imagens para montar o panorama.',
+    'panorama_approximate_notice' => 'Composição aproximada gerada automaticamente — não é uma medida; confira sobreposição e bordas.',
+    'panorama_video_not_allowed'  => 'Vídeos não podem entrar no panorama — desmarque-os e tente de novo.',
+    'panorama_unavailable'        => 'Panorama indisponível neste ambiente (processamento de imagem não instalado no servidor).',
+    'panorama_unreadable_image'   => 'Uma das imagens selecionadas não pôde ser lida para montar o panorama.',
+    'panorama_stitch_failed'      => 'Não foi possível combinar as imagens (sobreposição insuficiente ou baixo contraste) — tente exames do mesmo olho com áreas em comum.',
+    'panorama_timeout'            => 'O panorama demorou demais para ser gerado. Tente com menos imagens.',
+    'panorama_failed'             => 'Não foi possível gerar o panorama.',
+    'panorama_busy'               => 'O servidor está ocupado gerando outra imagem; tente de novo em instantes.',
+
     // Impressão: reordenar/agrupar OD-OE/legenda ad hoc (Fase 5).
     'print_group_od_oe'                    => 'Agrupar OD/OE',
     'print_group_od_oe_hint'               => 'Agrupa cada exame com OD antes de OE (lado a lado no modo por folha); some a reordenação manual',
@@ -193,6 +205,15 @@ return [
     'compare_opacity'           => 'Opacidade',
     'compare_reset'             => 'Redefinir posição',
     'compare_hint'              => 'Arraste a imagem de cima para alinhar os pontos de referência.',
+    'align_auto_button'         => 'Auto-alinhar',
+    'align_video_not_allowed'   => 'Vídeos não podem ser alinhados automaticamente.',
+    'align_unavailable'         => 'Auto-alinhamento indisponível neste ambiente (processamento de imagem não instalado no servidor).',
+    'align_unreadable_image'    => 'Uma das imagens não pôde ser lida para o alinhamento automático.',
+    'align_no_matches'          => 'Não foram encontrados pontos em comum suficientes entre as imagens.',
+    'align_low_confidence'      => 'O alinhamento automático não foi confiável — ajuste manualmente.',
+    'align_timeout'             => 'O alinhamento automático demorou demais. Ajuste manualmente.',
+    'align_failed'              => 'Não foi possível alinhar automaticamente.',
+    'align_busy'                => 'O servidor está ocupado gerando outra imagem; tente de novo em instantes.',
 
     // Importar exame externo
     'import' => [

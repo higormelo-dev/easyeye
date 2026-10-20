@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Services\Concerns\HasIsolatedProcess;
 use InvalidArgumentException;
 use RuntimeException;
-use Symfony\Component\Process\Process;
 
 final class BoundedPdfProcess
 {
+    use HasIsolatedProcess;
+
     public function run(string $mode, string $path): string
     {
         if (! in_array($mode, ['text', 'render'], true)) {
@@ -26,45 +28,13 @@ final class BoundedPdfProcess
         ], $mode === 'text' ? 262144 : 10485760, $mode === 'text' ? 10 : 15);
     }
 
-    public static function hasIsolation(): bool
+    protected function outputLimitFailureReason(): string
     {
-        return PHP_OS_FAMILY === 'Linux' && is_executable('/usr/bin/setsid')
-            && function_exists('posix_kill') && function_exists('posix_setrlimit')
-            && defined('POSIX_RLIMIT_AS') && defined('POSIX_RLIMIT_CPU') && defined('POSIX_RLIMIT_FSIZE');
+        return 'pdf_output_limit';
     }
 
-    /** Runs only commands assembled by the application; never accepts request command input. */
-    public function execute(array $command, int $maxOutputBytes, float $timeout): string
+    protected function workerFailureReason(): string
     {
-        $process = new Process($command);
-        $process->setTimeout($timeout);
-        $output = '';
-        $process->start();
-        $pid = $process->getPid();
-
-        try {
-            $process->wait(function (string $type, string $bytes) use ($process, &$output, $maxOutputBytes): void {
-                if ($type === Process::OUT) {
-                    if (strlen($output) + strlen($bytes) > $maxOutputBytes) {
-                        throw new RuntimeException('pdf_output_limit');
-                    }
-                    $output .= $bytes;
-                }
-                $process->clearOutput();
-                $process->clearErrorOutput();
-            });
-
-            if (! $process->isSuccessful()) {
-                throw new RuntimeException('pdf_worker_failed');
-            }
-
-            return $output;
-        } finally {
-            // setsid makes the worker its own process group; delegates inherit it.
-            if ($pid !== null && function_exists('posix_kill')) {
-                @posix_kill(-$pid, SIGKILL);
-            }
-            $process->stop(0, SIGKILL);
-        }
+        return 'pdf_worker_failed';
     }
 }
