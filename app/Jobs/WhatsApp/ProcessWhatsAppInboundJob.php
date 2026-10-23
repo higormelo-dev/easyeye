@@ -42,7 +42,7 @@ class ProcessWhatsAppInboundJob implements ShouldQueue, ShouldBeUnique
 
     public function __construct(public readonly string $inboundMessageId)
     {
-        $this->onQueue((string) config('whatsapp.queue', 'default'));
+        $this->onQueue((string) config('whatsapp.inbound_queue', 'critical'));
     }
 
     public function uniqueId(): string

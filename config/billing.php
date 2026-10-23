@@ -123,8 +123,15 @@ return [
         'verify_url' => 'https://challenges.cloudflare.com/turnstile/v0/siteverify',
     ],
 
+    // Jobs de cobrança que NÃO são webhook (cancelamentos, renovação, retry, estorno): fila normal, para não
+    // herdar a prioridade `critical` do webhook de pagamento.
+    'jobs' => [
+        'queue' => env('BILLING_JOBS_QUEUE', 'default') ?: 'default',
+    ],
+
     'webhooks' => [
-        'queue' => env('BILLING_WEBHOOK_QUEUE', 'default'),
+        // Webhook de pagamento: `critical`, consumida primeiro pelo worker fast (ver docs/internal/runbooks/filas-workers.md).
+        'queue' => env('BILLING_WEBHOOK_QUEUE', 'critical') ?: 'critical',
         // billing:prune-webhook-events apaga os processados há mais que isso
         // (os com falha ou não processados ficam).
         'retention_days' => (int) env('BILLING_WEBHOOK_RETENTION_DAYS', 90),

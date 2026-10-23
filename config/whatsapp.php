@@ -86,9 +86,13 @@ return [
         'connect_timeout_seconds' => (int) env('WHATSAPP_HTTP_CONNECT_TIMEOUT', 5),
     ],
 
-    // Fila dos envios. Fila diferente de "default" precisa entrar no worker
-    // (queue:work --queue=whatsapp,default).
+    // Fila dos envios e dos status de entrega. Fila fora das que o worker fast lê
+    // (critical,default,tiss-*) precisa entrar no --queue dele.
     'queue' => env('WHATSAPP_QUEUE', 'default') ?: 'default',
+
+    // OTP do cadastro (vence em 10 min) e mensagem recebida: sensíveis a atraso, ficam na frente do envio em massa.
+    'verification_queue' => env('WHATSAPP_VERIFICATION_QUEUE', 'critical') ?: 'critical',
+    'inbound_queue'      => env('WHATSAPP_INBOUND_QUEUE', 'critical') ?: 'critical',
 
     // Idiomas com templates APROVADOS na Meta. Destinatário em inglês recebe
     // o template "en" só se "en" estiver aqui; senão vai em pt_BR.

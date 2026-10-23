@@ -55,7 +55,7 @@ class RenewSubscriptionJob implements ShouldQueue
         // Reagendamentos por 429 (limite da API) já feitos neste dia.
         public readonly int $rateLimitRetries = 0,
     ) {
-        $this->onQueue((string) config('billing.webhooks.queue', 'default'));
+        $this->onQueue((string) config('billing.jobs.queue', 'default'));
     }
 
     public function handle(

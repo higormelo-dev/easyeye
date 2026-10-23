@@ -25,7 +25,7 @@ class ProcessBillingWebhookJob implements ShouldQueue
     public function __construct(
         public readonly string $webhookEventId,
     ) {
-        $this->onQueue((string) config('billing.webhooks.queue', 'default'));
+        $this->onQueue((string) config('billing.webhooks.queue', 'critical'));
     }
 
     public function handle(ProcessWebhookEventService $service): void

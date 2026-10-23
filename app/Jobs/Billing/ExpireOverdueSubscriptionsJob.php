@@ -27,7 +27,7 @@ class ExpireOverdueSubscriptionsJob implements ShouldQueue
 
     public function __construct()
     {
-        $this->onQueue((string) config('billing.webhooks.queue', 'default'));
+        $this->onQueue((string) config('billing.jobs.queue', 'default'));
     }
 
     public function handle(SubscriptionService $subscriptionService): void

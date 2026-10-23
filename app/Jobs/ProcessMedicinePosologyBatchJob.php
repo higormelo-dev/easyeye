@@ -41,6 +41,7 @@ class ProcessMedicinePosologyBatchJob implements ShouldQueue
     public function __construct(
         public readonly MedicinePosologyBatch $batch,
     ) {
+        $this->onQueue((string) config('queue.bulk_queue', 'bulk'));
     }
 
     public function handle(MedicinePosologyBatchService $service): void

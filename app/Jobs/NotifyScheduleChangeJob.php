@@ -5,12 +5,16 @@ namespace App\Jobs;
 use App\Models\Schedule;
 use App\Notifications\ScheduleNotification;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\{ShouldBeEncrypted, ShouldQueue};
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
 
-class NotifyScheduleChangeJob implements ShouldQueue
+/**
+ * `extraInfo` é texto livre digitado pela clínica (motivo de cancelamento, até 2000 caracteres) e pode citar o
+ * paciente: o payload viaja CIFRADO (ShouldBeEncrypted) no Redis e em failed_jobs, como o código de verificação.
+ */
+class NotifyScheduleChangeJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -26,6 +30,7 @@ class NotifyScheduleChangeJob implements ShouldQueue
         public readonly string $event,
         public readonly ?string $extraInfo = null,
     ) {
+        $this->onQueue('default');
     }
 
     public function handle(): void

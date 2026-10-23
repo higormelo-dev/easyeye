@@ -3,15 +3,15 @@
 namespace App\Notifications;
 
 use App\Models\Schedule;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class ScheduleNotification extends Notification implements ShouldQueue
+/**
+ * E-mail de mudança na agenda. NÃO é `ShouldQueue` de propósito: o único caller é NotifyScheduleChangeJob, que já é
+ * o job durável (tries/backoff). Enfileirar de novo criava um 2º job com Schedule e paciente serializados no Redis.
+ */
+class ScheduleNotification extends Notification
 {
-    use Queueable;
-
     public const EVENT_CREATED = 'created';
 
     public const EVENT_CONFIRMED = 'confirmed';

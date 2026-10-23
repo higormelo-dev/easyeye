@@ -38,4 +38,20 @@ if [ "${APP_ENV:-production}" = "local" ]; then
     php artisan config:clear >/dev/null 2>&1 || true
 fi
 
+# ─── 5. Conexão do worker bulk ───────────────────────────────────────────────
+# O programa `easyeye-worker-bulk` (Supervisor) lê SUPERVISOR_BULK_CONNECTION. Com Redis o bulk tem conexão própria
+# (`redis-bulk`, retry_after 960); sem Redis (QUEUE_CONNECTION=database, o padrão do compose) ele lê a mesma tabela `jobs`
+# dos fast (retry_after 960 >= 900 do maior job bulk). Sem este mapeamento os imports iam para a fila `bulk` do
+# `database` e nenhum worker a lia. Qualquer outro valor só gera AVISO: o entrypoint é compartilhado com o app (que não
+# pode morrer por isso) e o worker falha visível no `queue:work`. Exportado antes do exec: o supervisord herda o ambiente.
+case "${QUEUE_CONNECTION:-database}" in
+    redis) SUPERVISOR_BULK_CONNECTION=redis-bulk ;;
+    database) SUPERVISOR_BULK_CONNECTION=database ;;
+    *)
+        echo "[entrypoint] QUEUE_CONNECTION='${QUEUE_CONNECTION:-}' não suportada pelos workers (use redis ou database)" >&2
+        SUPERVISOR_BULK_CONNECTION="${QUEUE_CONNECTION:-database}"
+        ;;
+esac
+export SUPERVISOR_BULK_CONNECTION
+
 exec "$@"

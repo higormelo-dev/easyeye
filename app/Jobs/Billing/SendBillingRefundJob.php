@@ -31,7 +31,7 @@ class SendBillingRefundJob implements ShouldQueue
 
     public function __construct(public readonly string $refundId)
     {
-        $this->onQueue((string) config('billing.webhooks.queue', 'default'));
+        $this->onQueue((string) config('billing.jobs.queue', 'default'));
     }
 
     public function handle(RefundService $refunds): void

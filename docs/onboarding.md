@@ -41,6 +41,8 @@ O Vite usa a porta 5173 e cria `public/hot`; preservar/restaurar esse arquivo é
 
 `rtk proxy composer dev` inicia cinco processos: servidor 8085, `queue:listen`, Pail, Vite e Reverb. O worker pode processar jobs existentes e disparar integrações. Use somente quando esses efeitos forem necessários e estiverem isolados/autorizados.
 
+**Filas.** A aplicação usa três prioridades: `critical` (código de verificação do cadastro, mensagem recebida do WhatsApp e webhook de pagamento), `default` (o resto, mais as filas `tiss-*`) e `bulk` (importações, catálogos e posologia). O `queue:listen` do `composer dev` consome só a fila `default`: para exercitar o OTP ou o webhook localmente rode `queue:listen --queue=critical,default`, e para importações um segundo worker na conexão própria (`queue:work redis-bulk --queue=bulk`, que exige Redis). Em produção, no teste (cron) e no Docker são 3 processos: 2 fast em ordens diferentes (`fast-critical`: critical primeiro; `fast-tiss`: TISS primeiro) e 1 bulk (importações) — veja o [runbook de filas e workers](internal/runbooks/filas-workers.md).
+
 O [Docker existente](../DOCKER.md) tem efeitos adicionais: o entrypoint instala Composer se necessário, gera chave quando ausente e aplica `migrate --force` com `RUN_MIGRATIONS=true`, atualmente configurado no serviço app. O serviço Node instala dependências e inicia Vite; outros serviços incluem worker/Reverb. `docker compose up` não é preflight passivo e não faz parte do setup sem migrations. Seeds também não são uma etapa automática autorizada.
 
 ## Verificação e agentes

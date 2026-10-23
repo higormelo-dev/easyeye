@@ -41,6 +41,10 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // Os eventos usam ShouldBroadcastNow: o timeout do cliente é o teto do que um Reverb pendurado
+                // custa ao request/worker (o padrão do Guzzle é esperar 30 s).
+                'timeout'         => 2,
+                'connect_timeout' => 1,
             ],
         ],
 

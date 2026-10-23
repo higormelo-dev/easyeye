@@ -61,6 +61,8 @@ services:
     command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
     environment:
       APP_USER: ${APP_USER:-easyeye}
+      # Conexão do fast. O bulk segue a mesma conexão: o entrypoint mapeia redis -> redis-bulk e database -> database
+      # (SUPERVISOR_BULK_CONNECTION). Redis fica fora do compose (externo, host.docker.internal).
       QUEUE_CONNECTION: ${QUEUE_CONNECTION_DOCKER:-database}
       SUPERVISOR_WORKER_USER: ${APP_USER:-easyeye}
       SUPERVISOR_QUEUE_CONNECTION: ${QUEUE_CONNECTION_DOCKER:-database}

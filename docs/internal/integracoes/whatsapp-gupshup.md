@@ -164,12 +164,14 @@ WHATSAPP_MOCK_REQUIRES_CODE=false      # só testes automatizados (phpunit.xml) 
 # GUPSHUP_PARTNER_SECRET=...
 GUPSHUP_AUTH_MODE=                     # vazio = escolhe sozinho
 WHATSAPP_TEMPLATE_LANGUAGES=pt_BR      # acrescente ,en quando aprovar os templates em inglês
-WHATSAPP_QUEUE=default                 # outra fila precisa entrar no worker (--queue=whatsapp,default)
+WHATSAPP_QUEUE=default                 # envio e status de entrega; fora de critical,default,tiss-* precisa entrar no --queue do worker fast
+WHATSAPP_VERIFICATION_QUEUE=critical   # código de verificação (OTP) do cadastro — vence em 10 min
+WHATSAPP_INBOUND_QUEUE=critical        # mensagem recebida do paciente
 ```
 
 Depois: `php artisan migrate` (apaga as credenciais da Z-API, troca os tokens de URL, passa as pendentes da Z-API para `skipped` e limpa o hash do código de verificação de `audit_logs`), `php artisan config:cache` (ou `config:clear`) e reiniciar o worker da fila.
 
-**Fila:** os jobs de envio têm `$timeout` de 150 s (cobre o lock de 120 s do token + o envio). O `retry_after` da conexão da fila (`REDIS_QUEUE_RETRY_AFTER`/`DB_QUEUE_RETRY_AFTER`, padrão 960 nas duas) precisa continuar **maior** que o maior `$timeout` (importações têm 900 s) — ver `docs/infra/reverb-ambiente-teste.md`. Um valor explícito abaixo disso no `.env` faz um envio demorado ser entregue a outro worker no meio.
+**Fila:** os jobs de envio têm `$timeout` de 150 s (cobre o lock de 120 s do token + o envio). O código de verificação (`SendPhoneVerificationCodeJob`) e a mensagem recebida (`ProcessWhatsAppInboundJob`) vão para a fila **`critical`**, que o worker **fast-critical** lê primeiro — um envio em massa (300 confirmações às 8h) ou uma importação não fica na frente do OTP. Envio, status de entrega e aviso do SaaS ficam em `default` (`WHATSAPP_QUEUE`). O worker fast roda na conexão `redis` com `retry_after` de 240 s (`REDIS_QUEUE_RETRY_AFTER`), que precisa continuar **maior** que o maior `$timeout` dele (IA: 180 s; WhatsApp: 150 s); a conexão do `database` (`DB_QUEUE_RETRY_AFTER`) segue em 960 s. Um valor explícito abaixo disso no `.env` faz um envio demorado ser entregue a outro worker no meio. Workers, filas e deploy: `docs/internal/runbooks/filas-workers.md` e `docs/internal/infra/reverb-ambiente-teste.md`.
 
 **Um app Gupshup por ambiente:** homologação e produção **não** podem usar o mesmo app (App ID) — cada ambiente gera os próprios tokens de app (UAT) e a Gupshup aceita no máximo **3 ativos por app**; dois ambientes no mesmo app disputam esse limite (e o webhook do app só aponta para um servidor). Use um app (e número) de teste na homologação.
 

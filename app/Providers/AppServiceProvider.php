@@ -21,9 +21,13 @@ use App\Support\Database\AccentInsensitiveSearch;
 use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\{Connection, LazyLoadingViolationException};
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
-use Illuminate\Support\Facades\{Auth, Blade, DB, Gate, RateLimiter, URL};
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Support\Facades\{Auth, Blade, Context, DB, Gate, Log, Queue, RateLimiter, URL};
 use Illuminate\Support\{ServiceProvider, Str};
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\{PersonalAccessToken, Sanctum};
@@ -96,6 +100,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->bootObservability();
+
         // BUGFIX: forçar HTTPS por NOME de ambiente (production/testing) quebra
         // qualquer setup local que rode APP_ENV=testing sem TLS (ex.: docker
         // nginx local só com `listen 80`, sem certificado) — toda URL absoluta
@@ -525,6 +531,48 @@ class AppServiceProvider extends ServiceProvider
         // massa do link, por IP.
         RateLimiter::for('external-report-view', static function (Request $r) {
             return Limit::perMinute(10)->by('external-report-view|' . $r->ip());
+        });
+    }
+
+    /**
+     * F0 "Enxergar": torna N+1 e query lenta visíveis sem mudar comportamento. Nada aqui lança nem loga dado de
+     * paciente: só nome de model/relação, conexão, duração e rota/comando/job (nunca SQL, bindings ou URL completa).
+     */
+    private function bootObservability(): void
+    {
+        // Lazy loading proibido fora de produção, mas o callback só REPORTA: a dívida de N+1 aparece sem quebrar tela
+        // nem teste. Em testing só loga (sem report()/Sentry). O framework só marca como "N+1" o model hidratado numa
+        // coleção de 2+ itens; um model sozinho (find/first) nunca chega aqui.
+        Model::preventLazyLoading(! $this->app->isProduction());
+
+        Model::handleLazyLoadingViolationUsing(function (Model $model, string $relation): void {
+            if ($this->app->environment('testing')) {
+                Log::warning('eloquent.lazy_loading_violation', ['model' => $model::class, 'relation' => $relation]);
+
+                return;
+            }
+
+            report(new LazyLoadingViolationException($model, $relation));
+        });
+
+        // Nome do job (nunca o payload) no contexto dos logs enquanto ele roda.
+        Queue::before(fn (JobProcessing $event) => Context::add('job', $event->job->resolveName()));
+        Queue::after(fn () => Context::forget('job'));
+        Queue::failing(fn () => Context::forget('job'));
+
+        // Query lenta: o gatilho é a duração ACUMULADA da conexão (roda uma vez por conexão/processo), por isso o log
+        // traz o total e a query corrente. Só metadados — o SQL e os bindings podem carregar dado clínico.
+        DB::whenQueryingForLongerThan(500, function (Connection $connection, QueryExecuted $query): void {
+            $console = $this->app->runningInConsole();
+
+            Log::warning('db.slow_query', [
+                'connection'        => $connection->getName(),
+                'duration_ms'       => round((float) $query->time, 1),
+                'total_duration_ms' => round($connection->totalQueryDuration(), 1),
+                'route'             => $console ? null : request()->route()?->getName(),
+                'command'           => $console ? ($_SERVER['argv'][1] ?? null) : null,
+                'job'               => Context::get('job'),
+            ]);
         });
     }
 }

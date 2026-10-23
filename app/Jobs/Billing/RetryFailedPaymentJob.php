@@ -36,7 +36,7 @@ class RetryFailedPaymentJob implements ShouldQueue
     public function __construct(
         public readonly string $retryScheduleId,
     ) {
-        $this->onQueue((string) config('billing.webhooks.queue', 'default'));
+        $this->onQueue((string) config('billing.jobs.queue', 'default'));
     }
 
     public function handle(

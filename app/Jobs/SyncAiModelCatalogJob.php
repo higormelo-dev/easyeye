@@ -30,6 +30,7 @@ class SyncAiModelCatalogJob implements ShouldQueue
     public function __construct(
         public readonly AiCatalogSync $import,
     ) {
+        $this->onQueue((string) config('queue.bulk_queue', 'bulk'));
     }
 
     public function handle(AiModelCatalogSyncService $service): void

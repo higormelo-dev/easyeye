@@ -39,6 +39,14 @@ class GenerateExamDerivatives implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
+    /**
+     * 2 tentativas, a 2ª só após 60 s: sobrevive a um soluço de rede no S3 (o intent do outbox já foi apagado no
+     * dispatch; a recuperação manual é o BackfillExamDerivatives), e a falha determinística de formato/memória roda 2×, não 3×.
+     */
+    public int $tries = 2;
+
+    public int $backoff = 60;
+
     private const DISPLAY_MAX_EDGE = 2560;
 
     private const DISPLAY_QUALITY = 85;
@@ -51,6 +59,7 @@ class GenerateExamDerivatives implements ShouldQueue
 
     public function __construct(public string $patientExamId, public ?string $expectedArchive = null)
     {
+        $this->onQueue('default');
     }
 
     public function handle(): void

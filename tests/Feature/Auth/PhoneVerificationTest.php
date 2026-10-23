@@ -322,11 +322,11 @@ test('job envia o código pelo template de autenticação do app global e regist
         ->and(json_encode($message->payload))->not->toContain('482913');
 });
 
-test('job do código usa a fila do WhatsApp e cifra o payload (código não fica em claro na fila)', function () {
-    config(['whatsapp.queue' => 'whatsapp']);
+test('job do código usa a fila de verificação (não a do envio em massa) e cifra o payload (código não fica em claro na fila)', function () {
+    config(['whatsapp.queue' => 'envio-em-massa', 'whatsapp.verification_queue' => 'otp']);
 
     $job = new SendPhoneVerificationCodeJob('user-1', '5511988887777', '123456');
 
-    expect($job->queue)->toBe('whatsapp')
+    expect($job->queue)->toBe('otp')
         ->and($job)->toBeInstanceOf(ShouldBeEncrypted::class);
 });

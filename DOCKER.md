@@ -39,7 +39,7 @@ Browser
         ├── PostgreSQL :5432  (acessado via host.docker.internal)
         └── Redis      :6379  (acessado via host.docker.internal)
 
-easyeye_worker ──► supervisord ──► queue:work (2 processos: default, high)
+easyeye_worker ──► supervisord ──► queue:work (3 processos: fast-critical = critical,default,tiss-* · fast-tiss = tiss-*,default,critical · bulk = bulk)
 ```
 
 ---
@@ -294,11 +294,19 @@ Browser ──► localhost:5173 ──► easyeye_node (Vite HMR)
 
 ### Worker (Supervisor)
 
-O `easyeye_worker` roda 2 processos paralelos na fila `default,high` com:
+O `easyeye_worker` roda **3 processos**, em três programas do Supervisor de 1 processo cada (`.docker/supervisor/easyeye-worker.conf`; runbook: `docs/internal/runbooks/filas-workers.md`):
 
-- `--timeout=90` — jobs longos são encerrados após 90s
-- `--tries=3` — 3 tentativas antes de mover para failed_jobs
-- `--max-jobs=1000` — recicla o processo após 1000 jobs (evita memory leak)
+| Programa | Conexão | Filas (nessa ordem) | `--timeout` | Log |
+|---|---|---|---:|---|
+| `easyeye-worker-fast-critical` | `SUPERVISOR_QUEUE_CONNECTION` | `critical`, `default`, `tiss-xml`, `tiss-send`, `tiss-returns` | 190 s | `easyeye-fast-critical.log` |
+| `easyeye-worker-fast-tiss` | `SUPERVISOR_QUEUE_CONNECTION` | `tiss-xml`, `tiss-send`, `tiss-returns`, `default`, `critical` | 190 s | `easyeye-fast-tiss.log` |
+| `easyeye-worker-bulk` | `SUPERVISOR_BULK_CONNECTION` | `bulk` | 900 s | `easyeye-bulk.log` |
+
+- `critical` = código de verificação (OTP) do cadastro, mensagem recebida do WhatsApp e webhook de pagamento; `bulk` = importações, sync de catálogos e posologia. O resto é `default`. Um import de 15 min não segura mais o OTP.
+- **Por que dois fast com ordens diferentes:** uma rajada sustentada em `critical` prende quem lê `critical` primeiro, e `default` cheia prende quem lê `default` antes do TISS. O `fast-tiss` lê as três filas TISS (lote esparso) primeiro e `default` logo depois; o `fast-critical` mantém `critical` na frente e também atende `default` e TISS. Cada fila tem um consumidor que a prioriza ou a atende logo após uma fila de volume baixo.
+- `--tries=3` nos fast (1 no bulk) — tentativas antes de mover para failed_jobs; `--memory=256` (fast) / `512` (bulk); `--max-jobs=1000` nos fast recicla o processo (evita memory leak).
+- A conexão é argumento posicional do `queue:work`; o Laravel 12 não tem `--connection=`.
+- **Conexão do bulk segue a conexão efetiva.** O `.docker/php/entrypoint.sh` exporta `SUPERVISOR_BULK_CONNECTION`: com `QUEUE_CONNECTION_DOCKER=redis` vira `redis-bulk` (mesmo Redis da conexão `redis`, retry_after 960); com `database` (o padrão do compose, já que o Redis é externo) vira `database` — fast e bulk leem a mesma tabela `jobs` e a fila `bulk` tem consumidor nos dois modos.
 
 ---
 
@@ -332,7 +340,9 @@ docker compose logs -f worker
 docker compose logs -f node
 
 # Logs do Supervisor (workers)
-docker exec easyeye_worker cat /var/log/supervisor/easyeye-default.log
+docker exec easyeye_worker cat /var/log/supervisor/easyeye-fast-critical.log
+docker exec easyeye_worker cat /var/log/supervisor/easyeye-fast-tiss.log
+docker exec easyeye_worker cat /var/log/supervisor/easyeye-bulk.log
 ```
 
 ### Artisan
@@ -401,7 +411,7 @@ docker exec -it easyeye_node sh
 | `APP_USER` | `easyeye` | Usuário do processo PHP dentro do container |
 | `UID` | `1000` | UID do usuário (deve bater com o do host para evitar problemas de permissão) |
 | `GID` | `1000` | GID do grupo |
-| `QUEUE_CONNECTION_DOCKER` | `database` | Conexão de fila usada pelo worker no Docker |
+| `QUEUE_CONNECTION_DOCKER` | `database` | Conexão de fila do worker no Docker (`redis` ou `database`). Os fast usam esta; o bulk segue (`redis` → `redis-bulk`, `database` → `database`): ver *Worker (Supervisor)* |
 | `RUN_MIGRATIONS` | `true` (no serviço app) | Habilita `migrate --force` automático no entrypoint |
 
 ---

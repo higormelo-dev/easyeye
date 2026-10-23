@@ -30,6 +30,7 @@ class ProcessCovenantImportJob implements ShouldQueue
     public function __construct(
         public readonly CovenantImport $import,
     ) {
+        $this->onQueue((string) config('queue.bulk_queue', 'bulk'));
     }
 
     public function handle(AnsOperatorImportService $service): void

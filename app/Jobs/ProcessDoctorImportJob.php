@@ -28,6 +28,7 @@ class ProcessDoctorImportJob implements ShouldQueue
     public function __construct(
         public readonly DoctorImport $import,
     ) {
+        $this->onQueue((string) config('queue.bulk_queue', 'bulk'));
     }
 
     public function handle(DoctorImportService $service): void

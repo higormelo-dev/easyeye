@@ -28,6 +28,7 @@ class ProcessScheduleImportJob implements ShouldQueue
     public function __construct(
         public readonly ScheduleImport $import,
     ) {
+        $this->onQueue((string) config('queue.bulk_queue', 'bulk'));
     }
 
     public function handle(ScheduleImportService $service): void

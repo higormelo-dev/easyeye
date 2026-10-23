@@ -48,7 +48,7 @@ class RecreateGatewayRecurrenceJob implements ShouldQueue
         public readonly string $firstDueDate,
         public readonly string $correlationId,
     ) {
-        $this->onQueue((string) config('billing.webhooks.queue', 'default'));
+        $this->onQueue((string) config('billing.jobs.queue', 'default'));
     }
 
     public function handle(GatewayRegistry $registry, BillingLogService $billingLog): void

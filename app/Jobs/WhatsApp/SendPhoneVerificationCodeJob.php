@@ -62,7 +62,7 @@ class SendPhoneVerificationCodeJob implements ShouldBeEncrypted, ShouldQueue
         public readonly string $locale = 'pt_BR',
     ) {
         $this->sendKey = (string) Str::uuid();
-        $this->onQueue((string) config('whatsapp.queue', 'default'));
+        $this->onQueue((string) config('whatsapp.verification_queue', 'critical'));
     }
 
     public function handle(WhatsAppProvider $provider, WhatsAppTemplates $templates): void

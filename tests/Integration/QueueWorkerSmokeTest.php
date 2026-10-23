@@ -3,22 +3,23 @@
 declare(strict_types=1);
 
 /**
- * Alinhamento filas/timeout/retry/parada do worker Supervisor — achado via
- * auditoria de encerramento, EE-09. tiss-xml/tiss-send/tiss-returns
- * (config/tiss.php) nunca apareciam no --queue do worker
- * (.docker/supervisor/easyeye-worker.conf) — jobs despachados pra elas
- * ficavam parados pra sempre na tabela `jobs`. QUEUE_CONNECTION=sync do
- * phpunit.xml (dispatch roda na hora, nunca fila de verdade) não prova
- * isso — por isso um worker REAL, processo próprio, igual ao comando do
- * Supervisor em produção (RELATORIO.md: "Testes com QUEUE_CONNECTION=sync
- * não bastam").
+ * Worker REAL (processo próprio, igual ao comando do Supervisor) — achado via auditoria de encerramento, EE-09:
+ * tiss-xml/tiss-send/tiss-returns (config/tiss.php) nunca apareciam no --queue do worker
+ * (.docker/supervisor/easyeye-worker.conf) e os jobs despachados pra elas ficavam parados pra sempre na tabela `jobs`.
+ * QUEUE_CONNECTION=sync do phpunit.xml (dispatch roda na hora, nunca fila de verdade) não prova isso (RELATORIO.md:
+ * "Testes com QUEUE_CONNECTION=sync não bastam").
+ *
+ * Só o que precisa de worker/banco de verdade mora aqui (DatabaseMigrations recria o schema; tests/Integration fica
+ * fora das suítes do phpunit.xml). As travas ESTÁTICAS da topologia (parse do Supervisor, do entrypoint, do crontab e
+ * da config; retry_after, --timeout, stopwaitsecs, filas configuradas) rodam na CI em
+ * tests/Feature/Queue/WorkerTopologyTest.php. Reserva real no Redis: QueueRedisReservationTest.php.
  */
 
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Tests\Integration\Support\Ee09MarkerJob;
+use Tests\Support\QueueTopology;
 use Tests\TestCase;
 
 uses(TestCase::class, DatabaseMigrations::class);
@@ -43,21 +44,19 @@ function ee09WorkerEnv(): array
     ];
 }
 
-it('[GAP] worker real (comando do Supervisor) drena as 3 filas TISS — não ficam paradas pra sempre (EE-09)', function () {
-    $conf = file_get_contents(base_path('.docker/supervisor/easyeye-worker.conf'));
-    preg_match('/--queue=(\S+)/', (string) $conf, $matches);
-    $queueList = $matches[1] ?? '';
+it('[GAP] worker real (comando de cada programa fast) drena critical, default e as 3 filas TISS — não ficam paradas pra sempre (EE-09)', function (string $program) {
+    $queueList = QueueTopology::programs()[$program]['queues'];
 
-    expect($queueList)->toContain('tiss-xml')
+    expect($queueList)->toContain('critical')
+        ->and($queueList)->toContain('default')
+        ->and($queueList)->toContain('tiss-xml')
         ->and($queueList)->toContain('tiss-send')
         ->and($queueList)->toContain('tiss-returns');
 
     $dir = sys_get_temp_dir() . '/ee09-' . Str::uuid();
     mkdir($dir, 0700);
 
-    $queues = ['tiss-xml', 'tiss-send', 'tiss-returns'];
-
-    foreach ($queues as $queue) {
+    foreach ($queueList as $queue) {
         Ee09MarkerJob::dispatch("{$dir}/{$queue}.marker")
             ->onConnection('database')
             ->onQueue($queue);
@@ -68,7 +67,7 @@ it('[GAP] worker real (comando do Supervisor) drena as 3 filas TISS — não fic
         ->timeout(30)
         ->run([
             PHP_BINARY, 'artisan', 'queue:work', 'database',
-            '--queue=' . $queueList,
+            '--queue=' . implode(',', $queueList),
             '--stop-when-empty',
             '--timeout=10',
         ]);
@@ -76,95 +75,38 @@ it('[GAP] worker real (comando do Supervisor) drena as 3 filas TISS — não fic
     expect($process->successful())
         ->toBeTrue("worker saiu com erro — stdout: {$process->output()} | stderr: {$process->errorOutput()}");
 
-    foreach ($queues as $queue) {
+    foreach ($queueList as $queue) {
         expect(is_file("{$dir}/{$queue}.marker"))->toBeTrue("fila '{$queue}' não foi drenada pelo worker real");
     }
-});
+})->with([
+    'fast-critical' => ['easyeye-worker-fast-critical'],
+    'fast-tiss'     => ['easyeye-worker-fast-tiss'],
+]);
 
-// redis: o .env.example seleciona QUEUE_CONNECTION=redis e o default dele
-// ficou em 90 s depois do EE-09 corrigir só o `database` (F3, revisão
-// adversarial Codex). O comportamento real no Redis está em
-// QueueRedisReservationTest.php.
-it('retry_after da conexão de fila é maior que o maior $timeout declarado entre os jobs (EE-09)', function (string $connection) {
-    expect((int) config("queue.connections.{$connection}.retry_after"))->toBeGreaterThan(maxDeclaredJobTimeout());
-})->with(['database', 'redis']);
+it('o worker respeita a ordem do --queue de cada programa fast: a fila da frente sai antes, mesmo com o job da outra chegando primeiro (prioridade viva)', function (string $program, string $first, string $second) {
+    $queueList = QueueTopology::programs()[$program]['queues'];
 
-it('stopwaitsecs do worker Supervisor é maior que o maior $timeout declarado entre os jobs da fila (EE-09)', function () {
-    $conf = file_get_contents(base_path('.docker/supervisor/easyeye-worker.conf'));
-    preg_match('/^stopwaitsecs=(\d+)/m', (string) $conf, $matches);
+    expect(array_search($first, $queueList, true))->toBeLessThan((int) array_search($second, $queueList, true));
 
-    expect($matches)->not->toBeEmpty('stopwaitsecs não declarado em easyeye-worker.conf');
+    $dir = sys_get_temp_dir() . '/ee09-' . Str::uuid();
+    mkdir($dir, 0700);
 
-    $stopwaitsecs = (int) $matches[1];
+    // O job da fila de trás chega ANTES; só a ordem do --queue pode fazer o da frente passar na vez.
+    Ee09MarkerJob::dispatch("{$dir}/{$second}.marker")->onConnection('database')->onQueue($second);
+    Ee09MarkerJob::dispatch("{$dir}/{$first}.marker")->onConnection('database')->onQueue($first);
 
-    expect($stopwaitsecs)->toBeGreaterThan(maxDeclaredJobTimeout());
-});
+    $process = Process::path(base_path())
+        ->env(ee09WorkerEnv())
+        ->timeout(30)
+        ->run([PHP_BINARY, 'artisan', 'queue:work', 'database', '--queue=' . implode(',', $queueList), '--stop-when-empty', '--timeout=10']);
 
-/**
- * Maior $timeout declarado (propriedade literal, não calculado no
- * construtor) entre todas as classes de job da aplicação.
- */
-function maxDeclaredJobTimeout(): int
-{
-    $maxTimeout = 60; // default implícito do Laravel pra job sem $timeout próprio
-
-    foreach (allQueueableJobClasses() as $class) {
-        $ref = new ReflectionClass($class);
-
-        if (! $ref->hasProperty('timeout')) {
-            continue;
-        }
-
-        $instance = $ref->newInstanceWithoutConstructor();
-        $property = $ref->getProperty('timeout');
-
-        // Job que calcula o timeout no construtor (ex.: RunAiWorkflowJob, a
-        // partir de config) não tem valor acessível sem rodar o construtor
-        // de verdade — fora do alcance desta checagem estática.
-        if (! $property->isInitialized($instance)) {
-            continue;
-        }
-
-        $timeout = $property->getValue($instance);
-
-        if (is_int($timeout) && $timeout > $maxTimeout) {
-            $maxTimeout = $timeout;
-        }
-    }
-
-    return $maxTimeout;
-}
-
-/**
- * @return list<class-string>
- */
-function allQueueableJobClasses(): array
-{
-    $classes = [];
-    $root    = app_path();
-
-    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
-
-    foreach ($iterator as $file) {
-        if (! $file->isFile() || $file->getExtension() !== 'php') {
-            continue;
-        }
-
-        $relative = substr($file->getPathname(), strlen($root) + 1, -4);
-        $class    = 'App\\' . str_replace('/', '\\', $relative);
-
-        if (! class_exists($class)) {
-            continue;
-        }
-
-        $ref = new ReflectionClass($class);
-
-        if ($ref->isAbstract() || $ref->isInterface() || ! $ref->implementsInterface(ShouldQueue::class)) {
-            continue;
-        }
-
-        $classes[] = $class;
-    }
-
-    return $classes;
-}
+    expect($process->successful())
+        ->toBeTrue("worker saiu com erro — stdout: {$process->output()} | stderr: {$process->errorOutput()}")
+        ->and((int) file_get_contents("{$dir}/{$first}.marker"))->toBeLessThan((int) file_get_contents("{$dir}/{$second}.marker"));
+})->with([
+    'fast-critical: critical antes de default' => ['easyeye-worker-fast-critical', 'critical', 'default'],
+    'fast-tiss: tiss-xml antes de default'     => ['easyeye-worker-fast-tiss', 'tiss-xml', 'default'],
+    'fast-tiss: tiss-send antes de default'    => ['easyeye-worker-fast-tiss', 'tiss-send', 'default'],
+    'fast-tiss: tiss-returns antes de default' => ['easyeye-worker-fast-tiss', 'tiss-returns', 'default'],
+    'fast-tiss: default antes de critical'     => ['easyeye-worker-fast-tiss', 'default', 'critical'],
+]);

@@ -29,6 +29,7 @@ class ProcessCid10ImportJob implements ShouldQueue
     public function __construct(
         public readonly Cid10Import $import,
     ) {
+        $this->onQueue((string) config('queue.bulk_queue', 'bulk'));
     }
 
     public function handle(Cid10ImportService $service): void

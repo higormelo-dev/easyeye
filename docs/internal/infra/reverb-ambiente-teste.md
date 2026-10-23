@@ -148,30 +148,77 @@ preservada em redeploy pela Jelastic.
 ```cron
 # Agendador do Laravel (routes/console.php)
 * * * * * cd /var/www/webroot/ROOT && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
-# Worker da fila (Redis) — sai a cada 1 h (--max-time) e o cron sobe com o código atual
-* * * * * cd /var/www/webroot/ROOT && /usr/bin/flock -n /tmp/easyeye-queue.lock /usr/bin/php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600 --memory=256 -q >> storage/logs/queue-worker.log 2>&1
+# Worker FAST-CRITICAL: critical (OTP, mensagem recebida, webhook de pagamento) primeiro, depois default e TISS. Sai a cada 1 h (--max-time) e o cron sobe com o código atual
+* * * * * cd /var/www/webroot/ROOT && /usr/bin/flock -n /tmp/easyeye-queue-fast-critical.lock /usr/bin/php artisan queue:work redis --queue=critical,default,tiss-xml,tiss-send,tiss-returns --sleep=1 --timeout=190 --tries=3 --max-time=3600 --memory=256 -q >> storage/logs/queue-worker-fast-critical.log 2>&1
+# Worker FAST-TISS: as 3 filas TISS primeiro, depois default, critical por último (atenua a starvation de TISS/default sob rajada de critical; risco residual no runbook filas-workers.md)
+* * * * * cd /var/www/webroot/ROOT && /usr/bin/flock -n /tmp/easyeye-queue-fast-tiss.lock /usr/bin/php artisan queue:work redis --queue=tiss-xml,tiss-send,tiss-returns,default,critical --sleep=1 --timeout=190 --tries=3 --max-time=3600 --memory=256 -q >> storage/logs/queue-worker-fast-tiss.log 2>&1
+# Worker BULK: importações, sync de catálogos e posologia, em conexão própria (redis-bulk), um processo. A conexão é argumento posicional
+* * * * * cd /var/www/webroot/ROOT && /usr/bin/flock -n /tmp/easyeye-queue-bulk.lock /usr/bin/php artisan queue:work redis-bulk --queue=bulk --sleep=3 --timeout=900 --tries=1 --max-time=3600 --memory=512 -q >> storage/logs/queue-worker-bulk.log 2>&1
 # Reverb (WebSocket) — só interno
 * * * * * cd /var/www/webroot/ROOT && /usr/bin/flock -n /tmp/easyeye-reverb.lock /usr/bin/php artisan reverb:start --host=127.0.0.1 --port=8080 >> storage/logs/reverb.log 2>&1
 ```
 
 A Jelastic exige uma **linha em branco depois da última entrada** da crontab.
 
-**Um worker só, de propósito — e `retry_after` acima do maior `$timeout`.** Os
-jobs de importação têm `$timeout` de 600 s (pacientes, médicos, agenda) e 900 s
-(medicamentos — envio ou download da CMED — e sincronização de convênios/planos
-com a ANS). O `retry_after` da conexão `redis` (`REDIS_QUEUE_RETRY_AFTER`) tem
-que ficar **acima** disso: vencido, o job reservado volta para a fila e outro
-worker pega o **mesmo** job enquanto o primeiro ainda roda. Com um worker isso
-não aparece; com dois ou mais, aparece. O padrão do código agora é **960 s**
-(`config/queue.php`, igual ao da conexão `database`), então não é preciso
-definir nada no `.env` — mas um `REDIS_QUEUE_RETRY_AFTER` explícito e menor que
-900 s neste ambiente anula a proteção (remova ou ajuste). Como a config fica em
-cache aqui, o deploy que traz o padrão novo precisa de `php artisan config:cache`
-e `php artisan queue:restart`. Contrapartida: um worker que morre no meio de um
-job (OOM, `kill -9`) só devolve esse job à fila depois de `retry_after` (até
-16 min). O teste `tests/Integration/QueueWorkerSmokeTest.php` trava o
-`retry_after` acima do maior `$timeout`, e `tests/Integration/QueueRedisReservationTest.php`
-confere, com um worker real no Redis, o prazo da reserva.
+**Padrão: 3 linhas de cron, 3 processos (decisão O1, reversível pelo dono).** São `fast-critical`, `fast-tiss` e `bulk`, cada
+uma com `flock` e log próprios (as 3 linhas acima, prontas para colar). Com **1 fast só, `default` e TISS podem ficar sem consumo
+sob rajada de `critical`** (a `critical` ganha sempre, e uma rajada sustentada de mensagens recebidas do WhatsApp ou de
+webhooks mantém a fila cheia): não use essa configuração. Com dois fast em ordens diferentes cada fila tem um consumidor que a
+prioriza ou a atende logo após uma fila de volume baixo: `critical` é a primeira do `fast-critical`; as três filas TISS (lote
+esparso de 90–120 s) são as primeiras do `fast-tiss`, e `default` vem logo depois delas, então também não fica órfã. É o mesmo
+desenho do Docker (programas `fast-critical`, `fast-tiss` e `bulk`). Custo: ~256 MB de memória a mais que o desenho antigo de 1 fast.
+
+**Como aplicar no deploy** (a crontab do usuário `nginx` não vem do `git pull`; é editada no nó):
+
+```bash
+crontab -e                        # troque a linha única do fast pelas 3 linhas acima (fast-critical, fast-tiss, bulk); deixe uma linha em branco no fim
+php artisan config:cache
+php artisan schedule:clear-cache  # fora de uma tarefa longa
+php artisan queue:restart         # o(s) worker(s) antigo(s) terminam o job corrente e o cron sobe os 3 novos
+ps -eo pid,etime,args | grep "queue:work" | grep -v grep   # esperado: redis (critical primeiro), redis (tiss primeiro) e redis-bulk
+```
+
+Remova do crontab qualquer linha antiga de fast (`/tmp/easyeye-queue.lock` ou `/tmp/easyeye-queue-fast.lock`): ela leria as mesmas filas
+com outro `flock` e o `redis` teria três consumidores iguais.
+
+Vigie as filas (sem serviço novo): `redis-cli llen queues:critical`, `redis-cli llen queues:default` e `redis-cli llen queues:tiss-xml`
+(com o prefixo da aplicação, ex.: `easyeye_database_queues:critical`; `redis-cli --scan --pattern '*queues:*'` mostra as chaves).
+`default` ou TISS crescendo enquanto `critical` não zera é o sintoma de que só há um fast rodando. Com os 3 processos ainda resta um risco (prioridade fixa: `critical` e `tiss-xml` saturadas ao mesmo tempo deixam `default`/`tiss-send`/`tiss-returns` sem consumidor); aceite do dono pendente — ver "Risco residual" em `docs/internal/runbooks/filas-workers.md`.
+
+**Fast e bulk, de propósito — e `retry_after` acima do maior `$timeout` de cada conexão.**
+Antes havia um worker só, sem `--queue`, e uma importação de 10–15 min parava a fila inteira: o OTP do
+cadastro (vale 10 min) e o webhook de pagamento esperavam atrás dela. Agora:
+
+| Worker (linha do cron) | Conexão | Filas (nessa ordem) | `retry_after` | Maior job |
+|---|---|---|---:|---|
+| fast-critical | `redis` | `critical`, `default`, `tiss-xml`, `tiss-send`, `tiss-returns` | 240 s | 180 s (IA) |
+| fast-tiss | `redis` | `tiss-xml`, `tiss-send`, `tiss-returns`, `default`, `critical` | 240 s | 180 s (IA) |
+| bulk | `redis-bulk` | `bulk` | 960 s | 900 s (medicamentos/CMED, convênios/ANS) |
+
+`critical` = OTP do cadastro, mensagem recebida do WhatsApp e webhook de pagamento. `bulk` = as 6
+importações, a sincronização de catálogos de IA e a posologia. O resto cai em `default`. O job bulk é
+despachado pela conexão `redis` e o worker `redis-bulk` o consome do **mesmo** Redis (mesmo DB e
+prefixo: `REDIS_QUEUE_CONNECTION` vale para as duas) — por isso o `queue:work redis-bulk --queue=bulk`
+lê o que a aplicação gravou em `queues:bulk`.
+
+O `retry_after` (`REDIS_QUEUE_RETRY_AFTER` = 240 s e `REDIS_BULK_QUEUE_RETRY_AFTER` = 960 s) tem que
+ficar **acima** do maior `$timeout` dos jobs da conexão: vencido, o job reservado volta para a fila e
+outro worker pega o **mesmo** job enquanto o primeiro ainda roda. Os padrões do código já são esses
+(`config/queue.php`); um `REDIS_QUEUE_RETRY_AFTER=960` que sobrou no `.env` deste ambiente continua
+seguro (≥ 240) mas devolve um webhook de um worker morto só em 16 min — remova. **Nunca abaixo de 190 s**
+(o `--timeout` do fast). Como a config fica em cache aqui, o deploy precisa de `php artisan config:cache`
+e `php artisan queue:restart`. Contrapartida: um worker que morre no meio de um job (OOM, `kill -9`)
+só devolve esse job à fila depois de `retry_after` (4 min no fast, 16 min no bulk).
+
+Os envs de fila (`BULK_QUEUE`, `BILLING_WEBHOOK_QUEUE`, `BILLING_JOBS_QUEUE`, `WHATSAPP_QUEUE`,
+`WHATSAPP_VERIFICATION_QUEUE`, `WHATSAPP_INBOUND_QUEUE`, `AI_QUEUE`, `FISCAL_QUEUE`) precisam sair da
+lista `--queue=` dos workers fast-critical e fast-tiss (as filas do bulk, só no bulk); trocar uma sem a outra deixa o job parado. Um
+`BILLING_WEBHOOK_QUEUE=default` herdado do `.env` antigo desliga a prioridade do webhook de pagamento:
+troque para `critical`. O teste `tests/Integration/QueueWorkerSmokeTest.php` trava o `retry_after` de
+cada conexão acima do maior `$timeout` dos jobs que ela serve, as filas dos dois comandos contra as
+filas configuradas e a ordem `critical` primeiro; `tests/Integration/QueueRedisReservationTest.php`
+confere, com um worker real no Redis, o prazo da reserva nas duas conexões. Runbook completo:
+`docs/internal/runbooks/filas-workers.md`.
 
 **Memória do nó.** O OOM killer do kernel mata o worker se o processo
 estourar a RAM do nó. Isso acontece mesmo abaixo do `memory_limit` do PHP
@@ -283,7 +330,8 @@ composer install --optimize-autoloader   # em produção: --no-dev
 php artisan migrate --force
 npm ci && npm run build          # sempre que mudar o front ou alguma VITE_*
 php artisan config:cache && php artisan route:cache
-php artisan queue:restart        # worker termina o job atual e o cron sobe de novo
+php artisan schedule:clear-cache # solta os mutex do agendador (rode fora de uma tarefa longa)
+php artisan queue:restart        # os 3 workers (fast-critical, fast-tiss e bulk) terminam o job atual e o cron sobe de novo
 php artisan reverb:restart       # Reverb fecha as conexões e o cron sobe de novo
 ```
 
@@ -298,7 +346,7 @@ com IA" em Manager → Medicamentos. No deploy que o traz: `php artisan migrate
 `medicine_posology_batches`/`_groups`), `php artisan queue:restart` e
 `php artisan reverb:restart`. O job agenda a própria continuação a cada
 `MEDICINE_POSOLOGY_BATCH_JOB_BUDGET` segundos (padrão 45, bem abaixo do
-`retry_after` de 960 s da fila).
+`retry_after` de 960 s da conexão `redis-bulk`, onde roda a posologia).
 
 ## 4. Como verificar
 
@@ -318,8 +366,11 @@ curl -s -i -N --http1.1 --max-time 8 \
   -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Origin: https://teste.easyeye.app" \
   "https://teste.easyeye.app/app/${KEY}?protocol=7&client=js&version=8.4.0" | head -12
 
-# fila e falhas
+# fila e falhas (3 workers: fast-critical, fast-tiss e bulk, cada um com o seu log)
 php artisan tinker --execute 'echo app("queue")->connection("redis")->size("default"), PHP_EOL;'
+php artisan tinker --execute 'echo app("queue")->connection("redis")->size("critical"), PHP_EOL;'
+php artisan queue:monitor redis:critical,redis:default,redis:tiss-xml,redis:tiss-send,redis:tiss-returns,redis-bulk:bulk --max=1000
+tail -n 20 storage/logs/queue-worker-fast-critical.log storage/logs/queue-worker-fast-tiss.log storage/logs/queue-worker-bulk.log
 php artisan queue:failed
 ```
 
@@ -337,7 +388,8 @@ com 1 assinante no Redis, fila zerada e nenhum job com falha.
 
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
-| Barra de progresso não anda, importação fica "Aguardando" | Worker da fila parado | Ver processo `queue:work`; conferir crontab (`crontab -l`) e `storage/logs/queue-worker.log` |
+| Barra de progresso não anda, importação fica "Aguardando" | Worker **bulk** parado (importação e catálogo rodam só nele), ou Reverb parado | Ver os 3 processos `queue:work` (2 em `redis`, 1 em `redis-bulk`); conferir crontab (`crontab -l`) e `storage/logs/queue-worker-bulk.log` |
+| Cadastro não recebe o código por WhatsApp, ou pagamento aprovado não aparece | Worker **fast-critical** parado ou travado num job longo (a fila `critical` é a primeira que ele lê), ou só 1 fast rodando | `queue-worker-fast-critical.log`; `queue:monitor` (seção 4); `BILLING_WEBHOOK_QUEUE`/`WHATSAPP_*_QUEUE` do `.env` ainda em `default` |
 | Tela mostra "Conexão em tempo real indisponível" | Reverb parado, ou nginx sem o bloco `/app` | `ss -ltn \| grep 8080`; `storage/logs/reverb.log`; conferir o bloco no `default.conf` e `nginx -t` |
 | `https://teste.easyeye.app/app/...` responde 502 | Reverb não está escutando em 127.0.0.1:8080 | Aguardar 1 min (cron) ou ver `reverb.log`; outro processo na 8080? |
 | Navegador tenta conectar em host/porta errados | Build feito antes de ajustar `VITE_REVERB_*` | Corrigir `.env` e rodar `npm run build` |

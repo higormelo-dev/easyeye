@@ -8,9 +8,14 @@ declare(strict_types=1);
  * importação declaram $timeout de 900 s e o Supervisor sobe 2 consumidores.
  * O teste de config (QueueWorkerSmokeTest) prova o VALOR; este prova o
  * COMPORTAMENTO: um worker de verdade (processo separado, `queue:work
- * redis`) pega um job de $timeout 900 s e a reserva no Redis (ZSET
- * queues:{fila}:reserved, score = agora + retry_after) tem que durar mais
- * que o $timeout — senão outro consumidor reentrega o MESMO job no meio.
+ * <conexão>`) pega um job e a reserva no Redis (ZSET queues:{fila}:reserved,
+ * score = agora + retry_after) tem que durar mais que o $timeout — senão outro
+ * consumidor reentrega o MESMO job no meio.
+ *
+ * Duas conexões desde a F1 de performance: `redis` (fast: job de 180 s, reserva
+ * de 240 s) e `redis-bulk` (bulk: job de 900 s, reserva de 960 s). O job é
+ * DESPACHADO sempre na conexão `redis` — como a aplicação faz — e o worker
+ * `redis-bulk` o consome: prova que as duas conexões enxergam a MESMA fila.
  *
  * Fila com nome único e chaves apagadas no fim: não encosta nas filas da
  * aplicação. Roda só com caminho explícito (tests/Integration fica fora das
@@ -24,9 +29,9 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-it('worker real no Redis reserva o job por mais tempo que o maior $timeout — nenhum outro consumidor reentrega o mesmo job (F3)', function () {
+it('worker real no Redis reserva o job por mais tempo que o maior $timeout — nenhum outro consumidor reentrega o mesmo job (F3)', function (string $connection, int $jobTimeout) {
     try {
-        $redis = Redis::connection((string) config('queue.connections.redis.connection', 'default'));
+        $redis = Redis::connection((string) config("queue.connections.{$connection}.connection", 'default'));
         $redis->ping();
     } catch (Throwable $e) {
         $this->markTestSkipped('Redis inacessível: ' . $e->getMessage());
@@ -40,12 +45,13 @@ it('worker real no Redis reserva o job por mais tempo que o maior $timeout — n
     $worker = null;
 
     try {
-        Ee09SlowMarkerJob::dispatch($dir)->onConnection('redis')->onQueue($queue);
+        // Despachado SEMPRE pela conexão `redis` (a padrão da aplicação); quem consome é a conexão do teste.
+        Ee09SlowMarkerJob::dispatch($dir, $jobTimeout)->onConnection('redis')->onQueue($queue);
 
         $worker = Process::path(base_path())
             ->env(['APP_ENV' => 'testing'])
             ->timeout(120)
-            ->start([PHP_BINARY, 'artisan', 'queue:work', 'redis', '--queue=' . $queue, '--once']);
+            ->start([PHP_BINARY, 'artisan', 'queue:work', $connection, '--queue=' . $queue, '--once']);
 
         // O job começou a rodar no worker filho = já foi reservado.
         $deadline = microtime(true) + 30;
@@ -67,8 +73,8 @@ it('worker real no Redis reserva o job por mais tempo que o maior $timeout — n
         expect($members)->toHaveCount(1);
 
         $remaining       = (float) $redis->zscore($reserved, $members[0]) - time();
-        $retryAfter      = (int) config('queue.connections.redis.retry_after');
-        $declaredTimeout = (new Ee09SlowMarkerJob($dir))->timeout;
+        $retryAfter      = (int) config("queue.connections.{$connection}.retry_after");
+        $declaredTimeout = (new Ee09SlowMarkerJob($dir, $jobTimeout))->timeout;
 
         // Vale mais que o $timeout do job: nenhum outro worker pega o mesmo
         // job enquanto o 1º, legítimo, ainda tem tempo de rodar...
@@ -99,4 +105,7 @@ it('worker real no Redis reserva o job por mais tempo que o maior $timeout — n
 
         @rmdir($dir);
     }
-});
+})->with([
+    'fast: conexão redis, job de 180 s (IA), reserva de 240 s'           => ['redis', 180],
+    'bulk: conexão redis-bulk, job de 900 s (imports), reserva de 960 s' => ['redis-bulk', 900],
+]);

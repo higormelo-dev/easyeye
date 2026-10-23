@@ -65,7 +65,7 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
         public readonly string $correlationId,
         public readonly ?string $externalSubscriptionId = null,
     ) {
-        $this->onQueue((string) config('billing.webhooks.queue', 'default'));
+        $this->onQueue((string) config('billing.jobs.queue', 'default'));
     }
 
     public function handle(
