@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
@@ -107,5 +107,118 @@ describe('SearchSelect — busca remota', () => {
 
         expect(window.axios.get).not.toHaveBeenCalled();
         expect(wrapper.vm.effectiveOptions.length).toBe(2);
+    });
+});
+
+describe('SearchSelect — estados e ordem das respostas', () => {
+    let wrapper;
+    const seed = { id: 'seed', label: 'Opção inicial' };
+    async function render(extra = {}) {
+        wrapper = mount(SearchSelect, {
+            props: {
+                modelValue: null,
+                options: [seed],
+                labelKey: 'label',
+                remoteSearchUrl: '/search?q=__Q__',
+                ...extra,
+            },
+            attachTo: document.body,
+        });
+        await wrapper.find('input').trigger('focus');
+        return wrapper;
+    }
+    async function search(term) {
+        wrapper.vm.onSearchChange(term);
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+    }
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        window.axios = { get: vi.fn() };
+    });
+    afterEach(() => {
+        wrapper?.unmount();
+        vi.useRealTimers();
+    });
+    it('aborta e ignora resposta antiga desde o debounce da nova busca', async () => {
+        let old;
+        window.axios.get
+            .mockImplementationOnce(
+                () =>
+                    new Promise((done) => {
+                        old = done;
+                    }),
+            )
+            .mockResolvedValueOnce({ data: { data: [{ id: 'new', label: 'Atual' }] } });
+        await render();
+        await search('old');
+        const signal = window.axios.get.mock.calls[0][1].signal;
+        wrapper.vm.onSearchChange('new');
+        expect(signal.aborted).toBe(true);
+        old({ data: { data: [{ id: 'old', label: 'ANTIGA' }] } });
+        await flushPromises();
+        expect(wrapper.vm.effectiveOptions).toEqual([]);
+        await vi.advanceTimersByTimeAsync(300);
+        await flushPromises();
+        expect(wrapper.vm.effectiveOptions.map((o) => o.label)).toEqual(['Atual']);
+    });
+    it('erro permite retry, vazio não volta ao seed e limpar restaura opções iniciais', async () => {
+        window.axios.get.mockRejectedValueOnce(new Error()).mockResolvedValueOnce({ data: { data: [] } });
+        await render();
+        await search('none');
+        expect(wrapper.vm.remoteState).toBe('error');
+        expect(wrapper.vm.effectiveOptions).toEqual([]);
+        expect(wrapper.find('[role="alert"]').text()).toContain('Não foi possível');
+        await wrapper.find('[role="alert"] button').trigger('click');
+        await flushPromises();
+        expect(window.axios.get).toHaveBeenCalledTimes(2);
+        expect(wrapper.vm.remoteState).toBe('empty');
+        expect(wrapper.vm.effectiveOptions).toEqual([]);
+        wrapper.vm.onSearchChange('');
+        await flushPromises();
+        expect(wrapper.vm.effectiveOptions).toEqual([seed]);
+    });
+    it('selecionada preserva rótulo durante erro e expõe retry antes da lista', async () => {
+        window.axios.get.mockRejectedValueOnce(new Error());
+        await render({ modelValue: 'seed', options: [seed, { id: 'other', label: 'Outra opção inicial' }] });
+        await search('none');
+        expect(wrapper.vm.effectiveOptions).toEqual([seed]);
+        expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+        expect(wrapper.props('modelValue')).toBe('seed');
+    });
+    it('id, aria e focus apontam para o input interno e loading é anunciado', async () => {
+        window.axios.get.mockImplementation(() => new Promise(() => {}));
+        await render({ id: 'real-control', ariaLabelledby: 'label-id', ariaDescribedby: 'error-id', invalid: true });
+        wrapper.vm.focus();
+        const input = wrapper.get('#real-control');
+        expect(document.activeElement).toBe(input.element);
+        expect(input.attributes('aria-labelledby').split(' ')).toContain('label-id');
+        expect(input.attributes('aria-describedby')).toBe('error-id');
+        expect(input.attributes('aria-invalid')).toBe('true');
+        await search('load');
+        expect(input.attributes('aria-busy')).toBe('true');
+        expect(wrapper.text()).toContain('Buscando');
+    });
+    it('unmount cancela timer e requisição, mesmo se o transporte ignorar signal', async () => {
+        let finish;
+        window.axios.get.mockImplementation(
+            () =>
+                new Promise((done) => {
+                    finish = done;
+                }),
+        );
+        await render();
+        wrapper.vm.onSearchChange('pending');
+        wrapper.unmount();
+        await vi.advanceTimersByTimeAsync(400);
+        expect(window.axios.get).not.toHaveBeenCalled();
+        await render();
+        await search('active');
+        const signal = window.axios.get.mock.calls[0][1].signal;
+        wrapper.unmount();
+        expect(signal.aborted).toBe(true);
+        finish({ data: { data: [{ id: 'late', label: 'Tardio' }] } });
+        await flushPromises();
+        expect(wrapper.vm.effectiveOptions).not.toContainEqual(expect.objectContaining({ id: 'late' }));
     });
 });

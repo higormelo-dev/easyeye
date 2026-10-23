@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import DoctorMissingAlert from '@/Components/Panel/DoctorMissingAlert.vue';
@@ -10,6 +10,7 @@ import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import MedicalRecordDetailDrawer from './MedicalRecordDetailDrawer.vue';
 import PatientInfoSidebar from './Components/PatientInfoSidebar.vue';
 import PdfPreviewModal from './Components/PdfPreviewModal.vue';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
 
 const props = defineProps({
@@ -34,33 +35,53 @@ const hasMore = ref(true);
 const nextPage = ref(1);
 const total = ref(0);
 
+const initialError = ref(false);
+const loadMoreError = ref(false);
+const timelineRequest = latestRequest();
 async function loadPage(page = 1) {
+    if (page > 1 && (loading.value || loadingMore.value)) return;
+    const req = timelineRequest.begin();
     if (page === 1) {
         loading.value = true;
+        loadingMore.value = false;
         records.value = [];
+        initialError.value = false;
+        loadMoreError.value = false;
     } else {
         loadingMore.value = true;
+        loadMoreError.value = false;
     }
-
     try {
         const res = await fetch(`${props.urls.ajax_list}?page=${page}&per_page=10`, {
             headers: { Accept: 'application/json' },
+            signal: req.signal,
         });
+        if (!res.ok) throw new Error();
         const json = await res.json();
-
+        if (!req.current()) return;
         if (page === 1) records.value = json.data;
         else records.value.push(...json.data);
-
         hasMore.value = json.has_more;
         nextPage.value = json.next_page;
         total.value = json.total;
+    } catch (error) {
+        if (req.current() && !isAbortError(error)) {
+            if (page === 1) initialError.value = true;
+            else loadMoreError.value = true;
+        }
     } finally {
-        loading.value = false;
-        loadingMore.value = false;
+        if (req.current()) {
+            loading.value = false;
+            loadingMore.value = false;
+        }
     }
 }
-
 onMounted(() => loadPage(1));
+watch(
+    () => [props.patient.id, props.urls.ajax_list],
+    () => loadPage(1),
+);
+onBeforeUnmount(() => timelineRequest.cancel());
 
 // ── Detail drawer ───────────────────────────────────────────────────────────
 const detailOpen = ref(false);
@@ -115,7 +136,7 @@ async function onDelete(record) {
     }
 }
 
-const isEmpty = computed(() => !loading.value && records.value.length === 0);
+const isEmpty = computed(() => !loading.value && !initialError.value && records.value.length === 0);
 </script>
 
 <template>
@@ -165,6 +186,17 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
                                 <div class="spinner-border text-info"></div>
                             </div>
 
+                            <div
+                                v-else-if="initialError"
+                                class="alert alert-danger"
+                                role="alert"
+                                data-testid="timeline-initial-error"
+                            >
+                                {{ t.timeline_load_error || 'Não foi possível carregar os prontuários.' }}
+                                <button type="button" class="btn btn-outline-primary btn-sm" @click="loadPage(1)">
+                                    {{ t.timeline_retry || 'Tentar novamente' }}
+                                </button>
+                            </div>
                             <!-- Empty -->
                             <div v-else-if="isEmpty" class="text-center py-5 text-muted">
                                 <i class="ti ti-file-text-ai fs-1 d-block mb-3 opacity-25"></i>
@@ -307,7 +339,22 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
                                 </div>
 
                                 <!-- Load more -->
-                                <div v-if="hasMore" class="text-center py-3">
+                                <div
+                                    v-if="loadMoreError"
+                                    class="alert alert-danger"
+                                    role="alert"
+                                    data-testid="timeline-more-error"
+                                >
+                                    {{ t.timeline_load_more_error || 'Não foi possível carregar mais prontuários.' }}
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        @click="loadPage(nextPage)"
+                                    >
+                                        {{ t.timeline_retry || 'Tentar novamente' }}
+                                    </button>
+                                </div>
+                                <div v-else-if="hasMore" class="text-center py-3">
                                     <button
                                         class="btn btn-outline-secondary btn-sm"
                                         :disabled="loadingMore"

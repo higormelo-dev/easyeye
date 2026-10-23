@@ -10,6 +10,30 @@ return [
     'close'   => 'Close',
     'loading' => 'Loading...',
 
+    // UI/UX batch 1 for the panel: accessibility (menu, theme, password), discard confirmation, retry, remote search and
+    // estimated duration on the calendar. Plan: docs/internal/planos/frontend-uiux-lote1-plano.md §3.6.
+    'retry'                             => 'Try again',
+    'cep_lookup'                        => 'Look up postal code',
+    'password_show'                     => 'Show password',
+    'password_hide'                     => 'Hide password',
+    'discard_changes'                   => 'You have unsaved changes. Discard them?',
+    'form_errors_summary'               => 'Fix the highlighted fields.',
+    'load_error'                        => 'Could not load the data.',
+    'open_menu'                         => 'Open menu',
+    'toggle_sidebar'                    => 'Collapse or expand sidebar',
+    'close_menu'                        => 'Close menu',
+    'language'                          => 'Language',
+    'theme_toggle'                      => 'Toggle theme',
+    'theme_dark'                        => 'Enable dark theme',
+    'theme_light'                       => 'Enable light theme',
+    'search_loading'                    => 'Searching…',
+    'search_error'                      => 'Could not load search options.',
+    'search_retry'                      => 'Try again',
+    'calendar_duration_estimated'       => 'Estimated duration',
+    'calendar_duration_estimated_short' => '~:minutes min',
+    'calendar_duration_estimated_aria'  => ':minutes min (estimated duration)',
+    'calendar_duration_minutes'         => ':minutes min',
+
     // Progresso em tempo real (WebSocket/Reverb) — composables/useImportProgress.js
     'realtime_offline' => 'Real-time connection unavailable — trying to reconnect…',
 

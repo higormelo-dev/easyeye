@@ -17,7 +17,9 @@
  *   range-change(range)        → trocou dia/semana/mês
  *   date-click(date)           → clicou no número de um dia (abre o dia)
  */
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive, watch, computed } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+import { resolveEventPalette } from '@/Support/eventPalette.js';
 import FullCalendar from '@fullcalendar/vue3';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -26,6 +28,7 @@ import ptBrLocale from '@fullcalendar/core/locales/pt-br';
 import { sessionLabel } from '@/Support/sessionLabel.js';
 
 const props = defineProps({
+    calendarBounds: { type: Object, default: null },
     scheduleItems: { type: Array, default: () => [] },
     date: { type: String, required: true },
     range: { type: String, default: 'day' },
@@ -35,6 +38,8 @@ const props = defineProps({
 const emit = defineEmits(['event-click', 'slot-click', 'range-change', 'date-click']);
 
 const calRef = ref(null);
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui ?? {});
 
 const VIEWS = { day: 'timeGridDay', week: 'timeGridWeek', month: 'dayGridMonth' };
 
@@ -44,19 +49,34 @@ const rangeOptions = [
     { key: 'month', icon: 'ti ti-calendar-month' },
 ];
 
-// ── Bootstrap 5 badge → hex ───────────────────────────────────────────────────
-const BADGE_HEX = {
-    'bg-primary': '#0d6efd',
-    'bg-secondary': '#6c757d',
-    'bg-success': '#198754',
-    'bg-info': '#0aa2c0',
-    'bg-warning': '#b7791f',
-    'bg-danger': '#dc3545',
-    'bg-dark': '#212529',
-    'bg-purple': '#7c3aed',
-    'bg-orange': '#ea580c',
-    'bg-teal': '#0e9384',
-};
+function resolveScheduleEnd(item) {
+    const start = new Date(item.sort_time).getTime();
+    for (const value of [item.ends_at_iso, item.ends_at]) {
+        const end = value ? new Date(value).getTime() : NaN;
+        if (Number.isFinite(end) && end > start)
+            return {
+                end: new Date(end).toISOString(),
+                duration_minutes: (end - start) / 60000,
+                duration_estimated: false,
+            };
+    }
+    const duration = Number(item.duration_minutes);
+    const explicit = Number.isFinite(duration) && duration > 0;
+    const minutes = explicit ? duration : 20;
+    return {
+        end: new Date(start + minutes * 60000).toISOString(),
+        duration_minutes: minutes,
+        duration_estimated: !explicit,
+    };
+}
+function durationText(item, short = false) {
+    const template = item.duration_estimated
+        ? short
+            ? ui.value.calendar_duration_estimated_short || '~:minutes min'
+            : ui.value.calendar_duration_estimated_aria || ':minutes min (duração estimada)'
+        : ui.value.calendar_duration_minutes || ':minutes min';
+    return template.replace(':minutes', String(item.duration_minutes));
+}
 
 function sessionText(item) {
     return sessionLabel(item.session_number, item.session_total);
@@ -66,22 +86,23 @@ function sessionText(item) {
 function toCalendarEvents(items) {
     return items.map((item) => {
         if (item.type === 'schedule') {
-            const startMs = new Date(item.sort_time).getTime();
+            const duration = resolveScheduleEnd(item);
+            const palette = resolveEventPalette({ badge: item.badge, color: item.doctor_color });
             return {
                 id: item.id,
                 title: item.name ?? '—',
                 start: item.sort_time,
-                end: new Date(startMs + 20 * 60_000).toISOString(),
+                end: duration.end,
                 // item.badge vem com a classe completa ("bg-info text-dark");
                 // só o 1º token é a cor — sem isso vários status saíam cinza.
-                backgroundColor: BADGE_HEX[item.badge?.split(' ')[0]] ?? '#6c757d',
+                backgroundColor: palette.backgroundColor,
                 borderColor: item.doctor_color ?? '#0d6efd',
-                textColor: '#fff',
+                textColor: palette.textColor,
                 classNames: [
                     item.is_fit_in ? 'fc-ev-fit-in' : null,
                     item.is_urgent_care ? 'fc-ev-urgent' : null,
                 ].filter(Boolean),
-                extendedProps: { ...item },
+                extendedProps: { ...item, ...duration },
             };
         }
 
@@ -91,7 +112,7 @@ function toCalendarEvents(items) {
                 title: item.title ?? '—',
                 start: item.sort_time,
                 end: item.ends_at_iso,
-                backgroundColor: '#6b7280',
+                backgroundColor: '#4b5563',
                 borderColor: '#4b5563',
                 textColor: '#fff',
                 classNames: ['fc-ev-block'],
@@ -101,14 +122,15 @@ function toCalendarEvents(items) {
 
         // ScheduleEvent (compromisso não-clínico)
         const dateStr = item.sort_time.substring(0, 10);
+        const palette = resolveEventPalette({ color: item.color });
         return {
             id: `evt-${item.id}`,
             title: item.title ?? '—',
             start: item.sort_time,
-            end: `${dateStr}T${item.ends_at_fmt}:00`,
-            backgroundColor: item.color ?? '#6c757d',
-            borderColor: item.color ?? '#6c757d',
-            textColor: '#fff',
+            end: item.ends_at_iso || item.ends_at || `${dateStr}T${item.ends_at_fmt}:00`,
+            backgroundColor: palette.backgroundColor,
+            borderColor: palette.backgroundColor,
+            textColor: palette.textColor,
             extendedProps: { ...item },
         };
     });
@@ -140,6 +162,7 @@ function renderEventContent(arg) {
 
     if (isSchedule) {
         const tags = el('div', 'fc-ev-tags');
+        if (!compact && item.duration_estimated) tags.appendChild(el('span', 'fc-ev-tag', durationText(item, true)));
         if (item.is_fit_in) tags.appendChild(el('span', 'fc-ev-tag fc-ev-tag--fit', props.t.fit_in_badge ?? 'Encaixe'));
         if (item.is_urgent_care) {
             tags.appendChild(
@@ -164,7 +187,8 @@ function renderEventContent(arg) {
 function eventDidMount(arg) {
     const item = arg.event.extendedProps;
     if (item.type !== 'schedule') return;
-    const parts = [item.time, item.name, item.label, item.doctor_name];
+    const duration = item.duration_minutes ? item : { ...item, ...resolveScheduleEnd(item) };
+    const parts = [item.time, item.name, item.label, item.doctor_name, durationText(duration)];
     if (item.is_fit_in) parts.push(props.t.fit_in_badge ?? 'Encaixe');
     if (item.is_urgent_care) parts.push(props.t.urgent_care_badge ?? 'Pronto atendimento');
     const session = sessionText(item);
@@ -175,9 +199,44 @@ function eventDidMount(arg) {
 
 // ── Locale ────────────────────────────────────────────────────────────────────
 function resolveLocale() {
-    const loc = (window.sessionLocale ?? 'pt-BR').toLowerCase();
+    const loc = (typeof window !== 'undefined' ? (window.sessionLocale ?? 'pt-BR') : 'pt-BR').toLowerCase();
     return loc.startsWith('pt') ? ptBrLocale : 'en';
 }
+
+function computeSlotBounds(events) {
+    const parse = (value) => {
+        const match = /^(\d{2}):(\d{2})(?::00)?$/.exec(value ?? '');
+        if (!match) return null;
+        const minutes = Number(match[1]) * 60 + Number(match[2]);
+        return Number(match[2]) < 60 && minutes <= 1440 ? minutes : null;
+    };
+    const from = parse(props.calendarBounds?.start),
+        to = parse(props.calendarBounds?.end);
+    const valid = from !== null && to !== null && from < to;
+    let min = valid ? from : 420,
+        max = valid ? to : 1230;
+    for (const event of events) {
+        const start = new Date(event.start),
+            end = new Date(event.end);
+        if (!Number.isFinite(start.getTime())) continue;
+        min = Math.min(min, start.getHours() * 60 + start.getMinutes());
+        if (Number.isFinite(end.getTime()) && end > start) {
+            const endMinute =
+                end.toDateString() !== start.toDateString()
+                    ? 1440
+                    : end.getHours() * 60 + end.getMinutes() + end.getSeconds() / 60;
+            max = Math.max(max, endMinute);
+        }
+    }
+    const time = (minutes) =>
+        `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}:00`;
+    return {
+        slotMinTime: time(Math.max(0, Math.floor(min / 15) * 15)),
+        slotMaxTime: time(Math.min(1440, Math.ceil(max / 15) * 15)),
+    };
+}
+const initialEvents = toCalendarEvents(props.scheduleItems);
+const initialBounds = computeSlotBounds(initialEvents);
 
 // ── Opções FullCalendar — objeto reactive para atualizações incrementais ───────
 const options = reactive({
@@ -188,8 +247,7 @@ const options = reactive({
     firstDay: 0, // domingo, como o calendário lateral e o período do servidor
     headerToolbar: false,
     allDaySlot: false,
-    slotMinTime: '07:00:00',
-    slotMaxTime: '20:30:00',
+    ...initialBounds,
     slotDuration: '00:15:00',
     slotLabelInterval: '01:00:00',
     slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
@@ -208,7 +266,7 @@ const options = reactive({
     },
     eventContent: renderEventContent,
     eventDidMount,
-    events: [],
+    events: initialEvents,
 
     eventClick(info) {
         emit('event-click', info.event.extendedProps);
@@ -228,9 +286,14 @@ const options = reactive({
 
 // ── Sincroniza eventos quando scheduleItems muda (polling / reload Inertia) ────
 watch(
-    () => props.scheduleItems,
-    (items) => {
+    () => [props.scheduleItems, props.calendarBounds],
+    ([items]) => {
         options.events = toCalendarEvents(items);
+        const bounds = computeSlotBounds(options.events);
+        Object.assign(options, bounds);
+        const api = calRef.value?.getApi?.();
+        api?.setOption?.('slotMinTime', bounds.slotMinTime);
+        api?.setOption?.('slotMaxTime', bounds.slotMaxTime);
     },
     { immediate: true },
 );
@@ -299,7 +362,6 @@ watch(
 
 :deep(.fc-ev-time) {
     font-size: 0.68rem;
-    opacity: 0.9;
     font-weight: 700;
     margin-right: 4px;
 }
@@ -327,8 +389,8 @@ watch(
     padding: 0 4px;
     margin-right: 3px;
     border-radius: 3px;
-    background: rgba(255, 255, 255, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: transparent;
+    border: 1px solid currentColor;
     text-transform: uppercase;
     letter-spacing: 0.02em;
 }
@@ -347,12 +409,10 @@ watch(
 
 :deep(.fc-ev-label) {
     font-size: 0.65rem;
-    opacity: 0.9;
 }
 
 :deep(.fc-ev-doctor) {
     font-size: 0.65rem;
-    opacity: 0.8;
     font-style: italic;
     white-space: nowrap;
     overflow: hidden;

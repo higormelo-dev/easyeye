@@ -1,8 +1,9 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, useId } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import PatientAllergiesPanel from '@/Components/Panel/ClinicalSafety/PatientAllergiesPanel.vue';
 import PatientMedicationsPanel from '@/Components/Panel/ClinicalSafety/PatientMedicationsPanel.vue';
 import { useClinicalSafety } from '@/composables/useClinicalSafety.js';
@@ -82,6 +83,9 @@ const medicineSearchUrl = computed(() => {
 // Textos compartilhados (lang/<locale>/ui.php → patient_form) — o mesmo
 // componente serve Pacientes e Agenda, cada um com o seu `t` de página.
 const page = usePage();
+const sharedUi = computed(() => page?.props?.t_ui ?? {});
+const idPrefix = useId();
+const fieldId = (field) => `patient-${idPrefix}-${field}`;
 const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
 
 const covenantOptions = computed(() => {
@@ -190,11 +194,22 @@ const showNoPlans = computed(
 
 <template>
     <!-- TAB: Pessoal -->
-    <div v-show="section === 'personal'">
+    <div v-show="section === 'personal'" data-patient-section="personal">
         <div class="mb-3">
-            <label class="form-label">Nome completo <span class="text-danger">*</span></label>
-            <input v-model="form.name" type="text" class="form-control" :class="{ 'is-invalid': form.errors.name }" />
-            <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
+            <label :for="fieldId('name')" class="form-label">Nome completo <span class="text-danger">*</span></label>
+            <input
+                :id="fieldId('name')"
+                v-model="form.name"
+                aria-required="true"
+                :aria-invalid="!!form.errors.name"
+                :aria-describedby="form.errors.name ? fieldId('name') + '-error' : undefined"
+                type="text"
+                class="form-control"
+                :class="{ 'is-invalid': form.errors.name }"
+            />
+            <div v-if="form.errors.name" :id="fieldId('name') + '-error'" class="invalid-feedback">
+                {{ form.errors.name }}
+            </div>
         </div>
 
         <!-- Homônimo: mesmo nome de outro paciente desta clínica (com outra data
@@ -224,25 +239,48 @@ const showNoPlans = computed(
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Apelido</label>
-            <input v-model="form.nickname" type="text" class="form-control" />
+            <label :for="fieldId('nickname')" class="form-label">Apelido</label>
+            <input
+                :id="fieldId('nickname')"
+                v-model="form.nickname"
+                :aria-invalid="!!form.errors.nickname"
+                :aria-describedby="form.errors.nickname ? fieldId('nickname') + '-error' : undefined"
+                :class="{ 'is-invalid': form.errors.nickname }"
+                type="text"
+                class="form-control"
+            />
+            <div v-if="form.errors.nickname" :id="fieldId('nickname') + '-error'" class="invalid-feedback d-block">
+                {{ form.errors.nickname }}
+            </div>
         </div>
 
         <div class="row g-3 mb-3">
             <div class="col-6">
-                <label class="form-label">Data de nascimento <span class="text-danger">*</span></label>
+                <label :for="fieldId('birth_date')" class="form-label"
+                    >Data de nascimento <span class="text-danger">*</span></label
+                >
                 <input
+                    :id="fieldId('birth_date')"
                     v-model="form.birth_date"
+                    aria-required="true"
+                    :aria-invalid="!!form.errors.birth_date"
+                    :aria-describedby="form.errors.birth_date ? fieldId('birth_date') + '-error' : undefined"
                     type="date"
                     class="form-control"
                     :class="{ 'is-invalid': form.errors.birth_date }"
                 />
-                <div v-if="form.errors.birth_date" class="invalid-feedback">{{ form.errors.birth_date }}</div>
+                <div v-if="form.errors.birth_date" :id="fieldId('birth_date') + '-error'" class="invalid-feedback">
+                    {{ form.errors.birth_date }}
+                </div>
             </div>
             <div class="col-6">
-                <label class="form-label">Gênero <span class="text-danger">*</span></label>
+                <label :for="fieldId('gender')" class="form-label">Gênero <span class="text-danger">*</span></label>
                 <SearchSelect
+                    :id="fieldId('gender')"
                     v-model="form.gender"
+                    aria-required="true"
+                    :aria-invalid="!!form.errors.gender"
+                    :aria-describedby="form.errors.gender ? fieldId('gender') + '-error' : undefined"
                     :options="genderOptions"
                     :value-key="'value'"
                     :label-key="'label'"
@@ -250,15 +288,23 @@ const showNoPlans = computed(
                     :clearable="false"
                     :invalid="!!form.errors.gender"
                 />
-                <div v-if="form.errors.gender" class="invalid-feedback d-block">{{ form.errors.gender }}</div>
+                <div v-if="form.errors.gender" :id="fieldId('gender') + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.gender }}
+                </div>
             </div>
         </div>
 
         <div class="row g-3 mb-3">
             <div class="col-6">
-                <label class="form-label">Estado civil <span class="text-danger">*</span></label>
+                <label :for="fieldId('marital_status')" class="form-label"
+                    >Estado civil <span class="text-danger">*</span></label
+                >
                 <SearchSelect
+                    :id="fieldId('marital_status')"
                     v-model="form.marital_status"
+                    aria-required="true"
+                    :aria-invalid="!!form.errors.marital_status"
+                    :aria-describedby="form.errors.marital_status ? fieldId('marital_status') + '-error' : undefined"
                     :options="maritalOptions"
                     :value-key="'value'"
                     :label-key="'label'"
@@ -266,46 +312,98 @@ const showNoPlans = computed(
                     :clearable="false"
                     :invalid="!!form.errors.marital_status"
                 />
-                <div v-if="form.errors.marital_status" class="invalid-feedback d-block">
+                <div
+                    v-if="form.errors.marital_status"
+                    :id="fieldId('marital_status') + '-error'"
+                    class="invalid-feedback d-block"
+                >
                     {{ form.errors.marital_status }}
                 </div>
             </div>
             <div class="col-6">
-                <label class="form-label">CPF <span class="text-danger">*</span></label>
+                <label :for="fieldId('national_registry')" class="form-label"
+                    >CPF <span class="text-danger">*</span></label
+                >
                 <input
+                    :id="fieldId('national_registry')"
                     v-model="form.national_registry"
                     v-mask="'cpf'"
+                    aria-required="true"
+                    :aria-invalid="!!form.errors.national_registry"
+                    :aria-describedby="
+                        form.errors.national_registry ? fieldId('national_registry') + '-error' : undefined
+                    "
                     type="text"
                     inputmode="numeric"
                     class="form-control"
                     placeholder="000.000.000-00"
                     :class="{ 'is-invalid': form.errors.national_registry }"
                 />
-                <div v-if="form.errors.national_registry" class="invalid-feedback">
+                <div
+                    v-if="form.errors.national_registry"
+                    :id="fieldId('national_registry') + '-error'"
+                    class="invalid-feedback"
+                >
                     {{ form.errors.national_registry }}
                 </div>
             </div>
         </div>
 
         <div class="mb-3">
-            <label class="form-label">E-mail <span class="text-danger">*</span></label>
+            <label :for="fieldId('email')" class="form-label">E-mail <span class="text-danger">*</span></label>
             <input
+                :id="fieldId('email')"
                 v-model="form.email"
+                aria-required="true"
+                :aria-invalid="!!form.errors.email"
+                :aria-describedby="form.errors.email ? fieldId('email') + '-error' : undefined"
                 type="email"
                 class="form-control"
                 :class="{ 'is-invalid': form.errors.email }"
             />
-            <div v-if="form.errors.email" class="invalid-feedback">{{ form.errors.email }}</div>
+            <div v-if="form.errors.email" :id="fieldId('email') + '-error'" class="invalid-feedback">
+                {{ form.errors.email }}
+            </div>
         </div>
 
         <div class="row g-3 mb-3">
             <div class="col-6">
-                <label class="form-label">Nome da mãe</label>
-                <input v-model="form.mother_name" type="text" class="form-control" />
+                <label :for="fieldId('mother_name')" class="form-label">Nome da mãe</label>
+                <input
+                    :id="fieldId('mother_name')"
+                    v-model="form.mother_name"
+                    :aria-invalid="!!form.errors.mother_name"
+                    :aria-describedby="form.errors.mother_name ? fieldId('mother_name') + '-error' : undefined"
+                    :class="{ 'is-invalid': form.errors.mother_name }"
+                    type="text"
+                    class="form-control"
+                />
+                <div
+                    v-if="form.errors.mother_name"
+                    :id="fieldId('mother_name') + '-error'"
+                    class="invalid-feedback d-block"
+                >
+                    {{ form.errors.mother_name }}
+                </div>
             </div>
             <div class="col-6">
-                <label class="form-label">Nome do pai</label>
-                <input v-model="form.father_name" type="text" class="form-control" />
+                <label :for="fieldId('father_name')" class="form-label">Nome do pai</label>
+                <input
+                    :id="fieldId('father_name')"
+                    v-model="form.father_name"
+                    :aria-invalid="!!form.errors.father_name"
+                    :aria-describedby="form.errors.father_name ? fieldId('father_name') + '-error' : undefined"
+                    :class="{ 'is-invalid': form.errors.father_name }"
+                    type="text"
+                    class="form-control"
+                />
+                <div
+                    v-if="form.errors.father_name"
+                    :id="fieldId('father_name') + '-error'"
+                    class="invalid-feedback d-block"
+                >
+                    {{ form.errors.father_name }}
+                </div>
             </div>
         </div>
 
@@ -314,46 +412,70 @@ const showNoPlans = computed(
             <input
                 id="patient-occupation"
                 v-model="form.occupation"
+                :aria-invalid="!!form.errors.occupation"
+                :aria-describedby="form.errors.occupation ? 'patient-occupation' + '-error' : undefined"
                 type="text"
                 class="form-control"
                 maxlength="120"
                 autocomplete="organization-title"
                 :placeholder="ui.occupation_placeholder"
                 :class="{ 'is-invalid': form.errors.occupation }"
-                :aria-invalid="form.errors.occupation ? 'true' : 'false'"
-                :aria-describedby="form.errors.occupation ? 'patient-occupation-error' : undefined"
             />
-            <div v-if="form.errors.occupation" id="patient-occupation-error" class="invalid-feedback">
+            <div v-if="form.errors.occupation" :id="'patient-occupation' + '-error'" class="invalid-feedback">
                 {{ form.errors.occupation }}
             </div>
         </div>
 
         <div v-if="isEdit" class="mb-3">
             <div class="form-check form-switch">
-                <input id="chkActive" v-model="form.active" class="form-check-input" type="checkbox" />
+                <input
+                    id="chkActive"
+                    v-model="form.active"
+                    :aria-invalid="!!form.errors.active"
+                    :aria-describedby="form.errors.active ? 'chkActive' + '-error' : undefined"
+                    :class="{ 'is-invalid': form.errors.active }"
+                    class="form-check-input"
+                    type="checkbox"
+                />
+                <div v-if="form.errors.active" :id="'chkActive' + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.active }}
+                </div>
                 <label class="form-check-label" for="chkActive">Paciente ativo</label>
             </div>
         </div>
     </div>
 
     <!-- TAB: Clínico -->
-    <div v-show="section === 'clinical'">
+    <div v-show="section === 'clinical'" data-patient-section="clinical">
         <div class="mb-3">
-            <label class="form-label">Convênio <span class="text-danger">*</span></label>
+            <label :for="fieldId('covenant_id')" class="form-label">Convênio <span class="text-danger">*</span></label>
             <SearchSelect
+                :id="fieldId('covenant_id')"
                 v-model="form.covenant_id"
+                aria-required="true"
+                :aria-invalid="!!form.errors.covenant_id"
+                :aria-describedby="form.errors.covenant_id ? fieldId('covenant_id') + '-error' : undefined"
                 :options="covenantOptions"
                 :placeholder="'Selecione'"
                 :invalid="!!form.errors.covenant_id"
                 @change="onCovenantChange"
             />
-            <div v-if="form.errors.covenant_id" class="invalid-feedback d-block">{{ form.errors.covenant_id }}</div>
+            <div
+                v-if="form.errors.covenant_id"
+                :id="fieldId('covenant_id') + '-error'"
+                class="invalid-feedback d-block"
+            >
+                {{ form.errors.covenant_id }}
+            </div>
         </div>
 
         <div class="mb-3 patient-plan-field">
-            <label class="form-label">{{ ui.plan }}</label>
+            <label :for="fieldId('covenant_plan_id')" class="form-label">{{ ui.plan }}</label>
             <SearchSelect
+                :id="fieldId('covenant_plan_id')"
                 v-model="form.covenant_plan_id"
+                :aria-invalid="!!form.errors.covenant_plan_id"
+                :aria-describedby="form.errors.covenant_plan_id ? fieldId('covenant_plan_id') + '-error' : undefined"
                 :options="planOptions"
                 value-key="id"
                 label-key="label"
@@ -367,7 +489,11 @@ const showNoPlans = computed(
                 :invalid="!!form.errors.covenant_plan_id"
                 @option-selected="pickedPlan = $event"
             />
-            <div v-if="form.errors.covenant_plan_id" class="invalid-feedback d-block">
+            <div
+                v-if="form.errors.covenant_plan_id"
+                :id="fieldId('covenant_plan_id') + '-error'"
+                class="invalid-feedback d-block"
+            >
                 {{ form.errors.covenant_plan_id }}
             </div>
             <div aria-live="polite">
@@ -387,25 +513,58 @@ const showNoPlans = computed(
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Número da carteirinha</label>
+            <label :for="fieldId('card_number')" class="form-label">Número da carteirinha</label>
             <input
+                :id="fieldId('card_number')"
                 v-model="form.card_number"
+                :aria-invalid="!!form.errors.card_number"
+                :aria-describedby="form.errors.card_number ? fieldId('card_number') + '-error' : undefined"
+                :class="{ 'is-invalid': form.errors.card_number }"
                 type="text"
                 class="form-control"
                 :disabled="isParticular"
                 :placeholder="isParticular ? 'Não se aplica a Particular' : ''"
             />
+            <div
+                v-if="form.errors.card_number"
+                :id="fieldId('card_number') + '-error'"
+                class="invalid-feedback d-block"
+            >
+                {{ form.errors.card_number }}
+            </div>
             <small v-if="isParticular" class="text-muted">Paciente particular não tem carteirinha de convênio.</small>
         </div>
 
         <div class="row g-3 mb-3">
             <div class="col-6">
-                <label class="form-label">Tipo de pele</label>
-                <SearchSelect v-model="form.skin_id" :options="skinTypes" :placeholder="'Não informado'" />
+                <label :for="fieldId('skin_id')" class="form-label">Tipo de pele</label>
+                <SearchSelect
+                    :id="fieldId('skin_id')"
+                    v-model="form.skin_id"
+                    :aria-invalid="!!form.errors.skin_id"
+                    :aria-describedby="form.errors.skin_id ? fieldId('skin_id') + '-error' : undefined"
+                    :invalid="!!form.errors.skin_id"
+                    :options="skinTypes"
+                    :placeholder="'Não informado'"
+                />
+                <div v-if="form.errors.skin_id" :id="fieldId('skin_id') + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.skin_id }}
+                </div>
             </div>
             <div class="col-6">
-                <label class="form-label">Tipo de íris</label>
-                <SearchSelect v-model="form.iris_id" :options="irisTypes" :placeholder="'Não informado'" />
+                <label :for="fieldId('iris_id')" class="form-label">Tipo de íris</label>
+                <SearchSelect
+                    :id="fieldId('iris_id')"
+                    v-model="form.iris_id"
+                    :aria-invalid="!!form.errors.iris_id"
+                    :aria-describedby="form.errors.iris_id ? fieldId('iris_id') + '-error' : undefined"
+                    :invalid="!!form.errors.iris_id"
+                    :options="irisTypes"
+                    :placeholder="'Não informado'"
+                />
+                <div v-if="form.errors.iris_id" :id="fieldId('iris_id') + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.iris_id }}
+                </div>
             </div>
         </div>
 
@@ -452,50 +611,133 @@ const showNoPlans = computed(
             <p class="text-muted small fw-medium mb-2">Registro estadual (opcional)</p>
             <div class="row g-3">
                 <div class="col-6">
-                    <label class="form-label small">RG</label>
-                    <input v-model="form.state_registry" type="text" class="form-control" />
+                    <label :for="fieldId('state_registry')" class="form-label small">RG</label>
+                    <input
+                        :id="fieldId('state_registry')"
+                        v-model="form.state_registry"
+                        :aria-invalid="!!form.errors.state_registry"
+                        :aria-describedby="
+                            form.errors.state_registry ? fieldId('state_registry') + '-error' : undefined
+                        "
+                        :class="{ 'is-invalid': form.errors.state_registry }"
+                        type="text"
+                        class="form-control"
+                    />
+                    <div
+                        v-if="form.errors.state_registry"
+                        :id="fieldId('state_registry') + '-error'"
+                        class="invalid-feedback d-block"
+                    >
+                        {{ form.errors.state_registry }}
+                    </div>
                 </div>
                 <div class="col-6">
-                    <label class="form-label small">Órgão emissor</label>
-                    <input v-model="form.state_registry_agency" type="text" class="form-control" />
+                    <label :for="fieldId('state_registry_agency')" class="form-label small">Órgão emissor</label>
+                    <input
+                        :id="fieldId('state_registry_agency')"
+                        v-model="form.state_registry_agency"
+                        :aria-invalid="!!form.errors.state_registry_agency"
+                        :aria-describedby="
+                            form.errors.state_registry_agency ? fieldId('state_registry_agency') + '-error' : undefined
+                        "
+                        :class="{ 'is-invalid': form.errors.state_registry_agency }"
+                        type="text"
+                        class="form-control"
+                    />
+                    <div
+                        v-if="form.errors.state_registry_agency"
+                        :id="fieldId('state_registry_agency') + '-error'"
+                        class="invalid-feedback d-block"
+                    >
+                        {{ form.errors.state_registry_agency }}
+                    </div>
                 </div>
                 <div class="col-6">
-                    <label class="form-label small">UF do RG</label>
+                    <label :for="fieldId('state_registry_initial')" class="form-label small">UF do RG</label>
                     <SearchSelect
+                        :id="fieldId('state_registry_initial')"
                         v-model="form.state_registry_initial"
+                        :aria-invalid="!!form.errors.state_registry_initial"
+                        :aria-describedby="
+                            form.errors.state_registry_initial
+                                ? fieldId('state_registry_initial') + '-error'
+                                : undefined
+                        "
+                        :invalid="!!form.errors.state_registry_initial"
                         :options="stateOptions"
                         :value-key="'value'"
                         :label-key="'value'"
                         :placeholder="'—'"
                     />
+                    <div
+                        v-if="form.errors.state_registry_initial"
+                        :id="fieldId('state_registry_initial') + '-error'"
+                        class="invalid-feedback d-block"
+                    >
+                        {{ form.errors.state_registry_initial }}
+                    </div>
                 </div>
                 <div class="col-6">
-                    <label class="form-label small">Data do RG</label>
-                    <input v-model="form.state_registry_date" type="date" class="form-control" />
+                    <label :for="fieldId('state_registry_date')" class="form-label small">Data do RG</label>
+                    <input
+                        :id="fieldId('state_registry_date')"
+                        v-model="form.state_registry_date"
+                        :aria-invalid="!!form.errors.state_registry_date"
+                        :aria-describedby="
+                            form.errors.state_registry_date ? fieldId('state_registry_date') + '-error' : undefined
+                        "
+                        :class="{ 'is-invalid': form.errors.state_registry_date }"
+                        type="date"
+                        class="form-control"
+                    />
+                    <div
+                        v-if="form.errors.state_registry_date"
+                        :id="fieldId('state_registry_date') + '-error'"
+                        class="invalid-feedback d-block"
+                    >
+                        {{ form.errors.state_registry_date }}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- TAB: Contato -->
-    <div v-show="section === 'contact'">
+    <div v-show="section === 'contact'" data-patient-section="contact">
         <div class="mb-3">
-            <label class="form-label">Celular <span class="text-danger">*</span></label>
+            <label :for="fieldId('cellphone')" class="form-label">Celular <span class="text-danger">*</span></label>
             <input
+                :id="fieldId('cellphone')"
                 v-model="form.cellphone"
                 v-mask="'phone'"
+                aria-required="true"
+                :aria-invalid="!!form.errors.cellphone"
+                :aria-describedby="form.errors.cellphone ? fieldId('cellphone') + '-error' : undefined"
                 type="text"
                 inputmode="numeric"
                 class="form-control"
                 placeholder="(00) 00000-0000"
                 :class="{ 'is-invalid': form.errors.cellphone }"
             />
-            <div v-if="form.errors.cellphone" class="invalid-feedback">{{ form.errors.cellphone }}</div>
+            <div v-if="form.errors.cellphone" :id="fieldId('cellphone') + '-error'" class="invalid-feedback">
+                {{ form.errors.cellphone }}
+            </div>
         </div>
 
         <div class="mb-3">
             <div class="form-check">
-                <input id="chkWhatsapp" v-model="form.whatsapp" class="form-check-input" type="checkbox" />
+                <input
+                    id="chkWhatsapp"
+                    v-model="form.whatsapp"
+                    :aria-invalid="!!form.errors.whatsapp"
+                    :aria-describedby="form.errors.whatsapp ? 'chkWhatsapp' + '-error' : undefined"
+                    :class="{ 'is-invalid': form.errors.whatsapp }"
+                    class="form-check-input"
+                    type="checkbox"
+                />
+                <div v-if="form.errors.whatsapp" :id="'chkWhatsapp' + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.whatsapp }}
+                </div>
                 <label class="form-check-label" for="chkWhatsapp">
                     <i class="fab fa-whatsapp text-success me-1"></i>Este celular tem WhatsApp
                 </label>
@@ -511,7 +753,13 @@ const showNoPlans = computed(
                     type="checkbox"
                     :checked="form.care_reminders_consent === true"
                     :disabled="!form.whatsapp"
-                    aria-describedby="chkCareRemindersHint"
+                    :aria-describedby="
+                        form.errors.care_reminders_consent
+                            ? 'chkCareRemindersHint chkCareRemindersError'
+                            : 'chkCareRemindersHint'
+                    "
+                    :aria-invalid="!!form.errors.care_reminders_consent"
+                    :class="{ 'is-invalid': form.errors.care_reminders_consent }"
                     data-testid="care-reminders-consent"
                     @change="form.care_reminders_consent = $event.target.checked"
                 />
@@ -520,85 +768,179 @@ const showNoPlans = computed(
             <div id="chkCareRemindersHint" class="form-text">
                 {{ form.whatsapp ? ui.care_reminders_hint : ui.care_reminders_needs_whatsapp }}
             </div>
-            <div v-if="form.errors.care_reminders_consent" class="text-danger small" role="alert">
+            <div
+                v-if="form.errors.care_reminders_consent"
+                id="chkCareRemindersError"
+                class="text-danger small"
+                role="alert"
+            >
                 {{ form.errors.care_reminders_consent }}
             </div>
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Telefone fixo</label>
+            <label :for="fieldId('telephone')" class="form-label">Telefone fixo</label>
             <input
+                :id="fieldId('telephone')"
                 v-model="form.telephone"
                 v-mask="'phone'"
+                :aria-invalid="!!form.errors.telephone"
+                :aria-describedby="form.errors.telephone ? fieldId('telephone') + '-error' : undefined"
+                :class="{ 'is-invalid': form.errors.telephone }"
                 type="text"
                 inputmode="numeric"
                 class="form-control"
                 placeholder="(00) 0000-0000"
             />
+            <div v-if="form.errors.telephone" :id="fieldId('telephone') + '-error'" class="invalid-feedback d-block">
+                {{ form.errors.telephone }}
+            </div>
         </div>
     </div>
 
     <!-- TAB: Endereço -->
-    <div v-show="section === 'address'">
+    <div v-show="section === 'address'" data-patient-section="address">
         <div class="mb-3">
-            <label class="form-label">CEP</label>
+            <label :for="fieldId('zipcode')" class="form-label">CEP</label>
             <div class="input-group">
                 <input
+                    :id="fieldId('zipcode')"
                     v-model="form.zipcode"
                     v-mask="'cep'"
+                    :aria-invalid="!!form.errors.zipcode"
+                    :aria-describedby="form.errors.zipcode ? fieldId('zipcode') + '-error' : undefined"
+                    :class="{ 'is-invalid': form.errors.zipcode }"
                     type="text"
                     inputmode="numeric"
                     class="form-control"
                     placeholder="00000-000"
                     @blur="lookupCep"
                 />
-                <button type="button" class="btn btn-outline-secondary" @click="lookupCep">
-                    <i class="ti ti-search"></i>
-                </button>
+                <div v-if="form.errors.zipcode" :id="fieldId('zipcode') + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.zipcode }}
+                </div>
+                <ActionIconButton icon="ti ti-search" :label="sharedUi.cep_lookup || 'Buscar CEP'" @click="lookupCep" />
             </div>
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Logradouro</label>
-            <input v-model="form.address" type="text" class="form-control" />
+            <label :for="fieldId('address')" class="form-label">Logradouro</label>
+            <input
+                :id="fieldId('address')"
+                v-model="form.address"
+                :aria-invalid="!!form.errors.address"
+                :aria-describedby="form.errors.address ? fieldId('address') + '-error' : undefined"
+                :class="{ 'is-invalid': form.errors.address }"
+                type="text"
+                class="form-control"
+            />
+            <div v-if="form.errors.address" :id="fieldId('address') + '-error'" class="invalid-feedback d-block">
+                {{ form.errors.address }}
+            </div>
         </div>
 
         <div class="row g-3 mb-3">
             <div class="col-4">
-                <label class="form-label">Número</label>
-                <input v-model="form.number" type="text" class="form-control" />
+                <label :for="fieldId('number')" class="form-label">Número</label>
+                <input
+                    :id="fieldId('number')"
+                    v-model="form.number"
+                    :aria-invalid="!!form.errors.number"
+                    :aria-describedby="form.errors.number ? fieldId('number') + '-error' : undefined"
+                    :class="{ 'is-invalid': form.errors.number }"
+                    type="text"
+                    class="form-control"
+                />
+                <div v-if="form.errors.number" :id="fieldId('number') + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.number }}
+                </div>
             </div>
             <div class="col-8">
-                <label class="form-label">Complemento</label>
-                <input v-model="form.complement" type="text" class="form-control" />
+                <label :for="fieldId('complement')" class="form-label">Complemento</label>
+                <input
+                    :id="fieldId('complement')"
+                    v-model="form.complement"
+                    :aria-invalid="!!form.errors.complement"
+                    :aria-describedby="form.errors.complement ? fieldId('complement') + '-error' : undefined"
+                    :class="{ 'is-invalid': form.errors.complement }"
+                    type="text"
+                    class="form-control"
+                />
+                <div
+                    v-if="form.errors.complement"
+                    :id="fieldId('complement') + '-error'"
+                    class="invalid-feedback d-block"
+                >
+                    {{ form.errors.complement }}
+                </div>
             </div>
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Bairro</label>
-            <input v-model="form.district" type="text" class="form-control" />
+            <label :for="fieldId('district')" class="form-label">Bairro</label>
+            <input
+                :id="fieldId('district')"
+                v-model="form.district"
+                :aria-invalid="!!form.errors.district"
+                :aria-describedby="form.errors.district ? fieldId('district') + '-error' : undefined"
+                :class="{ 'is-invalid': form.errors.district }"
+                type="text"
+                class="form-control"
+            />
+            <div v-if="form.errors.district" :id="fieldId('district') + '-error'" class="invalid-feedback d-block">
+                {{ form.errors.district }}
+            </div>
         </div>
 
         <div class="row g-3 mb-3">
             <div class="col-8">
-                <label class="form-label">Cidade</label>
-                <input v-model="form.city" type="text" class="form-control" />
+                <label :for="fieldId('city')" class="form-label">Cidade</label>
+                <input
+                    :id="fieldId('city')"
+                    v-model="form.city"
+                    :aria-invalid="!!form.errors.city"
+                    :aria-describedby="form.errors.city ? fieldId('city') + '-error' : undefined"
+                    :class="{ 'is-invalid': form.errors.city }"
+                    type="text"
+                    class="form-control"
+                />
+                <div v-if="form.errors.city" :id="fieldId('city') + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.city }}
+                </div>
             </div>
             <div class="col-4">
-                <label class="form-label">UF</label>
+                <label :for="fieldId('state')" class="form-label">UF</label>
                 <SearchSelect
+                    :id="fieldId('state')"
                     v-model="form.state"
+                    :aria-invalid="!!form.errors.state"
+                    :aria-describedby="form.errors.state ? fieldId('state') + '-error' : undefined"
+                    :invalid="!!form.errors.state"
                     :options="stateOptions"
                     :value-key="'value'"
                     :label-key="'value'"
                     :placeholder="'—'"
                 />
+                <div v-if="form.errors.state" :id="fieldId('state') + '-error'" class="invalid-feedback d-block">
+                    {{ form.errors.state }}
+                </div>
             </div>
         </div>
 
         <div class="mb-3">
-            <label class="form-label">País</label>
-            <input v-model="form.country" type="text" class="form-control" />
+            <label :for="fieldId('country')" class="form-label">País</label>
+            <input
+                :id="fieldId('country')"
+                v-model="form.country"
+                :aria-invalid="!!form.errors.country"
+                :aria-describedby="form.errors.country ? fieldId('country') + '-error' : undefined"
+                :class="{ 'is-invalid': form.errors.country }"
+                type="text"
+                class="form-control"
+            />
+            <div v-if="form.errors.country" :id="fieldId('country') + '-error'" class="invalid-feedback d-block">
+                {{ form.errors.country }}
+            </div>
         </div>
     </div>
 </template>

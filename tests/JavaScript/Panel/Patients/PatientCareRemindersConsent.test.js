@@ -85,7 +85,7 @@ describe('Cadastro de paciente — lembretes de retorno por WhatsApp', () => {
             errors: { care_reminders_consent: 'O campo precisa ser verdadeiro ou falso.' },
         });
 
-        expect(box(wrapper).attributes('aria-describedby')).toBe('chkCareRemindersHint');
+        expect(box(wrapper).attributes('aria-describedby')).toBe('chkCareRemindersHint chkCareRemindersError');
         expect(wrapper.find('[role="alert"]').text()).toContain('verdadeiro ou falso');
     });
 });

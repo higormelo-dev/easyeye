@@ -979,6 +979,11 @@ return [
         'issued_at'    => 'Issued on',
         'generated_at' => 'Generated on',
         'signed_at'    => 'Electronically signed on',
+
+        // Medical record timeline: initial error, pagination error and retry (read-only).
+        'timeline_load_error'      => 'Could not load medical records.',
+        'timeline_load_more_error' => 'Could not load more medical records.',
+        'timeline_retry'           => 'Try again',
     ],
 
     'documentation' => [

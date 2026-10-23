@@ -1,8 +1,14 @@
 <script setup>
-defineProps({
+import { computed } from 'vue';
+import { resolveEventPalette } from '@/Support/eventPalette.js';
+const props = defineProps({
     item: { type: Object, required: true },
     t: { type: Object, required: true },
 });
+
+const palette = computed(() =>
+    resolveEventPalette({ color: props.item.type === 'block' ? '#4b5563' : props.item.color }),
+);
 
 const typeKeyMap = {
     meeting: 'event_meeting',
@@ -17,14 +23,14 @@ const typeKeyMap = {
     <div
         class="card mb-2 border-0 shadow-sm event-card"
         :class="{ 'event-card--block': item.type === 'block' }"
-        :style="{ borderLeft: `4px solid ${item.color} !important` }"
+        :style="{ borderLeft: `4px solid ${palette.backgroundColor} !important` }"
         :data-row-type="item.type"
     >
         <div class="card-body py-2 px-3">
             <div class="d-flex align-items-center gap-3">
                 <!-- Time range -->
                 <div class="text-center flex-shrink-0" style="min-width: 48px">
-                    <div class="fw-bold" :style="{ fontSize: '.9rem', color: item.color }">
+                    <div class="fw-bold" :style="{ fontSize: '.9rem', color: 'var(--bs-body-color)' }">
                         {{ item.starts_at_fmt }}
                     </div>
                     <div class="text-muted" style="font-size: 0.7rem">{{ item.ends_at_fmt }}</div>
@@ -35,7 +41,7 @@ const typeKeyMap = {
                     <i
                         class="fa-lg"
                         :class="item.type === 'block' ? 'ti ti-lock fs-4' : 'fas fa-calendar-check'"
-                        :style="{ color: item.color, opacity: '.7' }"
+                        :style="{ color: palette.backgroundColor }"
                         aria-hidden="true"
                     ></i>
                 </div>
@@ -46,7 +52,11 @@ const typeKeyMap = {
                         <span class="fw-semibold text-truncate" style="font-size: 0.9rem">{{ item.title }}</span>
                         <span
                             class="badge rounded-pill"
-                            :style="{ background: item.color, fontSize: '.68rem', opacity: '.85' }"
+                            :style="{
+                                background: palette.backgroundColor,
+                                color: palette.textColor,
+                                fontSize: '.68rem',
+                            }"
                         >
                             {{ item.type_label ?? t[typeKeyMap[item.event_type]] ?? item.event_type }}
                         </span>

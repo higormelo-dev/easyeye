@@ -31,6 +31,7 @@ const props = defineProps({
     loadingLabel: { type: String, default: '' },
     /** Rótulo acessível do botão fechar; padrão: `t_ui.close` (idioma do usuário). */
     closeLabel: { type: String, default: '' },
+    confirmClose: { type: Function, default: null },
 });
 
 const emit = defineEmits(['close']);
@@ -47,18 +48,23 @@ const dialogRef = ref(null);
 const closeText = computed(() => props.closeLabel || page?.props?.t_ui?.close || 'Fechar');
 const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.loading || 'Carregando...');
 
-useModalA11y(
-    dialogRef,
-    () => props.open,
-    () => emit('close'),
-);
+useModalA11y(dialogRef, () => props.open, requestClose);
+function requestClose() {
+    try {
+        if (props.confirmClose?.() === false) return;
+    } catch {
+        // Falha no guard mantém o conteúdo aberto; não registra dados do formulário.
+        return;
+    }
+    emit('close');
+}
 </script>
 
 <template>
     <Teleport to="body">
         <!-- Backdrop -->
         <transition name="ee-fade">
-            <div v-if="open" class="ee-modal__backdrop" @click="$emit('close')" />
+            <div v-if="open" class="ee-modal__backdrop" @click="requestClose" />
         </transition>
 
         <!-- Wrapper que centraliza o dialog -->
@@ -69,7 +75,7 @@ useModalA11y(
                 role="dialog"
                 aria-modal="true"
                 :aria-labelledby="$slots.header ? titleId : undefined"
-                @click.self="$emit('close')"
+                @click.self="requestClose"
             >
                 <div ref="dialogRef" class="ee-modal__dialog" :style="{ maxWidth: `${width}px` }" tabindex="-1">
                     <!-- Header -->
@@ -82,7 +88,7 @@ useModalA11y(
                             class="btn-close flex-shrink-0"
                             :aria-label="closeText"
                             :title="closeText"
-                            @click="$emit('close')"
+                            @click="requestClose"
                         />
                     </div>
 

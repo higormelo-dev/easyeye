@@ -1,5 +1,7 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onBeforeUnmount } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
 import Multiselect from '@vueform/multiselect';
 
 // Select com busca, nativo Vue 3 (sem jQuery, SSR-safe).
@@ -11,6 +13,9 @@ import Multiselect from '@vueform/multiselect';
 //     que ficam visíveis. As `options` iniciais ainda funcionam como seed.
 //   - remoteMinChars: número mínimo de caracteres para disparar a busca.
 const props = defineProps({
+    id: { type: String, default: '' },
+    ariaLabelledby: { type: String, default: '' },
+    ariaDescribedby: { type: String, default: '' },
     modelValue: { type: [String, Number, Boolean, Array, null], default: null },
     options: { type: Array, default: () => [] },
     valueKey: { type: String, default: 'id' },
@@ -54,6 +59,14 @@ const props = defineProps({
 // auto-preencher o resto do form), esse evento novo e opcional resolve sem
 // quebrar ninguém que já usa o componente.
 const emit = defineEmits(['update:modelValue', 'change', 'option-selected']);
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui ?? {});
+const multiselectRef = ref(null);
+function focus() {
+    const root = multiselectRef.value?.$el;
+    (root?.querySelector('input') ?? root?.querySelector('[role="combobox"]'))?.focus();
+}
+defineExpose({ focus });
 
 // Onda 4 / C2 fix — em modo remoto, o Multiselect limpa o texto de busca ao
 // selecionar uma opção; isso zera `remoteOptions` (ver watch(searchTerm)
@@ -61,6 +74,7 @@ const emit = defineEmits(['update:modelValue', 'change', 'option-selected']);
 // objeto correspondente em `effectiveOptions`). Fixamos a opção escolhida
 // aqui e a reinjetamos em `effectiveOptions` até o valor mudar de novo.
 const selectedOption = ref(null);
+const selectedOptions = ref([]);
 
 const value = computed({
     get: () => {
@@ -73,6 +87,7 @@ const value = computed({
         // multiselect em mode="tags" quebra com valor não-array).
         if (props.multiple) {
             const arr = Array.isArray(v) ? v : v == null ? [] : [v];
+            selectedOptions.value = effectiveOptions.value.filter((option) => arr.includes(option[props.valueKey]));
             emit('update:modelValue', arr);
             emit('change', arr);
 
@@ -90,51 +105,82 @@ const value = computed({
 
 // ── Onda 4 / C2 — busca remota debounced ───────────────────────────────────
 const remoteOptions = ref([]);
+const remoteState = ref('idle');
+const remoteReq = latestRequest();
 const effectiveOptions = computed(() => {
-    const base = props.remoteSearchUrl
-        ? remoteOptions.value.length
-            ? remoteOptions.value
-            : props.options
-        : props.options;
+    const base = props.remoteSearchUrl && remoteState.value !== 'idle' ? remoteOptions.value : props.options;
 
-    const sel = selectedOption.value;
-    if (!sel) return base;
-
-    return base.some((o) => o[props.valueKey] === sel[props.valueKey]) ? base : [sel, ...base];
+    const selectedValues = props.multiple
+        ? Array.isArray(props.modelValue)
+            ? props.modelValue
+            : []
+        : [props.modelValue];
+    const pinned = [...selectedOptions.value, selectedOption.value, ...props.options].filter(
+        (option) => option && selectedValues.includes(option[props.valueKey]),
+    );
+    const options = [...base];
+    for (const option of pinned) {
+        if (!options.some((row) => row[props.valueKey] === option[props.valueKey])) options.push(option);
+    }
+    return options;
 });
 
 const searchTerm = ref('');
 let remoteTimer = null;
 
-watch(searchTerm, (q) => {
-    if (!props.remoteSearchUrl) return;
-    if (remoteTimer) clearTimeout(remoteTimer);
-
-    const term = (q || '').trim();
-    if (term.length < props.remoteMinChars) {
-        remoteOptions.value = [];
-        return;
+async function runRemoteSearch(term) {
+    const req = remoteReq.begin();
+    remoteState.value = 'loading';
+    remoteOptions.value = [];
+    try {
+        const url = props.remoteSearchUrl.replace('__Q__', encodeURIComponent(term));
+        const { data } = await window.axios.get(url, { signal: req.signal });
+        if (!req.current()) return;
+        const rows = Array.isArray(data?.data) ? data.data : [];
+        remoteOptions.value = rows.map((row) => ({
+            ...row,
+            [props.valueKey]: row.id ?? row[props.valueKey],
+            [props.labelKey]: row.label ?? row[props.labelKey],
+            sub_label: row.sub_label ?? '',
+        }));
+        remoteState.value = rows.length ? 'success' : 'empty';
+    } catch (error) {
+        if (req.current() && !isAbortError(error)) remoteState.value = 'error';
     }
+}
 
-    remoteTimer = setTimeout(async () => {
-        try {
-            const url = props.remoteSearchUrl.replace('__Q__', encodeURIComponent(term));
-            const { data } = await window.axios.get(url);
-            const rows = Array.isArray(data?.data) ? data.data : [];
-            // Normaliza para a forma esperada pelo Multiselect via valueKey/labelKey,
-            // preservando (`...r` primeiro) os DEMAIS campos originais da linha —
-            // necessário pro `option-selected` acima devolver o objeto completo
-            // (ex.: manufacturer/model_name/category/image_url), não só id/label.
-            remoteOptions.value = rows.map((r) => ({
-                ...r,
-                [props.valueKey]: r.id ?? r[props.valueKey],
-                [props.labelKey]: r.label ?? r[props.labelKey],
-                sub_label: r.sub_label ?? '',
-            }));
-        } catch {
-            // silencioso — seed mantém UX funcional
+watch(
+    [searchTerm, () => props.remoteSearchUrl, () => props.remoteMinChars],
+    ([query]) => {
+        clearTimeout(remoteTimer);
+        remoteReq.cancel();
+        remoteOptions.value = [];
+        const term = (query || '').trim();
+        if (!props.remoteSearchUrl || term.length < props.remoteMinChars) {
+            remoteState.value = 'idle';
+            return;
         }
-    }, 300);
+        // A resposta anterior não vale nem durante o debounce da nova consulta.
+        remoteState.value = 'loading';
+        remoteTimer = setTimeout(() => runRemoteSearch(term), 300);
+    },
+    { flush: 'sync' },
+);
+
+function retrySearch() {
+    clearTimeout(remoteTimer);
+    const term = searchTerm.value.trim();
+    if (props.remoteSearchUrl && term.length >= props.remoteMinChars) runRemoteSearch(term);
+}
+watch(
+    () => props.modelValue,
+    (value) => {
+        if (value == null || value === '') selectedOption.value = null;
+    },
+);
+onBeforeUnmount(() => {
+    clearTimeout(remoteTimer);
+    remoteReq.cancel();
 });
 
 function onSearchChange(q) {
@@ -164,7 +210,16 @@ const selectedTitle = computed(() => {
 
 <template>
     <Multiselect
+        :id="id || undefined"
+        ref="multiselectRef"
         v-model="value"
+        :aria="{
+            'aria-labelledby': ariaLabelledby || undefined,
+            'aria-describedby': ariaDescribedby || undefined,
+            'aria-invalid': invalid ? 'true' : undefined,
+            'aria-busy': remoteState === 'loading' ? 'true' : undefined,
+        }"
+        :aria-busy="remoteState === 'loading'"
         class="search-select"
         :class="{ 'is-invalid': invalid, 'search-select--sm': sm, 'search-select--multiple': multiple }"
         :style="listHeight ? { '--ms-max-height': listHeight } : {}"
@@ -186,6 +241,36 @@ const selectedTitle = computed(() => {
         :no-results-text="noResultsText"
         @search-change="onSearchChange"
     >
+        <template #beforelist>
+            <div v-if="effectiveOptions.length && remoteState === 'loading'" class="p-2 small" role="status">
+                {{ ui.search_loading || 'Buscando…' }}
+            </div>
+            <div v-else-if="effectiveOptions.length && remoteState === 'error'" class="p-2 small" role="alert">
+                {{ ui.search_error || 'Não foi possível buscar as opções.' }}
+                <button type="button" class="btn btn-link btn-sm" @mousedown.stop.prevent @click.stop="retrySearch">
+                    {{ ui.search_retry || 'Tentar novamente' }}
+                </button>
+            </div>
+        </template>
+        <template #nooptions>
+            <div v-if="remoteState === 'loading'" class="p-2 small" role="status">
+                {{ ui.search_loading || 'Buscando…' }}
+            </div>
+            <div v-else-if="remoteState === 'error'" class="p-2 small" role="alert">
+                {{ ui.search_error || 'Não foi possível buscar as opções.' }}
+                <button type="button" class="btn btn-link btn-sm" @mousedown.stop.prevent @click.stop="retrySearch">
+                    {{ ui.search_retry || 'Tentar novamente' }}
+                </button>
+            </div>
+            <div v-else class="multiselect-no-options">
+                {{ remoteState === 'idle' ? noOptionsText : noResultsText }}
+            </div>
+        </template>
+        <template #noresults>
+            <div v-if="!['loading', 'error'].includes(remoteState)" class="multiselect-no-results">
+                {{ noResultsText }}
+            </div>
+        </template>
         <template v-if="showSubLabel" #option="{ option }">
             <span class="search-select__option">
                 <span class="search-select__option-label">{{ option[labelKey] }}</span>

@@ -27,9 +27,18 @@ body {
     color: $white;
 }
 
-button,
-a {
-    outline: none !important;
+// Foco de teclado compartilhado; não suprime outlines de componentes.
+:root {
+    --ee-focus-color: #0b5ed7;
+    --ee-focus-width: 2px;
+    --ee-focus-offset: 2px;
+}
+:root[data-bs-theme='dark'] {
+    --ee-focus-color: #93c5fd;
+}
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline: var(--ee-focus-width) solid var(--ee-focus-color);
+    outline-offset: var(--ee-focus-offset);
 }
 a {
     text-decoration: none;

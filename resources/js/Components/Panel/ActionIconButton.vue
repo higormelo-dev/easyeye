@@ -126,7 +126,7 @@ function handleClick(event) {
 }
 
 .ee-action-icon:focus-visible {
-    outline: 2px solid var(--primary);
+    outline: var(--ee-focus-width, 2px) solid var(--ee-focus-color, #0b5ed7);
     outline-offset: 2px;
 }
 

@@ -1,5 +1,7 @@
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard.js';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import PatientFormSections from '@/Pages/Panel/Patients/PatientFormSections.vue';
 import { usePatientForm } from '@/Support/usePatientForm.js';
@@ -27,6 +29,9 @@ const emit = defineEmits(['close', 'saved']);
 const isEdit = computed(() => !!props.patientId);
 const title = computed(() => (isEdit.value ? 'Editar Paciente' : 'Novo Paciente'));
 const activeTab = ref('personal');
+const formRef = ref(null);
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui ?? {});
 
 // Toda a lógica do formulário (campos, load, save embedded, CEP, badges de
 // aba) vive em usePatientForm — compartilhada com o agendamento
@@ -47,6 +52,29 @@ const {
     tabIncomplete,
 } = usePatientForm(props);
 
+const { bypass } = useUnsavedChangesGuard({
+    isDirty: () => props.open && form.isDirty,
+    message: () => ui.value.discard_changes || 'Há alterações não salvas. Descartar?',
+});
+function confirmClose() {
+    return !form.isDirty || window.confirm(ui.value.discard_changes || 'Há alterações não salvas. Descartar?');
+}
+function requestClose() {
+    if (confirmClose()) emit('close');
+}
+const errorSummary = computed(() => Object.entries(form.errors).filter(([key]) => key !== 'confirm_homonym'));
+async function focusFirstError() {
+    // Os painéis continuam montados: localizar campo real evita focar erros globais.
+    const invalid = [...(formRef.value?.querySelectorAll('.is-invalid, [aria-invalid="true"]') ?? [])].find(
+        (element) => element.matches('input,textarea,select') || element.querySelector('input,[role="combobox"]'),
+    );
+    const section = invalid?.closest('[data-patient-section]')?.dataset.patientSection;
+    if (!section || !props.open) return;
+    activeTab.value = section;
+    await nextTick();
+    (invalid.querySelector('input,[role="combobox"]') ?? invalid).focus();
+}
+
 watch(
     () => props.open,
     async (val) => {
@@ -61,19 +89,26 @@ async function submit() {
     if (props.embedded) {
         const result = await savePatient(props.patientId);
         if (result.ok) emit('saved', result.patient);
+        else await focusFirstError();
         return;
     }
 
     if (isEdit.value) {
-        form.put(route('panel.patients.update', props.patientId), {
-            preserveScroll: true,
-            onSuccess: () => emit('close'),
-        });
+        bypass(() =>
+            form.put(route('panel.patients.update', props.patientId), {
+                preserveScroll: true,
+                onSuccess: () => emit('close'),
+                onError: focusFirstError,
+            }),
+        );
     } else {
-        form.post(route('panel.patients.store'), {
-            preserveScroll: true,
-            onSuccess: () => emit('close'),
-        });
+        bypass(() =>
+            form.post(route('panel.patients.store'), {
+                preserveScroll: true,
+                onSuccess: () => emit('close'),
+                onError: focusFirstError,
+            }),
+        );
     }
 }
 
@@ -86,7 +121,7 @@ const tabs = [
 </script>
 
 <template>
-    <OffcanvasPanel :open="open" :width="600" :loading="loading" @close="emit('close')">
+    <OffcanvasPanel :open="open" :width="600" :loading="loading" :confirm-close="confirmClose" @close="emit('close')">
         <!-- ── Cabeçalho ────────────────────────────────────────────────────── -->
         <template #header>
             <h5 class="mb-0 fw-semibold"><i class="ti ti-user me-2 text-primary"></i>{{ title }}</h5>
@@ -123,7 +158,18 @@ const tabs = [
              contribuem pro layout), então sem isso o offcanvas encolhe/cresce
              a cada troca de aba. Altura calibrada pra caber a aba Pessoal
              (a mais longa) sem sobra visível nas mais curtas. -->
-        <form class="patient-form-tabs" @submit.prevent="submit">
+        <form ref="formRef" class="patient-form-tabs" @submit.prevent="submit">
+            <div
+                v-if="errorSummary.length > 1"
+                class="alert alert-danger"
+                role="alert"
+                data-testid="form-error-summary"
+            >
+                {{ ui.form_errors_summary || 'Corrija os campos destacados.' }}
+                <ul class="mb-0">
+                    <li v-for="[key, message] in errorSummary" :key="key">{{ message }}</li>
+                </ul>
+            </div>
             <PatientFormSections
                 :form="form"
                 :section="activeTab"
@@ -143,7 +189,7 @@ const tabs = [
 
         <!-- ── Rodapé ────────────────────────────────────────────────────────── -->
         <template #footer>
-            <button type="button" class="btn btn-light" @click="emit('close')">Cancelar</button>
+            <button type="button" class="btn btn-light" @click="requestClose">Cancelar</button>
             <button type="button" class="btn btn-primary px-4" :disabled="form.processing" @click="submit">
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                 {{ isEdit ? 'Salvar alterações' : 'Cadastrar paciente' }}

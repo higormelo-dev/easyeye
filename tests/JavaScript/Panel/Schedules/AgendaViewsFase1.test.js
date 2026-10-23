@@ -8,6 +8,7 @@ import { router } from '@inertiajs/vue3';
  * mês no calendário lateral e o detalhe abrindo pelo clique no calendário.
  */
 let lastCalendarOptions = null;
+const setOption = vi.hoisted(() => vi.fn());
 vi.mock('@fullcalendar/vue3', () => ({
     default: {
         props: ['options'],
@@ -15,7 +16,7 @@ vi.mock('@fullcalendar/vue3', () => ({
             lastCalendarOptions = props.options;
             return {};
         },
-        methods: { getApi: () => ({ gotoDate() {}, changeView() {} }) },
+        methods: { getApi: () => ({ gotoDate() {}, changeView() {}, setOption }) },
         template: '<div class="fc-stub" />',
     },
 }));
@@ -71,7 +72,7 @@ describe('CalendarView — dia, semana e mês', () => {
 
         const [schedule, block] = lastCalendarOptions.events;
         expect(schedule.classNames).toContain('fc-ev-fit-in');
-        expect(schedule.backgroundColor).toBe('#0aa2c0');
+        expect(schedule.backgroundColor).toBe('#0e7490');
         expect(block.classNames).toContain('fc-ev-block');
         expect(block.end).toBe('2030-01-07T19:00:00.000Z');
 
@@ -257,4 +258,94 @@ describe('Agenda (Index) — filtros, impressão, vagas e detalhe', () => {
 
         expect(router.get.mock.calls.at(-1)[1]).toMatchObject({ range: 'day' });
     });
+});
+
+describe('CalendarView — duração e faixa fiel aos eventos', () => {
+    it.each([30, 45])('duração explícita %s determina ocupação e rótulo acessível', (minutes) => {
+        const wrapper = mount(CalendarView, {
+            props: { date: '2030-01-07', t, scheduleItems: [{ ...items[0], duration_minutes: minutes }] },
+        });
+        const event = lastCalendarOptions.events[0];
+        expect(new Date(event.end) - new Date(event.start)).toBe(minutes * 60000);
+        expect(event.extendedProps.duration_estimated).toBe(false);
+        const element = document.createElement('div');
+        lastCalendarOptions.eventDidMount({ event: { extendedProps: event.extendedProps }, el: element });
+        expect(element.getAttribute('aria-label')).toContain(`${minutes} min`);
+        expect(element.getAttribute('title')).not.toContain('estimada');
+        wrapper.unmount();
+    });
+    it('ends_at válido prevalece e ausência de duração mostra fallback estimado sem poluir mês', async () => {
+        const wrapper = mount(CalendarView, {
+            props: {
+                date: '2030-01-07',
+                t,
+                scheduleItems: [{ ...items[0], ends_at: '2030-01-07T13:00:00Z', duration_minutes: 30 }],
+            },
+        });
+        expect(lastCalendarOptions.events[0].extendedProps.duration_minutes).toBe(60);
+        await wrapper.setProps({ scheduleItems: [items[0]] });
+        const event = lastCalendarOptions.events[0];
+        expect(event.extendedProps.duration_estimated).toBe(true);
+        expect(new Date(event.end) - new Date(event.start)).toBe(20 * 60000);
+        const render = (type) =>
+            lastCalendarOptions.eventContent({
+                event: { extendedProps: event.extendedProps },
+                view: { type },
+                timeText: '09:00',
+            }).domNodes[0].textContent;
+        expect(render('timeGridWeek')).toContain('~20 min');
+        expect(render('dayGridMonth')).not.toContain('~20 min');
+        const el = document.createElement('div');
+        lastCalendarOptions.eventDidMount({ event: { extendedProps: event.extendedProps }, el });
+        expect(el.getAttribute('aria-label')).toContain('duração estimada');
+        wrapper.unmount();
+    });
+    it('faixa inclui eventos cedo/noite e é recalculada na API; sem eventos volta ao fallback', async () => {
+        const wrapper = mount(CalendarView, { props: { date: '2030-01-07', t, scheduleItems: [] } });
+        expect(lastCalendarOptions.slotMinTime).toBe('07:00:00');
+        expect(lastCalendarOptions.slotMaxTime).toBe('20:30:00');
+        await wrapper.setProps({
+            scheduleItems: [
+                { ...items[0], sort_time: '2030-01-07T06:30:00', duration_minutes: 20 },
+                { ...items[0], id: 'night', sort_time: '2030-01-07T21:00:00', duration_minutes: 20 },
+            ],
+        });
+        expect(lastCalendarOptions.slotMinTime).toBe('06:30:00');
+        expect(lastCalendarOptions.slotMaxTime).toBe('21:30:00');
+        expect(setOption).toHaveBeenCalledWith('slotMaxTime', '21:30:00');
+        await wrapper.setProps({ scheduleItems: [], calendarBounds: { start: '06:00', end: '22:00' } });
+        expect(lastCalendarOptions.slotMinTime).toBe('06:00:00');
+        expect(lastCalendarOptions.slotMaxTime).toBe('22:00:00');
+        await wrapper.setProps({ calendarBounds: null });
+        expect(lastCalendarOptions.slotMaxTime).toBe('20:30:00');
+        wrapper.unmount();
+    });
+    it('eventos que cruzam meia-noite e bounds inválidos não cortam a grade', () => {
+        const wrapper = mount(CalendarView, {
+            props: {
+                date: '2030-01-07',
+                t,
+                calendarBounds: { start: '30:00', end: '35:00' },
+                scheduleItems: [{ ...items[0], sort_time: '2030-01-07T23:50:00', duration_minutes: 30 }],
+            },
+        });
+        expect(lastCalendarOptions.slotMaxTime).toBe('24:00:00');
+        wrapper.unmount();
+    });
+});
+
+it('EventCard mantém horário theme-aware e badge com o par acessível sem opacidade', async () => {
+    const EventCard = (await vi.importActual('@/Pages/Panel/Schedules/EventCard.vue')).default;
+    const wrapper = mount(EventCard, {
+        props: {
+            item: { type: 'event', title: 'Sintético', color: '#0aa2c0', starts_at_fmt: '09:00', ends_at_fmt: '10:00' },
+            t: { event_badge: 'Evento' },
+        },
+    });
+    expect(wrapper.get('.fw-bold').attributes('style')).toContain('var(--bs-body-color)');
+    const badge = wrapper.get('.badge.rounded-pill');
+    expect(badge.element.style.background).toBe('#0e7490');
+    expect(badge.element.style.color).toBe('#ffffff');
+    expect(badge.element.style.opacity).toBe('');
+    wrapper.unmount();
 });

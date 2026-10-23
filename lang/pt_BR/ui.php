@@ -10,6 +10,30 @@ return [
     'close'   => 'Fechar',
     'loading' => 'Carregando...',
 
+    // Lote 1 de UI/UX do painel: acessibilidade (menu, tema, senha), confirmação de descarte, retry, busca remota e
+    // duração estimada no calendário. Plano: docs/internal/planos/frontend-uiux-lote1-plano.md §3.6.
+    'retry'                             => 'Tentar novamente',
+    'cep_lookup'                        => 'Buscar CEP',
+    'password_show'                     => 'Mostrar senha',
+    'password_hide'                     => 'Ocultar senha',
+    'discard_changes'                   => 'Há alterações não salvas. Descartar?',
+    'form_errors_summary'               => 'Corrija os campos destacados.',
+    'load_error'                        => 'Não foi possível carregar os dados.',
+    'open_menu'                         => 'Abrir menu',
+    'toggle_sidebar'                    => 'Recolher ou expandir menu lateral',
+    'close_menu'                        => 'Fechar menu',
+    'language'                          => 'Idioma',
+    'theme_toggle'                      => 'Alternar tema',
+    'theme_dark'                        => 'Ativar tema escuro',
+    'theme_light'                       => 'Ativar tema claro',
+    'search_loading'                    => 'Buscando…',
+    'search_error'                      => 'Não foi possível buscar as opções.',
+    'search_retry'                      => 'Tentar novamente',
+    'calendar_duration_estimated'       => 'Duração estimada',
+    'calendar_duration_estimated_short' => '~:minutes min',
+    'calendar_duration_estimated_aria'  => ':minutes min (duração estimada)',
+    'calendar_duration_minutes'         => ':minutes min',
+
     // Progresso em tempo real (WebSocket/Reverb) — composables/useImportProgress.js
     'realtime_offline' => 'Conexão em tempo real indisponível — tentando reconectar…',
 

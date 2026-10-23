@@ -16,7 +16,7 @@
     &:focus {
         border-color: $primary;
         background-color: $white;
-        outline: 0;
+
         box-shadow: none;
     }
 }
@@ -791,4 +791,10 @@ select.form-control-sm {
 .input-group .form-control.datetimepicker {
   border-top-right-radius: $border-radius !important;
   border-bottom-right-radius: $border-radius !important;
+}
+.form-control:focus-visible,
+.form-select:focus-visible,
+.form-check-input:focus-visible {
+    outline: var(--ee-focus-width, 2px) solid var(--ee-focus-color, #0b5ed7);
+    outline-offset: var(--ee-focus-offset, 2px);
 }

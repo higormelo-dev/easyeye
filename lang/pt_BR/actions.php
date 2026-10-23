@@ -985,6 +985,11 @@ return [
         'issued_at'    => 'Emitido em',
         'generated_at' => 'Gerado em',
         'signed_at'    => 'Assinado eletronicamente em',
+
+        // Linha do tempo do prontuário: erro inicial, erro de paginação e nova tentativa (somente leitura).
+        'timeline_load_error'      => 'Não foi possível carregar os prontuários.',
+        'timeline_load_more_error' => 'Não foi possível carregar mais prontuários.',
+        'timeline_retry'           => 'Tentar novamente',
     ],
 
     'documentation' => [

@@ -15,6 +15,7 @@ defineProps({
 });
 
 const page = usePage();
+const ui = computed(() => page?.props?.t_ui ?? {});
 const auth = computed(() => page.props.auth ?? {});
 const user = computed(() => auth.value.user ?? {});
 const entity = computed(() => auth.value.entity ?? {});
@@ -340,11 +341,24 @@ onUnmounted(() => panelTour.stop());
                             <span class="logo-lg"><img :src="logoWhiteSvg" alt="EasyEye" /></span>
                         </span>
                     </a>
-                    <a id="mobile_btn" class="mobile-btn" href="#sidebar" data-tour="mobile-menu">
-                        <i class="ti ti-menu-deep fs-24"></i>
+                    <a
+                        id="mobile_btn"
+                        :aria-label="ui.open_menu || 'Abrir menu'"
+                        aria-controls="sidebar"
+                        class="mobile-btn"
+                        href="#sidebar"
+                        data-tour="mobile-menu"
+                    >
+                        <i aria-hidden="true" class="ti ti-menu-deep fs-24"></i>
                     </a>
-                    <button id="toggle_btn2" class="sidenav-toggle-btn btn border-0 p-0 active">
-                        <i class="ti ti-arrow-right"></i>
+                    <button
+                        id="toggle_btn2"
+                        type="button"
+                        :aria-label="ui.toggle_sidebar || 'Recolher ou expandir menu lateral'"
+                        aria-controls="sidebar"
+                        class="sidenav-toggle-btn btn border-0 p-0 active"
+                    >
+                        <i aria-hidden="true" class="ti ti-arrow-right"></i>
                     </button>
                 </div>
 
@@ -374,11 +388,15 @@ onUnmounted(() => panelTour.stop());
                     <div v-if="locales.length > 1" class="header-item" data-tour="locale">
                         <div class="dropdown me-2">
                             <button
+                                type="button"
+                                :aria-label="ui.language || 'Idioma'"
+                                aria-haspopup="true"
+                                aria-expanded="false"
                                 class="topbar-link btn btn-icon dropdown-toggle drop-arrow-none"
                                 data-bs-toggle="dropdown"
                                 data-bs-offset="0,24"
                             >
-                                <i class="ti ti-world fs-16"></i>
+                                <i aria-hidden="true" class="ti ti-world fs-16"></i>
                             </button>
                             <div class="dropdown-menu dropdown-menu-end p-2">
                                 <a
@@ -397,8 +415,17 @@ onUnmounted(() => panelTour.stop());
 
                     <!-- Dark mode -->
                     <div class="header-item d-none d-sm-flex me-2" data-tour="theme">
-                        <button class="topbar-link btn btn-icon" type="button" @click="toggleDark">
-                            <i :class="isDark ? 'ti ti-sun fs-16' : 'ti ti-moon fs-16'"></i>
+                        <button
+                            class="topbar-link btn btn-icon"
+                            type="button"
+                            :aria-label="ui.theme_toggle || 'Alternar tema'"
+                            :aria-pressed="isDark"
+                            :title="
+                                isDark ? ui.theme_light || 'Ativar tema claro' : ui.theme_dark || 'Ativar tema escuro'
+                            "
+                            @click="toggleDark"
+                        >
+                            <i aria-hidden="true" :class="isDark ? 'ti ti-sun fs-16' : 'ti ti-moon fs-16'"></i>
                         </button>
                     </div>
 
@@ -485,11 +512,23 @@ onUnmounted(() => panelTour.stop());
                         <img :src="logoWhiteSvg" alt="EasyEye" />
                     </a>
                 </div>
-                <button id="toggle_btn" class="sidenav-toggle-btn btn border-0 p-0 active" data-tour="sidebar-toggle">
-                    <i class="ti ti-arrow-left"></i>
+                <button
+                    id="toggle_btn"
+                    type="button"
+                    :aria-label="ui.toggle_sidebar || 'Recolher ou expandir menu lateral'"
+                    aria-controls="sidebar"
+                    class="sidenav-toggle-btn btn border-0 p-0 active"
+                    data-tour="sidebar-toggle"
+                >
+                    <i aria-hidden="true" class="ti ti-arrow-left"></i>
                 </button>
-                <button class="sidebar-close">
-                    <i class="ti ti-x align-middle"></i>
+                <button
+                    class="sidebar-close"
+                    type="button"
+                    :aria-label="ui.close_menu || 'Fechar menu'"
+                    aria-controls="sidebar"
+                >
+                    <i aria-hidden="true" class="ti ti-x align-middle"></i>
                 </button>
             </div>
 

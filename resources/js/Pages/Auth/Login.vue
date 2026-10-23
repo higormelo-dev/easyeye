@@ -1,5 +1,5 @@
 <script setup>
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 import logoWhiteSvg from '@img/system/logo-white.svg';
@@ -19,6 +19,8 @@ const form = useForm({
 });
 
 const showPassword = ref(false);
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui ?? {});
 
 function submit() {
     form.post('/login', {
@@ -81,17 +83,20 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                     <i class="ti ti-circle-check me-1"></i> {{ statusMessage }}
                 </div>
 
-                <div v-if="form.errors.email" class="alert alert-danger mb-3 py-2">
+                <div v-if="form.errors.email" id="login-email-error" role="alert" class="alert alert-danger mb-3 py-2">
                     <i class="ti ti-alert-circle me-1"></i> {{ form.errors.email }}
                 </div>
 
                 <form novalidate @submit.prevent="submit">
                     <div class="mb-3">
-                        <label class="form-label">{{ t.email ?? 'E-mail' }}</label>
+                        <label for="login-email" class="form-label">{{ t.email ?? 'E-mail' }}</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="ti ti-mail"></i></span>
                             <input
+                                id="login-email"
                                 v-model="form.email"
+                                :aria-invalid="!!form.errors.email"
+                                :aria-describedby="form.errors.email ? 'login-email-error' : undefined"
                                 type="email"
                                 class="form-control"
                                 :class="{ 'is-invalid': form.errors.email }"
@@ -103,11 +108,14 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">{{ t.password ?? 'Senha' }}</label>
+                        <label for="login-password" class="form-label">{{ t.password ?? 'Senha' }}</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="ti ti-lock"></i></span>
                             <input
+                                id="login-password"
                                 v-model="form.password"
+                                :aria-invalid="!!form.errors.password"
+                                :aria-describedby="form.errors.password ? 'login-password-error' : undefined"
                                 :type="showPassword ? 'text' : 'password'"
                                 class="form-control border-end-0"
                                 :class="{ 'is-invalid': form.errors.password }"
@@ -118,13 +126,27 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                             <button
                                 type="button"
                                 class="btn btn-light"
-                                tabindex="-1"
+                                :aria-label="
+                                    showPassword
+                                        ? ui.password_hide || 'Ocultar senha'
+                                        : ui.password_show || 'Mostrar senha'
+                                "
+                                :title="
+                                    showPassword
+                                        ? ui.password_hide || 'Ocultar senha'
+                                        : ui.password_show || 'Mostrar senha'
+                                "
+                                :aria-pressed="showPassword"
                                 @click="showPassword = !showPassword"
                             >
-                                <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
+                                <i aria-hidden="true" :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                             </button>
                         </div>
-                        <div v-if="form.errors.password" class="invalid-feedback d-block mt-1">
+                        <div
+                            v-if="form.errors.password"
+                            id="login-password-error"
+                            class="invalid-feedback d-block mt-1"
+                        >
                             {{ form.errors.password }}
                         </div>
                     </div>

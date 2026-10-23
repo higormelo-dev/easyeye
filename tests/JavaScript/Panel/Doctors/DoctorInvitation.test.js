@@ -20,11 +20,18 @@ vi.mock('@inertiajs/vue3', async () => {
         usePage: () => ({ props: {} }),
         Head: { template: '<div />' },
         useForm: (data) => {
-            const initial = { ...data };
+            let initial = { ...data };
             const form = reactive({
                 ...data,
                 errors: {},
                 processing: false,
+                data: () => Object.fromEntries(Object.keys(data).map((key) => [key, form[key]])),
+                defaults: (next) => {
+                    initial = { ...next };
+                },
+                get isDirty() {
+                    return Object.keys(data).some((key) => form[key] !== initial[key]);
+                },
                 reset: () => Object.assign(form, initial),
                 clearErrors: () => {
                     form.errors = {};
