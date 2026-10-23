@@ -42,6 +42,12 @@ yarn-error.log
 
 # Claude Code agent worktrees (artefatos de runtime)
 .claude/worktrees/
+# Claude Code: aprovações de comando e hooks desta máquina (não compartilhar)
+.claude/settings.json
+# Ruflo/claude-flow: estado de sessão do agente (runtime)
+.claude-flow/
+# Saída de `php artisan ziggy:generate` (rotas chegam em runtime via @routes/prop)
+resources/js/ziggy.js
 
 # Maestri: papéis e estado do time de agentes (local, não entra no repo)
 /.maestri/
