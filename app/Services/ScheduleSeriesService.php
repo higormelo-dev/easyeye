@@ -36,6 +36,9 @@ use InvalidArgumentException;
  *  - Cancelar as futuras: só sessões que ainda vão acontecer e não começaram
  *    (Agendado/Confirmado, horário a partir de agora); passadas, atendidas e
  *    em andamento ficam como estão.
+ *  - Reagendar a série ("Esta e as seguintes", tudo ou nada): prévia e escrita
+ *    em App\Services\Schedules\ScheduleSeriesRescheduler; aqui ficam só a trava
+ *    da série (lockSeries) e o "Cancelar as futuras", que a respeitam.
  */
 class ScheduleSeriesService
 {
@@ -321,7 +324,7 @@ class ScheduleSeriesService
      * Trava a série até o fim da transação corrente. PostgreSQL: advisory lock de transação (só quem acrescenta à
      * MESMA série espera); demais drivers: lock nas linhas da série (as próprias leituras seguintes já as travam).
      */
-    private function lockSeries(string $entityId, string $seriesId): void
+    public static function lockSeries(string $entityId, string $seriesId): void
     {
         $connection = DB::connection();
 
@@ -355,6 +358,9 @@ class ScheduleSeriesService
         }
 
         return DB::transaction(function () use ($schedule, $reason, $entityUserId, $doctorId): array {
+            // Serializa com o reagendar da série e com o acréscimo de sessão ANTES de ler quem ainda está aberto.
+            self::lockSeries((string) $schedule->entity_id, (string) $schedule->series_id);
+
             $sessions = Schedule::query()
                 ->where('entity_id', $schedule->entity_id)
                 ->where('series_id', $schedule->series_id)

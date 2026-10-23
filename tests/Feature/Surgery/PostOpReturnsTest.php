@@ -394,3 +394,46 @@ it('o retorno cirúrgico na Agenda traz o atalho para a avaliação pós-op só 
     $res = surgeryAs($this->w, 'doctor')->getJson(route('panel.schedules.show', $plain))->assertOk();
     expect($res->json('postop_case_url') ?? $res->json('data.postop_case_url'))->toBeNull();
 });
+
+it('reagendar a série a partir do D7 leva os retornos D7 e D30 para os agendamentos novos; o D1 (antes da escolhida) fica', function () {
+    $case = spoPerformedCase($this->w);
+    $this->service->plan((string) $case->id);   // D1 sex 16/10 08:00, D7 qui 22/10 08:00, D30 seg 16/11 08:00
+
+    $returns = SurgicalPostopReturn::query()->where('surgical_case_id', $case->id)->get()->keyBy(fn ($r) => $r->milestone->value);
+    $oldD1   = Schedule::query()->findOrFail($returns['d1']->schedule_id);
+    $oldD7   = Schedule::query()->findOrFail($returns['d7']->schedule_id);
+    $oldD30  = Schedule::query()->findOrFail($returns['d30']->schedule_id);
+
+    // +1 dia e 30 min: D7 vai para sexta 23/10 08:30 e o D30 para terça 17/11 08:30.
+    $res = surgeryAs($this->w, 'secretary')
+        ->postJson(route('panel.schedules.series.reschedule', $oldD7), ['date_time' => '2026-10-23 08:30'])
+        ->assertCreated()
+        ->assertJsonPath('updated', 2);
+
+    $newOf  = fn (Schedule $old) => Schedule::query()->findOrFail(collect($res->json('new_schedules'))->firstWhere('old_id', (string) $old->id)['id']);
+    $newD7  = $newOf($oldD7);
+    $newD30 = $newOf($oldD30);
+
+    $returns = SurgicalPostopReturn::query()->where('surgical_case_id', $case->id)->get()->keyBy(fn ($r) => $r->milestone->value);
+
+    expect((string) $returns['d7']->schedule_id)->toBe((string) $newD7->id)
+        ->and($returns['d7']->scheduled_for->format('Y-m-d H:i'))->toBe('2026-10-23 08:30')
+        ->and((string) $returns['d30']->schedule_id)->toBe((string) $newD30->id)
+        ->and($returns['d30']->scheduled_for->format('Y-m-d H:i'))->toBe('2026-11-17 08:30')
+        ->and([$returns['d7']->status, $returns['d30']->status])->toBe([PostOpReturnStatus::Scheduled, PostOpReturnStatus::Scheduled])
+        // O D1 está ANTES da âncora: o retorno e o agendamento continuam onde estavam.
+        ->and((string) $returns['d1']->schedule_id)->toBe((string) $oldD1->id)
+        ->and($oldD1->refresh()->situation)->toBe(ScheduleSituation::Scheduled)
+        ->and($oldD1->date_time->format('Y-m-d H:i'))->toBe('2026-10-16 08:00')
+        // Os agendamentos novos continuam sendo do caso, na mesma série, com a mesma numeração.
+        ->and([(string) $newD7->surgical_case_id, $newD7->attendance_type, $newD7->session_number, $newD7->session_total])->toBe([(string) $case->id, ScheduleAttendanceType::PostOpEvaluation, 2, 3])
+        ->and([(string) $newD30->surgical_case_id, $newD30->session_number, (string) $newD30->series_id])->toBe([(string) $case->id, 3, (string) $oldD1->series_id])
+        ->and($oldD7->refresh()->situation)->toBe(ScheduleSituation::Cancelled)
+        ->and($oldD30->refresh()->situation)->toBe(ScheduleSituation::Cancelled);
+
+    // A alta cancela os agendamentos VIGENTES dos retornos (os novos).
+    $this->service->cancelOpen($case->refresh(), 'Alta');
+
+    expect($newD7->refresh()->situation)->toBe(ScheduleSituation::Cancelled)
+        ->and($newD30->refresh()->situation)->toBe(ScheduleSituation::Cancelled);
+});

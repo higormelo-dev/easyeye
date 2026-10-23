@@ -488,6 +488,8 @@ function openReschedule(item) {
 function onRescheduled(json) {
     rescheduleItem.value = null;
     showToast(json.message, 'success');
+    const newId = json.anchor_id ?? json.new_schedule?.id;
+    if (detailOpen.value && newId) viewScheduleId.value = newId;
     router.reload({ only: ['scheduleItems', 'counters'] });
 }
 

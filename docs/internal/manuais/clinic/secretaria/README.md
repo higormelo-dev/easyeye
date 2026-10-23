@@ -156,7 +156,8 @@ Fluxo típico do dia:
 > O horário volta a ficar livre para novos agendamentos.
 
 Os demais botões do card permitem **editar** o agendamento, **reagendar** para outro
-horário e abrir os dados do paciente.
+horário e abrir os dados do paciente. O botão **Reagendar** também permite
+[reagendar a série de sessões](#reagendar-a-série-de-sessões).
 
 ### Drawer de detalhe: códigos e cadastro do paciente
 
@@ -201,6 +202,23 @@ sistema mostra o motivo e não grava nada.
 
 > Série **fechada** (criada em **Repetir**, com total) não aceita sessão extra:
 > "Só se acrescenta sessão a uma série aberta (sem total)."
+
+### Reagendar a série de sessões
+
+Para mudar o horário, abra o detalhe do agendamento e clique em **Reagendar** na sessão desejada. Você também pode usar o botão **Reagendar** do card, na agenda do dia.
+
+Escolha quais sessões mudar:
+
+- **Só esta sessão**: muda apenas a sessão escolhida.
+- **Esta e as seguintes (N)**: desloca a sessão escolhida e as futuras a partir dela pelo mesmo intervalo. As anteriores, mesmo futuras, ficam como estão. Sessões passadas, atendidas, em andamento, canceladas e faltas também ficam como estão.
+
+Se você trocar o **médico** ou marcar/desmarcar **encaixe**, a escolha vale para todas as sessões afetadas. Sem trocar, cada sessão mantém o que já tinha.
+
+Ao escolher a série, confira a **prévia** com a data antiga, a data nova e os conflitos de cada sessão. A prévia verifica médico, escala, bloqueio, sala e teto de encaixe. Se qualquer sessão não couber, a confirmação fica bloqueada e nada é gravado. Ajuste o horário e confira a nova prévia antes de confirmar.
+
+A numeração (como “3/10”) e o total da série são preservados. As sessões antigas aparecem como **Cancelado**, com a nota “Reagendado para …”.
+
+> A remarcação da série não envia aviso automático ao paciente; combine o novo horário na recepção.
 
 ---
 

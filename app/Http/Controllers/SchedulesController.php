@@ -8,7 +8,7 @@ use App\Domains\Recall\Services\RecallLinkService;
 use App\Domains\Recall\Support\{RecallLocks, RecallRuleInUse, RecallTaskLabel};
 use App\Enums\{CashEntryReferenceType, ClientRule, DataAccessPurpose, EntityGate, FeatureKey, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleSituation};
 use App\Enums\ScheduleAttendanceType;
-use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleSlotUnavailableException};
+use App\Exceptions\{AttendanceRequiresCashEntryException, ScheduleSeriesChangedException, ScheduleSlotUnavailableException};
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
 use App\Http\Requests\ScheduleRequest;
@@ -20,7 +20,7 @@ use App\Rules\ActiveCovenant;
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
 use App\Services\{DataAccessLogService, FeatureGateService, ScheduleSeriesService, ScheduleService};
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
-use App\Services\Schedules\{AgendaFilters, AgendaQueryService, ScheduleAvailabilityService};
+use App\Services\Schedules\{AgendaFilters, AgendaQueryService, ScheduleAvailabilityService, ScheduleSeriesRescheduler, SeriesFutureCounts};
 use App\Services\Surgery\PostOp\PostOpReturnService;
 use App\Services\Surgery\Sections\PostOpSection;
 use App\Services\WhatsApp\WhatsAppService;
@@ -413,6 +413,10 @@ class SchedulesController extends Controller
                 $this->service->assertDoctorFreeOfSurgery($doctorId, $dateTime);
 
                 if ($isFitIn) {
+                    // Série de encaixes: TODAS as cotas (1ª data e extras), em ordem estável, antes do 1º INSERT. O INSERT toma a
+                    // trava do código SDL; travar as cotas das sessões extras só em createSessions() (depois do código) entrava em
+                    // círculo com o reagendar (que faz cota → código) — 40P01. Ordem global: cirurgia → cota → série → linhas → código.
+                    $this->service->lockFitInQuotas(array_map(fn (Carbon $date): array => [$doctorId, $date], [$dateTime, ...$extraDates]));
                     $this->service->assertFitInCapacity($doctorId, $dateTime);
                 }
 
@@ -630,40 +634,17 @@ class SchedulesController extends Controller
         ]);
     }
 
-    public function reschedule(Request $request, Schedule $schedule): JsonResponse
+    public function reschedule(Request $request, Schedule $schedule, ScheduleSeriesRescheduler $rescheduler): JsonResponse
     {
         $this->authorizeSchedule($schedule);
 
         $request->validate([
             'date_time' => ['required', 'date'],
-            // Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via
-            // request body): Doctor não tem entity_id direto (só via
-            // entity_user_id -> entity_users.entity_id), então 'uuid' sozinho
-            // deixava reagendar com médico de OUTRA clínica. Mesmo closure já
-            // usado em ScheduleRequest::rules() para store()/update().
-            'doctor_id' => ['nullable', 'uuid', function ($attribute, $value, $fail) {
-                if (! CurrentDoctor::canAccessDoctorId((string) $value)) {
-                    $fail(__('schedules.doctor_only_own'));
-
-                    return;
-                }
-
-                $exists = DB::table('doctors')
-                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-                    ->where('doctors.id', $value)
-                    ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                    ->whereNull('doctors.deleted_at')
-                    ->exists();
-
-                if (! $exists) {
-                    $fail(__('validation.custom.schedule.doctor_not_found'));
-                }
-            }],
+            'doctor_id' => $this->clinicDoctorRules(),
             // Encaixe: sem o campo, a remarcação mantém o que o agendamento é.
             'is_fit_in' => ['nullable', 'boolean'],
         ]);
 
-        $entityId = session()->get('selected_entity_id');
         $doctorId = $request->input('doctor_id') ?: $schedule->doctor_id;
         $dateTime = Carbon::parse($request->input('date_time'));
         $isFitIn  = $request->input('is_fit_in') !== null ? $request->boolean('is_fit_in') : (bool) $schedule->is_fit_in;
@@ -699,36 +680,17 @@ class SchedulesController extends Controller
         // nunca fica sem o antigo cancelado, nem o contrário). A sessão de
         // série continua na série ("3/10"); encaixe confere o teto sob lock.
         try {
-            $newSchedule = DB::transaction(function () use ($schedule, $entityId, $doctorId, $dateTime, $isFitIn, $resourceIds): Schedule {
+            $newSchedule = DB::transaction(function () use ($schedule, $rescheduler, $doctorId, $dateTime, $isFitIn, $resourceIds): Schedule {
                 $this->service->assertDoctorFreeOfSurgery($doctorId, $dateTime);
 
                 if ($isFitIn) {
                     $this->service->assertFitInCapacity($doctorId, $dateTime, (string) $schedule->id);
                 }
 
-                $newSchedule = $this->model->create([
-                    'entity_id'          => $entityId,
-                    'doctor_id'          => $doctorId,
-                    'patient_id'         => $schedule->patient_id,
-                    'covenant_id'        => $schedule->covenant_id,
-                    'visit_id'           => $schedule->visit_id,
-                    'attendance_type'    => $schedule->attendance_type,
-                    'specialty_area'     => $schedule->specialty_area,
-                    'full_name'          => $schedule->full_name,
-                    'date_time'          => $dateTime,
-                    'telephone'          => $schedule->telephone,
-                    'cellphone'          => $schedule->cellphone,
-                    'cellphone_whatsapp' => (bool) $schedule->cellphone_whatsapp,
-                    'notes'              => $schedule->notes,
-                    'situation'          => ScheduleSituation::Scheduled->value,
-                    'is_fit_in'          => $isFitIn,
-                    'series_id'          => $schedule->series_id,
-                    'session_number'     => $schedule->session_number,
-                    'session_total'      => $schedule->session_total,
-                    // Retorno de uma cirurgia continua sendo dela: o agendamento novo herda o caso.
-                    'surgical_case_id' => $schedule->surgical_case_id,
-                    'active'           => true,
-                ]);
+                // Sessão de série: serializa com "Reagendar a série" (cota → série), sem criar uma 2ª sessão onde o lote acabou de cancelar.
+                $rescheduler->lockForSingleReschedule($schedule);
+
+                $newSchedule = $this->model->create($this->service->rescheduleAttributes($schedule, $doctorId, $dateTime, $isFitIn));
 
                 if ($resourceIds !== []) {
                     $newSchedule->resources()->sync($resourceIds);
@@ -763,6 +725,8 @@ class SchedulesController extends Controller
             $this->rethrowUnlessSlotConflict($e);
         } catch (ScheduleSlotUnavailableException $e) {
             return $this->slotUnavailableResponse($e);
+        } catch (ScheduleSeriesChangedException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
         }
 
         Cache::forget("waiting_room:{$schedule->entity_id}");
@@ -1125,6 +1089,83 @@ class SchedulesController extends Controller
     }
 
     /**
+     * Prévia de "Esta e as seguintes" do reagendar: cada sessão do lote (a escolhida e as seguintes ainda agendadas ou
+     * confirmadas) com a data nova e os conflitos. Não grava. `doctor_id`/`is_fit_in` ausentes = cada sessão mantém o
+     * seu; presentes valem para todas. Perfil médico: só as sessões dele.
+     */
+    public function seriesReschedulePreview(Request $request, Schedule $schedule, ScheduleSeriesRescheduler $rescheduler): JsonResponse
+    {
+        $this->authorizeSchedule($schedule);
+        abort_unless($schedule->series_id, 404);
+
+        [$dateTime, $doctorOverride, $fitInOverride] = $this->seriesRescheduleInput($request);
+
+        try {
+            return response()->json($rescheduler->preview($schedule, $dateTime, $doctorOverride, $fitInOverride, $this->doctorScopeForBulk()));
+        } catch (ScheduleSlotUnavailableException $e) {
+            return $this->slotUnavailableResponse($e);
+        }
+    }
+
+    /**
+     * "Esta e as seguintes" do reagendar: desloca a sessão escolhida e as seguintes da série pelo mesmo intervalo, tudo ou
+     * nada (conflito em qualquer sessão = 422 sem gravar; série alterada no meio = 409). As antigas viram Cancelado
+     * ("Reagendado para …"); numeração e total da série são preservados. Não avisa o paciente.
+     */
+    public function seriesReschedule(Request $request, Schedule $schedule, ScheduleSeriesRescheduler $rescheduler): JsonResponse
+    {
+        $this->authorizeSchedule($schedule);
+        abort_unless($schedule->series_id, 404);
+
+        [$dateTime, $doctorOverride, $fitInOverride] = $this->seriesRescheduleInput($request);
+
+        try {
+            $result = $rescheduler->reschedule($schedule, $dateTime, $doctorOverride, $fitInOverride, session('selected_entity_user_id'), $this->doctorScopeForBulk());
+        } catch (ScheduleSeriesChangedException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        } catch (ScheduleSlotUnavailableException $e) {
+            return $this->slotUnavailableResponse($e);
+        }
+
+        return response()->json([
+            'message'       => trans_choice('schedules.series_rescheduled', $result['updated'], ['count' => $result['updated']]),
+            'anchor_id'     => $result['anchor_id'],
+            'updated'       => $result['updated'],
+            'new_schedules' => array_map(fn (array $pair): array => [
+                'id'             => (string) $pair['schedule']->id,
+                'code'           => $pair['schedule']->code,
+                'date_time'      => $pair['schedule']->date_time->format('Y-m-d\TH:i'),
+                'session_number' => $pair['schedule']->session_number,
+                'session_total'  => $pair['schedule']->session_total,
+                'doctor_id'      => $pair['schedule']->doctor_id,
+                'is_fit_in'      => (bool) $pair['schedule']->is_fit_in,
+                'old_id'         => $pair['old_id'],
+            ], $result['new_schedules']),
+        ], 201);
+    }
+
+    /**
+     * Entrada comum da prévia e da confirmação: novo horário da sessão escolhida (futuro) e as sobrescritas opcionais
+     * de médico e de encaixe (null = cada sessão mantém o que tem).
+     *
+     * @return array{0: Carbon, 1: ?string, 2: ?bool}
+     */
+    private function seriesRescheduleInput(Request $request): array
+    {
+        $request->validate([
+            'date_time' => ['required', 'date', 'after:now'],
+            'doctor_id' => $this->clinicDoctorRules(),
+            'is_fit_in' => ['nullable', 'boolean'],
+        ]);
+
+        return [
+            Carbon::parse($request->input('date_time')),
+            $request->input('doctor_id') ?: null,
+            $request->filled('is_fit_in') ? $request->boolean('is_fit_in') : null,
+        ];
+    }
+
+    /**
      * Linhas da Agenda: agendamentos (filtrados pelo chip/busca), compromissos
      * e — no chip "Bloqueados" — os bloqueios. Período "dia" (lista e
      * calendário do dia) leva a linha completa; semana/mês, a linha compacta
@@ -1263,9 +1304,12 @@ class SchedulesController extends Controller
             ? app(PatientClinicalSafetyService::class)->compactFor($entityId, $schedules->pluck('patient_id')->filter()->all())
             : [];
 
+        // "Esta e as seguintes (N)" do reagendar: uma consulta para as séries da página.
+        $seriesFutureCounts = app(SeriesFutureCounts::class)->forPage($entityId, $schedules, $this->doctorScopeForBulk());
+
         $scheduleRows = $schedules->map(fn ($s) => array_merge(
             ['sort_time' => $s->date_time->toISOString(), 'type' => 'schedule'],
-            $this->toScheduleRow($s, $cashEntryScheduleIds, $chargingCovenantIds),
+            $this->toScheduleRow($s, $cashEntryScheduleIds, $chargingCovenantIds, $seriesFutureCounts),
             $canSeePatients ? $this->whatsAppFields($s, $optedOut) : [],
             ['allergy' => $s->patient_id ? ($allergyFlags[(string) $s->patient_id] ?? null) : null],
         ));
@@ -1369,7 +1413,7 @@ class SchedulesController extends Controller
         ];
     }
 
-    private function toScheduleRow(Schedule $s, array $cashEntryScheduleIds = [], array $chargingCovenantIds = []): array
+    private function toScheduleRow(Schedule $s, array $cashEntryScheduleIds = [], array $chargingCovenantIds = [], array $seriesFutureCounts = []): array
     {
         $sit = $s->situation instanceof ScheduleSituation
             ? $s->situation
@@ -1433,6 +1477,10 @@ class SchedulesController extends Controller
             'series_id'      => $s->series_id,
             'session_number' => $s->session_number,
             'session_total'  => $s->session_total,
+            // "Reagendar a série": quantas sessões "Esta e as seguintes" moveria a partir desta (0 = não elegível).
+            'series_future_count'           => $seriesFutureCounts[(string) $s->id] ?? 0,
+            'reschedule_series_url'         => $s->series_id ? route('panel.schedules.series.reschedule', $s->id) : null,
+            'reschedule_series_preview_url' => $s->series_id ? route('panel.schedules.series.reschedule-preview', $s->id) : null,
             // Sala/equipamento reservado (nome curto na linha).
             'resource_names' => $s->relationLoaded('resources') ? $s->resources->pluck('name')->values()->all() : [],
             'patient_mood'   => $mood ? [
@@ -1460,14 +1508,17 @@ class SchedulesController extends Controller
         $doctorScope = CurrentDoctor::isDoctorProfile() ? (string) CurrentDoctor::doctor()?->id : null;
         $locale      = app()->getLocale();
 
-        return Schedule::query()
+        $sessions = Schedule::query()
             ->where('entity_id', $schedule->entity_id)
             ->where('series_id', $schedule->series_id)
             ->when($doctorScope, fn ($q) => $q->where('doctor_id', $doctorScope))
             ->orderBy('date_time')
             ->orderBy('session_number')
-            ->get()
-            ->map(function (Schedule $session) use ($schedule, $locale) {
+            ->get();
+        $futureCounts = app(SeriesFutureCounts::class)->of($sessions);
+
+        return $sessions
+            ->map(function (Schedule $session) use ($schedule, $locale, $futureCounts) {
                 $sit = $session->situation;
 
                 return [
@@ -1487,6 +1538,11 @@ class SchedulesController extends Controller
                     'is_past'        => $session->date_time->lt(now()),
                     'is_current'     => (string) $session->id === (string) $schedule->id,
                     'reschedule_url' => route('panel.schedules.reschedule', $session->id),
+                    // "Reagendar a série" a partir desta sessão.
+                    'series_id'                     => $session->series_id,
+                    'series_future_count'           => $futureCounts[(string) $session->id] ?? 0,
+                    'reschedule_series_url'         => route('panel.schedules.series.reschedule', $session->id),
+                    'reschedule_series_preview_url' => route('panel.schedules.series.reschedule-preview', $session->id),
                 ];
             })
             ->values()
@@ -1714,6 +1770,29 @@ class SchedulesController extends Controller
             ->where('entity_users.entity_id', $entityId)
             ->whereNull('doctors.deleted_at')
             ->exists();
+    }
+
+    /**
+     * Regra do `doctor_id` opcional de remarcação. Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via request
+     * body): Doctor não tem entity_id direto (só via entity_user_id -> entity_users.entity_id), então 'uuid' sozinho
+     * deixava reagendar com médico de OUTRA clínica; o perfil médico só escolhe a si mesmo. Mesma regra de
+     * ScheduleRequest::rules() para store()/update().
+     *
+     * @return list<mixed>
+     */
+    private function clinicDoctorRules(): array
+    {
+        return ['nullable', 'uuid', function ($attribute, $value, $fail) {
+            if (! CurrentDoctor::canAccessDoctorId((string) $value)) {
+                $fail(__('schedules.doctor_only_own'));
+
+                return;
+            }
+
+            if (! $this->doctorBelongsToEntity((string) $value, (string) session()->get('selected_entity_id'))) {
+                $fail(__('validation.custom.schedule.doctor_not_found'));
+            }
+        }];
     }
 
     private function doctorsByEntity(string $entityId)

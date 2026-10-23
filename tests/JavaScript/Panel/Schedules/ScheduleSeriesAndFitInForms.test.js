@@ -210,6 +210,10 @@ describe('ScheduleDetailDrawer — série e encaixe', () => {
                 name: 'MARIA',
                 doctor_id: 'd1',
                 reschedule_url: '/reschedule/s3',
+                series_id: 'synthetic-series',
+                series_future_count: 7,
+                reschedule_series_url: '/series/s3/reschedule',
+                reschedule_series_preview_url: '/series/s3/reschedule-preview',
             },
         ],
     };
@@ -246,6 +250,10 @@ describe('ScheduleDetailDrawer — série e encaixe', () => {
             id: 's3',
             reschedule_url: '/reschedule/s3',
             doctor_id: 'd1',
+            series_id: 'synthetic-series',
+            series_future_count: 7,
+            reschedule_series_url: '/series/s3/reschedule',
+            reschedule_series_preview_url: '/series/s3/reschedule-preview',
         });
     });
 
@@ -357,5 +365,426 @@ describe('Configurações › Agenda', () => {
         expect(options.method).toBe('PATCH');
         expect(JSON.parse(options.body)).toEqual({ few_slots_percent: 25 });
         expect(wrapper.text()).toContain('Salvo');
+    });
+});
+
+describe('Remarcar — série', () => {
+    const texts = {
+        reschedule_save: 'Confirmar remarcação',
+        reschedule_title: 'Reagendar',
+        reschedule_cancel: 'Cancelar',
+        reschedule_doctor: 'Médico',
+        form_fit_in: 'Encaixe',
+        series_ok: 'Livre',
+        series_reschedule_scope: 'Remarcar',
+        series_reschedule_one: 'Só esta sessão',
+        series_reschedule_following: 'Esta e as seguintes (:count)',
+        series_reschedule_hint: 'As sessões anteriores e encerradas ficam como estão.',
+        series_reschedule_doctor_hint: 'O médico escolhido vale para todas as sessões afetadas.',
+        series_reschedule_fit_in_hint: 'O encaixe escolhido vale para todas as sessões afetadas.',
+        series_reschedule_preview: 'Sessões que serão remarcadas',
+        series_reschedule_loading: 'Conferindo as sessões…',
+        series_reschedule_conflicts: 'Há conflito em :count sessão(ões). Ajuste o horário para continuar.',
+        series_reschedule_error: 'Não foi possível conferir a série. Tente de novo.',
+        series_reschedule_blocked: 'Resolva os conflitos para confirmar.',
+    };
+    const anchor = {
+        id: 'session-2',
+        doctor_id: 'doctor-1',
+        name: 'Paciente sintético',
+        time: '09:00',
+        is_fit_in: false,
+        series_id: 'series-synthetic',
+        series_future_count: 3,
+        reschedule_url: '/session-2/reschedule',
+        reschedule_series_url: '/session-2/series/reschedule',
+        reschedule_series_preview_url: '/session-2/series/reschedule-preview',
+    };
+    const preview = {
+        total: 3,
+        delta_seconds: 604800,
+        sessions: [2, 3, 4].map((number) => ({
+            id: `session-${number}`,
+            session_number: number,
+            session_total: 4,
+            doctor_id: 'doctor-1',
+            is_fit_in: false,
+            old_label: `0${number}/01/2030 09:00`,
+            new_label: `0${number + 7}/01/2030 09:00`,
+            errors: [],
+        })),
+    };
+    let wrapper;
+    let hide;
+    let focusTrigger;
+    const confirm = () => wrapper.get('[data-test="reschedule-confirm"]');
+    const state = () => wrapper.vm.$.setupState;
+    const posts = () => globalThis.fetch.mock.calls.filter((call) => call[1]?.method === 'POST');
+
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        hide = vi.fn();
+        globalThis.bootstrap = window.bootstrap = {
+            Modal: class {
+                show() {}
+                hide() {
+                    hide();
+                }
+            },
+        };
+        globalThis.fetch = vi.fn(() => jsonResponse(preview));
+    });
+    afterEach(() => {
+        wrapper?.unmount();
+        wrapper = null;
+        focusTrigger?.remove();
+        vi.useRealTimers();
+    });
+
+    async function render(item = anchor, translation = texts) {
+        const RescheduleModal = (await import('@/Pages/Panel/Schedules/RescheduleModal.vue')).default;
+        wrapper = mount(RescheduleModal, {
+            props: {
+                item: null,
+                doctors: [
+                    { id: 'doctor-1', name: 'Médico sintético A' },
+                    { id: 'doctor-2', name: 'Médico sintético B' },
+                ],
+                t: translation,
+            },
+            global: { stubs: { SlotPicker: SlotPickerStub, SearchSelect: SearchSelectStub, teleport: true } },
+            attachTo: document.body,
+        });
+        await wrapper.setProps({ item: { ...item } });
+        await flushPromises();
+        return wrapper;
+    }
+    async function chooseFollowing() {
+        await wrapper.get('#reschedule-scope-following').setValue();
+        state().dateTime = '2030-01-09T09:00';
+        await flushPromises();
+    }
+    async function settlePreview() {
+        await vi.advanceTimersByTimeAsync(350);
+        await flushPromises();
+    }
+
+    it.each([
+        { series_id: null, series_future_count: 3 },
+        { series_id: 'series-synthetic', series_future_count: 1 },
+    ])('sem mais de uma sessão futura preserva o POST unitário: %j', async (fields) => {
+        await render({ ...anchor, ...fields });
+        expect(wrapper.find('[data-test="series-reschedule-scope"]').exists()).toBe(false);
+        state().dateTime = '2030-01-09T09:00';
+        await flushPromises();
+        globalThis.fetch.mockResolvedValueOnce(await jsonResponse({ new_schedule: { id: 'new-one' } }, 201));
+        await confirm().trigger('click');
+        await flushPromises();
+        expect(posts()).toHaveLength(1);
+        expect(posts()[0][0]).toBe(anchor.reschedule_url);
+        expect(JSON.parse(posts()[0][1].body)).toEqual({
+            date_time: '2030-01-09T09:00',
+            doctor_id: 'doctor-1',
+            is_fit_in: false,
+        });
+    });
+
+    it('rádios têm legend, labels e contagem, e respeitam o idioma recebido', async () => {
+        await render(anchor, {
+            ...texts,
+            series_reschedule_scope: 'Reschedule scope',
+            series_reschedule_following: 'This and the following (:count)',
+        });
+        const fieldset = wrapper.get('[data-test="series-reschedule-scope"]');
+        expect(fieldset.element.tagName).toBe('FIELDSET');
+        expect(fieldset.get('legend').text()).toBe('Reschedule scope');
+        expect(fieldset.get('label[for="reschedule-scope-following"]').text()).toBe('This and the following (3)');
+        expect(fieldset.get('label[for="reschedule-scope-one"]').exists()).toBe(true);
+        expect(fieldset.get('#reschedule-scope-one').element.checked).toBe(true);
+        expect(wrapper.get(`#${fieldset.attributes('aria-describedby')}`).text()).toBe(texts.series_reschedule_hint);
+    });
+
+    it('prévia usa GET após o debounce, preserva overrides omitidos e mostra datas do servidor', async () => {
+        await render();
+        await chooseFollowing();
+        expect(confirm().element.disabled).toBe(true);
+        expect(wrapper.text()).toContain(texts.series_reschedule_loading);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+        await settlePreview();
+        expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+        const [url, options] = globalThis.fetch.mock.calls[0];
+        expect(url.split('?')[0]).toBe(anchor.reschedule_series_preview_url);
+        const params = new URL(url, 'http://localhost').searchParams;
+        expect([...params.entries()]).toEqual([['date_time', '2030-01-09T09:00']]);
+        expect(options.headers.Accept).toBe('application/json');
+        expect(options.signal).toBeInstanceOf(AbortSignal);
+        const section = wrapper.get('[data-test="series-reschedule-preview"]');
+        expect(section.attributes('aria-live')).toBe('polite');
+        expect(section.text()).toContain('#2/4');
+        expect(section.text()).toContain(preview.sessions[0].old_label);
+        expect(section.text()).toContain(preview.sessions[0].new_label);
+        expect(confirm().element.disabled).toBe(false);
+    });
+
+    it('um conflito bloqueia toda a série, mostra motivo acessível e não permite POST direto', async () => {
+        globalThis.fetch.mockImplementation(() =>
+            jsonResponse({ ...preview, sessions: [{ ...preview.sessions[0], errors: ['Horário ocupado'] }] }),
+        );
+        await render();
+        await chooseFollowing();
+        await settlePreview();
+        expect(confirm().element.disabled).toBe(true);
+        expect(wrapper.get('[role="alert"]').text()).toContain('1 sessão(ões)');
+        expect(wrapper.text()).toContain('Horário ocupado');
+        expect(wrapper.get(`#${confirm().attributes('aria-describedby')}`).text()).toBe(
+            texts.series_reschedule_blocked,
+        );
+        expect(confirm().attributes('title')).toBe(texts.series_reschedule_blocked);
+        await wrapper.vm.onConfirm();
+        expect(posts()).toHaveLength(0);
+    });
+
+    it.each([422, 403, 404, 500])(
+        'erro HTTP %s na prévia mantém confirmação bloqueada e exibe mensagem',
+        async (status) => {
+            globalThis.fetch.mockImplementation(() =>
+                jsonResponse({ message: 'Prévia indisponível pelo servidor.' }, status),
+            );
+            await render();
+            await chooseFollowing();
+            await settlePreview();
+            expect(wrapper.get('[role="alert"]').text()).toBe('Prévia indisponível pelo servidor.');
+            expect(confirm().element.disabled).toBe(true);
+            expect(wrapper.findAll('[data-test="series-reschedule-preview"] li')).toHaveLength(0);
+        },
+    );
+
+    it('falha de rede usa tradução e bloqueia; uma nova prévia permite tentar novamente', async () => {
+        globalThis.fetch.mockRejectedValueOnce(new Error('Network'));
+        await render();
+        await chooseFollowing();
+        await settlePreview();
+        expect(wrapper.get('[role="alert"]').text()).toBe(texts.series_reschedule_error);
+        expect(confirm().element.disabled).toBe(true);
+        state().dateTime = '2030-01-10T09:00';
+        await settlePreview();
+        expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+        expect(confirm().element.disabled).toBe(false);
+    });
+
+    it('confirma via POST só com data quando não há overrides e emite anchor_id no 201', async () => {
+        await render();
+        await chooseFollowing();
+        await settlePreview();
+        const result = { message: 'Série remarcada.', anchor_id: 'new-anchor', updated: 3, new_schedules: [] };
+        globalThis.fetch.mockResolvedValueOnce(await jsonResponse(result, 201));
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        const oldToken = meta.content;
+        meta.content = 'synthetic-csrf';
+        try {
+            await confirm().trigger('click');
+            await flushPromises();
+            const [url, options] = posts()[0];
+            expect(url).toBe(anchor.reschedule_series_url);
+            expect(JSON.parse(options.body)).toEqual({ date_time: '2030-01-09T09:00' });
+            expect(options.headers['X-CSRF-TOKEN']).toBe('synthetic-csrf');
+            expect(hide).toHaveBeenCalled();
+            expect(wrapper.emitted('rescheduled')[0]).toEqual([result]);
+        } finally {
+            meta.content = oldToken;
+        }
+    });
+
+    it.each([true, false])('médico alterado e encaixe %s aparecem nos hints, GET e POST', async (fitIn) => {
+        await render({ ...anchor, is_fit_in: !fitIn });
+        await chooseFollowing();
+        await wrapper.get('.ss').setValue('doctor-2');
+        await wrapper.get('#reschedule-fit-in').setValue(fitIn);
+        await settlePreview();
+        expect(wrapper.get('[data-test="series-doctor-hint"]').text()).toBe(texts.series_reschedule_doctor_hint);
+        expect(wrapper.get('[data-test="series-fit-in-hint"]').text()).toBe(texts.series_reschedule_fit_in_hint);
+        const params = new URL(globalThis.fetch.mock.calls[0][0], 'http://localhost').searchParams;
+        expect(params.get('doctor_id')).toBe('doctor-2');
+        expect(params.get('is_fit_in')).toBe(fitIn ? '1' : '0');
+        globalThis.fetch.mockResolvedValueOnce(await jsonResponse({ anchor_id: 'new-anchor' }, 201));
+        await confirm().trigger('click');
+        await flushPromises();
+        expect(JSON.parse(posts()[0][1].body)).toEqual({
+            date_time: '2030-01-09T09:00',
+            doctor_id: 'doctor-2',
+            is_fit_in: fitIn,
+        });
+    });
+
+    it('409 limpa a prévia imediatamente, mostra a mensagem e refaz a conferência antes de tentar', async () => {
+        await render();
+        await chooseFollowing();
+        await settlePreview();
+        globalThis.fetch.mockResolvedValueOnce(await jsonResponse({ message: 'A série mudou. Tente de novo.' }, 409));
+        await confirm().trigger('click');
+        await flushPromises();
+        expect(wrapper.emitted('rescheduled')).toBeUndefined();
+        expect(wrapper.get('[role="alert"]').text()).toBe('A série mudou. Tente de novo.');
+        expect(confirm().element.disabled).toBe(true);
+        expect(wrapper.findAll('[data-test="series-reschedule-preview"] li')).toHaveLength(0);
+        await settlePreview();
+        expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+        expect(confirm().element.disabled).toBe(false);
+    });
+
+    it('422 na escrita mantém o modal aberto e mostra a mensagem, sem afirmar sucesso', async () => {
+        await render();
+        await chooseFollowing();
+        await settlePreview();
+        globalThis.fetch.mockResolvedValueOnce(await jsonResponse({ message: 'Conflito novo na sala.' }, 422));
+        await confirm().trigger('click');
+        await flushPromises();
+        expect(wrapper.get('[role="alert"]').text()).toBe('Conflito novo na sala.');
+        expect(wrapper.emitted('rescheduled')).toBeUndefined();
+        expect(hide).not.toHaveBeenCalled();
+    });
+
+    it('duas alterações rápidas fazem só um GET e invalidam a prévia antes do debounce', async () => {
+        await render();
+        await chooseFollowing();
+        await settlePreview();
+        globalThis.fetch.mockClear();
+        state().dateTime = '2030-01-10T09:00';
+        await flushPromises();
+        expect(confirm().element.disabled).toBe(true);
+        await vi.advanceTimersByTimeAsync(200);
+        state().dateTime = '2030-01-11T09:00';
+        await flushPromises();
+        await settlePreview();
+        expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+        expect(new URL(globalThis.fetch.mock.calls[0][0], 'http://localhost').searchParams.get('date_time')).toBe(
+            '2030-01-11T09:00',
+        );
+    });
+
+    it('resposta antiga não restaura uma prévia nem libera a confirmação de outra data', async () => {
+        let resolveOld;
+        globalThis.fetch.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    resolveOld = resolve;
+                }),
+        );
+        await render();
+        await chooseFollowing();
+        await settlePreview();
+        const firstSignal = globalThis.fetch.mock.calls[0][1].signal;
+        state().dateTime = '2030-01-10T09:00';
+        await flushPromises();
+        expect(firstSignal.aborted).toBe(true);
+        resolveOld(
+            await jsonResponse({ ...preview, sessions: [{ ...preview.sessions[0], new_label: 'RESPOSTA ANTIGA' }] }),
+        );
+        await flushPromises();
+        expect(wrapper.text()).not.toContain('RESPOSTA ANTIGA');
+        expect(confirm().element.disabled).toBe(true);
+        await settlePreview();
+        expect(confirm().element.disabled).toBe(false);
+        expect(wrapper.text()).not.toContain('RESPOSTA ANTIGA');
+    });
+
+    it('voltar para só esta limpa conflitos e não deixa o debounce fazer outra chamada', async () => {
+        await render();
+        await chooseFollowing();
+        await wrapper.get('#reschedule-scope-one').setValue();
+        await settlePreview();
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+        expect(wrapper.find('[data-test="series-reschedule-preview"]').exists()).toBe(false);
+        expect(confirm().element.disabled).toBe(false);
+    });
+
+    it('fechar pelo evento nativo cancela a prévia e reabrir em outra sessão começa em só esta', async () => {
+        await render();
+        await chooseFollowing();
+        wrapper.get('#rescheduleModal').element.dispatchEvent(new Event('hidden.bs.modal'));
+        await settlePreview();
+        expect(wrapper.emitted('close')).toBeTruthy();
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+        await wrapper.setProps({ item: { ...anchor, id: 'session-other' } });
+        await flushPromises();
+        expect(wrapper.get('#reschedule-scope-one').element.checked).toBe(true);
+        expect(wrapper.find('[data-test="series-reschedule-preview"]').exists()).toBe(false);
+        expect(confirm().element.disabled).toBe(true);
+    });
+
+    it('desmontar descarta o debounce pendente', async () => {
+        await render();
+        await chooseFollowing();
+        wrapper.unmount();
+        wrapper = null;
+        await settlePreview();
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('URLs ausentes não provocam chamadas inventadas nem liberam confirmar', async () => {
+        await render({ ...anchor, reschedule_series_preview_url: null, reschedule_series_url: null });
+        await chooseFollowing();
+        await settlePreview();
+        expect(wrapper.get('[role="alert"]').text()).toBe(texts.series_reschedule_error);
+        expect(confirm().element.disabled).toBe(true);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('prévia vazia é tratada como falha e nunca libera o lote', async () => {
+        globalThis.fetch.mockImplementation(() => jsonResponse({ total: 0, sessions: [] }));
+        await render();
+        await chooseFollowing();
+        await settlePreview();
+        expect(confirm().element.disabled).toBe(true);
+        expect(wrapper.get('[role="alert"]').text()).toBe(texts.series_reschedule_error);
+    });
+
+    it('foco entra no diálogo ao abrir e retorna ao gatilho depois do dismiss', async () => {
+        focusTrigger = document.createElement('button');
+        document.body.append(focusTrigger);
+        focusTrigger.focus();
+        await render();
+        wrapper.get('#rescheduleModal').element.dispatchEvent(new Event('shown.bs.modal'));
+        await flushPromises();
+        expect(wrapper.get('#rescheduleModal').element.contains(document.activeElement)).toBe(true);
+        wrapper.get('#rescheduleModal').element.dispatchEvent(new Event('hidden.bs.modal'));
+        await flushPromises();
+        expect(document.activeElement).toBe(focusTrigger);
+    });
+});
+
+describe('Agenda — âncora depois de reagendar', () => {
+    it.each([
+        { anchor_id: 'new-series-anchor', new_schedule: { id: 'ignored-unitary' } },
+        { new_schedule: { id: 'new-unitary' } },
+    ])('mantém o drawer aberto no novo agendamento e atualiza lista e contadores: %j', async (result) => {
+        const { shallowMount } = await import('@vue/test-utils');
+        const { router } = await import('@inertiajs/vue3');
+        const reload = vi.spyOn(router, 'reload').mockImplementation(() => {});
+        const Index = (await import('@/Pages/Panel/Schedules/Index.vue')).default;
+        const success = vi.fn();
+        const oldToast = window.showSuccessToast;
+        window.showSuccessToast = success;
+        const wrapper = shallowMount(Index, {
+            props: { t: {}, filters: {} },
+            global: { mocks: { route: globalThis.route }, stubs: { AppLayout: { template: '<div><slot /></div>' } } },
+        });
+        try {
+            const drawer = wrapper.findComponent(ScheduleDetailDrawer);
+            const RescheduleModal = (await import('@/Pages/Panel/Schedules/RescheduleModal.vue')).default;
+            wrapper.vm.onView({ id: 'old-anchor' });
+            await flushPromises();
+            expect(drawer.props('scheduleId')).toBe('old-anchor');
+            wrapper.findComponent(RescheduleModal).vm.$emit('rescheduled', { ...result, message: 'Concluído' });
+            await flushPromises();
+            expect(drawer.props('open')).toBe(true);
+            expect(drawer.props('scheduleId')).toBe(result.anchor_id ?? result.new_schedule.id);
+            expect(router.reload).toHaveBeenCalledWith({ only: ['scheduleItems', 'counters'] });
+            expect(success).toHaveBeenCalledWith('Concluído');
+        } finally {
+            wrapper.unmount();
+            window.showSuccessToast = oldToast;
+            reload.mockRestore();
+        }
     });
 });

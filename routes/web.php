@@ -846,6 +846,10 @@ Route::group(
             Route::get('schedules/series/preview', [SchedulesController::class, 'seriesPreview'])->name('schedules.series.preview');
             Route::post('schedules/{schedule}/series/cancel-future', [SchedulesController::class, 'cancelSeriesFuture'])->name('schedules.series.cancel-future');
             Route::post('schedules/{schedule}/series/add-session', [SchedulesController::class, 'addSeriesSession'])->name('schedules.series.add-session');
+            // "Reagendar" a sessão e as seguintes da série: prévia (sem gravar; valida o lote inteiro, por isso com limite por
+            // usuário) e confirmação.
+            Route::get('schedules/{schedule}/series/reschedule-preview', [SchedulesController::class, 'seriesReschedulePreview'])->middleware('throttle:60,1')->name('schedules.series.reschedule-preview');
+            Route::post('schedules/{schedule}/series/reschedule', [SchedulesController::class, 'seriesReschedule'])->name('schedules.series.reschedule');
             // Impressão: agenda do dia (com os filtros da tela) e ficha do
             // paciente a partir do agendamento — ambas com log de acesso.
             Route::get('schedules/print', [SchedulePrintController::class, 'agenda'])->name('schedules.print');

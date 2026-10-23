@@ -34,14 +34,16 @@ class ScheduleService
      * Returns an array of human-readable error messages.
      * An empty array means the slot is fully valid.
      *
-     * @param string|null $excludeScheduleId UUID of the record being updated (skips self-conflict)
+     * @param array<int, string>|string|null $excludeScheduleId UUID(s) of the record(s) being updated (skips self-conflict); a
+     *                                                          lista serve à remarcação da série, em que a data nova de uma
+     *                                                          sessão pode ser a antiga de outra do mesmo lote
      *
      * @return string[]
      */
     /**
      * @param string[] $resourceIds
      */
-    public function validateSlot(string $doctorId, Carbon $dateTime, ?string $excludeScheduleId = null, array $resourceIds = []): array
+    public function validateSlot(string $doctorId, Carbon $dateTime, array|string|null $excludeScheduleId = null, array $resourceIds = []): array
     {
         $errors = [];
 
@@ -89,11 +91,13 @@ class ScheduleService
      * aqui é a mensagem antecipada do formulário; a conta que vale é a feita
      * sob lock na gravação (assertFitInCapacity).
      *
-     * @param string[] $resourceIds
+     * @param array<int, string>|string|null $excludeScheduleId
+     * @param string[]                       $resourceIds
+     * @param int                            $pendingFitIns     encaixes do mesmo turno que o chamador ainda vai gravar (prévia da série)
      *
      * @return string[]
      */
-    public function validateFitIn(string $doctorId, Carbon $dateTime, ?string $excludeScheduleId = null, array $resourceIds = []): array
+    public function validateFitIn(string $doctorId, Carbon $dateTime, array|string|null $excludeScheduleId = null, array $resourceIds = [], int $pendingFitIns = 0): array
     {
         if (! $this->isWithinWorkSchedule($doctorId, $dateTime)) {
             return [__('actions.work_schedule_outside', ['day' => $this->dayName($dateTime->dayOfWeek), 'time' => $dateTime->format('H:i')])];
@@ -109,7 +113,7 @@ class ScheduleService
             $errors[] = $surgery;
         }
 
-        if ($limitError = $this->fitInLimitError($doctorId, $dateTime, $excludeScheduleId)) {
+        if ($limitError = $this->fitInLimitError($doctorId, $dateTime, $excludeScheduleId, $pendingFitIns)) {
             $errors[] = $limitError;
         }
 
@@ -120,14 +124,15 @@ class ScheduleService
      * Regra do horário conforme o tipo: encaixe (validateFitIn) ou normal
      * (validateSlot). Ponto único para agendar, editar, remarcar, lote e série.
      *
-     * @param string[] $resourceIds
+     * @param array<int, string>|string|null $excludeScheduleId
+     * @param string[]                       $resourceIds
      *
      * @return string[]
      */
-    public function validateFor(bool $isFitIn, string $doctorId, Carbon $dateTime, ?string $excludeScheduleId = null, array $resourceIds = []): array
+    public function validateFor(bool $isFitIn, string $doctorId, Carbon $dateTime, array|string|null $excludeScheduleId = null, array $resourceIds = [], int $pendingFitIns = 0): array
     {
         return $isFitIn
-            ? $this->validateFitIn($doctorId, $dateTime, $excludeScheduleId, $resourceIds)
+            ? $this->validateFitIn($doctorId, $dateTime, $excludeScheduleId, $resourceIds, $pendingFitIns)
             : $this->validateSlot($doctorId, $dateTime, $excludeScheduleId, $resourceIds);
     }
 
@@ -183,7 +188,7 @@ class ScheduleService
      *
      * @throws ScheduleSlotUnavailableException teto atingido ou turno sem encaixe
      */
-    public function assertFitInCapacity(string $doctorId, Carbon $dateTime, ?string $excludeScheduleId = null): void
+    public function assertFitInCapacity(string $doctorId, Carbon $dateTime, array|string|null $excludeScheduleId = null): void
     {
         $this->lockFitInQuota($doctorId, $dateTime);
 
@@ -195,8 +200,12 @@ class ScheduleService
     /**
      * Mensagem do teto de encaixes (null = cabe). Conta os encaixes NÃO
      * cancelados do médico no mesmo dia e turno (faltou também ocupa a cota).
+     * `$pending` soma ao que já existe os encaixes que o chamador ainda vai gravar
+     * naquele turno (a prévia da série, que não grava nada).
+     *
+     * @param array<int, string>|string|null $excludeScheduleId
      */
-    public function fitInLimitError(string $doctorId, Carbon $dateTime, ?string $excludeScheduleId = null): ?string
+    public function fitInLimitError(string $doctorId, Carbon $dateTime, array|string|null $excludeScheduleId = null, int $pending = 0): ?string
     {
         $doctor = Doctor::query()->find($doctorId);
 
@@ -212,7 +221,7 @@ class ScheduleService
             return __('schedules.fit_in_not_accepted', ['shift' => $label]);
         }
 
-        if ($this->fitInCount($doctorId, $dateTime, $shift, $excludeScheduleId) >= $limit) {
+        if ($this->fitInCount($doctorId, $dateTime, $shift, $excludeScheduleId) + $pending >= $limit) {
             return trans_choice('schedules.fit_in_limit_reached', $limit, [
                 'limit' => $limit,
                 'shift' => $label,
@@ -223,8 +232,12 @@ class ScheduleService
         return null;
     }
 
-    /** Encaixes não cancelados do médico no turno do dia (sem o próprio, ao editar). */
-    public function fitInCount(string $doctorId, Carbon $dateTime, string $shift, ?string $excludeScheduleId = null): int
+    /**
+     * Encaixes não cancelados do médico no turno do dia (sem o próprio, ao editar).
+     *
+     * @param array<int, string>|string|null $excludeScheduleId
+     */
+    public function fitInCount(string $doctorId, Carbon $dateTime, string $shift, array|string|null $excludeScheduleId = null): int
     {
         [$start, $end] = ScheduleShift::bounds($dateTime, $shift);
 
@@ -234,7 +247,7 @@ class ScheduleService
             ->where('date_time', '>=', $start)
             ->where('date_time', '<', $end)
             ->where('situation', '!=', ScheduleSituation::Cancelled->value)
-            ->when($excludeScheduleId, fn ($q) => $q->where('id', '!=', $excludeScheduleId))
+            ->when($this->excludedIds($excludeScheduleId) !== [], fn ($q) => $q->whereNotIn('id', $this->excludedIds($excludeScheduleId)))
             ->count();
     }
 
@@ -270,6 +283,28 @@ class ScheduleService
         Doctor::query()->whereKey($doctorId)->lockForUpdate()->first();
     }
 
+    /**
+     * Trava, em ORDEM ESTÁVEL (médico, dia e turno), a cota de encaixe de cada (médico, horário) dado. Quem grava vários
+     * encaixes numa transação só (série criada pela Agenda, "Reagendar a série") chama isto ANTES do primeiro INSERT: o
+     * INSERT toma a trava do código SDL e os outros caminhos (reagendar, lote) seguem cota → código; travar uma cota depois
+     * do código entra em círculo com eles (40P01). Duas séries com cotas em comum travam na mesma ordem e só esperam.
+     *
+     * @param list<array{0: string, 1: Carbon}> $slots pares [médico, horário]
+     */
+    public function lockFitInQuotas(array $slots): void
+    {
+        $quotas = [];
+
+        foreach ($slots as [$doctorId, $dateTime]) {
+            $quotas[$doctorId . '|' . $dateTime->toDateString() . '|' . ScheduleShift::ofTime($dateTime)] = [$doctorId, $dateTime];
+        }
+        ksort($quotas, SORT_STRING);
+
+        foreach ($quotas as [$doctorId, $dateTime]) {
+            $this->lockFitInQuota($doctorId, $dateTime);
+        }
+    }
+
     /** Chave bigint estável da cota (60 bits do sha1, sempre positiva). */
     public static function fitInLockKey(string $doctorId, Carbon $dateTime): int
     {
@@ -289,7 +324,7 @@ class ScheduleService
      *
      * @return string[]
      */
-    public function resourceErrors(array $resourceIds, Carbon $dateTime, ?string $excludeScheduleId = null): array
+    public function resourceErrors(array $resourceIds, Carbon $dateTime, array|string|null $excludeScheduleId = null): array
     {
         $errors = [];
 
@@ -324,7 +359,7 @@ class ScheduleService
     /**
      * Checks if a resource is already reserved at the given datetime (by an active schedule).
      */
-    public function isResourceDoubleBooked(string $resourceId, Carbon $dateTime, ?string $excludeScheduleId): bool
+    public function isResourceDoubleBooked(string $resourceId, Carbon $dateTime, array|string|null $excludeScheduleId): bool
     {
         $query = DB::table('schedule_resources')
             ->join('schedules', 'schedules.id', '=', 'schedule_resources.schedule_id')
@@ -333,8 +368,8 @@ class ScheduleService
             ->whereNull('schedules.deleted_at')
             ->whereNotIn('schedules.situation', $this->terminalSituationValues());
 
-        if ($excludeScheduleId) {
-            $query->where('schedules.id', '!=', $excludeScheduleId);
+        if (($excluded = $this->excludedIds($excludeScheduleId)) !== []) {
+            $query->whereNotIn('schedules.id', $excluded);
         }
 
         return $query->exists();
@@ -1153,7 +1188,7 @@ class ScheduleService
         );
     }
 
-    private function isDoubleBooked(string $doctorId, Carbon $dateTime, ?string $excludeScheduleId): bool
+    private function isDoubleBooked(string $doctorId, Carbon $dateTime, array|string|null $excludeScheduleId): bool
     {
         // Encaixe e atendimento do pronto atendimento não ocupam o horário
         // (mesma regra do índice único): o horário normal continua livre para
@@ -1166,11 +1201,57 @@ class ScheduleService
             ->whereNull('origin')
             ->whereNotIn('situation', $this->terminalSituationValues());
 
-        if ($excludeScheduleId) {
-            $query->where('id', '!=', $excludeScheduleId);
+        if (($excluded = $this->excludedIds($excludeScheduleId)) !== []) {
+            $query->whereNotIn('id', $excluded);
         }
 
         return $query->exists();
+    }
+
+    /**
+     * Campos que o agendamento NOVO herda do antigo ao remarcar (uma sessão ou a série): o paciente, o convênio, o tipo e
+     * os contatos ficam; a situação volta a Agendado; a sessão continua na série ("3/10") e no caso cirúrgico. `origin`
+     * não é copiado (o remarcado vira agendamento normal) nem a recorrência. Ponto único dos dois caminhos.
+     *
+     * @return array<string, mixed>
+     */
+    public function rescheduleAttributes(Schedule $old, string $doctorId, Carbon $dateTime, bool $isFitIn): array
+    {
+        return [
+            'entity_id'          => $old->entity_id,
+            'doctor_id'          => $doctorId,
+            'patient_id'         => $old->patient_id,
+            'covenant_id'        => $old->covenant_id,
+            'visit_id'           => $old->visit_id,
+            'attendance_type'    => $old->attendance_type,
+            'specialty_area'     => $old->specialty_area,
+            'full_name'          => $old->full_name,
+            'date_time'          => $dateTime,
+            'telephone'          => $old->telephone,
+            'cellphone'          => $old->cellphone,
+            'cellphone_whatsapp' => (bool) $old->cellphone_whatsapp,
+            'notes'              => $old->notes,
+            'situation'          => ScheduleSituation::Scheduled->value,
+            'is_fit_in'          => $isFitIn,
+            'series_id'          => $old->series_id,
+            'session_number'     => $old->session_number,
+            'session_total'      => $old->session_total,
+            // Retorno de uma cirurgia continua sendo dela: o agendamento novo herda o caso.
+            'surgical_case_id' => $old->surgical_case_id,
+            'active'           => true,
+        ];
+    }
+
+    /**
+     * Ids a ignorar nas conferências de conflito: um id (edição/remarcação), vários (remarcação da série) ou nenhum.
+     *
+     * @param array<int, string>|string|null $ids
+     *
+     * @return list<string>
+     */
+    private function excludedIds(array|string|null $ids): array
+    {
+        return array_values(array_filter(array_map('strval', (array) $ids), fn (string $id) => $id !== ''));
     }
 
     private function dayName(int $dayOfWeek): string

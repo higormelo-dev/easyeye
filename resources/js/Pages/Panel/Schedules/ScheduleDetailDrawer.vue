@@ -71,6 +71,10 @@ function rescheduleSession(session) {
         doctor_id: session.doctor_id,
         is_fit_in: session.is_fit_in,
         reschedule_url: session.reschedule_url,
+        series_id: session.series_id,
+        series_future_count: session.series_future_count,
+        reschedule_series_url: session.reschedule_series_url,
+        reschedule_series_preview_url: session.reschedule_series_preview_url,
     });
 }
 
