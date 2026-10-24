@@ -23,7 +23,7 @@ class EloquentAiRunProviderCallStore implements AiRunProviderCallStoreInterface
         ?AiProviderResponseData $response = null,
         ?string $errorMessage = null,
         array $metadata = [],
-        ?int $normalizedCredits = null,
+        ?int $normalizedChargeCents = null,
     ): void {
         $provider = $response?->provider?->value ?? (string) ($metadata['provider'] ?? 'unknown');
 
@@ -42,12 +42,12 @@ class EloquentAiRunProviderCallStore implements AiRunProviderCallStoreInterface
             'raw_cost_usd' => $status === 'success' && $response !== null
                 ? $this->pricingService->resolveCostUsdForResponse($response)
                 : $response?->usage->rawCostUsd,
-            'normalized_credits' => $normalizedCredits,
-            'latency_ms'         => $response?->latencyMs,
-            'request_hash'       => $response?->requestHash,
-            'response_hash'      => $response?->responseHash,
-            'metadata'           => $metadata,
-            'error_message'      => $errorMessage,
+            'normalized_charge_cents' => $normalizedChargeCents,
+            'latency_ms'              => $response?->latencyMs,
+            'request_hash'            => $response?->requestHash,
+            'response_hash'           => $response?->responseHash,
+            'metadata'                => $metadata,
+            'error_message'           => $errorMessage,
         ]);
     }
 }

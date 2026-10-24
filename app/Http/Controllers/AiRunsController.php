@@ -107,11 +107,11 @@ class AiRunsController extends Controller
         $monthStart = $now->copy()->startOfMonth();
         $monthEnd   = $now->copy()->endOfMonth();
 
-        $monthConsumedCredits = (int) AiRun::query()
+        $monthConsumedCharge = (int) AiRun::query()
             ->where('entity_id', $entityId)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->whereIn('status', [AiRunStatus::Approved->value, AiRunStatus::WaitingApproval->value])
-            ->sum('consumed_credits');
+            ->sum('consumed_charge_cents');
 
         $monthRunsTotal = (int) AiRun::query()
             ->where('entity_id', $entityId)
@@ -121,14 +121,14 @@ class AiRunsController extends Controller
         $byWorkflow = AiRun::query()
             ->where('entity_id', $entityId)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
-            ->selectRaw('workflow, count(*) as runs_count, sum(consumed_credits) as credits_total')
+            ->selectRaw('workflow, count(*) as runs_count, sum(consumed_charge_cents) as charge_cents_total')
             ->groupBy('workflow')
             ->orderByDesc('runs_count')
             ->get()
             ->map(fn ($row) => [
-                'workflow'      => (string) $row->workflow,
-                'runs_count'    => (int) $row->runs_count,
-                'credits_total' => (int) $row->credits_total,
+                'workflow'           => (string) $row->workflow,
+                'runs_count'         => (int) $row->runs_count,
+                'charge_cents_total' => (int) $row->charge_cents_total,
             ])->all();
 
         $byMode = AiRun::query()
@@ -162,16 +162,16 @@ class AiRunsController extends Controller
             ->where('entity_id', $entityId)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->with(['patient.person:id,full_name', 'requestedBy:id,name'])
-            ->orderByDesc('consumed_credits')
+            ->orderByDesc('consumed_charge_cents')
             ->limit(5)
             ->get()
             ->map(fn (AiRun $r) => [
-                'id'               => $r->id,
-                'workflow'         => (string) $r->workflow,
-                'consumed_credits' => (int) $r->consumed_credits,
-                'patient'          => $r->patient?->person?->full_name ?? $r->patient?->code,
-                'requested_by'     => $r->requestedBy?->name,
-                'created_at'       => $r->created_at?->format('d/m/Y H:i'),
+                'id'                    => $r->id,
+                'workflow'              => (string) $r->workflow,
+                'consumed_charge_cents' => (int) $r->consumed_charge_cents,
+                'patient'               => $r->patient?->person?->full_name ?? $r->patient?->code,
+                'requested_by'          => $r->requestedBy?->name,
+                'created_at'            => $r->created_at?->format('d/m/Y H:i'),
             ])->all();
 
         return Inertia::render('Panel/AI/Index', [
@@ -189,11 +189,11 @@ class AiRunsController extends Controller
                     'end'   => $monthEnd->format('d/m/Y'),
                     'label' => $monthStart->locale('pt_BR')->isoFormat('MMMM/YYYY'),
                 ],
-                'plan_quota' => $quotaSnap['monthly_quota'],
-                'quota'      => $quotaSnap,
-                'consumed'   => [
-                    'credits' => $monthConsumedCredits,
-                    'runs'    => $monthRunsTotal,
+                'plan_quota_cents' => $quotaSnap['monthly_quota_cents'],
+                'quota'            => $quotaSnap,
+                'consumed'         => [
+                    'charge_cents' => $monthConsumedCharge,
+                    'runs'         => $monthRunsTotal,
                 ],
                 'by_workflow' => $byWorkflow,
                 'by_mode'     => $byMode,
@@ -205,28 +205,28 @@ class AiRunsController extends Controller
                 ],
                 'top_runs' => $topRuns,
                 // Onda 3, P4 — métricas operacionais
-                'by_doctor'                => $this->analyticsService->byDoctor($entityId, $monthStart, $monthEnd),
-                'avg_approve_time_seconds' => $this->analyticsService->averageApproveSeconds($entityId, $monthStart, $monthEnd),
-                'avg_cost_per_record'      => $this->analyticsService->averageCostPerRecord($entityId, $monthStart, $monthEnd),
+                'by_doctor'                   => $this->analyticsService->byDoctor($entityId, $monthStart, $monthEnd),
+                'avg_approve_time_seconds'    => $this->analyticsService->averageApproveSeconds($entityId, $monthStart, $monthEnd),
+                'avg_charge_cents_per_record' => $this->analyticsService->averageChargeCentsPerRecord($entityId, $monthStart, $monthEnd),
             ],
             'runs' => $runs->through(function (AiRun $run): array {
                 return [
-                    'id'                   => $run->id,
-                    'workflow'             => $run->workflow,
-                    'mode'                 => $run->mode?->value,
-                    'risk_level'           => $run->risk_level?->value,
-                    'status'               => $run->status?->value,
-                    'estimated_credits'    => (int) $run->estimated_credits,
-                    'reserved_credits'     => (int) $run->reserved_credits,
-                    'consumed_credits'     => (int) $run->consumed_credits,
-                    'requested_by'         => $run->requestedBy?->name,
-                    'approved_by'          => $run->approvedBy?->name,
-                    'patient'              => $run->patient?->person?->full_name ?? $run->patient?->code,
-                    'medical_record_code'  => $run->medicalRecord?->code,
-                    'provider_calls_count' => (int) $run->provider_calls_count,
-                    'created_at'           => $run->created_at?->format('d/m/Y H:i'),
-                    'approved_at'          => $run->approved_at?->format('d/m/Y H:i'),
-                    'rejected_at'          => $run->rejected_at?->format('d/m/Y H:i'),
+                    'id'                     => $run->id,
+                    'workflow'               => $run->workflow,
+                    'mode'                   => $run->mode?->value,
+                    'risk_level'             => $run->risk_level?->value,
+                    'status'                 => $run->status?->value,
+                    'estimated_charge_cents' => (int) $run->estimated_charge_cents,
+                    'reserved_charge_cents'  => (int) $run->reserved_charge_cents,
+                    'consumed_charge_cents'  => (int) $run->consumed_charge_cents,
+                    'requested_by'           => $run->requestedBy?->name,
+                    'approved_by'            => $run->approvedBy?->name,
+                    'patient'                => $run->patient?->person?->full_name ?? $run->patient?->code,
+                    'medical_record_code'    => $run->medicalRecord?->code,
+                    'provider_calls_count'   => (int) $run->provider_calls_count,
+                    'created_at'             => $run->created_at?->format('d/m/Y H:i'),
+                    'approved_at'            => $run->approved_at?->format('d/m/Y H:i'),
+                    'rejected_at'            => $run->rejected_at?->format('d/m/Y H:i'),
                     // Onda 4, C3 — badge "↩ Reanálise" no dashboard
                     'is_escalation' => $run->parent_run_id !== null,
                 ];
@@ -330,23 +330,23 @@ class AiRunsController extends Controller
             'elapsed_ms'       => $aiRun->started_at
                 ? max(0, (int) abs(now()->diffInMilliseconds($aiRun->started_at)))
                 : null,
-            'cancelled_at'        => $aiRun->cancelled_at?->format('d/m/Y H:i'),
-            'estimated_credits'   => (int) $aiRun->estimated_credits,
-            'reserved_credits'    => (int) $aiRun->reserved_credits,
-            'consumed_credits'    => (int) $aiRun->consumed_credits,
-            'input_summary'       => $aiRun->input_summary ?? [],
-            'final_output'        => $aiRun->final_output,
-            'safety_notes'        => $aiRun->safety_notes ?? [],
-            'error_message'       => $aiRun->error_message,
-            'patient'             => $aiRun->patient?->person?->full_name ?? $aiRun->patient?->code,
-            'medical_record_code' => $aiRun->medicalRecord?->code,
-            'exam_context'        => $examContext,
-            'analysis_summary'    => $aiRun->input_summary['user_prompt'] ?? null,
-            'requested_by'        => $aiRun->requestedBy?->name,
-            'approved_by'         => $aiRun->approvedBy?->name,
-            'approved_at'         => $aiRun->approved_at?->format('d/m/Y H:i'),
-            'rejected_at'         => $aiRun->rejected_at?->format('d/m/Y H:i'),
-            'provider_calls'      => $aiRun->providerCalls->map(function ($call): array {
+            'cancelled_at'           => $aiRun->cancelled_at?->format('d/m/Y H:i'),
+            'estimated_charge_cents' => (int) $aiRun->estimated_charge_cents,
+            'reserved_charge_cents'  => (int) $aiRun->reserved_charge_cents,
+            'consumed_charge_cents'  => (int) $aiRun->consumed_charge_cents,
+            'input_summary'          => $aiRun->input_summary ?? [],
+            'final_output'           => $aiRun->final_output,
+            'safety_notes'           => $aiRun->safety_notes ?? [],
+            'error_message'          => $aiRun->error_message,
+            'patient'                => $aiRun->patient?->person?->full_name ?? $aiRun->patient?->code,
+            'medical_record_code'    => $aiRun->medicalRecord?->code,
+            'exam_context'           => $examContext,
+            'analysis_summary'       => $aiRun->input_summary['user_prompt'] ?? null,
+            'requested_by'           => $aiRun->requestedBy?->name,
+            'approved_by'            => $aiRun->approvedBy?->name,
+            'approved_at'            => $aiRun->approved_at?->format('d/m/Y H:i'),
+            'rejected_at'            => $aiRun->rejected_at?->format('d/m/Y H:i'),
+            'provider_calls'         => $aiRun->providerCalls->map(function ($call): array {
                 return [
                     'id'         => $call->id,
                     'role'       => $call->role?->value,
@@ -383,19 +383,19 @@ class AiRunsController extends Controller
             ])
             ->orderByDesc('created_at')
             ->limit(5)
-            ->get(['id', 'workflow', 'mode', 'status', 'final_output', 'created_at', 'consumed_credits', 'parent_run_id']);
+            ->get(['id', 'workflow', 'mode', 'status', 'final_output', 'created_at', 'consumed_charge_cents', 'parent_run_id']);
 
         return response()->json([
             'data' => $runs->map(fn (AiRun $run): array => [
-                'id'               => (string) $run->id,
-                'workflow'         => (string) $run->workflow,
-                'workflow_label'   => __('ai.workflow_' . $run->workflow),
-                'mode'             => $run->mode?->value,
-                'status'           => $run->status?->value,
-                'created_at'       => $run->created_at?->format('d/m/Y H:i'),
-                'consumed_credits' => (int) $run->consumed_credits,
-                'preview'          => mb_substr((string) $run->final_output, 0, 140),
-                'final_output'     => (string) $run->final_output,
+                'id'                    => (string) $run->id,
+                'workflow'              => (string) $run->workflow,
+                'workflow_label'        => __('ai.workflow_' . $run->workflow),
+                'mode'                  => $run->mode?->value,
+                'status'                => $run->status?->value,
+                'created_at'            => $run->created_at?->format('d/m/Y H:i'),
+                'consumed_charge_cents' => (int) $run->consumed_charge_cents,
+                'preview'               => mb_substr((string) $run->final_output, 0, 140),
+                'final_output'          => (string) $run->final_output,
                 // Onda 4, C3 — badge "↩ Reanálise" no histórico do paciente
                 'is_escalation' => $run->parent_run_id !== null,
                 'parent_run_id' => $run->parent_run_id ? (string) $run->parent_run_id : null,
@@ -511,10 +511,8 @@ class AiRunsController extends Controller
                     'risk_level'        => $payload['risk_level'],
                     'conversation_id'   => $payload['conversation_id'] ?? null,
                     'status'            => AiRunStatus::Pending->value,
-                    'estimated_credits' => $estimate->normalizedCredits,
-                    'reserved_credits'  => 0,
-                    'consumed_credits'  => 0,
-                    'input_summary'     => [
+                    ...$estimate->runPricingAttributes(),
+                    'input_summary' => [
                         'user_prompt'   => $payload['user_prompt'],
                         'system_prompt' => $payload['system_prompt'] ?? null,
                         // record_assist single-field: escalate re-deriva o
@@ -549,10 +547,10 @@ class AiRunsController extends Controller
 
                 $this->walletService->reserve(
                     entityId: $entityId,
-                    amount: $estimate->normalizedCredits,
+                    amount: $estimate->chargeCents,
                     aiRunId: (string) $run->id,
                     subscriptionId: $subscriptionId,
-                    description: 'Reserva de créditos para execução de IA.',
+                    description: 'Reserva de saldo para execução de IA.',
                     idempotencyKey: "ai-run:{$run->id}:reserve",
                     createdBy: (string) auth()->id(),
                     metadata: [
@@ -562,8 +560,8 @@ class AiRunsController extends Controller
                 );
 
                 $run->update([
-                    'status'           => AiRunStatus::Reserved->value,
-                    'reserved_credits' => $estimate->normalizedCredits,
+                    'status'                => AiRunStatus::Reserved->value,
+                    'reserved_charge_cents' => $estimate->chargeCents,
                 ]);
 
                 return $run->fresh();
@@ -937,10 +935,8 @@ class AiRunsController extends Controller
                     'mode'              => $payload['mode'],
                     'risk_level'        => $payload['risk_level'],
                     'status'            => AiRunStatus::Pending->value,
-                    'estimated_credits' => $estimate->normalizedCredits,
-                    'reserved_credits'  => 0,
-                    'consumed_credits'  => 0,
-                    'input_summary'     => [
+                    ...$estimate->runPricingAttributes(),
+                    'input_summary' => [
                         'user_prompt'       => $payload['user_prompt'],
                         'system_prompt'     => $payload['system_prompt'],
                         'field'             => $payload['field'],
@@ -970,7 +966,7 @@ class AiRunsController extends Controller
 
                 $this->walletService->reserve(
                     entityId: $entityId,
-                    amount: $estimate->normalizedCredits,
+                    amount: $estimate->chargeCents,
                     aiRunId: (string) $run->id,
                     subscriptionId: $subscriptionId,
                     description: 'Reserva de créditos para reanálise (escalate).',
@@ -984,8 +980,8 @@ class AiRunsController extends Controller
                 );
 
                 $run->update([
-                    'status'           => AiRunStatus::Reserved->value,
-                    'reserved_credits' => $estimate->normalizedCredits,
+                    'status'                => AiRunStatus::Reserved->value,
+                    'reserved_charge_cents' => $estimate->chargeCents,
                 ]);
 
                 return $run->fresh();
@@ -1252,6 +1248,8 @@ class AiRunsController extends Controller
     {
         return [
             'title'                       => __('ai.title'),
+            'balance_consumed'            => __('ai.balance_consumed'),
+            'top_balance_runs'            => __('ai.top_balance_runs'),
             'subtitle'                    => __('ai.subtitle'),
             'support_notice'              => __('ai.support_notice'),
             'estimate'                    => __('ai.estimate'),
@@ -1300,7 +1298,6 @@ class AiRunsController extends Controller
             'clinical_prompt'             => __('ai.clinical_prompt'),
             'clinical_prompt_placeholder' => __('ai.clinical_prompt_placeholder'),
             'estimated_credits'           => __('ai.estimated_credits'),
-            'raw_cost_usd'                => __('ai.raw_cost_usd'),
             'runs'                        => __('ai.runs'),
             'all_statuses'                => __('ai.all_statuses'),
             'date'                        => __('ai.date'),
@@ -1346,12 +1343,13 @@ class AiRunsController extends Controller
             'message' => __('ai.insufficient_credits'),
             'code'    => AiPaywallService::CODE,
             'details' => [
-                'requested' => $e->requested,
-                'available' => $e->available,
+                'requested_cents' => $e->requestedCents,
+                'available_cents' => $e->availableCents,
+                'missing_cents'   => $e->missingCents(),
             ],
-            // Com o pedido e o saldo: ainda há créditos, só que menos do que
+            // Com o pedido e o saldo: ainda há saldo, só que menos do que
             // a execução pede, a mensagem diz quanto falta (não que acabou).
-            'paywall' => $this->paywall->describe($entityId, requested: $e->requested, available: $e->available),
+            'paywall' => $this->paywall->describe($entityId, requestedCents: $e->requestedCents, availableCents: $e->availableCents),
         ], 422);
     }
 

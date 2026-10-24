@@ -45,11 +45,6 @@ function workflowLabel(w) {
     return workflowLabels.value?.[w] ?? w;
 }
 
-const PROVIDER_LABEL = { openai: 'ChatGPT', anthropic: 'Claude', gemini: 'Gemini' };
-function providerLabel(code) {
-    return PROVIDER_LABEL[code] ?? (code || '');
-}
-
 // ── Contexto ────────────────────────────────────────────────────────────────
 const examIds = computed(() => (Array.isArray(props.context?.exam_ids) ? props.context.exam_ids : []));
 const isImageFlow = computed(() => (props.context?.workflow_default ?? '') === 'eye_image_analysis');
@@ -101,7 +96,7 @@ const ETA_BY_MODE = { economy: 10, validated: 25, consensus: 45 };
 const etaSeconds = computed(() => ETA_BY_MODE[mode.value] ?? 25);
 
 // ── F6 — Franquia mensal (carteira) ─────────────────────────────────────────
-const { date: formatDate, number: formatNumber } = useLocaleFormat();
+const { date: formatDate, moneyCents: formatAiAmount } = useLocaleFormat();
 const quota = computed(() => props.ai?.quota ?? {});
 // Renovação só para quem ganha franquia (em atraso, condicionada ao
 // pagamento); cota que sobrou (ex.: virou cortesia) mostra até quando vale,
@@ -131,18 +126,20 @@ const quotaAlertText = computed(() => {
     return tpl.replace(':percent', quotaPercent.value);
 });
 // Saldo de créditos avulsos (comprados/cortesia) — separado da franquia.
-// balance.balance = avulso; balance.available = franquia restante + avulso.
-const purchasedCredits = computed(() => Number(quota.value?.purchased_balance ?? props.ai?.balance?.balance ?? 0));
+// balance.balance = avulso; balance.available_cents = franquia restante + avulso.
+const purchasedCredits = computed(() =>
+    Number(quota.value?.purchased_balance_cents ?? props.ai?.balance?.balance_cents ?? 0),
+);
 // Créditos que a carteira ainda libera (mesma conta da reserva no backend).
 const availableCredits = computed(() => {
-    const value = props.ai?.balance?.available ?? quota.value?.available;
+    const value = props.ai?.balance?.available_cents ?? quota.value?.available_cents;
     return value === undefined || value === null ? null : Number(value);
 });
 
 // Cota mensal totalmente consumida (consumed >= quota), independente de avulso.
 const quotaFullyUsed = computed(() => {
-    const q = Number(quota.value?.monthly_quota ?? 0);
-    const c = Number(quota.value?.consumed_credits ?? 0);
+    const q = Number(quota.value?.monthly_quota_cents ?? 0);
+    const c = Number(quota.value?.monthly_quota_used_cents ?? 0);
     return q > 0 && c >= q;
 });
 
@@ -158,16 +155,16 @@ const usingPurchasedCredits = computed(() => quotaFullyUsed.value && purchasedCr
 const quotaExhaustedText = computed(() => {
     const tpl = lbl('quota_exhausted', '');
     return tpl
-        .replace(':consumed', formatNumber(quota.value?.consumed_credits ?? 0))
-        .replace(':quota', formatNumber(quota.value?.monthly_quota ?? 0));
+        .replace(':consumed', formatAiAmount(quota.value?.monthly_quota_used_cents ?? 0))
+        .replace(':quota', formatAiAmount(quota.value?.monthly_quota_cents ?? 0));
 });
 
 const usingPurchasedText = computed(() => {
     const tpl = lbl('quota_spillover', '');
     return tpl
-        .replace(':consumed', formatNumber(quota.value?.consumed_credits ?? 0))
-        .replace(':quota', formatNumber(quota.value?.monthly_quota ?? 0))
-        .replace(':available', formatNumber(purchasedCredits.value));
+        .replace(':consumed', formatAiAmount(quota.value?.monthly_quota_used_cents ?? 0))
+        .replace(':quota', formatAiAmount(quota.value?.monthly_quota_cents ?? 0))
+        .replace(':available', formatAiAmount(purchasedCredits.value));
 });
 
 // ── Estado do run ───────────────────────────────────────────────────────────
@@ -1091,16 +1088,16 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                 <!-- F6 — Saldo + progress ring de cota -->
                 <div class="d-flex flex-wrap align-items-center gap-3 small text-muted">
                     <span
-                        ><strong>{{ formatNumber(balance.available) }}</strong>
-                        {{ lbl('credits_available', 'Créditos disponíveis') }}</span
+                        ><strong>{{ formatAiAmount(balance.available_cents) }}</strong>
+                        {{ lbl('credits_available', 'Saldo de IA disponível') }}</span
                     >
                     <div
-                        v-if="quota.monthly_quota > 0"
+                        v-if="quota.monthly_quota_cents > 0"
                         class="d-flex align-items-center gap-2"
                         :title="
                             lbl('quota_used', '')
-                                .replace(':consumed', formatNumber(quota.consumed_credits))
-                                .replace(':quota', formatNumber(quota.monthly_quota))
+                                .replace(':consumed', formatAiAmount(quota.monthly_quota_used_cents))
+                                .replace(':quota', formatAiAmount(quota.monthly_quota_cents))
                                 .replace(':percent', quotaPercent ?? 0)
                         "
                     >

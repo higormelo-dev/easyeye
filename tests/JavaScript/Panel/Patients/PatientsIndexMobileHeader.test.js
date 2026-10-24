@@ -30,4 +30,16 @@ describe('Pacientes: cabeçalho sem rolagem lateral no celular', () => {
         expect(actions.text()).toContain('Novo paciente');
         expect(header.text()).toContain('Total: 3');
     });
+
+    it('é uma região de densidade padrão: alternador, busca e botões seguem a densidade, sem medida local', () => {
+        const wrapper = mount(PatientsIndex, {
+            props: { patients: { data: [], links: [], total: 3 } },
+            global: { mocks: { route: globalThis.route } },
+        });
+        const page = wrapper.get('.page-patients');
+
+        expect(page.attributes('data-ee-density')).toBe('default');
+        expect(page.find('.page-header-toggle').exists()).toBe(true);
+        expect(page.html()).not.toMatch(/\b(btn-sm|btn-md|fs-13|input-group-sm)\b/);
+    });
 });

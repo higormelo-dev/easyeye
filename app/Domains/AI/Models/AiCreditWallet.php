@@ -14,20 +14,22 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 /**
- * Carteira de créditos IA — modelo unificado com cota mensal + saldo comprado.
+ * Carteira de saldo de IA em CENTAVOS de BRL — modelo unificado com cota mensal + saldo comprado.
+ *
+ * Todas as colunas de valor são `*_cents` (inteiros). As colunas antigas (`balance`, `monthly_quota`... em "créditos") ficam
+ * congeladas só para auditoria da conversão (ver `legacy_conversion`); o código novo nunca as lê nem escreve.
  *
  * Conceitos:
- *   - balance              : créditos COMPRADOS que NUNCA expiram (acumulam).
- *   - reserved_balance     : porção de balance reservada em execuções em curso.
- *   - monthly_quota        : franquia mensal do plano (só cobrança automática paga), expira no fim da janela (use-or-lose).
- *   - monthly_quota_used   : quanto da cota foi consumido nesta janela.
- *   - quota_period_ends_at : fim da janela mensal (ver AiQuotaWindow) — a próxima vem da leitura da carteira (reserva/medidor) ou do ai:grant-monthly-quotas.
+ *   - balance_cents                : saldo COMPRADO que NUNCA expira (acumula).
+ *   - reserved_balance_cents       : porção do saldo comprado reservada em execuções em curso.
+ *   - monthly_quota_cents          : franquia mensal do plano (só cobrança automática paga), expira no fim da janela (use-or-lose).
+ *   - monthly_quota_used_cents     : quanto da cota foi consumido nesta janela.
+ *   - quota_period_ends_at         : fim da janela mensal (ver AiQuotaWindow).
  *
- * Política de consumo: consome COTA primeiro (que vai expirar), só depois desconta do balance.
+ * Política de consumo: consome a COTA primeiro (que vai expirar), só depois desconta do saldo comprado.
  *
- * Tracking por provedor (analítico): lifetime_consumed_openai/anthropic/gemini
- * registra quanto cada provedor consumiu historicamente — usado em dashboards.
- * NÃO há saldo separado por provedor — o cliente vê 1 saldo total.
+ * Tracking por provedor (analítico): lifetime_consumed_{openai,anthropic,gemini}_cents. NÃO há saldo separado por
+ * provedor — o cliente vê 1 saldo total.
  */
 class AiCreditWallet extends Model
 {
@@ -40,37 +42,40 @@ class AiCreditWallet extends Model
     protected $fillable = [
         'entity_id',
         // Saldo comprado (acumula)
-        'balance',
-        'reserved_balance',
-        'lifetime_purchased',
-        'lifetime_consumed',
+        'balance_cents',
+        'reserved_balance_cents',
+        'lifetime_purchased_cents',
+        'lifetime_consumed_cents',
         // Cota mensal (expira)
-        'monthly_quota',
-        'monthly_quota_used',
+        'monthly_quota_cents',
+        'monthly_quota_used_cents',
         'quota_period_ends_at',
-        'monthly_quota_lifetime_granted',
+        'monthly_quota_lifetime_granted_cents',
         // Tracking analítico por provedor (consumo histórico)
-        'lifetime_consumed_openai',
-        'lifetime_consumed_anthropic',
-        'lifetime_consumed_gemini',
+        'lifetime_consumed_openai_cents',
+        'lifetime_consumed_anthropic_cents',
+        'lifetime_consumed_gemini_cents',
+        // Trilha da conversão de créditos antigos para centavos
+        'legacy_conversion',
     ];
 
     protected function casts(): array
     {
         return [
-            'balance'                        => 'integer',
-            'reserved_balance'               => 'integer',
-            'lifetime_purchased'             => 'integer',
-            'lifetime_consumed'              => 'integer',
-            'monthly_quota'                  => 'integer',
-            'monthly_quota_used'             => 'integer',
-            'quota_period_ends_at'           => 'datetime',
-            'monthly_quota_lifetime_granted' => 'integer',
-            'lifetime_consumed_openai'       => 'integer',
-            'lifetime_consumed_anthropic'    => 'integer',
-            'lifetime_consumed_gemini'       => 'integer',
-            'created_at'                     => 'datetime',
-            'updated_at'                     => 'datetime',
+            'balance_cents'                        => 'integer',
+            'reserved_balance_cents'               => 'integer',
+            'lifetime_purchased_cents'             => 'integer',
+            'lifetime_consumed_cents'              => 'integer',
+            'monthly_quota_cents'                  => 'integer',
+            'monthly_quota_used_cents'             => 'integer',
+            'quota_period_ends_at'                 => 'datetime',
+            'monthly_quota_lifetime_granted_cents' => 'integer',
+            'lifetime_consumed_openai_cents'       => 'integer',
+            'lifetime_consumed_anthropic_cents'    => 'integer',
+            'lifetime_consumed_gemini_cents'       => 'integer',
+            'legacy_conversion'                    => 'array',
+            'created_at'                           => 'datetime',
+            'updated_at'                           => 'datetime',
         ];
     }
 
@@ -96,7 +101,7 @@ class AiCreditWallet extends Model
             return 0;
         }
 
-        return max(0, $this->monthly_quota - $this->monthly_quota_used);
+        return max(0, (int) $this->monthly_quota_cents - (int) $this->monthly_quota_used_cents);
     }
 
     public function quotaExpired(): bool
@@ -111,7 +116,7 @@ class AiCreditWallet extends Model
      */
     public function quotaLastDay(): ?string
     {
-        if ($this->quota_period_ends_at === null || $this->quotaExpired() || (int) $this->monthly_quota <= 0) {
+        if ($this->quota_period_ends_at === null || $this->quotaExpired() || (int) $this->monthly_quota_cents <= 0) {
             return null;
         }
 
@@ -119,18 +124,18 @@ class AiCreditWallet extends Model
     }
 
     /**
-     * Saldo total disponível para uso = cota restante + balance comprado.
+     * Saldo total disponível para uso (centavos) = cota restante + saldo comprado.
      */
     public function totalAvailable(): int
     {
-        return $this->quotaRemaining() + (int) $this->balance;
+        return $this->quotaRemaining() + (int) $this->balance_cents;
     }
 
     // ── Helpers de tracking por provedor ─────────────────────────────────────
 
     public function lifetimeConsumedFor(AiProvider $provider): int
     {
-        return (int) $this->{"lifetime_consumed_{$provider->value}"};
+        return (int) $this->{"lifetime_consumed_{$provider->value}_cents"};
     }
 
     protected static function newFactory(): AiCreditWalletFactory

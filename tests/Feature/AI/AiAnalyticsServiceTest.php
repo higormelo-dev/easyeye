@@ -53,19 +53,19 @@ function makeAnalyticsRun($test, User $approver, int $consumed, ?int $approveAft
     $approvedAt = $approveAfterSec !== null ? $createdAt->copy()->addSeconds($approveAfterSec) : null;
 
     $run = AiRun::query()->create([
-        'entity_id'         => $test->entity->id,
-        'patient_id'        => $test->patient->id,
-        'medical_record_id' => $recordId ?? $test->record1->id,
-        'requested_by'      => $test->user->id,
-        'approved_by'       => $approver->id,
-        'workflow'          => 'record_assist',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::Approved->value,
-        'estimated_credits' => $consumed,
-        'reserved_credits'  => $consumed,
-        'consumed_credits'  => $consumed,
-        'approved_at'       => $approvedAt,
+        'entity_id'              => $test->entity->id,
+        'patient_id'             => $test->patient->id,
+        'medical_record_id'      => $recordId ?? $test->record1->id,
+        'requested_by'           => $test->user->id,
+        'approved_by'            => $approver->id,
+        'workflow'               => 'record_assist',
+        'mode'                   => AiRunMode::Validated->value,
+        'risk_level'             => AiRiskLevel::Medium->value,
+        'status'                 => AiRunStatus::Approved->value,
+        'estimated_charge_cents' => $consumed,
+        'reserved_charge_cents'  => $consumed,
+        'consumed_charge_cents'  => $consumed,
+        'approved_at'            => $approvedAt,
     ]);
 
     $run->forceFill(['created_at' => $createdAt])->save();
@@ -73,7 +73,7 @@ function makeAnalyticsRun($test, User $approver, int $consumed, ?int $approveAft
     return $run;
 }
 
-it('byDoctor agrupa por médico aprovador e calcula avg de créditos', function () {
+it('byDoctor agrupa por médico aprovador e calcula avg em centavos', function () {
     makeAnalyticsRun($this, $this->user, 10, 30);
     makeAnalyticsRun($this, $this->user, 20, 60);
     makeAnalyticsRun($this, $this->userOther, 50, 120);
@@ -86,9 +86,9 @@ it('byDoctor agrupa por médico aprovador e calcula avg de créditos', function 
     $ana   = collect($rows)->firstWhere('doctor_name', 'DR. ANA');
 
     expect($mario['approved'])->toBe(2)
-        ->and($mario['avg_credits'])->toBe(15.0)
+        ->and($mario['avg_charge_cents'])->toBe(15.0)
         ->and($ana['approved'])->toBe(1)
-        ->and($ana['avg_credits'])->toBe(50.0);
+        ->and($ana['avg_charge_cents'])->toBe(50.0);
 });
 
 it('byDoctor ordena descendente por número de aprovados', function () {
@@ -127,14 +127,14 @@ it('averageApproveSeconds retorna null sem runs aprovados', function () {
     expect($avg)->toBeNull();
 });
 
-it('averageCostPerRecord soma créditos por record e calcula média entre records', function () {
+it('averageCostPerRecord soma centavos por record e calcula média entre records', function () {
     // record1: 10 + 20 = 30
     makeAnalyticsRun($this, $this->user, 10, recordId: $this->record1->id);
     makeAnalyticsRun($this, $this->user, 20, recordId: $this->record1->id);
     // record2: 50
     makeAnalyticsRun($this, $this->user, 50, recordId: $this->record2->id);
 
-    $avg = $this->service->averageCostPerRecord($this->entity->id, now()->subDay(), now()->addDay());
+    $avg = $this->service->averageChargeCentsPerRecord($this->entity->id, now()->subDay(), now()->addDay());
 
     // (30 + 50) / 2 = 40
     expect($avg)->toBe(40.0);

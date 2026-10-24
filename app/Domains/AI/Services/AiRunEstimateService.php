@@ -7,17 +7,18 @@ namespace App\Domains\AI\Services;
 use App\Domains\AI\Exceptions\AiModelPriceNotFoundException;
 use App\DTOs\AI\AiCreditEstimateData;
 use App\Enums\AI\{AiProvider, AiRunMode};
+use App\Support\Money;
 
 /**
- * Estimativa de créditos de uma execução de IA (extraído de AiRunsController).
- *
- * Sem mudança de comportamento: lógica de pricing/provedores movida verbatim.
+ * Estimativa de preço (centavos de BRL) de uma execução de IA (extraído de AiRunsController). A política de preço
+ * (câmbio/markup/pisos) é lida UMA vez aqui e vai dentro do resultado — a execução a congela antes de reservar.
  */
 class AiRunEstimateService
 {
     public function __construct(
         private readonly AiProviderSettings $providerSettings,
         private readonly AiPricingService $pricingService,
+        private readonly AiPricingPolicyResolver $policyResolver,
     ) {
     }
 
@@ -78,42 +79,17 @@ class AiRunEstimateService
             $providerEstimates = $priced;
         }
 
+        $policy = $this->policyResolver->current();
+
         try {
-            return $this->pricingService->estimateCredits(
+            return $this->pricingService->estimateCharge(
                 workflow: $workflow,
                 mode: $mode,
                 providerEstimates: $providerEstimates,
+                policy: $policy,
             );
         } catch (AiModelPriceNotFoundException) {
-            $minimumBase = max(
-                (int) config('ai.pricing.minimum_credits_default', 5),
-                (int) data_get(config('ai.pricing.minimum_credits_by_workflow', []), $workflow, 0),
-            );
-
-            $multiplier = match ($mode) {
-                AiRunMode::Economy   => 1,
-                AiRunMode::Validated => 2,
-                AiRunMode::Consensus => 3,
-            };
-
-            $minimum = $minimumBase * $multiplier;
-
-            return new AiCreditEstimateData(
-                workflow: $workflow,
-                mode: $mode,
-                rawCostUsd: 0.0,
-                costUsdWithMargin: 0.0,
-                marginMultiplier: (float) config('ai.pricing.margin_multiplier', 2.0),
-                usdPerCredit: (float) config('ai.pricing.usd_per_credit', 0.01),
-                creditsBeforeMinimum: 0,
-                minimumCredits: $minimum,
-                minimumApplied: true,
-                normalizedCredits: $minimum,
-                breakdown: [[
-                    'source' => 'fallback_minimum_only',
-                    'reason' => 'model_price_not_configured',
-                ]],
-            );
+            return $this->pricingService->fallbackMinimumCharge($workflow, $mode, $policy);
         }
     }
 
@@ -151,16 +127,19 @@ class AiRunEstimateService
     }
 
     /**
-     * @return array<string, mixed>
+     * Contrato PÚBLICO da estimativa (rota de clínica): só o valor a cobrar. Custo do provedor, câmbio, markup,
+     * valor bruto e breakdown ficam de fora — são segredo comercial do SaaS (AiPricingLeakageTest).
+     *
+     * @return array{workflow: string, mode: string, minimum_applied: bool, charge_cents: int, charge_formatted: string}
      */
     public function publicEstimate(AiCreditEstimateData $estimate): array
     {
         return [
-            'workflow'           => $estimate->workflow,
-            'mode'               => $estimate->mode->value,
-            'minimum_applied'    => $estimate->minimumApplied,
-            'minimum_credits'    => $estimate->minimumCredits,
-            'normalized_credits' => $estimate->normalizedCredits,
+            'workflow'         => $estimate->workflow,
+            'mode'             => $estimate->mode->value,
+            'minimum_applied'  => $estimate->minimumApplied,
+            'charge_cents'     => $estimate->chargeCents,
+            'charge_formatted' => Money::formatBrl($estimate->chargeCents),
         ];
     }
 }

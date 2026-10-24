@@ -126,7 +126,7 @@ const breadcrumbs = computed(() => [
 
 <template>
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
-        <div class="page-doctors">
+        <div class="page-doctors" data-ee-density="default">
             <PageHeader
                 :title="pageTitle"
                 :total="doctors.total ?? 0"
@@ -139,13 +139,10 @@ const breadcrumbs = computed(() => [
             >
                 <template #actions>
                     <div class="d-flex align-items-center gap-2">
-                        <Link
-                            :href="route('panel.doctors.import.index')"
-                            class="btn btn-outline-secondary fs-13 btn-md"
-                        >
+                        <Link :href="route('panel.doctors.import.index')" class="btn btn-outline-secondary">
                             <i class="ti ti-upload me-1" aria-hidden="true"></i> {{ t.btn_import ?? 'Importar' }}
                         </Link>
-                        <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
+                        <button type="button" class="btn btn-primary" @click="openCreate">
                             <i class="ti ti-plus me-1" aria-hidden="true"></i> {{ t.btn_new ?? 'Novo médico' }}
                         </button>
                     </div>

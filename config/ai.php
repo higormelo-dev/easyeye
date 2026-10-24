@@ -185,22 +185,41 @@ return [
     ],
 
     'pricing' => [
-        // Quanto 1 crédito representa em USD.
-        'usd_per_credit' => (float) env('AI_USD_PER_CREDIT', 0.01),
+        // Preço da execução (centavos de BRL): custo_usd × câmbio × markup, arredondado HALF_UP, com piso. O câmbio vem do
+        // histórico do manager (AiExchangeRateService); markup e pisos podem ser editados no manager (system_settings
+        // > estes padrões) e NUNCA aparecem para a clínica. Sem reutilizar a env antiga AI_CREDIT_MARGIN_MULTIPLIER
+        // (produção pode estar com 2.0 do modelo de créditos).
+        'markup_multiplier' => (float) env('AI_MARKUP_MULTIPLIER', 5.0),
 
-        // Multiplicador para absorver custo indireto, risco de variação e margem do produto.
-        'margin_multiplier' => (float) env('AI_CREDIT_MARGIN_MULTIPLIER', 2.0),
+        // Piso global por execução, em centavos (R$ 0,10): chamada curta não corrói a margem.
+        'minimum_charge_cents_default' => (int) env('AI_MIN_CHARGE_CENTS_DEFAULT', 10),
 
-        // Piso global por execução (mesmo para prompts curtos).
-        'minimum_credits_default' => (int) env('AI_MIN_CREDITS_DEFAULT', 1),
-
-        // Pisos específicos por workflow.
-        'minimum_credits_by_workflow' => [
-            'exam_assistant'     => (int) env('AI_MIN_CREDITS_EXAM_ASSISTANT', 3),
-            'report_drafting'    => (int) env('AI_MIN_CREDITS_REPORT_DRAFTING', 2),
-            'consensus_review'   => (int) env('AI_MIN_CREDITS_CONSENSUS_REVIEW', 5),
-            'eye_image_analysis' => (int) env('AI_MIN_CREDITS_EYE_IMAGE', 4),
+        // Pisos específicos por workflow, em centavos.
+        'minimum_charge_cents_by_workflow' => [
+            'exam_assistant'     => (int) env('AI_MIN_CHARGE_CENTS_EXAM_ASSISTANT', 10),
+            'report_drafting'    => (int) env('AI_MIN_CHARGE_CENTS_REPORT_DRAFTING', 10),
+            'consensus_review'   => (int) env('AI_MIN_CHARGE_CENTS_CONSENSUS_REVIEW', 10),
+            'eye_image_analysis' => (int) env('AI_MIN_CHARGE_CENTS_EYE_IMAGE', 10),
         ],
+    ],
+
+    // Conversão ÚNICA do saldo em créditos (modelo antigo) para centavos de BRL (migration/comando ai:convert-legacy-credits).
+    // São PARÂMETROS para o dono trocar antes do deploy — não números soltos no código.
+    // Cotação automática do dólar (frankfurter.dev, taxa diária do BCE). Desligar só em testes/ambientes sem rede.
+    'exchange_rate' => [
+        'auto_fetch' => (bool) env('AI_EXCHANGE_RATE_AUTO_FETCH', true),
+    ],
+
+    'legacy_conversion' => [
+        // Centavos por crédito comprado quando a clínica não tem nenhuma compra paga (decisão do dono: R$ 2,00/crédito).
+        'default_credit_cents' => (int) env('AI_LEGACY_DEFAULT_CREDIT_CENTS', 200),
+
+        // Centavos por crédito da cota mensal legada (1 crédito = R$ 1,00: plano de 30 créditos vira R$ 30,00).
+        'quota_credit_cents' => (int) env('AI_LEGACY_QUOTA_CREDIT_CENTS', 100),
+
+        // Markup e cotação do modelo antigo, só para estimar o `normalized_charge_cents` diagnóstico das chamadas já feitas.
+        'legacy_markup'        => (float) env('AI_LEGACY_MARKUP', 2.0),
+        'legacy_fallback_rate' => (float) env('AI_LEGACY_FALLBACK_RATE', 5.50),
     ],
 
     // Análise de imagem ocular (módulo Eye Image).
@@ -224,24 +243,39 @@ return [
         // Pagamento que chegar depois ainda credita (o cliente pagou).
         'pending_expiry_days' => (int) env('AI_CREDIT_PACK_PENDING_EXPIRY_DAYS', 7),
 
+        // Pacote personalizado: valor livre em reais inteiros, acima do Enterprise. Limites editáveis no manager
+        // (AiPricingSettings); o servidor sempre revalida — o preço nunca vem do cliente.
+        'custom_package' => [
+            'min_cents'  => (int) env('AI_CUSTOM_PACKAGE_MIN_CENTS', 100000),
+            'max_cents'  => (int) env('AI_CUSTOM_PACKAGE_MAX_CENTS', 1000000),
+            'step_cents' => 100,
+        ],
+
+        // Pacotes fixos: R$ pagos = R$ de saldo (sem bônus). `value_cents` é o preço E o crédito na carteira.
         'packages' => [
             [
-                'code'        => 'starter',
-                'credits'     => 25,
-                'price_cents' => 6990,
+                'code'        => 'basic',
+                'value_cents' => 10000,
                 'featured'    => false,
+                'custom'      => false,
             ],
             [
-                'code'        => 'operational',
-                'credits'     => 100,
-                'price_cents' => 24990,
+                'code'        => 'premium',
+                'value_cents' => 49900,
                 'featured'    => true,
+                'custom'      => false,
             ],
             [
-                'code'        => 'scale',
-                'credits'     => 300,
-                'price_cents' => 59990,
+                'code'        => 'enterprise',
+                'value_cents' => 99900,
                 'featured'    => false,
+                'custom'      => false,
+            ],
+            [
+                'code'        => 'custom',
+                'value_cents' => null,
+                'featured'    => false,
+                'custom'      => true,
             ],
         ],
     ],

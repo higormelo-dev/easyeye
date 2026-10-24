@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import AiPaywallNotice from '@/Components/Panel/AiPaywallNotice.vue';
 import AiCreditPackCheckout from '@/Components/Billing/AiCreditPackCheckout.vue';
@@ -44,7 +45,7 @@ function formatSeconds(s) {
     return `${m}m ${r}s`;
 }
 // Franquia mensal: lida da carteira (mesma fonte que bloqueia a execução).
-const { date: formatDate, number: formatNumber } = useLocaleFormat();
+const { date: formatDate, moneyCents: formatAiAmount } = useLocaleFormat();
 const quota = computed(() => analytics.value?.quota ?? {});
 const usagePercent = computed(() => quota.value?.usage_percent ?? null);
 // Renovação só para quem ganha franquia (em atraso, condicionada ao
@@ -59,7 +60,7 @@ const quotaRenewsText = computed(() => {
     return '';
 });
 // Sem nenhum crédito liberado: mostra o paywall (comprar ou pedir ao admin).
-const showPaywall = computed(() => !!props.paywall && Number(props.balance?.available ?? 0) <= 0);
+const showPaywall = computed(() => !!props.paywall && Number(props.balance?.available_cents ?? 0) <= 0);
 const usageBarClass = computed(() => {
     const p = usagePercent.value ?? 0;
     if (p >= 90) return 'bg-danger';
@@ -69,10 +70,10 @@ const usageBarClass = computed(() => {
 
 // Créditos avulsos (cortesia/comprados) — entram na carteira (balance.balance),
 // NÃO na franquia. Com a franquia da janela esgotada, as execuções usam eles.
-const purchasedCredits = computed(() => Number(props.balance?.balance ?? 0));
+const purchasedCredits = computed(() => Number(props.balance?.balance_cents ?? 0));
 const quotaFullyUsed = computed(() => {
-    const total = Number(quota.value?.monthly_quota ?? 0);
-    return total > 0 && Number(quota.value?.consumed_credits ?? 0) >= total;
+    const total = Number(quota.value?.monthly_quota_cents ?? 0);
+    return total > 0 && Number(quota.value?.monthly_quota_used_cents ?? 0) >= total;
 });
 const coveredByPurchased = computed(() => quotaFullyUsed.value && purchasedCredits.value > 0);
 
@@ -190,7 +191,7 @@ function goToPage(url) {
 // Pacote pago (cartão aprovado ou webhook): saldo e paywall atualizados.
 function onCreditsPaid() {
     router.reload({ only: ['balance', 'paywall', 'recentCreditPurchases'] });
-    showSuccess(label('credit_purchase_credited', 'Créditos adicionados.'));
+    showSuccess(label('credit_purchase_credited', 'Saldo de IA adicionado.'));
 }
 
 // "Comprar créditos" do aviso: leva aos pacotes desta tela.
@@ -270,16 +271,18 @@ async function rejectRun() {
                     <div class="border rounded p-3 bg-white h-100">
                         <div class="d-flex flex-column gap-2">
                             <div>
-                                <strong>{{ label('credits_available', 'Créditos disponíveis') }}:</strong>
-                                <span data-test="ai-balance-available">{{ formatNumber(balance.available) }}</span>
+                                <strong>{{ label('credits_available', 'Saldo de IA disponível') }}:</strong>
+                                <span data-test="ai-balance-available">{{
+                                    formatAiAmount(balance.available_cents)
+                                }}</span>
                             </div>
                             <div>
                                 <strong>{{ label('credits_reserved', 'Reservados') }}:</strong>
-                                {{ formatNumber(balance.reserved) }}
+                                {{ formatAiAmount(balance.reserved_cents) }}
                             </div>
                             <div>
                                 <strong>{{ label('credits_total', 'Total') }}:</strong>
-                                {{ formatNumber(balance.total) }}
+                                {{ formatAiAmount(balance.total_cents) }}
                             </div>
                         </div>
                         <div class="mt-2 text-muted fs-13">{{ label('support_notice') }}</div>
@@ -290,10 +293,10 @@ async function rejectRun() {
                     <div class="border rounded p-3 bg-white h-100">
                         <div class="mb-2">
                             <h6 class="fw-semibold mb-1">
-                                {{ label('credit_packages_title', 'Pacotes de créditos IA') }}
+                                {{ label('credit_packages_title', 'Saldo de IA') }}
                             </h6>
                             <div class="text-muted fs-13">
-                                {{ label('credit_packages_subtitle', 'Créditos extras avulsos.') }}
+                                {{ label('credit_packages_subtitle', 'Adicione saldo de IA em reais.') }}
                             </div>
                         </div>
                         <!-- Compra paga no checkout do sistema (Pix, boleto, cartão à vista); pedido pendente: continuar ou descartar. -->
@@ -313,14 +316,14 @@ async function rejectRun() {
                 </div>
 
                 <!-- Franquia mensal (carteira) + barra de progresso -->
-                <div v-if="quota.monthly_quota > 0" class="mb-3" data-test="ai-quota-meter">
+                <div v-if="quota.monthly_quota_cents > 0" class="mb-3" data-test="ai-quota-meter">
                     <div class="d-flex justify-content-between mb-1 fs-13 flex-wrap gap-1">
                         <span class="fw-semibold">{{ label('quota_title', 'Franquia mensal de IA') }}</span>
                         <span class="text-muted" data-test="ai-quota-text">
                             {{
                                 label('quota_credits', ':used / :quota')
-                                    .replace(':used', formatNumber(quota.consumed_credits ?? 0))
-                                    .replace(':quota', formatNumber(quota.monthly_quota))
+                                    .replace(':used', formatAiAmount(quota.monthly_quota_used_cents ?? 0))
+                                    .replace(':quota', formatAiAmount(quota.monthly_quota_cents))
                             }}
                             <span v-if="usagePercent !== null" class="ms-1">({{ usagePercent }}%)</span>
                             <span v-if="quotaRenewsText" class="ms-1">· {{ quotaRenewsText }}</span>
@@ -342,7 +345,7 @@ async function rejectRun() {
                         data-test="ai-quota-spillover"
                     >
                         <i class="ti ti-wallet me-1" aria-hidden="true"></i>
-                        {{ label('quota_spillover', '').replace(':available', formatNumber(purchasedCredits)) }}
+                        {{ label('quota_spillover', '').replace(':available', formatAiAmount(purchasedCredits)) }}
                     </div>
                 </div>
 
@@ -356,8 +359,10 @@ async function rejectRun() {
                     </div>
                     <div class="col-md-3">
                         <div class="border rounded p-2 text-center h-100">
-                            <div class="text-muted fs-13">Créditos consumidos</div>
-                            <div class="fs-3 fw-bold text-info">{{ analytics.consumed?.credits ?? 0 }}</div>
+                            <div class="text-muted fs-13">{{ label('balance_consumed', '') }}</div>
+                            <div class="fs-3 fw-bold text-info">
+                                {{ formatAiAmount(analytics.consumed?.charge_cents ?? 0) }}
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -394,7 +399,8 @@ async function rejectRun() {
                             >
                                 <span>{{ workflowDisplayLabel(row.workflow) }}</span>
                                 <span class="text-muted">
-                                    {{ row.runs_count }} runs · <strong>{{ row.credits_total }}</strong> créditos
+                                    {{ row.runs_count }} runs ·
+                                    <strong>{{ formatAiAmount(row.charge_cents_total) }}</strong>
                                 </span>
                             </li>
                         </ul>
@@ -436,14 +442,19 @@ async function rejectRun() {
                         </div>
                     </div>
                     <div
-                        v-if="analytics.avg_cost_per_record !== null && analytics.avg_cost_per_record !== undefined"
+                        v-if="
+                            analytics.avg_charge_cents_per_record !== null &&
+                            analytics.avg_charge_cents_per_record !== undefined
+                        "
                         class="col-md-4"
                     >
                         <div class="border rounded p-3 h-100 bg-white">
                             <div class="text-muted fs-13 mb-1">
-                                {{ label('dashboard_avg_cost', 'Custo médio por consulta') }}
+                                {{ label('dashboard_avg_cost', 'Consumo médio por consulta') }}
                             </div>
-                            <div class="fs-3 fw-bold text-info">{{ analytics.avg_cost_per_record }} cr</div>
+                            <div class="fs-3 fw-bold text-info">
+                                {{ formatAiAmount(analytics.avg_charge_cents_per_record) }}
+                            </div>
                         </div>
                     </div>
                     <div v-if="analytics.by_doctor?.length" class="col-12">
@@ -457,7 +468,7 @@ async function rejectRun() {
                                         <th>{{ label('dashboard_doctor', 'Médico') }}</th>
                                         <th class="text-end">{{ label('dashboard_approved', 'Aprovados') }}</th>
                                         <th class="text-end">
-                                            {{ label('dashboard_avg_credits', 'Créditos médios') }}
+                                            {{ label('dashboard_avg_credits', 'Consumo médio') }}
                                         </th>
                                         <th class="text-end">{{ label('dashboard_avg_time', 'Tempo médio') }}</th>
                                     </tr>
@@ -466,7 +477,7 @@ async function rejectRun() {
                                     <tr v-for="r in analytics.by_doctor" :key="r.doctor_id">
                                         <td class="fs-13">{{ r.doctor_name }}</td>
                                         <td class="text-end">{{ r.approved }}</td>
-                                        <td class="text-end">{{ r.avg_credits }}</td>
+                                        <td class="text-end">{{ formatAiAmount(r.avg_charge_cents) }}</td>
                                         <td class="text-end fs-13 text-muted">
                                             {{ formatSeconds(r.avg_approve_seconds) }}
                                         </td>
@@ -478,7 +489,7 @@ async function rejectRun() {
 
                     <!-- Top runs por custo -->
                     <div v-if="analytics.top_runs?.length" class="col-12">
-                        <h6 class="fw-semibold fs-13 mb-2">Top 5 execuções por custo</h6>
+                        <h6 class="fw-semibold fs-13 mb-2">{{ label('top_balance_runs', '') }}</h6>
                         <div class="table-responsive">
                             <table class="table table-sm table-hover align-middle mb-0">
                                 <thead class="table-light">
@@ -487,7 +498,7 @@ async function rejectRun() {
                                         <th>Workflow</th>
                                         <th>Paciente</th>
                                         <th>Solicitante</th>
-                                        <th class="text-end">Créditos</th>
+                                        <th class="text-end">{{ label('credits', '') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -496,7 +507,9 @@ async function rejectRun() {
                                         <td class="fs-13">{{ workflowDisplayLabel(run.workflow) }}</td>
                                         <td class="fs-13">{{ run.patient ?? '—' }}</td>
                                         <td class="fs-13">{{ run.requested_by ?? '—' }}</td>
-                                        <td class="text-end fw-bold">{{ run.consumed_credits }}</td>
+                                        <td class="text-end fw-bold">
+                                            {{ formatAiAmount(run.consumed_charge_cents) }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -530,7 +543,7 @@ async function rejectRun() {
                                         <th>{{ label('workflow', 'Workflow') }}</th>
                                         <th>{{ label('mode', 'Modo') }}</th>
                                         <th>{{ label('status', 'Status') }}</th>
-                                        <th>{{ label('credits', 'Créditos') }}</th>
+                                        <th>{{ label('credits', 'Consumo / reserva (R$)') }}</th>
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -551,14 +564,17 @@ async function rejectRun() {
                                         <td>
                                             <span :class="statusClass(run.status)">{{ statusLabel(run.status) }}</span>
                                         </td>
-                                        <td>{{ run.consumed_credits }}/{{ run.reserved_credits }}</td>
+                                        <td>
+                                            {{ formatAiAmount(run.consumed_charge_cents) }}/{{
+                                                formatAiAmount(run.reserved_charge_cents)
+                                            }}
+                                        </td>
                                         <td class="text-end">
-                                            <button
-                                                class="btn btn-sm btn-outline-secondary"
+                                            <ActionIconButton
+                                                icon="ti ti-eye"
+                                                :title="label('details', '')"
                                                 @click="loadRunDetail(run.id)"
-                                            >
-                                                <i class="ti ti-eye"></i>
-                                            </button>
+                                            />
                                         </td>
                                     </tr>
                                     <tr v-if="runs.data.length === 0">
@@ -644,6 +660,12 @@ async function rejectRun() {
                                 </div>
                             </template>
 
+                            <dl class="row small" data-test="ai-run-charge">
+                                <dt class="col-6">{{ label('balance_consumed', '') }}</dt>
+                                <dd class="col-6">{{ formatAiAmount(selectedRun.consumed_charge_cents) }}</dd>
+                                <dt class="col-6">{{ label('credits_reserved', '') }}</dt>
+                                <dd class="col-6">{{ formatAiAmount(selectedRun.reserved_charge_cents) }}</dd>
+                            </dl>
                             <div v-if="selectedRun.analysis_summary" class="mb-2">
                                 <strong>{{ label('analysis_summary', 'Resumo da análise') }}:</strong>
                                 <div class="text-muted fs-13" style="white-space: pre-wrap">

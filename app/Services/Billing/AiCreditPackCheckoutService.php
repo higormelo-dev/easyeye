@@ -15,12 +15,13 @@ use App\Models\Billing\{Gateway, Invoice, Payment, PaymentAttempt};
 use App\Models\{Entity, Subscription, User};
 use App\Services\SubscriptionService;
 use App\Support\Billing\{BillingCustomer, ChargeIdempotency, PayerDocument, PaymentUrl};
+use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Closure;
 use DomainException;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\{Collection, Str};
-use Illuminate\Support\Facades\{Cache, DB, Log};
+use Illuminate\Support\Facades\{Cache, DB, Lang, Log};
 use Throwable;
 
 /**
@@ -80,7 +81,7 @@ class AiCreditPackCheckoutService
      *
      * @return array<string, mixed>
      */
-    public function options(Entity $entity, ?string $packageCode = null): array
+    public function options(Entity $entity, ?string $packageCode = null, ?int $customAmountCents = null): array
     {
         $reason  = $this->ineligibility($entity);
         $gateway = null;
@@ -96,13 +97,24 @@ class AiCreditPackCheckoutService
         $packages = $this->purchases->packages();
         $package  = $packageCode !== null ? collect($packages)->firstWhere('code', $packageCode) : null;
 
+        // Personalizado: o valor é validado no servidor (reais inteiros, entre o mínimo e o máximo); sem valor válido, não
+        // abre checkout (package = null). Pacote fixo: o valor é o da config.
+        if ($package !== null && ($package['custom'] ?? false)) {
+            try {
+                $resolved = $this->purchases->resolvePackage($packageCode, $customAmountCents);
+                $package  = [...$package, 'value_cents' => $resolved['value_cents'], 'value_formatted' => Money::formatBrl((int) $resolved['value_cents'])];
+            } catch (DomainException) {
+                $package = null;
+            }
+        }
+
         return [
             'allowed'   => $reason === null,
             'reason'    => $reason,
             'message'   => $reason !== null ? __("checkout.errors.{$reason}") : null,
             'packages'  => $packages,
             'package'   => $package,
-            'payment'   => $gateway ? $this->paymentOptions($gateway, $package ? $package['price_cents'] / 100 : null) : null,
+            'payment'   => $gateway ? $this->paymentOptions($gateway, $package ? $package['value_cents'] / 100 : null) : null,
             'purchases' => $this->recentPurchases($entity),
             // Pedidos ainda não pagos (tela de IA): "Continuar pagamento" ou "Descartar".
             'open_orders' => $this->openOrderInvoices($entity)
@@ -172,10 +184,15 @@ class AiCreditPackCheckoutService
     {
         $purchase = $this->purchaseOf($invoice);
 
+        $code  = (string) ($purchase?->package_code ?? data_get($invoice->metadata, 'package_code', ''));
+        $cents = (int) ($purchase?->wallet_credit_cents ?? data_get($invoice->metadata, 'wallet_credit_cents', (int) round(((float) $invoice->amount) * 100)));
+        $key   = "ai.credit_packages.{$code}.name";
+
         return [
-            'credits'      => (int) ($purchase?->credits ?? data_get($invoice->metadata, 'credits', 0)),
-            'package_code' => (string) ($purchase?->package_code ?? data_get($invoice->metadata, 'package_code', '')),
-            'package_name' => __('ai.credit_packages.' . ($purchase?->package_code ?? data_get($invoice->metadata, 'package_code', '')) . '.name'),
+            'value_cents'     => $cents,
+            'value_formatted' => Money::formatBrl($cents),
+            'package_code'    => $code,
+            'package_name'    => Lang::has($key) ? (string) __($key) : ucfirst($code),
         ];
     }
 
@@ -188,9 +205,12 @@ class AiCreditPackCheckoutService
      *
      * @return array<string, mixed>
      */
-    public function purchase(Entity $entity, User $user, string $packageCode, CheckoutMethod $method, ?CheckoutCardInput $card = null, ?string $idempotencyKey = null): array
+    public function purchase(Entity $entity, User $user, string $packageCode, CheckoutMethod $method, ?CheckoutCardInput $card = null, ?string $idempotencyKey = null, ?int $customAmountCents = null): array
     {
-        return $this->exclusive($entity, 'ai-pack:' . $packageCode . ':' . $method->value, $idempotencyKey, function () use ($entity, $user, $packageCode, $method, $card): array {
+        // O valor entra na chave: dois cliques no personalizado com valores diferentes nunca compartilham pedido/trava.
+        $lockKey = $customAmountCents !== null ? "ai-pack:{$packageCode}:{$customAmountCents}:{$method->value}" : "ai-pack:{$packageCode}:{$method->value}";
+
+        return $this->exclusive($entity, $lockKey, $idempotencyKey, function () use ($entity, $user, $packageCode, $method, $card, $customAmountCents): array {
             $this->assertEligible($entity);
 
             $subscription = $this->subscriptions->currentAccess($entity);
@@ -198,7 +218,7 @@ class AiCreditPackCheckoutService
 
             $this->assertMethod($gateway, $method, $card);
 
-            [$purchase, $invoice] = $this->openOrder($entity, $user, $subscription, $packageCode, $gateway);
+            [$purchase, $invoice] = $this->openOrder($entity, $user, $subscription, $packageCode, $gateway, $customAmountCents);
 
             return [
                 'purchase' => $this->purchases->presentPurchase($purchase),
@@ -297,11 +317,20 @@ class AiCreditPackCheckoutService
      *
      * @return array{0: AiCreditPurchase, 1: Invoice}
      */
-    private function openOrder(Entity $entity, User $user, ?Subscription $subscription, string $packageCode, PaymentGatewayInterface $gateway): array
+    private function openOrder(Entity $entity, User $user, ?Subscription $subscription, string $packageCode, PaymentGatewayInterface $gateway, ?int $customAmountCents = null): array
     {
+        // Valor resolvido/validado no servidor ANTES de procurar pedido aberto: o pedido aberto é por pacote + VALOR
+        // (um personalizado de R$ 1.500 nunca reaproveita o de R$ 2.000).
+        try {
+            $value = (int) $this->purchases->resolvePackage($packageCode, $customAmountCents)['value_cents'];
+        } catch (DomainException $e) {
+            throw CheckoutException::make(str_starts_with($e->getMessage(), 'ai_credit_custom_amount') ? 'ai_pack_invalid_amount' : 'ai_pack_unavailable', 422);
+        }
+
         $open = AiCreditPurchase::query()
             ->where('entity_id', $entity->id)
             ->where('package_code', $packageCode)
+            ->where('amount_cents', $value)
             ->where('status', AiCreditPurchaseStatus::PendingPayment->value)
             ->whereNotNull('invoice_id')
             ->latest('created_at')
@@ -317,7 +346,7 @@ class AiCreditPackCheckoutService
         }
 
         try {
-            return DB::transaction(function () use ($entity, $user, $subscription, $packageCode, $gateway): array {
+            return DB::transaction(function () use ($entity, $user, $subscription, $packageCode, $gateway, $customAmountCents): array {
                 $purchase = $this->purchases->createPendingPurchase(
                     entityId: (string) $entity->id,
                     packageCode: $packageCode,
@@ -326,6 +355,7 @@ class AiCreditPackCheckoutService
                     idempotencyKey: 'ai-credit-purchase:checkout:' . Str::uuid(),
                     metadata: ['gateway' => $gateway->code()],
                     source: 'checkout',
+                    customAmountCents: $customAmountCents,
                 );
 
                 $today   = CarbonImmutable::today();
@@ -344,7 +374,8 @@ class AiCreditPackCheckoutService
                     'metadata'        => [
                         'ai_credit_purchase_id' => (string) $purchase->id,
                         'package_code'          => $purchase->package_code,
-                        'credits'               => (int) $purchase->credits,
+                        'package_name'          => $this->purchases->presentPurchase($purchase)['package_name'],
+                        'wallet_credit_cents'   => (int) $purchase->wallet_credit_cents,
                     ],
                     'correlation_id'  => (string) Str::uuid(),
                     'idempotency_key' => 'ai-credit-pack:' . $purchase->id,
@@ -354,8 +385,8 @@ class AiCreditPackCheckoutService
 
                 $this->billingLog->log(
                     level: 'info',
-                    message: 'Compra de créditos de IA aberta pelo checkout.',
-                    context: ['ai_credit_purchase_id' => $purchase->id, 'package_code' => $packageCode, 'credits' => $purchase->credits],
+                    message: 'Compra de saldo de IA aberta pelo checkout.',
+                    context: ['ai_credit_purchase_id' => $purchase->id, 'package_code' => $packageCode, 'wallet_credit_cents' => $purchase->wallet_credit_cents],
                     entityId: (string) $entity->id,
                     invoice: $invoice,
                     gatewayCode: $gateway->code(),
@@ -886,7 +917,7 @@ class AiCreditPackCheckoutService
             payment: $payment,
             amount: (float) ($payment?->amount ?? $invoice->amount),
             currency: $payment?->currency ?? $invoice->currency,
-            metadata: ['kind' => Invoice::BILLING_REASON_AI_CREDIT_PACK, 'ai_credit_purchase_id' => $purchase?->id, 'credits' => $purchase?->credits],
+            metadata: ['kind' => Invoice::BILLING_REASON_AI_CREDIT_PACK, 'ai_credit_purchase_id' => $purchase?->id, 'wallet_credit_cents' => $purchase?->wallet_credit_cents],
             correlationId: $correlationId,
             source: $source,
         );
@@ -896,7 +927,7 @@ class AiCreditPackCheckoutService
             message: $purchase === null
                 ? 'Pacote de IA pago sem o pedido ligado à fatura — créditos NÃO lançados; conferir e creditar pelo manager.'
                 : 'Pacote de IA pago — créditos lançados na carteira.',
-            context: ['ai_credit_purchase_id' => $purchase?->id, 'credits' => $purchase?->credits, 'source' => $source],
+            context: ['ai_credit_purchase_id' => $purchase?->id, 'wallet_credit_cents' => $purchase?->wallet_credit_cents, 'source' => $source],
             entityId: (string) $invoice->entity_id,
             invoice: $invoice,
             payment: $payment,
@@ -1080,8 +1111,8 @@ class AiCreditPackCheckoutService
                     app(GatewayAlertService::class)->alert(
                         gateway: (string) $n->gatewayCode,
                         kind: 'refund_credits',
-                        params: ['entity' => (string) $invoice->entity?->name, 'reference' => (string) $invoice->reference, 'shortfall' => $shortfall, 'revoked' => (int) data_get($reversed->metadata, 'gateway_reversal.revoked', 0)],
-                        message: "Estorno do pacote de IA {$invoice->reference}: {$shortfall} créditos não puderam ser retirados (a clínica já usou) — conferir.",
+                        params: ['entity' => (string) $invoice->entity?->name, 'reference' => (string) $invoice->reference, 'shortfall' => Money::formatBrl($shortfall), 'shortfall_cents' => $shortfall, 'revoked' => Money::formatBrl((int) data_get($reversed->metadata, 'gateway_reversal.revoked', 0)), 'revoked_cents' => (int) data_get($reversed->metadata, 'gateway_reversal.revoked', 0)],
+                        message: 'Estorno do pacote de IA ' . $invoice->reference . ': ' . Money::formatBrl($shortfall) . ' de saldo não puderam ser retirados (a clínica já usou) — conferir.',
                         level: 'critical',
                         throttleKey: (string) $invoice->id . ':reversal',
                         throttleMinutes: 60 * 24 * 30,
@@ -1109,7 +1140,7 @@ class AiCreditPackCheckoutService
             $this->billingLog->log(
                 level: 'warning',
                 message: $refund ? 'Pacote de IA estornado no gateway — créditos revertidos.' : 'Chargeback de pacote de IA — créditos revertidos (o que já foi consumido não volta).',
-                context: ['ai_credit_purchase_id' => $purchase?->id, 'credits' => $purchase?->credits],
+                context: ['ai_credit_purchase_id' => $purchase?->id, 'wallet_credit_cents' => $purchase?->wallet_credit_cents],
                 entityId: (string) $invoice->entity_id,
                 invoice: $invoice,
                 payment: $payment,
@@ -1395,7 +1426,9 @@ class AiCreditPackCheckoutService
 
     private function description(Invoice $invoice): string
     {
-        return __('ai.credit_purchase_description', ['credits' => (int) data_get($invoice->metadata, 'credits', 0)]) . " — {$invoice->reference}";
+        $cents = (int) data_get($invoice->metadata, 'wallet_credit_cents', (int) round(((float) $invoice->amount) * 100));
+
+        return 'Pacote de saldo de IA (' . Money::formatBrl($cents) . ") — {$invoice->reference}";
     }
 
     private function cachedInstructions(Invoice $invoice, CheckoutMethod $method): ?PaymentInstructionsDTO

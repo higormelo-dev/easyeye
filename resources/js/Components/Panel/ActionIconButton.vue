@@ -3,8 +3,9 @@
  * Botão de ação compacto, somente ícone, padrão "flat icon button" do design system.
  *
  * Substitui o uso de `btn btn-sm btn-outline-secondary` espalhado pelas listagens.
- * Mantém área de toque acessível (32x32px), tooltip via `title`, e variantes
- * que se mapeiam às cores do design system em resources/css/system/_variables.scss.
+ * Área de toque de 32x32px fora de uma região de densidade (`data-ee-density`); dentro dela acompanha
+ * os campos vizinhos (32, 40 ou 44px). O nome acessível vem de `title` (nunca de `label`, que não é
+ * prop). Variantes que se mapeiam às cores do design system em resources/css/system/_variables.scss.
  *
  * Suporta:
  *  - <button> (default): emite `click` ao usuário.
@@ -97,18 +98,20 @@ function handleClick(event) {
    possam reaproveitar via prop btn-class, mantendo visual consistente em toda
    a action group. Prefixo `ee-action-icon` evita colisão com outros estilos. */
 .ee-action-icon {
-    /* Tamanho/área de toque acessível mas compacto: 32x32 com ícone 16px. */
+    /* Fora de uma região de densidade: 32x32 com ícone de 15px (como sempre). Dentro de uma
+       (data-ee-density, ver resources/css/system/_control-tokens.scss) acompanha os campos
+       vizinhos: 32, 40 ou 44px. */
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: var(--ee-control-min-height, 32px);
+    height: var(--ee-control-min-height, 32px);
     padding: 0;
-    border-radius: 8px;
+    border-radius: var(--ee-control-radius, 8px);
     border: 1px solid var(--gray-100);
     background: var(--white);
     color: var(--gray-700);
-    font-size: 15px;
+    font-size: var(--ee-icon-size, 15px);
     line-height: 1;
     cursor: pointer;
     transition:

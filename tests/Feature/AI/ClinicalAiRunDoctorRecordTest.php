@@ -104,18 +104,18 @@ function clinicalAiGateStorePayload($test, string $workflow): array
 function clinicalAiGateParentRun($test, string $workflow, User $requestedBy): AiRun
 {
     return AiRun::query()->create([
-        'entity_id'         => $test->entity->id,
-        'patient_id'        => $test->patient->id,
-        'medical_record_id' => $workflow === 'record_assist' ? $test->record->id : null,
-        'requested_by'      => $requestedBy->id,
-        'workflow'          => $workflow,
-        'mode'              => AiRunMode::Economy->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::Approved->value,
-        'estimated_credits' => 30,
-        'reserved_credits'  => 30,
-        'consumed_credits'  => 25,
-        'input_summary'     => [
+        'entity_id'                => $test->entity->id,
+        'patient_id'               => $test->patient->id,
+        'medical_record_id'        => $workflow === 'record_assist' ? $test->record->id : null,
+        'requested_by'             => $requestedBy->id,
+        'workflow'                 => $workflow,
+        'mode'                     => AiRunMode::Economy->value,
+        'risk_level'               => AiRiskLevel::Medium->value,
+        'status'                   => AiRunStatus::Approved->value,
+        'estimated_charge_cents'   => 30,
+        'reserved_charge_cents'    => 30,
+        'monthly_quota_used_cents' => 25,
+        'input_summary'            => [
             'user_prompt'  => 'Resumir o caso clínico do paciente em consulta.',
             'context'      => [],
             'attachments'  => [],
@@ -136,10 +136,10 @@ function clinicalAiGateWalletSnapshot(string $entityId): array
     $wallet = AiCreditWallet::query()->where('entity_id', $entityId)->firstOrFail();
 
     return [
-        'balance'            => (int) $wallet->balance,
-        'reserved_balance'   => (int) $wallet->reserved_balance,
-        'monthly_quota_used' => (int) $wallet->monthly_quota_used,
-        'ledger_entries'     => AiCreditLedgerEntry::query()->where('entity_id', $entityId)->count(),
+        'balance_cents'            => (int) $wallet->balance_cents,
+        'reserved_balance'         => (int) $wallet->reserved_balance_cents,
+        'monthly_quota_used_cents' => (int) $wallet->monthly_quota_used_cents,
+        'ledger_entries'           => AiCreditLedgerEntry::query()->where('entity_id', $entityId)->count(),
     ];
 }
 
@@ -208,7 +208,7 @@ describe('store: médico com cadastro ativo segue funcionando', function () {
 
         expect($run->workflow)->toBe($workflow)
             ->and((string) $run->requested_by)->toBe((string) $this->doctor->id)
-            ->and($run->reserved_credits)->toBeGreaterThan(0)
+            ->and($run->reserved_charge_cents)->toBeGreaterThan(0)
             ->and(clinicalAiGateWalletSnapshot($this->entity->id)['ledger_entries'])->toBeGreaterThan($wallet['ledger_entries']);
 
         Queue::assertPushed(RunAiWorkflowJob::class, 1);

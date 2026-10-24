@@ -37,11 +37,11 @@ const t = {
         ai_credits: ':count créditos',
         ai_unit_price: ':price por crédito',
         ai_buy: 'Comprar',
-        ai_modal_title: ':package — :credits créditos',
+        ai_balance_modal_title: ':package — :amount em saldo de IA',
         ai_pending_title: 'Pedido de créditos aguardando pagamento',
         ai_pending_hint: 'Só vira créditos depois do pagamento.',
         ai_pending_continue: 'Continuar pagamento',
-        ai_pending_value: ':credits créditos · :amount',
+        ai_balance_pending_value: ':amount em saldo de IA',
         ai_pack_open_created: 'Pedido de :date',
         ai_pack_discard: 'Descartar',
         ai_pack_discard_keep: 'Manter pedido',
@@ -61,12 +61,10 @@ const order = {
     can_pay: true,
     can_discard: true,
     kind: 'ai_credit_pack',
-    ai_credit_pack: { credits: 100, package_code: 'operational', package_name: 'Operacional' },
+    ai_credit_pack: { value_cents: 24990, package_code: 'operational', package_name: 'Operacional' },
     payment,
 };
-const packages = [
-    { code: 'operational', name: 'Operacional', credits: 100, price_cents: 24990, price_formatted: 'R$ 249,90' },
-];
+const packages = [{ code: 'operational', name: 'Operacional', value_cents: 24990, price_formatted: 'R$ 249,90' }];
 const state = (openOrders) => ({
     data: {
         data: {
@@ -112,7 +110,7 @@ describe('pedido de créditos pendente (tela de IA)', () => {
         await flushPromises();
 
         const row = wrapper.get('[data-test="ai-pack-pending-order"]');
-        expect(row.text().replace(/\u00a0/g, ' ')).toContain('100 créditos · R$ 249,90');
+        expect(row.text().replace(/\u00a0/g, ' ')).toContain('R$ 249,90 em saldo de IA');
         expect(row.find('[data-test="ai-pack-pending-continue"]').exists()).toBe(true);
         expect(row.find('[data-test="ai-pack-pending-discard"]').exists()).toBe(true);
     });
@@ -130,7 +128,7 @@ describe('pedido de créditos pendente (tela de IA)', () => {
         expect(flow.props('aiPack')).toBeNull();
         expect(flow.props('payment')).toEqual(payment);
         expect(flow.props('amount')).toBe(249.9);
-        expect(wrapper.get('[data-test="modal"]').text()).toContain('Operacional — 100 créditos');
+        expect(wrapper.get('[data-test="modal"]').text()).toContain('Operacional — R$\u00a0249,90 em saldo de IA');
         expect(axios.post).not.toHaveBeenCalled();
     });
 

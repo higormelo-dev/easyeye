@@ -48,7 +48,7 @@ const props = defineProps({
     realtime: { type: Object, default: null }, // { channel, event }
 });
 
-const emit = defineEmits(['paid', 'invoice', 'done']);
+const emit = defineEmits(['paid', 'invoice', 'done', 'error']);
 
 const RETRY_DELAYS = [3, 5, 8, 13, 21];
 
@@ -264,6 +264,9 @@ function applyResponse(res) {
 
 async function handleFailure(e) {
     const err = checkoutError(e, props.t);
+    if (props.aiPack && err.status === 422 && err.code === 'unknown' && e.response?.data?.message) {
+        err.message = e.response.data.message;
+    }
 
     if (err.code === 'charge_pending') return scheduleRetry();
 
@@ -274,6 +277,7 @@ async function handleFailure(e) {
 
     cancelRetry();
     error.value = err;
+    emit('error', err);
     step.value = method.value === 'credit_card' && cardConfig.value ? 'card' : 'choose';
 }
 

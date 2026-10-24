@@ -39,7 +39,7 @@ defineEmits(['update:modelValue']);
             />
             <button
                 v-if="modelValue"
-                class="btn btn-outline-secondary border-start-0"
+                class="btn btn-outline-secondary border-start-0 ee-btn-square"
                 type="button"
                 :title="clearLabel"
                 :aria-label="clearLabel"

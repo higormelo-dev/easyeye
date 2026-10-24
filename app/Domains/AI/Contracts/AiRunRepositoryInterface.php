@@ -26,8 +26,9 @@ interface AiRunRepositoryInterface
         AiRun $run,
         string $finalOutput,
         array $safetyNotes,
-        int $consumedCredits,
+        int $consumedChargeCents,
         ?string $errorMessage = null,
+        ?float $actualCostUsd = null,
     ): void;
 
     public function markFailed(AiRun $run, string $errorMessage): void;

@@ -28,8 +28,9 @@ class AiCreditLedgerEntry extends Model
         'ai_run_id',
         'type',
         'provider',
-        'amount',
-        'balance_after',
+        'amount_cents',
+        'balance_after_cents',
+        'unit',
         'description',
         'metadata',
         'idempotency_key',
@@ -39,13 +40,13 @@ class AiCreditLedgerEntry extends Model
     protected function casts(): array
     {
         return [
-            'type'          => AiLedgerEntryType::class,
-            'provider'      => AiProvider::class,
-            'amount'        => 'integer',
-            'balance_after' => 'integer',
-            'metadata'      => 'array',
-            'created_at'    => 'datetime',
-            'updated_at'    => 'datetime',
+            'type'                => AiLedgerEntryType::class,
+            'provider'            => AiProvider::class,
+            'amount_cents'        => 'integer',
+            'balance_after_cents' => 'integer',
+            'metadata'            => 'array',
+            'created_at'          => 'datetime',
+            'updated_at'          => 'datetime',
         ];
     }
 

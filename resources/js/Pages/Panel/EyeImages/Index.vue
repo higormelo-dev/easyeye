@@ -65,7 +65,7 @@ const props = defineProps({
 });
 
 const { getPreference: getPedalPreference } = useUserPreferences();
-const { date, dateTime } = useLocaleFormat();
+const { date, dateTime, moneyCents } = useLocaleFormat();
 
 // Pedal USB (Fase 5 / 7b) — mesma tecla "avançar" configurada na captura
 // (ImportExternalExamModal) também passa pra próxima imagem aqui no
@@ -1443,7 +1443,7 @@ const aiModalOpen = ref(false);
 const aiEstimating = ref(false);
 const aiSubmitting = ref(false);
 const aiEstimate = ref(null);
-const aiBalance = reactive({ available: '—', reserved: '—' });
+const aiBalance = reactive({ available_cents: null, reserved_cents: null });
 
 // Motivo de o "Executar IA" estar desabilitado — exibido no rodapé + tooltip.
 // A estimativa é opcional: o custo é calculado/reservado no servidor ao executar.
@@ -1603,8 +1603,8 @@ async function estimateAiRun() {
     try {
         const { data } = await window.axios.post(route('panel.ai-runs.estimate'), aiPayload());
         aiEstimate.value = data?.estimate ?? null;
-        aiBalance.available = data?.balance?.available ?? '—';
-        aiBalance.reserved = data?.balance?.reserved ?? '—';
+        aiBalance.available_cents = data?.balance?.available_cents ?? null;
+        aiBalance.reserved_cents = data?.balance?.reserved_cents ?? null;
     } catch (error) {
         setAiAlert('danger', aiErrorMessage(error, aiLabel('estimate_failed', 'Falha ao estimar custo.')));
     } finally {
@@ -4210,11 +4210,11 @@ const printEntity = computed(() => props.entity ?? {});
                     <div class="modal-body">
                         <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
                             <span
-                                ><strong>{{ aiBalance.available }}</strong>
-                                {{ aiLabel('credits_available', 'Créditos disponíveis') }}</span
+                                ><strong>{{ moneyCents(aiBalance.available_cents) }}</strong>
+                                {{ aiLabel('credits_available', 'Saldo de IA disponível') }}</span
                             >
                             <span class="text-warning"
-                                ><strong>{{ aiBalance.reserved }}</strong>
+                                ><strong>{{ moneyCents(aiBalance.reserved_cents) }}</strong>
                                 {{ aiLabel('credits_reserved', 'Reservados') }}</span
                             >
                         </div>
@@ -4324,8 +4324,8 @@ const printEntity = computed(() => props.entity ?? {});
                         <div v-if="aiEstimate" class="border rounded p-2 bg-light small">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span>
-                                    <strong>{{ aiLabel('estimated_credits', 'Créditos estimados') }}:</strong>
-                                    {{ aiEstimate.normalized_credits ?? '—' }}
+                                    <strong>{{ aiLabel('estimated_credits', 'Valor estimado') }}:</strong>
+                                    {{ moneyCents(aiEstimate.charge_cents) }}
                                 </span>
                                 <span class="text-muted">{{ aiWorkflowLabel(aiEstimate.workflow) }}</span>
                             </div>

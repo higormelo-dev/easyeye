@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Support\Fiscal;
 
-use App\Domains\AI\Models\AiCreditPurchase;
 use App\Enums\BillingCycle;
 use App\Models\Billing\Invoice;
+use App\Support\Money;
 use Illuminate\Support\Facades\App;
 
 /**
  * Texto da discriminação do serviço (municipal) / descrição do serviço (nacional) a partir do modelo configurado no
- * Manager. Placeholders: {plano}, {ciclo}, {periodo}, {fatura}, {creditos}, {cliente}.
+ * Manager. Placeholders: {plano}, {ciclo}, {periodo}, {fatura}, {valor} (R$ da fatura), {cliente}. {creditos} é legado: não é mais
+ * preenchido (o pacote de IA é vendido em reais) e some do texto — revise modelos customizados no manager.
  *
  * Placeholder sem valor some, e o que ele deixaria torto também: parênteses vazios e espaços repetidos. Placeholder que
  * não existe vira vazio (um erro de digitação no modelo nunca vaza `{xyz}` para a nota fiscal). O resultado respeita o
@@ -21,7 +22,7 @@ final class NfseDiscriminacao
 {
     public const MAX_LENGTH = 1000;
 
-    public const PLACEHOLDERS = ['plano', 'ciclo', 'periodo', 'fatura', 'creditos', 'cliente'];
+    public const PLACEHOLDERS = ['plano', 'ciclo', 'periodo', 'fatura', 'valor', 'cliente', 'creditos'];
 
     /**
      * Texto da nota de uma fatura: modelo do pacote de IA ou da assinatura, preenchido com os dados dela. Sempre em
@@ -43,19 +44,15 @@ final class NfseDiscriminacao
                 ? $invoice->period_start->format('d/m/Y') . ' a ' . $invoice->period_end->format('d/m/Y')
                 : ($invoice->paid_at ?? $invoice->created_at)?->format('d/m/Y');
 
-            $credits = $invoice->isAiCreditPack()
-                ? AiCreditPurchase::query()->where('invoice_id', $invoice->id)->value('credits')
-                : null;
-
             return self::render(
                 $settings->discriminacao($invoice->isAiCreditPack() ? 'ia' : 'plano'),
                 [
-                    'plano'    => $invoice->plan?->name ?? $invoice->subscription?->plan?->name,
-                    'ciclo'    => $cycle?->label(),
-                    'periodo'  => $period,
-                    'fatura'   => $invoice->reference,
-                    'creditos' => $credits !== null ? number_format((int) $credits, 0, ',', '.') : null,
-                    'cliente'  => $invoice->entity?->name,
+                    'plano'   => $invoice->plan?->name ?? $invoice->subscription?->plan?->name,
+                    'ciclo'   => $cycle?->label(),
+                    'periodo' => $period,
+                    'fatura'  => $invoice->reference,
+                    'valor'   => Money::formatBrl((int) round(((float) $invoice->amount) * 100)),
+                    'cliente' => $invoice->entity?->name,
                 ],
                 // O teto do municipal varia por prefeitura (config); o builder nacional corta nos 1000 da DPS.
                 max(self::MAX_LENGTH, (int) config('fiscal.limits.discriminacao', 2000)),

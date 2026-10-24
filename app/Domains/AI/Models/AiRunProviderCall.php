@@ -31,7 +31,7 @@ class AiRunProviderCall extends Model
         'reasoning_tokens',
         'tool_calls_count',
         'raw_cost_usd',
-        'normalized_credits',
+        'normalized_charge_cents',
         'latency_ms',
         'request_hash',
         'response_hash',
@@ -42,18 +42,18 @@ class AiRunProviderCall extends Model
     protected function casts(): array
     {
         return [
-            'provider'           => AiProvider::class,
-            'role'               => AiProviderCallRole::class,
-            'input_tokens'       => 'integer',
-            'output_tokens'      => 'integer',
-            'reasoning_tokens'   => 'integer',
-            'tool_calls_count'   => 'integer',
-            'raw_cost_usd'       => 'decimal:8',
-            'normalized_credits' => 'integer',
-            'latency_ms'         => 'integer',
-            'metadata'           => 'array',
-            'created_at'         => 'datetime',
-            'updated_at'         => 'datetime',
+            'provider'                => AiProvider::class,
+            'role'                    => AiProviderCallRole::class,
+            'input_tokens'            => 'integer',
+            'output_tokens'           => 'integer',
+            'reasoning_tokens'        => 'integer',
+            'tool_calls_count'        => 'integer',
+            'raw_cost_usd'            => 'decimal:8',
+            'normalized_charge_cents' => 'integer',
+            'latency_ms'              => 'integer',
+            'metadata'                => 'array',
+            'created_at'              => 'datetime',
+            'updated_at'              => 'datetime',
         ];
     }
 

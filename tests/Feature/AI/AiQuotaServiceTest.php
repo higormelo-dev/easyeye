@@ -44,14 +44,14 @@ it('mostra franquia, usado, renovação e saldo avulso da carteira', function ()
     $snap = $this->service->snapshot($this->entity->id);
 
     expect($snap)->toMatchArray([
-        'monthly_quota'     => 80,
-        'consumed_credits'  => 20,
-        'remaining'         => 60,
-        'usage_percent'     => 25.0,
-        'renews_on'         => '2026-11-04',
-        'expires_on'        => null,
-        'purchased_balance' => 15,
-        'available'         => 75,
+        'monthly_quota_cents'           => 80,
+        'monthly_quota_used_cents'      => 20,
+        'monthly_quota_remaining_cents' => 60,
+        'usage_percent'                 => 25.0,
+        'renews_on'                     => '2026-11-04',
+        'expires_on'                    => null,
+        'purchased_balance_cents'       => 15,
+        'available_cents'               => 75,
     ]);
 });
 
@@ -66,11 +66,11 @@ it('assinatura que não ganha franquia não promete renovação: a cota que sobr
 
     expect($current->fresh()->earnsMonthlyAiQuota())->toBeFalse()
         ->and($this->service->snapshot($this->entity->id))->toMatchArray([
-            'monthly_quota'    => 80,
-            'consumed_credits' => 30,
-            'remaining'        => 50,
-            'renews_on'        => null,
-            'expires_on'       => '2026-12-31',
+            'monthly_quota_cents'           => 80,
+            'monthly_quota_used_cents'      => 30,
+            'monthly_quota_remaining_cents' => 50,
+            'renews_on'                     => null,
+            'expires_on'                    => '2026-12-31',
         ]);
 })->with([
     // Convertida em cortesia pelas migrações, com a cota antiga ainda em vigor.
@@ -102,11 +102,11 @@ it('é igual ao que a carteira libera para a reserva', function () {
     $snap    = $this->service->snapshot($this->entity->id);
     $balance = $this->wallet->balance($this->entity->id);
 
-    expect($snap['available'])->toBe($balance['available'])
-        ->and($snap['remaining'])->toBe($balance['quota_remaining'])
-        ->and($snap['consumed_credits'])->toBe($balance['quota_used'])
-        ->and($snap['monthly_quota'])->toBe($balance['quota_total'])
-        ->and($snap['available'])->toBe(3);
+    expect($snap['available_cents'])->toBe($balance['available_cents'])
+        ->and($snap['monthly_quota_remaining_cents'])->toBe($balance['quota_remaining_cents'])
+        ->and($snap['monthly_quota_used_cents'])->toBe($balance['quota_used_cents'])
+        ->and($snap['monthly_quota_cents'])->toBe($balance['quota_total_cents'])
+        ->and($snap['available_cents'])->toBe(3);
 });
 
 it('rascunho rejeitado continua contando (a reserva consumida não volta)', function () {
@@ -115,13 +115,13 @@ it('rascunho rejeitado continua contando (a reserva consumida não volta)', func
     $run = AiRun::factory()->create(['entity_id' => $this->entity->id, 'status' => AiRunStatus::Reserved->value]);
     $this->wallet->reserve($this->entity->id, 30, aiRunId: $run->id);
     $this->wallet->consumeReservation($this->entity->id, 30, aiRunId: $run->id);
-    $run->update(['status' => AiRunStatus::Rejected->value, 'consumed_credits' => 30]);
+    $run->update(['status' => AiRunStatus::Rejected->value, 'consumed_charge_cents' => 30]);
 
     $snap = $this->service->snapshot($this->entity->id);
 
     // O medidor antigo (ai_runs aprovados do mês) mostraria 0/30 e o botão liberado.
-    expect($snap['consumed_credits'])->toBe(30)
-        ->and($snap['available'])->toBe(0);
+    expect($snap['monthly_quota_used_cents'])->toBe(30)
+        ->and($snap['available_cents'])->toBe(0);
 });
 
 it('não zera na virada do mês civil, só na virada da janela', function () {
@@ -131,19 +131,19 @@ it('não zera na virada do mês civil, só na virada da janela', function () {
 
     Carbon::setTestNow('2026-02-02 09:00:00');
     expect($this->service->snapshot($this->entity->id))
-        ->toMatchArray(['consumed_credits' => 80, 'remaining' => 0, 'usage_percent' => 100.0]);
+        ->toMatchArray(['monthly_quota_used_cents' => 80, 'monthly_quota_remaining_cents' => 0, 'usage_percent' => 100.0]);
 
     // Janela vencida (sem nova concessão): não há franquia em vigor.
     Carbon::setTestNow('2026-02-20 00:00:01');
     expect($this->service->snapshot($this->entity->id))
-        ->toMatchArray(['monthly_quota' => 0, 'consumed_credits' => 0, 'usage_percent' => null, 'renews_on' => null]);
+        ->toMatchArray(['monthly_quota_cents' => 0, 'monthly_quota_used_cents' => 0, 'usage_percent' => null, 'renews_on' => null]);
 });
 
 it('empresa sem carteira tem medidor zerado', function () {
     $snap = $this->service->snapshot($this->entity->id);
 
-    expect($snap['monthly_quota'])->toBe(0)
-        ->and($snap['available'])->toBe(0)
+    expect($snap['monthly_quota_cents'])->toBe(0)
+        ->and($snap['available_cents'])->toBe(0)
         ->and($snap['usage_percent'])->toBeNull()
         ->and(AiCreditWallet::query()->where('entity_id', $this->entity->id)->exists())->toBeFalse();
 });

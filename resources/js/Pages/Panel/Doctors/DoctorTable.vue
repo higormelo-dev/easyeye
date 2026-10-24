@@ -80,7 +80,7 @@ const columnMenuLabels = computed(() => ({
             :title="t.columns_customize ?? 'Personalizar colunas'"
             align="right"
             :min-width="230"
-            btn-class="bg-body border shadow-sm rounded px-2 py-1 d-flex align-items-center gap-1 fs-13 text-muted"
+            btn-class="btn btn-white"
         >
             <template #trigger>
                 <i class="ti ti-adjustments" aria-hidden="true"></i>

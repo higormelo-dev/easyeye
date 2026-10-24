@@ -12,8 +12,8 @@ it('troca cada placeholder pelo valor', function () {
 });
 
 it('renderiza o modelo do pacote de IA e o do cliente', function () {
-    expect(NfseDiscriminacao::render('Pacote de créditos de IA ({creditos} créditos) — fatura {fatura}', ['creditos' => 500, 'fatura' => 'INV-9']))
-        ->toBe('Pacote de créditos de IA (500 créditos) — fatura INV-9')
+    expect(NfseDiscriminacao::render('Pacote de saldo de IA ({valor}) — fatura {fatura}', ['valor' => 'R$ 5,00', 'fatura' => 'INV-9']))
+        ->toBe('Pacote de saldo de IA (R$ 5,00) — fatura INV-9')
         ->and(NfseDiscriminacao::render('Serviços para {cliente}', ['cliente' => 'CLINICA X']))->toBe('Serviços para CLINICA X');
 });
 
@@ -50,5 +50,5 @@ it('não interpreta o valor como modelo (valor com chaves não vira outro placeh
 });
 
 it('expõe a lista de placeholders aceitos', function () {
-    expect(NfseDiscriminacao::PLACEHOLDERS)->toBe(['plano', 'ciclo', 'periodo', 'fatura', 'creditos', 'cliente']);
+    expect(NfseDiscriminacao::PLACEHOLDERS)->toBe(['plano', 'ciclo', 'periodo', 'fatura', 'valor', 'cliente', 'creditos']);
 });

@@ -16,22 +16,22 @@ class AiRunProviderCallFactory extends Factory
     public function definition(): array
     {
         return [
-            'ai_run_id'          => AiRun::factory(),
-            'provider'           => AiProvider::OpenAI->value,
-            'model'              => 'gpt-4o-mini',
-            'role'               => AiProviderCallRole::Generator->value,
-            'status'             => 'completed',
-            'input_tokens'       => $this->faker->numberBetween(200, 5000),
-            'output_tokens'      => $this->faker->numberBetween(100, 2000),
-            'reasoning_tokens'   => null,
-            'tool_calls_count'   => 0,
-            'raw_cost_usd'       => $this->faker->randomFloat(8, 0.0001, 0.05),
-            'normalized_credits' => $this->faker->numberBetween(1, 10),
-            'latency_ms'         => $this->faker->numberBetween(200, 4000),
-            'request_hash'       => hash('sha256', (string) $this->faker->uuid()),
-            'response_hash'      => hash('sha256', (string) $this->faker->uuid()),
-            'metadata'           => null,
-            'error_message'      => null,
+            'ai_run_id'               => AiRun::factory(),
+            'provider'                => AiProvider::OpenAI->value,
+            'model'                   => 'gpt-4o-mini',
+            'role'                    => AiProviderCallRole::Generator->value,
+            'status'                  => 'completed',
+            'input_tokens'            => $this->faker->numberBetween(200, 5000),
+            'output_tokens'           => $this->faker->numberBetween(100, 2000),
+            'reasoning_tokens'        => null,
+            'tool_calls_count'        => 0,
+            'raw_cost_usd'            => $this->faker->randomFloat(8, 0.0001, 0.05),
+            'normalized_charge_cents' => $this->faker->numberBetween(1, 100),
+            'latency_ms'              => $this->faker->numberBetween(200, 4000),
+            'request_hash'            => hash('sha256', (string) $this->faker->uuid()),
+            'response_hash'           => hash('sha256', (string) $this->faker->uuid()),
+            'metadata'                => null,
+            'error_message'           => null,
         ];
     }
 
@@ -48,9 +48,9 @@ class AiRunProviderCallFactory extends Factory
     public function failed(string $reason = 'Provider error'): static
     {
         return $this->state([
-            'status'             => 'failed',
-            'error_message'      => $reason,
-            'normalized_credits' => 0,
+            'status'                  => 'failed',
+            'error_message'           => $reason,
+            'normalized_charge_cents' => 0,
         ]);
     }
 }

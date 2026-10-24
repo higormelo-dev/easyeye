@@ -19,6 +19,6 @@ interface AiRunProviderCallStoreInterface
         ?AiProviderResponseData $response = null,
         ?string $errorMessage = null,
         array $metadata = [],
-        ?int $normalizedCredits = null,
+        ?int $normalizedChargeCents = null,
     ): void;
 }

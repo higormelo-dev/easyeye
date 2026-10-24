@@ -131,7 +131,8 @@ class AiUsageController extends Controller
                 (string) $row['calls'],
                 (string) $row['failed_calls'],
                 implode(', ', $row['providers']),
-                (string) $row['credits'],
+                // Valor cobrado da clínica em R$ (texto já formatado: o escritor de CSV põe 2 casas em todo número).
+                number_format(((int) $row['charge_cents']) / 100, 2, $decimal, ''),
                 number_format((float) $row['cost_usd'], 6, $decimal, ''),
                 (float) $row['cost_brl'],
                 $row['id'],

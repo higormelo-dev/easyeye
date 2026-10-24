@@ -33,7 +33,7 @@ test('store persiste call com response completa (success path)', function () {
         status: 'success',
         response: $response,
         metadata: ['workflow' => 'report_drafting', 'provider' => 'openai'],
-        normalizedCredits: 5,
+        normalizedChargeCents: 5,
     );
 
     $call = AiRunProviderCall::query()->where('ai_run_id', $run->id)->firstOrFail();
@@ -47,7 +47,7 @@ test('store persiste call com response completa (success path)', function () {
     expect($call->reasoning_tokens)->toBe(10);
     expect($call->tool_calls_count)->toBe(2);
     expect((float) $call->raw_cost_usd)->toBe(0.0123);
-    expect($call->normalized_credits)->toBe(5);
+    expect($call->normalized_charge_cents)->toBe(5);
     expect($call->latency_ms)->toBe(250);
     expect($call->request_hash)->not->toBeNull();
     expect($call->response_hash)->not->toBeNull();
@@ -64,7 +64,7 @@ test('store persiste call com response=null (provider falhou antes de responder)
         response: null,
         errorMessage: 'Timeout na chamada ao provider Anthropic.',
         metadata: ['workflow' => 'report_drafting', 'provider' => 'anthropic'],
-        normalizedCredits: null,
+        normalizedChargeCents: null,
     );
 
     $call = AiRunProviderCall::query()->where('ai_run_id', $run->id)->firstOrFail();
@@ -76,6 +76,6 @@ test('store persiste call com response=null (provider falhou antes de responder)
     expect($call->input_tokens)->toBeNull();
     expect($call->output_tokens)->toBeNull();
     expect($call->tool_calls_count)->toBe(0); // default DB
-    expect($call->normalized_credits)->toBeNull();
+    expect($call->normalized_charge_cents)->toBeNull();
     expect($call->error_message)->toBe('Timeout na chamada ao provider Anthropic.');
 });

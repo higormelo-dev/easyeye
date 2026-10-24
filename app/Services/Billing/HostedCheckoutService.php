@@ -12,6 +12,7 @@ use App\Exceptions\Billing\{CheckoutException, GatewayIntegrationException};
 use App\Models\Billing\{HostedCheckout, Invoice};
 use App\Models\{Entity, Subscription};
 use App\Support\Billing\HostedCheckoutReference;
+use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\{DB, Log};
@@ -405,7 +406,7 @@ class HostedCheckoutService
     private function itemName(Invoice $invoice, ?Subscription $subscription): string
     {
         $name = $invoice->isAiCreditPack()
-            ? __('checkout.hosted.item_ai_pack', ['credits' => (int) data_get($invoice->metadata, 'credits', 0)])
+            ? __('checkout.hosted.item_ai_pack', ['value' => Money::formatBrl((int) data_get($invoice->metadata, 'wallet_credit_cents', (int) round(((float) $invoice->amount) * 100)))])
             : ($invoice->isPlanChange()
                 ? __('checkout.hosted.item_upgrade', ['plan' => (string) data_get($invoice->metadata, 'plan_change.plan_name', '')])
                 : __('checkout.hosted.item_subscription', ['plan' => (string) ($subscription?->plan?->name ?? '')]));

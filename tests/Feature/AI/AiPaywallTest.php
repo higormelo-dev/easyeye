@@ -63,7 +63,7 @@ test('cortesia sem créditos: 422 com código estável e oferta de compra para o
 
     $response->assertStatus(422)
         ->assertJsonPath('code', 'ai_insufficient_credits')
-        ->assertJsonPath('details.available', 0)
+        ->assertJsonPath('details.available_cents', 0)
         ->assertJsonPath('paywall.code', 'ai_insufficient_credits')
         ->assertJsonPath('paywall.reason', 'complimentary')
         ->assertJsonPath('paywall.can_purchase', true)
@@ -125,7 +125,7 @@ test('cortesia com a cota que sobrou da assinatura paga: medidor e paywall conta
 
     // Medidor: sem "renova em" — a cota vale até 15/11.
     expect(app(AiQuotaService::class)->snapshot($this->entity->id))
-        ->toMatchArray(['monthly_quota' => 80, 'consumed_credits' => 80, 'renews_on' => null, 'expires_on' => '2026-11-15']);
+        ->toMatchArray(['monthly_quota_cents' => 80, 'monthly_quota_used_cents' => 80, 'renews_on' => null, 'expires_on' => '2026-11-15']);
 
     // Paywall: a cota que restava (válida até 15/11) acabou e não renova.
     $response = $this->actingAs($this->admin)
@@ -172,7 +172,8 @@ test('contratação aguardando o 1º pagamento: a franquia começa quando o paga
     app()->setLocale('en');
 
     expect(app(AiPaywallService::class)->describe($this->entity->id, ClientRule::Admin->value)['texts']['message'])
-        ->toBe('The monthly AI allowance starts once the first invoice payment is confirmed. Until then, the clinic needs extra credits to use AI.');
+        ->toBe(__('ai.paywall.reasons.awaiting_payment', [], 'en'))
+        ->not->toBe(__('ai.paywall.reasons.awaiting_payment', [], 'pt_BR'));
 });
 
 test('virada da janela antes do agendador: a execução recebe a janela vigente em vez do paywall', function () {
@@ -193,18 +194,18 @@ test('virada da janela antes do agendador: a execução recebe a janela vigente 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->sole();
     $grants = fn () => AiCreditLedgerEntry::query()->where('entity_id', $this->entity->id)->where('type', AiLedgerEntryType::Grant->value)->count();
 
-    expect($wallet->monthly_quota)->toBe(80)
-        ->and($wallet->monthly_quota_used)->toBeGreaterThan(0)
+    expect($wallet->monthly_quota_cents)->toBe(80)
+        ->and($wallet->monthly_quota_used_cents)->toBeGreaterThan(0)
         ->and($wallet->quota_period_ends_at->toDateString())->toBe('2026-12-04')
         ->and($grants())->toBe(2);
 
     // O agendador (mesma chave da janela) não concede de novo nem zera o consumo.
-    $used = $wallet->monthly_quota_used;
+    $used = $wallet->monthly_quota_used_cents;
     Carbon::setTestNow('2026-11-04 00:20:00');
     $this->artisan('ai:grant-monthly-quotas')->assertSuccessful();
 
     expect($grants())->toBe(2)
-        ->and($wallet->fresh()->monthly_quota_used)->toBe($used)
+        ->and($wallet->fresh()->monthly_quota_used_cents)->toBe($used)
         ->and(AiCreditLedgerEntry::query()->where('idempotency_key', "ai-quota-window:{$subscription->id}:2026-11-04")->count())->toBe(1);
 });
 
@@ -240,7 +241,7 @@ test('textos do paywall seguem o idioma do usuário', function () {
     app()->setLocale('en');
     $paywall = app(AiPaywallService::class)->describe($this->entity->id, ClientRule::Admin->value);
 
-    expect($paywall['texts']['buy'])->toBe('Buy credits')
+    expect($paywall['texts']['buy'])->toBe('Add AI balance')
         ->and($paywall['texts']['message'])->toContain('complimentary');
 });
 
@@ -253,8 +254,8 @@ test('assistente flutuante (médico) recebe medidor da carteira e paywall sem co
     $props = app(AiAssistantWidgetPropsBuilder::class)->build($this->entity->id, ClientRule::Doctor->value);
 
     expect($props['enabled'])->toBeTrue()
-        ->and($props['quota']['monthly_quota'])->toBe(80)
-        ->and($props['quota']['consumed_credits'])->toBe(30)
+        ->and($props['quota']['monthly_quota_cents'])->toBe(80)
+        ->and($props['quota']['monthly_quota_used_cents'])->toBe(30)
         ->and($props['quota']['renews_on'])->toBe('2026-11-04')
         ->and($props['paywall']['can_purchase'])->toBeFalse();
 });

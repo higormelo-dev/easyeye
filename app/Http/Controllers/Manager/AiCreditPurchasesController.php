@@ -13,6 +13,7 @@ use App\Models\Billing\Invoice;
 use App\Models\Entity;
 use App\Services\Audit\AuditLogger;
 use App\Support\Fiscal\NfseManagerPresenter;
+use App\Support\Money;
 use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Http\{JsonResponse, Request};
@@ -36,7 +37,8 @@ use Inertia\{Inertia, Response as InertiaResponse};
 class AiCreditPurchasesController extends Controller
 {
     /** Limite diário (em créditos) para usuários Support criarem manual. Admin/Financial: sem limite. */
-    private const SUPPORT_DAILY_LIMIT = 500;
+    /** Teto diário do suporte (centavos de BRL): R$ 500,00. */
+    private const SUPPORT_DAILY_LIMIT_CENTS = 50000;
 
     public function __construct(
         private readonly AiCreditPurchaseService $purchaseService,
@@ -133,7 +135,9 @@ class AiCreditPurchasesController extends Controller
                 'create_manual_for_internal' => Gate::allows(EntityGate::SaasAdminPanel->value, $this->currentSaasEntity()),
                 'create_topup'               => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
                 'delete_topup'               => Gate::allows(EntityGate::SaasAdminPanel->value, $this->currentSaasEntity()),
-                'support_daily_limit'        => self::SUPPORT_DAILY_LIMIT,
+                'support_daily_limit_cents'  => self::SUPPORT_DAILY_LIMIT_CENTS,
+                // Texto pronto em R$ (a tela só interpola ':limit').
+                'support_daily_limit' => Money::formatBrl(self::SUPPORT_DAILY_LIMIT_CENTS),
             ],
             't' => trans('manager_ai_credit_purchases'),
         ]);
@@ -182,10 +186,10 @@ class AiCreditPurchasesController extends Controller
             auditableId: (string) $purchase->id,
             reason: 'Manual credit by SaaS Manager',
             newValues: [
-                'credits'      => $purchase->credits,
-                'amount_cents' => $purchase->amount_cents,
-                'package_code' => $purchase->package_code,
-                'provider'     => $purchase->provider instanceof AiProvider ? $purchase->provider->value : (string) $purchase->provider,
+                'wallet_credit_cents' => $purchase->wallet_credit_cents,
+                'amount_cents'        => $purchase->amount_cents,
+                'package_code'        => $purchase->package_code,
+                'provider'            => $purchase->provider instanceof AiProvider ? $purchase->provider->value : (string) $purchase->provider,
             ],
             request: $request,
         );
@@ -299,10 +303,10 @@ class AiCreditPurchasesController extends Controller
             auditableId: (string) $purchase->id,
             reason: $validated['reason'],
             newValues: [
-                'credits_revoked' => $purchase->credits,
-                'amount_cents'    => $purchase->amount_cents,
-                'package_code'    => $purchase->package_code,
-                'provider'        => $purchase->provider instanceof AiProvider ? $purchase->provider->value : (string) $purchase->provider,
+                'wallet_credit_cents_revoked' => $purchase->wallet_credit_cents,
+                'amount_cents'                => $purchase->amount_cents,
+                'package_code'                => $purchase->package_code,
+                'provider'                    => $purchase->provider instanceof AiProvider ? $purchase->provider->value : (string) $purchase->provider,
             ],
             request: $request,
         );
@@ -321,7 +325,7 @@ class AiCreditPurchasesController extends Controller
      * RBAC:
      *   - Admin SaaS: pode creditar para qualquer entity (incluindo interna), sem limite.
      *   - Financial : pode creditar para clientes, sem limite. NÃO pode operar na entity interna.
-     *   - Support   : pode creditar para clientes, limitado a SUPPORT_DAILY_LIMIT créditos/dia.
+     *   - Support   : pode creditar para clientes, limitado a SUPPORT_DAILY_LIMIT_CENTS por dia (centavos).
      */
     public function createManual(Request $request): JsonResponse
     {
@@ -330,7 +334,8 @@ class AiCreditPurchasesController extends Controller
         $validated = $request->validate([
             'entity_id' => ['required', 'string', 'uuid', 'exists:entities,id'],
             'kind'      => ['nullable', 'string', Rule::in(['courtesy', 'purchase'])],
-            'credits'   => ['required', 'integer', 'min:1', 'max:1000000'],
+            // Quanto creditar na carteira, em CENTAVOS de BRL (a UI digita em reais): mínimo R$ 1,00, máximo R$ 100.000,00.
+            'wallet_credit_cents' => ['required', 'integer', 'min:100', 'max:10000000'],
             // Valor da compra: aceitamos Reais (UI) e convertemos para centavos.
             // `amount_cents` segue aceito por compatibilidade com chamadas antigas.
             'amount_reais' => ['nullable', 'numeric', 'min:0', 'max:99999.99'],
@@ -339,8 +344,8 @@ class AiCreditPurchasesController extends Controller
             'package_code' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $entity  = Entity::findOrFail($validated['entity_id']);
-        $credits = (int) $validated['credits'];
+        $entity      = Entity::findOrFail($validated['entity_id']);
+        $creditCents = (int) $validated['wallet_credit_cents'];
 
         // Cortesia × Compra: a distinção de domínio é amount_cents == 0 (cortesia)
         // vs > 0 (compra paga fora do app). O package_code documenta a operação.
@@ -367,11 +372,11 @@ class AiCreditPurchasesController extends Controller
         if (! $isFinancialOrAdmin) {
             $usedToday = $this->supportDailyUsage((string) auth()->id());
 
-            if ($usedToday + $credits > self::SUPPORT_DAILY_LIMIT) {
+            if ($usedToday + $creditCents > self::SUPPORT_DAILY_LIMIT_CENTS) {
                 return response()->json([
                     'message' => __('manager_ai_credit_purchases.errors.support_daily_limit_exceeded', [
-                        'limit' => self::SUPPORT_DAILY_LIMIT,
-                        'used'  => $usedToday,
+                        'limit' => Money::formatBrl(self::SUPPORT_DAILY_LIMIT_CENTS),
+                        'used'  => Money::formatBrl($usedToday),
                     ]),
                 ], 422);
             }
@@ -380,7 +385,7 @@ class AiCreditPurchasesController extends Controller
         try {
             $purchase = $this->purchaseService->createManualPurchase(
                 entityId: (string) $entity->id,
-                credits: $credits,
+                walletCreditCents: $creditCents,
                 reason: (string) $validated['reason'],
                 createdBy: (string) auth()->id(),
                 provider: null, // carteira tem saldo único — provedor não roteia crédito
@@ -401,12 +406,12 @@ class AiCreditPurchasesController extends Controller
             auditableId: (string) $purchase->id,
             reason: (string) $validated['reason'],
             newValues: [
-                'credits'          => $credits,
-                'amount_cents'     => $amountCents,
-                'kind'             => $isCourtesy ? 'courtesy' : 'purchase',
-                'package_code'     => $packageCode,
-                'is_internal'      => ! $entity->is_client,
-                'used_daily_quota' => ! $isFinancialOrAdmin,
+                'wallet_credit_cents' => $creditCents,
+                'amount_cents'        => $amountCents,
+                'kind'                => $isCourtesy ? 'courtesy' : 'purchase',
+                'package_code'        => $packageCode,
+                'is_internal'         => ! $entity->is_client,
+                'used_daily_quota'    => ! $isFinancialOrAdmin,
             ],
             request: $request,
         );
@@ -567,7 +572,7 @@ class AiCreditPurchasesController extends Controller
             ->where('requested_by', $userId)
             ->where('created_at', '>=', $startOfDay)
             ->whereIn('package_code', ['manual', 'courtesy'])
-            ->sum('credits');
+            ->sum('wallet_credit_cents');
     }
 
     /**
@@ -587,31 +592,31 @@ class AiCreditPurchasesController extends Controller
         $kind       = $this->purchaseKind($p);
 
         return [
-            'id'               => (string) $p->id,
-            'entity_id'        => (string) $p->entity_id,
-            'entity_name'      => $p->entity?->name,
-            'is_internal'      => $isInternal,
-            'package_code'     => (string) $p->package_code,
-            'package_name'     => $this->packageName((string) $p->package_code),
-            'kind'             => $kind,
-            'kind_label'       => __("manager_ai_credit_purchases.kind.{$kind}"),
-            'provider'         => $provider?->value,
-            'provider_label'   => $provider ? __("ai.providers.{$provider->value}") : null,
-            'credits'          => (int) $p->credits,
-            'amount_cents'     => (int) $p->amount_cents,
-            'amount_formatted' => $this->formatMoney((int) $p->amount_cents, (string) $p->currency),
-            'currency'         => (string) $p->currency,
-            'status'           => $status?->value ?? (string) $p->status,
-            'status_label'     => $status ? __("ai.credit_purchase_status.{$status->value}") : (string) $p->status,
-            'status_badge'     => $this->statusBadge($status),
-            'requested_by'     => $p->requestedBy?->name,
-            'requested_email'  => $p->requestedBy?->email,
-            'created_at'       => $p->created_at?->format('d/m/Y H:i'),
-            'credited_at'      => $p->credited_at?->format('d/m/Y H:i'),
-            'cancelled_at'     => $p->cancelled_at?->format('d/m/Y H:i'),
-            'failed_at'        => $p->failed_at?->format('d/m/Y H:i'),
-            'refunded_at'      => $p->refunded_at?->format('d/m/Y H:i'),
-            'actions_url'      => [
+            'id'                  => (string) $p->id,
+            'entity_id'           => (string) $p->entity_id,
+            'entity_name'         => $p->entity?->name,
+            'is_internal'         => $isInternal,
+            'package_code'        => (string) $p->package_code,
+            'package_name'        => $this->packageName((string) $p->package_code),
+            'kind'                => $kind,
+            'kind_label'          => __("manager_ai_credit_purchases.kind.{$kind}"),
+            'provider'            => $provider?->value,
+            'provider_label'      => $provider ? __("ai.providers.{$provider->value}") : null,
+            'wallet_credit_cents' => (int) ($p->wallet_credit_cents ?? 0),
+            'amount_cents'        => (int) $p->amount_cents,
+            'amount_formatted'    => $this->formatMoney((int) $p->amount_cents, (string) $p->currency),
+            'currency'            => (string) $p->currency,
+            'status'              => $status?->value ?? (string) $p->status,
+            'status_label'        => $status ? __("ai.credit_purchase_status.{$status->value}") : (string) $p->status,
+            'status_badge'        => $this->statusBadge($status),
+            'requested_by'        => $p->requestedBy?->name,
+            'requested_email'     => $p->requestedBy?->email,
+            'created_at'          => $p->created_at?->format('d/m/Y H:i'),
+            'credited_at'         => $p->credited_at?->format('d/m/Y H:i'),
+            'cancelled_at'        => $p->cancelled_at?->format('d/m/Y H:i'),
+            'failed_at'           => $p->failed_at?->format('d/m/Y H:i'),
+            'refunded_at'         => $p->refunded_at?->format('d/m/Y H:i'),
+            'actions_url'         => [
                 'show'   => route('manager.ai-credit-purchases.show', $p),
                 'credit' => route('manager.ai-credit-purchases.credit', $p),
                 'cancel' => route('manager.ai-credit-purchases.cancel', $p),
@@ -643,10 +648,10 @@ class AiCreditPurchasesController extends Controller
             ->where('status', AiCreditPurchaseStatus::Credited)
             ->where('credited_at', '>=', $startOfMonth)
             ->selectRaw('COUNT(*) as cnt')
-            ->selectRaw('COALESCE(SUM(credits), 0) as credits')
+            ->selectRaw('COALESCE(SUM(wallet_credit_cents), 0) as wallet_credit_cents')
             ->selectRaw('COALESCE(SUM(amount_cents), 0) as amount_cents')
-            ->selectRaw('COALESCE(SUM(CASE WHEN amount_cents = 0 THEN credits ELSE 0 END), 0) as courtesy_credits')
-            ->selectRaw('COALESCE(SUM(CASE WHEN amount_cents > 0 THEN credits ELSE 0 END), 0) as paid_credits')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount_cents = 0 THEN wallet_credit_cents ELSE 0 END), 0) as courtesy_wallet_credit_cents')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount_cents > 0 THEN wallet_credit_cents ELSE 0 END), 0) as paid_wallet_credit_cents')
             ->first();
 
         $pending = AiCreditPurchase::query()
@@ -656,12 +661,12 @@ class AiCreditPurchasesController extends Controller
 
         return [
             'distributed_mtd' => [
-                'count'            => (int) ($distributed->cnt ?? 0),
-                'credits'          => (int) ($distributed->credits ?? 0),
-                'courtesy_credits' => (int) ($distributed->courtesy_credits ?? 0),
-                'paid_credits'     => (int) ($distributed->paid_credits ?? 0),
-                'amount_cents'     => (int) ($distributed->amount_cents ?? 0),
-                'amount_formatted' => $this->formatMoney((int) ($distributed->amount_cents ?? 0), 'BRL'),
+                'count'                        => (int) ($distributed->cnt ?? 0),
+                'wallet_credit_cents'          => (int) ($distributed->wallet_credit_cents ?? 0),
+                'courtesy_wallet_credit_cents' => (int) ($distributed->courtesy_wallet_credit_cents ?? 0),
+                'paid_wallet_credit_cents'     => (int) ($distributed->paid_wallet_credit_cents ?? 0),
+                'amount_cents'                 => (int) ($distributed->amount_cents ?? 0),
+                'amount_formatted'             => $this->formatMoney((int) ($distributed->amount_cents ?? 0), 'BRL'),
             ],
             'pending' => [
                 'count'            => (int) ($pending->cnt ?? 0),
@@ -672,9 +677,9 @@ class AiCreditPurchasesController extends Controller
     }
 
     /**
-     * Consumo de créditos por provedor nos últimos 30 dias (agregado em todas as entities).
+     * Consumo de saldo (centavos de BRL) por provedor nos últimos 30 dias (agregado em todas as entities).
      *
-     * @return array<string, array{credits:int,percent:float,label:string}>
+     * @return array<string, array{charge_cents:int,percent:float,label:string}>
      */
     private function consumptionByProviderLast30Days(): array
     {
@@ -685,20 +690,20 @@ class AiCreditPurchasesController extends Controller
             ->whereNotNull('provider')
             ->where('created_at', '>=', $thirtyDaysAgo)
             ->select('provider')
-            ->selectRaw("COALESCE(SUM((metadata->>'consumed_from_reservation')::int), 0) as credits_consumed")
+            ->selectRaw("COALESCE(SUM((metadata->>'consumed_from_reservation_cents')::bigint), 0) as charge_cents_consumed")
             ->groupBy('provider')
             ->get()
             ->keyBy('provider');
 
-        $total  = (int) $rows->sum('credits_consumed');
+        $total  = (int) $rows->sum('charge_cents_consumed');
         $result = [];
 
         foreach (AiProvider::cases() as $provider) {
-            $credits                  = (int) ($rows[$provider->value]->credits_consumed ?? 0);
+            $credits                  = (int) ($rows[$provider->value]->charge_cents_consumed ?? 0);
             $result[$provider->value] = [
-                'credits' => $credits,
-                'percent' => $total > 0 ? round($credits / $total * 100, 1) : 0.0,
-                'label'   => __("ai.providers.{$provider->value}"),
+                'charge_cents' => $credits,
+                'percent'      => $total > 0 ? round($credits / $total * 100, 1) : 0.0,
+                'label'        => __("ai.providers.{$provider->value}"),
             ];
         }
 
@@ -722,22 +727,22 @@ class AiCreditPurchasesController extends Controller
                 'ai_credit_purchases.entity_id',
                 'entities.name as entity_name',
                 'entities.is_client',
-                DB::raw('SUM(ai_credit_purchases.credits) as credits_total'),
+                DB::raw('SUM(ai_credit_purchases.wallet_credit_cents) as wallet_credit_cents_total'),
                 DB::raw('SUM(ai_credit_purchases.amount_cents) as amount_total'),
                 DB::raw('COUNT(*) as purchases_total'),
             ])
             ->groupBy('ai_credit_purchases.entity_id', 'entities.name', 'entities.is_client')
-            ->orderByDesc('credits_total')
+            ->orderByDesc('wallet_credit_cents_total')
             ->limit(5)
             ->get()
             ->map(fn ($row) => [
-                'entity_id'        => (string) $row->entity_id,
-                'entity_name'      => $row->entity_name,
-                'is_internal'      => ! (bool) $row->is_client,
-                'credits_total'    => (int) $row->credits_total,
-                'amount_total'     => (int) $row->amount_total,
-                'amount_formatted' => $this->formatMoney((int) $row->amount_total, 'BRL'),
-                'purchases_total'  => (int) $row->purchases_total,
+                'entity_id'                 => (string) $row->entity_id,
+                'entity_name'               => $row->entity_name,
+                'is_internal'               => ! (bool) $row->is_client,
+                'wallet_credit_cents_total' => (int) $row->wallet_credit_cents_total,
+                'amount_total'              => (int) $row->amount_total,
+                'amount_formatted'          => $this->formatMoney((int) $row->amount_total, 'BRL'),
+                'purchases_total'           => (int) $row->purchases_total,
             ])
             ->all();
     }

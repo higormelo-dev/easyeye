@@ -42,10 +42,10 @@ test('grantForSubscription cria cota mensal (não balance comprado)', function (
     // O observer já disparou o grant em created(). Verifica resultado direto.
     $wallet = AiCreditWallet::query()->where('entity_id', $subscription->entity_id)->firstOrFail();
 
-    expect($wallet->balance)->toBe(0);                // cota não vai para balance comprado
-    expect($wallet->monthly_quota)->toBe(80);
-    expect($wallet->monthly_quota_used)->toBe(0);
-    expect($wallet->monthly_quota_lifetime_granted)->toBe(80);
+    expect($wallet->balance_cents)->toBe(0);                // cota não vai para balance comprado
+    expect($wallet->monthly_quota_cents)->toBe(80);
+    expect($wallet->monthly_quota_used_cents)->toBe(0);
+    expect($wallet->monthly_quota_lifetime_granted_cents)->toBe(80);
     expect($wallet->quota_period_ends_at)->not->toBeNull();
 
     $entries = AiCreditLedgerEntry::query()
@@ -54,7 +54,7 @@ test('grantForSubscription cria cota mensal (não balance comprado)', function (
         ->get();
 
     expect($entries)->toHaveCount(1);
-    expect($entries->first()->amount)->toBe(80);
+    expect($entries->first()->amount_cents)->toBe(80);
     expect($entries->first()->subscription_id)->toBe($subscription->id);
     expect($entries->first()->metadata['source'])->toBe('subscription_window');
     expect($entries->first()->metadata['plan_id'])->toBe($plan->id);
@@ -91,8 +91,8 @@ test('grantForSubscription é idempotente para a mesma janela', function () {
     $service->grantMonthlyCreditsForSubscription($subscription->fresh());
 
     $wallet = AiCreditWallet::query()->where('entity_id', $subscription->entity_id)->firstOrFail();
-    expect($wallet->monthly_quota)->toBe(50);
-    expect($wallet->balance)->toBe(0);
+    expect($wallet->monthly_quota_cents)->toBe(50);
+    expect($wallet->balance_cents)->toBe(0);
 
     $count = AiCreditLedgerEntry::query()
         ->where('entity_id', $subscription->entity_id)
@@ -115,9 +115,9 @@ test('ends_at avançando (renovação/Adicionar período) não reinicia a cota d
     $wallet = AiCreditWallet::query()->where('entity_id', $subscription->entity_id)->firstOrFail();
 
     // A janela atual já foi concedida: nada de cota nova nem consumo zerado.
-    expect($wallet->monthly_quota)->toBe(40);
-    expect($wallet->monthly_quota_used)->toBe(25);
-    expect($wallet->monthly_quota_lifetime_granted)->toBe(40);
+    expect($wallet->monthly_quota_cents)->toBe(40);
+    expect($wallet->monthly_quota_used_cents)->toBe(25);
+    expect($wallet->monthly_quota_lifetime_granted_cents)->toBe(40);
 
     $grantCount = AiCreditLedgerEntry::query()
         ->where('entity_id', $subscription->entity_id)
@@ -175,8 +175,8 @@ test('conversão de trial para cobrança automática paga dispara grant uma úni
     $subscription->update(['ends_at' => now()->addMonths(2)->startOfDay()]);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $entity->id)->firstOrFail();
-    expect($wallet->balance)->toBe(0);          // cota não vai para balance comprado
-    expect($wallet->monthly_quota)->toBe(25);
+    expect($wallet->balance_cents)->toBe(0);          // cota não vai para balance comprado
+    expect($wallet->monthly_quota_cents)->toBe(25);
 
     expect(AiCreditLedgerEntry::query()
         ->where('entity_id', $entity->id)

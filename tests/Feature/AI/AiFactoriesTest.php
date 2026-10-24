@@ -9,15 +9,15 @@ uses(RefreshDatabase::class);
 test('AiCreditWalletFactory persiste carteira zerada', function () {
     $wallet = AiCreditWallet::factory()->create();
 
-    expect($wallet->balance)->toBe(0);
-    expect($wallet->reserved_balance)->toBe(0);
+    expect($wallet->balance_cents)->toBe(0);
+    expect($wallet->reserved_balance_cents)->toBe(0);
     expect($wallet->entity_id)->not->toBeNull();
 });
 
 test('AiCreditWalletFactory state withBalance ajusta saldo', function () {
     $wallet = AiCreditWallet::factory()->withBalance(123)->create();
 
-    expect($wallet->balance)->toBe(123);
+    expect($wallet->balance_cents)->toBe(123);
 });
 
 test('AiCreditLedgerEntryFactory cria entry vinculada a carteira', function () {

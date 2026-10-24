@@ -23,7 +23,7 @@ class InMemoryCallStore implements AiRunProviderCallStoreInterface
         ?AiProviderResponseData $response = null,
         ?string $errorMessage = null,
         array $metadata = [],
-        ?int $normalizedCredits = null,
+        ?int $normalizedChargeCents = null,
     ): void {
         $this->entries[] = [
             'ai_run_id' => $aiRunId,
@@ -31,11 +31,11 @@ class InMemoryCallStore implements AiRunProviderCallStoreInterface
             'status'    => $status,
             // Mesma resolução do EloquentAiRunProviderCallStore real: fallback para
             // metadata.provider quando response é null (caso de status=skipped).
-            'provider'           => $response?->provider->value ?? (string) ($metadata['provider'] ?? 'unknown'),
-            'model'              => $response?->model,
-            'error'              => $errorMessage,
-            'normalized_credits' => $normalizedCredits,
-            'metadata'           => $metadata,
+            'provider'                => $response?->provider->value ?? (string) ($metadata['provider'] ?? 'unknown'),
+            'model'                   => $response?->model,
+            'error'                   => $errorMessage,
+            'normalized_charge_cents' => $normalizedChargeCents,
+            'metadata'                => $metadata,
         ];
     }
 }

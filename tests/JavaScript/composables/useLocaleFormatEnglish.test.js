@@ -16,7 +16,7 @@ vi.mock('@inertiajs/vue3', () => ({
 }));
 
 describe('useLocaleFormat (locale en)', () => {
-    const { money, number, date, dateTime } = useLocaleFormat();
+    const { money, moneyCents, number, date, dateTime } = useLocaleFormat();
 
     it('formata moeda em BRL mas no formato en (separador de milhar/decimal invertido)', () => {
         expect(money(1234.5)).toBe('R$1,234.50');
@@ -33,5 +33,11 @@ describe('useLocaleFormat (locale en)', () => {
 
     it('formata data e hora no padrão en', () => {
         expect(dateTime('2026-09-26T14:30:00')).toBe('9/26/26, 2:30 PM');
+    });
+    it('centavos BRL não são interpretados como créditos nem reais inteiros', () => {
+        expect(moneyCents(49900)).toBe('R$499.00');
+        expect(moneyCents(1)).toBe('R$0.01');
+        expect(moneyCents(0)).toBe('R$0.00');
+        expect(moneyCents(null)).toBe('—');
     });
 });

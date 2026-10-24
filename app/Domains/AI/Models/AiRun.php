@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Models;
 
 use App\Domains\AI\Services\AiAnalyticsService;
+use App\DTOs\AI\AiPricingPolicyData;
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Models\Concerns\BelongsToEntity;
 use App\Models\{Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, User};
@@ -39,9 +40,16 @@ class AiRun extends Model
         'status',
         'current_role',
         'current_provider',
-        'estimated_credits',
-        'reserved_credits',
-        'consumed_credits',
+        'estimated_charge_cents',
+        'reserved_charge_cents',
+        'consumed_charge_cents',
+        'estimated_cost_usd',
+        'actual_cost_usd',
+        'exchange_rate_brl_usd',
+        'markup_multiplier',
+        'minimum_charge_cents',
+        'pricing_source',
+        'priced_at',
         'input_summary',
         'final_output',
         'safety_notes',
@@ -57,28 +65,53 @@ class AiRun extends Model
     protected function casts(): array
     {
         return [
-            'mode'                => AiRunMode::class,
-            'risk_level'          => AiRiskLevel::class,
-            'status'              => AiRunStatus::class,
-            'estimated_credits'   => 'integer',
-            'reserved_credits'    => 'integer',
-            'consumed_credits'    => 'integer',
-            'input_summary'       => 'array',
-            'dispatch_audit'      => 'array',
-            'safety_notes'        => 'array',
-            'started_at'          => 'datetime',
-            'approved_at'         => 'datetime',
-            'rejected_at'         => 'datetime',
-            'cancelled_at'        => 'datetime',
-            'notified_pending_at' => 'datetime',
-            'created_at'          => 'datetime',
-            'updated_at'          => 'datetime',
+            'mode'                   => AiRunMode::class,
+            'risk_level'             => AiRiskLevel::class,
+            'status'                 => AiRunStatus::class,
+            'estimated_charge_cents' => 'integer',
+            'reserved_charge_cents'  => 'integer',
+            'consumed_charge_cents'  => 'integer',
+            'estimated_cost_usd'     => 'decimal:8',
+            'actual_cost_usd'        => 'decimal:8',
+            'exchange_rate_brl_usd'  => 'decimal:6',
+            'markup_multiplier'      => 'decimal:3',
+            'minimum_charge_cents'   => 'integer',
+            'priced_at'              => 'datetime',
+            'input_summary'          => 'array',
+            'dispatch_audit'         => 'array',
+            'safety_notes'           => 'array',
+            'started_at'             => 'datetime',
+            'approved_at'            => 'datetime',
+            'rejected_at'            => 'datetime',
+            'cancelled_at'           => 'datetime',
+            'notified_pending_at'    => 'datetime',
+            'created_at'             => 'datetime',
+            'updated_at'             => 'datetime',
         ];
     }
 
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id');
+    }
+
+    /**
+     * Política de preço CONGELADA na execução (câmbio, markup e piso do momento da estimativa): mudar o câmbio/markup no
+     * manager só afeta estimativas novas. Null para execução sem snapshot (legado convertido) — quem liquida usa a política
+     * vigente.
+     */
+    public function pricingPolicy(): ?AiPricingPolicyData
+    {
+        if ($this->exchange_rate_brl_usd === null || $this->markup_multiplier === null || $this->minimum_charge_cents === null) {
+            return null;
+        }
+
+        return new AiPricingPolicyData(
+            exchangeRateBrlUsd: (float) $this->exchange_rate_brl_usd,
+            markupMultiplier: (float) $this->markup_multiplier,
+            minimumChargeCentsDefault: (int) $this->minimum_charge_cents,
+            source: (string) ($this->pricing_source ?? 'manual'),
+        );
     }
 
     public function patient(): BelongsTo
@@ -173,7 +206,7 @@ class AiRun extends Model
 
     /**
      * Invalida o cache analítico da entity sempre que um run salva mudanças
-     * em status ou consumed_credits — campos que influenciam as métricas do
+     * em status ou consumed_charge_cents — campos que influenciam as métricas do
      * dashboard /panel/ai/usage. O medidor da franquia lê a carteira, sem
      * cache (ver AiQuotaService).
      */
@@ -181,7 +214,7 @@ class AiRun extends Model
     {
         static::saved(function (self $run): void {
             $touchedAggregates = $run->wasRecentlyCreated
-                || $run->wasChanged(['status', 'consumed_credits', 'approved_at']);
+                || $run->wasChanged(['status', 'consumed_charge_cents', 'approved_at']);
 
             if (! $touchedAggregates || empty($run->entity_id)) {
                 return;

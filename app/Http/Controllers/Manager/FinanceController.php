@@ -34,7 +34,7 @@ use Inertia\{Inertia, Response as InertiaResponse};
  *
  * Os runs de IA aqui NÃO passam pela carteira de créditos (reserve/consume) —
  * não é um recurso vendável/cobrado de clínica, é ferramenta interna. Criados
- * com estimated/reserved/consumed_credits=0, o que faz AiRunExecutionService
+ * com estimated/reserved/consumed_charge_cents=0, o que faz AiRunExecutionService
  * pular o wallet inteiro (reserved=0 → consumed=min(actual,0)=0 → nenhuma
  * chamada de wallet acontece — ver AiRunExecutionService::execute()). O custo
  * REAL em USD ainda é gravado em ai_run_provider_calls.raw_cost_usd — e por
@@ -415,11 +415,11 @@ class FinanceController extends Controller
             // Pending (não Reserved): não passa pela carteira de créditos —
             // "Reserved" implicaria uma reserva real no ledger, que não
             // existe aqui (0 crédito, sem transação). Ver docblock da classe.
-            'status'            => AiRunStatus::Pending->value,
-            'estimated_credits' => 0,
-            'reserved_credits'  => 0,
-            'consumed_credits'  => 0,
-            'input_summary'     => [
+            'status'                 => AiRunStatus::Pending->value,
+            'estimated_charge_cents' => 0,
+            'reserved_charge_cents'  => 0,
+            'consumed_charge_cents'  => 0,
+            'input_summary'          => [
                 'user_prompt'   => $enriched['user_prompt'],
                 'system_prompt' => $enriched['system_prompt'] ?? null,
                 'context'       => $enriched['context'] ?? [],

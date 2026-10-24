@@ -4,6 +4,8 @@
  *
  * - `gap="tight"`: ícones colados (mesma "ilha"), ideal para 2 ações afins (ver+editar).
  * - `gap="normal"` (default): cada botão fica visualmente separado.
+ * Dentro de uma região de densidade (`data-ee-density`) todo `gap` vira 8px: alvos independentes
+ * de 40px colados violariam o espaço mínimo entre alvos (design-system/MASTER.md §1).
  *
  * `align` controla a horizontal: start (default em cards), end (típico em última coluna de tabela), center.
  *
@@ -36,19 +38,21 @@ defineProps({
     flex-wrap: nowrap;
 }
 
+/* Dentro de uma região de densidade (data-ee-density) todo espaço entre alvos independentes é
+   --ee-control-gap (8px), qualquer que seja o `gap`; fora dela valem os espaços de sempre. */
 .ee-action-group--wrap {
     flex-wrap: wrap;
-    row-gap: 4px;
+    row-gap: var(--ee-control-gap, 4px);
 }
 
 .ee-action-group--gap-tight {
-    gap: 2px;
+    gap: var(--ee-control-gap, 2px);
 }
 .ee-action-group--gap-normal {
-    gap: 6px;
+    gap: var(--ee-control-gap, 6px);
 }
 .ee-action-group--gap-wide {
-    gap: 12px;
+    gap: var(--ee-control-gap, 12px);
 }
 
 .ee-action-group--align-start {

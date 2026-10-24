@@ -7,8 +7,9 @@ namespace App\Domains\AI\Services;
 use App\Domains\AI\Contracts\AiModelPriceRepositoryInterface;
 use App\Domains\AI\Exceptions\AiModelPriceNotFoundException;
 use App\Domains\AI\Models\AiModelPrice;
-use App\DTOs\AI\{AiCreditEstimateData, AiProviderResponseData};
+use App\DTOs\AI\{AiCreditEstimateData, AiPricingPolicyData, AiProviderResponseData};
 use App\Enums\AI\{AiProvider, AiRunMode};
+use Brick\Math\{BigDecimal, RoundingMode};
 
 class AiPricingService
 {
@@ -27,7 +28,7 @@ class AiPricingService
      *   tool_calls_count?: int
      * }> $providerEstimates
      */
-    public function estimateCredits(string $workflow, AiRunMode $mode, array $providerEstimates): AiCreditEstimateData
+    public function estimateCharge(string $workflow, AiRunMode $mode, array $providerEstimates, AiPricingPolicyData $policy): AiCreditEstimateData
     {
         $rawCostUsd = 0.0;
         $breakdown  = [];
@@ -71,6 +72,7 @@ class AiPricingService
             workflow: $workflow,
             mode: $mode,
             rawCostUsd: $rawCostUsd,
+            policy: $policy,
             breakdown: $breakdown,
         );
     }
@@ -78,7 +80,7 @@ class AiPricingService
     /**
      * @param list<AiProviderResponseData> $providerResponses
      */
-    public function calculateActualCredits(string $workflow, AiRunMode $mode, array $providerResponses): AiCreditEstimateData
+    public function calculateActualCharge(string $workflow, AiRunMode $mode, array $providerResponses, AiPricingPolicyData $policy): AiCreditEstimateData
     {
         $rawCostUsd = 0.0;
         $breakdown  = [];
@@ -120,18 +122,19 @@ class AiPricingService
             workflow: $workflow,
             mode: $mode,
             rawCostUsd: $rawCostUsd,
+            policy: $policy,
             breakdown: $breakdown,
         );
     }
 
     /**
-     * Normaliza uma única chamada de provider em créditos EasyEye (sem aplicar piso de workflow).
+     * Valor DIAGNÓSTICO de uma única chamada de provedor, em centavos (arredondado para CIMA por chamada, sem piso).
      *
-     * Usado pelo AiOrchestrator para registrar `normalized_credits` granular por chamada em
-     * `ai_run_provider_calls`. Mantém a fórmula em um só lugar (margem + usd_per_credit + ceil)
-     * para evitar divergir do cálculo de `calculateActualCredits`.
+     * Usado pelo AiOrchestrator para registrar `normalized_charge_cents` em `ai_run_provider_calls`. NÃO é o que se
+     * debita: a cobrança da execução usa a soma do custo real das chamadas e a fórmula única de `chargeCentsFromUsd`
+     * (HALF_UP, com piso) — somar estes centavos por chamada inflaria a conta.
      */
-    public function normalizeCreditsForResponse(AiProviderResponseData $response): int
+    public function normalizeChargeForResponse(AiProviderResponseData $response, AiPricingPolicyData $policy): int
     {
         $rawCostUsd = (float) ($this->resolveCostUsdForResponse($response) ?? 0.0);
 
@@ -139,10 +142,43 @@ class AiPricingService
             return 0;
         }
 
-        $marginMultiplier = max(0.0, (float) config('ai.pricing.margin_multiplier', 2.0));
-        $usdPerCredit     = max(0.000001, (float) config('ai.pricing.usd_per_credit', 0.01));
+        return $this->grossCents($rawCostUsd, $policy, RoundingMode::CEILING);
+    }
 
-        return (int) ceil(($rawCostUsd * $marginMultiplier) / $usdPerCredit);
+    /**
+     * Fórmula única do preço: `bruto = round(custo_usd × câmbio × markup × 100, HALF_UP)`; `preço = max(1, piso, bruto)`.
+     * Aritmética decimal exata (sem float) para a borda de 0,5 centavo não oscilar.
+     */
+    public function chargeCentsFromUsd(float $rawCostUsd, string $workflow, AiPricingPolicyData $policy): int
+    {
+        return max(1, $policy->minimumChargeCentsFor($workflow), $this->grossCents($rawCostUsd, $policy));
+    }
+
+    /** Preço mínimo quando o modelo não tem preço cadastrado: piso do workflow × modo (Economy 1, Validated 2, Consensus 3). */
+    public function fallbackMinimumCharge(string $workflow, AiRunMode $mode, AiPricingPolicyData $policy): AiCreditEstimateData
+    {
+        $multiplier = match ($mode) {
+            AiRunMode::Economy   => 1,
+            AiRunMode::Validated => 2,
+            AiRunMode::Consensus => 3,
+        };
+
+        $minimum = $policy->minimumChargeCentsFor($workflow) * $multiplier;
+
+        return new AiCreditEstimateData(
+            workflow: $workflow,
+            mode: $mode,
+            rawCostUsd: 0.0,
+            grossChargeCents: 0,
+            minimumChargeCents: $minimum,
+            minimumApplied: true,
+            chargeCents: $minimum,
+            policy: $policy,
+            breakdown: [[
+                'source' => 'fallback_minimum_only',
+                'reason' => 'model_price_not_configured',
+            ]],
+        );
     }
 
     /**
@@ -209,36 +245,33 @@ class AiPricingService
     /**
      * @param array<int, array<string, mixed>> $breakdown
      */
-    private function buildEstimate(string $workflow, AiRunMode $mode, float $rawCostUsd, array $breakdown): AiCreditEstimateData
+    private function buildEstimate(string $workflow, AiRunMode $mode, float $rawCostUsd, AiPricingPolicyData $policy, array $breakdown): AiCreditEstimateData
     {
-        $rawCostUsd           = round($rawCostUsd, 8);
-        $marginMultiplier     = max(0.0, (float) config('ai.pricing.margin_multiplier', 2.0));
-        $usdPerCredit         = max(0.000001, (float) config('ai.pricing.usd_per_credit', 0.01));
-        $costUsdWithMargin    = round($rawCostUsd * $marginMultiplier, 8);
-        $creditsBeforeMinimum = (int) ceil($costUsdWithMargin / $usdPerCredit);
-        $minimumCredits       = $this->minimumCreditsForWorkflow($workflow);
-        $normalizedCredits    = max($minimumCredits, $creditsBeforeMinimum);
+        $rawCostUsd  = round($rawCostUsd, 8);
+        $gross       = $this->grossCents($rawCostUsd, $policy);
+        $minimum     = max(1, $policy->minimumChargeCentsFor($workflow));
+        $chargeCents = max($minimum, $gross);
 
         return new AiCreditEstimateData(
             workflow: $workflow,
             mode: $mode,
             rawCostUsd: $rawCostUsd,
-            costUsdWithMargin: $costUsdWithMargin,
-            marginMultiplier: $marginMultiplier,
-            usdPerCredit: $usdPerCredit,
-            creditsBeforeMinimum: $creditsBeforeMinimum,
-            minimumCredits: $minimumCredits,
-            minimumApplied: $normalizedCredits > $creditsBeforeMinimum,
-            normalizedCredits: $normalizedCredits,
+            grossChargeCents: $gross,
+            minimumChargeCents: $minimum,
+            minimumApplied: $chargeCents > $gross,
+            chargeCents: $chargeCents,
+            policy: $policy,
             breakdown: $breakdown,
         );
     }
 
-    private function minimumCreditsForWorkflow(string $workflow): int
+    private function grossCents(float $rawCostUsd, AiPricingPolicyData $policy, RoundingMode $rounding = RoundingMode::HALF_UP): int
     {
-        $workflowMinimum = (int) data_get(config('ai.pricing.minimum_credits_by_workflow', []), $workflow, 0);
-        $defaultMinimum  = (int) config('ai.pricing.minimum_credits_default', 5);
-
-        return max(0, $workflowMinimum, $defaultMinimum);
+        return BigDecimal::of(number_format(max(0.0, $rawCostUsd), 8, '.', ''))
+            ->multipliedBy(number_format(max(0.0, $policy->exchangeRateBrlUsd), 6, '.', ''))
+            ->multipliedBy(number_format(max(0.0, $policy->markupMultiplier), 3, '.', ''))
+            ->multipliedBy('100')
+            ->toScale(0, $rounding)
+            ->toInt();
     }
 }

@@ -269,7 +269,7 @@ describe('pacote de créditos de IA (mesma guarda)', function () {
         ]);
         Http::fake();
 
-        pduAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])
+        pduAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])
             ->assertStatus(422)
             ->assertJsonPath('code', 'document_required');
 

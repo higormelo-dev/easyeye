@@ -156,7 +156,7 @@ const breadcrumbs = [
 
 <template>
     <AppLayout title="Pacientes" :breadcrumbs="breadcrumbs">
-        <div class="page-patients">
+        <div class="page-patients" data-ee-density="default">
             <!-- ── Page Header ───────────────────────────────────────────── -->
             <!-- flex-wrap (G5): no celular as ações descem para a linha de baixo —
                  sem isso a linha passava de 390 px (rolagem lateral de 118 px). -->
@@ -183,7 +183,7 @@ const breadcrumbs = [
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2" data-testid="patients-header-actions">
                     <!-- View toggle -->
-                    <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
+                    <div class="page-header-toggle bg-white border shadow-sm rounded px-1 d-flex align-items-center">
                         <button
                             type="button"
                             class="rounded p-1 d-flex align-items-center justify-content-center border-0"
@@ -204,11 +204,11 @@ const breadcrumbs = [
                         </button>
                     </div>
                     <!-- Import -->
-                    <Link :href="route('panel.patients.import.index')" class="btn btn-outline-secondary fs-13 btn-md">
+                    <Link :href="route('panel.patients.import.index')" class="btn btn-outline-secondary">
                         <i class="ti ti-upload me-1"></i> Importar
                     </Link>
                     <!-- New patient -->
-                    <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
+                    <button type="button" class="btn btn-primary" @click="openCreate">
                         <i class="ti ti-plus me-1"></i> Novo paciente
                     </button>
                 </div>
@@ -218,7 +218,7 @@ const breadcrumbs = [
             <!-- ── Search bar ────────────────────────────────────────────── -->
             <div class="d-flex align-items-center justify-content-between flex-wrap mb-3 gap-2">
                 <div class="table-search">
-                    <div class="input-group input-group-sm" style="min-width: 280px">
+                    <div class="input-group" style="min-width: 280px">
                         <span class="input-group-text bg-white">
                             <i class="ti ti-search fs-12"></i>
                         </span>

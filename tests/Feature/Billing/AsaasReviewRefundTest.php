@@ -147,14 +147,14 @@ function rvrWebhook(array $payload): ?string
     return WebhookEvent::query()->where('external_event_id', $id)->value('normalized_payload')['outcome'] ?? null;
 }
 
-/** Pacote de IA (100 créditos) pago e creditado; a carteira com +200 de outro pacote. */
+/** Pacote de IA (R$ 499,00) pago e creditado; a carteira com +R$ 200,00 de outro pacote. */
 function rvrPack(string $gateway, string $externalId): array
 {
-    $purchase = app(AiCreditPurchaseService::class)->createPendingPurchase(entityId: (string) test()->clinic->id, packageCode: 'operational', source: 'checkout');
+    $purchase = app(AiCreditPurchaseService::class)->createPendingPurchase(entityId: (string) test()->clinic->id, packageCode: 'premium', source: 'checkout');
     $invoice  = Invoice::query()->create([
         'entity_id'      => test()->clinic->id, 'gateway_code' => $gateway, 'reference' => 'IA-RVR', 'external_invoice_id' => $externalId,
-        'due_at'         => '2026-10-08 23:59:59', 'amount' => 249.90, 'currency' => 'BRL', 'status' => InvoiceStatus::Pending->value,
-        'billing_reason' => Invoice::BILLING_REASON_AI_CREDIT_PACK, 'metadata' => ['ai_credit_purchase_id' => (string) $purchase->id, 'credits' => 100],
+        'due_at'         => '2026-10-08 23:59:59', 'amount' => 499.00, 'currency' => 'BRL', 'status' => InvoiceStatus::Pending->value,
+        'billing_reason' => Invoice::BILLING_REASON_AI_CREDIT_PACK, 'metadata' => ['ai_credit_purchase_id' => (string) $purchase->id, 'wallet_credit_cents' => 49900],
     ]);
     $purchase->update(['invoice_id' => $invoice->id]);
 
@@ -163,64 +163,64 @@ function rvrPack(string $gateway, string $externalId): array
 
 function rvrBalance(): int
 {
-    return (int) AiCreditWallet::query()->where('entity_id', test()->clinic->id)->value('balance');
+    return (int) AiCreditWallet::query()->where('entity_id', test()->clinic->id)->value('balance_cents');
 }
 
 describe('pacote de IA: parcial e depois o restante (achado 4)', function () {
-    it('Asaas: PARTIALLY_REFUNDED (50%) e depois PAYMENT_REFUNDED (restante) tiram só os 100 créditos do pacote', function () {
+    it('Asaas: PARTIALLY_REFUNDED (50%) e depois PAYMENT_REFUNDED (restante) tiram só os R$ 499,00 do pacote', function () {
         [$purchase, $invoice] = rvrPack('asaas', 'pay_pack');
         Http::fake();
-        rvrWebhook(['event' => 'PAYMENT_CONFIRMED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'externalReference' => (string) $invoice->id])]);
-        AiCreditWallet::query()->where('entity_id', $this->clinic->id)->update(['balance' => 300]);
+        rvrWebhook(['event' => 'PAYMENT_CONFIRMED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'externalReference' => (string) $invoice->id])]);
+        AiCreditWallet::query()->where('entity_id', $this->clinic->id)->update(['balance_cents' => 69900]);
 
-        rvrWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'refunds' => [['status' => 'DONE', 'value' => 124.95]]])]);
-        expect(rvrBalance())->toBe(250);
+        rvrWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'refunds' => [['status' => 'DONE', 'value' => 249.50]]])]);
+        expect(rvrBalance())->toBe(44950);
 
-        $outcome = rvrWebhook(['event' => 'PAYMENT_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'status' => 'REFUNDED', 'refunds' => [['status' => 'DONE', 'value' => 124.95], ['status' => 'DONE', 'value' => 124.95]]])]);
+        $outcome = rvrWebhook(['event' => 'PAYMENT_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'status' => 'REFUNDED', 'refunds' => [['status' => 'DONE', 'value' => 249.50], ['status' => 'DONE', 'value' => 249.50]]])]);
 
         expect($outcome)->toBe('ai_credits_refunded')
-            ->and(rvrBalance())->toBe(200)
+            ->and(rvrBalance())->toBe(20000)
             ->and($purchase->fresh()->status)->toBe(AiCreditPurchaseStatus::Refunded)
-            ->and(data_get($purchase->fresh()->metadata, 'gateway_reversal'))->toMatchArray(['already_revoked' => 50, 'revoked' => 50, 'shortfall' => 0]);
+            ->and(data_get($purchase->fresh()->metadata, 'gateway_reversal'))->toMatchArray(['already_revoked' => 24950, 'revoked' => 24950, 'shortfall' => 0]);
 
         // Reentrega do estorno total: nada sai de novo.
-        rvrWebhook(['event' => 'PAYMENT_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'status' => 'REFUNDED'])]);
-        expect(rvrBalance())->toBe(200);
+        rvrWebhook(['event' => 'PAYMENT_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'status' => 'REFUNDED'])]);
+        expect(rvrBalance())->toBe(20000);
     });
 
     it('Mercado Pago: approved com transaction_amount_refunded e depois refunded — o restante só', function () {
         [$purchase, $invoice] = rvrPack('mercadopago', '555000111');
         Http::fake(['https://api.mercadopago.com/v1/payments/555000111' => Http::sequence()
-            ->push(['id' => 555000111, 'status' => 'approved', 'transaction_amount' => 249.9, 'external_reference' => (string) $invoice->id])
-            ->push(['id' => 555000111, 'status' => 'approved', 'transaction_amount' => 249.9, 'transaction_amount_refunded' => 124.95, 'external_reference' => (string) $invoice->id])
-            ->push(['id' => 555000111, 'status' => 'refunded', 'transaction_amount' => 249.9, 'transaction_amount_refunded' => 249.9, 'external_reference' => (string) $invoice->id])]);
+            ->push(['id' => 555000111, 'status' => 'approved', 'transaction_amount' => 499.0, 'external_reference' => (string) $invoice->id])
+            ->push(['id' => 555000111, 'status' => 'approved', 'transaction_amount' => 499.0, 'transaction_amount_refunded' => 249.5, 'external_reference' => (string) $invoice->id])
+            ->push(['id' => 555000111, 'status' => 'refunded', 'transaction_amount' => 499.0, 'transaction_amount_refunded' => 499.0, 'external_reference' => (string) $invoice->id])]);
         $mp       = app(MercadoPagoGateway::class);
         $webhooks = app(ProcessWebhookEventService::class);
 
         $webhooks->applyNormalized($mp->paymentStatusEvent('555000111'));
-        AiCreditWallet::query()->where('entity_id', $this->clinic->id)->update(['balance' => 300]);
+        AiCreditWallet::query()->where('entity_id', $this->clinic->id)->update(['balance_cents' => 69900]);
 
         expect($webhooks->applyNormalized($mp->paymentStatusEvent('555000111')))->toBe('partially_refunded')
-            ->and(rvrBalance())->toBe(250);
+            ->and(rvrBalance())->toBe(44950);
 
         expect($webhooks->applyNormalized($mp->paymentStatusEvent('555000111')))->toBe('ai_credits_refunded')
-            ->and(rvrBalance())->toBe(200)
+            ->and(rvrBalance())->toBe(20000)
             ->and($purchase->fresh()->status)->toBe(AiCreditPurchaseStatus::Refunded);
     });
 
     it('sem saldo para o restante: tira o que há (nunca negativo) e alerta o que faltou', function () {
         [$purchase, $invoice] = rvrPack('asaas', 'pay_pack');
         Http::fake();
-        rvrWebhook(['event' => 'PAYMENT_CONFIRMED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'externalReference' => (string) $invoice->id])]);
-        rvrWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'refunds' => [['status' => 'DONE', 'value' => 124.95]]])]);
-        // A clínica usou o resto: sobraram 10 dos 50 que ainda deveriam sair.
-        AiCreditWallet::query()->where('entity_id', $this->clinic->id)->update(['balance' => 10]);
+        rvrWebhook(['event' => 'PAYMENT_CONFIRMED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'externalReference' => (string) $invoice->id])]);
+        rvrWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'refunds' => [['status' => 'DONE', 'value' => 249.50]]])]);
+        // A clínica usou o resto: sobraram R$ 10,00 dos R$ 249,50 que ainda deveriam sair.
+        AiCreditWallet::query()->where('entity_id', $this->clinic->id)->update(['balance_cents' => 1000]);
 
-        rvrWebhook(['event' => 'PAYMENT_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'status' => 'REFUNDED'])]);
+        rvrWebhook(['event' => 'PAYMENT_REFUNDED', 'payment' => rvrAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'status' => 'REFUNDED'])]);
 
         expect(rvrBalance())->toBe(0)
-            ->and(data_get($purchase->fresh()->metadata, 'gateway_reversal'))->toMatchArray(['already_revoked' => 50, 'revoked' => 10, 'shortfall' => 40]);
-        Notification::assertSentTo($this->admin, GatewayOperationalAlertNotification::class, fn ($n) => $n->kind === 'refund_credits' && (int) $n->params['shortfall'] === 40);
+            ->and(data_get($purchase->fresh()->metadata, 'gateway_reversal'))->toMatchArray(['already_revoked' => 24950, 'revoked' => 1000, 'shortfall' => 23950]);
+        Notification::assertSentTo($this->admin, GatewayOperationalAlertNotification::class, fn ($n) => $n->kind === 'refund_credits' && (int) $n->params['shortfall_cents'] === 23950);
     });
 });
 

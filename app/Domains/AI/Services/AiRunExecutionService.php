@@ -22,6 +22,7 @@ class AiRunExecutionService
         private readonly AiRunRepositoryInterface $runRepository,
         private readonly AiOrchestrator $orchestrator,
         private readonly AiPricingService $pricingService,
+        private readonly AiPricingPolicyResolver $policyResolver,
         private readonly AiCreditWalletService $walletService,
         private readonly AiSafetyService $safetyService,
         private readonly EyeImageAttachmentService $eyeImageAttachments,
@@ -48,31 +49,34 @@ class AiRunExecutionService
             // dados — gravada antes da chamada, sem o conteúdo.
             $this->runRepository->recordDispatch($run, AiDispatchAudit::summarize($request));
 
-            $result   = $this->orchestrator->execute($run, $request);
-            $estimate = $this->pricingService->calculateActualCredits(
+            $result = $this->orchestrator->execute($run, $request);
+            // Preço real com a política CONGELADA na estimativa (câmbio/markup do momento); sem snapshot (execução legada
+            // convertida), vale a política vigente.
+            $estimate = $this->pricingService->calculateActualCharge(
                 workflow: $run->workflow,
                 mode: $run->mode,
                 providerResponses: $result->providerCalls,
+                policy: $run->pricingPolicy() ?? $this->policyResolver->current(),
             );
 
-            $actualCredits   = max(0, (int) $estimate->normalizedCredits);
-            $reservedCredits = max(0, (int) $run->reserved_credits);
-            $consumedCredits = min($actualCredits, $reservedCredits);
+            $actualCharge   = max(0, $estimate->chargeCents);
+            $reservedCharge = max(0, (int) $run->reserved_charge_cents);
+            $consumedCharge = min($actualCharge, $reservedCharge);
 
-            if ($consumedCredits > 0) {
+            if ($consumedCharge > 0) {
                 $this->walletService->consumeReservation(
                     entityId: (string) $run->entity_id,
-                    amount: $consumedCredits,
+                    amount: $consumedCharge,
                     aiRunId: (string) $run->id,
                     idempotencyKey: "ai-run:{$run->id}:consume",
                     metadata: ['workflow' => $run->workflow, 'mode' => $run->mode->value],
                 );
             }
 
-            if ($reservedCredits > $consumedCredits) {
+            if ($reservedCharge > $consumedCharge) {
                 $this->walletService->releaseReservation(
                     entityId: (string) $run->entity_id,
-                    amount: $reservedCredits - $consumedCredits,
+                    amount: $reservedCharge - $consumedCharge,
                     aiRunId: (string) $run->id,
                     idempotencyKey: "ai-run:{$run->id}:release",
                     metadata: ['workflow' => $run->workflow, 'mode' => $run->mode->value],
@@ -85,8 +89,20 @@ class AiRunExecutionService
                 $result->safetyNotes,
             )));
 
-            if ($actualCredits > $reservedCredits) {
-                $safetyNotes[] = 'Custo real acima da reserva inicial; crédito extra não cobrado automaticamente.';
+            if ($actualCharge > $reservedCharge) {
+                // Excedente acima da reserva não é cobrado nesta entrega (comportamento mantido); fica registrado para medir.
+                $safetyNotes[] = 'Custo real acima da reserva inicial; valor extra não cobrado automaticamente.';
+
+                // Execução interna (reserva 0, ex.: posologia do manager) não é cobrada: sem métrica.
+                if ($reservedCharge > 0) {
+                    Log::info('ai.run.charge_above_reservation', [
+                        'run_id'          => (string) $run->id,
+                        'workflow'        => (string) $run->workflow,
+                        'reserved_cents'  => $reservedCharge,
+                        'actual_cents'    => $actualCharge,
+                        'uncharged_cents' => $actualCharge - $reservedCharge,
+                    ]);
+                }
             }
 
             // Inspeciona o conteúdo final através do AiSafetyService. Adiciona notas
@@ -104,7 +120,8 @@ class AiRunExecutionService
                 run: $run,
                 finalOutput: $result->finalOutput,
                 safetyNotes: $safetyNotes,
-                consumedCredits: $consumedCredits,
+                consumedChargeCents: $consumedCharge,
+                actualCostUsd: $estimate->rawCostUsd,
             );
         } catch (AiRunCancelledException) {
             // Cancelamento cooperativo: o orchestrator detectou cancelled_at entre
@@ -181,7 +198,7 @@ class AiRunExecutionService
 
     private function releaseRemainderOnCancel(AiRun $run): void
     {
-        $remainder = max(0, ((int) $run->reserved_credits) - ((int) $run->consumed_credits));
+        $remainder = max(0, ((int) $run->reserved_charge_cents) - ((int) $run->consumed_charge_cents));
 
         if ($remainder <= 0) {
             return;
@@ -384,9 +401,9 @@ class AiRunExecutionService
 
     private function releaseReservationOnFailure(AiRun $run): void
     {
-        $reservedCredits = max(0, (int) $run->reserved_credits);
+        $reservedCharge = max(0, (int) $run->reserved_charge_cents);
 
-        if ($reservedCredits <= 0) {
+        if ($reservedCharge <= 0) {
             return;
         }
 
@@ -395,8 +412,8 @@ class AiRunExecutionService
         // a reserva INTEIRA aqui devolveria créditos de chamadas de provider já
         // pagas (a idempotency key desta liberação é outra, então não protege).
         // Desconta o que o ledger deste run já resolveu.
-        $settled   = $this->settledCreditsFromLedger($run);
-        $remaining = max(0, $reservedCredits - $settled);
+        $settled   = $this->settledCentsFromLedger($run);
+        $remaining = max(0, $reservedCharge - $settled);
 
         if ($remaining <= 0) {
             return;
@@ -420,7 +437,7 @@ class AiRunExecutionService
      * consumo definitivo (metadata.consumed_from_reservation — a entry Consume
      * grava amount 0) e liberação de sobra (amount da entry Release).
      */
-    private function settledCreditsFromLedger(AiRun $run): int
+    private function settledCentsFromLedger(AiRun $run): int
     {
         $entries = AiCreditLedgerEntry::query()
             ->withoutGlobalScopes()
@@ -429,14 +446,14 @@ class AiRunExecutionService
                 "ai-run:{$run->id}:consume",
                 "ai-run:{$run->id}:release",
             ])
-            ->get(['idempotency_key', 'amount', 'metadata']);
+            ->get(['idempotency_key', 'amount_cents', 'metadata']);
 
         $settled = 0;
 
         foreach ($entries as $entry) {
             $settled += $entry->idempotency_key === "ai-run:{$run->id}:consume"
-                ? (int) data_get($entry->metadata, 'consumed_from_reservation', 0)
-                : abs((int) $entry->amount);
+                ? (int) data_get($entry->metadata, 'consumed_from_reservation_cents', 0)
+                : abs((int) $entry->amount_cents);
         }
 
         return $settled;

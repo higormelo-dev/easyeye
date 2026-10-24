@@ -9,8 +9,8 @@ use App\Enums\{ClientRule, FeatureKey, SubscriptionAccessLevel, SubscriptionStat
 use App\Models\{Subscription, User};
 use App\Services\Billing\SubscriptionNoticeService;
 use App\Services\FeatureGateService;
+use App\Support\Money;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Number;
 
 /**
  * Paywall da IA: o que dizer (e oferecer) a quem ficou sem créditos.
@@ -55,8 +55,8 @@ class AiPaywallService
     }
 
     /**
-     * @param int|null $requested créditos que a execução recusada pedia (resposta 422)
-     * @param int|null $available créditos que a carteira ainda liberava nessa hora
+     * @param int|null $requestedCents saldo (centavos de BRL) que a execução recusada pedia (resposta 422)
+     * @param int|null $availableCents saldo (centavos de BRL) que a carteira ainda liberava nessa hora
      *
      * @return array{
      *   code: string,
@@ -66,12 +66,13 @@ class AiPaywallService
      *   renews_on: string|null,
      *   renews_if_paid_on: string|null,
      *   expires_on: string|null,
-     *   requested: int|null,
-     *   available: int|null,
+     *   requested_cents: int|null,
+     *   available_cents: int|null,
+     *   missing_cents: int|null,
      *   texts: array<string, string>
      * }
      */
-    public function describe(string $entityId, ?string $userRule = null, ?int $requested = null, ?int $available = null): array
+    public function describe(string $entityId, ?string $userRule = null, ?int $requestedCents = null, ?int $availableCents = null): array
     {
         $userRule ??= session('selected_entity_user_rule');
 
@@ -93,8 +94,8 @@ class AiPaywallService
 
         // Ainda há saldo (franquia, cota que sobrou ou avulso), só que menos
         // do que a execução pede: nada "acabou" — diz quanto falta.
-        $short = $reason !== 'limited' && $requested !== null && $available !== null
-            && $available > 0 && $available < $requested;
+        $short = $reason !== 'limited' && $requestedCents !== null && $availableCents !== null
+            && $availableCents > 0 && $availableCents < $requestedCents;
 
         if ($short) {
             $reason = 'insufficient_for_request';
@@ -108,11 +109,12 @@ class AiPaywallService
             'renews_on'         => $short ? null : $renewsOn,
             'renews_if_paid_on' => ! $short && $ifPaid ? $renewal->toDateString() : null,
             'expires_on'        => $short ? null : $expiresOn,
-            'requested'         => $short ? $requested : null,
-            'available'         => $short ? $available : null,
+            'requested_cents'   => $short ? $requestedCents : null,
+            'available_cents'   => $short ? $availableCents : null,
+            'missing_cents'     => $short ? $requestedCents - $availableCents : null,
             'texts'             => [
                 'title'     => __($short ? 'ai.paywall.title_insufficient' : 'ai.paywall.title'),
-                'message'   => $short ? $this->shortMessage($requested, $available) : __("ai.paywall.reasons.{$messageKey}"),
+                'message'   => $short ? $this->shortMessage($requestedCents, $availableCents) : __("ai.paywall.reasons.{$messageKey}"),
                 'buy'       => __('ai.paywall.buy'),
                 'ask_admin' => __('ai.paywall.ask_admin'),
                 'limited'   => __('ai.paywall.reasons.limited'),
@@ -176,6 +178,7 @@ class AiPaywallService
             return 'complimentary';
         }
 
+        // Valor da franquia do plano em CENTAVOS de BRL (a chave AiMonthlyCredits é legada, o valor não).
         $planQuota = (int) ($subscription->plan?->featureValue(FeatureKey::AiMonthlyCredits) ?? 0);
 
         if (! $subscription->isBillable() || $planQuota <= 0) {
@@ -189,23 +192,22 @@ class AiPaywallService
 
     private function renewsOn(?AiCreditWallet $wallet): ?CarbonInterface
     {
-        if (! $wallet || $wallet->quotaExpired() || (int) $wallet->monthly_quota <= 0) {
+        if (! $wallet || $wallet->quotaExpired() || (int) $wallet->monthly_quota_cents <= 0) {
             return null;
         }
 
         return $wallet->quota_period_ends_at;
     }
 
-    /** "Precisa de X, há Y, falta Z" — números no idioma do usuário. */
-    private function shortMessage(int $requested, int $available): string
+    /** "Precisa de R$ X, há R$ Y, falta R$ Z" — valores em reais (a clínica nunca vê "créditos"). */
+    private function shortMessage(int $requestedCents, int $availableCents): string
     {
-        $locale  = app()->getLocale();
-        $missing = $requested - $available;
+        $missing = $requestedCents - $availableCents;
 
-        return trans_choice('ai.paywall.reasons.insufficient_for_request', $missing, [
-            'requested' => Number::format($requested, locale: $locale),
-            'available' => Number::format($available, locale: $locale),
-            'missing'   => Number::format($missing, locale: $locale),
+        return trans_choice('ai.paywall.reasons.insufficient_for_request', max(1, intdiv($missing, 100)), [
+            'requested' => Money::formatBrl($requestedCents),
+            'available' => Money::formatBrl($availableCents),
+            'missing'   => Money::formatBrl($missing),
         ]);
     }
 }

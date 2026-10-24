@@ -339,43 +339,43 @@ describe('PAYMENT_PARTIALLY_REFUNDED', function () {
 
     it('pacote de IA: tira os créditos proporcionais (arredondado para baixo), sem saldo negativo; falta de saldo vira alerta', function () {
         $purchases = app(AiCreditPurchaseService::class);
-        $purchase  = $purchases->createPendingPurchase(entityId: (string) $this->clinic->id, packageCode: 'operational', source: 'checkout');
+        $purchase  = $purchases->createPendingPurchase(entityId: (string) $this->clinic->id, packageCode: 'premium', source: 'checkout');
         $invoice   = Invoice::query()->create([
             'entity_id'           => $this->clinic->id,
             'gateway_code'        => 'asaas',
             'reference'           => 'IA-20261005-PACK',
             'external_invoice_id' => 'pay_pack',
             'due_at'              => '2026-10-08 23:59:59',
-            'amount'              => 249.90,
+            'amount'              => 499.00,
             'currency'            => 'BRL',
             'status'              => InvoiceStatus::Pending->value,
             'billing_reason'      => Invoice::BILLING_REASON_AI_CREDIT_PACK,
-            'metadata'            => ['ai_credit_purchase_id' => (string) $purchase->id, 'credits' => 100],
+            'metadata'            => ['ai_credit_purchase_id' => (string) $purchase->id, 'wallet_credit_cents' => 49900],
         ]);
         $purchase->update(['invoice_id' => $invoice->id]);
         Http::fake();
 
-        refWebhook(['event' => 'PAYMENT_CONFIRMED', 'payment' => refAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'externalReference' => (string) $invoice->id])]);
-        $wallet = fn () => (int) AiCreditWallet::query()->where('entity_id', $this->clinic->id)->value('balance');
-        expect($wallet())->toBe(100);
+        refWebhook(['event' => 'PAYMENT_CONFIRMED', 'payment' => refAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'externalReference' => (string) $invoice->id])]);
+        $wallet = fn () => (int) AiCreditWallet::query()->where('entity_id', $this->clinic->id)->value('balance_cents');
+        expect($wallet())->toBe(49900);
 
-        // 30% devolvido → 30 créditos.
-        refWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => refAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'refunds' => [['status' => 'DONE', 'value' => 74.97]]])]);
-        expect($wallet())->toBe(70)
+        // 30% devolvido → R$ 149,70 (14970 centavos).
+        refWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => refAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'refunds' => [['status' => 'DONE', 'value' => 149.70]]])]);
+        expect($wallet())->toBe(34930)
             ->and(AiCreditPurchase::query()->sole()->status)->toBe(AiCreditPurchaseStatus::Credited)
             ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Paid)
-            ->and((float) $invoice->fresh()->refunded_amount)->toBe(74.97);
+            ->and((float) $invoice->fresh()->refunded_amount)->toBe(149.7);
 
         // Reentrega do mesmo total: nada muda.
-        refWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => refAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'refunds' => [['status' => 'DONE', 'value' => 74.97]]])]);
-        expect($wallet())->toBe(70);
+        refWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => refAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'refunds' => [['status' => 'DONE', 'value' => 149.70]]])]);
+        expect($wallet())->toBe(34930);
 
-        // A clínica usou quase tudo: 50% devolvido pede mais 20, só há 5.
-        AiCreditWallet::query()->where('entity_id', $this->clinic->id)->update(['balance' => 5]);
-        refWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => refAsaasPayment('pay_pack', ['subscription' => null, 'value' => 249.9, 'refunds' => [['status' => 'DONE', 'value' => 74.97], ['status' => 'DONE', 'value' => 49.98]]])]);
+        // A clínica usou quase tudo: 50% devolvido pede mais R$ 99,80, só há R$ 5,00.
+        AiCreditWallet::query()->where('entity_id', $this->clinic->id)->update(['balance_cents' => 500]);
+        refWebhook(['event' => 'PAYMENT_PARTIALLY_REFUNDED', 'payment' => refAsaasPayment('pay_pack', ['subscription' => null, 'value' => 499.0, 'refunds' => [['status' => 'DONE', 'value' => 149.70], ['status' => 'DONE', 'value' => 99.80]]])]);
 
         expect($wallet())->toBe(0)
-            ->and(data_get(AiCreditPurchase::query()->sole()->metadata, 'partial_refund'))->toMatchArray(['handled_credits' => 50, 'revoked_credits' => 35, 'shortfall' => 15]);
-        Notification::assertSentTo($this->admin, GatewayOperationalAlertNotification::class, fn ($n) => $n->kind === 'refund_credits' && (int) $n->params['shortfall'] === 15);
+            ->and(data_get(AiCreditPurchase::query()->sole()->metadata, 'partial_refund'))->toMatchArray(['handled_cents' => 24950, 'revoked_cents' => 15470, 'shortfall' => 9480]);
+        Notification::assertSentTo($this->admin, GatewayOperationalAlertNotification::class, fn ($n) => $n->kind === 'refund_credits' && $n->params['shortfall'] === 'R$ 94,80');
     });
 });

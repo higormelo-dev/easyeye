@@ -53,7 +53,9 @@ const t = {
         contract_modal: ':plan — :cycle',
         installments_hint: 'No cartão em até :count× sem juros.',
         paid_notice: 'Pagamento confirmado. Obrigado!',
-        ai_pack_invoice: 'Créditos de IA — :credits créditos',
+        ai_balance_invoice: 'Saldo de IA — :amount',
+        payment_method: 'Forma de pagamento',
+        ai_latest_transactions: 'Últimas transações',
         ai_pack_open_title: 'Pedidos de créditos de IA aguardando pagamento',
         ai_pack_open_hint: 'Não é cobrança da assinatura.',
         ai_pack_open_created: 'Pedido de :date',
@@ -289,7 +291,7 @@ describe('Minha assinatura — pedidos de créditos de IA não pagos', () => {
         can_pay: true,
         can_discard: true,
         kind: 'ai_credit_pack',
-        ai_credit_pack: { credits: 100 },
+        ai_credit_pack: { value_cents: 24990 },
         payment: { gateway: 'mercadopago', methods: [{ method: 'pix', label: 'Pix', mode: 'transparent' }] },
     };
 
@@ -303,7 +305,7 @@ describe('Minha assinatura — pedidos de créditos de IA não pagos', () => {
         expect(wrapper.get('[data-test="open-ai-packs"]').text()).toContain(
             'Pedidos de créditos de IA aguardando pagamento',
         );
-        expect(row.text()).toContain('Créditos de IA — 100 créditos');
+        expect(row.text()).toContain('Saldo de IA — R$\u00a0249,90');
         expect(row.text()).toContain('Pedido de 20/09/2026');
         expect(row.text()).not.toContain('Vencida');
         expect(row.text()).not.toContain('Venceu em');
@@ -367,5 +369,34 @@ describe('Minha assinatura — pedidos de créditos de IA não pagos', () => {
 
         expect(wrapper.get('[data-test="open-ai-pack"] [role="alert"]').text()).toBe('Não pode mais.');
         expect(wrapper.find('[data-test="open-ai-pack-pay"]').exists()).toBe(true);
+    });
+});
+
+describe('Minha assinatura — saldo de IA em reais', () => {
+    it('pagamento e transações permanecem acessíveis; histórico de IA usa centavos e não créditos', () => {
+        render(
+            summary({
+                invoices: [
+                    {
+                        id: 'paid-ai',
+                        kind: 'ai_credit_pack',
+                        amount: 499,
+                        amount_cents: 49900,
+                        status: 'paid',
+                        ai_credit_pack: {
+                            value_cents: 49900,
+                            credits: 987654,
+                            raw_cost_usd: 654321,
+                            margin_multiplier: 999,
+                        },
+                    },
+                ],
+            }),
+        );
+        expect(wrapper.get('[data-test="my-subscription-payment"]').text()).toContain('Forma de pagamento');
+        const history = wrapper.get('[data-test="my-subscription-history"]');
+        expect(history.text()).toContain('Últimas transações');
+        expect(history.text()).toContain('Saldo de IA — R$\u00a0499,00');
+        expect(history.text()).not.toMatch(/créditos|USD|987654|654321|markup|margin_multiplier/);
     });
 });

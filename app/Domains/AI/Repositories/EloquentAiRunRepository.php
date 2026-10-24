@@ -42,15 +42,17 @@ class EloquentAiRunRepository implements AiRunRepositoryInterface
         AiRun $run,
         string $finalOutput,
         array $safetyNotes,
-        int $consumedCredits,
+        int $consumedChargeCents,
         ?string $errorMessage = null,
+        ?float $actualCostUsd = null,
     ): void {
         $run->update([
-            'status'           => AiRunStatus::WaitingApproval->value,
-            'final_output'     => $finalOutput,
-            'safety_notes'     => $safetyNotes,
-            'consumed_credits' => $consumedCredits,
-            'error_message'    => $errorMessage,
+            'status'                => AiRunStatus::WaitingApproval->value,
+            'final_output'          => $finalOutput,
+            'safety_notes'          => $safetyNotes,
+            'consumed_charge_cents' => $consumedChargeCents,
+            'actual_cost_usd'       => $actualCostUsd,
+            'error_message'         => $errorMessage,
         ]);
     }
 

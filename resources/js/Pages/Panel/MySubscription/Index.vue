@@ -47,7 +47,7 @@ const props = defineProps({
 });
 
 const page = usePage();
-const { money, date, dateTime } = useLocaleFormat();
+const { money, moneyCents, date, dateTime } = useLocaleFormat();
 const pt = computed(() => props.t?.page ?? {});
 const { tx } = useTrans(() => pt.value);
 
@@ -227,7 +227,9 @@ async function confirmScheduled() {
 
 function invoiceLabel(invoice) {
     if (invoice.kind === 'ai_credit_pack')
-        return tx('ai_pack_invoice', { credits: invoice.ai_credit_pack?.credits ?? '' });
+        return tx('ai_balance_invoice', {
+            amount: moneyCents(invoice.ai_credit_pack?.value_cents ?? invoice.amount_cents),
+        });
 
     return invoice.kind === 'plan_change' && invoice.plan_change?.plan?.name
         ? tx('plan_change_invoice', { plan: invoice.plan_change.plan.name })
@@ -813,110 +815,143 @@ watch(
                 </div>
             </section>
 
-            <!-- Histórico de faturas -->
-            <section class="card mb-0" aria-labelledby="my-history-title" data-test="my-subscription-history">
-                <div class="card-header py-2">
-                    <h2 id="my-history-title" class="h6 fw-semibold mb-0">
-                        <i class="ti ti-history me-1 text-primary" aria-hidden="true"></i>{{ pt.history_title }}
-                    </h2>
+            <div class="row g-3">
+                <div class="col-xl-3">
+                    <section
+                        class="card h-100 mb-0"
+                        aria-labelledby="my-payment-title"
+                        data-test="my-subscription-payment"
+                    >
+                        <div class="card-header py-2">
+                            <h2 id="my-payment-title" class="h6 fw-semibold mb-0">{{ pt.payment_method }}</h2>
+                        </div>
+                        <div class="card-body">
+                            <p>{{ methodLabel(subscription?.payment_method) }}</p>
+                            <p class="small text-muted">{{ cardText(subscription?.card) }}</p>
+                            <button
+                                v-if="canChangeCard"
+                                type="button"
+                                class="btn btn-outline-primary"
+                                @click="openCardModal"
+                            >
+                                {{ pt.change_card }}
+                            </button>
+                        </div>
+                    </section>
                 </div>
-                <div v-if="invoices.length === 0" class="card-body text-muted">{{ pt.history_empty }}</div>
-                <template v-else>
-                    <!-- md+: tabela -->
-                    <div class="table-responsive d-none d-md-block">
-                        <table class="table table-hover align-middle mb-0">
-                            <caption class="visually-hidden">
-                                {{
-                                    pt.history_title
-                                }}
-                            </caption>
-                            <thead class="table-light">
-                                <tr>
-                                    <th scope="col">{{ pt.col_reference }}</th>
-                                    <th scope="col">{{ pt.col_period }}</th>
-                                    <th scope="col">{{ pt.col_due }}</th>
-                                    <th scope="col" class="text-end">{{ pt.col_amount }}</th>
-                                    <th scope="col">{{ pt.col_method }}</th>
-                                    <th scope="col">{{ pt.col_status }}</th>
-                                    <th scope="col">{{ pt.col_paid_at }}</th>
-                                    <th scope="col">
-                                        <span class="visually-hidden">{{ pt.pay }}</span>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="invoice in invoices" :key="invoice.id" data-test="history-row">
-                                    <td class="small">
-                                        {{ invoice.reference ?? '—' }}
-                                        <span
-                                            v-if="invoice.kind === 'ai_credit_pack'"
-                                            class="d-block text-muted"
-                                            data-test="history-ai-pack"
-                                            >{{ invoiceLabel(invoice) }}</span
-                                        >
-                                        <NfseInvoiceLinks :nfse="invoice.nfse" :t="t.nfse ?? {}" />
-                                    </td>
-                                    <td class="small">
-                                        <template v-if="invoice.period_start">{{
-                                            tx('period', {
-                                                start: date(invoice.period_start),
-                                                end: date(invoice.period_end),
-                                            })
-                                        }}</template>
-                                        <template v-else>—</template>
-                                    </td>
-                                    <td class="small">{{ date(invoice.due_date) }}</td>
-                                    <td class="text-end">{{ money(invoice.amount, invoice.currency || 'BRL') }}</td>
-                                    <td class="small">{{ methodLabel(invoice.payment_method) }}</td>
-                                    <td>
+                <div class="col-xl-9">
+                    <!-- Histórico de faturas -->
+                    <section class="card mb-0" aria-labelledby="my-history-title" data-test="my-subscription-history">
+                        <div class="card-header py-2">
+                            <h2 id="my-history-title" class="h6 fw-semibold mb-0">
+                                <i class="ti ti-history me-1 text-primary" aria-hidden="true"></i
+                                >{{ pt.ai_latest_transactions }}
+                            </h2>
+                        </div>
+                        <div v-if="invoices.length === 0" class="card-body text-muted">{{ pt.history_empty }}</div>
+                        <template v-else>
+                            <!-- md+: tabela -->
+                            <div class="table-responsive d-none d-md-block">
+                                <table class="table table-hover align-middle mb-0">
+                                    <caption class="visually-hidden">
+                                        {{
+                                            pt.history_title
+                                        }}
+                                    </caption>
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col">{{ pt.col_reference }}</th>
+                                            <th scope="col">{{ pt.col_period }}</th>
+                                            <th scope="col">{{ pt.col_due }}</th>
+                                            <th scope="col" class="text-end">{{ pt.col_amount }}</th>
+                                            <th scope="col">{{ pt.col_method }}</th>
+                                            <th scope="col">{{ pt.col_status }}</th>
+                                            <th scope="col">{{ pt.col_paid_at }}</th>
+                                            <th scope="col">
+                                                <span class="visually-hidden">{{ pt.pay }}</span>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="invoice in invoices" :key="invoice.id" data-test="history-row">
+                                            <td class="small">
+                                                {{ invoice.reference ?? '—' }}
+                                                <span
+                                                    v-if="invoice.kind === 'ai_credit_pack'"
+                                                    class="d-block text-muted"
+                                                    data-test="history-ai-pack"
+                                                    >{{ invoiceLabel(invoice) }}</span
+                                                >
+                                                <NfseInvoiceLinks :nfse="invoice.nfse" :t="t.nfse ?? {}" />
+                                            </td>
+                                            <td class="small">
+                                                <template v-if="invoice.period_start">{{
+                                                    tx('period', {
+                                                        start: date(invoice.period_start),
+                                                        end: date(invoice.period_end),
+                                                    })
+                                                }}</template>
+                                                <template v-else>—</template>
+                                            </td>
+                                            <td class="small">{{ date(invoice.due_date) }}</td>
+                                            <td class="text-end">
+                                                {{ money(invoice.amount, invoice.currency || 'BRL') }}
+                                            </td>
+                                            <td class="small">{{ methodLabel(invoice.payment_method) }}</td>
+                                            <td>
+                                                <span class="badge" :class="invoiceBadge(invoice.status)">{{
+                                                    invoiceStatus(invoice.status)
+                                                }}</span>
+                                            </td>
+                                            <td class="small">
+                                                {{ invoice.paid_at ? dateTime(invoice.paid_at) : '—' }}
+                                            </td>
+                                            <td class="text-end">
+                                                <button
+                                                    v-if="canPay(invoice)"
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    @click="openPay(invoice)"
+                                                >
+                                                    {{ pt.pay
+                                                    }}<span class="visually-hidden"> {{ invoice.reference }}</span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- celular: cartões -->
+                            <ul class="list-unstyled mb-0 d-md-none">
+                                <li v-for="invoice in invoices" :key="invoice.id" class="p-3 border-bottom">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <strong>{{ money(invoice.amount, invoice.currency || 'BRL') }}</strong>
                                         <span class="badge" :class="invoiceBadge(invoice.status)">{{
                                             invoiceStatus(invoice.status)
                                         }}</span>
-                                    </td>
-                                    <td class="small">{{ invoice.paid_at ? dateTime(invoice.paid_at) : '—' }}</td>
-                                    <td class="text-end">
-                                        <button
-                                            v-if="canPay(invoice)"
-                                            type="button"
-                                            class="btn btn-sm btn-outline-primary"
-                                            @click="openPay(invoice)"
-                                        >
-                                            {{ pt.pay }}<span class="visually-hidden"> {{ invoice.reference }}</span>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- celular: cartões -->
-                    <ul class="list-unstyled mb-0 d-md-none">
-                        <li v-for="invoice in invoices" :key="invoice.id" class="p-3 border-bottom">
-                            <div class="d-flex justify-content-between gap-2">
-                                <strong>{{ money(invoice.amount, invoice.currency || 'BRL') }}</strong>
-                                <span class="badge" :class="invoiceBadge(invoice.status)">{{
-                                    invoiceStatus(invoice.status)
-                                }}</span>
-                            </div>
-                            <div class="small text-muted">
-                                {{ invoiceLabel(invoice) }} · {{ pt.col_due }}: {{ date(invoice.due_date) }}
-                            </div>
-                            <div v-if="invoice.paid_at" class="small text-muted">
-                                {{ pt.col_paid_at }}: {{ dateTime(invoice.paid_at) }}
-                            </div>
-                            <NfseInvoiceLinks :nfse="invoice.nfse" :t="t.nfse ?? {}" />
-                            <button
-                                v-if="canPay(invoice)"
-                                type="button"
-                                class="btn btn-sm btn-primary mt-2 w-100"
-                                @click="openPay(invoice)"
-                            >
-                                {{ pt.pay }}
-                            </button>
-                        </li>
-                    </ul>
-                </template>
-            </section>
+                                    </div>
+                                    <div class="small text-muted">
+                                        {{ invoiceLabel(invoice) }} · {{ pt.col_due }}: {{ date(invoice.due_date) }}
+                                    </div>
+                                    <div v-if="invoice.paid_at" class="small text-muted">
+                                        {{ pt.col_paid_at }}: {{ dateTime(invoice.paid_at) }}
+                                    </div>
+                                    <NfseInvoiceLinks :nfse="invoice.nfse" :t="t.nfse ?? {}" />
+                                    <button
+                                        v-if="canPay(invoice)"
+                                        type="button"
+                                        class="btn btn-sm btn-primary mt-2 w-100"
+                                        @click="openPay(invoice)"
+                                    >
+                                        {{ pt.pay }}
+                                    </button>
+                                </li>
+                            </ul>
+                        </template>
+                    </section>
+                </div>
+            </div>
         </div>
 
         <!-- Checkout (pagar fatura / contratar) -->

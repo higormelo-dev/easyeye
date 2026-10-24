@@ -29,8 +29,9 @@ it('formata o número com o separador de milhar do idioma', function () {
         ->and(planLimitLabel(FeatureKey::MaxPatients, 10000, 'en'))->toBe('Up to 10,000 patients');
 });
 
-it('zero continua significando ilimitado, ou "sem créditos" para a IA', function () {
+it('zero continua significando ilimitado, ou "sem saldo" para a IA; a franquia de IA é mostrada em reais (valor em centavos)', function () {
     expect(planLimitLabel(FeatureKey::MaxPatients, 0, 'pt_BR'))->toBe(trans('subscriptions.features.max_patients_unlimited', [], 'pt_BR'))
         ->and(planLimitLabel(FeatureKey::AiMonthlyCredits, 0, 'pt_BR'))->toBe(trans('subscriptions.features.ai_credits_none', [], 'pt_BR'))
-        ->and(planLimitLabel(FeatureKey::AiMonthlyCredits, 1, 'pt_BR'))->toBe('1 crédito de IA por mês');
+        ->and(planLimitLabel(FeatureKey::AiMonthlyCredits, 3000, 'pt_BR'))->toContain('R$ 30,00')
+        ->and(planLimitLabel(FeatureKey::AiMonthlyCredits, 3000, 'pt_BR'))->not->toContain('crédito');
 });

@@ -39,17 +39,20 @@ class AiQuotaService
     }
 
     /**
+     * Tudo em CENTAVOS de BRL. `purchased_balance_cents` e `balance_cents` são o mesmo valor (saldo comprado).
+     *
      * @return array{
-     *   monthly_quota: int,
-     *   consumed_credits: int,
-     *   remaining: int,
+     *   monthly_quota_cents: int,
+     *   monthly_quota_used_cents: int,
+     *   monthly_quota_remaining_cents: int,
      *   usage_percent: float|null,
      *   renews_on: string|null,
      *   renews_if_paid_on: string|null,
      *   expires_on: string|null,
-     *   purchased_balance: int,
-     *   reserved: int,
-     *   available: int
+     *   purchased_balance_cents: int,
+     *   balance_cents: int,
+     *   reserved_cents: int,
+     *   available_cents: int
      * }
      */
     public function snapshot(string $entityId): array
@@ -60,40 +63,44 @@ class AiQuotaService
 
         if (! $wallet) {
             return [
-                'monthly_quota'     => 0,
-                'consumed_credits'  => 0,
-                'remaining'         => 0,
-                'usage_percent'     => null,
-                'renews_on'         => null,
-                'renews_if_paid_on' => null,
-                'expires_on'        => null,
-                'purchased_balance' => 0,
-                'reserved'          => 0,
-                'available'         => 0,
+                'monthly_quota_cents'           => 0,
+                'monthly_quota_used_cents'      => 0,
+                'monthly_quota_remaining_cents' => 0,
+                'usage_percent'                 => null,
+                'renews_on'                     => null,
+                'renews_if_paid_on'             => null,
+                'expires_on'                    => null,
+                'purchased_balance_cents'       => 0,
+                'balance_cents'                 => 0,
+                'reserved_cents'                => 0,
+                'available_cents'               => 0,
             ];
         }
 
         // Janela vencida (ou cota encerrada): não há franquia em vigor.
         $expired      = $wallet->quotaExpired();
-        $quota        = $expired ? 0 : max(0, (int) $wallet->monthly_quota);
-        $used         = $expired ? 0 : min($quota, max(0, (int) $wallet->monthly_quota_used));
+        $quota        = $expired ? 0 : max(0, (int) $wallet->monthly_quota_cents);
+        $used         = $expired ? 0 : min($quota, max(0, (int) $wallet->monthly_quota_used_cents));
         $subscription = $quota > 0 ? Subscription::bestAccessibleFor($entityId) : null;
         $renews       = $subscription?->earnsMonthlyAiQuota() ?? false;
         $renewal      = $renews ? $wallet->quota_period_ends_at : null;
         // Em atraso, a renovação que cai no acesso limitado depende do pagamento.
         $ifPaid = $renewal !== null && self::renewalNeedsPayment($subscription, $renewal);
 
+        $purchased = max(0, (int) $wallet->balance_cents);
+
         return [
-            'monthly_quota'     => $quota,
-            'consumed_credits'  => $used,
-            'remaining'         => $wallet->quotaRemaining(),
-            'usage_percent'     => $quota > 0 ? round(($used / $quota) * 100, 1) : null,
-            'renews_on'         => $renewal !== null && ! $ifPaid ? $renewal->toDateString() : null,
-            'renews_if_paid_on' => $ifPaid ? $renewal->toDateString() : null,
-            'expires_on'        => $quota > 0 && ! $renews ? $wallet->quotaLastDay() : null,
-            'purchased_balance' => max(0, (int) $wallet->balance),
-            'reserved'          => max(0, (int) $wallet->reserved_balance),
-            'available'         => $wallet->totalAvailable(),
+            'monthly_quota_cents'           => $quota,
+            'monthly_quota_used_cents'      => $used,
+            'monthly_quota_remaining_cents' => $wallet->quotaRemaining(),
+            'usage_percent'                 => $quota > 0 ? round(($used / $quota) * 100, 1) : null,
+            'renews_on'                     => $renewal !== null && ! $ifPaid ? $renewal->toDateString() : null,
+            'renews_if_paid_on'             => $ifPaid ? $renewal->toDateString() : null,
+            'expires_on'                    => $quota > 0 && ! $renews ? $wallet->quotaLastDay() : null,
+            'purchased_balance_cents'       => $purchased,
+            'balance_cents'                 => $purchased,
+            'reserved_cents'                => max(0, (int) $wallet->reserved_balance_cents),
+            'available_cents'               => $wallet->totalAvailable(),
         ];
     }
 

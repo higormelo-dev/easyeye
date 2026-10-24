@@ -290,7 +290,6 @@ class EyeImagesController extends Controller
                     'clinical_prompt_placeholder' => __('ai.clinical_prompt_placeholder'),
                     'prompt_min_chars'            => __('ai.prompt_min_chars', ['min' => 12]),
                     'estimated_credits'           => __('ai.estimated_credits'),
-                    'raw_cost_usd'                => __('ai.raw_cost_usd'),
                     'estimate'                    => __('ai.estimate'),
                     'run'                         => __('ai.run'),
                     'credits_available'           => __('ai.credits_available'),

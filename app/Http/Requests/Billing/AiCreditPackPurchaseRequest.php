@@ -2,16 +2,19 @@
 
 namespace App\Http\Requests\Billing;
 
-use App\Domains\AI\Services\AiCreditPurchaseService;
+use App\Domains\AI\Services\{AiCreditPurchaseService, AiPricingSettings};
 use App\DTOs\Billing\CheckoutCardInput;
 use App\Enums\Billing\CheckoutMethod;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Compra de pacote de créditos de IA pelo checkout (POST
+ * Compra de pacote de saldo de IA pelo checkout (POST
  * /panel/my-subscription/ai-credits): pacote do config, forma de pagamento
  * e, no cartão transparente, só o token do SDK (cartão à vista).
+ *
+ * Pacote personalizado: `custom_amount_cents` em reais inteiros (múltiplo de 100), entre o mínimo e o máximo vigentes — lidos
+ * do servidor na hora da validação, nunca fixos aqui nem vindos da UI. Pacote fixo PROÍBE valor (o preço nunca vem do cliente).
  */
 class AiCreditPackPurchaseRequest extends FormRequest
 {
@@ -22,11 +25,19 @@ class AiCreditPackPurchaseRequest extends FormRequest
 
     public function rules(): array
     {
-        $codes = collect(app(AiCreditPurchaseService::class)->packages())->pluck('code')->filter()->values()->all();
+        $codes    = collect(app(AiCreditPurchaseService::class)->packages())->pluck('code')->filter()->values()->all();
+        $settings = app(AiPricingSettings::class);
 
         return [
-            'package_code' => ['required', 'string', Rule::in($codes)],
-            'method'       => ['required', 'string', Rule::in(CheckoutMethod::values())],
+            'package_code'        => ['required', 'string', Rule::in($codes)],
+            'custom_amount_cents' => [
+                'required_if:package_code,custom',
+                'prohibited_unless:package_code,custom',
+                'integer',
+                'multiple_of:' . $settings->customStepCents(),
+                'between:' . $settings->customMinCents() . ',' . $settings->customMaxCents(),
+            ],
+            'method' => ['required', 'string', Rule::in(CheckoutMethod::values())],
             // Número de cartão cru (só dígitos) nunca é aceito — só o token do SDK.
             'card_token'        => ['nullable', 'string', 'max:4096', 'not_regex:/^[\d\s.-]{12,23}$/'],
             'installments'      => ['nullable', 'integer', 'min:1', 'max:12'],
@@ -39,6 +50,11 @@ class AiCreditPackPurchaseRequest extends FormRequest
     public function packageCode(): string
     {
         return (string) $this->input('package_code');
+    }
+
+    public function customAmountCents(): ?int
+    {
+        return $this->filled('custom_amount_cents') ? (int) $this->input('custom_amount_cents') : null;
     }
 
     public function checkoutMethod(): CheckoutMethod

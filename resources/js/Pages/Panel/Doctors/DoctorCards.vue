@@ -98,7 +98,7 @@ onUnmounted(() => removeSuccessListener?.());
         <span class="me-auto">{{ t.load_error ?? 'Não foi possível carregar os médicos.' }}</span>
         <button
             type="button"
-            class="btn btn-sm btn-outline-danger"
+            class="btn btn-outline-danger btn-icon"
             :title="t.retry ?? 'Tentar novamente'"
             :aria-label="t.retry ?? 'Tentar novamente'"
             @click="fetchCards(meta.current_page)"

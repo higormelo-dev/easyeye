@@ -62,12 +62,7 @@ const orderedColumns = computed(() =>
 <template>
     <!-- Toolbar: personalizar colunas -->
     <div class="d-flex justify-content-end mb-2">
-        <ActionDropdown
-            title="Personalizar colunas"
-            align="right"
-            :min-width="230"
-            btn-class="bg-body border shadow-sm rounded px-2 py-1 d-flex align-items-center gap-1 fs-13 text-muted"
-        >
+        <ActionDropdown title="Personalizar colunas" align="right" :min-width="230" btn-class="btn btn-white">
             <template #trigger>
                 <i class="ti ti-adjustments"></i>
                 <span class="d-none d-sm-inline">Colunas</span>

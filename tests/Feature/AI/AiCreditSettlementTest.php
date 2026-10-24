@@ -32,7 +32,7 @@ test('sobra de reserva paga com crédito comprado volta ao comprado, não à cot
     // Franquia 30/30 usada + 100 comprados: a reserva sai toda do comprado.
     $this->service->grantMonthlyQuota($this->entity->id, 30, CarbonImmutable::now()->addMonth());
     $this->service->purchaseCredits($this->entity->id, 100);
-    settlementWallet($this->entity)->update(['monthly_quota_used' => 30]);
+    settlementWallet($this->entity)->update(['monthly_quota_used_cents' => 30]);
 
     $run = settlementRun($this->entity);
     $this->service->reserve($this->entity->id, 4, aiRunId: $run->id);
@@ -40,13 +40,13 @@ test('sobra de reserva paga com crédito comprado volta ao comprado, não à cot
     // Execução falhou: devolve a reserva inteira.
     $release = $this->service->releaseReservation($this->entity->id, 4, aiRunId: $run->id);
 
-    expect($release->metadata['to_balance'])->toBe(4)
-        ->and($release->metadata['to_quota'])->toBe(0);
+    expect($release->metadata['to_balance_cents'])->toBe(4)
+        ->and($release->metadata['to_quota_cents'])->toBe(0);
 
     $wallet = settlementWallet($this->entity);
-    expect($wallet->balance)->toBe(100)
-        ->and($wallet->monthly_quota_used)->toBe(30)
-        ->and($wallet->reserved_balance)->toBe(0);
+    expect($wallet->balance_cents)->toBe(100)
+        ->and($wallet->monthly_quota_used_cents)->toBe(30)
+        ->and($wallet->reserved_balance_cents)->toBe(0);
 });
 
 test('consumo sai primeiro da cota e a sobra devolve o comprado', function () {
@@ -60,15 +60,15 @@ test('consumo sai primeiro da cota e a sobra devolve o comprado', function () {
     $consume = $this->service->consumeReservation($this->entity->id, 10, aiRunId: $run->id);
     $release = $this->service->releaseReservation($this->entity->id, 50, aiRunId: $run->id);
 
-    expect($consume->metadata['from_quota'])->toBe(10)
-        ->and($consume->metadata['from_balance'])->toBe(0)
-        ->and($release->metadata['to_balance'])->toBe(20)
-        ->and($release->metadata['to_quota'])->toBe(30);
+    expect($consume->metadata['from_quota_cents'])->toBe(10)
+        ->and($consume->metadata['from_balance_cents'])->toBe(0)
+        ->and($release->metadata['to_balance_cents'])->toBe(20)
+        ->and($release->metadata['to_quota_cents'])->toBe(30);
 
     $wallet = settlementWallet($this->entity);
-    expect($wallet->monthly_quota_used)->toBe(10)   // só o consumido saiu da cota
-        ->and($wallet->balance)->toBe(100)              // comprado intacto
-        ->and($wallet->reserved_balance)->toBe(0);
+    expect($wallet->monthly_quota_used_cents)->toBe(10)   // só o consumido saiu da cota
+        ->and($wallet->balance_cents)->toBe(100)              // comprado intacto
+        ->and($wallet->reserved_balance_cents)->toBe(0);
 });
 
 test('consumo de uma execução não mexe no reservado de outra', function () {
@@ -81,19 +81,19 @@ test('consumo de uma execução não mexe no reservado de outra', function () {
     $this->service->reserve($this->entity->id, 5, aiRunId: $fromQuota->id);    // 5 da cota
     $this->service->reserve($this->entity->id, 10, aiRunId: $fromBalance->id); // 10 do comprado
 
-    expect(settlementWallet($this->entity)->reserved_balance)->toBe(10);
+    expect(settlementWallet($this->entity)->reserved_balance_cents)->toBe(10);
 
     // A execução paga com cota consome tudo: o reservado (do comprado) da outra fica.
     $this->service->consumeReservation($this->entity->id, 5, aiRunId: $fromQuota->id);
 
-    expect(settlementWallet($this->entity)->reserved_balance)->toBe(10);
+    expect(settlementWallet($this->entity)->reserved_balance_cents)->toBe(10);
 
     $this->service->consumeReservation($this->entity->id, 10, aiRunId: $fromBalance->id);
 
     $wallet = settlementWallet($this->entity);
-    expect($wallet->reserved_balance)->toBe(0)
-        ->and($wallet->balance)->toBe(40)
-        ->and($wallet->monthly_quota_used)->toBe(5);
+    expect($wallet->reserved_balance_cents)->toBe(0)
+        ->and($wallet->balance_cents)->toBe(40)
+        ->and($wallet->monthly_quota_used_cents)->toBe(5);
 });
 
 test('virada da janela durante a execução: a parte da cota se perde sem quebrar a liberação', function () {
@@ -108,14 +108,14 @@ test('virada da janela durante a execução: a parte da cota se perde sem quebra
 
     $release = $this->service->releaseReservation($this->entity->id, 25, aiRunId: $run->id);
 
-    expect($release->metadata['to_balance'])->toBe(5)
-        ->and($release->metadata['to_quota'])->toBe(0)
-        ->and($release->metadata['quota_forfeited'])->toBe(20);
+    expect($release->metadata['to_balance_cents'])->toBe(5)
+        ->and($release->metadata['to_quota_cents'])->toBe(0)
+        ->and($release->metadata['quota_forfeited_cents'])->toBe(20);
 
     $wallet = settlementWallet($this->entity);
-    expect($wallet->monthly_quota_used)->toBe(0)   // a janela nova não ganha nem perde
-        ->and($wallet->balance)->toBe(10)
-        ->and($wallet->reserved_balance)->toBe(0);
+    expect($wallet->monthly_quota_used_cents)->toBe(0)   // a janela nova não ganha nem perde
+        ->and($wallet->balance_cents)->toBe(10)
+        ->and($wallet->reserved_balance_cents)->toBe(0);
 });
 
 test('liberação maior que o reservado do run é recusada', function () {
@@ -136,30 +136,30 @@ test('saneamento devolve ao comprado o reservado sem execução em andamento', f
     $this->service->reserve($this->entity->id, 4, aiRunId: $running->id);
 
     // "Reservados" fantasma deixado por liquidações antigas.
-    settlementWallet($this->entity)->increment('reserved_balance', 6);
+    settlementWallet($this->entity)->increment('reserved_balance_cents', 6);
 
     $dryRun = $this->service->reconcileReservedBalance($this->entity->id);
 
-    expect($dryRun['reserved'])->toBe(10)
-        ->and($dryRun['expected'])->toBe(4)
-        ->and($dryRun['phantom'])->toBe(6)
+    expect($dryRun['reserved_cents'])->toBe(10)
+        ->and($dryRun['expected_cents'])->toBe(4)
+        ->and($dryRun['phantom_cents'])->toBe(6)
         ->and($dryRun['applied'])->toBeFalse()
-        ->and(settlementWallet($this->entity)->reserved_balance)->toBe(10);
+        ->and(settlementWallet($this->entity)->reserved_balance_cents)->toBe(10);
 
     $this->artisan('ai:reconcile-reserved-balance', ['--apply' => true])->assertSuccessful();
 
     $wallet = settlementWallet($this->entity);
-    expect($wallet->reserved_balance)->toBe(4)
-        ->and($wallet->balance)->toBe(96 + 6);
+    expect($wallet->reserved_balance_cents)->toBe(4)
+        ->and($wallet->balance_cents)->toBe(96 + 6);
 
     $adjustment = AiCreditLedgerEntry::query()
         ->where('entity_id', $this->entity->id)
         ->where('type', AiLedgerEntryType::Adjustment->value)
         ->sole();
 
-    expect($adjustment->amount)->toBe(6)
+    expect($adjustment->amount_cents)->toBe(6)
         ->and($adjustment->metadata['adjustment_reason'])->toBe('reserved_balance_reconcile');
 
     // Rodar de novo não devolve outra vez.
-    expect($this->service->reconcileReservedBalance($this->entity->id, apply: true)['phantom'])->toBe(0);
+    expect($this->service->reconcileReservedBalance($this->entity->id, apply: true)['phantom_cents'])->toBe(0);
 });

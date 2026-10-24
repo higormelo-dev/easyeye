@@ -25,7 +25,7 @@ function cancel(invitation) {
 </script>
 
 <template>
-    <section class="card border-0 shadow-sm mt-3" aria-labelledby="doctor-invitations-title">
+    <section class="card border-0 shadow-sm mt-3" aria-labelledby="doctor-invitations-title" data-ee-density="default">
         <div class="card-body">
             <h2 id="doctor-invitations-title" class="h6 fw-semibold mb-1">
                 <i class="ti ti-mail-forward me-1 text-primary" aria-hidden="true"></i>{{ it.pending_title }}
@@ -40,7 +40,9 @@ function cancel(invitation) {
                             <th scope="col">{{ t.col_record }}</th>
                             <th scope="col">{{ it.col_sent_at }}</th>
                             <th scope="col">{{ it.col_expires_at }}</th>
-                            <th scope="col" class="text-end">
+                            <!-- position-relative: o .visually-hidden é absoluto; sem um pai posicionado ele fica
+                                 no x real da coluna e alarga a página inteira no celular (rolagem lateral). -->
+                            <th scope="col" class="text-end position-relative">
                                 <span class="visually-hidden">{{ it.cancel }}</span>
                             </th>
                         </tr>
@@ -52,7 +54,7 @@ function cancel(invitation) {
                             <td>{{ dateTime(invitation.sent_at) }}</td>
                             <td>{{ dateTime(invitation.expires_at) }}</td>
                             <td class="text-end">
-                                <button type="button" class="btn btn-outline-danger btn-sm" @click="cancel(invitation)">
+                                <button type="button" class="btn btn-outline-danger" @click="cancel(invitation)">
                                     <i class="ti ti-x me-1" aria-hidden="true"></i>{{ it.cancel }}
                                 </button>
                             </td>

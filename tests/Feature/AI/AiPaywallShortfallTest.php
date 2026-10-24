@@ -6,6 +6,7 @@ use App\Domains\AI\Models\AiCreditWallet;
 use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiQuotaService};
 use App\Enums\{ClientRule, FeatureKey, SubscriptionBillingMode, SubscriptionStatus};
 use App\Models\{Entity, Plan, PlanFeature, Subscription, User};
+use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 
@@ -68,47 +69,47 @@ test('ainda há franquia, só que menos do que a solicitação pede: 422 diz qua
         ->withSession(panelSession($this->adminEU))
         ->postJson(route('panel.ai-runs.store'), baseRunPayload())
         ->assertStatus(422)
-        ->assertJsonPath('details.available', 1)
+        ->assertJsonPath('details.available_cents', 1)
         ->assertJsonPath('paywall.reason', 'insufficient_for_request')
-        ->assertJsonPath('paywall.available', 1)
+        ->assertJsonPath('paywall.available_cents', 1)
         ->assertJsonPath('paywall.can_purchase', true)
         ->assertJsonPath('paywall.texts.title', __('ai.paywall.title_insufficient'));
 
-    $requested = (int) $response->json('details.requested');
+    $requested = (int) $response->json('details.requested_cents');
     $message   = $response->json('paywall.texts.message');
 
     expect($requested)->toBeGreaterThan(1)
-        ->and($response->json('paywall.requested'))->toBe($requested)
-        ->and($message)->toContain("precisa de {$requested} créditos")
-        ->and($message)->toContain('o saldo disponível é 1')
+        ->and($response->json('paywall.requested_cents'))->toBe($requested)
+        ->and($message)->toContain('são necessários ' . Money::formatBrl($requested))
+        ->and($message)->toContain('há R$ 0,01 disponíveis')
         ->and($message)->not->toContain('acabou')
         ->and($message)->not->toBe(__('ai.paywall.reasons.quota_exhausted'));
 });
 
-test('quanto falta: singular/plural e números no idioma', function () {
+test('quanto falta: valores em reais no idioma do usuário', function () {
     Subscription::factory()->for($this->entity)->for($this->plan)->create(['last_payment_at' => now(), 'gateway' => 'asaas']);
     $paywall = app(AiPaywallService::class);
 
-    expect($paywall->describe($this->entity->id, ClientRule::Admin->value, requested: 4, available: 3)['texts']['message'])
-        ->toEndWith('Falta 1 crédito.')
-        ->and($paywall->describe($this->entity->id, ClientRule::Admin->value, requested: 2000, available: 1500)['texts']['message'])
-        ->toBe('Saldo de IA insuficiente para esta solicitação: ela precisa de 2.000 créditos e o saldo disponível é 1.500. Faltam 500 créditos.');
+    expect($paywall->describe($this->entity->id, ClientRule::Admin->value, requestedCents: 4, availableCents: 3)['texts']['message'])
+        ->toEndWith('Faltam R$ 0,01.')
+        ->and($paywall->describe($this->entity->id, ClientRule::Admin->value, requestedCents: 2000, availableCents: 1500)['texts']['message'])
+        ->toBe('Saldo de IA insuficiente para esta solicitação: são necessários R$ 20,00 e há R$ 15,00 disponíveis. Faltam R$ 5,00.');
 
     app()->setLocale('en');
 
-    expect($paywall->describe($this->entity->id, ClientRule::Admin->value, requested: 4, available: 3)['texts']['message'])
-        ->toEndWith('You are 1 credit short.')
-        ->and($paywall->describe($this->entity->id, ClientRule::Admin->value, requested: 2000, available: 1500)['texts']['message'])
-        ->toContain('it needs 2,000 credits and the available balance is 1,500. You are 500 credits short.');
+    expect($paywall->describe($this->entity->id, ClientRule::Admin->value, requestedCents: 4, availableCents: 3)['texts']['message'])
+        ->toEndWith('Shortfall: R$ 0,01.')
+        ->and($paywall->describe($this->entity->id, ClientRule::Admin->value, requestedCents: 2000, availableCents: 1500)['texts']['message'])
+        ->toContain('R$ 20,00 is needed and R$ 15,00 is available. Shortfall: R$ 5,00.');
 });
 
 test('sem saldo nenhum continua a mensagem da situação (franquia acabou)', function () {
     Subscription::factory()->for($this->entity)->for($this->plan)->create(['last_payment_at' => now(), 'gateway' => 'asaas']);
 
-    $paywall = app(AiPaywallService::class)->describe($this->entity->id, ClientRule::Admin->value, requested: 4, available: 0);
+    $paywall = app(AiPaywallService::class)->describe($this->entity->id, ClientRule::Admin->value, requestedCents: 4, availableCents: 0);
 
     expect($paywall['reason'])->toBe('quota_exhausted')
-        ->and($paywall['requested'])->toBeNull()
+        ->and($paywall['requested_cents'])->toBeNull()
         ->and($paywall['texts']['title'])->toBe(__('ai.paywall.title'));
 });
 
@@ -118,7 +119,7 @@ test('em atraso com a renovação no acesso limitado: medidor e paywall condicio
     shortfallExhaustedWindow($subscription, '2026-10-07 00:00:00');
 
     expect(app(AiQuotaService::class)->snapshot($this->entity->id))
-        ->toMatchArray(['monthly_quota' => 80, 'renews_on' => null, 'renews_if_paid_on' => '2026-10-07', 'expires_on' => null]);
+        ->toMatchArray(['monthly_quota_cents' => 80, 'renews_on' => null, 'renews_if_paid_on' => '2026-10-07', 'expires_on' => null]);
 
     $paywall = app(AiPaywallService::class)->describe($this->entity->id, ClientRule::Admin->value);
 
@@ -127,7 +128,7 @@ test('em atraso com a renovação no acesso limitado: medidor e paywall condicio
         ->and($paywall['renews_if_paid_on'])->toBe('2026-10-07')
         ->and($paywall['texts']['message'])->toBe(__('ai.paywall.reasons.quota_exhausted_if_paid'))
         ->and($paywall['texts']['message'])->toContain(':date')
-        ->and(__('ai.paywall.reasons.quota_exhausted_if_paid', [], 'en'))->toContain('if the payment is confirmed');
+        ->and(__('ai.paywall.reasons.quota_exhausted_if_paid', [], 'en'))->toContain('if payment is confirmed');
 });
 
 test('em atraso com a renovação ainda no acesso total: a renovação acontece, sem condição', function () {
@@ -140,5 +141,5 @@ test('em atraso com a renovação ainda no acesso total: a renovação acontece,
 
     expect(app(AiPaywallService::class)->describe($this->entity->id, ClientRule::Admin->value))
         ->toMatchArray(['renews_on' => '2026-10-05', 'renews_if_paid_on' => null])
-        ->and(AiCreditWallet::query()->where('entity_id', $this->entity->id)->sole()->monthly_quota)->toBe(80);
+        ->and(AiCreditWallet::query()->where('entity_id', $this->entity->id)->sole()->monthly_quota_cents)->toBe(80);
 });

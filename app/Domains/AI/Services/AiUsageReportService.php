@@ -37,16 +37,16 @@ class AiUsageReportService
     ) {
     }
 
-    /** @return array{rate: float, topped_up_at: ?string, is_fallback: bool, usd_per_credit: float} */
+    /** @return array{rate: float, topped_up_at: ?string, is_fallback: bool, source: string} */
     public function rate(): array
     {
         $rate = $this->rates->current();
 
         return [
-            'rate'           => $rate['rate'],
-            'topped_up_at'   => $rate['topped_up_at']?->toDateString(),
-            'is_fallback'    => $rate['is_fallback'],
-            'usd_per_credit' => $this->usdPerCredit(),
+            'rate'         => $rate['rate'],
+            'topped_up_at' => $rate['topped_up_at']?->toDateString(),
+            'is_fallback'  => $rate['is_fallback'],
+            'source'       => $rate['source'],
         ];
     }
 
@@ -65,7 +65,7 @@ class AiUsageReportService
             'delta'    => [
                 'runs'         => $this->deltaPct($current['runs'], $previous['runs']),
                 'cost_brl'     => $this->deltaPct($current['cost_brl'], $previous['cost_brl']),
-                'credits'      => $this->deltaPct($current['credits'], $previous['credits']),
+                'charge_cents' => $this->deltaPct($current['charge_cents'], $previous['charge_cents']),
                 'revenue_brl'  => $this->deltaPct($current['revenue_brl'], $previous['revenue_brl']),
                 'margin_brl'   => $this->deltaPct($current['margin_brl'], $previous['margin_brl']),
                 'avg_cost_brl' => $this->deltaPct($current['avg_cost_brl'], $previous['avg_cost_brl']),
@@ -83,7 +83,7 @@ class AiUsageReportService
         $runs = $this->runs($filters)
             ->selectRaw('COUNT(*) as runs')
             ->selectRaw('COALESCE(SUM(CASE WHEN r.status = ? THEN 1 ELSE 0 END), 0) as failed', [AiRunStatus::Failed->value])
-            ->selectRaw('COALESCE(SUM(r.consumed_credits), 0) as credits')
+            ->selectRaw('COALESCE(SUM(r.consumed_charge_cents), 0) as charge_cents')
             ->selectRaw('COUNT(DISTINCT r.entity_id) as entities')
             ->selectRaw('COUNT(DISTINCT r.requested_by) as users')
             ->first();
@@ -99,7 +99,7 @@ class AiUsageReportService
         $totalRuns = (int) $runs->runs;
 
         return [
-            ...$this->money((float) $calls->cost_usd, (int) $runs->credits, $rate),
+            ...$this->money((float) $calls->cost_usd, (int) $runs->charge_cents, $rate),
             'runs'              => $totalRuns,
             'failed'            => (int) $runs->failed,
             'failure_rate'      => $this->pct((int) $runs->failed, $totalRuns),
@@ -304,7 +304,8 @@ class AiUsageReportService
             ->first([
                 'r.id', 'r.workflow', 'r.mode', 'r.risk_level', 'r.status', 'r.created_at', 'r.updated_at',
                 'r.approved_at', 'r.cancelled_at', 'r.parent_run_id', 'r.error_message',
-                'r.estimated_credits', 'r.reserved_credits', 'r.consumed_credits',
+                'r.estimated_charge_cents', 'r.reserved_charge_cents', 'r.consumed_charge_cents',
+                'r.exchange_rate_brl_usd', 'r.markup_multiplier', 'r.minimum_charge_cents', 'r.pricing_source', 'r.estimated_cost_usd', 'r.actual_cost_usd',
                 'e.id as entity_id', 'e.name as entity_name', 'e.is_client',
                 'u.name as user_name', 'a.name as approver_name',
             ]);
@@ -338,18 +339,27 @@ class AiUsageReportService
             'status_label'   => $this->label('ai.status_' . $run->status, (string) $run->status),
             'is_escalation'  => $run->parent_run_id !== null,
             // error_message do run já é o texto genérico (AiRunExecutionService::doctorSafeReason).
-            'error'             => $run->error_message,
-            'entity_id'         => $run->entity_id !== null ? (string) $run->entity_id : null,
-            'entity_name'       => $run->entity_name,
-            'is_internal'       => $run->entity_id !== null && ! $run->is_client,
-            'user_name'         => $run->user_name,
-            'approver_name'     => $run->approver_name,
-            'estimated_credits' => (int) $run->estimated_credits,
-            'reserved_credits'  => (int) $run->reserved_credits,
-            'consumed_credits'  => (int) $run->consumed_credits,
-            'cost_usd'          => round($costUsd, 6),
-            'cost_brl'          => round($costUsd * $rate, 2),
-            'calls'             => $calls->map(fn ($call) => [
+            'error'                  => $run->error_message,
+            'entity_id'              => $run->entity_id !== null ? (string) $run->entity_id : null,
+            'entity_name'            => $run->entity_name,
+            'is_internal'            => $run->entity_id !== null && ! $run->is_client,
+            'user_name'              => $run->user_name,
+            'approver_name'          => $run->approver_name,
+            'estimated_charge_cents' => (int) $run->estimated_charge_cents,
+            'reserved_charge_cents'  => (int) $run->reserved_charge_cents,
+            'consumed_charge_cents'  => (int) $run->consumed_charge_cents,
+            'cost_usd'               => round($costUsd, 6),
+            // Custo em R$ com o câmbio CONGELADO na execução (a taxa de hoje só para execução sem snapshot).
+            'cost_brl' => round($costUsd * ($run->exchange_rate_brl_usd !== null ? (float) $run->exchange_rate_brl_usd : $rate), 2),
+            // Snapshot de precificação (SÓ manager): câmbio, markup, piso e origem — nunca em rota de clínica.
+            'pricing' => [
+                'exchange_rate_brl_usd' => $run->exchange_rate_brl_usd !== null ? (float) $run->exchange_rate_brl_usd : null,
+                'markup_multiplier'     => $run->markup_multiplier !== null ? (float) $run->markup_multiplier : null,
+                'minimum_charge_cents'  => $run->minimum_charge_cents !== null ? (int) $run->minimum_charge_cents : null,
+                'pricing_source'        => $run->pricing_source,
+                'converted'             => $run->pricing_source === 'legacy_migration',
+            ],
+            'calls' => $calls->map(fn ($call) => [
                 'role'             => (string) $call->role,
                 'role_label'       => $this->label('manager_ai_usage.roles.' . $call->role, (string) $call->role),
                 'provider'         => (string) $call->provider,
@@ -458,7 +468,7 @@ class AiUsageReportService
             ->leftJoin('entities as e', 'e.id', '=', 'r.entity_id')
             ->leftJoin('users as u', 'u.id', '=', 'r.requested_by')
             ->select([
-                'r.id', 'r.created_at', 'r.workflow', 'r.mode', 'r.status', 'r.consumed_credits',
+                'r.id', 'r.created_at', 'r.workflow', 'r.mode', 'r.status', 'r.consumed_charge_cents',
                 'r.entity_id', 'e.name as entity_name', 'e.is_client', 'r.requested_by', 'u.name as user_name',
             ])
             ->selectRaw('COALESCE(pr.calls, 0) as calls')
@@ -492,7 +502,7 @@ class AiUsageReportService
             ->select(array_map(fn (string $column) => "{$column} as {$this->alias($column)}", $columns))
             ->selectRaw('COUNT(*) as runs')
             ->selectRaw('COALESCE(SUM(CASE WHEN r.status = ? THEN 1 ELSE 0 END), 0) as failed', [AiRunStatus::Failed->value])
-            ->selectRaw('COALESCE(SUM(r.consumed_credits), 0) as credits')
+            ->selectRaw('COALESCE(SUM(r.consumed_charge_cents), 0) as charge_cents')
             ->groupBy($columns)
             ->get();
 
@@ -516,7 +526,7 @@ class AiUsageReportService
                     'failed'       => (int) $row->failed,
                     'failure_rate' => $this->pct((int) $row->failed, $runs),
                     'calls'        => (int) ($cost->calls ?? 0),
-                    ...$this->money($costUsd, (int) $row->credits, $rate),
+                    ...$this->money($costUsd, (int) $row->charge_cents, $rate),
                     'avg_cost_brl' => $runs > 0 ? round($costUsd * $rate / $runs, 4) : 0.0,
                 ];
             })
@@ -532,21 +542,20 @@ class AiUsageReportService
      *
      * @return array<string, mixed>
      */
-    private function money(float $costUsd, int $credits, float $rate): array
+    private function money(float $costUsd, int $chargeCents, float $rate): array
     {
-        $revenueUsd = $credits * $this->usdPerCredit();
+        // Receita = o que as execuções cobraram (centavos → R$); a fórmula antiga créditos × usd_per_credit × margem acabou.
         $costBrl    = round($costUsd * $rate, 2);
-        $revenueBrl = round($revenueUsd * $rate, 2);
+        $revenueBrl = round($chargeCents / 100, 2);
         $marginBrl  = round($revenueBrl - $costBrl, 2);
 
         return [
-            'cost_usd'    => round($costUsd, 6),
-            'cost_brl'    => $costBrl,
-            'credits'     => $credits,
-            'revenue_usd' => round($revenueUsd, 4),
-            'revenue_brl' => $revenueBrl,
-            'margin_brl'  => $marginBrl,
-            'margin_pct'  => $revenueBrl > 0 ? round($marginBrl / $revenueBrl * 100, 1) : null,
+            'cost_usd'     => round($costUsd, 6),
+            'cost_brl'     => $costBrl,
+            'charge_cents' => $chargeCents,
+            'revenue_brl'  => $revenueBrl,
+            'margin_brl'   => $marginBrl,
+            'margin_pct'   => $revenueBrl > 0 ? round($marginBrl / $revenueBrl * 100, 1) : null,
         ];
     }
 
@@ -573,7 +582,7 @@ class AiUsageReportService
             'is_internal'    => $row->entity_name !== null && ! $row->is_client,
             'user_id'        => (string) $row->requested_by,
             'user_name'      => $row->user_name ?? '—',
-            'credits'        => (int) $row->consumed_credits,
+            'charge_cents'   => (int) $row->consumed_charge_cents,
             'calls'          => (int) $row->calls,
             'failed_calls'   => (int) $row->failed_calls,
             'providers'      => array_map(fn (string $provider) => $this->providerLabel($provider), $providers[(string) $row->id] ?? []),
@@ -636,11 +645,6 @@ class AiUsageReportService
         unset($row['keys']);
 
         return $row;
-    }
-
-    private function usdPerCredit(): float
-    {
-        return (float) config('ai.pricing.usd_per_credit', 0.01);
     }
 
     private function pct(int $part, int $total): float

@@ -51,7 +51,7 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
                 open: true,
                 ai: {
                     urls: baseUrls,
-                    balance: { available, balance: quota?.purchased_balance ?? 0 },
+                    balance: { available_cents: available, balance_cents: quota?.purchased_balance_cents ?? 0 },
                     quota,
                     paywall: paywallProps,
                     modes: [{ value: 'validated' }],
@@ -61,7 +61,7 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
                         title: 'Assistente de IA',
                         analyze: 'Analisar com IA',
                         quota_label: 'Franquia mensal',
-                        quota_used: ':consumed/:quota créditos usados (:percent%)',
+                        quota_used: ':consumed/:quota usados (:percent%)',
                         quota_renews_on: 'Renova em :date',
                         quota_renews_if_paid: 'Renova em :date se o pagamento em atraso for confirmado',
                         quota_expires_on: 'Vale até :date',
@@ -94,7 +94,12 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
 
     it('carteira sem crédito → Analisar bloqueado e paywall com "peça ao administrador"', () => {
         const wrapper = mountPanel({
-            quota: { monthly_quota: 80, consumed_credits: 80, usage_percent: 100, renews_on: '2026-11-04' },
+            quota: {
+                monthly_quota_cents: 80,
+                monthly_quota_used_cents: 80,
+                usage_percent: 100,
+                renews_on: '2026-11-04',
+            },
             available: 0,
         });
 
@@ -110,7 +115,7 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
 
     it('franquia quase no fim mas ainda com crédito → segue liberado (o medidor é a carteira)', () => {
         const wrapper = mountPanel({
-            quota: { monthly_quota: 100, consumed_credits: 96, usage_percent: 96 },
+            quota: { monthly_quota_cents: 100, monthly_quota_used_cents: 96, usage_percent: 96 },
             available: 4,
         });
 
@@ -121,7 +126,12 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
 
     it('franquia esgotada com avulso → segue liberado consumindo o avulso', () => {
         const wrapper = mountPanel({
-            quota: { monthly_quota: 80, consumed_credits: 80, usage_percent: 100, purchased_balance: 25 },
+            quota: {
+                monthly_quota_cents: 80,
+                monthly_quota_used_cents: 80,
+                usage_percent: 100,
+                purchased_balance_cents: 25,
+            },
             available: 25,
         });
 
@@ -131,7 +141,12 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
 
     it('mostra a data de renovação da janela no idioma', () => {
         const wrapper = mountPanel({
-            quota: { monthly_quota: 80, consumed_credits: 10, usage_percent: 12.5, renews_on: '2026-11-04' },
+            quota: {
+                monthly_quota_cents: 80,
+                monthly_quota_used_cents: 10,
+                usage_percent: 12.5,
+                renews_on: '2026-11-04',
+            },
             available: 70,
         });
 
@@ -141,8 +156,8 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
     it('cota que sobrou (assinatura sem franquia) → "Vale até", sem prometer renovação', () => {
         const wrapper = mountPanel({
             quota: {
-                monthly_quota: 80,
-                consumed_credits: 30,
+                monthly_quota_cents: 80,
+                monthly_quota_used_cents: 30,
                 usage_percent: 37.5,
                 renews_on: null,
                 expires_on: '2026-11-15',
@@ -179,7 +194,7 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
             }),
         );
 
-        const wrapper = mountPanel({ quota: { monthly_quota: 0, consumed_credits: 0 }, available: 2 });
+        const wrapper = mountPanel({ quota: { monthly_quota_cents: 0, monthly_quota_used_cents: 0 }, available: 2 });
         wrapper.vm.form.user_prompt = 'Resumir o caso clínico do paciente';
         await wrapper.vm.analyze();
         await flushPromises();
@@ -198,7 +213,7 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
         );
 
         const wrapper = mountPanel({
-            quota: { monthly_quota: 80, consumed_credits: 0 },
+            quota: { monthly_quota_cents: 80, monthly_quota_used_cents: 0 },
             available: 80,
             paywallProps: paywall({ can_purchase: true, purchase_url: '/panel/ai/usage#ai-credit-packages' }),
         });
@@ -215,8 +230,8 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
     it('em atraso: a renovação aparece condicionada ao pagamento', () => {
         const wrapper = mountPanel({
             quota: {
-                monthly_quota: 80,
-                consumed_credits: 10,
+                monthly_quota_cents: 80,
+                monthly_quota_used_cents: 10,
                 usage_percent: 12.5,
                 renews_on: null,
                 renews_if_paid_on: '2026-11-19',
@@ -232,18 +247,30 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
     // FT-10: números no idioma (1.500, não 1500).
     it('saldo e franquia com os números no idioma', () => {
         const wrapper = mountPanel({
-            quota: { monthly_quota: 2000, consumed_credits: 2000, usage_percent: 100, purchased_balance: 1500 },
+            quota: {
+                monthly_quota_cents: 2000,
+                monthly_quota_used_cents: 2000,
+                usage_percent: 100,
+                purchased_balance_cents: 1500,
+            },
             available: 1500,
         });
 
-        expect(wrapper.vm.usingPurchasedText).toBe('Franquia atingida (2.000/2.000). Saldo avulso: 1.500.');
-        expect(wrapper.text()).toContain('1.500');
+        expect(wrapper.vm.usingPurchasedText).toBe(
+            'Franquia atingida (R$\u00a020,00/R$\u00a020,00). Saldo avulso: R$\u00a015,00.',
+        );
+        expect(wrapper.text()).toContain('R$\u00a015,00');
     });
 
     // FT-9: o aviso das props não interrompe o leitor de tela; o da resposta, sim.
     it('paywall das props é status; o da resposta 422 é alerta', async () => {
         const wrapper = mountPanel({
-            quota: { monthly_quota: 80, consumed_credits: 80, usage_percent: 100, renews_on: '2026-11-04' },
+            quota: {
+                monthly_quota_cents: 80,
+                monthly_quota_used_cents: 80,
+                usage_percent: 100,
+                renews_on: '2026-11-04',
+            },
             available: 0,
         });
         expect(wrapper.get('[data-test="ai-paywall"]').attributes('role')).toBe('status');
@@ -256,7 +283,10 @@ describe('AiAssistantPanel — franquia da carteira e paywall', () => {
                 },
             }),
         );
-        const fromResponse = mountPanel({ quota: { monthly_quota: 0, consumed_credits: 0 }, available: 2 });
+        const fromResponse = mountPanel({
+            quota: { monthly_quota_cents: 0, monthly_quota_used_cents: 0 },
+            available: 2,
+        });
         fromResponse.vm.form.user_prompt = 'Resumir o caso clínico do paciente';
         await fromResponse.vm.analyze();
         await flushPromises();

@@ -175,12 +175,12 @@ describe('A4 — pedido de créditos pendente na tela de IA', function () {
             'id'                   => 9101,
             'status'               => 'pending',
             'payment_method_id'    => 'pix',
-            'transaction_amount'   => 249.90,
+            'transaction_amount'   => 499.00,
             'date_of_expiration'   => '2026-10-08T23:59:59.000-03:00',
             'point_of_interaction' => ['transaction_data' => ['qr_code' => '00020101pix-9101', 'qr_code_base64' => 'iVBOR=', 'ticket_url' => 'https://www.mercadopago.com.br/payments/9101/ticket']],
         ], 201)]);
 
-        r5AiAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])->assertOk();
+        r5AiAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])->assertOk();
         $invoice = Invoice::query()->where('billing_reason', Invoice::BILLING_REASON_AI_CREDIT_PACK)->sole();
 
         r5AiAs()->getJson(route('panel.my-subscription.ai-credits.options'))
@@ -189,7 +189,7 @@ describe('A4 — pedido de créditos pendente na tela de IA', function () {
             ->assertJsonPath('data.open_orders.0.id', $invoice->id)
             ->assertJsonPath('data.open_orders.0.can_pay', true)
             ->assertJsonPath('data.open_orders.0.can_discard', true)
-            ->assertJsonPath('data.open_orders.0.ai_credit_pack.credits', 100)
+            ->assertJsonPath('data.open_orders.0.ai_credit_pack.value_cents', 49900)
             ->assertJsonPath('data.open_orders.0.payment.gateway', 'mercadopago');
 
         Http::fake(['https://api.mercadopago.com/v1/payments/9101' => Http::response(['id' => 9101, 'status' => 'cancelled'])]);

@@ -22,17 +22,18 @@ class AiCreditLedgerEntryFactory extends Factory
         $amount = $this->faker->numberBetween(10, 200);
 
         return [
-            'entity_id'       => $entity->id,
-            'wallet_id'       => $wallet->id,
-            'subscription_id' => null,
-            'ai_run_id'       => null,
-            'type'            => AiLedgerEntryType::Grant->value,
-            'amount'          => $amount,
-            'balance_after'   => $amount,
-            'description'     => 'Entrada de ledger de teste.',
-            'metadata'        => null,
-            'idempotency_key' => null,
-            'created_by'      => null,
+            'entity_id'           => $entity->id,
+            'wallet_id'           => $wallet->id,
+            'subscription_id'     => null,
+            'ai_run_id'           => null,
+            'type'                => AiLedgerEntryType::Grant->value,
+            'amount_cents'        => $amount,
+            'balance_after_cents' => $amount,
+            'unit'                => 'brl_cent',
+            'description'         => 'Entrada de ledger de teste.',
+            'metadata'            => null,
+            'idempotency_key'     => null,
+            'created_by'          => null,
         ];
     }
 
@@ -44,8 +45,8 @@ class AiCreditLedgerEntryFactory extends Factory
     public function reserve(int $amount): static
     {
         return $this->state([
-            'type'   => AiLedgerEntryType::Reserve->value,
-            'amount' => -$amount,
+            'type'         => AiLedgerEntryType::Reserve->value,
+            'amount_cents' => -$amount,
         ]);
     }
 }

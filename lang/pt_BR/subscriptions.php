@@ -142,6 +142,7 @@ return [
         'max_storage_count'        => ':n GB de armazenamento|:n GB de armazenamento',
         'ai_credits_none'          => 'Sem créditos de IA',
         'ai_credits_count'         => ':n crédito de IA por mês|:n créditos de IA por mês',
+        'ai_credits_value'         => ':value de saldo de IA por mês',
         'api_exam_sends_unlimited' => 'Exames ilimitados dentro do armazenamento contratado',
         'api_exam_sends_count'     => 'Até :n envio via integrador por mês|Até :n envios via integrador por mês',
         'generic_unlimited'        => ':label ilimitado(a)',

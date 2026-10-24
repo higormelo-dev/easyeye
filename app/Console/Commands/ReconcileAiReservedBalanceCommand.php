@@ -27,13 +27,13 @@ class ReconcileAiReservedBalanceCommand extends Command
         $rows  = [];
 
         AiCreditWallet::query()
-            ->where('reserved_balance', '>', 0)
+            ->where('reserved_balance_cents', '>', 0)
             ->pluck('entity_id')
             ->each(function (string $entityId) use ($wallets, $apply, &$rows): void {
                 $result = $wallets->reconcileReservedBalance($entityId, $apply);
 
-                if ($result['phantom'] > 0) {
-                    $rows[] = [$result['entity_id'], $result['reserved'], $result['expected'], $result['phantom'], $result['applied'] ? 'sim' : 'não'];
+                if ($result['phantom_cents'] > 0) {
+                    $rows[] = [$result['entity_id'], $result['reserved_cents'], $result['expected_cents'], $result['phantom_cents'], $result['applied'] ? 'sim' : 'não'];
                 }
             });
 

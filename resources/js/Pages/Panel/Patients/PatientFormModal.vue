@@ -121,7 +121,14 @@ const tabs = [
 </script>
 
 <template>
-    <OffcanvasPanel :open="open" :width="600" :loading="loading" :confirm-close="confirmClose" @close="emit('close')">
+    <OffcanvasPanel
+        :open="open"
+        :width="600"
+        :loading="loading"
+        :confirm-close="confirmClose"
+        density="default"
+        @close="emit('close')"
+    >
         <!-- ── Cabeçalho ────────────────────────────────────────────────────── -->
         <template #header>
             <h5 class="mb-0 fw-semibold"><i class="ti ti-user me-2 text-primary"></i>{{ title }}</h5>
@@ -154,10 +161,11 @@ const tabs = [
         </template>
 
         <!-- ── Corpo do formulário ───────────────────────────────────────────── -->
-        <!-- min-height fixo: v-show usa display:none nas abas ocultas (não
-             contribuem pro layout), então sem isso o offcanvas encolhe/cresce
-             a cada troca de aba. Altura calibrada pra caber a aba Pessoal
-             (a mais longa) sem sobra visível nas mais curtas. -->
+        <!-- min-height estável (480px; menor em tela baixa, ver o <style>): v-show
+             usa display:none nas abas ocultas (não contribuem pro layout), então
+             sem isso o offcanvas encolhe/cresce a cada troca de aba. Altura
+             calibrada pra caber a aba Pessoal (a mais longa) sem sobra visível
+             nas mais curtas. -->
         <form ref="formRef" class="patient-form-tabs" @submit.prevent="submit">
             <div
                 v-if="errorSummary.length > 1"
@@ -199,8 +207,12 @@ const tabs = [
 </template>
 
 <style scoped>
-/* Tamanho fixo entre abas (ver comentário acima do <form>). */
+/* Altura estável entre abas (ver comentário acima do <form>): 480px em tela alta; em tela baixa
+   (celular deitado, teclado virtual) acompanha a viewport, em vez de forçar rolagem interna
+   mesmo nas abas curtas. `svh` (e não `dvh`) porque a altura não pode oscilar quando a barra do
+   navegador some; a 1ª linha é a reserva para navegador sem `svh`/`min()`. */
 .patient-form-tabs {
     min-height: 480px;
+    min-height: min(480px, 55svh);
 }
 </style>

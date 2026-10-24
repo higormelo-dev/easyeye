@@ -266,7 +266,7 @@ describe('idempotência nas emissões do checkout', function () {
         Http::fake(function (Request $r) use (&$visible) {
             if ($r->method() === 'GET' && str_starts_with($r->url(), 'https://api.asaas.com/v3/payments?')) {
                 return Http::response(['object' => 'list', 'hasMore' => false, 'data' => $visible
-                    ? [resRow('pay_pack', ['externalReference' => $r['externalReference'], 'value' => 249.9])]
+                    ? [resRow('pay_pack', ['externalReference' => $r['externalReference'], 'value' => 499.0])]
                     : []]);
             }
 
@@ -282,7 +282,7 @@ describe('idempotência nas emissões do checkout', function () {
         });
 
         $this->actingAs($this->user)->withSession(panelSession($this->member))
-            ->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])
+            ->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])
             ->assertStatus(502);
 
         $invoice = Invoice::query()->where('billing_reason', Invoice::BILLING_REASON_AI_CREDIT_PACK)->sole();

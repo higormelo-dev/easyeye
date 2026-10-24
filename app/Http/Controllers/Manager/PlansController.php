@@ -56,6 +56,8 @@ class PlansController extends Controller
                 'is_numeric' => $f->isNumeric(),
                 // 0 em créditos de IA = nenhum (nos demais limites, 0 = ilimitado).
                 'zero_means_none' => $f === FeatureKey::AiMonthlyCredits,
+                // O valor da franquia de IA é em CENTAVOS de BRL (a UI digita/mostra em reais).
+                'is_money_cents' => $f === FeatureKey::AiMonthlyCredits,
             ])->values()->toArray(),
             'billingCycles' => $this->sellableCycles(),
             // Trial de toda empresa nova; ao fim dele o acesso é bloqueado.

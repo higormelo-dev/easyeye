@@ -280,6 +280,7 @@ return [
         'ai_menu_usage'         => 'Uso e custos',
         'ai_menu_credits'       => 'Compras de créditos',
         'ai_menu_providers'     => 'Provedores e modelos',
+        'ai_menu_pricing'       => 'Precificação',
         'financial'             => 'Financeiro',
         'cash_flow'             => 'Fluxo de caixa',
         'tiss_billing'          => 'Faturamento TISS',

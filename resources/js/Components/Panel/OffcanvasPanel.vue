@@ -14,6 +14,10 @@ import { useModalA11y } from '@/Support/useModalA11y.js';
  *   width        – largura máxima do modal em px (default 540)
  *   loading      – exibe spinner no lugar do conteúdo
  *   loadingLabel – texto acessível do spinner
+ *   density      – região de densidade dos controles dentro do modal:
+ *                  compact | default | comfortable (design-system/MASTER.md).
+ *                  Vazio (padrão) = sem região, medidas legadas. O modal é teleportado
+ *                  para o <body>, então a região da página NÃO chega até aqui.
  *
  * Emits:
  *   close – quando o usuário fecha (backdrop, btn-close ou clique fora)
@@ -32,6 +36,7 @@ const props = defineProps({
     /** Rótulo acessível do botão fechar; padrão: `t_ui.close` (idioma do usuário). */
     closeLabel: { type: String, default: '' },
     confirmClose: { type: Function, default: null },
+    density: { type: String, default: '' },
 });
 
 const emit = defineEmits(['close']);
@@ -75,6 +80,7 @@ function requestClose() {
                 role="dialog"
                 aria-modal="true"
                 :aria-labelledby="$slots.header ? titleId : undefined"
+                :data-ee-density="density || undefined"
                 @click.self="requestClose"
             >
                 <div ref="dialogRef" class="ee-modal__dialog" :style="{ maxWidth: `${width}px` }" tabindex="-1">
@@ -143,7 +149,7 @@ function requestClose() {
 /* ── Dialog box ───────────────────────────────────────────────────────── */
 .ee-modal__dialog {
     background: #fff;
-    border-radius: 0.5rem;
+    border-radius: var(--ee-surface-radius, 0.5rem);
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.22);
     display: flex;
     flex-direction: column;
@@ -197,7 +203,7 @@ function requestClose() {
 .ee-modal__footer {
     display: flex;
     justify-content: flex-end;
-    gap: 0.75rem;
+    gap: var(--ee-control-gap, 0.75rem);
     padding: 0.875rem 1.25rem;
     border-top: 1px solid var(--bs-border-color, #dee2e6);
     flex-shrink: 0;

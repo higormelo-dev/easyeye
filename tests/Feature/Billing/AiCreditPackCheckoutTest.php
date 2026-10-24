@@ -74,7 +74,7 @@ function packPaidSubscription(array $attributes = []): Subscription
     ]);
 }
 
-function packPixResponse(int $id = 901, float $amount = 249.90): array
+function packPixResponse(int $id = 901, float $amount = 499.00): array
 {
     return [
         'id'                   => $id,
@@ -101,7 +101,7 @@ function packWebhook(string $paymentId, string $eventId): WebhookEvent
 
 function packBalance(): int
 {
-    return (int) app(AiCreditWalletService::class)->balance((string) test()->clinic->id)['balance'];
+    return (int) app(AiCreditWalletService::class)->balance((string) test()->clinic->id)['balance_cents'];
 }
 
 describe('compra no Pix e confirmação pelo webhook', function () {
@@ -111,12 +111,12 @@ describe('compra no Pix e confirmação pelo webhook', function () {
 
         Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(packPixResponse(), 201)]);
 
-        $response = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])
+        $response = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])
             ->assertOk()
             ->assertJsonPath('data.mode', 'transparent')
             ->assertJsonPath('data.instructions.pix.copy_paste', '00020101pix-901')
             ->assertJsonPath('data.invoice.kind', 'ai_credit_pack')
-            ->assertJsonPath('data.invoice.ai_credit_pack.credits', 100)
+            ->assertJsonPath('data.invoice.ai_credit_pack.value_cents', 49900)
             ->assertJsonPath('data.purchase.status', 'pending_payment');
 
         $invoice  = Invoice::query()->findOrFail($response->json('data.invoice.id'));
@@ -124,7 +124,7 @@ describe('compra no Pix e confirmação pelo webhook', function () {
 
         expect($invoice->billing_reason)->toBe(Invoice::BILLING_REASON_AI_CREDIT_PACK)
             ->and($invoice->subscription_id)->toBeNull()
-            ->and((float) $invoice->amount)->toBe(249.90)
+            ->and((float) $invoice->amount)->toBe(499.00)
             ->and($invoice->external_invoice_id)->toBe('901')
             ->and($purchase->metadata['source'])->toBe('checkout')
             ->and($purchase->subscription_id)->toBe($subscription->id)
@@ -134,16 +134,16 @@ describe('compra no Pix e confirmação pelo webhook', function () {
         Http::assertSent(fn (Request $r) => $r->url() === 'https://api.mercadopago.com/v1/payments'
             && $r['payment_method_id'] === 'pix'
             && $r['external_reference'] === $invoice->id
-            && (float) $r['transaction_amount'] === 249.90);
+            && (float) $r['transaction_amount'] === 499.00);
 
-        Http::fake(['https://api.mercadopago.com/v1/payments/901' => Http::response(['id' => 901, 'status' => 'approved', 'transaction_amount' => 249.90, 'external_reference' => $invoice->id])]);
+        Http::fake(['https://api.mercadopago.com/v1/payments/901' => Http::response(['id' => 901, 'status' => 'approved', 'transaction_amount' => 499.00, 'external_reference' => $invoice->id])]);
 
         $event = packWebhook('901', 'evt-901-approved');
         app(ProcessWebhookEventService::class)->process($event);
 
         expect($invoice->fresh()->status)->toBe(InvoiceStatus::Paid)
             ->and($purchase->fresh()->status)->toBe(AiCreditPurchaseStatus::Credited)
-            ->and(packBalance())->toBe(100)
+            ->and(packBalance())->toBe(49900)
             ->and($event->fresh()->normalized_payload['outcome'])->toBe('ai_credits_granted')
             ->and($event->fresh()->entity_id)->toBe($this->clinic->id)
             ->and(Payment::query()->where('external_payment_id', '901')->value('status'))->toBe(PaymentStatus::Paid)
@@ -157,7 +157,7 @@ describe('compra no Pix e confirmação pelo webhook', function () {
         $again = packWebhook('901', 'evt-901-approved-2');
         app(ProcessWebhookEventService::class)->process($again);
 
-        expect(packBalance())->toBe(100)
+        expect(packBalance())->toBe(49900)
             ->and($again->fresh()->normalized_payload['outcome'])->toBe('duplicate');
     });
 
@@ -165,8 +165,8 @@ describe('compra no Pix e confirmação pelo webhook', function () {
         packPaidSubscription();
         Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(packPixResponse(), 201)]);
 
-        $first  = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])->assertOk();
-        $second = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])->assertOk();
+        $first  = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])->assertOk();
+        $second = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])->assertOk();
 
         expect($second->json('data.invoice.id'))->toBe($first->json('data.invoice.id'))
             ->and(AiCreditPurchase::query()->where('entity_id', $this->clinic->id)->count())->toBe(1);
@@ -178,7 +178,7 @@ describe('compra no Pix e confirmação pelo webhook', function () {
         packPaidSubscription();
         Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(packPixResponse(), 201)]);
 
-        $invoiceId = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'starter', 'method' => 'pix'])->json('data.invoice.id');
+        $invoiceId = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'basic', 'method' => 'pix'])->json('data.invoice.id');
 
         packAs()->getJson(route('panel.my-subscription.summary'))
             ->assertOk()
@@ -188,7 +188,7 @@ describe('compra no Pix e confirmação pelo webhook', function () {
             ->assertJsonPath('data.open_ai_packs.0.can_discard', true)
             ->assertJsonPath('data.open_ai_packs.0.payment.gateway', 'mercadopago')
             ->assertJsonPath('data.open_ai_packs.0.payment.card.max_installments', 1)
-            ->assertJsonPath('data.invoices.0.ai_credit_pack.credits', 25);
+            ->assertJsonPath('data.invoices.0.ai_credit_pack.value_cents', 10000);
 
         // Pagar pela fatura aberta (GET só lê: as instruções guardadas).
         packAs()->getJson(route('panel.my-subscription.instructions', ['invoice' => $invoiceId, 'method' => 'pix']))
@@ -204,10 +204,10 @@ describe('cartão à vista', function () {
         Event::fake([InvoicePaid::class]);
         $subscription = packPaidSubscription(['gateway_card_id' => 'card-old', 'card_last4' => '1111', 'payment_method' => 'credit_card']);
 
-        Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(['id' => 902, 'status' => 'approved', 'status_detail' => 'accredited', 'transaction_amount' => 69.90, 'payment_method_id' => 'visa'], 201)]);
+        Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(['id' => 902, 'status' => 'approved', 'status_detail' => 'accredited', 'transaction_amount' => 100.00, 'payment_method_id' => 'visa'], 201)]);
 
         packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), [
-            'package_code'      => 'starter',
+            'package_code'      => 'basic',
             'method'            => 'credit_card',
             'card_token'        => 'ff8080814c11e237014c1ff593b57b4d',
             'payment_method_id' => 'visa',
@@ -215,7 +215,7 @@ describe('cartão à vista', function () {
             ->assertJsonPath('data.status', 'paid')
             ->assertJsonPath('data.invoice.status', 'paid');
 
-        expect(packBalance())->toBe(25)
+        expect(packBalance())->toBe(10000)
             ->and(AiCreditPurchase::query()->where('entity_id', $this->clinic->id)->value('status'))->toBe(AiCreditPurchaseStatus::Credited)
             ->and($subscription->fresh()->gateway_card_id)->toBe('card-old');
 
@@ -228,7 +228,7 @@ describe('cartão à vista', function () {
         packPaidSubscription();
 
         packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), [
-            'package_code' => 'scale',
+            'package_code' => 'enterprise',
             'method'       => 'credit_card',
             'card_token'   => 'tok',
             'installments' => 3,
@@ -252,7 +252,7 @@ describe('quem pode comprar', function () {
             ->assertJsonPath('data.allowed', false)
             ->assertJsonPath('data.reason', 'ai_pack_requires_full_access');
 
-        packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'starter', 'method' => 'pix'])
+        packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'basic', 'method' => 'pix'])
             ->assertStatus(403)
             ->assertJsonPath('code', 'ai_pack_requires_full_access');
 
@@ -274,23 +274,23 @@ describe('quem pode comprar', function () {
 
         Http::fake([
             'https://api.mercadopago.com/v1/customers/search*' => Http::response(['results' => [['id' => '777-cus']]]),
-            'https://api.mercadopago.com/v1/payments'          => Http::response(packPixResponse(903, 69.90), 201),
+            'https://api.mercadopago.com/v1/payments'          => Http::response(packPixResponse(903, 100.00), 201),
         ]);
 
-        packAs($financial, $finMember)->getJson(route('panel.my-subscription.ai-credits.options', ['package_code' => 'starter']))
+        packAs($financial, $finMember)->getJson(route('panel.my-subscription.ai-credits.options', ['package_code' => 'basic']))
             ->assertOk()
             ->assertJsonPath('data.allowed', true)
             ->assertJsonPath('data.payment.gateway', 'mercadopago')
-            ->assertJsonPath('data.payment.card.installments.0.amount', 69.9);
+            ->assertJsonPath('data.payment.card.installments.0.amount', 100);
 
-        packAs($financial, $finMember)->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'starter', 'method' => 'pix'])
+        packAs($financial, $finMember)->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'basic', 'method' => 'pix'])
             ->assertOk()
             ->assertJsonPath('data.instructions.pix.copy_paste', '00020101pix-903');
 
         $secretary = User::factory()->create();
         $secMember = createEntityUser($this->clinic, $secretary, ClientRule::Secretary->value);
 
-        packAs($secretary, $secMember)->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'starter', 'method' => 'pix'])
+        packAs($secretary, $secMember)->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'basic', 'method' => 'pix'])
             ->assertStatus(403)
             ->assertJsonPath('code', 'forbidden');
     });
@@ -302,11 +302,11 @@ describe('estorno, chargeback e pedido cancelado pelo manager', function () {
     {
         packPaidSubscription();
         Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(packPixResponse(), 201)]);
-        $invoiceId = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])->json('data.invoice.id');
+        $invoiceId = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])->json('data.invoice.id');
 
         Http::fake(['https://api.mercadopago.com/v1/payments/901' => Http::sequence()
-            ->push(['id' => 901, 'status' => 'approved', 'transaction_amount' => 249.90, 'external_reference' => $invoiceId])
-            ->push(['id' => 901, 'status' => $nextStatus, 'transaction_amount' => 249.90, 'external_reference' => $invoiceId])]);
+            ->push(['id' => 901, 'status' => 'approved', 'transaction_amount' => 499.00, 'external_reference' => $invoiceId])
+            ->push(['id' => 901, 'status' => $nextStatus, 'transaction_amount' => 499.00, 'external_reference' => $invoiceId])]);
         app(ProcessWebhookEventService::class)->process(packWebhook('901', 'evt-pay'));
 
         return [Invoice::query()->findOrFail($invoiceId), AiCreditPurchase::query()->where('invoice_id', $invoiceId)->firstOrFail()];
@@ -314,7 +314,7 @@ describe('estorno, chargeback e pedido cancelado pelo manager', function () {
 
     it('estorno no gateway: créditos revertidos (regra do estorno do manager)', function () {
         [$invoice, $purchase] = packPaidByWebhook('refunded');
-        expect(packBalance())->toBe(100);
+        expect(packBalance())->toBe(49900);
 
         $event = packWebhook('901', 'evt-refund');
         app(ProcessWebhookEventService::class)->process($event);
@@ -327,8 +327,8 @@ describe('estorno, chargeback e pedido cancelado pelo manager', function () {
 
     it('chargeback: créditos revertidos mesmo já consumidos (regra do manager: o saldo comprado vai a zero)', function () {
         [, $purchase] = packPaidByWebhook('charged_back');
-        app(AiCreditWalletService::class)->reserve((string) $this->clinic->id, 30);
-        app(AiCreditWalletService::class)->consumeReservation((string) $this->clinic->id, 30);
+        app(AiCreditWalletService::class)->reserve((string) $this->clinic->id, 3000);
+        app(AiCreditWalletService::class)->consumeReservation((string) $this->clinic->id, 3000);
 
         $event = packWebhook('901', 'evt-chargeback');
         app(ProcessWebhookEventService::class)->process($event);
@@ -354,7 +354,7 @@ describe('estorno, chargeback e pedido cancelado pelo manager', function () {
     it('pedido cancelado pelo manager e depois pago: o dinheiro entrou — reabre e credita', function () {
         packPaidSubscription();
         Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(packPixResponse(), 201)]);
-        $invoiceId = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])->json('data.invoice.id');
+        $invoiceId = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])->json('data.invoice.id');
         $purchase  = AiCreditPurchase::query()->where('invoice_id', $invoiceId)->firstOrFail();
 
         app(AiCreditPurchaseService::class)->cancelPurchase($purchase, 'cliente desistiu');
@@ -364,12 +364,12 @@ describe('estorno, chargeback e pedido cancelado pelo manager', function () {
             ->assertStatus(409)->assertJsonPath('code', 'invoice_not_payable');
 
         // …mas o Pix já emitido foi pago.
-        Http::fake(['https://api.mercadopago.com/v1/payments/901' => Http::response(['id' => 901, 'status' => 'approved', 'transaction_amount' => 249.90, 'external_reference' => $invoiceId])]);
+        Http::fake(['https://api.mercadopago.com/v1/payments/901' => Http::response(['id' => 901, 'status' => 'approved', 'transaction_amount' => 499.00, 'external_reference' => $invoiceId])]);
         app(ProcessWebhookEventService::class)->process(packWebhook('901', 'evt-late'));
 
         expect($purchase->fresh()->status)->toBe(AiCreditPurchaseStatus::Credited)
             ->and($purchase->fresh()->metadata['reopened_by_payment']['previous_status'])->toBe('cancelled')
-            ->and(packBalance())->toBe(100);
+            ->and(packBalance())->toBe(49900);
     });
 });
 
@@ -381,7 +381,7 @@ function packHook(string $paymentId, string $status, string $invoiceId, string $
     Http::swap(new Factory());
     Http::preventStrayRequests();
     Http::fake([
-        "https://api.mercadopago.com/v1/payments/{$paymentId}" => Http::response(['id' => (int) $paymentId, 'status' => $status, 'transaction_amount' => 249.90, 'external_reference' => $invoiceId]),
+        "https://api.mercadopago.com/v1/payments/{$paymentId}" => Http::response(['id' => (int) $paymentId, 'status' => $status, 'transaction_amount' => 499.00, 'external_reference' => $invoiceId]),
         // cancelamento das outras cobranças depois do pagamento
         'https://api.mercadopago.com/v1/payments/*' => Http::response(['status' => 'cancelled']),
     ]);
@@ -398,11 +398,11 @@ function packPixThenBoleto(): Invoice
     packPaidSubscription();
     Http::fake(['https://api.mercadopago.com/v1/payments' => Http::sequence()
         ->push(packPixResponse(901), 201)
-        ->push(['id'              => 903, 'status' => 'pending', 'payment_method_id' => 'bolbradesco', 'transaction_amount' => 249.90, 'date_of_expiration' => '2026-10-08T23:59:59.000-03:00',
+        ->push(['id'              => 903, 'status' => 'pending', 'payment_method_id' => 'bolbradesco', 'transaction_amount' => 499.00, 'date_of_expiration' => '2026-10-08T23:59:59.000-03:00',
             'transaction_details' => ['external_resource_url' => 'https://www.mercadopago.com.br/payments/903/ticket', 'digitable_line' => '2379338128600820000000000000000019789000002999']], 201),
     ]);
 
-    $id = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'pix'])->assertOk()->json('data.invoice.id');
+    $id = packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'pix'])->assertOk()->json('data.invoice.id');
     packAs()->postJson(route('panel.my-subscription.charge', ['invoice' => $id]), ['method' => 'boleto'])->assertOk();
 
     $invoice = Invoice::query()->findOrFail($id);
@@ -417,7 +417,7 @@ describe('revisão: estorno e chargeback da cobrança certa', function () {
         $invoice = packPixThenBoleto();
 
         expect(packHook('901', 'approved', $invoice->id, 'evt-901-paid')->normalized_payload['outcome'])->toBe('ai_credits_granted')
-            ->and(packBalance())->toBe(100)
+            ->and(packBalance())->toBe(49900)
             ->and($invoice->fresh()->metadata['paid_by_charge'])->toBe('901');
 
         $refund = packHook('901', 'refunded', $invoice->id, 'evt-901-refund');
@@ -446,7 +446,7 @@ describe('revisão: estorno e chargeback da cobrança certa', function () {
         $refund = packHook('903', 'refunded', $invoice->id, 'evt-903-refund');
 
         expect($refund->normalized_payload['outcome'])->toBe('ai_pack_duplicate_refunded')
-            ->and(packBalance())->toBe(100)
+            ->and(packBalance())->toBe(49900)
             ->and(AiCreditPurchase::query()->where('invoice_id', $invoice->id)->value('status'))->toBe(AiCreditPurchaseStatus::Credited)
             ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Paid)
             ->and(Payment::query()->where('external_payment_id', '901')->value('status'))->toBe(PaymentStatus::Paid)
@@ -481,7 +481,7 @@ describe('revisão: estorno e chargeback da cobrança certa', function () {
 
         Http::fake([
             'https://api.mercadopago.com/v1/payments/902' => function (Request $request) {
-                return Http::response(['id' => 902, 'status' => 'approved', 'transaction_amount' => 69.90, 'external_reference' => Invoice::query()->value('id')]);
+                return Http::response(['id' => 902, 'status' => 'approved', 'transaction_amount' => 100.00, 'external_reference' => Invoice::query()->value('id')]);
             },
             'https://api.mercadopago.com/v1/payments' => function (Request $request) {
                 // O webhook do 902 é processado antes de o gateway responder.
@@ -489,18 +489,18 @@ describe('revisão: estorno e chargeback da cobrança certa', function () {
                 app(ProcessWebhookEventService::class)->process($event);
                 expect($event->fresh()->normalized_payload['outcome'])->toBe('ai_credits_granted');
 
-                return Http::response(['id' => 902, 'status' => 'approved', 'status_detail' => 'accredited', 'transaction_amount' => 69.90, 'payment_method_id' => 'visa'], 201);
+                return Http::response(['id' => 902, 'status' => 'approved', 'status_detail' => 'accredited', 'transaction_amount' => 100.00, 'payment_method_id' => 'visa'], 201);
             },
         ]);
 
         packAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), [
-            'package_code'      => 'starter',
+            'package_code'      => 'basic',
             'method'            => 'credit_card',
             'card_token'        => 'ff8080814c11e237014c1ff593b57b4d',
             'payment_method_id' => 'visa',
         ])->assertOk()->assertJsonPath('data.status', 'paid');
 
-        expect(packBalance())->toBe(25)
+        expect(packBalance())->toBe(10000)
             ->and(BillingLog::query()->where('level', 'critical')->count())->toBe(0)
             ->and(BillingLog::query()->where('message', 'like', '%estornar%')->count())->toBe(0);
     });
@@ -508,7 +508,7 @@ describe('revisão: estorno e chargeback da cobrança certa', function () {
 
 describe('revisão: pedido de pacote abandonado (descartar e expirar)', function () {
     /** Pedido de pacote em Pix (cobrança 901), não pago. */
-    function packOpenOrder(string $package = 'operational', int $chargeId = 901): Invoice
+    function packOpenOrder(string $package = 'premium', int $chargeId = 901): Invoice
     {
         Http::swap(new Factory());
         Http::preventStrayRequests();
@@ -568,7 +568,7 @@ describe('revisão: pedido de pacote abandonado (descartar e expirar)', function
 
         // Pagamento tardio: credita.
         expect(packHook('901', 'approved', $invoice->id, 'evt-901-late')->normalized_payload['outcome'])->toBe('ai_credits_granted')
-            ->and(packBalance())->toBe(100)
+            ->and(packBalance())->toBe(49900)
             ->and($invoice->fresh()->status)->toBe(InvoiceStatus::Paid)
             ->and(AiCreditPurchase::query()->where('invoice_id', $invoice->id)->value('status'))->toBe(AiCreditPurchaseStatus::Credited);
     });
@@ -595,7 +595,7 @@ describe('revisão: pedido de pacote abandonado (descartar e expirar)', function
         packHook('901', 'approved', $invoice->id, 'evt-901-paid');
         packAs()->deleteJson(route('panel.my-subscription.ai-credits.discard', ['invoice' => $invoice->id]))
             ->assertStatus(409)->assertJsonPath('code', 'ai_pack_not_discardable');
-        expect(packBalance())->toBe(100);
+        expect(packBalance())->toBe(49900);
     });
 
     it('ai:expire-credit-pack-orders descarta só os pendentes há mais de N dias sem nova cobrança (com --dry-run); pedido manual sem fatura fica', function () {
@@ -603,24 +603,24 @@ describe('revisão: pedido de pacote abandonado (descartar e expirar)', function
 
         // Antigo e abandonado (9 dias).
         Carbon::setTestNow(CarbonImmutable::parse('2026-09-26 10:00:00'));
-        $old = packOpenOrder('starter');
+        $old = packOpenOrder('basic');
 
         // Antigo, mas o cliente emitiu um boleto ontem: ainda vale.
-        $active = packOpenOrder('scale', 904);
+        $active = packOpenOrder('enterprise', 904);
         Carbon::setTestNow(CarbonImmutable::parse('2026-10-04 10:00:00'));
         Http::swap(new Factory());
         Http::preventStrayRequests();
-        Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(['id' => 905, 'status' => 'pending', 'payment_method_id' => 'bolbradesco', 'transaction_amount' => 599.90,
+        Http::fake(['https://api.mercadopago.com/v1/payments' => Http::response(['id' => 905, 'status' => 'pending', 'payment_method_id' => 'bolbradesco', 'transaction_amount' => 999.00,
             'transaction_details'                                                     => ['external_resource_url' => 'https://www.mercadopago.com.br/payments/905/ticket', 'digitable_line' => '23793381286']], 201)]);
         packAs()->postJson(route('panel.my-subscription.charge', ['invoice' => $active->id]), ['method' => 'boleto'])->assertOk();
 
         // Recente (3 dias).
         Carbon::setTestNow(CarbonImmutable::parse('2026-10-02 10:00:00'));
-        $recent = packOpenOrder('operational', 906);
+        $recent = packOpenOrder('premium', 906);
 
         // Pedido manual antigo (sem fatura): é do manager.
         Carbon::setTestNow(CarbonImmutable::parse('2026-09-01 10:00:00'));
-        $manual = app(AiCreditPurchaseService::class)->createPendingPurchase((string) $this->clinic->id, 'starter');
+        $manual = app(AiCreditPurchaseService::class)->createPendingPurchase((string) $this->clinic->id, 'basic');
 
         Carbon::setTestNow(CarbonImmutable::parse('2026-10-05 10:00:00'));
         Http::swap(new Factory());

@@ -32,16 +32,16 @@ function aiUsageRun(Entity $entity, User $user, string $workflow, string $status
     $id = (string) Str::uuid();
 
     DB::table('ai_runs')->insert([
-        'id'               => $id,
-        'entity_id'        => $entity->id,
-        'requested_by'     => $user->id,
-        'workflow'         => $workflow,
-        'mode'             => 'validated',
-        'risk_level'       => 'low',
-        'status'           => $status,
-        'consumed_credits' => $credits,
-        'created_at'       => $at,
-        'updated_at'       => $at,
+        'id'                    => $id,
+        'entity_id'             => $entity->id,
+        'requested_by'          => $user->id,
+        'workflow'              => $workflow,
+        'mode'                  => 'validated',
+        'risk_level'            => 'low',
+        'status'                => $status,
+        'consumed_charge_cents' => $credits,
+        'created_at'            => $at,
+        'updated_at'            => $at,
         ...$extra,
     ]);
 
@@ -64,7 +64,6 @@ function aiUsageRun(Entity $entity, User $user, string $workflow, string $status
 
 beforeEach(function () {
     Carbon::setTestNow('2026-10-15 12:00:00');
-    config(['ai.pricing.usd_per_credit' => 0.01]);
 
     $this->saas  = Entity::factory()->create(['is_client' => false, 'active' => true, 'name' => 'EasyEye']);
     $this->admin = User::factory()->create(['name' => 'Admin SaaS']);
@@ -120,7 +119,7 @@ function aiUsageProps(array $query = []): array
 }
 
 describe('indicadores', function () {
-    it('custo em US$ e R$, execuções, falhas, créditos, receita e margem do período', function () {
+    it('custo em US$ e R$, execuções, falhas, cobrança em centavos, receita e margem do período', function () {
         $kpi = aiUsageProps()['kpis']['current'];
 
         expect($kpi['runs'])->toBe(4)
@@ -130,9 +129,9 @@ describe('indicadores', function () {
             ->and($kpi['failed_calls'])->toBe(1)
             ->and($kpi['cost_usd'])->toBe(0.47)
             ->and($kpi['cost_brl'])->toBe(2.35)
-            ->and($kpi['credits'])->toBe(14)
-            ->and($kpi['revenue_brl'])->toBe(0.7)
-            ->and($kpi['margin_brl'])->toBe(-1.65)
+            ->and($kpi['charge_cents'])->toBe(14)
+            ->and($kpi['revenue_brl'])->toBe(0.14)
+            ->and($kpi['margin_brl'])->toBe(-2.21)
             ->and($kpi['entities'])->toBe(3)
             ->and($kpi['users'])->toBe(3)
             ->and($kpi['avg_cost_brl'])->toBe(0.5875);
@@ -214,7 +213,7 @@ describe('série e rankings', function () {
         $rows = aiUsageProps()['byWorkflow'];
 
         expect(array_column($rows, 'workflow'))->toBe(['eye_image_analysis', 'assistant_chat', 'medicine_posology', 'record_assist'])
-            ->and($rows[0])->toMatchArray(['label' => __('ai.workflow_eye_image_analysis'), 'runs' => 1, 'cost_brl' => 2.0, 'credits' => 10])
+            ->and($rows[0])->toMatchArray(['label' => __('ai.workflow_eye_image_analysis'), 'runs' => 1, 'cost_brl' => 2.0, 'charge_cents' => 10])
             ->and($rows[3])->toMatchArray(['failed' => 1, 'failure_rate' => 100.0, 'cost_brl' => 0.0]);
     });
 
@@ -223,7 +222,7 @@ describe('série e rankings', function () {
         $rows     = collect($byEntity['rows'])->keyBy('entity_id');
 
         expect($byEntity['total'])->toBe(3)
-            ->and($rows[$this->alfa->id])->toMatchArray(['runs' => 2, 'failed' => 1, 'cost_brl' => 2.0, 'revenue_brl' => 0.5, 'is_internal' => false])
+            ->and($rows[$this->alfa->id])->toMatchArray(['runs' => 2, 'failed' => 1, 'cost_brl' => 2.0, 'revenue_brl' => 0.1, 'is_internal' => false])
             ->and($rows[$this->saas->id])->toMatchArray(['cost_brl' => 0.1, 'revenue_brl' => 0.0, 'is_internal' => true]);
     });
 
@@ -359,15 +358,15 @@ describe('acesso', function () {
             ->and($group['label'])->toBe(__('actions.sidemenu.ai_group'))
             ->and(array_column($group['children'], 'route'))->toBe($routes)
             // Itens antigos soltos não ficam duplicados fora do grupo.
-            ->and($nav->pluck('route')->filter()->intersect(['manager.ai-usage.index', 'manager.ai-providers.index', 'manager.ai-credit-purchases.index'])->all())->toBe([]);
+            ->and($nav->pluck('route')->filter()->intersect(['manager.ai-usage.index', 'manager.ai-pricing.index', 'manager.ai-providers.index', 'manager.ai-credit-purchases.index'])->all())->toBe([]);
 
         // Todo link que aparece abre de verdade pra esse papel (nenhum 403 escondido).
         foreach ($routes as $route) {
             asAiUsageUser($user, $this->saas, $rule)->get(route($route))->assertOk();
         }
     })->with([
-        'admin'                   => [SaasRule::Admin->value, false, ['manager.ai-usage.index', 'manager.ai-credit-purchases.index', 'manager.ai-providers.index']],
-        'dono (financeiro)'       => [SaasRule::Financial->value, true, ['manager.ai-usage.index', 'manager.ai-credit-purchases.index']],
+        'admin'                   => [SaasRule::Admin->value, false, ['manager.ai-usage.index', 'manager.ai-pricing.index', 'manager.ai-credit-purchases.index', 'manager.ai-providers.index']],
+        'dono (financeiro)'       => [SaasRule::Financial->value, true, ['manager.ai-usage.index', 'manager.ai-pricing.index', 'manager.ai-credit-purchases.index']],
         'financeiro sem ser dono' => [SaasRule::Financial->value, false, ['manager.ai-credit-purchases.index']],
         'suporte'                 => [SaasRule::Support->value, false, ['manager.ai-credit-purchases.index']],
     ]);

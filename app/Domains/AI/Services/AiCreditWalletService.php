@@ -72,10 +72,10 @@ class AiCreditWalletService
             }
 
             // Reset do ciclo mensal: nova cota substitui qualquer resíduo do ciclo anterior.
-            $wallet->monthly_quota                  = $amount;
-            $wallet->monthly_quota_used             = 0;
-            $wallet->quota_period_ends_at           = $periodEndsAt;
-            $wallet->monthly_quota_lifetime_granted = (int) $wallet->monthly_quota_lifetime_granted + $amount;
+            $wallet->monthly_quota_cents                  = $amount;
+            $wallet->monthly_quota_used_cents             = 0;
+            $wallet->quota_period_ends_at                 = $periodEndsAt;
+            $wallet->monthly_quota_lifetime_granted_cents = (int) $wallet->monthly_quota_lifetime_granted_cents + $amount;
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -160,11 +160,11 @@ class AiCreditWalletService
     {
         $wallet = AiCreditWallet::query()
             ->where('entity_id', $entityId)
-            ->first(['id', 'monthly_quota', 'quota_period_ends_at']);
+            ->first(['id', 'monthly_quota_cents', 'quota_period_ends_at']);
 
         // Só quem já teve franquia e viu a janela vencer (cota zerada por
-        // cortesia/trial fica com monthly_quota = 0 e não consulta nada).
-        if ($wallet === null || (int) $wallet->monthly_quota <= 0 || ! $wallet->quotaExpired()) {
+        // cortesia/trial fica com monthly_quota_cents = 0 e não consulta nada).
+        if ($wallet === null || (int) $wallet->monthly_quota_cents <= 0 || ! $wallet->quotaExpired()) {
             return false;
         }
 
@@ -223,14 +223,14 @@ class AiCreditWalletService
                 return null;
             }
 
-            $previous = (int) $wallet->monthly_quota;
+            $previous = (int) $wallet->monthly_quota_cents;
 
             if ($previous === $amount) {
                 return null;
             }
 
-            $wallet->monthly_quota                  = $amount;
-            $wallet->monthly_quota_lifetime_granted = (int) $wallet->monthly_quota_lifetime_granted + max(0, $amount - $previous);
+            $wallet->monthly_quota_cents                  = $amount;
+            $wallet->monthly_quota_lifetime_granted_cents = (int) $wallet->monthly_quota_lifetime_granted_cents + max(0, $amount - $previous);
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -247,7 +247,7 @@ class AiCreditWalletService
                     'plan_id'           => $plan->id,
                     'previous_quota'    => $previous,
                     'new_quota'         => $amount,
-                    'quota_used'        => (int) $wallet->monthly_quota_used,
+                    'quota_used'        => (int) $wallet->monthly_quota_used_cents,
                     'window_start'      => $window->start->toDateString(),
                     'window_end'        => $window->end->toDateString(),
                 ],
@@ -273,17 +273,17 @@ class AiCreditWalletService
         return DB::transaction(function () use ($entityId, $subscriptionId, $reason, $createdBy): ?AiCreditLedgerEntry {
             $wallet = $this->lockWallet($entityId);
 
-            if ((int) $wallet->monthly_quota === 0 && (int) $wallet->monthly_quota_used === 0) {
+            if ((int) $wallet->monthly_quota_cents === 0 && (int) $wallet->monthly_quota_used_cents === 0) {
                 return null;
             }
 
             $remaining = $wallet->quotaRemaining();
-            $quota     = (int) $wallet->monthly_quota;
-            $used      = (int) $wallet->monthly_quota_used;
+            $quota     = (int) $wallet->monthly_quota_cents;
+            $used      = (int) $wallet->monthly_quota_used_cents;
 
-            $wallet->monthly_quota        = 0;
-            $wallet->monthly_quota_used   = 0;
-            $wallet->quota_period_ends_at = now();
+            $wallet->monthly_quota_cents      = 0;
+            $wallet->monthly_quota_used_cents = 0;
+            $wallet->quota_period_ends_at     = now();
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -394,8 +394,8 @@ class AiCreditWalletService
             }
 
             $wallet = $this->lockWallet($entityId);
-            $wallet->balance += $amount;
-            $wallet->lifetime_purchased += $amount;
+            $wallet->balance_cents += $amount;
+            $wallet->lifetime_purchased_cents += $amount;
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -440,21 +440,32 @@ class AiCreditWalletService
                 return $existing;
             }
 
-            $wallet                     = $this->lockWallet($entityId);
-            $wallet->balance            = max(0, $wallet->balance - $amount);
-            $wallet->lifetime_purchased = max(0, $wallet->lifetime_purchased - $amount);
+            $wallet = $this->lockWallet($entityId);
+
+            // Nunca deixa o saldo negativo: tira só o que a carteira ainda tem (o reservado de execuções em curso não
+            // entra); o que faltar é registrado como insuficiência (a clínica já usou o saldo da compra estornada).
+            $revoked   = min($amount, max(0, (int) $wallet->balance_cents));
+            $shortfall = $amount - $revoked;
+
+            $wallet->balance_cents            = (int) $wallet->balance_cents - $revoked;
+            $wallet->lifetime_purchased_cents = max(0, (int) $wallet->lifetime_purchased_cents - $amount);
             $wallet->save();
 
             return $this->createLedgerEntry(
                 wallet: $wallet,
                 type: AiLedgerEntryType::Adjustment,
                 provider: null,
-                amount: -$amount,
+                amount: -$revoked,
                 subscriptionId: $subscriptionId,
-                description: $description ?? 'Estorno administrativo de compra de créditos IA.',
+                description: $description ?? 'Estorno administrativo de compra de saldo de IA.',
                 idempotencyKey: $idempotencyKey,
                 createdBy: $createdBy,
-                metadata: array_merge($metadata ?? [], ['adjustment_reason' => 'purchase_refund']),
+                metadata: array_merge($metadata ?? [], [
+                    'adjustment_reason' => 'purchase_refund',
+                    'requested_cents'   => $amount,
+                    'revoked_cents'     => $revoked,
+                    'shortfall_cents'   => $shortfall,
+                ]),
             );
         });
     }
@@ -486,8 +497,8 @@ class AiCreditWalletService
                 return $existing;
             }
 
-            $wallet          = $this->lockWallet($entityId);
-            $wallet->balance = max(0, $wallet->balance + $delta);
+            $wallet                = $this->lockWallet($entityId);
+            $wallet->balance_cents = max(0, $wallet->balance_cents + $delta);
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -542,8 +553,8 @@ class AiCreditWalletService
 
             if ($available < $amount) {
                 throw new InsufficientAiCreditsException(
-                    requested: $amount,
-                    available: $available,
+                    requestedCents: $amount,
+                    availableCents: $available,
                 );
             }
 
@@ -552,12 +563,12 @@ class AiCreditWalletService
             $fromBalance = $amount - $fromQuota;
 
             if ($fromQuota > 0) {
-                $wallet->monthly_quota_used += $fromQuota;
+                $wallet->monthly_quota_used_cents += $fromQuota;
             }
 
             if ($fromBalance > 0) {
-                $wallet->balance -= $fromBalance;
-                $wallet->reserved_balance += $fromBalance;
+                $wallet->balance_cents -= $fromBalance;
+                $wallet->reserved_balance_cents += $fromBalance;
             }
 
             $wallet->save();
@@ -573,9 +584,9 @@ class AiCreditWalletService
                 idempotencyKey: $idempotencyKey,
                 createdBy: $createdBy,
                 metadata: array_merge($metadata ?? [], [
-                    'reserved_amount' => $amount,
-                    'from_quota'      => $fromQuota,
-                    'from_balance'    => $fromBalance,
+                    'reserved_cents'     => $amount,
+                    'from_quota_cents'   => $fromQuota,
+                    'from_balance_cents' => $fromBalance,
                     // Janela da cota usada: devolução depois da virada não
                     // volta para a janela nova (cota é use-or-lose).
                     'quota_window_ends_at' => $wallet->quota_period_ends_at?->toAtomString(),
@@ -631,16 +642,16 @@ class AiCreditWalletService
                 $fromQuota   = min($amount, $open['quota']);
                 $fromBalance = min($amount - $fromQuota, $open['balance']);
             } else {
-                $fromBalance = min($amount, (int) $wallet->reserved_balance);
+                $fromBalance = min($amount, (int) $wallet->reserved_balance_cents);
                 $fromQuota   = $amount - $fromBalance;
             }
 
             // A parte da cota já foi contada em monthly_quota_used na reserva.
-            $wallet->reserved_balance = max(0, (int) $wallet->reserved_balance - $fromBalance);
-            $wallet->lifetime_consumed += $amount;
+            $wallet->reserved_balance_cents = max(0, (int) $wallet->reserved_balance_cents - $fromBalance);
+            $wallet->lifetime_consumed_cents += $amount;
 
             if ($provider !== null) {
-                $col            = "lifetime_consumed_{$provider->value}";
+                $col            = "lifetime_consumed_{$provider->value}_cents";
                 $wallet->{$col} = (int) $wallet->{$col} + $amount;
             }
 
@@ -657,10 +668,10 @@ class AiCreditWalletService
                 idempotencyKey: $idempotencyKey,
                 createdBy: $createdBy,
                 metadata: array_merge($metadata ?? [], [
-                    'consumed_from_reservation' => $amount,
-                    'reserved_delta'            => $fromBalance,
-                    'from_quota'                => $fromQuota,
-                    'from_balance'              => $fromBalance,
+                    'consumed_from_reservation_cents' => $amount,
+                    'reserved_delta_cents'            => $fromBalance,
+                    'from_quota_cents'                => $fromQuota,
+                    'from_balance_cents'              => $fromBalance,
                 ]),
             );
         });
@@ -708,8 +719,8 @@ class AiCreditWalletService
                 $sameWindow = ! $wallet->quotaExpired()
                     && ($open['window'] === null || $open['window'] === $wallet->quota_period_ends_at?->toAtomString());
             } else {
-                $toBalance  = min($amount, (int) $wallet->reserved_balance);
-                $quotaPart  = min($amount - $toBalance, $wallet->quotaExpired() ? 0 : (int) $wallet->monthly_quota_used);
+                $toBalance  = min($amount, (int) $wallet->reserved_balance_cents);
+                $quotaPart  = min($amount - $toBalance, $wallet->quotaExpired() ? 0 : (int) $wallet->monthly_quota_used_cents);
                 $sameWindow = true;
             }
 
@@ -719,12 +730,12 @@ class AiCreditWalletService
                 );
             }
 
-            $toQuota   = $sameWindow ? min($quotaPart, (int) $wallet->monthly_quota_used) : 0;
+            $toQuota   = $sameWindow ? min($quotaPart, (int) $wallet->monthly_quota_used_cents) : 0;
             $forfeited = $quotaPart - $toQuota;
 
-            $wallet->monthly_quota_used -= $toQuota;
-            $wallet->reserved_balance = max(0, (int) $wallet->reserved_balance - $toBalance);
-            $wallet->balance += $toBalance;
+            $wallet->monthly_quota_used_cents -= $toQuota;
+            $wallet->reserved_balance_cents = max(0, (int) $wallet->reserved_balance_cents - $toBalance);
+            $wallet->balance_cents += $toBalance;
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -738,10 +749,10 @@ class AiCreditWalletService
                 idempotencyKey: $idempotencyKey,
                 createdBy: $createdBy,
                 metadata: array_merge($metadata ?? [], [
-                    'released_amount' => $amount,
-                    'to_quota'        => $toQuota,
-                    'to_balance'      => $toBalance,
-                    'quota_forfeited' => $forfeited,
+                    'released_cents'        => $amount,
+                    'to_quota_cents'        => $toQuota,
+                    'to_balance_cents'      => $toBalance,
+                    'quota_forfeited_cents' => $forfeited,
                 ]),
             );
         });
@@ -777,7 +788,7 @@ class AiCreditWalletService
             }
 
             $wallet = $this->lockWallet($entityId);
-            $wallet->balance += $amount;
+            $wallet->balance_cents += $amount;
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -796,22 +807,22 @@ class AiCreditWalletService
     }
 
     /**
-     * Retorna saldo agregado + breakdown analítico de consumo por provedor.
+     * Saldo agregado em CENTAVOS de BRL + consumo analítico por provedor (só o manager usa o breakdown).
      *
      * @return array{
-     *     available:int,
-     *     balance:int,
-     *     quota_remaining:int,
-     *     quota_total:int,
-     *     quota_used:int,
+     *     available_cents:int,
+     *     balance_cents:int,
+     *     quota_remaining_cents:int,
+     *     quota_total_cents:int,
+     *     quota_used_cents:int,
      *     quota_expired:bool,
      *     quota_period_ends_at:?string,
-     *     reserved:int,
-     *     total:int,
-     *     lifetime_purchased:int,
-     *     lifetime_consumed:int,
-     *     lifetime_quota_granted:int,
-     *     consumed_by_provider: array<string, int>
+     *     reserved_cents:int,
+     *     total_cents:int,
+     *     lifetime_purchased_cents:int,
+     *     lifetime_consumed_cents:int,
+     *     lifetime_quota_granted_cents:int,
+     *     consumed_by_provider_cents: array<string, int>
      * }
      */
     public function balance(string $entityId): array
@@ -831,24 +842,24 @@ class AiCreditWalletService
         }
 
         $quotaRemaining = $wallet->quotaRemaining();
-        $balance        = (int) $wallet->balance;
-        $reserved       = (int) $wallet->reserved_balance;
+        $balance        = (int) $wallet->balance_cents;
+        $reserved       = (int) $wallet->reserved_balance_cents;
         $available      = $quotaRemaining + $balance;
 
         return [
-            'available'              => $available,
-            'balance'                => $balance,
-            'quota_remaining'        => $quotaRemaining,
-            'quota_total'            => (int) $wallet->monthly_quota,
-            'quota_used'             => (int) $wallet->monthly_quota_used,
-            'quota_expired'          => $wallet->quotaExpired(),
-            'quota_period_ends_at'   => $wallet->quota_period_ends_at?->toAtomString(),
-            'reserved'               => $reserved,
-            'total'                  => $available + $reserved,
-            'lifetime_purchased'     => (int) $wallet->lifetime_purchased,
-            'lifetime_consumed'      => (int) $wallet->lifetime_consumed,
-            'lifetime_quota_granted' => (int) $wallet->monthly_quota_lifetime_granted,
-            'consumed_by_provider'   => $consumedByProvider,
+            'available_cents'              => $available,
+            'balance_cents'                => $balance,
+            'quota_remaining_cents'        => $quotaRemaining,
+            'quota_total_cents'            => (int) $wallet->monthly_quota_cents,
+            'quota_used_cents'             => (int) $wallet->monthly_quota_used_cents,
+            'quota_expired'                => $wallet->quotaExpired(),
+            'quota_period_ends_at'         => $wallet->quota_period_ends_at?->toAtomString(),
+            'reserved_cents'               => $reserved,
+            'total_cents'                  => $available + $reserved,
+            'lifetime_purchased_cents'     => (int) $wallet->lifetime_purchased_cents,
+            'lifetime_consumed_cents'      => (int) $wallet->lifetime_consumed_cents,
+            'lifetime_quota_granted_cents' => (int) $wallet->monthly_quota_lifetime_granted_cents,
+            'consumed_by_provider_cents'   => $consumedByProvider,
         ];
     }
 
@@ -859,7 +870,7 @@ class AiCreditWalletService
      * tinha saído do saldo comprado) volta ao saldo comprado, com registro no
      * ledger. Sem `$apply`, só calcula.
      *
-     * @return array{entity_id:string, reserved:int, expected:int, phantom:int, applied:bool}
+     * @return array{entity_id:string, reserved_cents:int, expected_cents:int, phantom_cents:int, applied:bool}
      */
     public function reconcileReservedBalance(string $entityId, bool $apply = false): array
     {
@@ -867,7 +878,7 @@ class AiCreditWalletService
             $wallet = AiCreditWallet::query()->where('entity_id', $entityId)->lockForUpdate()->first();
 
             if (! $wallet) {
-                return ['entity_id' => $entityId, 'reserved' => 0, 'expected' => 0, 'phantom' => 0, 'applied' => false];
+                return ['entity_id' => $entityId, 'reserved_cents' => 0, 'expected_cents' => 0, 'phantom_cents' => 0, 'applied' => false];
             }
 
             $openRunIds = AiRun::query()
@@ -886,13 +897,13 @@ class AiCreditWalletService
                 $expected += $this->openReservation($wallet, (string) $runId)['balance'] ?? 0;
             }
 
-            $reserved = (int) $wallet->reserved_balance;
+            $reserved = (int) $wallet->reserved_balance_cents;
             $phantom  = max(0, $reserved - $expected);
             $applied  = false;
 
             if ($apply && $phantom > 0) {
-                $wallet->reserved_balance = $reserved - $phantom;
-                $wallet->balance += $phantom;
+                $wallet->reserved_balance_cents = $reserved - $phantom;
+                $wallet->balance_cents += $phantom;
                 $wallet->save();
 
                 $this->createLedgerEntry(
@@ -900,7 +911,7 @@ class AiCreditWalletService
                     type: AiLedgerEntryType::Adjustment,
                     provider: null,
                     amount: $phantom,
-                    description: 'Créditos reservados sem execução em andamento devolvidos ao saldo comprado.',
+                    description: 'Saldo reservado sem execução em andamento devolvido ao saldo comprado.',
                     metadata: [
                         'adjustment_reason' => 'reserved_balance_reconcile',
                         'reserved_before'   => $reserved,
@@ -912,11 +923,11 @@ class AiCreditWalletService
             }
 
             return [
-                'entity_id' => $entityId,
-                'reserved'  => $reserved,
-                'expected'  => $expected,
-                'phantom'   => $phantom,
-                'applied'   => $applied,
+                'entity_id'      => $entityId,
+                'reserved_cents' => $reserved,
+                'expected_cents' => $expected,
+                'phantom_cents'  => $phantom,
+                'applied'        => $applied,
             ];
         });
     }
@@ -944,7 +955,7 @@ class AiCreditWalletService
                 AiLedgerEntryType::Consume->value,
                 AiLedgerEntryType::Release->value,
             ])
-            ->get(['type', 'amount', 'metadata']);
+            ->get(['type', 'amount_cents', 'metadata']);
 
         $reserve = $entries->first(fn (AiCreditLedgerEntry $entry) => $entry->type === AiLedgerEntryType::Reserve);
 
@@ -952,21 +963,21 @@ class AiCreditWalletService
             return null;
         }
 
-        $quota   = (int) data_get($reserve->metadata, 'from_quota', 0);
-        $balance = (int) data_get($reserve->metadata, 'from_balance', abs((int) $reserve->amount) - $quota);
+        $quota   = (int) data_get($reserve->metadata, 'from_quota_cents', 0);
+        $balance = (int) data_get($reserve->metadata, 'from_balance_cents', abs((int) $reserve->amount_cents) - $quota);
 
         foreach ($entries as $entry) {
             $meta = (array) $entry->metadata;
 
             if ($entry->type === AiLedgerEntryType::Consume) {
-                // Consumos antigos só registravam reserved_delta (parte do saldo comprado).
-                $consumed    = (int) ($meta['consumed_from_reservation'] ?? 0);
-                $fromBalance = (int) ($meta['from_balance'] ?? $meta['reserved_delta'] ?? 0);
-                $quota -= (int) ($meta['from_quota'] ?? max(0, $consumed - $fromBalance));
+                // Consumos antigos só registravam reserved_delta_cents (parte do saldo comprado).
+                $consumed    = (int) ($meta['consumed_from_reservation_cents'] ?? 0);
+                $fromBalance = (int) ($meta['from_balance_cents'] ?? $meta['reserved_delta_cents'] ?? 0);
+                $quota -= (int) ($meta['from_quota_cents'] ?? max(0, $consumed - $fromBalance));
                 $balance -= $fromBalance;
             } elseif ($entry->type === AiLedgerEntryType::Release) {
-                $quota -= (int) ($meta['to_quota'] ?? 0) + (int) ($meta['quota_forfeited'] ?? 0);
-                $balance -= (int) ($meta['to_balance'] ?? 0);
+                $quota -= (int) ($meta['to_quota_cents'] ?? 0) + (int) ($meta['quota_forfeited_cents'] ?? 0);
+                $balance -= (int) ($meta['to_balance_cents'] ?? 0);
             }
         }
 
@@ -1011,17 +1022,19 @@ class AiCreditWalletService
     private function emptyWalletColumns(): array
     {
         return [
-            'balance'                        => 0,
-            'reserved_balance'               => 0,
-            'lifetime_purchased'             => 0,
-            'lifetime_consumed'              => 0,
-            'monthly_quota'                  => 0,
-            'monthly_quota_used'             => 0,
-            'quota_period_ends_at'           => null,
-            'monthly_quota_lifetime_granted' => 0,
-            'lifetime_consumed_openai'       => 0,
-            'lifetime_consumed_anthropic'    => 0,
-            'lifetime_consumed_gemini'       => 0,
+            'balance_cents'                        => 0,
+            'reserved_balance_cents'               => 0,
+            'lifetime_purchased_cents'             => 0,
+            'lifetime_consumed_cents'              => 0,
+            'monthly_quota_cents'                  => 0,
+            'monthly_quota_used_cents'             => 0,
+            'quota_period_ends_at'                 => null,
+            'monthly_quota_lifetime_granted_cents' => 0,
+            'lifetime_consumed_openai_cents'       => 0,
+            'lifetime_consumed_anthropic_cents'    => 0,
+            'lifetime_consumed_gemini_cents'       => 0,
+            // Nasce em centavos: marca para o conversor de legado (AiLegacyCreditConverter) nunca a reconverter.
+            'legacy_conversion' => ['method' => 'native_brl', 'converted_at' => now()->toAtomString()], // cast array no model
         ];
     }
 
@@ -1038,18 +1051,19 @@ class AiCreditWalletService
         ?array $metadata = null,
     ): AiCreditLedgerEntry {
         return AiCreditLedgerEntry::query()->create([
-            'entity_id'       => $wallet->entity_id,
-            'wallet_id'       => $wallet->id,
-            'subscription_id' => $subscriptionId,
-            'ai_run_id'       => $aiRunId,
-            'type'            => $type->value,
-            'provider'        => $provider?->value,
-            'amount'          => $amount,
-            'balance_after'   => (int) $wallet->balance,
-            'description'     => $description,
-            'metadata'        => $metadata,
-            'idempotency_key' => $idempotencyKey,
-            'created_by'      => $createdBy,
+            'entity_id'           => $wallet->entity_id,
+            'wallet_id'           => $wallet->id,
+            'subscription_id'     => $subscriptionId,
+            'ai_run_id'           => $aiRunId,
+            'type'                => $type->value,
+            'provider'            => $provider?->value,
+            'amount_cents'        => $amount,
+            'balance_after_cents' => (int) $wallet->balance_cents,
+            'unit'                => 'brl_cent',
+            'description'         => $description,
+            'metadata'            => $metadata,
+            'idempotency_key'     => $idempotencyKey,
+            'created_by'          => $createdBy,
         ]);
     }
 

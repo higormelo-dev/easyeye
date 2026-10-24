@@ -5,6 +5,7 @@ use App\Http\Controllers\Manager\{
     AiCatalogSyncsController,
     AiCreditPurchasesController,
     AiModelPricesController,
+    AiPricingController,
     AiProvidersController,
     AiUsageController,
     Cid10CodesController,
@@ -406,6 +407,16 @@ Route::group([
     Route::get('ai-usage/export', [AiUsageController::class, 'export'])
         ->middleware('throttle:manager-destructive')
         ->name('ai-usage.export');
+
+    // ── Precificação da IA (câmbio manual, markup, pisos, pacote personalizado) ─
+    // Só dono/admin financeiro (Gate SaasOwnerFinancial no controller); toda escrita pede motivo e é auditada.
+    Route::get('ai-pricing', [AiPricingController::class, 'index'])->name('ai-pricing.index');
+    Route::put('ai-pricing/settings', [AiPricingController::class, 'updateSettings'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-pricing.settings');
+    Route::post('ai-pricing/exchange-rates', [AiPricingController::class, 'storeExchangeRate'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-pricing.exchange-rates.store');
 
     // ── WhatsApp oficial (Gupshup): app global + por clínica ───────────────────
     // Configuração EXCLUSIVA do dono/admin do SaaS (Gate SaasAdminPanel dentro

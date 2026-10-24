@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\{Cache, DB};
  *   - byDoctor: top 10 médicos por runs aprovados, com avg de créditos e tempo
  *     médio para aprovar.
  *   - averageApproveSeconds: tempo médio geral entre criação e aprovação.
- *   - averageCostPerRecord: custo médio em créditos por consulta (medical_record).
+ *   - averageChargeCentsPerRecord: valor médio cobrado (centavos de BRL) por consulta (medical_record).
  *
  * Todas as queries são scoped por entity_id e respeitam o período [start, end].
  */
@@ -26,7 +26,8 @@ class AiAnalyticsService
      *   doctor_id: string,
      *   doctor_name: string,
      *   approved: int,
-     *   avg_credits: float,
+     *   avg_charge_cents: float,
+     *   charge_cents_total: int,
      *   avg_approve_seconds: float
      * }>
      */
@@ -53,7 +54,8 @@ class AiAnalyticsService
                 ai_runs.approved_by as doctor_id,
                 users.name as doctor_name,
                 count(*) as approved,
-                avg(ai_runs.consumed_credits) as avg_credits,
+                avg(ai_runs.consumed_charge_cents) as avg_charge_cents,
+                sum(ai_runs.consumed_charge_cents) as charge_cents_total,
                 avg(extract(epoch from (ai_runs.approved_at - ai_runs.created_at))) as avg_approve_seconds
             ')
             ->groupBy('ai_runs.approved_by', 'users.name')
@@ -65,7 +67,8 @@ class AiAnalyticsService
             'doctor_id'           => (string) $row->doctor_id,
             'doctor_name'         => (string) $row->doctor_name,
             'approved'            => (int) $row->approved,
-            'avg_credits'         => round((float) $row->avg_credits, 1),
+            'avg_charge_cents'    => round((float) $row->avg_charge_cents, 1),
+            'charge_cents_total'  => (int) $row->charge_cents_total,
             'avg_approve_seconds' => round((float) $row->avg_approve_seconds, 1),
         ])->values()->all();
     }
@@ -98,14 +101,14 @@ class AiAnalyticsService
     }
 
     /**
-     * Custo médio (créditos consumidos) por consulta — soma por medical_record
+     * Valor médio cobrado (centavos de BRL) por consulta — soma por medical_record
      * dividido pela contagem de medical_records distintos.
      * Retorna null se não houver consultas associadas a runs Approved.
      */
-    public function averageCostPerRecord(string $entityId, Carbon $start, Carbon $end): ?float
+    public function averageChargeCentsPerRecord(string $entityId, Carbon $start, Carbon $end): ?float
     {
         $cached = Cache::remember(
-            $this->cacheKey('avg_cost', $entityId, $start, $end),
+            $this->cacheKey('avg_charge', $entityId, $start, $end),
             self::CACHE_TTL_SECONDS,
             function () use ($entityId, $start, $end): ?float {
                 $sub = DB::table('ai_runs')
@@ -114,7 +117,7 @@ class AiAnalyticsService
                     ->whereNotNull('medical_record_id')
                     ->whereBetween('created_at', [$start, $end])
                     ->groupBy('medical_record_id')
-                    ->selectRaw('medical_record_id, sum(consumed_credits) as total');
+                    ->selectRaw('medical_record_id, sum(consumed_charge_cents) as total');
 
                 $value = DB::query()
                     ->fromSub($sub, 'sub')
@@ -136,7 +139,8 @@ class AiAnalyticsService
      */
     private function cacheKey(string $kind, string $entityId, Carbon $start, Carbon $end): string
     {
-        return sprintf('ai:analytics:%s:%s:%s:%s', $kind, $entityId, $start->format('Ymd'), $end->format('Ymd'));
+        // v2: valores em centavos (a v1 guardava créditos) — o cache antigo nunca é lido.
+        return sprintf('ai:analytics:v2:%s:%s:%s:%s', $kind, $entityId, $start->format('Ymd'), $end->format('Ymd'));
     }
 
     /**
@@ -148,7 +152,7 @@ class AiAnalyticsService
         $start = Carbon::now()->startOfMonth();
         $end   = Carbon::now()->endOfMonth();
 
-        foreach (['by_doctor', 'avg_approve', 'avg_cost'] as $kind) {
+        foreach (['by_doctor', 'avg_approve', 'avg_charge'] as $kind) {
             Cache::forget($this->cacheKey($kind, $entityId, $start, $end));
         }
     }

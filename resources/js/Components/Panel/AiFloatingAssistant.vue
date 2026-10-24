@@ -27,7 +27,6 @@ import { ref, reactive, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import { aiAssistantContext } from '@/Support/aiAssistantContext';
 import AiPaywallNotice from '@/Components/Panel/AiPaywallNotice.vue';
 import { useLocaleFormat } from '@/composables/useLocaleFormat';
-import { choice } from '@/utils/billingPeriods.js';
 
 const props = defineProps({
     ai: { type: Object, required: true },
@@ -37,16 +36,16 @@ const t = computed(() => props.ai?.t ?? {});
 const tt = (key, fallback = '') => t.value?.[key] ?? fallback;
 
 // ── Medidor (carteira) ───────────────────────────────────────────────────────
-const { date: formatDate, number: formatNumber } = useLocaleFormat();
+const { date: formatDate, moneyCents: formatAiAmount } = useLocaleFormat();
 const quota = computed(() => props.ai?.quota ?? {});
 // Singular/plural ("1 crédito disponível") e número no idioma ("1.500").
 const availableText = computed(() => {
-    const value = props.ai?.balance?.available ?? quota.value?.available;
+    const value = props.ai?.balance?.available_cents ?? quota.value?.available_cents;
     if (value === undefined || value === null) return '';
-    return choice(tt('credits_available', ':count'), Number(value), { count: formatNumber(value) });
+    return tt('credits_available', ':count').replace(':count', formatAiAmount(value));
 });
 const quotaText = computed(() => {
-    const total = Number(quota.value?.monthly_quota ?? 0);
+    const total = Number(quota.value?.monthly_quota_cents ?? 0);
     if (total <= 0) return '';
     // Renovação só para quem ganha franquia (em atraso, condicionada ao
     // pagamento); cota que sobrou (ex.: virou cortesia) mostra até quando
@@ -60,8 +59,8 @@ const quotaText = computed(() => {
     else if (expiresOn) tpl = tt('quota_status_expiring', '');
     const date = renewsOn || renewsIfPaidOn || expiresOn;
     return tpl
-        .replace(':used', formatNumber(quota.value?.consumed_credits ?? 0))
-        .replace(':quota', formatNumber(total))
+        .replace(':used', formatAiAmount(quota.value?.monthly_quota_used_cents ?? 0))
+        .replace(':quota', formatAiAmount(total))
         .replace(':date', date ? formatDate(date) : '');
 });
 

@@ -80,3 +80,15 @@ it('as durações estimadas do calendário trazem o placeholder :minutes', funct
             ->and($ui['calendar_duration_estimated'])->not->toContain(':minutes');
     }
 });
+
+it('manager_ai_pricing.php: pt_BR e en têm as mesmas chaves', fn () => assertSameLangKeys('manager_ai_pricing'));
+
+it('a franquia de IA em reais mantém o placeholder de valor nos dois idiomas', function () {
+    foreach (['pt_BR', 'en'] as $locale) {
+        $subscriptions = require lang_path("{$locale}/subscriptions.php");
+        $actions       = require lang_path("{$locale}/actions.php");
+
+        expect($subscriptions['features']['ai_credits_value'])->toContain(':value')
+            ->and($actions['sidemenu']['ai_menu_pricing'])->not->toBe('');
+    }
+});

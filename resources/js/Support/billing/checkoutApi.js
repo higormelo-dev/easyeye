@@ -75,11 +75,21 @@ export function createCheckoutApi(endpoints, http = axios) {
             unwrap(await http.put(endpoints.payerDocument(), { document }, { headers: JSON_HEADERS })),
         contract: async (payload, key) => unwrap(await http.post(endpoints.contract(), payload, withKey(key))),
         /** Pacote de créditos de IA: opções (com o valor do pacote) e compra já pagando. */
-        aiPackOptions: async (packageCode = null) =>
+        aiPackOptions: async (packageCode = null, customAmountCents = null) =>
             unwrap(
-                await http.get(endpoints.aiPackOptions(packageCode ? { package_code: packageCode } : {}), {
-                    headers: JSON_HEADERS,
-                }),
+                await http.get(
+                    endpoints.aiPackOptions(
+                        packageCode
+                            ? {
+                                  package_code: packageCode,
+                                  ...(packageCode === 'custom' ? { custom_amount_cents: customAmountCents } : {}),
+                              }
+                            : {},
+                    ),
+                    {
+                        headers: JSON_HEADERS,
+                    },
+                ),
             ),
         aiPack: async (payload, key) => unwrap(await http.post(endpoints.aiPack(), payload, withKey(key))),
         /** Descarta o pedido de pacote ainda não pago (cancela a cobrança emitida). */

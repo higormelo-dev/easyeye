@@ -132,13 +132,13 @@ class MedicinePosologyAiService
             'workflow'     => $payload['workflow'],
             'mode'         => AiRunMode::Economy->value,
             'risk_level'   => $payload['risk_level'],
-            // Pending com créditos 0: o AiRunExecutionService pula a carteira
+            // Pending com valor 0: o AiRunExecutionService pula a carteira
             // inteira (ferramenta interna, não cobrada de clínica).
-            'status'            => AiRunStatus::Pending->value,
-            'estimated_credits' => 0,
-            'reserved_credits'  => 0,
-            'consumed_credits'  => 0,
-            'input_summary'     => [
+            'status'                 => AiRunStatus::Pending->value,
+            'estimated_charge_cents' => 0,
+            'reserved_charge_cents'  => 0,
+            'consumed_charge_cents'  => 0,
+            'input_summary'          => [
                 'user_prompt'   => $payload['user_prompt'],
                 'system_prompt' => $payload['system_prompt'] ?? null,
                 'context'       => $payload['context'] ?? [],

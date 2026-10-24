@@ -57,7 +57,7 @@ final class NfseSettings
             'nfse.auto_issue'                               => ['type' => 'boolean', 'default' => false, 'label' => 'NFS-e: emitir automaticamente ao pagar a fatura'],
             'nfse.copy_email'                               => ['type' => 'nullable_string', 'default' => null, 'label' => 'NFS-e: e-mail que recebe cópia da nota'],
             'nfse.discriminacao.plano'                      => ['type' => 'string', 'default' => 'Assinatura do plano {plano} ({ciclo}) — período {periodo} — fatura {fatura}', 'label' => 'NFS-e: discriminação da nota de assinatura'],
-            'nfse.discriminacao.ia'                         => ['type' => 'string', 'default' => 'Pacote de créditos de IA ({creditos} créditos) — fatura {fatura}', 'label' => 'NFS-e: discriminação da nota de pacote de IA'],
+            'nfse.discriminacao.ia'                         => ['type' => 'string', 'default' => 'Pacote de saldo de IA ({valor}) — fatura {fatura}', 'label' => 'NFS-e: discriminação da nota de pacote de IA'],
         ];
     }
 

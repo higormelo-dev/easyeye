@@ -165,14 +165,21 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Pacotes de créditos de IA: se a clínica pode comprar agora, formas de
-     * pagamento (com o valor do pacote, se informado) e compras recentes.
+     * Pacotes de saldo de IA: se a clínica pode comprar agora, formas de
+     * pagamento (com o valor do pacote, se informado; no personalizado, `custom_amount_cents`) e compras recentes.
      */
     public function aiCreditOptions(Request $request): JsonResponse
     {
-        $validated = $request->validate(['package_code' => ['nullable', 'string', 'max:60']]);
+        $validated = $request->validate([
+            'package_code'        => ['nullable', 'string', 'max:60'],
+            'custom_amount_cents' => ['nullable', 'integer', 'min:1', 'max:100000000'],
+        ]);
 
-        return response()->json(['data' => $this->aiPacks->options($this->entity($request), $validated['package_code'] ?? null)]);
+        return response()->json(['data' => $this->aiPacks->options(
+            $this->entity($request),
+            $validated['package_code'] ?? null,
+            isset($validated['custom_amount_cents']) ? (int) $validated['custom_amount_cents'] : null,
+        )]);
     }
 
     /** Compra um pacote de créditos de IA pagando no checkout (Pix, boleto, cartão à vista). */
@@ -185,6 +192,7 @@ class CheckoutController extends Controller
             method: $request->checkoutMethod(),
             card: $request->cardInput(),
             idempotencyKey: $request->idempotencyKey(),
+            customAmountCents: $request->customAmountCents(),
         );
 
         return $request->checkoutMethod()->isCard() && $request->cardInput() !== null

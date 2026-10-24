@@ -27,6 +27,14 @@ final class Money
     }
 
     /** 12345 → "123.45" (formato de coluna decimal, sem separador de milhar). */
+    /** "R$ 1.234,56" a partir de centavos inteiros (BRL, formato brasileiro, sem float no saldo). */
+    public static function formatBrl(int $cents): string
+    {
+        $sign = $cents < 0 ? '-' : '';
+
+        return $sign . 'R$ ' . number_format(abs($cents) / 100, 2, ',', '.');
+    }
+
     public static function fromCents(int $cents): string
     {
         $sign = $cents < 0 ? '-' : '';

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Medicines;
 
-use App\Domains\AI\Services\{AiPricingService, AiSystemPromptResolver, AiUsdBrlRate};
+use App\Domains\AI\Services\{AiPricingPolicyResolver, AiPricingService, AiSystemPromptResolver, AiUsdBrlRate};
 use App\Enums\AI\{AiProvider, AiRunMode};
 use App\Enums\{ImportStatus, MedicinePosologySource};
 use App\Models\{Medicine, MedicinePosologyBatch, MedicinePosologyBatchGroup, MedicinePresentation, User};
@@ -166,13 +166,14 @@ class MedicinePosologyBatchService
             $output += max(100, min(600, intdiv($tokens, 2) + 120));
         }
 
-        $estimate = $this->pricing->estimateCredits(MedicinePosologyAiService::WORKFLOW, AiRunMode::Economy, [[
+        // Só o custo USD interessa aqui (ferramenta interna do SaaS, não cobrada de clínica); a política é a vigente.
+        $estimate = $this->pricing->estimateCharge(MedicinePosologyAiService::WORKFLOW, AiRunMode::Economy, [[
             'provider'         => $provider,
             'model'            => (string) $model,
             'input_tokens'     => $input,
             'output_tokens'    => $output,
             'reasoning_tokens' => 12 * count($contexts),
-        ]]);
+        ]], app(AiPricingPolicyResolver::class)->current());
 
         return round($estimate->rawCostUsd, 6);
     }

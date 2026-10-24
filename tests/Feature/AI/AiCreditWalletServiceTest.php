@@ -37,15 +37,15 @@ test('grantMonthlyQuota cria carteira, popula cota e reseta ciclo', function () 
     );
 
     expect($entry->type)->toBe(AiLedgerEntryType::Grant);
-    expect($entry->amount)->toBe(120);
+    expect($entry->amount_cents)->toBe(120);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
 
-    expect($wallet->balance)->toBe(0);                  // cota não vai para balance
-    expect($wallet->monthly_quota)->toBe(120);
-    expect($wallet->monthly_quota_used)->toBe(0);
+    expect($wallet->balance_cents)->toBe(0);                  // cota não vai para balance
+    expect($wallet->monthly_quota_cents)->toBe(120);
+    expect($wallet->monthly_quota_used_cents)->toBe(0);
     expect($wallet->quota_period_ends_at->toDateString())->toBe($periodEnds->toDateString());
-    expect($wallet->monthly_quota_lifetime_granted)->toBe(120);
+    expect($wallet->monthly_quota_lifetime_granted_cents)->toBe(120);
 });
 
 test('purchaseCredits incrementa balance comprado (não cota)', function () {
@@ -57,14 +57,14 @@ test('purchaseCredits incrementa balance comprado (não cota)', function () {
     );
 
     expect($entry->type)->toBe(AiLedgerEntryType::Purchase);
-    expect($entry->amount)->toBe(300);
-    expect($entry->balance_after)->toBe(300);
+    expect($entry->amount_cents)->toBe(300);
+    expect($entry->balance_after_cents)->toBe(300);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
 
-    expect($wallet->balance)->toBe(300);
-    expect($wallet->lifetime_purchased)->toBe(300);
-    expect($wallet->monthly_quota)->toBe(0);            // compra não mexe na cota
+    expect($wallet->balance_cents)->toBe(300);
+    expect($wallet->lifetime_purchased_cents)->toBe(300);
+    expect($wallet->monthly_quota_cents)->toBe(0);            // compra não mexe na cota
 });
 
 test('reserve consome cota primeiro, depois balance', function () {
@@ -80,14 +80,14 @@ test('reserve consome cota primeiro, depois balance', function () {
     $reserve = $this->service->reserve(entityId: $this->entity->id, amount: 80);
 
     expect($reserve->type)->toBe(AiLedgerEntryType::Reserve);
-    expect($reserve->amount)->toBe(-80);
-    expect($reserve->metadata['from_quota'])->toBe(60);
-    expect($reserve->metadata['from_balance'])->toBe(20);
+    expect($reserve->amount_cents)->toBe(-80);
+    expect($reserve->metadata['from_quota_cents'])->toBe(60);
+    expect($reserve->metadata['from_balance_cents'])->toBe(20);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect($wallet->monthly_quota_used)->toBe(60);      // cota esgotada
-    expect($wallet->balance)->toBe(80);                 // 100 - 20
-    expect($wallet->reserved_balance)->toBe(20);
+    expect($wallet->monthly_quota_used_cents)->toBe(60);      // cota esgotada
+    expect($wallet->balance_cents)->toBe(80);                 // 100 - 20
+    expect($wallet->reserved_balance_cents)->toBe(20);
 });
 
 test('reserve lança InsufficientAiCreditsException quando saldo total é insuficiente', function () {
@@ -111,10 +111,10 @@ test('consumeReservation grava provider e incrementa lifetime_consumed_<provider
     expect($consume->provider)->toBe(AiProvider::Anthropic);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect($wallet->reserved_balance)->toBe(0);
-    expect($wallet->lifetime_consumed)->toBe(60);
-    expect($wallet->lifetime_consumed_anthropic)->toBe(60);
-    expect($wallet->lifetime_consumed_openai)->toBe(0);
+    expect($wallet->reserved_balance_cents)->toBe(0);
+    expect($wallet->lifetime_consumed_cents)->toBe(60);
+    expect($wallet->lifetime_consumed_anthropic_cents)->toBe(60);
+    expect($wallet->lifetime_consumed_openai_cents)->toBe(0);
 });
 
 test('releaseReservation sem run devolve primeiro ao saldo comprado, depois à cota', function () {
@@ -132,13 +132,13 @@ test('releaseReservation sem run devolve primeiro ao saldo comprado, depois à c
     $release = $this->service->releaseReservation(entityId: $this->entity->id, amount: 50);
 
     expect($release->type)->toBe(AiLedgerEntryType::Release);
-    expect($release->metadata['to_balance'])->toBe(20);
-    expect($release->metadata['to_quota'])->toBe(30);
+    expect($release->metadata['to_balance_cents'])->toBe(20);
+    expect($release->metadata['to_quota_cents'])->toBe(30);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect($wallet->monthly_quota_used)->toBe(10);
-    expect($wallet->balance)->toBe(100);                // comprado intacto
-    expect($wallet->reserved_balance)->toBe(0);
+    expect($wallet->monthly_quota_used_cents)->toBe(10);
+    expect($wallet->balance_cents)->toBe(100);                // comprado intacto
+    expect($wallet->reserved_balance_cents)->toBe(0);
 });
 
 test('idempotency key evita duplicidade de grant da cota', function () {
@@ -169,8 +169,8 @@ test('refund estorna créditos para o balance comprado', function () {
     $this->service->consumeReservation(entityId: $this->entity->id, amount: 90);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect($wallet->balance)->toBe(110);
-    expect($wallet->lifetime_consumed)->toBe(90);
+    expect($wallet->balance_cents)->toBe(110);
+    expect($wallet->lifetime_consumed_cents)->toBe(90);
 
     $refund = $this->service->refund(
         entityId: $this->entity->id,
@@ -179,11 +179,11 @@ test('refund estorna créditos para o balance comprado', function () {
     );
 
     expect($refund->type)->toBe(AiLedgerEntryType::Refund);
-    expect($refund->amount)->toBe(90);
+    expect($refund->amount_cents)->toBe(90);
 
     $wallet = $wallet->fresh();
-    expect($wallet->balance)->toBe(200);                // 110 + 90 refund
-    expect($wallet->lifetime_consumed)->toBe(90);       // não mexe no histórico
+    expect($wallet->balance_cents)->toBe(200);                // 110 + 90 refund
+    expect($wallet->lifetime_consumed_cents)->toBe(90);       // não mexe no histórico
 });
 
 test('refund é idempotente com mesma idempotencyKey', function () {
@@ -196,7 +196,7 @@ test('refund é idempotente com mesma idempotencyKey', function () {
     expect($first->id)->toBe($second->id);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect($wallet->balance)->toBe(140);                // 100 + 40 (uma única vez)
+    expect($wallet->balance_cents)->toBe(140);                // 100 + 40 (uma única vez)
 });
 
 test('balance() retorna saldo unificado + breakdown por provedor', function () {
@@ -211,12 +211,12 @@ test('balance() retorna saldo unificado + breakdown por provedor', function () {
 
     $balance = $this->service->balance($this->entity->id);
 
-    expect($balance['available'])->toBe(120);            // 20 cota restante + 100 balance
-    expect($balance['quota_remaining'])->toBe(20);
-    expect($balance['quota_total'])->toBe(50);
-    expect($balance['quota_used'])->toBe(30);
-    expect($balance['balance'])->toBe(100);
-    expect($balance['consumed_by_provider']['openai'])->toBe(30);
-    expect($balance['consumed_by_provider']['anthropic'])->toBe(0);
-    expect($balance['consumed_by_provider']['gemini'])->toBe(0);
+    expect($balance['available_cents'])->toBe(120);            // 20 cota restante + 100 balance
+    expect($balance['quota_remaining_cents'])->toBe(20);
+    expect($balance['quota_total_cents'])->toBe(50);
+    expect($balance['quota_used_cents'])->toBe(30);
+    expect($balance['balance_cents'])->toBe(100);
+    expect($balance['consumed_by_provider_cents']['openai'])->toBe(30);
+    expect($balance['consumed_by_provider_cents']['anthropic'])->toBe(0);
+    expect($balance['consumed_by_provider_cents']['gemini'])->toBe(0);
 });

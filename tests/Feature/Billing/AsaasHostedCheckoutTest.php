@@ -492,7 +492,7 @@ describe('cobranças avulsas no cartão (DETACHED)', function () {
         hcPaying(['ends_at' => '2026-11-08 23:59:59', 'next_billing_at' => '2026-11-08 23:59:59'], ['status' => InvoiceStatus::Paid->value, 'paid_at' => '2026-10-04 10:00:00']);
         hcFake(['POST https://api.asaas.com/v3/checkouts' => Http::response(['id' => 'chk_pack', 'status' => 'ACTIVE', 'minutesToExpire' => 60])]);
 
-        $data = hcAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'operational', 'method' => 'credit_card'])
+        $data = hcAs()->postJson(route('panel.my-subscription.ai-credits.purchase'), ['package_code' => 'premium', 'method' => 'credit_card'])
             ->assertOk()
             ->json('data');
 
@@ -502,15 +502,15 @@ describe('cobranças avulsas no cartão (DETACHED)', function () {
         Http::assertSent(fn (Request $r) => $r->url() === 'https://api.asaas.com/v3/checkouts'
             && $r['chargeTypes'] === ['DETACHED']
             && ! array_key_exists('subscription', $r->data())
-            && $r['items'][0]['value'] === 249.9);
+            && $r['items'][0]['value'] === 499.0);
 
         $packInvoice = Invoice::query()->where('billing_reason', Invoice::BILLING_REASON_AI_CREDIT_PACK)->sole();
 
-        hcPost(hcPayment('PAYMENT_CONFIRMED', 'pay_pack', ['subscription' => null, 'checkoutSession' => 'chk_pack', 'value' => 249.9, 'status' => 'CONFIRMED', 'dueDate' => '2026-10-05']));
+        hcPost(hcPayment('PAYMENT_CONFIRMED', 'pay_pack', ['subscription' => null, 'checkoutSession' => 'chk_pack', 'value' => 499.0, 'status' => 'CONFIRMED', 'dueDate' => '2026-10-05']));
 
         expect($packInvoice->fresh()->status)->toBe(InvoiceStatus::Paid)
             ->and(AiCreditPurchase::query()->sole()->status)->toBe(AiCreditPurchaseStatus::Credited)
-            ->and((int) AiCreditWallet::query()->where('entity_id', $this->clinic->id)->value('balance'))->toBe(100)
+            ->and((int) AiCreditWallet::query()->where('entity_id', $this->clinic->id)->value('balance_cents'))->toBe(49900)
             ->and(HostedCheckout::query()->where('external_checkout_id', 'chk_pack')->value('status'))->toBe(HostedCheckout::STATUS_COMPLETED);
     });
 

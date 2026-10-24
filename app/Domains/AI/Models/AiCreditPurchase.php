@@ -31,6 +31,7 @@ class AiCreditPurchase extends Model
         'package_code',
         'provider',
         'credits',
+        'wallet_credit_cents',
         'amount_cents',
         'currency',
         'status',
@@ -46,17 +47,18 @@ class AiCreditPurchase extends Model
     protected function casts(): array
     {
         return [
-            'credits'      => 'integer',
-            'amount_cents' => 'integer',
-            'status'       => AiCreditPurchaseStatus::class,
-            'provider'     => AiProvider::class,
-            'metadata'     => 'array',
-            'credited_at'  => 'datetime',
-            'cancelled_at' => 'datetime',
-            'failed_at'    => 'datetime',
-            'refunded_at'  => 'datetime',
-            'created_at'   => 'datetime',
-            'updated_at'   => 'datetime',
+            'credits'             => 'integer',
+            'wallet_credit_cents' => 'integer',
+            'amount_cents'        => 'integer',
+            'status'              => AiCreditPurchaseStatus::class,
+            'provider'            => AiProvider::class,
+            'metadata'            => 'array',
+            'credited_at'         => 'datetime',
+            'cancelled_at'        => 'datetime',
+            'failed_at'           => 'datetime',
+            'refunded_at'         => 'datetime',
+            'created_at'          => 'datetime',
+            'updated_at'          => 'datetime',
         ];
     }
 

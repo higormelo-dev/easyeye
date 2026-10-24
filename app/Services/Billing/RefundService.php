@@ -12,6 +12,7 @@ use App\Exceptions\Billing\{BillingException, GatewayIntegrationException};
 use App\Jobs\Billing\SendBillingRefundJob;
 use App\Models\Billing\{BillingRefund, Invoice, Payment};
 use App\Models\{Subscription, User};
+use App\Support\Money;
 use Illuminate\Support\Facades\{Cache, DB};
 use Illuminate\Support\Str;
 use Throwable;
@@ -584,8 +585,8 @@ class RefundService
                 $this->alerts->alert(
                     gateway: (string) $n->gatewayCode,
                     kind: 'refund_credits',
-                    params: ['entity' => (string) $invoice->entity?->name, 'reference' => (string) $invoice->reference, 'shortfall' => $credits['shortfall'], 'revoked' => $credits['revoked']],
-                    message: "Estorno parcial do pacote de IA {$invoice->reference}: {$credits['shortfall']} créditos não puderam ser retirados (a clínica já usou) — conferir.",
+                    params: ['entity' => (string) $invoice->entity?->name, 'reference' => (string) $invoice->reference, 'shortfall' => Money::formatBrl((int) $credits['shortfall']), 'revoked' => Money::formatBrl((int) $credits['revoked'])],
+                    message: 'Estorno parcial do pacote de IA ' . $invoice->reference . ': ' . Money::formatBrl((int) $credits['shortfall']) . ' de saldo não puderam ser retirados (a clínica já usou) — conferir.',
                     level: 'critical',
                     throttleKey: (string) $invoice->id . ':' . $total,
                     throttleMinutes: 60 * 24 * 30,

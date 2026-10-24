@@ -6,18 +6,22 @@ namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Models\{AiCreditPurchase, AiCreditWallet};
 use App\Enums\AI\{AiCreditPurchaseStatus, AiProvider};
+use App\Support\Money;
 use DomainException;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{DB, Lang};
 use Illuminate\Support\Str;
 
 class AiCreditPurchaseService
 {
     public function __construct(
         private readonly AiCreditWalletService $walletService,
+        private readonly AiPricingSettings $pricingSettings,
     ) {
     }
 
     /**
+     * Pacotes oferecidos à clínica (contrato público: só valores em centavos e limites do personalizado).
+     *
      * @return list<array<string, mixed>>
      */
     public function packages(): array
@@ -54,13 +58,17 @@ class AiCreditPurchaseService
         ?string $idempotencyKey = null,
         ?array $metadata = null,
         string $source = 'panel_ai_ui',
+        ?int $customAmountCents = null,
     ): AiCreditPurchase {
-        $package = $this->resolvePackage($packageCode);
+        // O valor é SEMPRE recalculado/validado aqui (pacote fixo: o da config; personalizado: dentro dos limites do servidor).
+        $package = $this->resolvePackage($packageCode, $customAmountCents);
+        $value   = (int) $package['value_cents'];
         $idempotencyKey ??= 'ai-credit-purchase:' . (string) Str::uuid();
 
         return DB::transaction(function () use (
             $entityId,
             $package,
+            $value,
             $provider,
             $subscriptionId,
             $requestedBy,
@@ -86,14 +94,14 @@ class AiCreditPurchaseService
                 'requested_by'    => $requestedBy,
                 'package_code'    => (string) $package['code'],
                 'provider'        => $provider?->value,
-                'credits'         => (int) $package['credits'],
-                'amount_cents'    => (int) $package['price_cents'],
-                'currency'        => (string) config('ai.credit_purchases.currency', 'BRL'),
-                'status'          => AiCreditPurchaseStatus::PendingPayment->value,
-                'description'     => __('ai.credit_purchase_description', [
-                    'credits' => (int) $package['credits'],
-                ]),
-                'metadata' => array_merge($metadata ?? [], [
+                'credits'         => null,
+                // R$ pagos = R$ de saldo (1:1, sem bônus): a compra credita exatamente o valor cobrado.
+                'wallet_credit_cents' => $value,
+                'amount_cents'        => $value,
+                'currency'            => (string) config('ai.credit_purchases.currency', 'BRL'),
+                'status'              => AiCreditPurchaseStatus::PendingPayment->value,
+                'description'         => 'Pacote de saldo de IA (' . Money::formatBrl($value) . ')',
+                'metadata'            => array_merge($metadata ?? [], [
                     'source'  => $source,
                     'package' => $this->presentPackage($package),
                 ]),
@@ -112,7 +120,7 @@ class AiCreditPurchaseService
      */
     public function createManualPurchase(
         string $entityId,
-        int $credits,
+        int $walletCreditCents,
         string $reason,
         string $createdBy,
         ?AiProvider $provider = null,
@@ -121,7 +129,7 @@ class AiCreditPurchaseService
         ?string $subscriptionId = null,
         ?array $metadata = null,
     ): AiCreditPurchase {
-        if ($credits <= 0) {
+        if ($walletCreditCents <= 0) {
             throw new DomainException('ai_credit_purchase_invalid_credits');
         }
 
@@ -130,7 +138,7 @@ class AiCreditPurchaseService
         return DB::transaction(function () use (
             $entityId,
             $provider,
-            $credits,
+            $walletCreditCents,
             $reason,
             $createdBy,
             $amountCents,
@@ -140,17 +148,18 @@ class AiCreditPurchaseService
             $idempotencyKey,
         ): AiCreditPurchase {
             $purchase = AiCreditPurchase::query()->create([
-                'entity_id'       => $entityId,
-                'subscription_id' => $subscriptionId,
-                'requested_by'    => $createdBy,
-                'package_code'    => $packageCode,
-                'provider'        => $provider?->value, // opcional — metadata, não controla saldo
-                'credits'         => $credits,
-                'amount_cents'    => max(0, $amountCents),
-                'currency'        => (string) config('ai.credit_purchases.currency', 'BRL'),
-                'status'          => AiCreditPurchaseStatus::PendingPayment->value,
-                'description'     => "Crédito manual: {$reason}",
-                'metadata'        => array_merge($metadata ?? [], [
+                'entity_id'           => $entityId,
+                'subscription_id'     => $subscriptionId,
+                'requested_by'        => $createdBy,
+                'package_code'        => $packageCode,
+                'provider'            => $provider?->value, // opcional — metadata, não controla saldo
+                'credits'             => null,
+                'wallet_credit_cents' => $walletCreditCents,
+                'amount_cents'        => max(0, $amountCents),
+                'currency'            => (string) config('ai.credit_purchases.currency', 'BRL'),
+                'status'              => AiCreditPurchaseStatus::PendingPayment->value,
+                'description'         => "Saldo manual: {$reason}",
+                'metadata'            => array_merge($metadata ?? [], [
                     'source'        => 'manager_manual',
                     'manual_reason' => $reason,
                     'created_by'    => $createdBy,
@@ -268,7 +277,7 @@ class AiCreditPurchaseService
 
             $this->walletService->revokePurchaseCredits(
                 entityId: (string) $locked->entity_id,
-                amount: (int) $locked->credits,
+                amount: $this->walletCreditOf($locked),
                 subscriptionId: $locked->subscription_id ? (string) $locked->subscription_id : null,
                 description: "Estorno administrativo da compra {$locked->id}.",
                 idempotencyKey: "ai-credit-purchase:{$locked->id}:refund",
@@ -312,7 +321,7 @@ class AiCreditPurchaseService
 
             $ledgerEntry = $this->walletService->purchaseCredits(
                 entityId: (string) $locked->entity_id,
-                amount: (int) $locked->credits,
+                amount: $this->walletCreditOf($locked),
                 subscriptionId: $locked->subscription_id ? (string) $locked->subscription_id : null,
                 description: $locked->description,
                 idempotencyKey: "ai-credit-purchase:{$locked->id}:credit",
@@ -413,10 +422,10 @@ class AiCreditPurchaseService
                 return $locked;
             }
 
-            $alreadyRevoked = (int) data_get($locked->metadata, 'partial_refund.revoked_credits', 0);
-            $toRevoke       = max(0, (int) $locked->credits - $alreadyRevoked);
+            $alreadyRevoked = (int) data_get($locked->metadata, 'partial_refund.revoked_cents', 0);
+            $toRevoke       = max(0, $this->walletCreditOf($locked) - $alreadyRevoked);
             $wallet         = AiCreditWallet::query()->where('entity_id', $locked->entity_id)->lockForUpdate()->first();
-            $available      = max(0, (int) ($wallet?->balance ?? 0) - (int) ($wallet?->reserved_balance ?? 0));
+            $available      = max(0, (int) ($wallet?->balance_cents ?? 0));
             $revoke         = min($toRevoke, $available);
 
             if ($revoke > 0) {
@@ -475,9 +484,9 @@ class AiCreditPurchaseService
             }
 
             $ratio    = max(0.0, min(1.0, $refundedTotal / $paidAmount));
-            $target   = (int) floor((int) $locked->credits * $ratio + 1e-9);
+            $target   = (int) floor($this->walletCreditOf($locked) * $ratio + 1e-9);
             $partial  = (array) data_get($locked->metadata, 'partial_refund', []);
-            $handled  = (int) ($partial['handled_credits'] ?? 0);
+            $handled  = (int) ($partial['handled_cents'] ?? 0);
             $toRevoke = $target - $handled;
 
             if ($toRevoke <= 0) {
@@ -485,7 +494,7 @@ class AiCreditPurchaseService
             }
 
             $wallet  = AiCreditWallet::query()->where('entity_id', $locked->entity_id)->lockForUpdate()->first();
-            $balance = max(0, (int) ($wallet?->balance ?? 0) - (int) ($wallet?->reserved_balance ?? 0));
+            $balance = max(0, (int) ($wallet?->balance_cents ?? 0));
             $revoke  = min($toRevoke, $balance);
 
             if ($revoke > 0) {
@@ -506,11 +515,11 @@ class AiCreditPurchaseService
 
             $locked->update(['metadata' => array_merge((array) $locked->metadata, [
                 'partial_refund' => [
-                    'handled_credits' => $target,
-                    'revoked_credits' => (int) ($partial['revoked_credits'] ?? 0) + $revoke,
-                    'shortfall'       => (int) ($partial['shortfall'] ?? 0) + ($toRevoke - $revoke),
-                    'refunded_total'  => round($refundedTotal, 2),
-                    'at'              => now()->toIso8601String(),
+                    'handled_cents'  => $target,
+                    'revoked_cents'  => (int) ($partial['revoked_cents'] ?? 0) + $revoke,
+                    'shortfall'      => (int) ($partial['shortfall'] ?? 0) + ($toRevoke - $revoke),
+                    'refunded_total' => round($refundedTotal, 2),
+                    'at'             => now()->toIso8601String(),
                 ],
             ])]);
 
@@ -527,39 +536,83 @@ class AiCreditPurchaseService
             ? $purchase->status
             : AiCreditPurchaseStatus::tryFrom((string) $purchase->status);
 
+        $walletCents = $purchase->wallet_credit_cents !== null ? (int) $purchase->wallet_credit_cents : (int) $purchase->amount_cents;
+
         return [
-            'id'               => (string) $purchase->id,
-            'package_code'     => (string) $purchase->package_code,
-            'package_name'     => __("ai.credit_packages.{$purchase->package_code}.name"),
-            'credits'          => (int) $purchase->credits,
-            'amount_cents'     => (int) $purchase->amount_cents,
-            'amount_formatted' => $this->formatMoney((int) $purchase->amount_cents, (string) $purchase->currency),
-            'currency'         => (string) $purchase->currency,
-            'status'           => $status?->value ?? (string) $purchase->status,
-            'status_label'     => $status ? __("ai.credit_purchase_status.{$status->value}") : (string) $purchase->status,
-            'created_at'       => $purchase->created_at?->format('d/m/Y H:i'),
-            'credited_at'      => $purchase->credited_at?->format('d/m/Y H:i'),
+            'id'                      => (string) $purchase->id,
+            'package_code'            => (string) $purchase->package_code,
+            'package_name'            => $this->packageText((string) $purchase->package_code, 'name', ucfirst((string) $purchase->package_code)),
+            'amount_cents'            => (int) $purchase->amount_cents,
+            'amount_formatted'        => $this->formatMoney((int) $purchase->amount_cents, (string) $purchase->currency),
+            'wallet_credit_cents'     => $walletCents,
+            'wallet_credit_formatted' => $this->formatMoney($walletCents, (string) $purchase->currency),
+            'currency'                => (string) $purchase->currency,
+            'status'                  => $status?->value ?? (string) $purchase->status,
+            'status_label'            => $status ? __("ai.credit_purchase_status.{$status->value}") : (string) $purchase->status,
+            'created_at'              => $purchase->created_at?->format('d/m/Y H:i'),
+            'credited_at'             => $purchase->credited_at?->format('d/m/Y H:i'),
         ];
     }
 
     /**
-     * @return array<string, mixed>
+     * Resolve o pacote e o VALOR a cobrar no servidor — nunca confia em preço vindo do cliente. Pacote fixo: o valor é o da
+     * config (e rejeita valor informado). Personalizado: reais inteiros (passo), dentro de [mínimo, máximo] vigentes.
+     *
+     * @return array<string, mixed> o pacote com `value_cents` resolvido
+     *
+     * @throws DomainException ai_credit_package_not_found|ai_credit_package_invalid|ai_credit_custom_amount_required|ai_credit_custom_amount_invalid|ai_credit_custom_amount_not_allowed
      */
-    private function resolvePackage(string $packageCode): array
+    public function resolvePackage(string $packageCode, ?int $customAmountCents = null): array
     {
-        $packages = config('ai.credit_purchases.packages', []);
+        foreach (config('ai.credit_purchases.packages', []) as $package) {
+            if (($package['code'] ?? null) !== $packageCode) {
+                continue;
+            }
 
-        foreach ($packages as $package) {
-            if (($package['code'] ?? null) === $packageCode) {
-                if ((int) ($package['credits'] ?? 0) <= 0 || (int) ($package['price_cents'] ?? 0) <= 0) {
-                    throw new DomainException('ai_credit_package_invalid');
+            if ((bool) ($package['custom'] ?? false)) {
+                if ($customAmountCents === null) {
+                    throw new DomainException('ai_credit_custom_amount_required');
                 }
 
-                return $package;
+                if (! $this->customAmountValid($customAmountCents)) {
+                    throw new DomainException('ai_credit_custom_amount_invalid');
+                }
+
+                return [...$package, 'value_cents' => $customAmountCents];
             }
+
+            if ($customAmountCents !== null) {
+                throw new DomainException('ai_credit_custom_amount_not_allowed');
+            }
+
+            if ((int) ($package['value_cents'] ?? 0) <= 0) {
+                throw new DomainException('ai_credit_package_invalid');
+            }
+
+            return $package;
         }
 
         throw new DomainException('ai_credit_package_not_found');
+    }
+
+    /** Valor do personalizado aceito: inteiro em reais cheios, entre o mínimo e o máximo vigentes. */
+    public function customAmountValid(int $cents): bool
+    {
+        return $cents >= $this->pricingSettings->customMinCents()
+            && $cents <= $this->pricingSettings->customMaxCents()
+            && $cents % $this->pricingSettings->customStepCents() === 0;
+    }
+
+    /** O que a compra credita na carteira (centavos). Falha alto se a coluna nova faltar: nunca cai nas colunas antigas. */
+    private function walletCreditOf(AiCreditPurchase $purchase): int
+    {
+        $cents = $purchase->wallet_credit_cents;
+
+        if ($cents === null || (int) $cents <= 0) {
+            throw new DomainException('ai_credit_purchase_invalid_credits');
+        }
+
+        return (int) $cents;
     }
 
     /**
@@ -569,33 +622,37 @@ class AiCreditPurchaseService
      */
     private function presentPackage(array $package): array
     {
-        $credits    = (int) ($package['credits'] ?? 0);
-        $priceCents = (int) ($package['price_cents'] ?? 0);
-        $currency   = (string) config('ai.credit_purchases.currency', 'BRL');
+        $code     = (string) ($package['code'] ?? '');
+        $custom   = (bool) ($package['custom'] ?? false);
+        $value    = $package['value_cents'] !== null ? (int) $package['value_cents'] : null;
+        $currency = (string) config('ai.credit_purchases.currency', 'BRL');
 
         return [
-            'code'                 => (string) ($package['code'] ?? ''),
-            'name'                 => __('ai.credit_packages.' . ($package['code'] ?? '') . '.name'),
-            'description'          => __('ai.credit_packages.' . ($package['code'] ?? '') . '.description'),
-            'credits'              => $credits,
-            'price_cents'          => $priceCents,
-            'price_formatted'      => $this->formatMoney($priceCents, $currency),
-            'unit_price_formatted' => $credits > 0
-                ? $this->formatMoney((int) ceil($priceCents / $credits), $currency)
-                : $this->formatMoney(0, $currency),
-            'currency' => $currency,
-            'featured' => (bool) ($package['featured'] ?? false),
+            'code'            => $code,
+            'name'            => $this->packageText($code, 'name', ucfirst($code)),
+            'description'     => $this->packageText($code, 'description', ''),
+            'value_cents'     => $value,
+            'value_formatted' => $value !== null ? $this->formatMoney($value, $currency) : null,
+            'currency'        => $currency,
+            'featured'        => (bool) ($package['featured'] ?? false),
+            'custom'          => $custom,
+            // Limites do personalizado vêm do servidor (a UI só os exibe); o servidor sempre revalida.
+            'custom_min_cents'  => $custom ? $this->pricingSettings->customMinCents() : null,
+            'custom_max_cents'  => $custom ? $this->pricingSettings->customMaxCents() : null,
+            'custom_step_cents' => $custom ? $this->pricingSettings->customStepCents() : null,
         ];
+    }
+
+    /** Texto traduzido do pacote (ai.credit_packages.{code}.{campo}); sem a chave, usa o padrão — nunca devolve a chave crua. */
+    private function packageText(string $code, string $field, string $fallback): string
+    {
+        $key = "ai.credit_packages.{$code}.{$field}";
+
+        return Lang::has($key) ? (string) __($key) : $fallback;
     }
 
     private function formatMoney(int $cents, string $currency): string
     {
-        $value = number_format($cents / 100, 2, ',', '.');
-
-        if ($currency === 'BRL') {
-            return 'R$ ' . $value;
-        }
-
-        return $currency . ' ' . $value;
+        return $currency === 'BRL' ? Money::formatBrl($cents) : $currency . ' ' . number_format($cents / 100, 2, ',', '.');
     }
 }

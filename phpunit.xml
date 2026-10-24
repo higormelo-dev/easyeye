@@ -27,6 +27,7 @@
         <!-- Bloqueio do painel sem assinatura: ligado só nos testes dele
              (SubscriptionAccessEnforcementTest) — as demais clínicas de teste
              nascem sem plano ativo, logo sem trial. -->
+        <env name="AI_EXCHANGE_RATE_AUTO_FETCH" value="false"/>
         <env name="BILLING_ENFORCE_SUBSCRIPTION_ACCESS" value="false"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <!-- Senhas fixas dos seeders e código do WhatsApp simulado: só em

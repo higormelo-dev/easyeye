@@ -43,16 +43,16 @@ beforeEach(function () {
 function createWaitingApprovalRun(Entity $entity, User $requestedBy): AiRun
 {
     return AiRun::query()->create([
-        'entity_id'         => $entity->id,
-        'requested_by'      => $requestedBy->id,
-        'workflow'          => 'report_drafting',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::WaitingApproval->value,
-        'estimated_credits' => 40,
-        'reserved_credits'  => 40,
-        'consumed_credits'  => 38,
-        'final_output'      => 'Rascunho inicial para aprovação.',
+        'entity_id'                => $entity->id,
+        'requested_by'             => $requestedBy->id,
+        'workflow'                 => 'report_drafting',
+        'mode'                     => AiRunMode::Validated->value,
+        'risk_level'               => AiRiskLevel::Medium->value,
+        'status'                   => AiRunStatus::WaitingApproval->value,
+        'estimated_charge_cents'   => 40,
+        'reserved_charge_cents'    => 40,
+        'monthly_quota_used_cents' => 38,
+        'final_output'             => 'Rascunho inicial para aprovação.',
     ]);
 }
 
@@ -73,11 +73,11 @@ test('estimate retorna créditos estimados e saldo', function () {
 
     $response->assertOk()
         ->assertJsonStructure([
-            'estimate' => ['workflow', 'mode', 'normalized_credits'],
-            'balance'  => ['available', 'reserved', 'total'],
+            'estimate' => ['workflow', 'mode', 'charge_cents'],
+            'balance'  => ['available_cents', 'reserved_cents', 'total_cents'],
         ]);
 
-    expect((int) data_get($response->json(), 'estimate.normalized_credits'))->toBeGreaterThan(0);
+    expect((int) data_get($response->json(), 'estimate.charge_cents'))->toBeGreaterThan(0);
 });
 
 test('estimate rate limit bloqueia após exceder o limite por minuto', function () {
@@ -162,13 +162,13 @@ test('store cria run reservada e despacha job', function () {
 
     $run = AiRun::query()->latest('created_at')->firstOrFail();
     expect($run->status)->toBe(AiRunStatus::Reserved);
-    expect($run->reserved_credits)->toBeGreaterThan(0);
+    expect($run->reserved_charge_cents)->toBeGreaterThan(0);
 
     // No novo modelo, reserva consome COTA primeiro (depois balance).
     // Validamos que o saldo disponível diminuiu — não importa de onde foi descontado.
     $after           = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    $beforeAvailable = (int) $before->balance + max(0, (int) $before->monthly_quota - (int) $before->monthly_quota_used);
-    $afterAvailable  = (int) $after->balance + max(0, (int) $after->monthly_quota - (int) $after->monthly_quota_used);
+    $beforeAvailable = (int) $before->balance_cents + max(0, (int) $before->monthly_quota_cents - (int) $before->monthly_quota_used_cents);
+    $afterAvailable  = (int) $after->balance_cents + max(0, (int) $after->monthly_quota_cents - (int) $after->monthly_quota_used_cents);
     expect($afterAvailable)->toBeLessThan($beforeAvailable);
 });
 
@@ -233,7 +233,7 @@ test('rota antiga de compra de créditos (POST /panel/ai/credit-purchases) não 
 
     expect($status)->toBeIn([404, 405])
         ->and(AiCreditPurchase::query()->where('entity_id', $this->entity->id)->count())->toBe(0)
-        ->and((int) AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail()->balance)->toBe((int) $before->balance);
+        ->and((int) AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail()->balance_cents)->toBe((int) $before->balance_cents);
 });
 
 test('compra de créditos pelo checkout é restrita aos contatos de cobrança (médico não compra)', function () {
@@ -332,10 +332,10 @@ test('store retorna 422 quando saldo é insuficiente', function () {
     // Zera tanto a cota mensal quanto o balance comprado (criados no beforeEach).
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
     $wallet->update([
-        'balance'            => 0,
-        'reserved_balance'   => 0,
-        'monthly_quota'      => 0,
-        'monthly_quota_used' => 0,
+        'balance_cents'            => 0,
+        'reserved_balance_cents'   => 0,
+        'monthly_quota_cents'      => 0,
+        'monthly_quota_used_cents' => 0,
     ]);
 
     $response = $this->actingAs($this->admin)
@@ -343,9 +343,9 @@ test('store retorna 422 quando saldo é insuficiente', function () {
         ->postJson(route('panel.ai-runs.store'), baseRunPayload());
 
     $response->assertStatus(422)
-        ->assertJsonStructure(['message', 'details' => ['requested', 'available']]);
+        ->assertJsonStructure(['message', 'details' => ['requested_cents', 'available_cents', 'missing_cents']]);
 
-    expect((int) data_get($response->json(), 'details.available'))->toBe(0);
+    expect((int) data_get($response->json(), 'details.available_cents'))->toBe(0);
 
     // Garante que nenhum AiRun foi persistido (rollback da transaction).
     expect(AiRun::query()->where('entity_id', $this->entity->id)->count())->toBe(0);
@@ -402,18 +402,18 @@ test('aprovação de run vinculada a prontuário cria MedicalRecordDocumentation
     ]);
 
     $run = AiRun::query()->create([
-        'entity_id'         => $this->entity->id,
-        'patient_id'        => $patient->id,
-        'medical_record_id' => $record->id,
-        'requested_by'      => $this->admin->id,
-        'workflow'          => 'report_drafting',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::WaitingApproval->value,
-        'estimated_credits' => 40,
-        'reserved_credits'  => 40,
-        'consumed_credits'  => 38,
-        'final_output'      => 'Rascunho de IA aguardando aprovação.',
+        'entity_id'                => $this->entity->id,
+        'patient_id'               => $patient->id,
+        'medical_record_id'        => $record->id,
+        'requested_by'             => $this->admin->id,
+        'workflow'                 => 'report_drafting',
+        'mode'                     => AiRunMode::Validated->value,
+        'risk_level'               => AiRiskLevel::Medium->value,
+        'status'                   => AiRunStatus::WaitingApproval->value,
+        'estimated_charge_cents'   => 40,
+        'reserved_charge_cents'    => 40,
+        'monthly_quota_used_cents' => 38,
+        'final_output'             => 'Rascunho de IA aguardando aprovação.',
     ]);
 
     $doctorUser = User::find($doctorEntityUser->entityUser->user_id);
@@ -448,18 +448,18 @@ test('aprovação concorrente ou repetida não duplica documentation por ai_run_
     ]);
 
     $run = AiRun::query()->create([
-        'entity_id'         => $this->entity->id,
-        'patient_id'        => $patient->id,
-        'medical_record_id' => $record->id,
-        'requested_by'      => $this->admin->id,
-        'workflow'          => 'report_drafting',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::WaitingApproval->value,
-        'estimated_credits' => 40,
-        'reserved_credits'  => 40,
-        'consumed_credits'  => 38,
-        'final_output'      => 'Primeira versão.',
+        'entity_id'                => $this->entity->id,
+        'patient_id'               => $patient->id,
+        'medical_record_id'        => $record->id,
+        'requested_by'             => $this->admin->id,
+        'workflow'                 => 'report_drafting',
+        'mode'                     => AiRunMode::Validated->value,
+        'risk_level'               => AiRiskLevel::Medium->value,
+        'status'                   => AiRunStatus::WaitingApproval->value,
+        'estimated_charge_cents'   => 40,
+        'reserved_charge_cents'    => 40,
+        'monthly_quota_used_cents' => 38,
+        'final_output'             => 'Primeira versão.',
     ]);
 
     $doctorUser = User::find($doctorEntityUser->entityUser->user_id);
@@ -480,16 +480,16 @@ test('aprovação concorrente ou repetida não duplica documentation por ai_run_
 
 test('aprovação de run sem medical_record_id NÃO cria documentation', function () {
     $run = AiRun::query()->create([
-        'entity_id'         => $this->entity->id,
-        'requested_by'      => $this->admin->id,
-        'workflow'          => 'report_drafting',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::WaitingApproval->value,
-        'estimated_credits' => 30,
-        'reserved_credits'  => 30,
-        'consumed_credits'  => 28,
-        'final_output'      => 'Rascunho standalone.',
+        'entity_id'                => $this->entity->id,
+        'requested_by'             => $this->admin->id,
+        'workflow'                 => 'report_drafting',
+        'mode'                     => AiRunMode::Validated->value,
+        'risk_level'               => AiRiskLevel::Medium->value,
+        'status'                   => AiRunStatus::WaitingApproval->value,
+        'estimated_charge_cents'   => 30,
+        'reserved_charge_cents'    => 30,
+        'monthly_quota_used_cents' => 28,
+        'final_output'             => 'Rascunho standalone.',
     ]);
 
     $doctorEU = createDoctorForEntity($this->entity)->entityUser;
@@ -515,17 +515,17 @@ test('rejeição NÃO cria documentation no prontuário', function () {
     ]);
 
     $run = AiRun::query()->create([
-        'entity_id'         => $this->entity->id,
-        'medical_record_id' => $record->id,
-        'requested_by'      => $this->admin->id,
-        'workflow'          => 'report_drafting',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::WaitingApproval->value,
-        'estimated_credits' => 30,
-        'reserved_credits'  => 30,
-        'consumed_credits'  => 28,
-        'final_output'      => 'Rascunho rejeitado.',
+        'entity_id'                => $this->entity->id,
+        'medical_record_id'        => $record->id,
+        'requested_by'             => $this->admin->id,
+        'workflow'                 => 'report_drafting',
+        'mode'                     => AiRunMode::Validated->value,
+        'risk_level'               => AiRiskLevel::Medium->value,
+        'status'                   => AiRunStatus::WaitingApproval->value,
+        'estimated_charge_cents'   => 30,
+        'reserved_charge_cents'    => 30,
+        'monthly_quota_used_cents' => 28,
+        'final_output'             => 'Rascunho rejeitado.',
     ]);
 
     $doctorEU = $doctorEntityUser->entityUser;
@@ -551,18 +551,18 @@ test('aprovação sanitiza HTML perigoso antes de persistir documentation', func
     ]);
 
     $run = AiRun::query()->create([
-        'entity_id'         => $this->entity->id,
-        'patient_id'        => $patient->id,
-        'medical_record_id' => $record->id,
-        'requested_by'      => $this->admin->id,
-        'workflow'          => 'report_drafting',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::WaitingApproval->value,
-        'estimated_credits' => 40,
-        'reserved_credits'  => 40,
-        'consumed_credits'  => 38,
-        'final_output'      => '<p>Resumo clínico</p><script>alert("xss")</script>',
+        'entity_id'                => $this->entity->id,
+        'patient_id'               => $patient->id,
+        'medical_record_id'        => $record->id,
+        'requested_by'             => $this->admin->id,
+        'workflow'                 => 'report_drafting',
+        'mode'                     => AiRunMode::Validated->value,
+        'risk_level'               => AiRiskLevel::Medium->value,
+        'status'                   => AiRunStatus::WaitingApproval->value,
+        'estimated_charge_cents'   => 40,
+        'reserved_charge_cents'    => 40,
+        'monthly_quota_used_cents' => 38,
+        'final_output'             => '<p>Resumo clínico</p><script>alert("xss")</script>',
     ]);
 
     $doctorEU = $doctorEntityUser->entityUser;
@@ -599,17 +599,17 @@ test('aprovação não persiste documentation se medical_record não pertencer �
     ]);
 
     $run = AiRun::query()->create([
-        'entity_id'         => $this->entity->id,
-        'medical_record_id' => $foreignRecord->id,
-        'requested_by'      => $this->admin->id,
-        'workflow'          => 'report_drafting',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => AiRunStatus::WaitingApproval->value,
-        'estimated_credits' => 30,
-        'reserved_credits'  => 30,
-        'consumed_credits'  => 28,
-        'final_output'      => 'Aprovado sem vínculo válido de prontuário.',
+        'entity_id'                => $this->entity->id,
+        'medical_record_id'        => $foreignRecord->id,
+        'requested_by'             => $this->admin->id,
+        'workflow'                 => 'report_drafting',
+        'mode'                     => AiRunMode::Validated->value,
+        'risk_level'               => AiRiskLevel::Medium->value,
+        'status'                   => AiRunStatus::WaitingApproval->value,
+        'estimated_charge_cents'   => 30,
+        'reserved_charge_cents'    => 30,
+        'monthly_quota_used_cents' => 28,
+        'final_output'             => 'Aprovado sem vínculo válido de prontuário.',
     ]);
 
     $this->actingAs($doctor)

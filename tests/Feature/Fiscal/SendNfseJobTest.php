@@ -99,11 +99,11 @@ describe('envio municipal', function () {
         expect($this->document->fresh()->request_payload)->toEqual(nfseSentBodies()[0]);
     });
 
-    it('o texto da nota usa o modelo do pacote de IA, com os créditos comprados', function () {
+    it('o texto da nota usa o modelo do pacote de IA, com o valor em reais', function () {
         $clinic = nfseClinic();
         $pack   = nfsePaidInvoice($clinic, ['billing_reason' => 'ai_credit_pack', 'subscription_id' => null, 'plan_id' => null, 'amount' => 49.90]);
 
-        AiCreditPurchase::factory()->create(['entity_id' => $clinic->id, 'invoice_id' => $pack->id, 'credits' => 1500]);
+        AiCreditPurchase::factory()->create(['entity_id' => $clinic->id, 'invoice_id' => $pack->id, 'wallet_credit_cents' => 4990, 'amount_cents' => 4990]);
 
         $document = app(NfseIssueService::class)->issue($pack, 'auto');
 
@@ -111,7 +111,7 @@ describe('envio municipal', function () {
 
         nfseRunSend($document);
 
-        expect(nfseSentBodies()[0]['servico']['discriminacao'])->toBe("Pacote de créditos de IA (1.500 créditos) — fatura {$pack->reference}")
+        expect(nfseSentBodies()[0]['servico']['discriminacao'])->toBe("Pacote de saldo de IA (R$ 49,90) — fatura {$pack->reference}")
             ->and(nfseSentBodies()[0]['servico']['valor_servicos'])->toBe(49.9);
     });
 });

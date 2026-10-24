@@ -31,8 +31,8 @@ describe('AiFloatingAssistant — medidor e paywall', () => {
                 ai: {
                     enabled: true,
                     mode: 'validated',
-                    balance: { available: 12 },
-                    quota: { monthly_quota: 80, consumed_credits: 70, renews_on: '2026-11-04' },
+                    balance: { available_cents: 12 },
+                    quota: { monthly_quota_cents: 80, monthly_quota_used_cents: 70, renews_on: '2026-11-04' },
                     paywall,
                     urls: {
                         store: '/_routes/panel.ai-runs.store',
@@ -42,7 +42,7 @@ describe('AiFloatingAssistant — medidor e paywall', () => {
                     t: {
                         title: 'Assistente virtual',
                         error_generic: 'Não foi possível obter resposta. Tente novamente.',
-                        credits_available: ':count créditos disponíveis',
+                        credits_available: ':count em saldo de IA',
                         quota_status: 'Franquia: :used/:quota · renova em :date',
                         quota_status_undated: 'Franquia: :used/:quota',
                         quota_status_expiring: 'Franquia: :used/:quota · vale até :date',
@@ -72,18 +72,18 @@ describe('AiFloatingAssistant — medidor e paywall', () => {
         await wrapper.find('button.ai-fab').trigger('click');
 
         const meter = wrapper.find('[data-test="ai-chat-meter"]').text();
-        expect(meter).toContain('12 créditos disponíveis');
-        expect(meter).toContain('Franquia: 70/80 · renova em 04/11/2026');
+        expect(meter).toContain('R$\u00a00,12 em saldo de IA');
+        expect(meter).toContain('Franquia: R$\u00a00,70/R$\u00a00,80 · renova em 04/11/2026');
     });
 
     it('cota que sobrou (assinatura sem franquia) → mostra até quando vale, sem prometer renovação', async () => {
         const wrapper = mountWidget({
-            quota: { monthly_quota: 80, consumed_credits: 30, renews_on: null, expires_on: '2026-11-15' },
+            quota: { monthly_quota_cents: 80, monthly_quota_used_cents: 30, renews_on: null, expires_on: '2026-11-15' },
         });
         await wrapper.find('button.ai-fab').trigger('click');
 
         const meter = wrapper.find('[data-test="ai-chat-meter"]').text();
-        expect(meter).toContain('Franquia: 30/80 · vale até 15/11/2026');
+        expect(meter).toContain('Franquia: R$\u00a00,30/R$\u00a00,80 · vale até 15/11/2026');
         expect(meter).not.toContain('renova');
     });
 
@@ -94,7 +94,7 @@ describe('AiFloatingAssistant — medidor e paywall', () => {
                 data: {
                     message: 'Saldo insuficiente de créditos IA para executar este fluxo.',
                     code: 'ai_insufficient_credits',
-                    details: { requested: 4, available: 0 },
+                    details: { requested: 4, available_cents: 0 },
                     paywall,
                 },
             },
@@ -124,34 +124,39 @@ describe('AiFloatingAssistant — medidor e paywall', () => {
     // FT-10: "1 créditos disponíveis" e "1500" sem separador.
     it('medidor: singular/plural e números no idioma', async () => {
         const t = {
-            credits_available: ':count crédito disponível|:count créditos disponíveis',
+            credits_available: ':count em saldo de IA',
             quota_status: 'Franquia: :used/:quota · renova em :date',
             quota_status_undated: 'Franquia: :used/:quota',
         };
 
-        const one = mountWidget({ balance: { available: 1 }, t });
+        const one = mountWidget({ balance: { available_cents: 1 }, t });
         await one.find('button.ai-fab').trigger('click');
-        expect(one.find('[data-test="ai-chat-meter"]').text()).toContain('1 crédito disponível');
+        expect(one.find('[data-test="ai-chat-meter"]').text()).toContain('R$\u00a00,01 em saldo de IA');
         one.unmount();
 
         const many = mountWidget({
-            balance: { available: 1500 },
-            quota: { monthly_quota: 2000, consumed_credits: 1200, renews_on: '2026-11-04' },
+            balance: { available_cents: 1500 },
+            quota: { monthly_quota_cents: 2000, monthly_quota_used_cents: 1200, renews_on: '2026-11-04' },
             t,
         });
         await many.find('button.ai-fab').trigger('click');
         const meter = many.find('[data-test="ai-chat-meter"]').text();
-        expect(meter).toContain('1.500 créditos disponíveis');
-        expect(meter).toContain('Franquia: 1.200/2.000 · renova em 04/11/2026');
+        expect(meter).toContain('R$\u00a015,00 em saldo de IA');
+        expect(meter).toContain('Franquia: R$\u00a012,00/R$\u00a020,00 · renova em 04/11/2026');
         many.unmount();
     });
 
     // IA-2: em atraso, a renovação depende do pagamento.
     it('medidor: cliente em atraso vê a renovação condicionada ao pagamento', async () => {
         const wrapper = mountWidget({
-            quota: { monthly_quota: 80, consumed_credits: 70, renews_on: null, renews_if_paid_on: '2026-11-19' },
+            quota: {
+                monthly_quota_cents: 80,
+                monthly_quota_used_cents: 70,
+                renews_on: null,
+                renews_if_paid_on: '2026-11-19',
+            },
             t: {
-                credits_available: ':count créditos disponíveis',
+                credits_available: ':count em saldo de IA',
                 quota_status: 'Franquia: :used/:quota · renova em :date',
                 quota_status_if_paid:
                     'Franquia: :used/:quota · renova em :date se o pagamento em atraso for confirmado',
@@ -162,7 +167,7 @@ describe('AiFloatingAssistant — medidor e paywall', () => {
         await wrapper.find('button.ai-fab').trigger('click');
 
         expect(wrapper.find('[data-test="ai-chat-meter"]').text()).toContain(
-            'Franquia: 70/80 · renova em 19/11/2026 se o pagamento em atraso for confirmado',
+            'Franquia: R$\u00a00,70/R$\u00a00,80 · renova em 19/11/2026 se o pagamento em atraso for confirmado',
         );
     });
 

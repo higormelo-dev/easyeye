@@ -142,6 +142,7 @@ return [
         'max_storage_count'        => ':n GB storage|:n GB storage',
         'ai_credits_none'          => 'No AI credits',
         'ai_credits_count'         => ':n AI credit per month|:n AI credits per month',
+        'ai_credits_value'         => ':value of AI balance per month',
         'api_exam_sends_unlimited' => 'Unlimited exams within plan storage',
         'api_exam_sends_count'     => 'Up to :n integrator exam send per month|Up to :n integrator exam sends per month',
         'generic_unlimited'        => 'Unlimited :label',

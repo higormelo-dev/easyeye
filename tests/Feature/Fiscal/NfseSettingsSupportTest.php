@@ -23,7 +23,7 @@ describe('leitura', function () {
             ->and($settings->serieDps())->toBe(1)
             ->and($settings->isConfigured())->toBeFalse()
             ->and($settings->discriminacao('plano'))->toContain('{plano}')->toContain('{fatura}')
-            ->and($settings->discriminacao('ia'))->toContain('{creditos}');
+            ->and($settings->discriminacao('ia'))->toContain('{valor}')->not->toContain('{creditos}');
     });
 
     it('cai em homologação e município quando o valor gravado é inválido', function () {

@@ -280,6 +280,7 @@ return [
         'ai_menu_usage'            => 'Usage and costs',
         'ai_menu_credits'          => 'Credit purchases',
         'ai_menu_providers'        => 'Providers and models',
+        'ai_menu_pricing'          => 'Pricing',
         'financial'                => 'Financial',
         'cash_flow'                => 'Cash Flow',
         'tiss_billing'             => 'TISS Billing',

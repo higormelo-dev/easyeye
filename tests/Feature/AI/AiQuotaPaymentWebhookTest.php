@@ -158,8 +158,8 @@ test('renovação paga pelo webhook concede a janela da âncora; webhook repetid
     $wallet = aqpWallet();
     expect($this->subscription->fresh()->ends_at->toDateTimeString())->toBe('2026-12-08 23:59:59')
         ->and(aqpGrantedWindows())->toBe(['2026-10-07', '2026-11-07'])
-        ->and($wallet->monthly_quota)->toBe(40)
-        ->and($wallet->monthly_quota_used)->toBe(0)
+        ->and($wallet->monthly_quota_cents)->toBe(40)
+        ->and($wallet->monthly_quota_used_cents)->toBe(0)
         ->and($wallet->quota_period_ends_at->toDateString())->toBe('2026-12-07');
 
     $this->wallet->reserve($this->clinic->id, 5);
@@ -176,7 +176,7 @@ test('renovação paga pelo webhook concede a janela da âncora; webhook repetid
     $wallet = aqpWallet();
     expect($this->subscription->fresh()->ends_at->toDateTimeString())->toBe('2027-01-08 23:59:59')
         ->and(aqpGrantedWindows())->toBe(['2026-10-07', '2026-11-07'])
-        ->and($wallet->monthly_quota_used)->toBe(5)
+        ->and($wallet->monthly_quota_used_cents)->toBe(5)
         ->and($wallet->quotaRemaining())->toBe(35)
         ->and($wallet->quota_period_ends_at->toDateString())->toBe('2026-12-07');
 });
@@ -203,7 +203,7 @@ test('regularização do atraso pelo webhook concede a janela atual que o acesso
 
     $this->artisan('ai:grant-monthly-quotas')->assertSuccessful();
 
-    expect(app(AiQuotaService::class)->snapshot($this->clinic->id)['monthly_quota'])->toBe(0)
+    expect(app(AiQuotaService::class)->snapshot($this->clinic->id)['monthly_quota_cents'])->toBe(0)
         ->and(aqpGrantedWindows())->toBe(['2026-10-12']);
 
     // Pagou em 13/11: volta a ficar ativa e recebe a janela 12/11–12/12 na hora.
@@ -214,8 +214,8 @@ test('regularização do atraso pelo webhook concede a janela atual que o acesso
     $wallet = aqpWallet();
     expect($this->subscription->fresh()->status)->toBe(SubscriptionStatus::Active)
         ->and(aqpGrantedWindows())->toBe(['2026-10-12', '2026-11-12'])
-        ->and($wallet->monthly_quota)->toBe(40)
-        ->and($wallet->monthly_quota_used)->toBe(0)
+        ->and($wallet->monthly_quota_cents)->toBe(40)
+        ->and($wallet->monthly_quota_used_cents)->toBe(0)
         ->and($wallet->quota_period_ends_at->toDateString())->toBe('2026-12-12');
 
     $this->wallet->reserve($this->clinic->id, 5);
@@ -227,5 +227,5 @@ test('regularização do atraso pelo webhook concede a janela atual que o acesso
     $this->artisan('ai:grant-monthly-quotas')->assertSuccessful();
 
     expect(aqpGrantedWindows())->toBe(['2026-10-12', '2026-11-12'])
-        ->and(aqpWallet()->monthly_quota_used)->toBe(5);
+        ->and(aqpWallet()->monthly_quota_used_cents)->toBe(5);
 });

@@ -819,7 +819,7 @@ const showNoPlans = computed(
                 <div v-if="form.errors.zipcode" :id="fieldId('zipcode') + '-error'" class="invalid-feedback d-block">
                     {{ form.errors.zipcode }}
                 </div>
-                <ActionIconButton icon="ti ti-search" :label="sharedUi.cep_lookup || 'Buscar CEP'" @click="lookupCep" />
+                <ActionIconButton icon="ti ti-search" :title="sharedUi.cep_lookup || 'Buscar CEP'" @click="lookupCep" />
             </div>
         </div>
 

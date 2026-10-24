@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Enums\FeatureKey;
+use App\Support\Money;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Number;
 
 class PlanFeature extends Model
@@ -72,11 +74,12 @@ class PlanFeature extends Model
         ]);
 
         return match ($feature) {
-            FeatureKey::MaxDoctors          => $n === 0 ? __('subscriptions.features.max_doctors_unlimited') : $count('max_doctors_count'),
-            FeatureKey::MaxPatients         => $n === 0 ? __('subscriptions.features.max_patients_unlimited') : $count('max_patients_count'),
-            FeatureKey::MaxUsers            => $n === 0 ? __('subscriptions.features.max_users_unlimited') : $count('max_users_count'),
-            FeatureKey::MaxStorageGB        => $n === 0 ? __('subscriptions.features.max_storage_unlimited') : $count('max_storage_count'),
-            FeatureKey::AiMonthlyCredits    => $n === 0 ? __('subscriptions.features.ai_credits_none') : $count('ai_credits_count'),
+            FeatureKey::MaxDoctors   => $n === 0 ? __('subscriptions.features.max_doctors_unlimited') : $count('max_doctors_count'),
+            FeatureKey::MaxPatients  => $n === 0 ? __('subscriptions.features.max_patients_unlimited') : $count('max_patients_count'),
+            FeatureKey::MaxUsers     => $n === 0 ? __('subscriptions.features.max_users_unlimited') : $count('max_users_count'),
+            FeatureKey::MaxStorageGB => $n === 0 ? __('subscriptions.features.max_storage_unlimited') : $count('max_storage_count'),
+            // O valor da franquia de IA é guardado em CENTAVOS de BRL (a chave AiMonthlyCredits é legada).
+            FeatureKey::AiMonthlyCredits    => $n === 0 ? __('subscriptions.features.ai_credits_none') : (Lang::has('subscriptions.features.ai_credits_value') ? __('subscriptions.features.ai_credits_value', ['value' => Money::formatBrl($n)]) : Money::formatBrl($n) . ' de saldo de IA por mês'),
             FeatureKey::ApiMonthlyExamSends => $n === 0 ? __('subscriptions.features.api_exam_sends_unlimited') : $count('api_exam_sends_count'),
             default                         => $n === 0
                 ? __('subscriptions.features.generic_unlimited', ['label' => $feature->label()])

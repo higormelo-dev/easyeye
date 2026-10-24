@@ -31,6 +31,10 @@ export function useLocaleFormat() {
         return new Intl.NumberFormat(locale.value, { style: 'currency', currency }).format(Number(value));
     }
 
+    function moneyCents(value, currency = 'BRL') {
+        return money(isBlank(value) ? null : Number(value) / 100, currency);
+    }
+
     function number(value, fractionDigits = 0) {
         if (isBlank(value)) return '—';
 
@@ -80,5 +84,5 @@ export function useLocaleFormat() {
         return new Intl.DateTimeFormat(locale.value, { dateStyle: 'short' }).format(parsed);
     }
 
-    return { locale, money, signedMoney, number, quantity, date, dateTime };
+    return { locale, money, moneyCents, signedMoney, number, quantity, date, dateTime };
 }

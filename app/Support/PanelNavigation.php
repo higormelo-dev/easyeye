@@ -611,6 +611,7 @@ class PanelNavigation
 
         if ($isOwnerOrAdmin) {
             $children[] = ['route' => 'manager.ai-usage.index', 'icon' => 'ti ti-chart-dots-3', 'label' => __('actions.sidemenu.ai_menu_usage'), 'match' => ['manager.ai-usage.*']];
+            $children[] = ['route' => 'manager.ai-pricing.index', 'icon' => 'ti ti-calculator', 'label' => __('actions.sidemenu.ai_menu_pricing'), 'match' => ['manager.ai-pricing.*']];
         }
 
         $children[] = ['route' => 'manager.ai-credit-purchases.index', 'icon' => 'ti ti-coin', 'label' => __('actions.sidemenu.ai_menu_credits'), 'match' => ['manager.ai-credit-purchases.*']];
@@ -623,7 +624,7 @@ class PanelNavigation
             'key'      => 'ai',
             'icon'     => 'ti ti-sparkles',
             'label'    => __('actions.sidemenu.ai_group'),
-            'match'    => ['manager.ai-usage.*', 'manager.ai-credit-purchases.*', 'manager.ai-providers.*'],
+            'match'    => ['manager.ai-usage.*', 'manager.ai-pricing.*', 'manager.ai-credit-purchases.*', 'manager.ai-providers.*'],
             'children' => $children,
         ];
     }

@@ -45,7 +45,7 @@ class AiProviderCostService
      *         models_breakdown: list<array{model: string, calls: int, cost_usd: float}>,
      *     }>,
      *     margin: array{
-     *         credits_consumed_mtd: int,
+     *         credits_consumed_mtd: int,  (centavos cobrados no mês — nome legado)
      *         revenue_estimate_usd: float,
      *         cost_mtd_usd: float,
      *         gross_margin_usd: float,
@@ -280,33 +280,38 @@ class AiProviderCostService
     }
 
     /**
-     * Margem bruta no mês corrente.
+     * Margem bruta no mês corrente (manager).
      *
-     * Receita estimada = créditos consumidos no mês × usd_per_credit × margin_multiplier
-     * (representa a parte da receita "alocada" ao consumo deste mês).
+     * Receita = valor efetivamente COBRADO no mês (`SUM(ai_runs.consumed_charge_cents)`, em R$); custo = custo do provedor em
+     * US$ convertido pela cotação vigente. A fórmula antiga (créditos × usd_per_credit × margem) acabou.
+     *
+     * @return array<string, int|float>
      */
     private function calculateMargin(float $costMtd, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $creditsConsumed = (int) DB::table('ai_credit_ledger_entries')
-            ->where('type', 'consume')
+        $chargedCents = (int) DB::table('ai_runs')
             ->whereBetween('created_at', [$from, $to])
-            ->sum(DB::raw("COALESCE((metadata->>'consumed_from_reservation')::int, 0)"));
+            ->sum('consumed_charge_cents');
 
-        $usdPerCredit    = (float) config('ai.pricing.usd_per_credit', 0.01);
-        $marginMult      = (float) config('ai.pricing.margin_multiplier', 2.0);
-        $revenueEstimate = $creditsConsumed * $usdPerCredit;     // valor "cobrado" no consumo
-        $grossMargin     = $revenueEstimate - $costMtd;
-        $grossMarginPct  = $revenueEstimate > 0
-            ? round(($grossMargin / $revenueEstimate) * 100, 1)
-            : 0.0;
+        $rate           = app(AiUsdBrlRate::class)->rate();
+        $revenueBrl     = $chargedCents / 100;
+        $costBrl        = $costMtd * $rate;
+        $grossMarginBrl = $revenueBrl - $costBrl;
+        $grossMarginPct = $revenueBrl > 0 ? round(($grossMarginBrl / $revenueBrl) * 100, 1) : 0.0;
 
         return [
-            'credits_consumed_mtd' => $creditsConsumed,
-            'revenue_estimate_usd' => round($revenueEstimate, 4),
+            // Compatível com o card atual do manager (USD): mesmos valores convertidos pela cotação vigente.
+            'credits_consumed_mtd' => $chargedCents,
+            'revenue_estimate_usd' => round($rate > 0 ? $revenueBrl / $rate : 0.0, 4),
+            'gross_margin_usd'     => round($rate > 0 ? $grossMarginBrl / $rate : 0.0, 4),
+            'margin_multiplier'    => app(AiPricingSettings::class)->markupMultiplier(),
+            'charged_cents_mtd'    => $chargedCents,
+            'revenue_brl'          => round($revenueBrl, 2),
             'cost_mtd_usd'         => round($costMtd, 4),
-            'gross_margin_usd'     => round($grossMargin, 4),
+            'cost_mtd_brl'         => round($costBrl, 2),
+            'exchange_rate'        => $rate,
+            'gross_margin_brl'     => round($grossMarginBrl, 2),
             'gross_margin_pct'     => $grossMarginPct,
-            'margin_multiplier'    => $marginMult,
         ];
     }
 }

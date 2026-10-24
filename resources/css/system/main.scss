@@ -42,6 +42,9 @@ Author URL: https://themeforest.net/user/dreamstechnologies
 @forward "components/chat";
 @forward "components/call";
 
+// Densidade dos controles (design-system/MASTER.md): só vale dentro de [data-ee-density].
+@forward "control-tokens";
+
 // Pages
 @forward "pages/blogs";
 @forward "pages/email";

@@ -1,7 +1,8 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, useId } from 'vue';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import CheckoutFlow from './CheckoutFlow.vue';
+import AiCreditPackCard from './AiCreditPackCard.vue';
 import { checkoutError, createCheckoutApi, panelEndpoints } from '@/Support/billing/checkoutApi.js';
 import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
 import { useTrans } from '@/composables/useTrans.js';
@@ -43,7 +44,41 @@ const error = ref('');
 const opening = ref('');
 const paidNotice = ref('');
 const modal = ref({ open: false, options: null, pkg: null, invoice: null, key: 0 });
-const { money, date } = useLocaleFormat();
+const { money, moneyCents, date } = useLocaleFormat();
+
+const uid = useId();
+const selectedCode = ref('premium');
+const customAmount = ref('1000');
+const attempted = ref(false);
+const failedCode = ref('');
+const modalError = ref('');
+const selected = computed(() => packages.value.find((pkg) => pkg.code === selectedCode.value) ?? packages.value[0]);
+const custom = computed(() => packages.value.find((pkg) => pkg.custom));
+const customMin = computed(() => (custom.value?.custom_min_cents ?? 100000) / 100);
+const customMax = computed(() => (custom.value?.custom_max_cents ?? 1000000) / 100);
+const validCustom = computed(
+    () =>
+        String(customAmount.value).trim() !== '' &&
+        Number.isSafeInteger(Number(customAmount.value)) &&
+        Number(customAmount.value) >= customMin.value &&
+        Number(customAmount.value) <= customMax.value,
+);
+const selectedCents = computed(() =>
+    selected.value?.custom
+        ? validCustom.value
+            ? Number(customAmount.value) * 100
+            : null
+        : selected.value?.value_cents,
+);
+const customError = computed(() =>
+    attempted.value && selected.value?.custom && !validCustom.value
+        ? tx('ai_custom_error', { min: money(customMin.value), max: money(customMax.value) })
+        : '',
+);
+const checkoutPayload = computed(() => ({
+    package_code: modal.value.pkg?.code,
+    ...(modal.value.pkg?.custom ? { custom_amount_cents: modal.value.pkg?.value_cents } : {}),
+}));
 
 const packages = computed(() => state.value?.packages ?? []);
 const openOrders = computed(() => (props.showPending ? (state.value?.open_orders ?? []) : []));
@@ -63,20 +98,25 @@ async function load() {
     }
 }
 
-async function buy(pkg) {
+async function buy(pkg = selected.value) {
+    attempted.value = true;
+    if (!pkg || !allowed.value || (pkg.custom && !validCustom.value)) return;
+    const purchase = { ...pkg, value_cents: pkg.custom ? Number(customAmount.value) * 100 : pkg.value_cents };
+    modalError.value = '';
+    failedCode.value = pkg.code;
     if (opening.value) return;
 
     opening.value = pkg.code;
     error.value = '';
     paidNotice.value = '';
     try {
-        const options = await api.aiPackOptions(pkg.code);
+        const options = await api.aiPackOptions(pkg.code, pkg.custom ? purchase.value_cents : null);
         if (!options?.allowed) {
             state.value = options;
 
             return;
         }
-        modal.value = { open: true, options, pkg, invoice: null, key: modal.value.key + 1 };
+        modal.value = { open: true, options, pkg: purchase, invoice: null, key: modal.value.key + 1 };
     } catch (e) {
         error.value = checkoutError(e, props.t).message;
     } finally {
@@ -85,6 +125,7 @@ async function buy(pkg) {
 }
 
 function closeModal() {
+    modalError.value = '';
     modal.value = { ...modal.value, open: false };
     load();
 }
@@ -94,12 +135,13 @@ function orderPackage(order) {
     return {
         code: order.ai_credit_pack?.package_code ?? '',
         name: order.ai_credit_pack?.package_name ?? order.reference ?? '',
-        credits: order.ai_credit_pack?.credits ?? '',
+        value_cents: order.ai_credit_pack?.value_cents ?? order.amount_cents,
     };
 }
 
 function continueOrder(order) {
     if (!order?.payment) return;
+    modalError.value = '';
 
     error.value = '';
     paidNotice.value = '';
@@ -139,9 +181,17 @@ async function confirmDiscard(order) {
     }
 }
 
+function onCheckoutError(failure) {
+    modalError.value = failure.message;
+    error.value = failure.message;
+    failedCode.value = modal.value.pkg?.code;
+}
+
 function onPaid() {
-    paidNotice.value = tx('ai_paid_notice', { credits: modal.value.pkg?.credits ?? '' });
-    emit('paid', { package_code: modal.value.pkg?.code, credits: modal.value.pkg?.credits });
+    error.value = '';
+    modalError.value = '';
+    paidNotice.value = tx('ai_balance_paid_notice', { amount: moneyCents(modal.value.pkg?.value_cents) });
+    emit('paid', { package_code: modal.value.pkg?.code, wallet_credit_cents: modal.value.pkg?.value_cents });
 }
 
 onMounted(() => {
@@ -152,7 +202,7 @@ defineExpose({ buy, reload: load });
 </script>
 
 <template>
-    <div data-test="ai-credit-pack-checkout">
+    <div data-test="ai-credit-pack-checkout" :aria-busy="loading || !!opening">
         <div aria-live="polite">
             <p v-if="paidNotice" class="alert alert-success text-success-emphasis small" data-test="ai-pack-paid">
                 <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ paidNotice }}
@@ -195,9 +245,8 @@ defineExpose({ buy, reload: load });
                         <div class="flex-grow-1 min-w-0">
                             <div class="fw-semibold">
                                 {{
-                                    tx('ai_pending_value', {
-                                        credits: order.ai_credit_pack?.credits ?? '',
-                                        amount: money(order.amount, order.currency || 'BRL'),
+                                    tx('ai_balance_pending_value', {
+                                        amount: moneyCents(order.ai_credit_pack?.value_cents ?? order.amount_cents),
                                     })
                                 }}
                             </div>
@@ -278,44 +327,59 @@ defineExpose({ buy, reload: load });
                 <i class="ti ti-lock me-1" aria-hidden="true"></i>{{ state.message || pt.ai_unavailable }}
             </p>
 
-            <ul class="list-unstyled d-grid gap-2 mb-0" :aria-label="pt.ai_title">
-                <li
-                    v-for="pkg in packages"
-                    :key="pkg.code"
-                    class="border rounded p-2 d-flex flex-wrap align-items-center gap-2"
-                    :class="{ 'border-primary': pkg.featured }"
-                    data-test="ai-pack"
-                    :data-code="pkg.code"
+            <fieldset class="border-0 p-0 m-0" :disabled="!allowed || !!opening" :aria-describedby="`${uid}-summary`">
+                <legend class="h5 fw-semibold mb-3">{{ pt.ai_choose_package }}</legend>
+                <div class="ai-pack-grid">
+                    <AiCreditPackCard
+                        v-for="pkg in packages"
+                        :key="pkg.code"
+                        v-model="selectedCode"
+                        :pkg="pkg"
+                        :name="`${uid}-package`"
+                        :value-id="`${uid}-${pkg.code}-value`"
+                        :error-id="`${uid}-${pkg.code}-error`"
+                        :error="failedCode === pkg.code ? error : ''"
+                        :t="pt"
+                        @update:model-value="attempted = false"
+                    />
+                </div>
+                <div v-if="selected?.custom" class="mt-3">
+                    <label :for="`${uid}-custom`" class="form-label">{{ pt.ai_custom_amount }}</label>
+                    <input
+                        :id="`${uid}-custom`"
+                        v-model="customAmount"
+                        type="number"
+                        inputmode="numeric"
+                        :min="customMin"
+                        :max="customMax"
+                        step="1"
+                        class="form-control"
+                        :aria-invalid="customError ? 'true' : undefined"
+                        :aria-describedby="`${uid}-custom-help${customError ? ` ${uid}-custom-error` : ''}`"
+                        data-test="ai-pack-custom"
+                        @blur="attempted = true"
+                    />
+                    <p :id="`${uid}-custom-help`" class="form-text">
+                        {{ tx('ai_custom_hint', { min: money(customMin), max: money(customMax) }) }}
+                    </p>
+                    <p v-if="customError" :id="`${uid}-custom-error`" class="text-danger small" role="alert">
+                        {{ customError }}
+                    </p>
+                </div>
+                <p :id="`${uid}-summary`" class="fw-semibold mt-3 mb-2" aria-live="polite" data-test="ai-pack-summary">
+                    {{ tx('ai_receives', { amount: moneyCents(selectedCents) }) }}
+                </p>
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    :disabled="!allowed || !!opening || !selected"
+                    data-test="ai-pack-buy"
+                    @click="buy()"
                 >
-                    <div class="flex-grow-1 min-w-0">
-                        <div class="fw-semibold">
-                            {{ tx('ai_credits', { count: pkg.credits }) }}
-                            <span v-if="pkg.featured" class="badge badge-soft-primary ms-1">{{ pt.ai_featured }}</span>
-                        </div>
-                        <div class="small text-muted">
-                            {{ pkg.name }} · {{ tx('ai_unit_price', { price: pkg.unit_price_formatted }) }}
-                        </div>
-                    </div>
-                    <strong class="text-nowrap">{{ pkg.price_formatted }}</strong>
-                    <button
-                        type="button"
-                        class="btn btn-sm"
-                        :class="pkg.featured ? 'btn-primary' : 'btn-outline-primary'"
-                        :disabled="!allowed || !!opening"
-                        :title="!allowed ? state.message || pt.ai_unavailable : undefined"
-                        data-test="ai-pack-buy"
-                        @click="buy(pkg)"
-                    >
-                        <span
-                            v-if="opening === pkg.code"
-                            class="spinner-border spinner-border-sm me-1"
-                            aria-hidden="true"
-                        ></span>
-                        <i v-else class="ti ti-shopping-cart me-1" aria-hidden="true"></i>{{ pt.ai_buy }}
-                        <span class="visually-hidden">{{ tx('ai_credits', { count: pkg.credits }) }}</span>
-                    </button>
-                </li>
-            </ul>
+                    <span v-if="opening" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    {{ pt.ai_buy }}
+                </button>
+            </fieldset>
 
             <div v-if="showRecent && purchases.length" class="mt-3">
                 <div class="fw-semibold small mb-1">{{ pt.ai_recent }}</div>
@@ -326,7 +390,7 @@ defineExpose({ buy, reload: load });
                         class="border rounded px-2 py-1 small d-inline-flex gap-2 align-items-center"
                         data-test="ai-pack-purchase"
                     >
-                        <span>{{ purchase.credits }} · {{ purchase.amount_formatted }}</span>
+                        <span>{{ moneyCents(purchase.wallet_credit_cents ?? purchase.amount_cents) }}</span>
                         <span class="text-muted">{{ purchase.created_at }}</span>
                         <span class="badge badge-soft-secondary">{{
                             purchase.status === 'pending_payment' && purchase.invoice
@@ -342,11 +406,19 @@ defineExpose({ buy, reload: load });
             <template #header>
                 <h2 class="h5 mb-0">
                     <i class="ti ti-lock me-2 text-success" aria-hidden="true"></i
-                    >{{ tx('ai_modal_title', { package: modal.pkg?.name ?? '', credits: modal.pkg?.credits ?? '' }) }}
+                    >{{
+                        tx('ai_balance_modal_title', {
+                            package: modal.pkg?.name ?? '',
+                            amount: moneyCents(modal.pkg?.value_cents),
+                        })
+                    }}
                 </h2>
             </template>
             <p class="small text-muted">
                 {{ pt.ai_intro }} <span class="d-block mt-1">{{ pt.ai_card_in_full }}</span>
+            </p>
+            <p v-if="modalError" class="alert alert-danger" role="alert" data-test="ai-pack-modal-error">
+                {{ modalError }}
             </p>
             <CheckoutFlow
                 v-if="modal.open"
@@ -355,12 +427,31 @@ defineExpose({ buy, reload: load });
                 :api="api"
                 :payment="modal.options?.payment"
                 :invoice="modal.invoice"
-                :ai-pack="modal.invoice ? null : { package_code: modal.pkg?.code }"
-                :amount="modal.invoice ? modal.invoice.amount : modal.pkg ? modal.pkg.price_cents / 100 : null"
+                :ai-pack="modal.invoice ? null : checkoutPayload"
+                :amount="modal.invoice ? modal.invoice.amount : modal.pkg ? modal.pkg.value_cents / 100 : null"
                 :realtime="modal.options?.realtime"
+                @error="onCheckoutError"
                 @paid="onPaid"
                 @done="closeModal"
             />
         </CenteredModal>
     </div>
 </template>
+
+<style scoped>
+.ai-pack-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+}
+@media (max-width: 991px) {
+    .ai-pack-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 479px) {
+    .ai-pack-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>

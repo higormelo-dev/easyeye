@@ -52,17 +52,17 @@ function makeRun($test, AiRunStatus $status, int $reserved = 50, int $consumed =
     $wallet = app(AiCreditWalletService::class);
 
     $run = AiRun::query()->create([
-        'entity_id'         => $test->entity->id,
-        'patient_id'        => $test->patient->id,
-        'medical_record_id' => $test->record->id,
-        'requested_by'      => $test->doctor->id,
-        'workflow'          => 'record_assist',
-        'mode'              => AiRunMode::Validated->value,
-        'risk_level'        => AiRiskLevel::Medium->value,
-        'status'            => $status->value,
-        'estimated_credits' => $reserved,
-        'reserved_credits'  => $reserved,
-        'consumed_credits'  => $consumed,
+        'entity_id'              => $test->entity->id,
+        'patient_id'             => $test->patient->id,
+        'medical_record_id'      => $test->record->id,
+        'requested_by'           => $test->doctor->id,
+        'workflow'               => 'record_assist',
+        'mode'                   => AiRunMode::Validated->value,
+        'risk_level'             => AiRiskLevel::Medium->value,
+        'status'                 => $status->value,
+        'estimated_charge_cents' => $reserved,
+        'reserved_charge_cents'  => $reserved,
+        'consumed_charge_cents'  => $consumed,
     ]);
 
     // Persiste a reserva no ledger para o release ter algo para devolver.
@@ -83,7 +83,7 @@ describe('cancel de run em pré-execução', function () {
         $balanceAfter  = app(AiCreditWalletService::class)->balance($this->entity->id);
 
         // A reserva tirou 100 do saldo disponível.
-        expect($balanceAfter['available'])->toBe($balanceBefore['available'] - 100);
+        expect($balanceAfter['available_cents'])->toBe($balanceBefore['available_cents'] - 100);
 
         $this->actingAs($this->doctor)
             ->withSession(panelSession($this->doctorUser))
@@ -94,7 +94,7 @@ describe('cancel de run em pré-execução', function () {
 
         // Saldo deve ter retornado ao patamar inicial.
         $balanceFinal = app(AiCreditWalletService::class)->balance($this->entity->id);
-        expect($balanceFinal['available'])->toBe($balanceBefore['available']);
+        expect($balanceFinal['available_cents'])->toBe($balanceBefore['available_cents']);
 
         $fresh = $run->fresh();
         expect($fresh->status)->toBe(AiRunStatus::Cancelled)
@@ -112,8 +112,8 @@ describe('cancel de run em pré-execução', function () {
             ->assertOk()
             ->assertJsonPath('will_settle_async', false);
 
-        expect(app(AiCreditWalletService::class)->balance($this->entity->id)['available'])
-            ->toBe($balanceBefore['available']);
+        expect(app(AiCreditWalletService::class)->balance($this->entity->id)['available_cents'])
+            ->toBe($balanceBefore['available_cents']);
     });
 });
 

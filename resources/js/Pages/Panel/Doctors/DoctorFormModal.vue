@@ -214,7 +214,14 @@ const tabErrors = computed(() => ({
 </script>
 
 <template>
-    <OffcanvasPanel :open="open" :width="580" :loading="loading" :confirm-close="confirmClose" @close="emit('close')">
+    <OffcanvasPanel
+        :open="open"
+        :width="580"
+        :loading="loading"
+        :confirm-close="confirmClose"
+        density="default"
+        @close="emit('close')"
+    >
         <!-- ── Cabeçalho ─────────────────────────────────────────────────────── -->
         <template #header>
             <h5 class="mb-0 fw-semibold"><i class="ti ti-stethoscope me-2 text-primary"></i>{{ title }}</h5>
@@ -279,12 +286,7 @@ const tabErrors = computed(() => ({
         >
             <div><i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ existingDoctor }}</div>
             <div>
-                <button
-                    type="button"
-                    class="btn btn-primary btn-sm"
-                    :disabled="form.processing"
-                    @click="sendInvitation"
-                >
+                <button type="button" class="btn btn-primary" :disabled="form.processing" @click="sendInvitation">
                     <span
                         v-if="form.processing"
                         class="spinner-border spinner-border-sm me-1"
@@ -297,7 +299,7 @@ const tabErrors = computed(() => ({
 
         <div v-if="loadError" role="alert" class="alert alert-danger" data-testid="doctor-load-error">
             {{ loadError }}
-            <button type="button" class="btn btn-outline-primary btn-sm" @click="loadEditData(doctorId)">
+            <button type="button" class="btn btn-outline-primary" @click="loadEditData(doctorId)">
                 {{ ui.retry || 'Tentar novamente' }}
             </button>
         </div>
@@ -568,7 +570,6 @@ const tabErrors = computed(() => ({
                         :aria-describedby="form.errors.color ? 'doctor-color' + '-error' : undefined"
                         type="color"
                         class="form-control form-control-color"
-                        style="height: 38px"
                         :class="{ 'is-invalid': form.errors.color }"
                     />
                     <div v-if="form.errors.color" :id="'doctor-color' + '-error'" class="invalid-feedback">
@@ -709,7 +710,7 @@ const tabErrors = computed(() => ({
                         </div>
                         <ActionIconButton
                             icon="ti ti-search"
-                            :label="ui.cep_lookup || 'Buscar CEP'"
+                            :title="ui.cep_lookup || 'Buscar CEP'"
                             @click="lookupCep"
                         />
                     </div>
