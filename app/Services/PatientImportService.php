@@ -6,7 +6,8 @@ use App\Concerns\OpensImportFile;
 use App\Enums\{FeatureKey, ImportStatus};
 use App\Models\{Covenant, CovenantPlan, Patient, PatientImport, People};
 use App\Services\ClinicalSafety\PatientClinicalSafetyService;
-use App\Support\{AuditContext, ClinicalSafety\TermNormalizer};
+use App\Services\Covenants\{CovenantResolutionException, PatientImportCovenantReportService, PatientImportCovenantResolver};
+use App\Support\{AuditContext, ClinicalSafety\TermNormalizer, ImportNameNormalizer};
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\{DB, Log, Storage};
@@ -186,12 +187,6 @@ class PatientImportService
 
     private const DATE_FORMATS = ['d/m/Y', 'd-m-Y', 'Y-m-d', 'd/m/Y H:i:s', 'd-m-Y H:i:s'];
 
-    /** Chave normalizada (normalizeKey) do convênio usado quando a coluna vem vazia. */
-    private const PARTICULAR_KEY = 'particular';
-
-    /** @var array<string, true> convênios inativos do mapa (loadCovenantsMap) */
-    private array $inactiveCovenantIds = [];
-
     /** Cabeçalhos que nomeiam o convênio de fato. */
     private const COVENANT_HEADERS = ['convenio', 'convenio_nome'];
 
@@ -202,6 +197,7 @@ class PatientImportService
         private readonly FeatureGateService $featureGate,
         private readonly PatientService $patientService,
         private readonly PatientDuplicateFinder $duplicateFinder,
+        private readonly PatientImportCovenantResolver $covenants,
     ) {
     }
 
@@ -263,7 +259,11 @@ class PatientImportService
             return ['error' => 'CSV sem cabeçalho ou vazio.'];
         }
 
-        $indexFieldMap = $this->buildIndexFieldMap($rawHeaders);
+        $indexFieldMap  = $this->buildIndexFieldMap($rawHeaders);
+        $covenantColumn = $this->covenantColumnIndex($rawHeaders);
+        $covenantLimit  = $this->covenantNamesLimit();
+        $covenantCounts = [];
+        $namesCapped    = false;
 
         // Monta coluna-a-coluna para o preview
         $mappedColumns   = [];
@@ -293,6 +293,8 @@ class PatientImportService
 
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
             $totalRows++;
+            // Convênios únicos na MESMA passagem (só nome e contagem, nenhum dado de paciente).
+            $this->tallyCovenantName($covenantCounts, $covenantColumn !== null ? ($row[$covenantColumn] ?? null) : null, $covenantLimit, $namesCapped);
 
             if ($totalRows <= 5) {
                 $mapped = [];
@@ -332,7 +334,134 @@ class PatientImportService
             'has_phone'        => $hasPhone,
             'missing_required' => $missingRequired,
             'can_proceed'      => empty($missingRequired),
+            ...$this->covenantPreview($import, $covenantCounts, $totalRows, $namesCapped),
         ];
+    }
+
+    /**
+     * Resumo dos convênios do arquivo para a prévia: situação de cada nome (catálogo + de-para da clínica) e a estimativa
+     * de linhas que falharão por convênio. Se o catálogo não carregar a prévia NÃO quebra: itens como não encontrados e um
+     * aviso (o processamento continua exigindo o convênio resolvido).
+     *
+     * @param array<string, array{source_name: string, rows: int}> $counts
+     *
+     * @return array<string, mixed>
+     */
+    private function covenantPreview(PatientImport $import, array $counts, int $fileRows, bool $namesCapped): array
+    {
+        $warning = null;
+
+        try {
+            $this->covenants->load((string) $import->entity_id);
+        } catch (Throwable $e) {
+            Log::warning('patient_import.covenant_preview_failed', ['import_id' => (string) $import->id, 'exception' => $e::class]);
+            $warning = 'catalog_unavailable';
+        }
+
+        $items = [];
+
+        foreach ($counts as $key => $count) {
+            $item = $warning === null
+                ? $this->covenants->forSource($count['source_name'])
+                : ['source_name' => $count['source_name'], 'source_name_normalized' => $key, 'status' => $key === '' ? 'particular' : 'unmatched', 'covenant' => null, 'plan' => null, 'mapping' => null, 'retryable' => false];
+
+            $failed  = in_array($item['status'], PatientImportCovenantReportService::PENDING_STATUSES, true) ? $count['rows'] : 0;
+            $items[] = [...$item, 'rows' => $count['rows'], 'failed_rows' => $failed, 'retryable' => $failed > 0];
+        }
+
+        return array_filter([
+            'covenant_summary' => PatientImportCovenantReportService::summaryPayload(PatientImportCovenantReportService::sortItems($items), $fileRows, $namesCapped),
+            'covenant_warning' => $warning,
+        ], fn ($value) => $value !== null);
+    }
+
+    /**
+     * Convênios citados no arquivo, numa única passagem em streaming — só nomes e contagens, nenhum dado de paciente.
+     * `names`: covenantSourceKey → [source_name (1ª grafia), rows]; a chave "" reúne as linhas sem convênio (entram como
+     * Particular). Para de coletar NOVOS nomes no teto `patient_imports.max_covenant_names` (`capped`). Null quando o
+     * arquivo não existe mais ou está vazio.
+     *
+     * @return array{file_rows: int, names: array<string, array{source_name: string, rows: int}>, capped: bool}|null
+     */
+    public function scanCovenantNames(PatientImport $import): ?array
+    {
+        $handle = $this->openImportFile((string) $import->file_path);
+
+        if (! $handle) {
+            return null;
+        }
+
+        $this->skipBom($handle);
+        $delimiter  = $this->detectDelimiter($handle, 0);
+        $rawHeaders = fgetcsv($handle, 0, $delimiter);
+
+        if (! $rawHeaders) {
+            fclose($handle);
+
+            return null;
+        }
+
+        $column = $this->covenantColumnIndex($rawHeaders);
+        $limit  = $this->covenantNamesLimit();
+        $names  = [];
+        $capped = false;
+        $rows   = 0;
+
+        while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            $rows++;
+            $this->tallyCovenantName($names, $column !== null ? ($row[$column] ?? null) : null, $limit, $capped);
+        }
+
+        fclose($handle);
+
+        return ['file_rows' => $rows, 'names' => $names, 'capped' => $capped];
+    }
+
+    /**
+     * Coluna que o processamento lê como convênio (a última, como o mapRow: a coluna seguinte sobrescreve a anterior).
+     * Null = planilha sem coluna de convênio (todas as linhas entram como Particular).
+     */
+    private function covenantColumnIndex(array $rawHeaders): ?int
+    {
+        $index = null;
+
+        foreach ($this->headerFields($rawHeaders) as $i => $field) {
+            if ($field === '_covenant') {
+                $index = $i;
+            }
+        }
+
+        return $index;
+    }
+
+    /** Teto de nomes distintos por passagem (config patient_imports.max_covenant_names). */
+    private function covenantNamesLimit(): int
+    {
+        return max(1, (int) config('patient_imports.max_covenant_names', 1000));
+    }
+
+    /**
+     * Conta a linha no nome. No teto de nomes distintos NÃO coleta nome novo (marca `$capped`), mas segue contando as
+     * linhas dos nomes já coletados — a memória fica limitada, a contagem dos que importam continua certa.
+     *
+     * @param array<string, array{source_name: string, rows: int}> $counts
+     */
+    private function tallyCovenantName(array &$counts, mixed $raw, int $limit, bool &$capped): void
+    {
+        $name = trim((string) $raw);
+        $key  = ImportNameNormalizer::covenantSourceKey($name);
+
+        if (! isset($counts[$key])) {
+            if (count($counts) >= $limit) {
+                $capped = true;
+
+                return;
+            }
+
+            $counts[$key] = ['source_name' => $name, 'rows' => 0];
+        }
+
+        $counts[$key]['rows']++;
     }
 
     // ── Ponto de entrada ──────────────────────────────────────────────────────
@@ -388,26 +517,35 @@ class PatientImportService
             throw new RuntimeException("Coluna obrigatória 'nome' não encontrada no CSV. Verifique o modelo.");
         }
 
-        // Conta linhas para exibição de progresso
-        $totalRows = 0;
+        // Reprocessamento por convênio: só as linhas listadas (número no arquivo ORIGINAL), sem a passagem de contagem.
+        $retrySet = $this->retrySet($import);
 
-        while (fgetcsv($handle, 0, $delimiter) !== false) {
-            $totalRows++;
+        if ($retrySet === null) {
+            // Conta linhas para exibição de progresso
+            $totalRows = 0;
+
+            while (fgetcsv($handle, 0, $delimiter) !== false) {
+                $totalRows++;
+            }
+
+            $import->update(['total_rows' => $totalRows]);
+
+            // Reinicia a leitura após a contagem
+            rewind($handle);
+            $this->skipBom($handle);
+            fgetcsv($handle, 0, $delimiter); // pula cabeçalho
+        } else {
+            $totalRows = count($retrySet);
+            $import->update(['total_rows' => $totalRows]);
         }
-
-        $import->update(['total_rows' => $totalRows]);
-
-        // Reinicia a leitura após a contagem
-        rewind($handle);
-        $this->skipBom($handle);
-        fgetcsv($handle, 0, $delimiter); // pula cabeçalho
 
         // Verifica limite de pacientes no plano
         $planStatus = $this->featureGate->status($import->entity_id, FeatureKey::MaxPatients);
         $planLimit  = $planStatus->isUnlimited ? PHP_INT_MAX : $planStatus->limit;
 
-        // Pre-carrega convênios (nome → id) para evitar N+1
-        $covenantsMap = $this->loadCovenantsMap($import->entity_id);
+        // Pre-carrega catálogo + de-para da clínica UMA vez (nenhuma consulta de convênio por linha). O snapshot congela o
+        // de-para do confirm/reprocessamento; import sem snapshot (antigo) lê a tabela.
+        $this->covenants->load((string) $import->entity_id, $import->covenant_mapping_snapshot);
 
         // Códigos de importação já usados nesta entidade (evita duplicidade
         // entre linhas do arquivo e contra pacientes já importados antes).
@@ -421,8 +559,21 @@ class PatientImportService
         $processed    = 0;
         // Planos por convênio, carregados sob demanda (a maior operadora tem ~4,5 mil).
         $plansCache = [];
+        // Convênios do arquivo: linhas por nome, falhas por nome e as linhas que falharam por convênio.
+        $covenantCounts     = [];
+        $covenantFailures   = [];
+        $covenantErrorLines = [];
+        $covenantLimit      = $this->covenantNamesLimit();
+        $namesCapped        = false;
+        $sourceLine         = 1; // linha física do arquivo (o cabeçalho é a 1)
 
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            $sourceLine++;
+
+            if ($retrySet !== null && ! isset($retrySet[$sourceLine])) {
+                continue; // linha fora do reprocessamento: não conta nem processa
+            }
+
             // Cancelamento solicitado em outra request enquanto este job
             // rodava — para no próximo checkpoint, preservando o que já foi
             // processado (não reverte linhas já importadas).
@@ -436,13 +587,14 @@ class PatientImportService
                     'error_rows'     => $errorCount,
                     'warning_rows'   => $warningCount,
                     'finished_at'    => now(),
+                    ...$this->covenantFinish($import, $covenantCounts, $covenantFailures, $covenantErrorLines, $totalRows, $namesCapped),
                 ]);
 
                 return;
             }
 
             $processed++;
-            $rowNum = $processed + 1; // +1 pela linha do cabeçalho
+            $rowNum = $sourceLine; // no reprocessamento aponta para a linha do arquivo original
 
             // Verifica limite antes de cada criação
             $currentTotal = Patient::where('entity_id', $import->entity_id)->count();
@@ -457,6 +609,7 @@ class PatientImportService
                     'warning_rows'   => $warningCount,
                     'abort_reason'   => "Limite do plano atingido ({$planLimit} pacientes). Importe interrompido na linha {$rowNum}.",
                     'finished_at'    => now(),
+                    ...$this->covenantFinish($import, $covenantCounts, $covenantFailures, $covenantErrorLines, $totalRows, $namesCapped),
                 ]);
                 fclose($handle);
                 $this->saveErrorsFile($import, $errors);
@@ -465,6 +618,7 @@ class PatientImportService
             }
 
             $data = $this->mapRow($row, $indexFieldMap);
+            $this->tallyCovenantName($covenantCounts, $data['_covenant'] ?? null, $covenantLimit, $namesCapped);
 
             // Validações mínimas
             if (empty(trim((string) ($data['full_name'] ?? '')))) {
@@ -489,8 +643,8 @@ class PatientImportService
             try {
                 $warning = null;
                 $result  = DB::transaction(
-                    function () use ($data, $import, $covenantsMap, &$usedImportCodes, &$plansCache, &$warning) {
-                        return $this->importRow($data, $import->entity_id, $covenantsMap, $usedImportCodes, $plansCache, $warning);
+                    function () use ($data, $import, &$usedImportCodes, &$plansCache, &$warning) {
+                        return $this->importRow($data, $import->entity_id, $usedImportCodes, $plansCache, $warning);
                     },
                 );
 
@@ -502,6 +656,17 @@ class PatientImportService
                     $errors[] = $this->errorRow($rowNum, $warning, $data);
                     $warningCount++;
                 }
+            } catch (CovenantResolutionException $e) {
+                // Convênio não resolvido: erro de negócio reprocessável depois de ajustar o de-para.
+                $errors[]             = $this->errorRow($rowNum, $e->getMessage(), $data);
+                $covenantErrorLines[] = $rowNum; // TODAS as linhas, mesmo as de nomes fora do teto: seguem reprocessáveis
+
+                // A contagem por nome só existe para os nomes coletados (memória limitada).
+                if (isset($covenantCounts[$e->sourceNameNormalized])) {
+                    $covenantFailures[$e->sourceNameNormalized] = ($covenantFailures[$e->sourceNameNormalized] ?? 0) + 1;
+                }
+
+                $errorCount++;
             } catch (Throwable $e) {
                 $errors[] = $this->errorRow($rowNum, $this->safeFailureReason($e, $import, $rowNum, 'shared_identity.import.row_failed'), $data);
                 $errorCount++;
@@ -510,6 +675,10 @@ class PatientImportService
             // Atualiza progresso a cada 25 linhas para não sobrecarregar o DB
             if ($processed % 25 === 0) {
                 $this->updateProgress($import, $processed, $imported, $skipped, $errorCount);
+            }
+
+            if ($retrySet !== null && $processed >= $totalRows) {
+                break; // todas as linhas do reprocessamento já foram tratadas: não lê o resto do arquivo
             }
         }
 
@@ -524,7 +693,56 @@ class PatientImportService
             'error_rows'     => $errorCount,
             'warning_rows'   => $warningCount,
             'finished_at'    => now(),
+            ...$this->covenantFinish($import, $covenantCounts, $covenantFailures, $covenantErrorLines, $totalRows, $namesCapped),
         ]);
+    }
+
+    /**
+     * Linhas do arquivo original a processar num import filho de reprocessamento (null = import normal). Filho sem
+     * linhas processa NADA — nunca o arquivo todo.
+     *
+     * @return array<int, true>|null
+     */
+    private function retrySet(PatientImport $import): ?array
+    {
+        $lines = $import->reprocess_lines;
+
+        if (! is_array($lines) && ! $import->isReprocess()) {
+            return null;
+        }
+
+        return array_fill_keys(array_map('intval', (array) $lines), true);
+    }
+
+    /**
+     * Fecha o que o processamento aprendeu sobre convênios: linhas que falharam por convênio (reprocessáveis), resumo com
+     * a contagem exata por nome, snapshot do de-para usado (preserva o do confirm/reprocessamento) e prazo de retenção
+     * dos arquivos renovado — o usuário ganha o prazo cheio para baixar o relatório.
+     *
+     * @param array<string, array{source_name: string, rows: int}> $counts
+     * @param array<string, int>                                   $failures
+     * @param list<int>                                            $lines
+     *
+     * @return array<string, mixed>
+     */
+    private function covenantFinish(PatientImport $import, array $counts, array $failures, array $lines, int $fileRows, bool $namesCapped): array
+    {
+        $items = [];
+
+        foreach ($counts as $key => $count) {
+            $failed  = (int) ($failures[$key] ?? 0);
+            $items[] = [...$this->covenants->forSource($count['source_name']), 'rows' => $count['rows'], 'failed_rows' => $failed, 'retryable' => $failed > 0];
+        }
+
+        return [
+            'covenant_error_lines'      => $lines,
+            'covenant_mapping_snapshot' => $import->covenant_mapping_snapshot ?? $this->covenants->snapshot(array_column($counts, 'source_name')),
+            'files_expire_at'           => now()->addDays((int) config('patient_imports.retention_days', 30)),
+            'preview'                   => [
+                ...(is_array($import->preview) ? $import->preview : []),
+                'covenant_summary' => PatientImportCovenantReportService::summaryPayload(PatientImportCovenantReportService::sortItems($items), $fileRows, $namesCapped),
+            ],
+        ];
     }
 
     // ── Criação de People + Patient ───────────────────────────────────────────
@@ -532,7 +750,6 @@ class PatientImportService
     private function importRow(
         array $data,
         string $entityId,
-        array $covenantsMap,
         array &$usedImportCodes,
         array &$plansCache = [],
         ?string &$warning = null,
@@ -603,7 +820,7 @@ class PatientImportService
             $patient = Patient::create([
                 'entity_id' => $entityId,
                 'person_id' => $person->id,
-                ...$this->covenantData($data, $entityId, $covenantsMap, $plansCache, $warning),
+                ...$this->covenantData($data, $entityId, $plansCache, $warning),
                 'active' => true,
             ]);
             $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
@@ -649,7 +866,7 @@ class PatientImportService
         $patient = Patient::create([
             'entity_id' => $entityId,
             'person_id' => $person->id,
-            ...$this->covenantData($data, $entityId, $covenantsMap, $plansCache, $warning),
+            ...$this->covenantData($data, $entityId, $plansCache, $warning),
             'active' => true,
         ]);
         $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
@@ -795,7 +1012,7 @@ class PatientImportService
      */
     private function headerFields(array $headers): array
     {
-        $keys        = array_map(fn ($header) => $this->normalizeKey((string) $header), $headers);
+        $keys        = array_map(fn ($header) => ImportNameNormalizer::key((string) $header), $headers);
         $hasCovenant = array_intersect($keys, self::COVENANT_HEADERS) !== [];
 
         return array_map(
@@ -828,16 +1045,6 @@ class PatientImportService
     }
 
     // ── Helpers de parsing ────────────────────────────────────────────────────
-
-    private function normalizeKey(string $key): string
-    {
-        $key = mb_strtolower(trim($key), 'UTF-8');
-        $key = str_replace([' ', '-'], '_', $key);
-        // Remove acentos via transliteração ASCII
-        $key = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $key) ?: $key;
-
-        return preg_replace('/[^a-z0-9_]/', '', $key) ?? $key;
-    }
 
     private function detectDelimiter(mixed $handle, int $bomOffset): string
     {
@@ -911,7 +1118,7 @@ class PatientImportService
         return match (mb_strtolower(trim($value), 'UTF-8')) {
             'm', 'masculino', 'male', '1', 'masc' => 1,
             'f', 'feminino', 'female', '0', 'fem' => 0,
-            default => null,
+            default                               => null,
         };
     }
 
@@ -935,46 +1142,22 @@ class PatientImportService
     }
 
     /**
-     * patients.covenant_id é NOT NULL: convênio vazio vira "PARTICULAR"
-     * (mesma semântica do sistema de origem), e nome não encontrado vira erro
-     * legível na linha em vez de violação de NOT NULL com SQL cru no CSV.
-     */
-    private function resolveCovenantId(?string $name, array $covenantsMap): string
-    {
-        $key = $this->normalizeKey((string) $name);
-
-        if ($key === '') {
-            return $covenantsMap[self::PARTICULAR_KEY]
-                ?? throw new RuntimeException('Convênio não informado e nenhum convênio "Particular" cadastrado.');
-        }
-
-        $covenantId = $covenantsMap[$key]
-            ?? throw new RuntimeException("Convênio \"{$name}\" não encontrado. Cadastre-o em Configurações › Convênios ou corrija a planilha.");
-
-        // Vínculo novo só com convênio ativo (mesma regra do cadastro manual,
-        // App\Rules\ActiveCovenant): a linha vira erro, sem gravar.
-        if (isset($this->inactiveCovenantIds[$covenantId])) {
-            throw new RuntimeException(__('validation.custom.covenant.inactive_named', ['name' => trim((string) $name)]));
-        }
-
-        return $covenantId;
-    }
-
-    /**
-     * Convênio, carteirinha e plano da linha. Particular não tem carteirinha
-     * nem plano (mesma regra do cadastro manual, PatientService).
+     * Convênio, carteirinha e plano da linha. patients.covenant_id é NOT NULL: convênio vazio vira "PARTICULAR" e nome
+     * não resolvido lança CovenantResolutionException (erro legível na linha, em vez de violação de NOT NULL com SQL cru).
+     * A resolução (catálogo + de-para da clínica) é do PatientImportCovenantResolver. Particular não tem carteirinha nem
+     * plano (mesma regra do cadastro manual, PatientService); o plano do de-para prevalece sobre a coluna da planilha.
      *
      * @return array{covenant_id: string, card_number: ?string, covenant_plan_id: ?string}
      */
-    private function covenantData(array $data, string $entityId, array $covenantsMap, array &$plansCache, ?string &$warning): array
+    private function covenantData(array $data, string $entityId, array &$plansCache, ?string &$warning): array
     {
-        $covenantId   = $this->resolveCovenantId($data['_covenant'] ?? null, $covenantsMap);
-        $isParticular = $covenantId === ($covenantsMap[self::PARTICULAR_KEY] ?? null);
+        $resolved     = $this->covenants->forRow($data['_covenant'] ?? null);
+        $isParticular = $resolved['is_particular'];
 
         return [
-            'covenant_id'      => $covenantId,
+            'covenant_id'      => $resolved['covenant_id'],
             'card_number'      => $isParticular ? null : ($data['_card_number'] ?? null),
-            'covenant_plan_id' => $isParticular ? null : $this->resolvePlanId($data['_plan'] ?? null, $covenantId, $entityId, $plansCache, $warning),
+            'covenant_plan_id' => $isParticular ? null : ($resolved['mapped_plan_id'] ?? $this->resolvePlanId($data['_plan'] ?? null, $resolved['covenant_id'], $entityId, $plansCache, $warning)),
         ];
     }
 
@@ -996,7 +1179,7 @@ class PatientImportService
         $code  = $this->onlyNumbers($value);
         $ids   = $code !== '' && $code === preg_replace('/[\s.\-\/]/', '', $value)
             ? ($plans['codes'][$code] ?? [])
-            : ($plans['names'][$this->normalizeKey($value)] ?? []);
+            : ($plans['names'][ImportNameNormalizer::key($value)] ?? []);
 
         if (count($ids) === 1) {
             return $ids[0];
@@ -1026,7 +1209,7 @@ class PatientImportService
                     $index['codes'][(string) $plan->ans_code][] = (string) $plan->id;
                 }
 
-                $index['names'][$this->normalizeKey((string) $plan->name)][] = (string) $plan->id;
+                $index['names'][ImportNameNormalizer::key((string) $plan->name)][] = (string) $plan->id;
             });
 
         return $index;
@@ -1039,28 +1222,18 @@ class PatientImportService
 
     // ── Convênios ─────────────────────────────────────────────────────────────
 
-    /** Retorna mapa nome-em-minúsculo → UUID para lookup eficiente, escopado à entidade. */
+    /**
+     * Mapa covenantKey → id do catálogo da clínica (próprios + globais; o próprio vence o global e o ativo vence o
+     * inativo). A fonte é o PatientImportCovenantResolver; o método segue aqui só porque o PatientCovenantTenantScopeTest
+     * o exercita por reflexão (isolamento por entity_id) — o processamento NÃO o usa.
+     *
+     * @return array<string, string>
+     */
     private function loadCovenantsMap(string $entityId): array
     {
-        // Inativos primeiro, depois globais, da clínica por último: o último
-        // sobrescreve — "Unimed" ativo ganha do inativo de mesmo nome e, entre
-        // ativos, o da clínica ganha do global.
-        $covenants = Covenant::where(function ($query) use ($entityId) {
-            $query->where('entity_id', $entityId)
-                ->orWhere('entity_id', null);
-        })
-            ->whereNull('deleted_at')
-            ->orderBy('active')
-            ->orderByRaw('entity_id IS NOT NULL')
-            ->get(['id', 'name', 'active']);
+        $this->covenants->load($entityId);
 
-        $this->inactiveCovenantIds = $covenants->reject(fn (Covenant $c) => (bool) $c->active)
-            ->mapWithKeys(fn (Covenant $c) => [(string) $c->id => true])
-            ->all();
-
-        return $covenants
-            ->mapWithKeys(fn (Covenant $c) => [$this->normalizeKey((string) $c->name) => (string) $c->id])
-            ->toArray();
+        return $this->covenants->catalogMap();
     }
 
     // ── Progresso e erros ─────────────────────────────────────────────────────
@@ -1083,15 +1256,16 @@ class PatientImportService
     /**
      * Motivo gravado no CSV de erros (baixável pela clínica) e em abort_reason.
      *
-     * Só a mensagem de negócio (RuntimeException lançada por este serviço)
-     * vai como está. Erro de banco (PDOException/QueryException) traz o SQL
+     * Só a mensagem de negócio (RuntimeException lançada por este serviço ou
+     * CovenantResolutionException) vai como está. Erro de banco (PDOException/QueryException) traz o SQL
      * com os bindings — CPF, carteirinha, e-mail — e host/porta/banco da
      * conexão: vira texto traduzido. O log leva só classe, SQLSTATE e local
      * (nunca a mensagem, que tem PHI).
      */
     private function safeFailureReason(Throwable $e, PatientImport $import, ?int $rowNum, string $fallbackKey): string
     {
-        if ($e::class === RuntimeException::class) {
+        // CovenantResolutionException também é erro de negócio (convênio inexistente/inativo, de-para indisponível).
+        if ($e::class === RuntimeException::class || $e instanceof CovenantResolutionException) {
             return $e->getMessage();
         }
 

@@ -1,16 +1,19 @@
 <script setup>
 import { useImportProgress } from '@/composables/useImportProgress';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, nextTick, onBeforeUnmount, watch } from 'vue';
 import { useForm, router, Link, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import PatientImportCovenantMapping from '@/Components/Panel/PatientImportCovenantMapping.vue';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
 
 /**
  * Importador CSV de pacientes:
  *  1. Upload do arquivo → backend gera preview (cabeçalho + 5 linhas) sem
  *     enfileirar o job. `preview_id` vem no flash.
  *  2. Usuário revisa preview e clica "Confirmar" → dispara o job.
- *  3. Polling do `status` endpoint (2s) até `is_done`.
+ *  3. WebSocket/Reverb acompanha o progresso até `is_done`.
  *
  * Padrão job-tries=1 + dedup CPF/(nome+tel) preservado no backend.
  */
@@ -20,11 +23,116 @@ const props = defineProps({
     pending_import: { type: Object, default: null },
     preview_id: { type: String, default: null },
     plan_status: { type: Object, default: () => ({}) },
+    can_create_covenant: { type: Boolean, default: false },
     urls: { type: Object, required: true },
     t: { type: Object, default: () => ({}) },
 });
 
 const page = usePage();
+const { date } = useLocaleFormat();
+const pageError = ref('');
+const mappingNotice = ref('');
+const confirming = ref(false);
+const confirmPosting = ref(false);
+const mappingRef = ref(null);
+const previewReport = ref(null);
+const resolution = ref(null);
+const resolutionSource = ref(null);
+const resolutionRef = ref(null);
+const resolvingId = ref(null);
+const reportRequest = latestRequest();
+let resolutionTrigger = null;
+const mappingText = computed(() => props.t.covenant_mapping ?? {});
+const tr = (key, values = {}) =>
+    Object.entries(values).reduce(
+        (text, [name, value]) => text.replaceAll(`:${name}`, String(value)),
+        mappingText.value[key] ?? key,
+    );
+const mappingUrls = (item) => ({
+    show: item.urls.covenants,
+    update: item.urls.covenants,
+    reprocess: item.urls.covenants_reprocess,
+    covenantSearch: props.urls.covenant_search,
+    covenantPlanSearch: props.urls.covenant_plan_search,
+});
+const previewSummary = computed(() => previewImport.value?.preview?.covenant_summary);
+const previewItems = computed(() => previewReport.value?.items ?? previewSummary.value?.items ?? []);
+const previewTotals = computed(
+    () =>
+        previewReport.value?.totals ?? {
+            ...previewSummary.value?.totals,
+            failed_rows: previewItems.value.reduce((sum, item) => sum + (item.failed_rows ?? 0), 0),
+            failed_rows_exact: false,
+        },
+);
+watch(
+    () => props.preview_id,
+    () => {
+        previewReport.value = null;
+    },
+);
+onBeforeUnmount(() => reportRequest.cancel());
+
+function updatePreviewReport(report) {
+    previewReport.value = report;
+}
+function updateResolution(report) {
+    resolution.value = report;
+}
+function responseMessage(json) {
+    return [].concat(json.errors?.import ?? json.errors?.reprocess ?? json.message ?? tr('save_failed'))[0];
+}
+async function openResolution(item, event) {
+    const request = reportRequest.begin();
+    resolutionTrigger = event?.currentTarget ?? null;
+    resolvingId.value = item.id;
+    resolution.value = null;
+    resolutionSource.value = null;
+    pageError.value = '';
+    try {
+        if (item.id === props.preview_id && mappingRef.value?.hasChanges) {
+            if (!(await mappingRef.value.save()) || !request.current()) return;
+        }
+        const response = await fetch(item.urls.covenants, {
+            headers: { Accept: 'application/json' },
+            signal: request.signal,
+        });
+        const json = await response.json();
+        if (!request.current()) return;
+        if (!response.ok) {
+            pageError.value = responseMessage(json);
+            return;
+        }
+        if (item.id === props.preview_id) {
+            previewReport.value = json.data;
+            await nextTick();
+            mappingRef.value?.$el?.querySelector('input[type="search"]')?.focus();
+            return;
+        }
+        resolutionSource.value = item;
+        resolution.value = json.data;
+        await nextTick();
+        resolutionRef.value?.focus();
+    } catch (error) {
+        if (request.current() && !isAbortError(error)) pageError.value = tr('save_failed');
+    } finally {
+        if (request.current()) resolvingId.value = null;
+    }
+}
+async function closeResolution() {
+    reportRequest.cancel();
+    resolution.value = null;
+    resolutionSource.value = null;
+    resolvingId.value = null;
+    await nextTick();
+    resolutionTrigger?.focus();
+}
+function reprocessed() {
+    mappingNotice.value = tr('reprocess_started');
+    resolution.value = null;
+    resolutionSource.value = null;
+    router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
+}
 
 // ── Upload ──────────────────────────────────────────────────────────────────
 const uploadForm = useForm({ file: null });
@@ -85,20 +193,43 @@ async function confirmDialog({
 }
 
 async function confirmImport(item) {
-    const ok = await confirmDialog({
-        icon: 'question',
-        title: 'Confirmar importação?',
-        text: `Iniciar a importação de "${item.original_name}"?`,
-        confirmButtonText: 'Confirmar e importar',
-        cancelButtonText: 'Cancelar',
-    });
-    if (!ok) return;
-
-    await fetch(item.urls.confirm, {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
-    });
-    router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
+    if (confirming.value) return;
+    confirming.value = true;
+    pageError.value = '';
+    try {
+        if (mappingRef.value?.hasChanges && !(await mappingRef.value.save())) return;
+        const unresolved = previewTotals.value.unmatched_names ?? mappingRef.value?.unresolvedCount ?? 0;
+        const text = [
+            tr('preview_confirm_text', { file: item.original_name }),
+            unresolved > 0 ? tr('unmatched_confirm', { count: unresolved }) : '',
+        ]
+            .filter(Boolean)
+            .join(' ');
+        const ok = await confirmDialog({
+            icon: 'question',
+            title: tr('preview_confirm_title'),
+            text,
+            confirmButtonText: tr('preview_confirm_button'),
+            cancelButtonText: tr('cancel'),
+        });
+        if (!ok) return;
+        confirmPosting.value = true;
+        const response = await fetch(item.urls.confirm, {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        if (!response.ok) {
+            const json = await response.json();
+            pageError.value = responseMessage(json);
+            return;
+        }
+        router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
+    } catch {
+        pageError.value = tr('save_failed');
+    } finally {
+        confirming.value = false;
+        confirmPosting.value = false;
+    }
 }
 
 async function cancelImport(item) {
@@ -158,7 +289,9 @@ watch(
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const statusBadgeClass = (color) => `badge bg-${color} fs-11 fw-medium`;
 
-const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.file);
+const flashError = computed(
+    () => pageError.value || page.props?.flash?.error || page.props?.errors?.import || uploadForm.errors.file,
+);
 </script>
 
 <template>
@@ -190,12 +323,14 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
             </div>
 
             <!-- Flash de erro -->
-            <div v-if="flashError" class="alert alert-danger alert-dismissible fade show mb-3">
+            <div v-if="flashError" class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
                 <i class="ti ti-alert-triangle me-1"></i>{{ flashError }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
 
-            <!-- Polling do import em processamento -->
+            <p v-if="mappingNotice" class="alert alert-success" role="status">{{ mappingNotice }}</p>
+
+            <!-- Progresso do import por WebSocket/Reverb -->
             <div v-if="liveImport && !liveImport.is_done" class="alert alert-info">
                 <div class="d-flex align-items-center mb-2">
                     <span class="spinner-border spinner-border-sm me-2"></span>
@@ -288,10 +423,42 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                         </div>
                     </div>
 
+                    <p v-if="previewImport.preview?.covenant_warning" class="alert alert-warning">
+                        {{ tr('catalog_unavailable') }}
+                    </p>
+                    <div v-if="previewSummary?.truncated && !previewReport" class="alert alert-info">
+                        {{ tr('truncated') }}
+                        <button
+                            type="button"
+                            class="btn btn-link btn-sm"
+                            data-test="full-covenant-report"
+                            @click="openResolution(previewImport, $event)"
+                        >
+                            {{ tr('resolve') }}
+                        </button>
+                    </div>
+                    <PatientImportCovenantMapping
+                        v-if="previewSummary && previewImport.urls.covenants"
+                        :key="previewImport.id"
+                        ref="mappingRef"
+                        :import-id="previewImport.id"
+                        :items="previewItems"
+                        :names-capped="previewReport?.names_capped ?? previewSummary?.names_capped ?? false"
+                        :totals="previewTotals"
+                        :permissions="previewReport?.permissions ?? { can_create_covenant, can_reprocess: false }"
+                        :urls="mappingUrls(previewImport)"
+                        mode="preview"
+                        :t="mappingText"
+                        :busy="confirmPosting"
+                        :files-expired="previewReport?.import.files_expired ?? previewImport.files_expired"
+                        @saved="updatePreviewReport"
+                    />
+
                     <div class="d-flex gap-2 justify-content-end">
                         <button
                             type="button"
                             class="btn btn-outline-danger btn-sm"
+                            :disabled="confirming"
                             @click="cancelImport(previewImport)"
                         >
                             <i class="ti ti-x me-1"></i>Cancelar
@@ -299,7 +466,12 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                         <button
                             type="button"
                             class="btn btn-primary btn-sm"
-                            :disabled="previewImport.preview?.can_proceed === false"
+                            data-test="confirm-import"
+                            :disabled="
+                                confirming ||
+                                previewImport.files_expired ||
+                                previewImport.preview?.can_proceed === false
+                            "
                             @click="confirmImport(previewImport)"
                         >
                             <i class="ti ti-check me-1"></i>Confirmar e importar
@@ -352,6 +524,41 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                 </div>
             </div>
 
+            <div
+                v-if="resolution && resolutionSource"
+                ref="resolutionRef"
+                tabindex="-1"
+                data-test="covenant-resolution"
+                class="mb-3"
+            >
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                    <h2 class="h5 mb-0">{{ resolution.import.original_name }}</h2>
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        data-test="close-covenant-resolution"
+                        @click="closeResolution"
+                    >
+                        {{ tr('close') }}
+                    </button>
+                </div>
+                <PatientImportCovenantMapping
+                    :key="resolution.import.id"
+                    :import-id="resolution.import.id"
+                    :items="resolution.items"
+                    :names-capped="resolution.names_capped ?? false"
+                    :totals="resolution.totals"
+                    :permissions="resolution.permissions"
+                    :urls="mappingUrls(resolutionSource)"
+                    :mode="['done', 'failed'].includes(resolution.import.status) ? 'reprocess' : 'preview'"
+                    :t="mappingText"
+                    :files-expired="resolution.import.files_expired"
+                    :report-available="resolution.import.report_available"
+                    @saved="updateResolution"
+                    @reprocessed="reprocessed"
+                />
+            </div>
+
             <!-- Histórico -->
             <div class="card">
                 <div class="card-header bg-transparent">
@@ -375,9 +582,31 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                             <tr v-if="imports.length === 0">
                                 <td colspan="8" class="text-center py-4 text-muted">Sem importações ainda.</td>
                             </tr>
-                            <tr v-for="item in imports" :key="item.id">
+                            <tr v-for="item in imports" :id="`patient-import-${item.id}`" :key="item.id">
                                 <td class="small text-muted">{{ item.created_at }}</td>
-                                <td>{{ item.original_name }}</td>
+                                <td>
+                                    {{ item.original_name }}
+                                    <div v-if="item.is_reprocess" class="small">
+                                        <span class="badge bg-info-subtle text-info-emphasis">{{
+                                            tr('reprocess_badge')
+                                        }}</span>
+                                        <a
+                                            v-if="imports.some((parent) => parent.id === item.reprocess_of_id)"
+                                            :href="`#patient-import-${item.reprocess_of_id}`"
+                                            class="d-block"
+                                            >{{ tr('reprocess_of', { id: item.reprocess_of_id }) }}</a
+                                        >
+                                        <span v-else-if="item.reprocess_of_id" class="d-block">{{
+                                            tr('reprocess_of', { id: item.reprocess_of_id })
+                                        }}</span>
+                                    </div>
+                                    <small v-if="item.files_expired" class="d-block text-muted">{{
+                                        tr('expired_label')
+                                    }}</small>
+                                    <small v-else-if="item.files_expire_at" class="d-block text-muted">{{
+                                        tr('available_until', { date: date(item.files_expire_at) })
+                                    }}</small>
+                                </td>
                                 <td class="text-muted small">{{ item.user_name }}</td>
                                 <td class="text-center">
                                     <span :class="statusBadgeClass(item.status_color)">{{ item.status_label }}</span>
@@ -391,8 +620,18 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                                     </div>
                                 </td>
                                 <td class="text-end">
+                                    <button
+                                        v-if="(item.has_covenant_errors || item.error_rows > 0) && item.urls.covenants"
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary me-2 mb-1"
+                                        data-test="resolve-covenants"
+                                        :aria-busy="resolvingId === item.id"
+                                        @click="openResolution(item, $event)"
+                                    >
+                                        {{ tr('resolve') }}
+                                    </button>
                                     <a
-                                        v-if="item.has_errors_file && item.urls.errors"
+                                        v-if="item.has_errors_file && item.urls.errors && !item.files_expired"
                                         :href="item.urls.errors"
                                         class="btn btn-sm btn-outline-secondary"
                                         title="Baixar erros"

@@ -207,6 +207,14 @@ Schedule::command('medical-records:prune-drafts')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Importação de pacientes: o CSV original e o de erros têm dado de paciente — apaga os vencidos (30 dias, configurável),
+// mantendo o histórico (LGPD).
+Schedule::command('imports:prune-patient-files')
+    ->dailyAt('03:55')
+    ->name('imports:prune-patient-files')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Onda 4, C6 — Purga feedbacks antigos para conformidade LGPD (>90 dias).
 Schedule::command('ai:purge-feedbacks')
     ->weeklyOn(0, '03:00')

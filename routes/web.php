@@ -46,6 +46,7 @@ use App\Http\Controllers\{
     PatientClinicalSafetyController,
     PatientConditionController,
     PatientDocumentSharesController,
+    PatientImportCovenantsController,
     PatientImportsController,
     PatientPortalInvitationsController,
     PatientsController,
@@ -80,7 +81,7 @@ use App\Http\Controllers\{
 };
 use App\Http\Controllers\Billing\{CheckoutController, NfseDownloadController};
 use App\Http\Controllers\{CallPanelDisplayController, DoctorDocumentTemplatesController, MedicalRecordExamKitsController, MedicationPresetsController};
-use App\Http\Controllers\{ChangelogController, Cid10SearchController, CovenantPlanSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
+use App\Http\Controllers\{ChangelogController, Cid10SearchController, CovenantPlanSearchController, CovenantSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
 use App\Http\Controllers\{PanelDashboardController, PreferencesController};
 use App\Http\Controllers\Security\TwoFactorController;
@@ -466,6 +467,8 @@ Route::group(
             Route::get('patients/search', [PatientsController::class, 'search'])->name('patients.search');
             // Planos do convênio escolhido no cadastro do paciente (ANS + próprios da clínica).
             Route::get('covenant-plans/search', CovenantPlanSearchController::class)->name('covenant-plans.search');
+            // Convênios ativos (próprios + globais) para o de-para da importação de pacientes.
+            Route::get('covenants/search', CovenantSearchController::class)->name('covenants.search');
             Route::post('patients/quick', [PatientsController::class, 'quickStore'])->name('patients.quick');
             // Importação em lote — rotas específicas antes do resource para não conflitar com {patient}
             Route::get('patients/import', [PatientImportsController::class, 'index'])->name('patients.import.index');
@@ -474,6 +477,10 @@ Route::group(
             Route::post('patients/import/{patientImport}/confirm', [PatientImportsController::class, 'confirm'])->name('patients.import.confirm');
             Route::delete('patients/import/{patientImport}/cancel', [PatientImportsController::class, 'cancel'])->name('patients.import.cancel');
             Route::get('patients/import/{patientImport}/errors', [PatientImportsController::class, 'errors'])->name('patients.import.errors');
+            // Convênios da importação: relatório, de-para em lote e reprocessamento das linhas com erro de convênio.
+            Route::get('patients/import/{patientImport}/covenants', [PatientImportCovenantsController::class, 'show'])->name('patients.import.covenants.show');
+            Route::put('patients/import/{patientImport}/covenants', [PatientImportCovenantsController::class, 'update'])->name('patients.import.covenants.update');
+            Route::post('patients/import/{patientImport}/covenants/reprocess', [PatientImportCovenantsController::class, 'reprocess'])->name('patients.import.covenants.reprocess');
             Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
             // Estrela de prioridade/triagem (benchmark 18/09/2026) — mesmo
             // grupo de permissão de patients.manage; tenant checado no

@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{FeatureKey, ImportStatus};
+use App\Enums\{FeatureKey, ImportStatus, Permission};
 use App\Jobs\ProcessPatientImportJob;
-use App\Models\PatientImport;
+use App\Models\{Entity, PatientImport};
+use App\Services\Covenants\PatientImportCovenantMappingService;
 use App\Services\{FeatureGateService, PatientImportService};
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Storage;
@@ -17,6 +18,7 @@ class PatientImportsController extends Controller
     public function __construct(
         private readonly PatientImportService $importService,
         private readonly FeatureGateService $featureGate,
+        private readonly PatientImportCovenantMappingService $covenantMappings,
     ) {
     }
 
@@ -51,10 +53,14 @@ class PatientImportsController extends Controller
                 'used'      => $planStatus->used,
                 'available' => $planStatus->isUnlimited ? null : $planStatus->remaining,
             ],
-            'urls' => [
-                'store'    => route('panel.patients.import.store'),
-                'template' => route('panel.patients.import.template'),
-                'patients' => route('panel.patients.index'),
+            // Criar convênio na hora (de-para da importação) exige settings.manage — a tela só oferece a ação a quem pode.
+            'can_create_covenant' => (bool) auth()->user()?->hasPermissionInEntity(Entity::query()->findOrFail($entityId), Permission::SettingsManage),
+            'urls'                => [
+                'store'                => route('panel.patients.import.store'),
+                'template'             => route('panel.patients.import.template'),
+                'patients'             => route('panel.patients.index'),
+                'covenant_search'      => route('panel.covenants.search'),
+                'covenant_plan_search' => route('panel.covenant-plans.search'),
             ],
             't' => trans('imports.patients'),
         ]);
@@ -86,6 +92,12 @@ class PatientImportsController extends Controller
             'user_name'       => $i->user?->name,
             'preview'         => $i->preview,
             'has_errors_file' => $i->errors_file_path !== null,
+            // Reprocessamento por convênio e retenção dos arquivos (as listas de linhas NÃO vão para a tela).
+            'reprocess_of_id'     => $i->reprocess_of_id ? (string) $i->reprocess_of_id : null,
+            'is_reprocess'        => $i->isReprocess(),
+            'has_covenant_errors' => $i->hasCovenantErrors(),
+            'files_expire_at'     => $i->files_expire_at?->toIso8601String(),
+            'files_expired'       => $i->filesExpired(),
             // Progresso chega por WebSocket (canal privado), sem polling HTTP.
             'channel' => $i->broadcastChannelName(),
             'urls'    => [
@@ -94,6 +106,8 @@ class PatientImportsController extends Controller
                 'errors'  => $i->errors_file_path
                     ? route('panel.patients.import.errors', $i->id)
                     : null,
+                'covenants'           => route('panel.patients.import.covenants.show', $i->id),
+                'covenants_reprocess' => route('panel.patients.import.covenants.reprocess', $i->id),
             ],
         ];
     }
@@ -135,6 +149,8 @@ class PatientImportsController extends Controller
             'status'        => ImportStatus::Pending,
             'file_path'     => $path,
             'original_name' => $file->getClientOriginalName(),
+            // Retenção LGPD: o CSV tem dado de paciente — expira mesmo que ninguém confirme (a limpeza agendada o apaga).
+            'files_expire_at' => now()->addDays((int) config('patient_imports.retention_days', 30)),
         ]);
 
         // Gera preview (leitura rápida: cabeçalho + 5 linhas)
@@ -154,7 +170,11 @@ class PatientImportsController extends Controller
         abort_if((string) $patientImport->entity_id !== session('selected_entity_id'), 403);
         abort_if($patientImport->status !== ImportStatus::Pending, 409);
 
-        $patientImport->update(['confirmed_at' => now()]);
+        // O job usa o de-para do MOMENTO do confirm: congela agora, para todos os nomes do arquivo. Se não der (arquivo
+        // indisponível), não confirma nem enfileira.
+        $snapshot = $this->covenantMappings->snapshotForConfirm($patientImport);
+
+        $patientImport->update(['confirmed_at' => now(), 'covenant_mapping_snapshot' => $snapshot]);
 
         ProcessPatientImportJob::dispatch($patientImport);
 
@@ -204,6 +224,12 @@ class PatientImportsController extends Controller
     public function errors(PatientImport $patientImport): StreamedResponse|RedirectResponse
     {
         abort_if((string) $patientImport->entity_id !== session('selected_entity_id'), 404);
+
+        // Retenção LGPD: o CSV de erros tem dado de paciente e expira (a limpeza agendada o apaga e zera o caminho).
+        if ($patientImport->files_purged_at !== null || ($patientImport->files_expire_at !== null && $patientImport->files_expire_at->isPast())) {
+            return back()->with('error', __('imports.errors_file_expired'));
+        }
+
         abort_if(! $patientImport->errors_file_path, 404);
 
         // Registro aponta pro CSV mas o arquivo sumiu do disco (storage
@@ -213,9 +239,15 @@ class PatientImportsController extends Controller
             return back()->with('error', __('imports.errors_file_missing'));
         }
 
+        // Dado de paciente: privado, nunca em cache de navegador/proxy, sem sniffing de tipo.
         return Storage::disk()->download(
             $patientImport->errors_file_path,
             "erros_importacao_{$patientImport->id}.csv",
+            [
+                'Content-Type'           => 'text/csv; charset=UTF-8',
+                'Cache-Control'          => 'private, no-store, max-age=0',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
         );
     }
 

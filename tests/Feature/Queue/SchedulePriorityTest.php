@@ -63,6 +63,7 @@ const SCHEDULE_TABLE = [
     'fiscal:nfse-sync'              => ['*/10 * * * *', true, 10],
     'queue:prune-failed'            => ['20 4 * * *', false, 10],
     'ai:fetch-exchange-rate'        => ['5 6 * * *', true, 10],
+    'imports:prune-patient-files'   => ['55 3 * * *', false, 1440],
 ];
 
 it('tem exatamente as tarefas esperadas, cada uma com nome', function () {

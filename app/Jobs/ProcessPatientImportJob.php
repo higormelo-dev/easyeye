@@ -18,8 +18,9 @@ class ProcessPatientImportJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    /** Sem retentativas — o serviço é idempotente, mas re-processar um import
-     *  parcialmente concluído geraria duplicatas. */
+    /** Sem retentativas do job — re-executar um import parcialmente concluído geraria duplicatas. Reprocessar as linhas
+     *  que falharam por convênio NÃO é retentar o pai: cria um import FILHO (`reprocess_of_id`, `reprocess_lines`) que
+     *  processa só essas linhas, contando com a deduplicação do serviço (CPF, nome+telefone, import_code). */
     public int $tries = 1;
 
     /** 10 minutos para imports grandes (até ~10 000 linhas). */
