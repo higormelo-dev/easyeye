@@ -417,6 +417,9 @@ Route::group([
     Route::post('ai-pricing/exchange-rates', [AiPricingController::class, 'storeExchangeRate'])
         ->middleware('throttle:manager-destructive')
         ->name('ai-pricing.exchange-rates.store');
+    Route::post('ai-pricing/exchange-rates/fetch', [AiPricingController::class, 'fetchExchangeRate'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-pricing.exchange-rates.fetch');
 
     // ── WhatsApp oficial (Gupshup): app global + por clínica ───────────────────
     // Configuração EXCLUSIVA do dono/admin do SaaS (Gate SaasAdminPanel dentro

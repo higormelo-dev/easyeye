@@ -154,7 +154,7 @@ test('o valor por chamada (diagnóstico) arredonda para CIMA e NÃO é o que se 
     $call    = fn (float $usd) => oneCall($usd)[0];
 
     // 3 chamadas de 0,5 centavo: diagnóstico = 3 × 1; cobrança da execução = round(1,5) = 2
-    expect($pricing->normalizeChargeForResponse($call(0.0002), pricingPolicy()))->toBe(1);
+    expect($pricing->normalizeChargeForResponse($call(0.0002), pricingPolicy(), 'x_workflow'))->toBe(1);
 
     $execucao = $pricing->calculateActualCharge('x', AiRunMode::Economy, [...oneCall(0.0002), ...oneCall(0.0002), ...oneCall(0.0002)], pricingPolicy(minimum: 1));
 
@@ -165,8 +165,8 @@ test('o valor por chamada é zero quando o custo bruto é nulo ou zero', functio
     $pricing  = new AiPricingService(fakePriceRepository([]));
     $nullCost = new AiProviderResponseData(provider: AiProvider::OpenAI, model: 'sem-preco', content: 'ok', usage: new AiUsageData(inputTokens: 10, outputTokens: 10, rawCostUsd: null), latencyMs: 90);
 
-    expect($pricing->normalizeChargeForResponse($nullCost, pricingPolicy()))->toBe(0)
-        ->and($pricing->normalizeChargeForResponse(oneCall(0.0)[0], pricingPolicy()))->toBe(0);
+    expect($pricing->normalizeChargeForResponse($nullCost, pricingPolicy(), 'x_workflow'))->toBe(0)
+        ->and($pricing->normalizeChargeForResponse(oneCall(0.0)[0], pricingPolicy(), 'x_workflow'))->toBe(0);
 });
 
 function fakePriceRepository(array $prices): AiModelPriceRepositoryInterface

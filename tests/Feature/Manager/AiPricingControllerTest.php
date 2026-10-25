@@ -7,7 +7,7 @@ use App\Domains\AI\Services\{AiExchangeRateService, AiPricingSettings};
 use App\Enums\SaasRule;
 use App\Models\{AuditLog, Entity, User};
 use App\Services\Audit\AuditLogger;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\{Cache, Http, Log};
 
 /*
  * Manager → IA → Precificação: só dono/admin financeiro do SaaS; toda escrita exige motivo, é auditada e o histórico de
@@ -35,12 +35,123 @@ it('mostra câmbio (com aviso de fallback), markup, pisos, pacotes e a conta de 
 
     $props = asPricingUser()->get(route('manager.ai-pricing.index'))->assertOk()->viewData('page')['props'];
 
-    expect($props['rate'])->toMatchArray(['rate' => 5.5, 'source' => 'fallback', 'is_fallback' => true])
+    expect($props['rate'])->toMatchArray(['rate' => 5.5, 'source' => 'fallback', 'is_fallback' => true, 'fetched_today' => false, 'is_automatic' => false, 'is_manual_override' => false, 'age_days' => null, 'fetched_at' => null])
         ->and($props['settings'])->toMatchArray(['markup_multiplier' => 5.0, 'minimum_charge_cents_default' => 10, 'custom_min_cents' => 100000, 'custom_max_cents' => 1000000])
         ->and(collect($props['packages'])->pluck('code')->all())->toBe(['basic', 'premium', 'enterprise', 'custom'])
         // US$ 1,00 × 5,50 × 5 = R$ 27,50
-        ->and(collect($props['examples'])->firstWhere('raw_cost_usd', 1.0))->toMatchArray(['charge_cents' => 2750, 'charge_formatted' => 'R$ 27,50', 'minimum_applied' => false])
+        ->and(collect($props['examples'])->firstWhere('raw_cost_usd', 1.0))->toMatchArray(['charge_cents' => 2750, 'charge_formatted' => 'R$ 27,50', 'minimum_applied' => false, 'markup_multiplier' => 5.0, 'exchange_rate_brl_usd' => 5.5])
         ->and($props['history']['data'])->toBe([]);
+});
+
+function fakeFrankfurter(float $rate = 5.4321): void
+{
+    config(['ai.exchange_rate.auto_fetch' => true]);
+    Http::fake(['api.frankfurter.dev/*' => Http::response(['base' => 'USD', 'date' => now()->toDateString(), 'rates' => ['BRL' => $rate]])]);
+}
+
+it('mostra o markup por ação (só overrides), as internas, a conta das 9 ações e NÃO busca câmbio ao carregar', function () {
+    config(['ai.exchange_rate.auto_fetch' => true]);
+    Http::preventStrayRequests();
+    app(AiPricingSettings::class)->update(['markup_by_workflow' => ['report_drafting' => 8]]);
+
+    $props = asPricingUser()->get(route('manager.ai-pricing.index'))->assertOk()->viewData('page')['props'];
+
+    expect((array) $props['settings']['markup_by_workflow'])->toBe(['report_drafting' => 8.0])
+        ->and($props['settings']['internal_workflows'])->toBe(AiPricingSettings::INTERNAL_WORKFLOWS)
+        ->and(collect($props['workflow_examples'])->pluck('workflow')->all())->toBe(AiPricingSettings::WORKFLOWS)
+        // US$ 0,01 × 5,50 × 8 = 44 centavos; com o global 5x = 27,5 → 28
+        ->and(collect($props['workflow_examples'])->firstWhere('workflow', 'report_drafting'))->toMatchArray(['workflow_label' => 'Rascunho de laudo', 'is_internal' => false, 'raw_cost_usd' => 0.01, 'exchange_rate_brl_usd' => 5.5, 'markup_multiplier' => 8.0, 'minimum_charge_cents' => 10, 'charge_cents' => 44, 'charge_formatted' => 'R$ 0,44', 'minimum_applied' => false])
+        ->and(collect($props['workflow_examples'])->firstWhere('workflow', 'medicine_posology'))->toMatchArray(['is_internal' => true, 'markup_multiplier' => 5.0, 'charge_cents' => 28])
+        ->and($props['urls']['exchange_rates_fetch'])->toBe(route('manager.ai-pricing.exchange-rates.fetch'));
+
+    Http::assertNothingSent();
+});
+
+it('salva o markup por ação com motivo e audita; mapa inválido é 422 com o campo; mapa vazio limpa', function () {
+    asPricingUser()->putJson(route('manager.ai-pricing.settings'), ['markup_by_workflow' => ['report_drafting' => 8, 'medicine_posology' => 2.5], 'reason' => 'Laudo custa mais revisão humana'])
+        ->assertOk()
+        ->assertJsonPath('settings.markup_by_workflow.report_drafting', 8)
+        ->assertJsonPath('settings.markup_by_workflow.medicine_posology', 2.5);
+
+    $settings = app(AiPricingSettings::class);
+
+    expect($settings->markupMultiplierFor('report_drafting'))->toBe(8.0)
+        ->and($settings->markupMultiplierFor('exam_assistant'))->toBe(5.0)
+        ->and(AuditLog::query()->where('event', 'manager.ai_pricing.settings_updated')->latest('id')->value('new_values'))->toMatchArray(['markup_by_workflow' => ['report_drafting' => 8.0, 'medicine_posology' => 2.5]]);
+
+    asPricingUser()->putJson(route('manager.ai-pricing.settings'), ['markup_by_workflow' => ['foo' => 5], 'reason' => 'Ação desconhecida'])
+        ->assertStatus(422)->assertJsonPath('field', 'markup_by_workflow');
+    asPricingUser()->putJson(route('manager.ai-pricing.settings'), ['markup_by_workflow' => ['report_drafting' => 0], 'reason' => 'Fora da faixa mínima'])
+        ->assertStatus(422)->assertJsonPath('field', 'markup_by_workflow');
+
+    // Mapa vazio limpa os overrides (todas voltam ao global). Faixa 1–20 e demais casos: AiPricingWorkflowMarkupTest.
+    asPricingUser()->putJson(route('manager.ai-pricing.settings'), ['markup_by_workflow' => [], 'reason' => 'Volta todas ao padrão global'])
+        ->assertOk();
+    expect($settings->markupByWorkflow())->toBe([]);
+});
+
+it('"buscar agora" grava a automática com auditoria; repetido no dia é 200 already_fetched sem nova requisição', function () {
+    fakeFrankfurter(5.4321);
+
+    $response = asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.fetch'), ['reason' => 'Primeira cotação do dia'])
+        ->assertCreated()
+        ->assertJsonPath('rate.source', 'frankfurter')
+        ->assertJsonPath('rate.rate', 5.4321)
+        ->assertJsonPath('rate.fetched_today', true)
+        ->assertJsonPath('history_first.source', 'frankfurter')
+        ->assertJsonPath('history_first.rate_brl_per_usd', 5.4321)
+        ->assertJsonPath('history_first.recorded_by_name', null);
+
+    expect($response->json('history_first.fetched_at'))->not->toBeNull()
+        ->and(AiExchangeRate::query()->where('source', 'frankfurter')->count())->toBe(1)
+        ->and(AuditLog::query()->where('event', 'manager.ai_pricing.exchange_rate_fetched')->where('auditable_id', $response->json('history_first.id'))->exists())->toBeTrue();
+
+    asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.fetch'), ['reason' => 'Tentativa repetida no dia'])
+        ->assertOk()
+        ->assertJsonPath('already_fetched', true)
+        ->assertJsonPath('rate.source', 'frankfurter');
+
+    expect(AiExchangeRate::query()->count())->toBe(1);
+    Http::assertSentCount(1);
+
+    // Manual gravada depois sobrepõe a automática de hoje.
+    asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.store'), ['rate_brl_per_usd' => 5.75, 'reason' => 'Correção manual do dia'])
+        ->assertCreated()
+        ->assertJsonPath('rate.source', 'manual')
+        ->assertJsonPath('rate.is_manual_override', true);
+});
+
+it('"buscar agora" com a API fora é 502 sem linha nova e mantém a cotação atual; lock ocupado é 409; sem motivo é 422', function () {
+    config(['ai.exchange_rate.auto_fetch' => true]);
+    Http::fake(['api.frankfurter.dev/*' => Http::response(null, 503)]);
+    Log::spy();
+    asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.store'), ['rate_brl_per_usd' => 5.10, 'effective_at' => now()->subDay()->toIso8601String(), 'reason' => 'Cotação de ontem']);
+
+    asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.fetch'), ['reason' => 'Tentativa com API fora'])
+        ->assertStatus(502)
+        ->assertJsonPath('rate.source', 'manual')
+        ->assertJsonPath('rate.rate', 5.1);
+
+    expect(AiExchangeRate::query()->where('source', 'frankfurter')->count())->toBe(0);
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $msg) => $msg === 'ai.exchange_rate.fetch_failed')->once();
+
+    $lock = Cache::lock('ai:exchange-rate:fetch:' . now()->toDateString(), 10);
+    $lock->get();
+    asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.fetch'), ['reason' => 'Tentativa com lock ocupado'])->assertStatus(409);
+    $lock->release();
+
+    asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.fetch'), [])->assertStatus(422)->assertJsonValidationErrors(['reason']);
+    Http::assertSentCount(1);
+});
+
+it('sem a linha de auditoria a busca automática é desfeita (500, nenhuma cotação nova)', function () {
+    fakeFrankfurter();
+    $this->mock(AuditLogger::class)->shouldReceive('recordAdminAction');
+
+    asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.fetch'), ['reason' => 'Sem trilha de auditoria'])->assertStatus(500);
+
+    expect(AiExchangeRate::query()->count())->toBe(0)
+        ->and(app(AiExchangeRateService::class)->current()['source'])->toBe('fallback');
 });
 
 it('salva markup e pisos com motivo, dentro da faixa, e audita; fora da faixa é 422 com o campo', function () {
@@ -97,6 +208,7 @@ it('só dono ou admin financeiro do SaaS entra; financeiro sem ser dono e suport
     $support = User::factory()->create();
     createEntityUser($this->saas, $support, SaasRule::Support->value);
     asPricingUser($support, SaasRule::Support->value)->postJson(route('manager.ai-pricing.exchange-rates.store'), ['rate_brl_per_usd' => 5, 'reason' => 'Tentativa sem permissão'])->assertForbidden();
+    asPricingUser($financial, SaasRule::Financial->value)->postJson(route('manager.ai-pricing.exchange-rates.fetch'), ['reason' => 'Tentativa sem permissão'])->assertForbidden();
 
     expect(AiExchangeRate::query()->count())->toBe(0);
 });
@@ -111,10 +223,14 @@ it('sem a linha de auditoria nada entra em vigor: markup e cotação são desfei
 
     asPricingUser()->putJson(route('manager.ai-pricing.settings'), ['markup_multiplier' => 9, 'reason' => 'Sem trilha de auditoria'])
         ->assertStatus(500);
+    asPricingUser()->putJson(route('manager.ai-pricing.settings'), ['markup_by_workflow' => ['report_drafting' => 9], 'reason' => 'Sem trilha de auditoria'])
+        ->assertStatus(500);
     asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.store'), ['rate_brl_per_usd' => 6.0, 'reason' => 'Sem trilha de auditoria'])
         ->assertStatus(500);
 
     expect(app(AiPricingSettings::class)->markupMultiplier())->toBe(5.0)
+        ->and(app(AiPricingSettings::class)->markupByWorkflow())->toBe([])
+        ->and(Cache::has('subscription_setting:' . AiPricingSettings::KEY_MARKUP_BY_WORKFLOW))->toBeFalse()
         ->and(AiExchangeRate::query()->count())->toBe(0)
         ->and(AuditLog::query()->where('event', 'like', 'manager.ai_pricing.%')->count())->toBe(0);
 });

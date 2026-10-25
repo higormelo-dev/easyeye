@@ -165,7 +165,7 @@ class AiOrchestrator
                     role: $role,
                     status: 'success',
                     response: $response,
-                    normalizedChargeCents: $this->pricingService->normalizeChargeForResponse($response, $run->pricingPolicy() ?? app(AiPricingPolicyResolver::class)->current()),
+                    normalizedChargeCents: $this->pricingService->normalizeChargeForResponse($response, $run->pricingPolicy() ?? app(AiPricingPolicyResolver::class)->current(ensureFresh: true), $run->workflow),
                     metadata: [
                         'workflow'    => $request->workflow,
                         'provider'    => $providerCode,

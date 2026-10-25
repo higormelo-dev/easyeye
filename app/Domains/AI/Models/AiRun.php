@@ -96,9 +96,10 @@ class AiRun extends Model
     }
 
     /**
-     * Política de preço CONGELADA na execução (câmbio, markup e piso do momento da estimativa): mudar o câmbio/markup no
-     * manager só afeta estimativas novas. Null para execução sem snapshot (legado convertido) — quem liquida usa a política
-     * vigente.
+     * Política de preço CONGELADA na execução (câmbio, markup EFETIVO da ação e piso do momento da estimativa): mudar o
+     * câmbio/markup no manager só afeta estimativas novas. O markup congelado volta como global com mapa vazio, então
+     * `markupFor($this->workflow)` devolve o snapshot, nunca o override atual. Null para execução sem snapshot (legado
+     * convertido) — quem liquida usa a política vigente.
      */
     public function pricingPolicy(): ?AiPricingPolicyData
     {

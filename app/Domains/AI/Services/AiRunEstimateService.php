@@ -79,7 +79,8 @@ class AiRunEstimateService
             $providerEstimates = $priced;
         }
 
-        $policy = $this->policyResolver->current();
+        // Primeira estimativa do dia busca a cotação automática (uma vez; falha mantém a última cotação).
+        $policy = $this->policyResolver->current(ensureFresh: true);
 
         try {
             return $this->pricingService->estimateCharge(

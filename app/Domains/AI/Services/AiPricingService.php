@@ -134,7 +134,7 @@ class AiPricingService
      * debita: a cobrança da execução usa a soma do custo real das chamadas e a fórmula única de `chargeCentsFromUsd`
      * (HALF_UP, com piso) — somar estes centavos por chamada inflaria a conta.
      */
-    public function normalizeChargeForResponse(AiProviderResponseData $response, AiPricingPolicyData $policy): int
+    public function normalizeChargeForResponse(AiProviderResponseData $response, AiPricingPolicyData $policy, string $workflow): int
     {
         $rawCostUsd = (float) ($this->resolveCostUsdForResponse($response) ?? 0.0);
 
@@ -142,16 +142,16 @@ class AiPricingService
             return 0;
         }
 
-        return $this->grossCents($rawCostUsd, $policy, RoundingMode::CEILING);
+        return $this->grossCents($rawCostUsd, $policy, $workflow, RoundingMode::CEILING);
     }
 
     /**
-     * Fórmula única do preço: `bruto = round(custo_usd × câmbio × markup × 100, HALF_UP)`; `preço = max(1, piso, bruto)`.
-     * Aritmética decimal exata (sem float) para a borda de 0,5 centavo não oscilar.
+     * Fórmula única do preço: `bruto = round(custo_usd × câmbio × markup_da_ação × 100, HALF_UP)`;
+     * `preço = max(1, piso, bruto)`. Aritmética decimal exata (sem float) para a borda de 0,5 centavo não oscilar.
      */
     public function chargeCentsFromUsd(float $rawCostUsd, string $workflow, AiPricingPolicyData $policy): int
     {
-        return max(1, $policy->minimumChargeCentsFor($workflow), $this->grossCents($rawCostUsd, $policy));
+        return max(1, $policy->minimumChargeCentsFor($workflow), $this->grossCents($rawCostUsd, $policy, $workflow));
     }
 
     /** Preço mínimo quando o modelo não tem preço cadastrado: piso do workflow × modo (Economy 1, Validated 2, Consensus 3). */
@@ -248,7 +248,7 @@ class AiPricingService
     private function buildEstimate(string $workflow, AiRunMode $mode, float $rawCostUsd, AiPricingPolicyData $policy, array $breakdown): AiCreditEstimateData
     {
         $rawCostUsd  = round($rawCostUsd, 8);
-        $gross       = $this->grossCents($rawCostUsd, $policy);
+        $gross       = $this->grossCents($rawCostUsd, $policy, $workflow);
         $minimum     = max(1, $policy->minimumChargeCentsFor($workflow));
         $chargeCents = max($minimum, $gross);
 
@@ -265,11 +265,11 @@ class AiPricingService
         );
     }
 
-    private function grossCents(float $rawCostUsd, AiPricingPolicyData $policy, RoundingMode $rounding = RoundingMode::HALF_UP): int
+    private function grossCents(float $rawCostUsd, AiPricingPolicyData $policy, string $workflow, RoundingMode $rounding = RoundingMode::HALF_UP): int
     {
         return BigDecimal::of(number_format(max(0.0, $rawCostUsd), 8, '.', ''))
             ->multipliedBy(number_format(max(0.0, $policy->exchangeRateBrlUsd), 6, '.', ''))
-            ->multipliedBy(number_format(max(0.0, $policy->markupMultiplier), 3, '.', ''))
+            ->multipliedBy(number_format(max(0.0, $policy->markupFor($workflow)), 3, '.', ''))
             ->multipliedBy('100')
             ->toScale(0, $rounding)
             ->toInt();

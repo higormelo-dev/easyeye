@@ -56,7 +56,7 @@ class AiRunExecutionService
                 workflow: $run->workflow,
                 mode: $run->mode,
                 providerResponses: $result->providerCalls,
-                policy: $run->pricingPolicy() ?? $this->policyResolver->current(),
+                policy: $run->pricingPolicy() ?? $this->policyResolver->current(ensureFresh: true),
             );
 
             $actualCharge   = max(0, $estimate->chargeCents);

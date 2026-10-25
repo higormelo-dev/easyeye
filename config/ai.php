@@ -191,6 +191,11 @@ return [
         // (produção pode estar com 2.0 do modelo de créditos).
         'markup_multiplier' => (float) env('AI_MARKUP_MULTIPLIER', 5.0),
 
+        // Overrides de markup por ação (workflow => 1–20). Vazio: todas herdam o global acima (uma mudança do global alcança
+        // quem não tem override). Editável no manager (system_settings > este padrão). Ações internas (posologia, P&L)
+        // aceitam override, mas não são cobradas.
+        'markup_by_workflow' => [],
+
         // Piso global por execução, em centavos (R$ 0,10): chamada curta não corrói a margem.
         'minimum_charge_cents_default' => (int) env('AI_MIN_CHARGE_CENTS_DEFAULT', 10),
 
@@ -203,13 +208,19 @@ return [
         ],
     ],
 
-    // Conversão ÚNICA do saldo em créditos (modelo antigo) para centavos de BRL (migration/comando ai:convert-legacy-credits).
-    // São PARÂMETROS para o dono trocar antes do deploy — não números soltos no código.
-    // Cotação automática do dólar (frankfurter.dev, taxa diária do BCE). Desligar só em testes/ambientes sem rede.
+    // Cotação automática do dólar (frankfurter.dev, taxa diária do BCE, sem chave). Sem segredo. `auto_fetch=false` só em
+    // testes/ambientes sem rede. A faixa automática (0,5–100) e a manual (1–20) vivem em AiExchangeRateService.
     'exchange_rate' => [
-        'auto_fetch' => (bool) env('AI_EXCHANGE_RATE_AUTO_FETCH', true),
+        'auto_fetch'              => (bool) env('AI_EXCHANGE_RATE_AUTO_FETCH', true),
+        'base_url'                => env('AI_EXCHANGE_RATE_BASE_URL', 'https://api.frankfurter.dev/v1'),
+        'connect_timeout_seconds' => (int) env('AI_EXCHANGE_RATE_CONNECT_TIMEOUT', 3),
+        'timeout_seconds'         => (int) env('AI_EXCHANGE_RATE_TIMEOUT', 5),
+        'failure_cache_minutes'   => 15,
+        'schedule_time'           => env('AI_EXCHANGE_RATE_SCHEDULE_TIME', '06:05'),
     ],
 
+    // Conversão ÚNICA do saldo em créditos (modelo antigo) para centavos de BRL (migration/comando ai:convert-legacy-credits).
+    // São PARÂMETROS para o dono trocar antes do deploy — não números soltos no código.
     'legacy_conversion' => [
         // Centavos por crédito comprado quando a clínica não tem nenhuma compra paga (decisão do dono: R$ 2,00/crédito).
         'default_credit_cents' => (int) env('AI_LEGACY_DEFAULT_CREDIT_CENTS', 200),

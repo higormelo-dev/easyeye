@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Manager;
 
+use App\Domains\AI\Models\AiExchangeRate;
 use App\Domains\AI\Services\{AiCreditPurchaseService, AiExchangeRateService, AiPricingPolicyResolver, AiPricingService, AiPricingSettings};
 use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
@@ -18,15 +19,19 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * Manager → IA → Precificação: câmbio manual (histórico append-only, com autor e data), markup, pisos e limites do pacote
- * personalizado. SÓ o dono/admin financeiro do SaaS (Gate SaasOwnerFinancial, o mesmo de Uso de IA): câmbio e markup são
- * segredo comercial e NUNCA aparecem em rota de clínica (AiPricingLeakageTest). Toda mudança exige motivo e fica na
- * auditoria (`manager.ai_pricing.*`). Plano: docs/internal/planos/ai-credit-packs-brl-plano.md §4.
+ * Manager → IA → Precificação: câmbio (manual append-only com autor e data; automática do BCE via "buscar agora"),
+ * markup global e por ação, pisos e limites do pacote personalizado. SÓ o dono/admin financeiro do SaaS (Gate
+ * SaasOwnerFinancial, o mesmo de Uso de IA): câmbio e markup são segredo comercial e NUNCA aparecem em rota de clínica
+ * (AiPricingBrlTest). Toda mudança exige motivo e fica na auditoria (`manager.ai_pricing.*`). O carregamento da tela
+ * NUNCA faz HTTP. Planos: docs/internal/planos/ai-credit-packs-brl-plano.md §4 e ai-pricing-lote2-plano.md §4.
  */
 class AiPricingController extends Controller
 {
     /** Custos de provedor (US$) usados nos exemplos da conta. */
     private const EXAMPLE_COSTS_USD = [0.001, 0.01, 0.05, 0.25, 1.0];
+
+    /** Custo de referência (US$) da conta por ação. */
+    private const WORKFLOW_EXAMPLE_COST_USD = 0.01;
 
     public function __construct(
         private readonly AiExchangeRateService $rates,
@@ -42,45 +47,52 @@ class AiPricingController extends Controller
     {
         $this->authorizeOwner();
 
-        $policy  = $this->policies->current();
+        $current = $this->rates->current(); // só leitura: a tela nunca busca câmbio
+        $policy  = $this->policies->fromRate($current);
         $history = $this->rates->history();
-        $current = $this->rates->current();
 
         $examples = array_map(function (float $usd) use ($policy): array {
             $cents = $this->pricing->chargeCentsFromUsd($usd, 'exam_assistant', $policy);
 
             return [
-                'raw_cost_usd'     => $usd,
-                'charge_cents'     => $cents,
-                'charge_formatted' => Money::formatBrl($cents),
-                'minimum_applied'  => $cents === $policy->minimumChargeCentsFor('exam_assistant'),
+                'raw_cost_usd'          => $usd,
+                'exchange_rate_brl_usd' => $policy->exchangeRateBrlUsd,
+                'markup_multiplier'     => $policy->markupFor('exam_assistant'),
+                'charge_cents'          => $cents,
+                'charge_formatted'      => Money::formatBrl($cents),
+                'minimum_applied'       => $cents === $policy->minimumChargeCentsFor('exam_assistant'),
             ];
         }, self::EXAMPLE_COSTS_USD);
 
+        $workflowExamples = array_map(function (string $workflow) use ($policy): array {
+            $cents = $this->pricing->chargeCentsFromUsd(self::WORKFLOW_EXAMPLE_COST_USD, $workflow, $policy);
+
+            return [
+                'workflow'              => $workflow,
+                'workflow_label'        => __("manager_ai_pricing.workflows.{$workflow}"),
+                'is_internal'           => in_array($workflow, AiPricingSettings::INTERNAL_WORKFLOWS, true),
+                'raw_cost_usd'          => self::WORKFLOW_EXAMPLE_COST_USD,
+                'exchange_rate_brl_usd' => $policy->exchangeRateBrlUsd,
+                'markup_multiplier'     => $policy->markupFor($workflow),
+                'minimum_charge_cents'  => $policy->minimumChargeCentsFor($workflow),
+                'charge_cents'          => $cents,
+                'charge_formatted'      => Money::formatBrl($cents),
+                'minimum_applied'       => $cents === $policy->minimumChargeCentsFor($workflow),
+            ];
+        }, AiPricingSettings::WORKFLOWS);
+
         return Inertia::render('Panel/Manager/AiPricing/Index', [
-            'rate' => [
-                'rate'             => $current['rate'],
-                'source'           => $current['source'],
-                'effective_at'     => $current['effective_at']?->toIso8601String(),
-                'recorded_by_name' => $current['recorded_by_name'],
-                'note'             => $current['note'],
-                'is_fallback'      => $current['is_fallback'],
-            ],
-            'settings' => $this->settingsPayload(),
-            'packages' => $this->purchases->packages(),
-            'examples' => $examples,
-            'history'  => $history->through(fn ($row): array => [
-                'id'               => (string) $row->id,
-                'source'           => $row->source->value,
-                'rate_brl_per_usd' => (float) $row->rate_brl_per_usd,
-                'effective_at'     => $row->effective_at?->toIso8601String(),
-                'recorded_by_name' => $row->recordedBy?->name,
-                'note'             => $row->note,
-            ]),
-            't'    => trans('manager_ai_pricing'),
-            'urls' => [
-                'settings'       => route('manager.ai-pricing.settings'),
-                'exchange_rates' => route('manager.ai-pricing.exchange-rates.store'),
+            'rate'              => $this->ratePayload($current),
+            'settings'          => $this->settingsPayload(),
+            'packages'          => $this->purchases->packages(),
+            'examples'          => $examples,
+            'workflow_examples' => $workflowExamples,
+            'history'           => $history->through(fn (AiExchangeRate $row): array => $this->historyRow($row)),
+            't'                 => trans('manager_ai_pricing'),
+            'urls'              => [
+                'settings'             => route('manager.ai-pricing.settings'),
+                'exchange_rates'       => route('manager.ai-pricing.exchange-rates.store'),
+                'exchange_rates_fetch' => route('manager.ai-pricing.exchange-rates.fetch'),
             ],
         ]);
     }
@@ -91,6 +103,7 @@ class AiPricingController extends Controller
 
         $validated = $request->validate([
             'markup_multiplier'                => ['sometimes', 'numeric'],
+            'markup_by_workflow'               => ['sometimes', 'array'],
             'minimum_charge_cents_default'     => ['sometimes', 'integer'],
             'minimum_charge_cents_by_workflow' => ['sometimes', 'array'],
             'custom_min_cents'                 => ['sometimes', 'integer'],
@@ -171,16 +184,101 @@ class AiPricingController extends Controller
 
         return response()->json([
             'message'       => __('manager_ai_pricing.exchange_rate_saved'),
-            'rate'          => $this->rates->current(),
-            'history_first' => [
-                'id'               => (string) $row->id,
-                'source'           => $row->source->value,
-                'rate_brl_per_usd' => (float) $row->rate_brl_per_usd,
-                'effective_at'     => $row->effective_at?->toIso8601String(),
-                'recorded_by_name' => auth()->user()?->name,
-                'note'             => $row->note,
-            ],
+            'rate'          => $this->ratePayload($this->rates->current()),
+            'history_first' => [...$this->historyRow($row), 'recorded_by_name' => auth()->user()?->name],
         ], 201);
+    }
+
+    /**
+     * "Buscar agora": busca a automática do dia (BCE via frankfurter.dev) com motivo e auditoria na MESMA transação do
+     * insert (sem trilha, a cotação é desfeita). Idempotente por dia (D4): já buscada → 200 e orientação para corrigir por
+     * cotação manual; lock ocupado → 409; API fora → 502 mantendo a cotação vigente. Tentativas sem efeito são auditadas
+     * em best-effort.
+     */
+    public function fetchExchangeRate(Request $request): JsonResponse
+    {
+        $this->authorizeOwner();
+
+        $reason = (string) $request->validate(['reason' => ['required', 'string', 'min:10', 'max:500']])['reason'];
+
+        $result = $this->rates->fetchNow(function (AiExchangeRate $row) use ($reason, $request): void {
+            $this->auditedOrFail('manager.ai_pricing.exchange_rate_fetched', fn () => $this->audit->recordAdminAction(
+                event: 'manager.ai_pricing.exchange_rate_fetched',
+                targetEntityId: (string) session('selected_entity_id'),
+                targetUserId: null,
+                auditableType: 'ai_exchange_rate',
+                auditableId: (string) $row->id,
+                reason: $reason,
+                newValues: ['source' => $row->source->value, 'rate_brl_per_usd' => (float) $row->rate_brl_per_usd, 'effective_at' => $row->effective_at?->toIso8601String(), 'fetched_at' => $row->created_at?->toIso8601String()],
+                request: $request,
+            ));
+        });
+
+        $rate = $this->ratePayload($this->rates->current());
+
+        if ($result['status'] === AiExchangeRateService::FETCH_CREATED) {
+            Log::info('manager.ai_pricing.exchange_rate_fetched', ['by' => (string) auth()->id(), 'id' => (string) $result['row']->id]);
+
+            return response()->json(['message' => __('manager_ai_pricing.fetch_success'), 'rate' => $rate, 'history_first' => $this->historyRow($result['row'])], 201);
+        }
+
+        if ($result['status'] === AiExchangeRateService::FETCH_BUSY) {
+            return response()->json(['message' => __('manager_ai_pricing.fetch_busy'), 'rate' => $rate], 409);
+        }
+
+        // Sem mudança de preço: trilha best-effort da tentativa (AuditLogger engole falha de escrita).
+        $this->audit->recordAdminAction(
+            event: 'manager.ai_pricing.exchange_rate_fetch_attempted',
+            targetEntityId: (string) session('selected_entity_id'),
+            targetUserId: null,
+            auditableType: 'ai_pricing',
+            auditableId: (string) session('selected_entity_id'),
+            reason: $reason,
+            newValues: ['status' => $result['status'], 'code' => $result['code']],
+            request: $request,
+        );
+
+        if ($result['status'] === AiExchangeRateService::FETCH_ALREADY) {
+            return response()->json(['message' => __('manager_ai_pricing.fetch_already'), 'rate' => $rate, 'already_fetched' => true]);
+        }
+
+        return response()->json(['message' => __('manager_ai_pricing.errors.ai_exchange_rate_fetch_failed'), 'rate' => $rate, 'code' => $result['code']], 502);
+    }
+
+    /**
+     * @param array<string, mixed> $current
+     *
+     * @return array<string, mixed>
+     */
+    private function ratePayload(array $current): array
+    {
+        return [
+            'rate'               => $current['rate'],
+            'source'             => $current['source'],
+            'effective_at'       => $current['effective_at']?->toIso8601String(),
+            'fetched_at'         => $current['fetched_at']?->toIso8601String(),
+            'recorded_by_name'   => $current['recorded_by_name'],
+            'note'               => $current['note'],
+            'is_fallback'        => $current['is_fallback'],
+            'fetched_today'      => $current['fetched_today'],
+            'is_automatic'       => $current['is_automatic'],
+            'is_manual_override' => $current['is_manual_override'],
+            'age_days'           => $current['age_days'],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function historyRow(AiExchangeRate $row): array
+    {
+        return [
+            'id'               => (string) $row->id,
+            'source'           => $row->source->value,
+            'rate_brl_per_usd' => (float) $row->rate_brl_per_usd,
+            'effective_at'     => $row->effective_at?->toIso8601String(),
+            'fetched_at'       => $row->created_at?->toIso8601String(),
+            'recorded_by_name' => $row->recordedBy?->name,
+            'note'             => $row->note,
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -188,6 +286,8 @@ class AiPricingController extends Controller
     {
         return [
             'markup_multiplier'                => $this->settings->markupMultiplier(),
+            'markup_by_workflow'               => (object) $this->settings->markupByWorkflow(), // vazio vira {} no JSON
+            'internal_workflows'               => AiPricingSettings::INTERNAL_WORKFLOWS,
             'minimum_charge_cents_default'     => $this->settings->minimumChargeCentsDefault(),
             'minimum_charge_cents_by_workflow' => $this->settings->minimumChargeCentsByWorkflow(),
             'custom_min_cents'                 => $this->settings->customMinCents(),
@@ -268,6 +368,10 @@ class AiPricingController extends Controller
         if (array_key_exists('minimum_charge_cents_by_workflow', $data)) {
             // Persistência substitui o mapa de overrides inteiro: efetivo = padrões do config + request (não o mapa antigo).
             $after['minimum_charge_cents_by_workflow'] = array_map('intval', [...(array) config('ai.pricing.minimum_charge_cents_by_workflow', []), ...(array) $data['minimum_charge_cents_by_workflow']]);
+        }
+
+        if (array_key_exists('markup_by_workflow', $data)) {
+            $after['markup_by_workflow'] = (object) array_map('floatval', [...(array) config('ai.pricing.markup_by_workflow', []), ...(array) $data['markup_by_workflow']]);
         }
 
         return $after;

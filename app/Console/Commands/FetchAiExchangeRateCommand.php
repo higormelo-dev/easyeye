@@ -4,24 +4,24 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Domains\AI\Services\AiExchangeRateService;
+use App\Jobs\AI\FetchAiExchangeRateJob;
 use Illuminate\Console\Command;
 
-/** Busca (se ainda não há) a cotação automática do dólar de hoje — o mesmo que a primeira operação de IA do dia faria. */
+/**
+ * Agendado diariamente (routes/console.php): só enfileira o job que busca a cotação automática do dólar de hoje —
+ * o agendador roda em série e não pode esperar a rede. Busca síncrona: AiExchangeRateService::fetchNow().
+ */
 class FetchAiExchangeRateCommand extends Command
 {
     protected $signature = 'ai:fetch-exchange-rate';
 
-    protected $description = 'Busca a cotação do dólar do dia (frankfurter.dev) para a precificação da IA.';
+    protected $description = 'Enfileira a busca da cotação do dólar do dia (frankfurter.dev) para a precificação da IA.';
 
-    public function handle(AiExchangeRateService $rates): int
+    public function handle(): int
     {
-        $row = $rates->ensureTodayRate();
-        $now = $rates->current();
+        FetchAiExchangeRateJob::dispatch();
 
-        $this->info($row !== null
-            ? "Cotação de hoje: R$ {$row->rate_brl_per_usd} ({$row->source->value})."
-            : "Sem cotação nova; em vigor: R$ {$now['rate']} ({$now['source']}).");
+        $this->info('Busca da cotação do dólar enfileirada (fila default).');
 
         return self::SUCCESS;
     }

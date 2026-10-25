@@ -7,9 +7,9 @@ use App\Domains\AI\Services\{AiCreditPurchaseService, AiCreditWalletService, AiE
 use App\Domains\AI\Support\AiLegacyCreditConverter;
 use App\DTOs\AI\AiPricingPolicyData;
 use App\Enums\AI\AiRunMode;
-use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
+use App\Enums\{ClientRule, FeatureKey, SaasRule, SubscriptionStatus};
 use App\Models\{Entity, Plan, PlanFeature, Subscription, User};
-use Illuminate\Support\Facades\{DB, Http};
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /*
@@ -21,7 +21,7 @@ use Illuminate\Support\Str;
 const AI_PRICING_FORBIDDEN_KEYS = [
     'raw_cost_usd', 'cost_usd', 'cost_usd_with_margin', 'margin_multiplier', 'usd_per_credit', 'margin', 'gross_margin',
     'exchange_rate', 'exchange_rate_brl_usd', 'provider_cost', 'revenue_estimate', 'pricing_source', 'markup_multiplier',
-    'gross_charge_cents', 'cost_brl',
+    'gross_charge_cents', 'cost_brl', 'markup_by_workflow', 'markup_effective', 'effective_markup', 'markup_for_workflow', 'workflow_examples', 'internal_workflows',
 ];
 
 /** @return list<string> caminhos onde apareceu chave proibida */
@@ -123,65 +123,6 @@ describe('câmbio', function () {
         expect($rates->current())->toMatchArray(['rate' => 5.75, 'source' => 'manual', 'recorded_by_name' => $user->name, 'note' => 'PTAX de ontem'])
             ->and(AiExchangeRate::query()->count())->toBe(2)
             ->and(fn () => $rates->record(55.0, now(), (string) $user->id))->toThrow(InvalidArgumentException::class);
-    });
-});
-
-describe('câmbio automático (frankfurter.dev)', function () {
-    beforeEach(fn () => config(['ai.exchange_rate.auto_fetch' => true]));
-
-    it('a primeira consulta do dia busca e grava a taxa do BCE; as seguintes leem do banco', function () {
-        Http::fake([AiExchangeRateService::FRANKFURTER_URL => Http::response(['base' => 'USD', 'date' => now()->toDateString(), 'rates' => ['BRL' => 5.4321]])]);
-
-        $rates = app(AiExchangeRateService::class);
-
-        expect($rates->current())->toMatchArray(['rate' => 5.4321, 'source' => 'frankfurter', 'is_fallback' => false])
-            ->and($rates->current()['rate'])->toBe(5.4321)
-            ->and(AiExchangeRate::query()->where('source', 'frankfurter')->count())->toBe(1);
-
-        Http::assertSentCount(1);
-    });
-
-    it('manual gravada hoje vence a automática de hoje; manual antiga perde para a automática do dia', function () {
-        Http::fake([AiExchangeRateService::FRANKFURTER_URL => Http::response(['date' => now()->toDateString(), 'rates' => ['BRL' => 5.40]])]);
-        $rates = app(AiExchangeRateService::class);
-        $user  = User::factory()->create();
-
-        $rates->record(5.90, now()->subDays(2), (string) $user->id, 'antiga');
-        expect($rates->current())->toMatchArray(['rate' => 5.4, 'source' => 'frankfurter']);
-
-        $rates->record(5.75, now(), (string) $user->id, 'ajuste de hoje');
-        expect($rates->current())->toMatchArray(['rate' => 5.75, 'source' => 'manual']);
-    });
-
-    it('API fora, taxa inválida ou tipo errado: nada é gravado, fica a última cotação e a rede não é repetida por 15 min', function (mixed $payload, int $status) {
-        $rates = app(AiExchangeRateService::class);
-        $user  = User::factory()->create();
-        $rates->record(5.10, now()->subDay(), (string) $user->id);
-
-        Http::fake([AiExchangeRateService::FRANKFURTER_URL => Http::response($payload, $status)]);
-
-        expect($rates->current())->toMatchArray(['rate' => 5.1, 'source' => 'manual'])
-            ->and($rates->current()['rate'])->toBe(5.1)
-            ->and(AiExchangeRate::query()->where('source', 'frankfurter')->count())->toBe(0);
-
-        // Cooldown: a segunda consulta não volta à rede.
-        Http::assertSentCount(1);
-
-        $this->artisan('ai:fetch-exchange-rate')->assertSuccessful();
-        Http::assertSentCount(1);
-    })->with([
-        'taxa zero'     => [['rates' => ['BRL' => 0]], 200],
-        'booleano'      => [['rates' => ['BRL' => true]], 200],
-        'array'         => [['rates' => ['BRL' => [5.4]]], 200],
-        'string suja'   => [['rates' => ['BRL' => '5.4garbage']], 200],
-        'fora da faixa' => [['rates' => ['BRL' => 150]], 200],
-        'servidor fora' => [null, 503],
-    ]);
-
-    it('string decimal íntegra da API é aceita', function () {
-        Http::fake([AiExchangeRateService::FRANKFURTER_URL => Http::response(['date' => now()->toDateString(), 'rates' => ['BRL' => '5.4321']])]);
-
-        expect(app(AiExchangeRateService::class)->current())->toMatchArray(['rate' => 5.4321, 'source' => 'frankfurter']);
     });
 });
 
@@ -315,8 +256,23 @@ describe('a clínica não vê a conta', function () {
             ->and(json_encode($index))->not->toContain('raw_cost_usd');
     });
 
+    it('o manager, e só ele, carrega o markup por ação e a conta por ação (prova de que o detector enxerga o lado proibido)', function () {
+        $saas  = Entity::factory()->create(['is_client' => false, 'active' => true]);
+        $admin = User::factory()->create();
+        createEntityUser($saas, $admin, SaasRule::Admin->value);
+
+        $props = $this->actingAs($admin)
+            ->withSession(['selected_entity_id' => $saas->id, 'selected_entity_is_client' => false, 'selected_entity_user_rule' => SaasRule::Admin->value])
+            ->get(route('manager.ai-pricing.index'))
+            ->assertOk()
+            ->viewData('page')['props'];
+
+        expect(aiPricingForbiddenPaths($props))->toContain('settings.markup_by_workflow', 'settings.internal_workflows', 'workflow_examples', 'workflow_examples.0.markup_multiplier', 'examples.0.exchange_rate_brl_usd');
+    });
+
     it('o detector de vazamento enxerga chave proibida em qualquer profundidade', function () {
         expect(aiPricingForbiddenPaths(['props' => ['analytics' => ['runs' => [['markup_multiplier' => 5]]]]]))->toBe(['props.analytics.runs.0.markup_multiplier'])
+            ->and(aiPricingForbiddenPaths(['props' => ['internal_workflows' => ['medicine_posology']]]))->toBe(['props.internal_workflows'])
             ->and(aiPricingForbiddenPaths(['charge_cents' => 10, 'balance' => ['available_cents' => 1]]))->toBe([]);
     });
 });

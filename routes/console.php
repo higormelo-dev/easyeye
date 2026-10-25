@@ -149,10 +149,10 @@ Schedule::command('recall:verify-integrity')
 
 // Recall de pacientes (Fase 6): reavalia, a cada minuto, os pacientes que um ato clínico marcou na outbox
 // (prontuário, exame, agenda, medicação, cadastro, condição) — quem grava nunca espera a avaliação.
-// Cotação do dólar da precificação da IA: 1 taxa por dia (BCE via frankfurter.dev). A primeira operação do dia também
-// busca se este job não rodou; falha mantém a última cotação guardada.
+// Cotação do dólar da precificação da IA: 1 taxa por dia (BCE via frankfurter.dev), via job na fila default. A primeira
+// precificação do dia também busca se o job não rodou; falha mantém a última cotação guardada.
 Schedule::command('ai:fetch-exchange-rate')
-    ->dailyAt('06:05')
+    ->dailyAt((string) config('ai.exchange_rate.schedule_time', '06:05'))
     ->name('ai:fetch-exchange-rate')
     ->withoutOverlapping(10)
     ->onOneServer()

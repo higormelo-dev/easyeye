@@ -13,8 +13,22 @@ vi.mock('@inertiajs/vue3', async (importOriginal) => {
 });
 vi.mock('@/Layouts/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }));
 
+const WORKFLOWS = [
+    'exam_assistant',
+    'report_drafting',
+    'consensus_review',
+    'eye_image_analysis',
+    'assistant_chat',
+    'record_assist',
+    'medicine_posology',
+    'platform_finance_digest',
+    'platform_finance_chat',
+];
+const INTERNAL = ['medicine_posology', 'platform_finance_digest', 'platform_finance_chat'];
 const settings = {
     markup_multiplier: 5,
+    markup_by_workflow: {},
+    internal_workflows: INTERNAL,
     minimum_charge_cents_default: 10,
     minimum_charge_cents_by_workflow: { exam_assistant: 10 },
     custom_min_cents: 100000,
@@ -26,10 +40,42 @@ const rate = {
     rate: 5.5,
     source: 'manual',
     effective_at: '2026-10-23T12:00:00Z',
+    fetched_at: '2026-10-23T12:00:00Z',
     recorded_by_name: 'Admin',
     note: null,
     is_fallback: false,
+    fetched_today: false,
+    is_automatic: false,
+    is_manual_override: false,
+    age_days: 0,
 };
+const autoRate = {
+    ...rate,
+    rate: 5.4321,
+    source: 'frankfurter',
+    effective_at: '2026-10-22T03:00:00Z',
+    fetched_at: '2026-10-23T09:05:00Z',
+    recorded_by_name: null,
+    note: 'Frankfurter/BCE',
+    fetched_today: true,
+    is_automatic: true,
+    age_days: 1,
+};
+const workflowLabels = Object.fromEntries(WORKFLOWS.map((w) => [w, `Ação ${w}`]));
+workflowLabels.exam_assistant = 'Assistente de exames';
+workflowLabels.report_drafting = 'Rascunho de laudo';
+const workflowExamples = WORKFLOWS.map((workflow) => ({
+    workflow,
+    workflow_label: workflowLabels[workflow],
+    is_internal: INTERNAL.includes(workflow),
+    raw_cost_usd: 0.01,
+    exchange_rate_brl_usd: 5.5,
+    markup_multiplier: workflow === 'report_drafting' ? 8 : 5,
+    minimum_charge_cents: 10,
+    charge_cents: workflow === 'report_drafting' ? 44 : 28,
+    charge_formatted: workflow === 'report_drafting' ? 'R$ 0,44' : 'R$ 0,28',
+    minimum_applied: false,
+}));
 const t = {
     title: 'Precificação de IA',
     subtitle: 'Regras',
@@ -43,8 +89,30 @@ const t = {
         rate_brl_per_usd: 'Nova cotação',
     },
     hints: {},
-    workflows: { exam_assistant: 'Assistente de exames' },
-    sources: { manual: 'Manual', fallback: 'Contingência' },
+    workflows: workflowLabels,
+    sources: { manual: 'Manual', fallback: 'Contingência', frankfurter: 'Frankfurter (BCE)' },
+    fetched_at: 'Buscada em',
+    age: 'Idade',
+    age_days: 'há :count dias',
+    age_one_day: 'há 1 dia',
+    today: 'hoje',
+    automatic: 'Automática',
+    manual_override: 'Manual sobrepõe a automática de hoje',
+    fetch_now: 'Buscar agora',
+    fetch_confirm: 'Confirmar busca da cotação automática',
+    fetch_hint: 'Busca a taxa do BCE.',
+    fetch_unavailable: 'A automática de hoje já foi buscada; registre uma cotação manual.',
+    markup_workflow_title: 'Markup por ação',
+    markup_workflow_hint: 'Cada ação usa o global salvo override.',
+    markup_use_default: 'Usar padrão global',
+    markup_global_default: 'Padrão global',
+    markup_effective: 'Efetivo',
+    workflow_examples_title: 'A conta por ação',
+    workflow_examples_hint: 'US$ 0,01 em cada ação.',
+    internal_not_charged: 'Interno — não cobrado',
+    action: 'Ação',
+    price: 'Preço',
+    minimum: 'Piso',
     fallback_warning: 'Defina a cotação.',
     rate_title: 'Registrar cotação',
     current_rate: 'Cotação atual',
@@ -86,9 +154,24 @@ function render(overrides = {}) {
                 { code: 'custom', name: 'Personalizado', custom: true },
             ],
             examples: [
-                { raw_cost_usd: 1, charge_cents: 2750, charge_formatted: 'R$ 27,50', minimum_applied: false },
-                { raw_cost_usd: 0.001, charge_cents: 10, charge_formatted: 'R$ 0,10', minimum_applied: true },
+                {
+                    raw_cost_usd: 1,
+                    exchange_rate_brl_usd: 5.5,
+                    markup_multiplier: 5,
+                    charge_cents: 2750,
+                    charge_formatted: 'R$ 27,50',
+                    minimum_applied: false,
+                },
+                {
+                    raw_cost_usd: 0.001,
+                    exchange_rate_brl_usd: 5.5,
+                    markup_multiplier: 5,
+                    charge_cents: 10,
+                    charge_formatted: 'R$ 0,10',
+                    minimum_applied: true,
+                },
             ],
+            workflow_examples: structuredClone(workflowExamples),
             history: {
                 data: [
                     {
@@ -103,7 +186,11 @@ function render(overrides = {}) {
                 last_page: 1,
                 links: [],
             },
-            urls: { settings: '/pricing/settings', exchange_rates: '/pricing/rates' },
+            urls: {
+                settings: '/pricing/settings',
+                exchange_rates: '/pricing/rates',
+                exchange_rates_fetch: '/pricing/rates/fetch',
+            },
             ...overrides,
         },
         global: { stubs: { teleport: true } },
@@ -165,13 +252,14 @@ describe('Manager AI pricing', () => {
             ...settings,
             custom_step_cents: undefined,
             limits: undefined,
+            internal_workflows: undefined,
             markup_multiplier: 6,
             reason: 'Revisão mensal dos valores',
         });
         expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
         expect(wrapper.get('[role="status"]').text()).toBe('Regras salvas.');
         expect(router.reload).toHaveBeenCalledWith(
-            expect.objectContaining({ only: ['examples', 'packages', 'history', 'rate'] }),
+            expect.objectContaining({ only: ['examples', 'workflow_examples', 'packages', 'history', 'rate'] }),
         );
         expect(wrapper.find('[data-test="example"]').exists()).toBe(false);
     });
@@ -296,5 +384,167 @@ describe('Manager AI pricing', () => {
         expect(fetch).toHaveBeenCalledTimes(1);
         await wrapper.get('.btn-close').trigger('click');
         expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
+    });
+
+    describe('lote 2: câmbio automático e markup por ação', () => {
+        it('mostra fonte, idade, badge automática e a conta das 9 ações (internas não cobradas) sem buscar câmbio ao carregar', () => {
+            const wrapper = render({ rate: { ...autoRate } });
+            const card = wrapper.get('[data-test="rate-card"]').text();
+            expect(card).toContain('Frankfurter (BCE)');
+            expect(card).toContain('há 1 dia');
+            expect(card).toContain('Buscada em');
+            expect(wrapper.get('[data-test="badge-automatic"]').text()).toBe('Automática');
+            expect(wrapper.find('[data-test="badge-manual-override"]').exists()).toBe(false);
+            const rows = wrapper.findAll('[data-test="workflow-example"]');
+            expect(rows).toHaveLength(9);
+            expect(rows[1].text()).toContain('Rascunho de laudo');
+            expect(rows[1].text()).toContain('R$ 0,44');
+            expect(rows.filter((row) => row.text().includes('Interno — não cobrado'))).toHaveLength(3);
+            expect(rows[6].text()).toContain('Interno — não cobrado');
+            expect(fetch).not.toHaveBeenCalled();
+        });
+
+        it('marca a manual que sobrepõe a automática de hoje e mostra "hoje" na idade', () => {
+            const wrapper = render({ rate: { ...rate, fetched_today: true, is_manual_override: true } });
+            expect(wrapper.get('[data-test="badge-manual-override"]').text()).toBe(
+                'Manual sobrepõe a automática de hoje',
+            );
+            expect(wrapper.get('[data-test="rate-card"]').text()).toContain('hoje');
+        });
+
+        it('"Buscar agora" fica desabilitado quando a automática de hoje já foi buscada e habilitado na contingência', () => {
+            const fetched = render({ rate: { ...autoRate } });
+            expect(fetched.get('[data-test="fetch-now"]').attributes('disabled')).toBeDefined();
+            expect(fetched.get('[data-test="fetch-now"]').attributes('type')).toBe('button');
+            expect(fetched.text()).toContain('A automática de hoje já foi buscada');
+
+            const fallback = render({ rate: { ...rate, source: 'fallback', is_fallback: true } });
+            expect(fallback.get('[data-test="fetch-now"]').attributes('disabled')).toBeUndefined();
+        });
+
+        it('"Buscar agora" exige motivo e, no 201, atualiza a cotação, prepende o histórico e recarrega a conta', async () => {
+            const wrapper = render();
+            respond(
+                {
+                    message: 'Cotação automática registrada.',
+                    rate: { ...autoRate },
+                    history_first: {
+                        id: 'auto',
+                        source: 'frankfurter',
+                        rate_brl_per_usd: 5.4321,
+                        effective_at: autoRate.effective_at,
+                        fetched_at: autoRate.fetched_at,
+                        recorded_by_name: null,
+                        note: 'Frankfurter/BCE',
+                    },
+                },
+                201,
+            );
+            await wrapper.get('[data-test="fetch-now"]').trigger('click');
+            expect(fetch).not.toHaveBeenCalled();
+            expect(wrapper.get('[role="dialog"]').text()).toContain('Confirmar busca da cotação automática');
+            await confirm(wrapper, 'curto');
+            expect(fetch).not.toHaveBeenCalled();
+            await confirm(wrapper, 'Primeira cotação do dia');
+            const [url, request] = fetch.mock.calls[0];
+            expect(url).toBe('/pricing/rates/fetch');
+            expect(request.method).toBe('POST');
+            expect(JSON.parse(request.body)).toEqual({ reason: 'Primeira cotação do dia' });
+            expect(wrapper.get('[data-test="current-rate"]').text().replace(/\s/g, '')).toContain('5,4321');
+            const rows = wrapper.findAll('[data-test="history-row"]');
+            expect(rows).toHaveLength(2);
+            expect(rows[0].text()).toContain('Frankfurter (BCE)');
+            expect(wrapper.get('[role="status"]').text()).toBe('Cotação automática registrada.');
+            expect(wrapper.get('[data-test="fetch-now"]').attributes('disabled')).toBeDefined();
+            expect(router.reload).toHaveBeenCalledWith(
+                expect.objectContaining({ only: ['examples', 'workflow_examples', 'packages', 'history', 'rate'] }),
+            );
+        });
+
+        it('"Buscar agora" repetido (200 already_fetched) mostra o aviso e não duplica o histórico', async () => {
+            const wrapper = render();
+            respond(
+                { message: 'A automática de hoje já foi buscada.', rate: { ...autoRate }, already_fetched: true },
+                200,
+            );
+            await wrapper.get('[data-test="fetch-now"]').trigger('click');
+            await confirm(wrapper, 'Tentativa repetida no dia');
+            expect(wrapper.get('[role="status"]').text()).toBe('A automática de hoje já foi buscada.');
+            expect(wrapper.findAll('[data-test="history-row"]')).toHaveLength(1);
+            expect(wrapper.get('[data-test="fetch-now"]').attributes('disabled')).toBeDefined();
+        });
+
+        it('"Buscar agora" com a API fora (502) mostra o erro e mantém a cotação', async () => {
+            const wrapper = render();
+            respond({ message: 'Não foi possível buscar a cotação agora.', rate: { ...rate } }, 502);
+            await wrapper.get('[data-test="fetch-now"]').trigger('click');
+            await confirm(wrapper, 'Tentativa com API fora');
+            expect(wrapper.get('[data-test="fetch-error"]').text()).toBe('Não foi possível buscar a cotação agora.');
+            expect(wrapper.get('[data-test="fetch-error"]').attributes('role')).toBe('alert');
+            expect(wrapper.get('[data-test="current-rate"]').text()).toContain('5,5');
+            expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+            expect(router.reload).not.toHaveBeenCalled();
+        });
+
+        it('markup por ação: desmarcar o padrão cria override com o global, marcar remove, o payload envia só overrides e a confirmação lista', async () => {
+            const wrapper = render();
+            expect(wrapper.findAll('[data-test="markup-row"]')).toHaveLength(9);
+            expect(wrapper.get('#pricing-markup-1').attributes('disabled')).toBeDefined();
+            expect(wrapper.get('[data-test="markup-row"]:nth-of-type(2)').text()).toContain('Efetivo');
+
+            await wrapper.get('#pricing-markup-default-1').setValue(false);
+            expect(wrapper.get('#pricing-markup-1').attributes('disabled')).toBeUndefined();
+            expect(wrapper.get('#pricing-markup-1').element.value).toBe('5');
+            await wrapper.get('#pricing-markup-1').setValue(8);
+            await wrapper.get('#pricing-markup-default-6').setValue(false);
+            await wrapper.get('#pricing-markup-default-6').setValue(true);
+
+            respond({
+                message: 'Regras salvas.',
+                settings: { ...settings, markup_by_workflow: { report_drafting: 8 } },
+            });
+            await wrapper.get('[data-test="settings-form"]').trigger('submit');
+            const dialog = wrapper.get('[role="dialog"]').text();
+            expect(dialog).toContain('Rascunho de laudo');
+            expect(dialog).toContain('8');
+            expect(dialog).toContain('Padrão global');
+            await confirm(wrapper);
+            expect(JSON.parse(fetch.mock.calls[0][1].body).markup_by_workflow).toEqual({ report_drafting: 8 });
+            expect(wrapper.get('#pricing-markup-1').element.value).toBe('8');
+
+            await wrapper.get('#pricing-markup-default-1').setValue(true);
+            await wrapper.get('[data-test="settings-form"]').trigger('submit');
+            await confirm(wrapper);
+            expect(JSON.parse(fetch.mock.calls[1][1].body).markup_by_workflow).toEqual({});
+        });
+
+        it('422 de markup_by_workflow destaca o fieldset, associa a mensagem e foca o override', async () => {
+            const wrapper = render();
+            await wrapper.get('#pricing-markup-default-1').setValue(false);
+            respond({ message: 'Markup por ação inválido.', field: 'markup_by_workflow' }, 422);
+            await wrapper.get('[data-test="settings-form"]').trigger('submit');
+            await confirm(wrapper);
+            expect(wrapper.get('#pricing-markup-1').attributes('aria-invalid')).toBe('true');
+            const ids = wrapper.get('#pricing-markup-1').attributes('aria-describedby').split(' ');
+            expect(ids.map((id) => wrapper.get(`#${id}`).text()).join(' ')).toContain('Markup por ação inválido.');
+            expect(document.activeElement).toBe(wrapper.get('#pricing-markup-1').element);
+            expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+        });
+
+        it('o ladder usa o markup efetivo do exemplo, não o global', () => {
+            const wrapper = render({
+                examples: [
+                    {
+                        raw_cost_usd: 1,
+                        exchange_rate_brl_usd: 5.5,
+                        markup_multiplier: 8,
+                        charge_cents: 4400,
+                        charge_formatted: 'R$ 44,00',
+                        minimum_applied: false,
+                    },
+                ],
+            });
+            expect(wrapper.get('[data-test="example"]').text()).toMatch(/Câmbio 5,5 × Markup 8 = R\$ 44,00/);
+        });
     });
 });

@@ -12,6 +12,7 @@ const props = defineProps({
     settings: { type: Object, required: true },
     packages: { type: Array, required: true },
     examples: { type: Array, required: true },
+    workflow_examples: { type: Array, default: () => [] },
     history: { type: Object, required: true },
     t: { type: Object, required: true },
     urls: { type: Object, required: true },
@@ -23,6 +24,7 @@ const currentSettings = ref({ ...props.settings });
 const historyRows = ref([...props.history.data]);
 const settingsForm = useForm({
     markup_multiplier: props.settings.markup_multiplier,
+    markup_by_workflow: { ...props.settings.markup_by_workflow },
     minimum_charge_cents_default: props.settings.minimum_charge_cents_default,
     minimum_charge_cents_by_workflow: { ...props.settings.minimum_charge_cents_by_workflow },
     custom_min_cents: props.settings.custom_min_cents,
@@ -30,14 +32,26 @@ const settingsForm = useForm({
     reason: '',
 });
 const rateForm = useForm({ rate_brl_per_usd: props.rate.rate, effective_at: '', note: '', reason: '' });
+const fetchForm = useForm({ reason: '' });
+const forms = { settings: settingsForm, rate: rateForm, fetch: fetchForm };
 const confirmation = ref(null);
 const pendingPayload = ref(null);
 const saving = ref(false);
 const message = ref('');
 const examplesStale = ref(false);
 const pageRef = ref(null);
-const modalForm = computed(() => (confirmation.value === 'settings' ? settingsForm : rateForm));
+const modalForm = computed(() => forms[confirmation.value] ?? settingsForm);
 const limits = computed(() => currentSettings.value.limits);
+const workflows = computed(() => Object.keys(props.t.workflows ?? {}));
+const internalWorkflows = computed(() => currentSettings.value.internal_workflows ?? []);
+const fetchDisabled = computed(() => currentRate.value.fetched_today && !currentRate.value.is_fallback);
+const rateAge = computed(() => {
+    const days = currentRate.value.age_days;
+    if (days === null || days === undefined) return '—';
+    if (days === 0) return props.t.today;
+    if (days === 1) return props.t.age_one_day;
+    return (props.t.age_days ?? '').replace(':count', days);
+});
 const settingsFields = computed(() => [
     { key: 'markup_multiplier', min: limits.value.markup_min, max: limits.value.markup_max, step: '0.01' },
     { key: 'minimum_charge_cents_default', min: limits.value.minimum_min, max: limits.value.minimum_max, step: 1 },
@@ -58,6 +72,12 @@ const breadcrumbs = computed(() => [
     { label: props.t.breadcrumb_home, url: route('manager.dashboard') },
     { label: props.t.title, url: '#', active: true },
 ]);
+const modalTitle = computed(
+    () =>
+        ({ settings: props.t.confirm_settings, rate: props.t.confirm_rate, fetch: props.t.fetch_confirm })[
+            confirmation.value
+        ],
+);
 
 watch(
     () => props.rate,
@@ -72,15 +92,32 @@ watch(
     },
 );
 
+function usesDefaultMarkup(workflow) {
+    return !(workflow in settingsForm.markup_by_workflow);
+}
+
+function effectiveMarkup(workflow) {
+    return usesDefaultMarkup(workflow) ? settingsForm.markup_multiplier : settingsForm.markup_by_workflow[workflow];
+}
+
+function toggleDefaultMarkup(workflow, useDefault) {
+    if (useDefault) {
+        delete settingsForm.markup_by_workflow[workflow];
+    } else {
+        settingsForm.markup_by_workflow[workflow] = settingsForm.markup_multiplier;
+    }
+}
+
 function prepare(kind) {
     if (saving.value) return;
-    const form = kind === 'settings' ? settingsForm : rateForm;
+    const form = forms[kind];
     form.clearErrors();
     message.value = '';
     const payload = form.data();
     if (kind === 'settings') {
         payload.minimum_charge_cents_by_workflow = { ...payload.minimum_charge_cents_by_workflow };
-    } else {
+        payload.markup_by_workflow = { ...payload.markup_by_workflow };
+    } else if (kind === 'rate') {
         payload.effective_at = payload.effective_at ? new Date(payload.effective_at).toISOString() : null;
         payload.note = payload.note || null;
     }
@@ -94,13 +131,23 @@ function closeConfirmation() {
 
 async function focusError(kind) {
     await nextTick();
-    pageRef.value?.querySelector(`[data-test="${kind}-form"] [aria-invalid="true"]`)?.focus();
+    pageRef.value?.querySelector(`[data-test="${kind}-form"] [aria-invalid="true"]:not(:disabled)`)?.focus();
+}
+
+function applyRate(json) {
+    currentRate.value = json.rate;
+    if (json.history_first) {
+        historyRows.value = [
+            json.history_first,
+            ...historyRows.value.filter((row) => row.id !== json.history_first.id),
+        ];
+    }
 }
 
 async function save() {
     if (saving.value || !confirmation.value) return;
     const kind = confirmation.value;
-    const form = kind === 'settings' ? settingsForm : rateForm;
+    const form = forms[kind];
     const reason = form.reason.trim();
     form.clearErrors();
     if (reason.length < 10 || reason.length > 500) {
@@ -110,7 +157,12 @@ async function save() {
     saving.value = true;
     try {
         // These endpoints return JSON; useForm owns data/errors, fetch transports the JSON response.
-        const response = await fetch(kind === 'settings' ? props.urls.settings : props.urls.exchange_rates, {
+        const url = {
+            settings: props.urls.settings,
+            rate: props.urls.exchange_rates,
+            fetch: props.urls.exchange_rates_fetch,
+        }[kind];
+        const response = await fetch(url, {
             method: kind === 'settings' ? 'PUT' : 'POST',
             headers: {
                 Accept: 'application/json',
@@ -144,14 +196,10 @@ async function save() {
                 .filter((key) => key !== 'reason')
                 .forEach((key) => {
                     settingsForm[key] =
-                        key === 'minimum_charge_cents_by_workflow' ? { ...json.settings[key] } : json.settings[key];
+                        typeof json.settings[key] === 'object' ? { ...json.settings[key] } : json.settings[key];
                 });
         } else {
-            currentRate.value = json.rate;
-            historyRows.value = [
-                json.history_first,
-                ...historyRows.value.filter((row) => row.id !== json.history_first.id),
-            ];
+            applyRate(json);
             rateForm.note = '';
             rateForm.effective_at = '';
         }
@@ -160,7 +208,7 @@ async function save() {
         message.value = json.message;
         examplesStale.value = true;
         router.reload({
-            only: ['examples', 'packages', 'history', 'rate'],
+            only: ['examples', 'workflow_examples', 'packages', 'history', 'rate'],
             onSuccess: () => {
                 examplesStale.value = false;
             },
@@ -261,6 +309,74 @@ async function save() {
                                         {{ settingsForm.errors.minimum_charge_cents_by_workflow }}
                                     </p>
                                 </fieldset>
+                                <fieldset
+                                    class="mt-3"
+                                    :class="{
+                                        'border border-danger rounded p-2': settingsForm.errors.markup_by_workflow,
+                                    }"
+                                    aria-describedby="markup-workflow-hint markup-workflow-error"
+                                    data-test="markup-fieldset"
+                                >
+                                    <legend class="fs-6">{{ t.markup_workflow_title }}</legend>
+                                    <p id="markup-workflow-hint" class="form-text">{{ t.markup_workflow_hint }}</p>
+                                    <div
+                                        v-for="(workflow, index) in workflows"
+                                        :key="workflow"
+                                        class="markup-row mb-2"
+                                        data-test="markup-row"
+                                    >
+                                        <label :for="`pricing-markup-${index}`" class="form-label mb-1">
+                                            {{ t.workflows[workflow] }}
+                                            <span
+                                                v-if="internalWorkflows.includes(workflow)"
+                                                class="badge badge-soft-secondary ms-1"
+                                                >{{ t.internal_not_charged }}</span
+                                            >
+                                        </label>
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <div class="form-check mb-0">
+                                                <input
+                                                    :id="`pricing-markup-default-${index}`"
+                                                    class="form-check-input"
+                                                    type="checkbox"
+                                                    :checked="usesDefaultMarkup(workflow)"
+                                                    @change="toggleDefaultMarkup(workflow, $event.target.checked)"
+                                                />
+                                                <label
+                                                    class="form-check-label"
+                                                    :for="`pricing-markup-default-${index}`"
+                                                    >{{ t.markup_use_default }}</label
+                                                >
+                                            </div>
+                                            <input
+                                                :id="`pricing-markup-${index}`"
+                                                type="number"
+                                                class="form-control markup-input"
+                                                :class="{ 'is-invalid': settingsForm.errors.markup_by_workflow }"
+                                                :value="effectiveMarkup(workflow)"
+                                                :disabled="usesDefaultMarkup(workflow)"
+                                                :min="limits.markup_min"
+                                                :max="limits.markup_max"
+                                                step="0.01"
+                                                :required="!usesDefaultMarkup(workflow)"
+                                                :aria-invalid="!!settingsForm.errors.markup_by_workflow"
+                                                aria-describedby="markup-workflow-hint markup-workflow-error"
+                                                @input="
+                                                    settingsForm.markup_by_workflow[workflow] = Number(
+                                                        $event.target.value,
+                                                    )
+                                                "
+                                            />
+                                            <span class="small text-muted"
+                                                >{{ t.markup_effective }}:
+                                                {{ quantity(effectiveMarkup(workflow), 2) }}×</span
+                                            >
+                                        </div>
+                                    </div>
+                                    <p id="markup-workflow-error" class="text-danger small" role="alert">
+                                        {{ settingsForm.errors.markup_by_workflow }}
+                                    </p>
+                                </fieldset>
                                 <button class="btn btn-primary mt-3" type="submit" data-test="settings-review">
                                     {{ t.review_settings }}
                                 </button>
@@ -273,20 +389,59 @@ async function save() {
                         <div class="card-header">
                             <h2 id="pricing-rate-title" class="h6 mb-0">{{ t.rate_title }}</h2>
                         </div>
-                        <div class="card-body">
+                        <div class="card-body" data-test="rate-card">
                             <dl class="row">
                                 <dt class="col-sm-5">{{ t.current_rate }}</dt>
                                 <dd class="col-sm-7" data-test="current-rate">
                                     R$ {{ quantity(currentRate.rate, 6) }} / US$ 1
                                 </dd>
                                 <dt class="col-sm-5">{{ t.source }}</dt>
-                                <dd class="col-sm-7">{{ t.sources[currentRate.source] ?? currentRate.source }}</dd>
+                                <dd class="col-sm-7">
+                                    {{ t.sources[currentRate.source] ?? currentRate.source }}
+                                    <span
+                                        v-if="currentRate.is_automatic"
+                                        class="badge badge-soft-info ms-1"
+                                        data-test="badge-automatic"
+                                        >{{ t.automatic }}</span
+                                    >
+                                    <span
+                                        v-if="currentRate.is_manual_override"
+                                        class="badge badge-soft-warning ms-1"
+                                        data-test="badge-manual-override"
+                                        >{{ t.manual_override }}</span
+                                    >
+                                </dd>
                                 <dt class="col-sm-5">{{ t.effective_at }}</dt>
-                                <dd class="col-sm-7">{{ dateTime(currentRate.effective_at) }}</dd>
+                                <dd class="col-sm-7">{{ dateTime(currentRate.effective_at) }} ({{ rateAge }})</dd>
+                                <template v-if="currentRate.fetched_at">
+                                    <dt class="col-sm-5">{{ t.fetched_at }}</dt>
+                                    <dd class="col-sm-7">{{ dateTime(currentRate.fetched_at) }}</dd>
+                                </template>
                                 <dt class="col-sm-5">{{ t.recorded_by }}</dt>
                                 <dd class="col-sm-7">{{ currentRate.recorded_by_name || '—' }}</dd>
                             </dl>
                             <p v-if="currentRate.note" class="text-break">{{ currentRate.note }}</p>
+                            <div class="mb-3" data-test="fetch-form">
+                                <div
+                                    v-if="fetchForm.errors._form"
+                                    class="alert alert-danger"
+                                    role="alert"
+                                    data-test="fetch-error"
+                                >
+                                    {{ fetchForm.errors._form }}
+                                </div>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary"
+                                    :disabled="saving || fetchDisabled"
+                                    data-test="fetch-now"
+                                    @click="prepare('fetch')"
+                                >
+                                    {{ t.fetch_now }}
+                                </button>
+                                <p v-if="fetchDisabled" class="form-text mb-0">{{ t.fetch_unavailable }}</p>
+                                <p v-else class="form-text mb-0">{{ t.fetch_hint }}</p>
+                            </div>
                             <form data-test="rate-form" @submit.prevent="prepare('rate')">
                                 <div v-if="rateForm.errors._form" class="alert alert-danger" role="alert">
                                     {{ rateForm.errors._form }}
@@ -363,13 +518,62 @@ async function save() {
                     <ul v-else class="list-unstyled mb-0">
                         <li v-for="example in examples" :key="example.raw_cost_usd" class="mb-2" data-test="example">
                             {{ t.provider_cost }} US$ {{ quantity(example.raw_cost_usd, 6) }} × {{ t.exchange_rate }}
-                            {{ quantity(currentRate.rate, 6) }} × {{ t.markup }}
-                            {{ quantity(currentSettings.markup_multiplier, 2) }} = {{ example.charge_formatted }}
+                            {{ quantity(example.exchange_rate_brl_usd ?? currentRate.rate, 6) }} × {{ t.markup }}
+                            {{ quantity(example.markup_multiplier ?? currentSettings.markup_multiplier, 2) }} =
+                            {{ example.charge_formatted }}
                             <span v-if="example.minimum_applied" class="badge badge-soft-info ms-2">{{
                                 t.minimum_applied
                             }}</span>
                         </li>
                     </ul>
+                </div>
+            </section>
+            <section class="card mb-3" aria-labelledby="pricing-workflow-examples-title">
+                <div class="card-header">
+                    <h2 id="pricing-workflow-examples-title" class="h6 mb-0">{{ t.workflow_examples_title }}</h2>
+                </div>
+                <div class="card-body">
+                    <p>{{ t.workflow_examples_hint }}</p>
+                    <p v-if="examplesStale" role="status">{{ t.examples_refresh }}</p>
+                    <div v-else class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <caption class="visually-hidden">
+                                {{
+                                    t.workflow_examples_title
+                                }}
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">{{ t.action }}</th>
+                                    <th scope="col">{{ t.provider_cost }}</th>
+                                    <th scope="col">{{ t.exchange_rate }}</th>
+                                    <th scope="col">{{ t.markup }}</th>
+                                    <th scope="col">{{ t.price }}</th>
+                                    <th scope="col">{{ t.minimum }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in workflow_examples" :key="row.workflow" data-test="workflow-example">
+                                    <th scope="row" class="fw-normal">
+                                        {{ row.workflow_label }}
+                                        <span v-if="row.is_internal" class="badge badge-soft-secondary ms-1">{{
+                                            t.internal_not_charged
+                                        }}</span>
+                                    </th>
+                                    <td>US$ {{ quantity(row.raw_cost_usd, 2) }}</td>
+                                    <td>{{ quantity(row.exchange_rate_brl_usd, 6) }}</td>
+                                    <td>{{ quantity(row.markup_multiplier, 2) }}×</td>
+                                    <td>{{ row.charge_formatted }}</td>
+                                    <td>
+                                        {{ moneyCents(row.minimum_charge_cents) }}
+                                        <span v-if="row.minimum_applied" class="badge badge-soft-info ms-1">{{
+                                            t.minimum_applied
+                                        }}</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
             <section class="card mb-3" aria-labelledby="pricing-packages-title">
@@ -408,6 +612,7 @@ async function save() {
                                     <th scope="col">{{ t.effective_at }}</th>
                                     <th scope="col">{{ t.exchange_rate }}</th>
                                     <th scope="col">{{ t.source }}</th>
+                                    <th scope="col">{{ t.fetched_at }}</th>
                                     <th scope="col">{{ t.recorded_by }}</th>
                                     <th scope="col">{{ t.note }}</th>
                                 </tr>
@@ -417,11 +622,12 @@ async function save() {
                                     <td>{{ dateTime(row.effective_at) }}</td>
                                     <td>{{ quantity(row.rate_brl_per_usd, 6) }}</td>
                                     <td>{{ t.sources[row.source] ?? row.source }}</td>
+                                    <td>{{ row.fetched_at ? dateTime(row.fetched_at) : '—' }}</td>
                                     <td>{{ row.recorded_by_name || '—' }}</td>
                                     <td class="text-break">{{ row.note || '—' }}</td>
                                 </tr>
                                 <tr v-if="!historyRows.length">
-                                    <td colspan="5">{{ t.history_empty }}</td>
+                                    <td colspan="6">{{ t.history_empty }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -446,11 +652,9 @@ async function save() {
             @close="closeConfirmation"
         >
             <template #header
-                ><h2 class="h5 mb-0">
-                    {{ confirmation === 'settings' ? t.confirm_settings : t.confirm_rate }}
-                </h2></template
+                ><h2 class="h5 mb-0">{{ modalTitle }}</h2></template
             >
-            <p>{{ t.confirm_hint }}</p>
+            <p>{{ confirmation === 'fetch' ? t.fetch_hint : t.confirm_hint }}</p>
             <dl v-if="confirmation === 'settings'">
                 <template v-for="field in settingsFields" :key="field.key"
                     ><dt>{{ t.fields[field.key] }}</dt>
@@ -460,8 +664,17 @@ async function save() {
                     ><dt>{{ t.workflows[workflow] ?? workflow }} ({{ t.cents }})</dt>
                     <dd>{{ value }}</dd></template
                 >
+                <dt>{{ t.markup_workflow_title }}</dt>
+                <dd>
+                    <ul class="list-unstyled mb-0">
+                        <li v-for="(value, workflow) in pendingPayload.markup_by_workflow" :key="workflow">
+                            {{ t.workflows[workflow] ?? workflow }}: {{ value }}×
+                        </li>
+                        <li>{{ t.markup_global_default }}: {{ pendingPayload.markup_multiplier }}×</li>
+                    </ul>
+                </dd>
             </dl>
-            <dl v-else-if="confirmation">
+            <dl v-else-if="confirmation === 'rate'">
                 <dt>{{ t.fields.rate_brl_per_usd }}</dt>
                 <dd>{{ pendingPayload.rate_brl_per_usd }}</dd>
                 <dt>{{ t.effective_at }}</dt>
@@ -507,6 +720,10 @@ async function save() {
 <style scoped>
 .pricing-header :deep(.me-auto) {
     flex-wrap: wrap;
+}
+
+.markup-input {
+    max-width: 8rem;
 }
 
 :is(

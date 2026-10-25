@@ -43,7 +43,7 @@ readonly class AiCreditEstimateData
             'consumed_charge_cents'  => 0,
             'estimated_cost_usd'     => number_format($this->rawCostUsd, 8, '.', ''),
             'exchange_rate_brl_usd'  => number_format($this->policy->exchangeRateBrlUsd, 6, '.', ''),
-            'markup_multiplier'      => number_format($this->policy->markupMultiplier, 3, '.', ''),
+            'markup_multiplier'      => number_format($this->policy->markupFor($this->workflow), 3, '.', ''), // efetivo da ação
             'minimum_charge_cents'   => $this->minimumChargeCents,
             'pricing_source'         => $this->policy->source,
             'priced_at'              => now(),
@@ -58,7 +58,7 @@ readonly class AiCreditEstimateData
             'mode'                  => $this->mode->value,
             'raw_cost_usd'          => $this->rawCostUsd,
             'exchange_rate_brl_usd' => $this->policy->exchangeRateBrlUsd,
-            'markup_multiplier'     => $this->policy->markupMultiplier,
+            'markup_multiplier'     => $this->policy->markupFor($this->workflow),
             'gross_charge_cents'    => $this->grossChargeCents,
             'minimum_charge_cents'  => $this->minimumChargeCents,
             'minimum_applied'       => $this->minimumApplied,

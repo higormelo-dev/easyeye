@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Uma cotação US$→R$ gravada pelo manager (histórico append-only: corrigir = nova linha).
+ * Uma cotação US$→R$: manual (gravada no manager, com autor) ou automática (source=frankfurter, BCE via frankfurter.dev,
+ * recorded_by null; created_at identifica a busca do dia). Histórico append-only: corrigir = nova linha.
  * Nunca é exposta a rotas de clínica.
  */
 class AiExchangeRate extends Model

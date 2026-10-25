@@ -173,7 +173,7 @@ class MedicinePosologyBatchService
             'input_tokens'     => $input,
             'output_tokens'    => $output,
             'reasoning_tokens' => 12 * count($contexts),
-        ]], app(AiPricingPolicyResolver::class)->current());
+        ]], app(AiPricingPolicyResolver::class)->current(ensureFresh: true));
 
         return round($estimate->rawCostUsd, 6);
     }
