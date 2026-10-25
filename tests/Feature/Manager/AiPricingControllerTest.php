@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Domains\AI\Models\AiExchangeRate;
+use App\Domains\AI\Models\{AiExchangeRate, AiRun};
 use App\Domains\AI\Services\{AiExchangeRateService, AiPricingSettings};
+use App\Enums\AI\AiRunStatus;
 use App\Enums\SaasRule;
 use App\Models\{AuditLog, Entity, User};
 use App\Services\Audit\AuditLogger;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\{Cache, Http, Log};
 
 /*
@@ -63,6 +65,111 @@ it('mostra o markup por ação (só overrides), as internas, a conta das 9 açõ
         ->and(collect($props['workflow_examples'])->firstWhere('workflow', 'report_drafting'))->toMatchArray(['workflow_label' => 'Rascunho de laudo', 'is_internal' => false, 'raw_cost_usd' => 0.01, 'exchange_rate_brl_usd' => 5.5, 'markup_multiplier' => 8.0, 'minimum_charge_cents' => 10, 'charge_cents' => 44, 'charge_formatted' => 'R$ 0,44', 'minimum_applied' => false])
         ->and(collect($props['workflow_examples'])->firstWhere('workflow', 'medicine_posology'))->toMatchArray(['is_internal' => true, 'markup_multiplier' => 5.0, 'charge_cents' => 28])
         ->and($props['urls']['exchange_rates_fetch'])->toBe(route('manager.ai-pricing.exchange-rates.fetch'));
+
+    Http::assertNothingSent();
+});
+
+function pricingUsageRun(string $workflow, ?string $cost, AiRunStatus $status = AiRunStatus::Approved, ?Carbon $createdAt = null, bool $platform = false): AiRun
+{
+    $run = AiRun::factory()->create([
+        // Plataforma = a própria entidade do SaaS (is_client=false; `ai_runs.entity_id` é NOT NULL), como no FinanceController.
+        'entity_id'       => $platform ? test()->saas->id : Entity::factory()->create(['is_client' => true])->id,
+        'workflow'        => $workflow,
+        'status'          => $status->value,
+        'actual_cost_usd' => $cost,
+    ]);
+
+    if ($createdAt !== null) {
+        $run->forceFill(['created_at' => $createdAt])->save();
+    }
+
+    return $run;
+}
+
+/** @return array<string, mixed> */
+function pricingUsageProps(): array
+{
+    return asPricingUser()->get(route('manager.ai-pricing.index'))->assertOk()->viewData('page')['props']['workflow_usage'];
+}
+
+it('manda o uso real dos últimos 30 dias com as 9 ações sempre presentes; sem uso é runs 0 e o resto null', function () {
+    $usage = pricingUsageProps();
+
+    expect($usage['window_days'])->toBe(30)
+        ->and(array_keys($usage['rows']))->toBe(AiPricingSettings::WORKFLOWS);
+
+    foreach ($usage['rows'] as $row) {
+        expect($row)->toBe(['runs' => 0, 'avg_cost_usd' => null, 'avg_price_cents' => null, 'avg_price_formatted' => null, 'minimum_applied' => null]);
+    }
+
+    // Contrato antigo intacto: a conta didática (US$ 0,01 fixo) continua na prop própria.
+    $props = asPricingUser()->get(route('manager.ai-pricing.index'))->viewData('page')['props'];
+    expect(collect($props['workflow_examples'])->pluck('workflow')->all())->toBe(AiPricingSettings::WORKFLOWS)
+        ->and(collect($props['workflow_examples'])->firstWhere('workflow', 'exam_assistant'))->toMatchArray(['raw_cost_usd' => 0.01, 'charge_cents' => 28]);
+});
+
+it('só execução concluída entra no uso: pending/reserved/running/failed/cancelled ficam de fora', function (AiRunStatus $status, int $runs) {
+    // Só quem passou pelo cálculo de preço grava `actual_cost_usd`; as demais ficam com o custo nulo.
+    pricingUsageRun('exam_assistant', $runs === 1 ? '0.02000000' : null, $status);
+
+    $row = pricingUsageProps()['rows']['exam_assistant'];
+
+    expect($row['runs'])->toBe($runs)
+        ->and($row['avg_cost_usd'])->toBe($runs === 1 ? 0.02 : null);
+})->with([
+    'pending'          => [AiRunStatus::Pending, 0],
+    'reserved'         => [AiRunStatus::Reserved, 0],
+    'running'          => [AiRunStatus::Running, 0],
+    'failed'           => [AiRunStatus::Failed, 0],
+    'cancelled'        => [AiRunStatus::Cancelled, 0],
+    'waiting_approval' => [AiRunStatus::WaitingApproval, 1],
+    'approved'         => [AiRunStatus::Approved, 1],
+    'rejected'         => [AiRunStatus::Rejected, 1], // o custo já foi pago ao provedor
+]);
+
+it('a janela é de 30 dias por created_at: 29 dias atrás entra, 31 não', function (int $daysAgo, int $runs) {
+    pricingUsageRun('assistant_chat', '0.01000000', createdAt: now()->subDays($daysAgo));
+
+    expect(pricingUsageProps()['rows']['assistant_chat']['runs'])->toBe($runs);
+})->with([
+    '29 dias' => [29, 1],
+    '31 dias' => [31, 0],
+]);
+
+it('o preço médio usa o markup da ação e o piso; a média é sobre as execuções concluídas', function () {
+    config(['ai.pricing.markup_multiplier' => 5.0]);
+    app(AiPricingSettings::class)->update(['markup_by_workflow' => ['report_drafting' => 8]]);
+
+    // Média de US$ 0,005 e US$ 0,015 = US$ 0,01 → × 5,50 × 8 = 44 centavos (com o global 5x seriam 28).
+    pricingUsageRun('report_drafting', '0.00500000');
+    pricingUsageRun('report_drafting', '0.01500000', AiRunStatus::WaitingApproval);
+    pricingUsageRun('report_drafting', null, AiRunStatus::Failed); // fora do denominador
+    // Média minúscula: a conta dá menos que o piso (R$ 0,10) → cobra-se o piso e vem marcado.
+    pricingUsageRun('exam_assistant', '0.00001000');
+
+    $rows = pricingUsageProps()['rows'];
+
+    expect($rows['report_drafting'])->toBe(['runs' => 2, 'avg_cost_usd' => 0.01, 'avg_price_cents' => 44, 'avg_price_formatted' => 'R$ 0,44', 'minimum_applied' => false])
+        ->and($rows['exam_assistant'])->toBe(['runs' => 1, 'avg_cost_usd' => 0.00001, 'avg_price_cents' => 10, 'avg_price_formatted' => 'R$ 0,10', 'minimum_applied' => true])
+        ->and($rows['consensus_review']['runs'])->toBe(0);
+});
+
+it('plataforma e clínicas entram juntas na média, as internas contam, ação fora da lista é ignorada e nada vai à rede', function () {
+    config(['ai.exchange_rate.auto_fetch' => true]);
+    Http::preventStrayRequests();
+
+    pricingUsageRun('exam_assistant', '0.02000000');
+    pricingUsageRun('exam_assistant', '0.04000000', platform: true); // entidade do SaaS = plataforma
+    pricingUsageRun('platform_finance_digest', '0.50000000', platform: true); // interna: custo real, cobrança 0
+    pricingUsageRun('exam_report_draft', '0.30000000'); // fora de AiPricingSettings::WORKFLOWS
+
+    $usage = pricingUsageProps();
+
+    expect(array_keys($usage['rows']))->toBe(AiPricingSettings::WORKFLOWS)
+        ->and($usage['rows']['exam_assistant'])->toMatchArray(['runs' => 2, 'avg_cost_usd' => 0.03])
+        // US$ 0,03 × 5,50 × 5 = 82,5 → 83 centavos
+        ->and($usage['rows']['exam_assistant']['avg_price_cents'])->toBe(83)
+        ->and($usage['rows']['platform_finance_digest'])->toMatchArray(['runs' => 1, 'avg_cost_usd' => 0.5]);
 
     Http::assertNothingSent();
 });
@@ -139,6 +246,9 @@ it('"buscar agora" com a API fora é 502 sem linha nova e mantém a cotação at
     $lock->get();
     asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.fetch'), ['reason' => 'Tentativa com lock ocupado'])->assertStatus(409);
     $lock->release();
+
+    // Trilha best-effort também cobre o 409: tentativa sem efeito continua auditada.
+    expect(AuditLog::query()->where('event', 'manager.ai_pricing.exchange_rate_fetch_attempted')->latest('id')->value('new_values'))->toMatchArray(['status' => 'busy']);
 
     asPricingUser()->postJson(route('manager.ai-pricing.exchange-rates.fetch'), [])->assertStatus(422)->assertJsonValidationErrors(['reason']);
     Http::assertSentCount(1);

@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Manager;
 
 use App\Domains\AI\Models\AiExchangeRate;
 use App\Domains\AI\Services\{AiCreditPurchaseService, AiExchangeRateService, AiPricingPolicyResolver, AiPricingService, AiPricingSettings};
+use App\DTOs\AI\AiPricingPolicyData;
 use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
 use App\Models\Entity;
@@ -32,6 +33,9 @@ class AiPricingController extends Controller
 
     /** Custo de referência (US$) da conta por ação. */
     private const WORKFLOW_EXAMPLE_COST_USD = 0.01;
+
+    /** Janela (dias) do preço médio real por uso. */
+    private const USAGE_WINDOW_DAYS = 30;
 
     public function __construct(
         private readonly AiExchangeRateService $rates,
@@ -87,6 +91,7 @@ class AiPricingController extends Controller
             'packages'          => $this->purchases->packages(),
             'examples'          => $examples,
             'workflow_examples' => $workflowExamples,
+            'workflow_usage'    => $this->workflowUsage($policy),
             'history'           => $history->through(fn (AiExchangeRate $row): array => $this->historyRow($row)),
             't'                 => trans('manager_ai_pricing'),
             'urls'              => [
@@ -222,11 +227,7 @@ class AiPricingController extends Controller
             return response()->json(['message' => __('manager_ai_pricing.fetch_success'), 'rate' => $rate, 'history_first' => $this->historyRow($result['row'])], 201);
         }
 
-        if ($result['status'] === AiExchangeRateService::FETCH_BUSY) {
-            return response()->json(['message' => __('manager_ai_pricing.fetch_busy'), 'rate' => $rate], 409);
-        }
-
-        // Sem mudança de preço: trilha best-effort da tentativa (AuditLogger engole falha de escrita).
+        // Sem mudança de preço (busy, already_fetched, failed): trilha best-effort da tentativa (AuditLogger engole falha de escrita).
         $this->audit->recordAdminAction(
             event: 'manager.ai_pricing.exchange_rate_fetch_attempted',
             targetEntityId: (string) session('selected_entity_id'),
@@ -237,6 +238,10 @@ class AiPricingController extends Controller
             newValues: ['status' => $result['status'], 'code' => $result['code']],
             request: $request,
         );
+
+        if ($result['status'] === AiExchangeRateService::FETCH_BUSY) {
+            return response()->json(['message' => __('manager_ai_pricing.fetch_busy'), 'rate' => $rate], 409);
+        }
 
         if ($result['status'] === AiExchangeRateService::FETCH_ALREADY) {
             return response()->json(['message' => __('manager_ai_pricing.fetch_already'), 'rate' => $rate, 'already_fetched' => true]);
@@ -279,6 +284,52 @@ class AiPricingController extends Controller
             'recorded_by_name' => $row->recordedBy?->name,
             'note'             => $row->note,
         ];
+    }
+
+    /**
+     * Preço médio REAL por uso (últimos 30 dias) por ação, pela política ATUAL (markup da ação + piso). "Concluída" =
+     * `actual_cost_usd` gravado, que só acontece no ponto único de conclusão/cobrança da execução: exclui
+     * pending/reserved/running/failed/cancelled e mantém waiting_approval/approved/rejected e as internas (custo real do
+     * provedor, cobrança 0). Plataforma e clínicas entram juntas; `runs` e a média usam o MESMO denominador. Uma consulta
+     * agregada (sem N+1) e nenhum HTTP; o preço vem de `chargeCentsFromUsd` (BigDecimal), nunca de float.
+     *
+     * @return array{window_days: int, rows: array<string, array<string, mixed>>}
+     */
+    private function workflowUsage(AiPricingPolicyData $policy): array
+    {
+        $aggregates = DB::table('ai_runs')
+            ->where('created_at', '>=', now()->subDays(self::USAGE_WINDOW_DAYS))
+            ->whereIn('workflow', AiPricingSettings::WORKFLOWS)
+            ->whereNotNull('actual_cost_usd')
+            ->groupBy('workflow')
+            ->selectRaw('workflow, COUNT(*) as runs, AVG(actual_cost_usd) as avg_cost_usd')
+            ->get()
+            ->keyBy('workflow');
+
+        $rows = [];
+
+        foreach (AiPricingSettings::WORKFLOWS as $workflow) {
+            $aggregate = $aggregates->get($workflow);
+
+            if ($aggregate === null) {
+                $rows[$workflow] = ['runs' => 0, 'avg_cost_usd' => null, 'avg_price_cents' => null, 'avg_price_formatted' => null, 'minimum_applied' => null];
+
+                continue;
+            }
+
+            $avgCostUsd = round((float) $aggregate->avg_cost_usd, 6);
+            $cents      = $this->pricing->chargeCentsFromUsd($avgCostUsd, $workflow, $policy);
+
+            $rows[$workflow] = [
+                'runs'                => (int) $aggregate->runs,
+                'avg_cost_usd'        => $avgCostUsd,
+                'avg_price_cents'     => $cents,
+                'avg_price_formatted' => Money::formatBrl($cents),
+                'minimum_applied'     => $cents === $policy->minimumChargeCentsFor($workflow),
+            ];
+        }
+
+        return ['window_days' => self::USAGE_WINDOW_DAYS, 'rows' => $rows];
     }
 
     /** @return array<string, mixed> */
