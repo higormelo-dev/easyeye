@@ -138,6 +138,22 @@ describe('DoctorInvitationsPending', () => {
         );
     });
 
+    it('o texto só para leitor de tela do cabeçalho não alarga a página no celular (pai posicionado)', () => {
+        const wrapper = mount(DoctorInvitationsPending, { props: { invitations, t: T } });
+        const hidden = wrapper.get('th .visually-hidden');
+
+        // .visually-hidden é position:absolute; sem pai posicionado ele fica no x real da coluna e gera
+        // rolagem lateral na página inteira (medido a 360px: 482px de conteúdo).
+        expect(hidden.element.parentElement.classList.contains('position-relative')).toBe(true);
+    });
+
+    it('é uma região de densidade padrão e o botão de cancelar não carrega btn-sm', () => {
+        const wrapper = mount(DoctorInvitationsPending, { props: { invitations, t: T } });
+
+        expect(wrapper.get('section').attributes('data-ee-density')).toBe('default');
+        expect(wrapper.html()).not.toMatch(/\bbtn-sm\b/);
+    });
+
     it('cancelar pede confirmação; só apaga quando confirmado', async () => {
         const wrapper = mount(DoctorInvitationsPending, { props: { invitations, t: T } });
         const confirm = vi.fn();

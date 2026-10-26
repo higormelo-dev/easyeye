@@ -126,4 +126,10 @@ describe('Paciente — foco e erros de formulário', () => {
         await wrapper.get('.btn-close').trigger('click');
         expect(wrapper.emitted('close')).toHaveLength(1);
     });
+    it('abre numa região de densidade padrão e o botão de buscar CEP tem nome acessível', async () => {
+        await render();
+        expect(wrapper.get('[role="dialog"]').attributes('data-ee-density')).toBe('default');
+        const cep = wrapper.get('[data-patient-section="address"] button.ee-action-icon');
+        expect(cep.attributes('aria-label')).toBe('Buscar CEP');
+    });
 });

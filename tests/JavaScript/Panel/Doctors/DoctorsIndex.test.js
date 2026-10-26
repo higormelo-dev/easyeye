@@ -107,4 +107,11 @@ describe('Doctors/Index', () => {
             expect.objectContaining({ preserveState: true, replace: true }),
         );
     });
+
+    it('é uma região de densidade padrão e os botões do topo não carregam medida local', () => {
+        const page = mountPage().get('.page-doctors');
+
+        expect(page.attributes('data-ee-density')).toBe('default');
+        expect(page.html()).not.toMatch(/\b(btn-sm|btn-md|fs-13)\b/);
+    });
 });

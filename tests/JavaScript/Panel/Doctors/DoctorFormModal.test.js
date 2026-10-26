@@ -169,6 +169,9 @@ describe('DoctorFormModal — acessibilidade e recuperação', () => {
         expect(json).not.toHaveBeenCalled();
         expect(wrapper.find('form').exists()).toBe(false);
         expect(wrapper.get('[data-testid="doctor-load-error"]').text()).toContain('Não foi possível carregar');
+        // O alerta também é região de densidade padrão: o botão de repetir não carrega medida local.
+        expect(wrapper.get('[role="dialog"]').attributes('data-ee-density')).toBe('default');
+        expect(wrapper.get('[data-testid="doctor-load-error"] button').classes()).not.toContain('btn-sm');
         await wrapper.get('[data-testid="doctor-load-error"] button').trigger('click');
         await flushPromises();
         expect(wrapper.get('form').exists()).toBe(true);
@@ -243,6 +246,25 @@ describe('DoctorFormModal — acessibilidade e recuperação', () => {
         resolve({ ok: true, json: async () => ({ data: { name: 'ANTIGO' } }) });
         await flushPromises();
         expect(wrapper.vm.form.name).toBe('Novo sintético');
+        wrapper.unmount();
+    });
+});
+
+describe('DoctorFormModal — padrão de controles (design-system/MASTER.md)', () => {
+    it('abre numa região de densidade padrão e o seletor de cor não carrega altura local', async () => {
+        const wrapper = await mountOpenModal();
+
+        expect(wrapper.get('[role="dialog"]').attributes('data-ee-density')).toBe('default');
+        expect(wrapper.get('input[type="color"]').attributes('style')).toBeUndefined();
+        wrapper.unmount();
+    });
+
+    it('o botão de buscar CEP só com ícone tem nome acessível', async () => {
+        const wrapper = await mountOpenModal();
+        const cep = wrapper.get('button.ee-action-icon');
+
+        expect(cep.attributes('aria-label')).toBe('Buscar CEP');
+        expect(cep.attributes('title')).toBe('Buscar CEP');
         wrapper.unmount();
     });
 });
