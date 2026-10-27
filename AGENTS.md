@@ -44,6 +44,7 @@ O build copia TinyMCE e substitui gerados em `public/vendor/`, `public/build/` e
 - Entregue a menor mudança completa que cumpra o escopo aprovado; reutilize padrões existentes e evite abstrações ou dependências sem necessidade demonstrada.
 - Controllers cuidam da borda HTTP; serviços/domínios concentram regras e transações. Eloquent e enums existentes definem contratos.
 - Frontend novo segue Vue 3 com `<script setup>`, componentes em `resources/js/Components/` e páginas em `resources/js/Pages/`. Blade atende entry-points e templates server-side.
+- Interface do painel, nova ou migrada, segue [design-system/MASTER.md](design-system/MASTER.md): região `data-ee-density` na raiz da página, `density` nos modais e nenhuma medida local em campo ou botão. Lotes e gates em [docs/internal/planos/design-system-adocao-plano.md](docs/internal/planos/design-system-adocao-plano.md).
 - Identificadores em inglês; UI traduzida em pt_BR e en conforme o módulo. Preserve acessibilidade e proteção de conteúdo clínico.
 - Selecione testes por comportamento e risco; registre comando, resultado e limitações. Falha legada não deve ser escondida por ignore, severidade menor ou exit 0.
 - Mudança não trivial requer revisão independente quando disponível, com diff e chamadores afetados. Revisões de segurança são somente leitura por padrão e produzem relatório privado fora do repositório.
