@@ -296,16 +296,16 @@ const flashError = computed(
 
 <template>
     <AppLayout title="Importar pacientes" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
+        <div class="container-fluid py-3" data-ee-density="default">
             <PageHeader
                 title="Importação em massa de pacientes"
                 subtitle="Upload CSV — geração de preview antes da importação efetiva."
             >
                 <template #actions>
-                    <a :href="urls.template" class="btn btn-outline-secondary btn-sm">
+                    <a :href="urls.template" class="btn btn-outline-secondary">
                         <i class="ti ti-download me-1"></i>Modelo CSV
                     </a>
-                    <Link :href="urls.patients" class="btn btn-outline-secondary btn-sm">
+                    <Link :href="urls.patients" class="btn btn-outline-secondary">
                         <i class="ti ti-arrow-left me-1"></i>Pacientes
                     </Link>
                 </template>
@@ -338,7 +338,7 @@ const flashError = computed(
                     <span :class="`badge bg-${liveImport.status_color} ms-2`">{{ liveImport.status_label }}</span>
                     <button
                         type="button"
-                        class="btn btn-outline-danger btn-sm ms-auto"
+                        class="btn btn-outline-danger ms-auto"
                         @click="cancelProcessingImport(liveImport)"
                     >
                         <i class="ti ti-ban me-1"></i>Cancelar importação
@@ -430,7 +430,7 @@ const flashError = computed(
                         {{ tr('truncated') }}
                         <button
                             type="button"
-                            class="btn btn-link btn-sm"
+                            class="btn btn-link"
                             data-test="full-covenant-report"
                             @click="openResolution(previewImport, $event)"
                         >
@@ -457,7 +457,7 @@ const flashError = computed(
                     <div class="d-flex gap-2 justify-content-end">
                         <button
                             type="button"
-                            class="btn btn-outline-danger btn-sm"
+                            class="btn btn-outline-danger"
                             :disabled="confirming"
                             @click="cancelImport(previewImport)"
                         >
@@ -465,7 +465,7 @@ const flashError = computed(
                         </button>
                         <button
                             type="button"
-                            class="btn btn-primary btn-sm"
+                            class="btn btn-primary"
                             data-test="confirm-import"
                             :disabled="
                                 confirming ||
@@ -493,14 +493,14 @@ const flashError = computed(
                                 ref="fileInput"
                                 type="file"
                                 accept=".csv,text/csv"
-                                class="form-control form-control-sm"
+                                class="form-control"
                                 :class="{ 'is-invalid': uploadForm.errors.file }"
                                 required
                                 @change="onFileChange"
                             />
                             <button
                                 type="submit"
-                                class="btn btn-primary btn-sm text-nowrap"
+                                class="btn btn-primary text-nowrap"
                                 :disabled="!uploadForm.file || uploadForm.processing"
                             >
                                 <span v-if="uploadForm.processing" class="spinner-border spinner-border-sm me-1"></span>
@@ -535,7 +535,7 @@ const flashError = computed(
                     <h2 class="h5 mb-0">{{ resolution.import.original_name }}</h2>
                     <button
                         type="button"
-                        class="btn btn-outline-secondary btn-sm"
+                        class="btn btn-outline-secondary"
                         data-test="close-covenant-resolution"
                         @click="closeResolution"
                     >
@@ -623,7 +623,7 @@ const flashError = computed(
                                     <button
                                         v-if="(item.has_covenant_errors || item.error_rows > 0) && item.urls.covenants"
                                         type="button"
-                                        class="btn btn-sm btn-outline-primary me-2 mb-1"
+                                        class="btn btn-outline-primary me-2 mb-1"
                                         data-test="resolve-covenants"
                                         :aria-busy="resolvingId === item.id"
                                         @click="openResolution(item, $event)"
@@ -633,7 +633,7 @@ const flashError = computed(
                                     <a
                                         v-if="item.has_errors_file && item.urls.errors && !item.files_expired"
                                         :href="item.urls.errors"
-                                        class="btn btn-sm btn-outline-secondary"
+                                        class="btn btn-outline-secondary"
                                         title="Baixar erros"
                                     >
                                         <i class="ti ti-download"></i>

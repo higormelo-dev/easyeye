@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import PatientTable from './PatientTable.vue';
 import PatientCards from './PatientCards.vue';
 import PatientFormModal from './PatientFormModal.vue';
@@ -160,59 +161,51 @@ const breadcrumbs = [
             <!-- ── Page Header ───────────────────────────────────────────── -->
             <!-- flex-wrap (G5): no celular as ações descem para a linha de baixo —
                  sem isso a linha passava de 390 px (rolagem lateral de 118 px). -->
-            <div
-                class="patients-header d-flex flex-wrap align-items-center gap-2 pb-3 mb-3 border-bottom"
+            <PageHeader
+                title="Pacientes"
+                title-tag="h1"
+                :total="patients.total"
+                class="patients-header"
                 data-testid="patients-header"
             >
-                <div class="d-flex align-items-center gap-2 me-auto">
-                    <h4 class="mb-0 fw-bold">Pacientes</h4>
-                    <span
-                        style="
-                            font-size: 0.78rem;
-                            font-weight: 600;
-                            color: #0d6efd;
-                            background: #eff4ff;
-                            border: 1.5px solid #0d6efd;
-                            border-radius: 20px;
-                            padding: 2px 12px;
-                            white-space: nowrap;
-                            line-height: 1.6;
-                        "
-                        >Total: {{ patients.total }}</span
-                    >
-                </div>
-                <div class="d-flex flex-wrap align-items-center gap-2" data-testid="patients-header-actions">
-                    <!-- View toggle -->
-                    <div class="page-header-toggle bg-white border shadow-sm rounded px-1 d-flex align-items-center">
-                        <button
-                            type="button"
-                            class="rounded p-1 d-flex align-items-center justify-content-center border-0"
-                            :class="view === 'table' ? 'bg-light' : 'bg-white'"
-                            title="Visualização em tabela"
-                            @click="setView('table')"
+                <template #actions>
+                    <div class="d-flex flex-wrap align-items-center gap-2" data-testid="patients-header-actions">
+                        <!-- View toggle -->
+                        <div
+                            class="page-header-toggle bg-white border shadow-sm rounded px-1 d-flex align-items-center"
                         >
-                            <i class="ti ti-list fs-14 text-body"></i>
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded p-1 d-flex align-items-center justify-content-center border-0"
-                            :class="view === 'cards' ? 'bg-light' : 'bg-white'"
-                            title="Visualização em cards"
-                            @click="setView('cards')"
-                        >
-                            <i class="ti ti-layout-grid fs-14 text-body"></i>
+                            <button
+                                type="button"
+                                class="btn-icon rounded p-1 d-flex align-items-center justify-content-center border-0"
+                                :class="view === 'table' ? 'bg-light' : 'bg-white'"
+                                title="Visualização em tabela"
+                                aria-label="Visualização em tabela"
+                                @click="setView('table')"
+                            >
+                                <i class="ti ti-list fs-14 text-body"></i>
+                            </button>
+                            <button
+                                type="button"
+                                class="btn-icon rounded p-1 d-flex align-items-center justify-content-center border-0"
+                                :class="view === 'cards' ? 'bg-light' : 'bg-white'"
+                                title="Visualização em cards"
+                                aria-label="Visualização em cards"
+                                @click="setView('cards')"
+                            >
+                                <i class="ti ti-layout-grid fs-14 text-body"></i>
+                            </button>
+                        </div>
+                        <!-- Import -->
+                        <Link :href="route('panel.patients.import.index')" class="btn btn-outline-secondary">
+                            <i class="ti ti-upload me-1"></i> Importar
+                        </Link>
+                        <!-- New patient -->
+                        <button type="button" class="btn btn-primary" @click="openCreate">
+                            <i class="ti ti-plus me-1"></i> Novo paciente
                         </button>
                     </div>
-                    <!-- Import -->
-                    <Link :href="route('panel.patients.import.index')" class="btn btn-outline-secondary">
-                        <i class="ti ti-upload me-1"></i> Importar
-                    </Link>
-                    <!-- New patient -->
-                    <button type="button" class="btn btn-primary" @click="openCreate">
-                        <i class="ti ti-plus me-1"></i> Novo paciente
-                    </button>
-                </div>
-            </div>
+                </template>
+            </PageHeader>
             <!-- ── /Page Header ──────────────────────────────────────────── -->
 
             <!-- ── Search bar ────────────────────────────────────────────── -->

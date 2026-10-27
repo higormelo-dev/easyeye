@@ -103,7 +103,7 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-    <CenteredModal :open="open" :close-label="tt('cancel')" @close="close">
+    <CenteredModal density="default" :open="open" :close-label="tt('cancel')" @close="close">
         <template #header
             ><h5 class="mb-0">{{ tt('title') }}</h5></template
         >

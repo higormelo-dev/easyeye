@@ -364,7 +364,12 @@ defineExpose({ save, hasChanges, unresolvedCount: computed(() => pending.value.l
 </script>
 
 <template>
-    <section class="covenant-mapping card mb-3" :aria-labelledby="id('section', 'title')" :aria-busy="working">
+    <section
+        data-ee-density="default"
+        class="covenant-mapping card mb-3"
+        :aria-labelledby="id('section', 'title')"
+        :aria-busy="working"
+    >
         <div class="card-body">
             <h2 :id="id('section', 'title')" class="h5">{{ tr('title') }}</h2>
             <p class="text-muted">{{ tr('subtitle') }}</p>
@@ -382,7 +387,7 @@ defineExpose({ save, hasChanges, unresolvedCount: computed(() => pending.value.l
                         v-for="name in ['pending', 'all', 'found']"
                         :key="name"
                         type="button"
-                        class="btn btn-sm btn-outline-secondary"
+                        class="btn btn-outline-secondary"
                         :aria-pressed="filter === name"
                         :data-filter="name"
                         @click="filter = name"
@@ -558,7 +563,7 @@ defineExpose({ save, hasChanges, unresolvedCount: computed(() => pending.value.l
                                 <button
                                     v-if="row.source_name"
                                     type="button"
-                                    class="btn btn-sm btn-outline-secondary"
+                                    class="btn btn-outline-secondary"
                                     data-test="row-edit"
                                     :aria-expanded="expanded.has(row.source_name_normalized)"
                                     :aria-controls="id(row.source_name_normalized, 'editor')"
@@ -690,7 +695,7 @@ defineExpose({ save, hasChanges, unresolvedCount: computed(() => pending.value.l
                 <div class="d-flex flex-wrap gap-2 mt-3">
                     <button
                         type="button"
-                        class="btn btn-outline-secondary"
+                        class="btn btn-outline-secondary text-wrap"
                         :disabled="!pending.some((row) => row.status === 'unmatched')"
                         @click="
                             confirmation = {
@@ -726,6 +731,7 @@ defineExpose({ save, hasChanges, unresolvedCount: computed(() => pending.value.l
             </fieldset>
         </div>
         <CenteredModal
+            density="default"
             :open="!!confirmation"
             size="md"
             :close-label="tr('cancel')"

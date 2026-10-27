@@ -68,6 +68,11 @@ async function selectAndSubmit() {
     await flushPromises();
 }
 describe('Mesclar cadastro', () => {
+    it('o modal teleportado declara a densidade padrão', async () => {
+        await render(vi.fn().mockResolvedValue(reply({ data: [candidate] })));
+        expect(wrapper.getComponent({ name: 'CenteredModal' }).props('density')).toBe('default');
+        expect(wrapper.get('[data-testid="patient-merge-confirm"]').classes()).not.toContain('btn-sm');
+    });
     it('carrega ao abrir, agrupa candidatos, exige seleção e informa direção', async () => {
         const fetchMock = vi
             .fn()

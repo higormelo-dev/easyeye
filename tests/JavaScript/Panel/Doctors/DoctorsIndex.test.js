@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 import DoctorsIndex from '@/Pages/Panel/Doctors/Index.vue';
 
 /**
@@ -15,7 +16,7 @@ vi.mock('@/Layouts/AppLayout.vue', () => ({
 }));
 vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     default: {
-        props: ['title', 'total', 'totalLabel', 'view'],
+        props: ['title', 'titleTag', 'total', 'totalLabel', 'view'],
         emits: ['set-view'],
         template: `<div>
             <span class="total">{{ totalLabel }} {{ total }}</span>
@@ -111,6 +112,7 @@ describe('Doctors/Index', () => {
     it('é uma região de densidade padrão e os botões do topo não carregam medida local', () => {
         const page = mountPage().get('.page-doctors');
 
+        expect(wrapper.getComponent(PageHeader).props('titleTag')).toBe('h1');
         expect(page.attributes('data-ee-density')).toBe('default');
         expect(page.html()).not.toMatch(/\b(btn-sm|btn-md|fs-13)\b/);
     });

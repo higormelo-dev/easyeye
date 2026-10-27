@@ -237,6 +237,21 @@ afterEach(() => {
 });
 
 describe('Patient import covenant mapping', () => {
+    it('permite quebrar o texto longo da ação Particular sem reduzir a densidade', async () => {
+        const wrapper = await render();
+        const button = wrapper.findAll('button').find((node) => node.text() === t.all_particular);
+        expect(button.classes()).toContain('text-wrap');
+        expect(button.classes()).toEqual(expect.arrayContaining(['btn', 'btn-outline-secondary']));
+        expect(button.classes()).not.toContain('btn-sm');
+        expect(button.attributes('style')).toBeUndefined();
+    });
+
+    it('mantém densidade padrão inclusive na confirmação teleportada', async () => {
+        const wrapper = await render();
+        expect(wrapper.get('.covenant-mapping').attributes('data-ee-density')).toBe('default');
+        expect(wrapper.getComponent({ name: 'CenteredModal' }).props('density')).toBe('default');
+        expect(wrapper.html()).not.toMatch(/\bbtn-sm\b/);
+    });
     it('renderiza status textual e contagens; filtra pendentes, encontrados e busca local', async () => {
         const wrapper = await render();
         expect(wrapper.findAll('[data-test="mapping-row"]')).toHaveLength(2);

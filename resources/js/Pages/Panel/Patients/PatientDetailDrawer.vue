@@ -113,7 +113,14 @@ function invitePortal() {
 </script>
 
 <template>
-    <OffcanvasPanel :open="open" :width="640" :loading="loading" loading-label="Carregando..." @close="$emit('close')">
+    <OffcanvasPanel
+        density="default"
+        :open="open"
+        :width="640"
+        :loading="loading"
+        loading-label="Carregando..."
+        @close="$emit('close')"
+    >
         <!-- ── Header ─────────────────────────────────────────────────────── -->
         <template #header>
             <div class="d-flex align-items-center gap-3 flex-grow-1 min-width-0">
@@ -351,7 +358,7 @@ function invitePortal() {
                 </p>
                 <button
                     type="button"
-                    class="btn btn-sm btn-outline-primary"
+                    class="btn btn-outline-primary"
                     :disabled="!patient.email || inviting"
                     @click="invitePortal"
                 >

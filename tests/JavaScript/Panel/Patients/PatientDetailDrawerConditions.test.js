@@ -73,6 +73,13 @@ describe('Gaveta do paciente — condições crônicas', () => {
         serve();
     });
 
+    it('a gaveta declara densidade padrão sem tamanho local nos botões', async () => {
+        const wrapper = await mountDrawer();
+        expect(wrapper.getComponent({ name: 'OffcanvasPanel' }).props('density')).toBe('default');
+        expect(wrapper.html()).not.toMatch(/\bbtn-sm\b/);
+        wrapper.unmount();
+    });
+
     it('com a permissão do servidor: o cartão aparece e carrega as condições DO PACIENTE aberto', async () => {
         const wrapper = await mountDrawer({ recallConditions: true });
 

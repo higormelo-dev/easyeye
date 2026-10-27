@@ -128,6 +128,7 @@ const breadcrumbs = computed(() => [
     <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="page-doctors" data-ee-density="default">
             <PageHeader
+                title-tag="h1"
                 :title="pageTitle"
                 :total="doctors.total ?? 0"
                 :total-label="t.total_label ?? 'Total:'"

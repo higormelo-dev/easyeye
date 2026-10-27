@@ -182,6 +182,12 @@ afterEach(() => {
 });
 
 describe('Patient imports page — mapping integration', () => {
+    it('usa densidade padrão sem medidas locais nos controles de importação', () => {
+        const wrapper = render({ preview_id: item.id });
+        expect(wrapper.get('.container-fluid').attributes('data-ee-density')).toBe('default');
+        expect(wrapper.get('[data-test="confirm-import"]').classes()).not.toContain('btn-sm');
+        expect(wrapper.html()).not.toMatch(/\b(btn-sm|form-control-sm)\b/);
+    });
     it('preview repassa props/URLs exatas e mostra o componente depois das amostras', () => {
         const wrapper = render({ preview_id: item.id });
         const props = mapping(wrapper).props();

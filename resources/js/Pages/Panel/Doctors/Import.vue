@@ -164,16 +164,16 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
 
 <template>
     <AppLayout title="Importar médicos" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
+        <div class="container-fluid py-3" data-ee-density="default">
             <PageHeader
                 title="Importação em massa de médicos"
                 subtitle="Upload CSV — geração de preview antes da importação efetiva."
             >
                 <template #actions>
-                    <a :href="urls.template" class="btn btn-outline-secondary btn-sm">
+                    <a :href="urls.template" class="btn btn-outline-secondary">
                         <i class="ti ti-download me-1"></i>Modelo CSV
                     </a>
-                    <Link :href="urls.doctors" class="btn btn-outline-secondary btn-sm">
+                    <Link :href="urls.doctors" class="btn btn-outline-secondary">
                         <i class="ti ti-arrow-left me-1"></i>Médicos
                     </Link>
                 </template>
@@ -204,7 +204,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                     <span :class="`badge bg-${liveImport.status_color} ms-2`">{{ liveImport.status_label }}</span>
                     <button
                         type="button"
-                        class="btn btn-outline-danger btn-sm ms-auto"
+                        class="btn btn-outline-danger ms-auto"
                         @click="cancelProcessingImport(liveImport)"
                     >
                         <i class="ti ti-ban me-1"></i>Cancelar importação
@@ -287,16 +287,12 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end">
-                        <button
-                            type="button"
-                            class="btn btn-outline-danger btn-sm"
-                            @click="cancelImport(previewImport)"
-                        >
+                        <button type="button" class="btn btn-outline-danger" @click="cancelImport(previewImport)">
                             <i class="ti ti-x me-1"></i>Cancelar
                         </button>
                         <button
                             type="button"
-                            class="btn btn-primary btn-sm"
+                            class="btn btn-primary"
                             :disabled="previewImport.preview?.can_proceed === false"
                             @click="confirmImport(previewImport)"
                         >
@@ -319,14 +315,14 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                                 ref="fileInput"
                                 type="file"
                                 accept=".csv,text/csv"
-                                class="form-control form-control-sm"
+                                class="form-control"
                                 :class="{ 'is-invalid': uploadForm.errors.file }"
                                 required
                                 @change="onFileChange"
                             />
                             <button
                                 type="submit"
-                                class="btn btn-primary btn-sm text-nowrap"
+                                class="btn btn-primary text-nowrap"
                                 :disabled="!uploadForm.file || uploadForm.processing"
                             >
                                 <span v-if="uploadForm.processing" class="spinner-border spinner-border-sm me-1"></span>
@@ -384,7 +380,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                                     <a
                                         v-if="item.has_errors_file && item.urls.errors"
                                         :href="item.urls.errors"
-                                        class="btn btn-sm btn-outline-secondary"
+                                        class="btn btn-outline-secondary"
                                         title="Baixar erros"
                                     >
                                         <i class="ti ti-download"></i>

@@ -29,6 +29,8 @@ describe('Pacientes: cabeçalho sem rolagem lateral no celular', () => {
         expect(actions.text()).toContain('Importar');
         expect(actions.text()).toContain('Novo paciente');
         expect(header.text()).toContain('Total: 3');
+        expect(header.get('h1').text()).toBe('Pacientes');
+        expect(wrapper.findAll('h1')).toHaveLength(1);
     });
 
     it('é uma região de densidade padrão: alternador, busca e botões seguem a densidade, sem medida local', () => {
