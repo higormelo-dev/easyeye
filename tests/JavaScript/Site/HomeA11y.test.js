@@ -132,12 +132,12 @@ function buildT() {
             included: 'Incluído',
             not_included: 'Não incluído',
             not_specified: 'Não informado',
-            integrator_label: 'Integrador de exames',
+            integrator_label: 'Integrador de exames (em breve)',
             integrator_description:
-                'Envie os exames dos aparelhos para o EasyEye e mantenha-os organizados para consulta.',
-            integrator_title: 'Integrador de exames',
-            integrator_badge: 'Integrador incluído',
-            integrator_plan: 'Incluído no :plan',
+                'Em breve você poderá enviar os exames dos aparelhos da clínica direto para o EasyEye, onde eles ficam organizados para consulta.',
+            integrator_title: 'Integrador de exames — em breve',
+            integrator_badge: 'Integrador em breve',
+            integrator_plan: 'Chega em breve no :plan',
             integrator_flow: ['Aparelhos', 'Integrador', 'Exames'],
             groups: { capacity: 'Capacidade', ai: 'Inteligência artificial', resources: 'Recursos' },
             upcoming_label: 'Em breve no Premium',
@@ -518,8 +518,8 @@ describe('Home — planos', () => {
         );
         const expectedRows = [
             ['Até 1 médico', 'Sem créditos de IA'],
-            ['Até 3 médicos', '100 créditos de IA por mês', 'Integrador de exames'],
-            ['Até 3 médicos', '500 créditos de IA por mês', 'Integrador de exames'],
+            ['Até 3 médicos', '100 créditos de IA por mês', 'Integrador de exames (em breve)'],
+            ['Até 3 médicos', '500 créditos de IA por mês', 'Integrador de exames (em breve)'],
             ['Médicos ilimitados'],
         ];
         expectedRows.forEach((labels, index) => {

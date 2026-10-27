@@ -20,15 +20,16 @@ const t = {
         unlimited: 'Ilimitado',
         none: 'Não incluído',
     },
-    integrator_badge: 'Integrador incluído',
-    integrator_plan: 'Incluído no :plan',
-    integrator_title: 'Integrador de exames',
+    integrator_badge: 'Integrador em breve',
+    integrator_plan: 'Chega em breve no :plan',
+    integrator_title: 'Integrador de exames — em breve',
     integrator_flow: ['Aparelhos da clínica', 'Integrador', 'Exames no EasyEye'],
     included: 'Incluído',
     not_included: 'Não incluído',
     not_specified: 'Consultar',
-    integrator_label: 'Integrador de exames',
-    integrator_description: 'Envie os exames dos aparelhos para o EasyEye e mantenha-os organizados para consulta.',
+    integrator_label: 'Integrador de exames (em breve)',
+    integrator_description:
+        'Em breve você poderá enviar os exames dos aparelhos da clínica direto para o EasyEye, onde eles ficam organizados para consulta.',
     ai_chat_label: 'Assistente de IA em todas as telas',
     featured_badge: 'Mais popular',
     on_request: 'Sob consulta',
@@ -255,13 +256,13 @@ describe('PricingPlans', () => {
         ];
         render({ plans: [plan('Premium', { features })] });
         const integrator = wrapper.get('details [data-feature="has_api_integrator"]');
-        expect(integrator.text()).toBe('Integrador de exames');
+        expect(integrator.text()).toBe('Integrador de exames (em breve)');
         expect(integrator.get('i').classes()).toContain('ti-circle-check');
         const highlight = wrapper.get('[data-test="premium-integrator"]');
         expect(highlight.get('h3').text()).toBe(t.integrator_title);
-        expect(highlight.get('.pricing-integrator-plan').text()).toBe('Incluído no Premium');
+        expect(highlight.get('.pricing-integrator-plan').text()).toBe('Chega em breve no Premium');
         expect(highlight.element.closest('.pricing-card')).toBeNull();
-        expect(wrapper.get('.pricing-badge--integrator').text()).toBe('Integrador incluído');
+        expect(wrapper.get('.pricing-badge--integrator').text()).toBe('Integrador em breve');
         expect(highlight.get('a').attributes('href')).toBe('/register?plan=Premium');
         expect(highlight.get('p').text()).toBe(t.integrator_description);
         expect(highlight.element.closest('details')).toBeNull();

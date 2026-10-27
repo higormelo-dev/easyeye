@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FeatureKey;
 use App\Models\{Plan, PlanFeature, SubscriptionSetting};
+use Illuminate\Support\{Arr, Str};
 use Inertia\Testing\AssertableInertia as Assert;
 
 /**
@@ -113,6 +114,33 @@ it('módulo de estoque não aparece como funcionalidade futura exclusiva do Prem
                         || str_contains(mb_strtolower((string) $title), 'inventory'))),
         );
 });
+
+/**
+ * O integrador de exames ainda não foi lançado: toda menção na landing precisa dizer que é função nova, em
+ * breve. O teste percorre TODAS as strings do grupo `site`, então um texto novo que cite o integrador sem o
+ * marcador reprova aqui, sem depender de alguém lembrar de checar a chave.
+ */
+it('apresenta o integrador de exames só como função em breve, nos dois idiomas', function (string $locale, string $marker, array $removed) {
+    $strings = collect(Arr::dot(trans('site', [], $locale)))
+        ->filter(fn ($text) => is_string($text))
+        // Diagrama "aparelhos → integrador → exames": nomeia o fluxo, não anuncia disponibilidade (decisão do dono).
+        ->reject(fn ($text, $key) => str_starts_with((string) $key, 'pricing.integrator_flow.'));
+
+    $mentions      = $strings->filter(fn (string $text) => Str::contains($text, ['integrador', 'integrator'], ignoreCase: true));
+    $withoutMarker = $mentions->reject(fn (string $text) => Str::contains($text, $marker, ignoreCase: true));
+
+    expect($mentions)->not->toBeEmpty()
+        ->and($withoutMarker->all())->toBe([])
+        ->and(trans('site.pricing.integrator_badge', [], $locale))->toContain($marker)
+        ->and(trans('site.footer.api', [], $locale))->toContain($marker);
+
+    foreach ($removed as $old) {
+        expect($strings->contains(fn (string $text) => Str::contains($text, $old)))->toBeFalse("texto antigo '{$old}' voltou");
+    }
+})->with([
+    'pt_BR' => ['pt_BR', 'breve', ['Integrador incluído', 'Incluído no :plan']],
+    'en'    => ['en', 'soon', ['Integrator included', 'Included in :plan']],
+]);
 
 it('expõe o prazo efetivo do cadastro e um link que preserva cada plano ativo', function () {
     SubscriptionSetting::setValue('trial_days', 9);
