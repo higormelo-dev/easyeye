@@ -11,6 +11,7 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat';
 
 defineProps({
     title: { type: String, default: '' },
+    titleTag: { type: String, default: 'h4' },
     subtitle: { type: String, default: '' },
     total: { type: Number, default: null },
     /** Rótulo traduzido do total (opcional — padrão mantém o texto de sempre). */
@@ -33,7 +34,7 @@ const { number } = useLocaleFormat();
     <div class="d-flex flex-wrap align-items-center gap-2 pb-3 mb-3 border-bottom">
         <!-- Título + subtitle + total -->
         <div class="d-flex align-items-center gap-2 me-auto">
-            <h4 class="mb-0 fw-bold">{{ title }}</h4>
+            <component :is="titleTag" class="h4 mb-0 fw-bold">{{ title }}</component>
             <small v-if="subtitle" class="text-muted">{{ subtitle }}</small>
             <span v-if="total !== null" class="page-header-total"> {{ totalLabel }} {{ number(total) }} </span>
         </div>

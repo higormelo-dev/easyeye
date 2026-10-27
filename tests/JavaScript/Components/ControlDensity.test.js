@@ -1,9 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { readFileSync } from 'node:fs';
+import { defineComponent } from 'vue';
+import { mount, flushPromises } from '@vue/test-utils';
 import { resolve } from 'node:path';
 import { compile } from 'sass';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
 
 /**
  * Densidade dos controles (design-system/MASTER.md §1 e §6).
@@ -31,6 +35,57 @@ describe.each([
 
         expect(document.querySelector('[role="dialog"]').getAttribute('data-ee-density')).toBe(density);
     });
+});
+
+describe('componentes compartilhados do lote 1', () => {
+    it('PageHeader preserva h4 por padrao e permite h1 com a mesma aparencia', async () => {
+        wrapper = mount(PageHeader, { props: { title: 'Título' } });
+        const classes = wrapper.get('h4').attributes('class');
+        await wrapper.setProps({ titleTag: 'h1' });
+        expect(wrapper.get('h1').text()).toBe('Título');
+        expect(wrapper.get('h1').attributes('class')).toBe(classes);
+    });
+    it('menu teleportado copia o ancestral mais proximo em cada abertura e remove fora de regiao', async () => {
+        const Host = defineComponent({
+            components: { ActionDropdown },
+            template:
+                '<div data-ee-density="comfortable"><div data-test="region" data-ee-density="compact"><ActionDropdown title="Ações"><li><button class="dropdown-item">Editar</button></li></ActionDropdown></div></div>',
+        });
+        wrapper = mount(Host, { attachTo: document.body });
+        const trigger = wrapper.get('button');
+        await trigger.trigger('click');
+        await flushPromises();
+        expect(document.body.querySelector('.dropdown-menu').getAttribute('data-ee-density')).toBe('compact');
+        await trigger.trigger('click');
+        wrapper.get('[data-test="region"]').element.setAttribute('data-ee-density', 'default');
+        await trigger.trigger('click');
+        await flushPromises();
+        expect(document.body.querySelector('.dropdown-menu').getAttribute('data-ee-density')).toBe('default');
+        await trigger.trigger('click');
+        wrapper.get('[data-test="region"]').element.removeAttribute('data-ee-density');
+        wrapper.element.removeAttribute('data-ee-density');
+        await trigger.trigger('click');
+        await flushPromises();
+        expect(document.body.querySelector('.dropdown-menu').hasAttribute('data-ee-density')).toBe(false);
+    });
+    it.each(['CenteredModal', 'OffcanvasPanel'])(
+        '%s reduz movimento apenas em regiao e preserva o estado visivel',
+        (name) => {
+            const source = readFileSync(resolve(process.cwd(), `resources/js/Components/Panel/${name}.vue`), 'utf8');
+            const media = source.slice(source.indexOf('@media (prefers-reduced-motion: reduce)'));
+            expect(source).toContain('@media (prefers-reduced-motion: reduce)');
+            expect(media).toContain('transition: none');
+            expect(media).toContain('opacity: 1');
+            expect(media).toContain('transform: none');
+            const lists = [...media.matchAll(/([^{}]+)\{/g)]
+                .map((match) => match[1].trim())
+                .filter((selector) => !selector.startsWith('@media'));
+            for (const list of lists)
+                for (const selector of list.split(',')) expect(selector).toContain('[data-ee-density]');
+            expect(source).not.toContain('transition: all');
+            expect(source).toContain('opacity 0.2s');
+        },
+    );
 });
 
 describe('_control-tokens.scss', () => {
@@ -85,6 +140,20 @@ describe('_control-tokens.scss', () => {
         expect(px(t['--ee-control-font-size'])).toBe(16);
     });
 
+    it.each(['nav-tabs', 'nav-pills'])('%s de página segue altura, fonte e padding da região', (variant) => {
+        const selector = `[data-ee-density] .${variant} .nav-link`;
+        const rule = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find((match) =>
+            splitTopLevel(match[1]).includes(selector),
+        )?.[2];
+        expect(rule, `regra de página: ${selector}`).toBeDefined();
+        expect(rule).toContain('min-height: var(--ee-control-min-height)');
+        expect(rule).toContain('padding: var(--ee-control-padding-y) var(--ee-control-padding-x)');
+        expect(rule).toContain('font-size: var(--ee-control-font-size)');
+        expect(rule).toContain('line-height: var(--ee-control-line-height)');
+        // Os tokens já provam 32/40/44px e 44px no toque; as abas usam a mesma conta.
+        expect(css).toContain('[data-ee-density] .ee-modal__tabs .nav-tabs .nav-link');
+    });
+
     it('os tokens só existem dentro de regiões: nada em :root muda o painel que não migrou', () => {
         expect(css).not.toMatch(/:root/);
     });
@@ -126,6 +195,43 @@ describe('_control-tokens.scss', () => {
         for (const selector of selectors) {
             expect(selector, `seletor fora de região: ${selector}`).toMatch(/^(:where\()?\[data-ee-density/);
         }
+    });
+
+    it.each([
+        ['[data-ee-density=compact]', 12, 44],
+        ['[data-ee-density]', 16, 52],
+        ['[data-ee-density=comfortable]', 16, 56],
+    ])(
+        '%s: tabela segue padding horizontal %d e referencia de linha %d sem altura rigida',
+        (selector, paddingX, rowHeight) => {
+            const t = tokens(selector);
+            expect(px(t['--ee-table-padding-x'])).toBe(paddingX);
+            // Celula Bootstrap tem uma borda inferior de 1px; conteudo multilinha pode crescer.
+            expect(px(t['--ee-control-line-height']) + 2 * px(t['--ee-table-padding-y']) + 1).toBe(rowHeight);
+            const start = css.indexOf('[data-ee-density] .table > :not(caption) > * > *');
+            const rule = css.slice(start, css.indexOf('}', start));
+            expect(start).toBeGreaterThanOrEqual(0);
+            expect(rule).toContain('var(--ee-table-padding-x)');
+            expect(rule).toContain('var(--ee-table-padding-y)');
+            expect(rule).not.toMatch(/(?:^|[;{])\s*height:/);
+        },
+    );
+    it('checkbox/radio tem indicador 18-20px e linha/label clicavel pela densidade', () => {
+        expect(px(tokens('[data-ee-density]')['--ee-choice-size'])).toBe(18);
+        const media = css.indexOf('@media (pointer: coarse), (max-width: 575.98px)');
+        expect(px(tokens('[data-ee-density]', media)['--ee-choice-size'])).toBe(20);
+        for (const selector of ['.form-check', '.form-check-label']) {
+            const start = css.indexOf(`[data-ee-density] ${selector} {`);
+            expect(start).toBeGreaterThanOrEqual(0);
+            expect(css.slice(start, css.indexOf('}', start))).toContain('min-height: var(--ee-control-min-height)');
+        }
+        expect(css).toContain('[data-ee-density] .form-switch .form-check-input');
+    });
+    it('itens de dropdown e numeros tabulares ficam apenas na regiao', () => {
+        const start = css.indexOf('[data-ee-density] .dropdown-item');
+        expect(start).toBeGreaterThanOrEqual(0);
+        expect(css.slice(start, css.indexOf('}', start))).toContain('min-height: var(--ee-control-min-height)');
+        expect(css).toContain('[data-ee-density] .ee-tabular { font-variant-numeric: tabular-nums; }');
     });
 
     it('campo inválido ou válido reserva o lado direito para o ícone do Bootstrap', () => {

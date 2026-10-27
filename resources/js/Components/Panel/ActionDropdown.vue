@@ -13,6 +13,7 @@ const open = ref(false);
 const triggerRef = ref(null);
 const menuRef = ref(null);
 const menuStyle = ref({});
+const menuDensity = ref(null);
 const menuId = `ee-dropdown-${useId()}`;
 
 // Itens navegáveis por teclado (divisores e itens desabilitados ficam de fora).
@@ -35,6 +36,7 @@ function toggle(e) {
  * scroll fecharia o menu); pelo mouse, nada muda.
  */
 async function openMenu(viaKeyboard = false) {
+    menuDensity.value = triggerRef.value?.closest('[data-ee-density]')?.getAttribute('data-ee-density') ?? null;
     open.value = true;
     await nextTick();
     position();
@@ -207,6 +209,7 @@ onBeforeUnmount(close);
                 ref="menuRef"
                 class="dropdown-menu show p-2"
                 :style="menuStyle"
+                :data-ee-density="menuDensity"
                 @click="onMenuClick"
                 @keydown="onMenuKeydown"
             >

@@ -16,29 +16,32 @@
 //   altura = line-height + 2 × padding-y + 2 × borda de 1px
 //   compact 20+10+2 = 32 | default 20+18+2 = 40 | comfortable 24+18+2 = 44
 
-@mixin -density($min-height, $font-size, $line-height, $padding-x, $padding-y, $icon-size) {
+@mixin -density($min-height, $font-size, $line-height, $padding-x, $padding-y, $icon-size, $table-x, $table-y, $choice-size) {
     --ee-control-min-height: #{$min-height};
     --ee-control-font-size: #{$font-size};
     --ee-control-line-height: #{$line-height};
     --ee-control-padding-x: #{$padding-x};
     --ee-control-padding-y: #{$padding-y};
     --ee-icon-size: #{$icon-size};
+    --ee-table-padding-x: #{$table-x};
+    --ee-table-padding-y: #{$table-y};
+    --ee-choice-size: #{$choice-size};
 }
 
 // Qualquer valor de data-ee-density (inclusive um erro de digitação) cai no padrão de 40px.
 [data-ee-density] {
-    @include -density(2.5rem, 0.875rem, 1.25rem, 0.75rem, 0.5625rem, 1.125rem);
+    @include -density(2.5rem, 0.875rem, 1.25rem, 0.75rem, 0.5625rem, 1.125rem, 1rem, 0.96875rem, 1.125rem);
     --ee-control-radius: 0.5rem;
     --ee-surface-radius: 0.75rem;
     --ee-control-gap: 0.5rem;
 }
 
 [data-ee-density="compact"] {
-    @include -density(2rem, 0.875rem, 1.25rem, 0.5rem, 0.3125rem, 1rem);
+    @include -density(2rem, 0.875rem, 1.25rem, 0.5rem, 0.3125rem, 1rem, 0.75rem, 0.71875rem, 1.125rem);
 }
 
 [data-ee-density="comfortable"] {
-    @include -density(2.75rem, 1rem, 1.5rem, 0.75rem, 0.5625rem, 1.25rem);
+    @include -density(2.75rem, 1rem, 1.5rem, 0.75rem, 0.5625rem, 1.25rem, 1rem, 0.96875rem, 1.25rem);
 }
 
 // Toque ou tela pequena: confortável em TODA região, inclusive a compacta. Fonte de 16px também
@@ -46,7 +49,7 @@
 // tem ponteiro impreciso e cai aqui.
 @media (pointer: coarse), (max-width: 575.98px) {
     [data-ee-density] {
-        @include -density(2.75rem, 1rem, 1.5rem, 0.75rem, 0.5625rem, 1.25rem);
+        @include -density(2.75rem, 1rem, 1.5rem, 0.75rem, 0.5625rem, 1.25rem, 1rem, 0.96875rem, 1.25rem);
     }
 }
 
@@ -185,6 +188,17 @@
         min-height: calc(var(--ee-control-min-height) - 2px);
     }
 
+    // Abas de página também seguem a região; o modal conserva sua regra mais específica abaixo.
+    .nav-tabs .nav-link,
+    .nav-pills .nav-link {
+        display: flex;
+        align-items: center;
+        min-height: var(--ee-control-min-height);
+        padding: var(--ee-control-padding-y) var(--ee-control-padding-x);
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
+    }
+
     // Abas do modal: o CSS escopado do componente fixa 13px e padding próprio (especificidade 0,3,0).
     .ee-modal__tabs .nav-tabs .nav-link {
         display: flex;
@@ -194,6 +208,64 @@
         font-size: var(--ee-control-font-size);
         line-height: var(--ee-control-line-height);
         border-radius: var(--ee-control-radius) var(--ee-control-radius) 0 0;
+    }
+
+    // Indicador separado do alvo: o label associado ocupa a linha clicavel da regiao.
+    .form-check {
+        display: flex;
+        align-items: center;
+        gap: var(--ee-control-gap);
+        min-height: var(--ee-control-min-height);
+        padding-left: 0;
+    }
+
+    input[type="checkbox"]:not(.btn-check),
+    input[type="radio"]:not(.btn-check) {
+        width: var(--ee-choice-size);
+        height: var(--ee-choice-size);
+        flex-shrink: 0;
+    }
+
+    .form-check .form-check-input {
+        float: none;
+        margin: 0;
+    }
+
+    .form-check-label {
+        display: flex;
+        align-items: center;
+        min-height: var(--ee-control-min-height);
+        cursor: pointer;
+    }
+
+    .form-check > .form-check-label {
+        flex: 1;
+    }
+
+    .form-switch .form-check-input {
+        width: calc(2 * var(--ee-choice-size));
+        height: var(--ee-choice-size);
+    }
+
+    // Referencia de linha textual = entrelinha + paddings + borda inferior Bootstrap (1px).
+    // Nao fixa altura: celulas com controles ou varias linhas crescem naturalmente.
+    .table > :not(caption) > * > * {
+        padding: var(--ee-table-padding-y) var(--ee-table-padding-x);
+        line-height: var(--ee-control-line-height);
+        vertical-align: middle;
+    }
+
+    .ee-tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        min-height: var(--ee-control-min-height);
+        padding: var(--ee-control-padding-y) var(--ee-control-padding-x);
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
     }
 
     // Select com busca (@vueform/multiselect via SearchSelect). A lib soma a borda no wrapper interno e

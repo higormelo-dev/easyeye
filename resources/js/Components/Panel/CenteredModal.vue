@@ -57,7 +57,12 @@ useModalA11y(
     <Teleport to="body">
         <!-- Backdrop -->
         <transition name="ee-fade">
-            <div v-if="open" class="ee-modal__backdrop" @click="$emit('close')" />
+            <div
+                v-if="open"
+                class="ee-modal__backdrop"
+                :data-ee-density="density || undefined"
+                @click="$emit('close')"
+            />
         </transition>
 
         <!-- Dialog wrapper -->
@@ -246,6 +251,22 @@ useModalA11y(
     .ee-modal__wrap {
         padding: 0.25rem;
         align-items: flex-end;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ee-fade-enter-active[data-ee-density],
+    .ee-fade-leave-active[data-ee-density],
+    .ee-modal-scale-enter-active[data-ee-density],
+    .ee-modal-scale-leave-active[data-ee-density] {
+        transition: none;
+    }
+
+    .ee-fade-enter-from[data-ee-density],
+    .ee-fade-leave-to[data-ee-density],
+    .ee-modal-scale-enter-from[data-ee-density],
+    .ee-modal-scale-leave-to[data-ee-density] {
+        opacity: 1;
+        transform: none;
     }
 }
 </style>
