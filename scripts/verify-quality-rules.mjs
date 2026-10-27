@@ -195,6 +195,69 @@ vueRuleTester.run('quality/max-lines (Vue)', plugin.rules['max-lines'], {
 });
 console.log('quality/max-lines (Vue): ok');
 
+// Local rule (EasyEye density contract): it reads the Vue template, so it only runs under vue-eslint-parser.
+// The full matrix lives in tests/JavaScript/eslint-rules/no-local-control-sizing.test.js; this is the smoke
+// that `quality:rules` keeps the rule loadable, flagging, and silent on legitimate geometry.
+const sizing = (body) => `<template>\n${body}\n</template>`;
+vueRuleTester.run('quality/no-local-control-sizing (Vue)', plugin.rules['no-local-control-sizing'], {
+    valid: [
+        {
+            name: 'a control without local sizing',
+            filename: 'src/Page.vue',
+            code: sizing('<button class="btn btn-primary">ok</button>'),
+        },
+        {
+            name: 'image geometry is not control sizing',
+            filename: 'src/Page.vue',
+            code: sizing('<img src="a.png" alt="" style="width: 30px; height: 30px" />'),
+        },
+        {
+            name: 'canvas geometry is not control sizing',
+            filename: 'src/Page.vue',
+            code: sizing('<canvas :style="{ height: `${h}px` }"></canvas>'),
+        },
+        {
+            name: 'btn-xs, btn-link and btn-close stay',
+            filename: 'src/Page.vue',
+            code: sizing(
+                '<button class="btn btn-xs">a</button><button class="btn btn-link fs-11">b</button><button class="btn-close"></button>',
+            ),
+        },
+        {
+            name: 'a badge keeps its font utility',
+            filename: 'src/Page.vue',
+            code: sizing('<span class="badge fs-11">ok</span>'),
+        },
+    ],
+    invalid: [
+        {
+            name: 'btn-sm on a button',
+            filename: 'src/Page.vue',
+            code: sizing('<button class="btn btn-sm">ok</button>'),
+            errors: [{ messageId: 'sizeClass', data: { name: 'btn-sm', tag: 'button' } }],
+        },
+        {
+            name: 'btn-sm in a dynamic class',
+            filename: 'src/Page.vue',
+            code: sizing('<button class="btn" :class="{ \'btn-sm\': compact }">ok</button>'),
+            errors: [{ messageId: 'sizeClass', data: { name: 'btn-sm', tag: 'button' } }],
+        },
+        {
+            name: 'fs-13 on a field',
+            filename: 'src/Page.vue',
+            code: sizing('<input class="form-control fs-13" />'),
+            errors: [{ messageId: 'fontClass', data: { name: 'fs-13', tag: 'input' } }],
+        },
+        {
+            name: 'inline height on a control component',
+            filename: 'src/Page.vue',
+            code: sizing('<SearchSelect style="height: 30px" />'),
+            errors: [{ messageId: 'style', data: { property: 'height', tag: 'SearchSelect' } }],
+        },
+    ],
+});
+console.log('quality/no-local-control-sizing (Vue): ok');
+
 ruleTester.run('quality/no-direct-console', plugin.rules['no-direct-console'], {
     valid: [
         ...testFilenames.map((filename) => ({

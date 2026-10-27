@@ -3,11 +3,13 @@
 'use strict';
 
 const { maxLines, noDirectConsole, noDirectDataAccess } = require('./core-rules.cjs');
+const { noLocalControlSizing } = require('./no-local-control-sizing.cjs');
 
 module.exports = {
     rules: {
         'max-lines': maxLines,
         'no-direct-console': noDirectConsole,
         'no-direct-data-access': noDirectDataAccess,
+        'no-local-control-sizing': noLocalControlSizing,
     },
 };

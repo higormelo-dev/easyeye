@@ -3,6 +3,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import prettier from 'eslint-config-prettier/flat';
 import pluginVue from 'eslint-plugin-vue';
 import globals from 'globals';
+import quality from './eslint-rules/index.cjs';
 
 /**
  * ESLint (flat config, v10) do frontend: app Vue/Inertia, testes Vitest,
@@ -57,6 +58,24 @@ export default defineConfig([
         },
     },
 
+    // Densidade dos controles (design-system/MASTER.md §6, plano de adoção D3): nas páginas JÁ migradas para
+    // uma região `data-ee-density` quem decide a medida do botão e do campo é a região, não a classe local.
+    // A lista cresce a cada lote, quando a página entra na região; a dívida fora dela fica visível (nunca
+    // recebe `eslint-disable`) e é medida por `npm run lint:quality`.
+    {
+        name: 'easyeye/design-system-density',
+        files: [
+            'resources/js/Pages/Panel/Doctors/**/*.vue',
+            'resources/js/Pages/Panel/Patients/**/*.vue',
+            'resources/js/Pages/Panel/Manager/AiPricing/**/*.vue',
+            'resources/js/Components/Panel/PatientImportCovenantMapping.vue',
+        ],
+        plugins: { quality },
+        rules: {
+            'quality/no-local-control-sizing': 'error',
+        },
+    },
+
     // Vitest roda com `globals: true` (vitest.config.js).
     {
         name: 'easyeye/vitest',
@@ -94,6 +113,7 @@ export default defineConfig([
             'e2e/cypress/support/e2e.js',
             'e2e/cypress/support/commands.js',
             'e2e/cypress/support/billing.js',
+            'e2e/cypress/support/density.js',
             'e2e/cypress/e2e/docs/billing-manual.cy.js',
         ],
         languageOptions: {
