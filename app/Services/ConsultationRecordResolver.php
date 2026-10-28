@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 /**
  * Resolve o "prontuário do dia da consulta" a partir de exames — a mesma
  * ancoragem usada tanto pelo laudo de IA (AiRunDocumentationService) quanto
- * pelo laudo manual do Gerenciador de Imagens (EyeImageReportController).
+ * pelo laudo manual do Gerenciador de exames (ExamManagerReportController).
  * Domínio neutro de propósito: nem um nem outro fluxo é "dono" dessa regra.
  *
  * Regra: um documento clínico gerado a partir de exames pertence ao
@@ -82,7 +82,7 @@ class ConsultationRecordResolver
      * o lock de abertura do paciente) com o RETRATO das alergias e medicações
      * ativas do paciente no momento — mesma regra de MedicalRecordService::store
      * (Fase 2 / A2). Ponto único dos prontuários abertos fora do salvar do
-     * formulário: laudo manual do Gerenciador de Imagens e laudo de IA aprovado.
+     * formulário: laudo manual do Gerenciador de exames e laudo de IA aprovado.
      */
     public function openRecord(string $entityId, string $patientId, string $doctorId, ?string $scheduleId): MedicalRecord
     {

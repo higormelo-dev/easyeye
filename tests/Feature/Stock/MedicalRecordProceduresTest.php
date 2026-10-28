@@ -55,7 +55,7 @@ beforeEach(function () {
 
 // Nomes com sufixo Account (em vez de actingAsDoctor/actingAsSecretary
 // genéricos) para não colidir com os helpers globais de mesmo nome já
-// declarados em tests/Feature/EyeImages/EyeImageManualReportTest.php — Pest
+// declarados em tests/Feature/ExamManager/ExamManagerManualReportTest.php — Pest
 // carrega todos os arquivos de tests/Feature no mesmo processo, e duas
 // funções globais com o MESMO nome em arquivos diferentes quebram a suite
 // inteira com "Cannot redeclare function" assim que os dois são carregados

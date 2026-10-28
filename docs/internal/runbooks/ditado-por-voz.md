@@ -23,7 +23,7 @@ abaixo é uma decisão de uma pessoa, com como voltar atrás.
 | Provedor habilitado **no Manager** | Manager → Provedores de IA → **Papéis do assistente** | **Fonte de verdade** lida a cada transcrição: a chave no `.env` sozinha não habilita nada, e retirar o provedor no Manager corta o envio **na hora** |
 | Chave e endereço do provedor | `.env` (`MISTRAL_API_KEY`, `AI_MISTRAL_BASE_URL`, …) | Sem chave/endereço, o provedor não conta como habilitado e o ditado fica indisponível |
 | Mecanismo de transferência internacional, quando exigido | Manager → Provedores de IA → drawer → **Proteção de dados** | Sem o registro, provedor que leva dado de paciente para fora do Brasil sem adequação não recebe o áudio |
-| Aviso na tela | `EyeImageReportModal.vue` | Já ligado: "o áudio vai a um provedor aprovado, não é guardado, não cite o nome do paciente" |
+| Aviso na tela | `ExamManagerReportModal.vue` | Já ligado: "o áudio vai a um provedor aprovado, não é guardado, não cite o nome do paciente" |
 | Trilha de auditoria | `audit_logs`, evento `eye_images.report.dictation` | Já ligado: a **intenção** é gravada antes do envio e o desfecho completa a linha; falha fechado (§6) |
 
 Nada é configurado na clínica. O painel de **Uso e créditos** de IA **não** vê o ditado: ele
@@ -82,14 +82,14 @@ Anthropic, xAI e Maritaca (`-br-sp`). Qualquer um sem o endpoint de transcriçã
 
 | O que | Como | Esperado |
 |---|---|---|
-| Recurso disponível | tela Gerenciador de Imagens do módulo de Imagens Oftálmicas (o botão **Ditar** aparece para quem prepara laudo) | botão visível; a prop `dictation.available` é `true` |
+| Recurso disponível | tela do Gerenciador de exames (o botão **Ditar** aparece para quem prepara laudo) | botão visível; a prop `dictation.available` é `true` |
 | Resolução do provedor | `php artisan tinker --execute="dump(app(App\Domains\AI\Services\SpeechTranscriptionService::class)->resolve());"` | `['provider' => …, 'model' => …]`; `null` = algum degrau faltando (§7) |
 | Transcrição real | ditar 2–3 s num laudo de teste | texto entra no cursor; nada de erro na tela |
 | Trilha de auditoria | `SELECT created_at, user_id, target_entity_id, new_values FROM audit_logs WHERE event = 'eye_images.report.dictation' ORDER BY created_at DESC LIMIT 5;` | uma linha por ditado, `outcome` de `sending` para `transcribed`/`no_speech`/`provider_failed`; `provider`, `model`, `audio_seconds`, `audio_bytes`, `audio_sha256` — **nunca** o áudio nem o texto |
 | Áudio não guardado | procurar o arquivo temporário / `storage/` após um ditado | nada gravado; nada de texto transcrito no log |
 | Falha não poluída | `grep -i speech.transcription storage/logs/*.log` | só `speech.transcription.failed` com `provider` e `status` (sem corpo de resposta) |
 | Teto por minuto | ditar mais que `AI_TRANSCRIPTION_PER_MINUTE` vezes em 1 min | 429 no excesso; o balde é por usuário + clínica |
-| Suíte automatizada | `./vendor/bin/pest tests/Feature/EyeImages/EyeImageReportDictationTest.php` | verde |
+| Suíte automatizada | `./vendor/bin/pest tests/Feature/ExamManager/ExamManagerReportDictationTest.php` | verde |
 
 O evento aparece na exportação de conformidade (Relatórios → **Compliance & Auditoria**, só
 admin: Data/Hora, Usuário, Evento, Modelo, ID, IP, User-Agent — **sem** os detalhes). Os

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * Origem do exame no Gerenciador de Imagens: capturado via integrador
+ * Origem do exame no Gerenciador de exames: capturado via integrador
  * (equipamento) ou importado manualmente de fonte externa.
  */
 enum ExamSource: string

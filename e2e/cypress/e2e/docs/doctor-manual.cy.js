@@ -203,19 +203,19 @@ describe('Manual do médico — capturas', () => {
         shot('16-ia-consumo');
     });
 
-    it('08 pacientes e imagens oftálmicas', () => {
+    it('08 pacientes e gerenciador de exames', () => {
         cy.visit('/panel/patients');
         cy.expectPanelPage();
         cy.wait(500);
         shot('17-pacientes');
 
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.wait(800);
         shot('18-imagens-oftalmicas');
     });
 
-    it('09 imagens oftálmicas: laudo manual (Novo laudo)', () => {
+    it('09 gerenciador de exames: laudo manual (Novo laudo)', () => {
         // Reseed do paciente de demonstração (prontuário assinado + 2 exames de
         // imagem de hoje) — mesmo fixture usado pelos testes de regressão.
         cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, {
@@ -224,7 +224,7 @@ describe('Manual do médico — capturas', () => {
             .its('stdout')
             .should('include', 'docsdoc:');
 
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
@@ -257,7 +257,7 @@ describe('Manual do médico — capturas', () => {
         cy.wait(300);
         shot('25-novo-laudo-preenchido');
 
-        cy.intercept('POST', '**/eye-images/reports').as('storeReport');
+        cy.intercept('POST', '**/exam-manager/reports').as('storeReport');
         cy.contains('button', 'Salvar laudo').should('not.be.disabled').click();
         cy.wait('@storeReport', { timeout: 20000 }).its('response.statusCode').should('be.oneOf', [200, 201, 422]); // 422 só se pedir confirmação de prontuário do dia
 
@@ -273,8 +273,8 @@ describe('Manual do médico — capturas', () => {
         shot('26-novo-laudo-sucesso-pdf');
     });
 
-    it('10 imagens oftálmicas: comparar dois exames', () => {
-        cy.visit('/panel/eye-images');
+    it('10 gerenciador de exames: comparar dois exames', () => {
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
@@ -333,8 +333,8 @@ describe('Manual do médico — capturas', () => {
         shot('31-compartilhar-laudo-ativo');
         cy.get('body').type('{esc}');
 
-        // Exame — a partir do Gerenciador de Imagens (badge circular na thumbnail).
-        cy.visit('/panel/eye-images');
+        // Exame — a partir do Gerenciador de exames (badge circular na thumbnail).
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();

@@ -39,7 +39,7 @@ return [
         'schedules'              => 'Agenda dos médicos: marque, confirme, remarque e acompanhe os atendimentos do dia, com lista de espera.',
         'patients'               => 'Cadastro dos pacientes com histórico de atendimentos, prontuário e documentos.',
         'doctors'                => 'Cadastro dos médicos da clínica, com horários de atendimento, bloqueios e ausências e os dados usados nos documentos, como o CRM.',
-        'eye-images'             => 'Imagens dos exames feitos nos equipamentos oftalmológicos, organizadas por paciente.',
+        'exam-manager'           => 'Imagens dos exames feitos nos equipamentos oftalmológicos, organizadas por paciente.',
         'ai'                     => 'Assistente de IA: acompanhe o consumo e o saldo de créditos (o administrador também compra créditos aqui) e, se você é médico, gerencie seus prompts.',
         'stock'                  => 'Estoque: produtos e lentes, entradas e saídas, compras, fornecedores, contagem e relatórios.',
         'financial'              => 'Financeiro: painel gerencial, fluxo e fechamento de caixa, faturamento TISS, repasse médico, tabela de preços, glosas e relatórios.',
@@ -130,7 +130,7 @@ return [
             ],
             'dashboard-ai-waiting' => [
                 'title'       => 'Laudos de IA aguardando aprovação',
-                'description' => 'Só para o médico, quando a clínica usa IA: análises de IA pedidas por você ou de exames e prontuários seus que esperam a sua revisão. "Revisar" abre o exame no Eye Images (ou a tela de IA), onde você aprova ou rejeita. Sem nada pendente, vira uma linha "tudo em dia".',
+                'description' => 'Só para o médico, quando a clínica usa IA: análises de IA pedidas por você ou de exames e prontuários seus que esperam a sua revisão. "Revisar" abre o exame no Gerenciador de exames (ou a tela de IA), onde você aprova ou rejeita. Sem nada pendente, vira uma linha "tudo em dia".',
             ],
             'dashboard-unsigned-records' => [
                 'title'       => 'Prontuários sem assinatura',
@@ -154,7 +154,7 @@ return [
             ],
             'dashboard-shortcuts' => [
                 'title'       => 'Atalhos',
-                'description' => 'Acesso rápido aos módulos que o seu perfil pode abrir: Agenda e Pacientes para quem atende ou agenda, Eye Images para todos e Financeiro, Guias TISS, Glosas e BI para a gestão e o financeiro (que os vê primeiro). "Centro Cirúrgico" ("Em breve") aparece só para gestão e recepção.',
+                'description' => 'Acesso rápido aos módulos que o seu perfil pode abrir: Agenda e Pacientes para quem atende ou agenda, Gerenciador de exames para todos e Financeiro, Guias TISS, Glosas e BI para a gestão e o financeiro (que os vê primeiro). "Centro Cirúrgico" ("Em breve") aparece só para gestão e recepção.',
             ],
         ],
     ],

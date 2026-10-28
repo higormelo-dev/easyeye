@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * Origem do diagnóstico vinculado a um exame no Gerenciador de Imagens:
+ * Origem do diagnóstico vinculado a um exame no Gerenciador de exames:
  * catálogo CID-10 global ou diagnóstico customizado da clínica.
  */
 enum DiagnosisType: string

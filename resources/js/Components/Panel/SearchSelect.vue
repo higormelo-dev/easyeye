@@ -316,7 +316,7 @@ const selectedTitle = computed(() => {
 
 /* Placeholder em uma linha só: a lib renderiza o texto solto num flex
    absoluto sem nowrap, então em coluna estreita (barra de filtros do
-   Gerenciador de Imagens, col-lg-2) ele quebrava em 2-3 linhas e vazava
+   Gerenciador de exames, col-lg-2) ele quebrava em 2-3 linhas e vazava
    da caixa. Block + nowrap + ellipsis (mesmo tratamento que a lib já dá
    ao valor selecionado em .multiselect-single-label-text); o padding-top
    repõe a centralização vertical que o align-items do flex fazia. */

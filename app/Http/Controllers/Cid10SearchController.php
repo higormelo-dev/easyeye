@@ -22,7 +22,7 @@ class Cid10SearchController extends Controller
             ->get(['id', 'code', 'description', 'category', 'source']);
 
         // shape=select: formato consumido por SearchSelect.vue em modo remoto
-        // (Gerenciador de Imagens, filtro de Diagnóstico). Valor = code, não o
+        // (Gerenciador de exames, filtro de Diagnóstico). Valor = code, não o
         // UUID, porque o filtro casa contra patient_exams.diagnosis_cids[].code.
         if ($request->string('shape')->value() === 'select') {
             return response()->json(['data' => $results->map(fn (Cid10Code $c) => [

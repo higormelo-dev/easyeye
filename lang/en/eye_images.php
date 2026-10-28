@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    // Page title (also the module name in titles and breadcrumbs)
+    'module_title' => 'Exam manager',
+
     // Filter bar
     'search_placeholder'    => 'Patient name or code...',
     'period_today'          => 'Today',
@@ -281,10 +284,10 @@ return [
     'drafts_returned_badge_hint'        => 'Drafts returned by the doctor for adjustment',
     'draft_mail_greeting'               => 'Hello, :name!',
     'draft_mail_submitted_subject'      => '[:clinic] Report waiting for your release',
-    'draft_mail_submitted_line'         => 'An image report draft is waiting for your review and release in the Image Manager.',
+    'draft_mail_submitted_line'         => 'An image report draft is waiting for your review and release in the Exam manager.',
     'draft_mail_returned_subject'       => '[:clinic] Report draft returned for adjustment',
-    'draft_mail_returned_line'          => 'The doctor returned an image report draft you prepared. The reason is on the draft itself, in the Image Manager.',
-    'draft_mail_action'                 => 'Open Image Manager',
+    'draft_mail_returned_line'          => 'The doctor returned an image report draft you prepared. The reason is on the draft itself, in the Exam manager.',
+    'draft_mail_action'                 => 'Open Exam manager',
     'draft_mail_salutation'             => '— :clinic',
     'dictation_start'                   => 'Dictate',
     'dictation_start_hint'              => 'Dictate the report; the text goes where the cursor is.',

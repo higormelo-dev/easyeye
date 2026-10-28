@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\URL;
  * lang/eye_images.php desde o início.
  *
  * Enviada via Notification::sendNow(Notification::route('mail', $email), ...)
- * — NUNCA ShouldQueue/->notify(): quem chama (EyeImageReportResendController,
+ * — NUNCA ShouldQueue/->notify(): quem chama (ExamManagerReportResendController,
  * o único caminho de envio — e só com o prontuário ASSINADO) só grava
  * requesting_doctor_sent_at depois do envio de verdade ter sucesso, pra nunca
  * confundir "enfileirado" com

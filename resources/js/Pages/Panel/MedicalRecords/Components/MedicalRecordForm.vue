@@ -1337,7 +1337,7 @@ async function confirmPresbyopiaCalc() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Lentes de contato (saiu do Gerenciador de Imagens): o modal devolve
+// Lentes de contato (saiu do Gerenciador de exames): o modal devolve
 // entradas + resultados; grava junto com a consulta ao salvar. O resumo
 // mostra a potência de LC SUGERIDA por olho (v2); cálculo da versão 1 segue
 // no formato antigo, marcado como "versão anterior".
@@ -1471,9 +1471,9 @@ function openDocumentationsModal() {
     showDocumentationsModal.value = true;
 }
 
-// Envio/reenvio ao médico solicitante (laudo do Gerenciador de Imagens,
+// Envio/reenvio ao médico solicitante (laudo do Gerenciador de exames,
 // Fase 5) — usa sempre o e-mail já gravado na emissão (sem campo de correção
-// aqui, mesma regra de EyeImageReportModal.vue). Esta lista é a ÚNICA tela
+// aqui, mesma regra de ExamManagerReportModal.vue). Esta lista é a ÚNICA tela
 // onde um laudo JÁ EMITIDO reaparece depois do modal de emissão fechar — e,
 // agora, é também onde o PRIMEIRO envio acontece: o laudo nasce num prontuário
 // ainda editável e só sai da clínica quando o prontuário é assinado
@@ -1495,7 +1495,7 @@ async function resendDocToRequestingDoctor(doc) {
     const firstSend = !doc.requesting_doctor_sent_at;
     resendingDocId.value = doc.id;
     try {
-        const { data } = await window.axios.post(route('panel.eye-images.reports.resend', doc.id));
+        const { data } = await window.axios.post(route('panel.exam-manager.reports.resend', doc.id));
         doc.requesting_doctor_sent_at = data.requesting_doctor_sent_at;
         window.showSuccessToast?.(
             firstSend
@@ -3923,7 +3923,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('procedures', 'Procedimentos') }}</span>
                 </button>
 
-                <!-- Exames de imagem do módulo Eye Images — consulta durante o
+                <!-- Exames de imagem do módulo Gerenciador de exames — consulta durante o
                      atendimento; leitura por paciente, disponível já no create. -->
                 <button
                     v-if="urls.eye_exams"

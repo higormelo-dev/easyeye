@@ -180,7 +180,7 @@ return [
         'enlarge'    => 'Ampliar imagem',
         'tabs'       => [
             ['key' => 'prontuario', 'icon' => 'ti-report-medical', 'label' => 'Prontuário', 'caption' => 'Acuidade visual, tonometria, refração, biomicroscopia e fundoscopia por olho.'],
-            ['key' => 'imagens', 'icon' => 'ti-photo', 'label' => 'Gerenciador de imagens', 'caption' => 'Exames por data e tipo — OCT, biometria, retinografia — com OD, OE e AO.'],
+            ['key' => 'imagens', 'icon' => 'ti-photo', 'label' => 'Gerenciador de exames', 'caption' => 'Exames por data e tipo — OCT, biometria, retinografia — com OD, OE e AO.'],
             ['key' => 'agenda', 'fictitious' => true, 'icon' => 'ti-calendar', 'label' => 'Agenda', 'caption' => 'Agenda do dia com horário, tipo de consulta, convênio e status de cada atendimento.'],
             ['key' => 'laudos', 'icon' => 'ti-file-text', 'label' => 'Laudos e documentos', 'caption' => 'Modelos prontos de laudos, atestados e exames especializados, com cabeçalho e assinatura.'],
         ],
@@ -270,7 +270,7 @@ return [
         'empty_subtitle' => 'Estamos preparando os melhores planos para sua clínica. Entre em contato e saiba mais.',
         // Módulos sem trava por plano (conferido nas rotas: só estoque é por plano).
         'included_all_label' => 'Em todos os planos',
-        'included_all'       => 'Agenda, prontuário oftalmológico, gerenciador de imagens, laudos e documentos, faturamento TISS e financeiro.',
+        'included_all'       => 'Agenda, prontuário oftalmológico, gerenciador de exames, laudos e documentos, faturamento TISS e financeiro.',
         // Planos acima do primeiro listam só o que acrescentam.
         'everything_in' => 'Tudo do :plan, mais:',
         // Optotipos ainda não existe no produto: sempre "Em breve", só no card do Premium.
@@ -295,7 +295,7 @@ return [
             ['q' => 'O EasyEye funciona offline?', 'a' => 'O EasyEye é uma solução 100% em nuvem — funciona em qualquer dispositivo com navegador e internet. Não há modo offline no momento: sem conexão, não é possível acessar prontuários, agenda ou os demais dados do sistema.'],
             ['q' => 'Como funciona o suporte técnico?', 'a' => 'Oferecemos suporte por e-mail e WhatsApp (em planos específicos). Nos planos Pro e Premium, o atendimento é prioritário, com SLA de 4 horas úteis.'],
             ['q' => 'O EasyEye já possui homologação para TISS?', 'a' => 'Ainda não. O EasyEye integra recursos para guias TISS 4.03.00, geração de lotes XML, envio e processamento de retornos, mas ainda não possui homologação.'],
-            ['q' => 'Como os exames dos aparelhos chegarão ao EasyEye?', 'a' => 'Em breve, o integrador de exames enviará os exames dos aparelhos ao EasyEye por uma API fechada e exclusiva desse integrador; lá eles ficam organizados para consulta. Até lá, as imagens de exame podem ser enviadas manualmente pelo Gerenciador de imagens.'],
+            ['q' => 'Como os exames dos aparelhos chegarão ao EasyEye?', 'a' => 'Em breve, o integrador de exames enviará os exames dos aparelhos ao EasyEye por uma API fechada e exclusiva desse integrador; lá eles ficam organizados para consulta. Até lá, as imagens de exame podem ser enviadas manualmente pelo Gerenciador de exames.'],
         ],
     ],
 

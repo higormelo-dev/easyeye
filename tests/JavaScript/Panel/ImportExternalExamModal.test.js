@@ -19,7 +19,7 @@ vi.mock('@/composables/useUserPreferences.js', () => ({
  * Captura pela câmera do navegador (Fase 5 / 6a). getUserMedia/MediaRecorder/
  * canvas.toBlob não existem de verdade no JSDOM — mockados aqui (1º teste
  * deste tipo no projeto). form.content-style: bindings do topo do <script
- * setup> acessados via wrapper.vm (mesmo padrão de EyeImageReportModal.test.js).
+ * setup> acessados via wrapper.vm (mesmo padrão de ExamManagerReportModal.test.js).
  */
 function fakeTrack() {
     return { stop: vi.fn(), getSettings: () => ({ deviceId: 'cam-1' }) };

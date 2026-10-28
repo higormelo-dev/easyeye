@@ -1513,7 +1513,7 @@ components:
               - unknown
             review_url:
               type: string
-              description: Caminho relativo autorizado /panel/eye-images com paciente e exame exatos; não implica revisão
+              description: Caminho relativo autorizado /panel/exam-manager com paciente e exame exatos; não implica revisão
                 clínica.
             exam_performed_at:
               type: string

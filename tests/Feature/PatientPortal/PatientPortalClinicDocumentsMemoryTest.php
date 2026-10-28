@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  * ClinicController::show() ("Meus documentos" do Portal do Paciente) lista
  * TODOS os documentos já liberados pro titular, sem paginação. Um laudo
  * compartilhado com imagem embutida pode ter ~27 MiB em base64 no metadata
- * (ReportImageBlockBuilder/EyeImageReportController::store()), nunca usado
+ * (ReportImageBlockBuilder/ExamManagerReportController::store()), nunca usado
  * em serializeShare() — mesma classe do achado original em
  * MedicalRecordsController, aqui sem nenhum teto de página (achado via
  * verificação adversarial do /codex:adversarial-review).

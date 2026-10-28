@@ -250,7 +250,7 @@ class MedicalRecordPdfService
             : (float) ($setting?->margin_bottom ?? 0);
 
         // Laudo: quais exames ele cobre (pode ser mais de um — laudo conjunto
-        // do Gerenciador de Imagens). Vazio pra laudo sem exame vinculado.
+        // do Gerenciador de exames). Vazio pra laudo sem exame vinculado.
         $examSummary = $doc->type === DocumentationType::Report
             ? app(ReportExamSummary::class)->forDocumentation($doc)
             : [];

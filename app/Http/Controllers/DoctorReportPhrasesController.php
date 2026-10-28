@@ -10,9 +10,9 @@ use DomainException;
 use Illuminate\Http\{JsonResponse, Request};
 
 /**
- * CRUD das frases rápidas do médico pro laudo do Gerenciador de Imagens
+ * CRUD das frases rápidas do médico pro laudo do Gerenciador de exames
  * (benchmark 18/09/2026 — adaptação do "Wizard" do concorrente). Só JSON —
- * consumido inline de dentro de EyeImageReportModal.vue, sem tela própria
+ * consumido inline de dentro de ExamManagerReportModal.vue, sem tela própria
  * de configurações (v1).
  *
  * Sempre filtrado pelo médico autenticado: doctor_id NUNCA vem do payload,
@@ -96,7 +96,7 @@ class DoctorReportPhrasesController extends Controller
     // 403 pra tudo (nunca 404): não é IDOR de posse de tenant só — é
     // "outro médico da MESMA clínica também não pode", então 404 (que aqui
     // sugeriria "não existe") seria menos preciso que 403 (existe, mas não
-    // é seu). Mesmo raciocínio de EyeImageExamActionsController.
+    // é seu). Mesmo raciocínio de ExamManagerActionsController.
     private function assertOwnership(DoctorReportPhrase $phrase): void
     {
         $entityId = $this->selectedEntityId();

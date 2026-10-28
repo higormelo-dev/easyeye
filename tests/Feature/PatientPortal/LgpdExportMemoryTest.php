@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
  * PatientDataExporter::medicalRecords() (usado por LgpdExportController::
  * export(), autoatendimento 100% síncrono e sem fila) nunca pode duplicar
  * o data_uri do laudo de imagem embutida (até ~27 MiB em base64 por laudo
- * — ReportImageBlockBuilder/EyeImageReportController::store()) no export:
+ * — ReportImageBlockBuilder/ExamManagerReportController::store()) no export:
  * um histórico com poucos laudos de imagem já esgotava o memory_limit
  * construindo o array completo e depois fazendo json_encode de novo
  * (achado via revisão adversarial Codex). Mesma redação já usada em

@@ -170,7 +170,7 @@ class AiPayloadEnricher
         // pelo AiSystemPromptResolver (mesma fonte usada por escalate e pelo
         // job de execução). Inclui exam_assistant/report_drafting/
         // consensus_review, que até aqui não tinham prompt forçado — na UI
-        // da tela Imagens Oftálmicas o campo "System prompt" era editável e
+        // da tela Gerenciador de exames o campo "System prompt" era editável e
         // ia direto ao provedor.
         $payload['system_prompt'] = $this->promptResolver->resolve($workflow, $payload['field'] ?? null);
 
@@ -482,7 +482,7 @@ class AiPayloadEnricher
         // este método é chamado por qualquer caller de enrich() — nunca
         // confiar só na validação de um FormRequest específico pra um
         // whereIn() que toca dado de paciente (mesmo racional do max:50
-        // aplicado em EyeImageExamActionsController/EyeImageReportController
+        // aplicado em ExamManagerActionsController/ExamManagerReportController
         // na revisão de segurança 09/09/2026).
         abort_if(count($examIds) > 50, 422);
 
@@ -506,10 +506,10 @@ class AiPayloadEnricher
         // Ordem da seleção do médico (o whereIn não garante ordem).
         $owned = $examIds;
 
-        // Imagem desabilitada (menu de contexto do Gerenciador de Imagens)
+        // Imagem desabilitada (menu de contexto do Gerenciador de exames)
         // nunca entra numa análise de IA nova — 422 de regra de negócio, DE
         // PROPÓSITO separado do 403 de posse acima (mesmo racional de
-        // EyeImageReportController::assertExamsActive()).
+        // ExamManagerReportController::assertExamsActive()).
         $hasInactive = PatientExam::query()
             ->whereIn('id', $owned)
             ->where('active', false)

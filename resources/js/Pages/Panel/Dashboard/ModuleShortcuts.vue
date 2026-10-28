@@ -37,7 +37,13 @@ const modules = computed(() => {
                 'module-icon--patients',
                 route('panel.patients.index'),
             ),
-        tile('eye-images', props.t.module_eye_images, 'ti ti-eye', 'module-icon--eye', route('panel.eye-images.index')),
+        tile(
+            'exam-manager',
+            props.t.module_eye_images,
+            'ti ti-eye',
+            'module-icon--eye',
+            route('panel.exam-manager.index'),
+        ),
     ];
     const financial = a.financial
         ? [

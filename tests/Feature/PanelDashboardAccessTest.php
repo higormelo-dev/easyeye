@@ -25,7 +25,7 @@ const DASHBOARD_ACCESS_ROUTES = [
     'patients'   => 'panel.patients.index',
     'doctors'    => 'panel.doctors.index',
     'financial'  => 'panel.financial.cash-flow.index',
-    'eye_images' => 'panel.eye-images.index',
+    'eye_images' => 'panel.exam-manager.index',
 ];
 
 /** Papel customizado da clínica só com as permissões informadas. */

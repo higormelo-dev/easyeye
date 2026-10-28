@@ -4,14 +4,14 @@ import MedicalRecordImagingModal from '@/Pages/Panel/MedicalRecords/Components/M
 
 /**
  * Painel "Exames de imagem" do prontuário — consome o MESMO endpoint
- * patientExamsForRecord() do Gerenciador de Imagens (urls.eye_exams), que já
+ * patientExamsForRecord() do Gerenciador de exames (urls.eye_exams), que já
  * expõe is_video (Fase 5 / 6a, revisão Codex) pra vídeo capturado pela
  * câmera nunca renderizar como <img> (preview/miniatura quebrados, já que
  * display_url/thumb_url apontam pro próprio arquivo .webm/.mp4 sem
  * derivado JPEG — GenerateExamDerivatives não gera poster-frame ainda).
  *
  * <Teleport to="body"> escapa da raiz do wrapper — consultas via
- * document.body, nunca wrapper.find() (mesmo padrão de EyeImageReportModal.test.js).
+ * document.body, nunca wrapper.find() (mesmo padrão de ExamManagerReportModal.test.js).
  */
 const wrappers = [];
 

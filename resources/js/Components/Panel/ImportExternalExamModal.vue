@@ -1,6 +1,6 @@
 <script setup>
 /**
- * ImportExternalExamModal — "Importar exame externo" (Gerenciador de Imagens).
+ * ImportExternalExamModal — "Importar exame externo" (Gerenciador de exames).
  *
  * Upload manual de N arquivos de exame para um paciente, sem passar pelo
  * integrador/equipamento — ver ExternalExamImportController::store() /
@@ -17,14 +17,14 @@
  *                quando já selecionado na página. Se null, mostra campo de
  *                busca (mesmo endpoint usado em ScheduleFormModal.vue —
  *                panel.patients.search).
- *   doctors    – [{id, name}] — já carregado por EyeImagesController::index()
+ *   doctors    – [{id, name}] — já carregado por ExamManagerController::index()
  *   examTypes  – [{id, name}] — idem (props.exam_types da página)
  *   equipments – [{id, name}] — idem (props.equipments da página)
  *   urls       – { import_store, diagnosis_search, diagnosis_store }
  *   presetGroup – { examTypeId, examTypeName, examPerformedAt, equipmentId,
  *                equipmentName } opcional. "Adicionar imagem a exame
  *                existente" (botão Upload de um grupo já exibido no
- *                Gerenciador de Imagens) reaproveita este MESMO modal em vez
+ *                Gerenciador de exames) reaproveita este MESMO modal em vez
  *                de duplicar upload/diagnóstico/picker de arquivos — só
  *                pré-preenche e trava tipo/data/equipamento pra a imagem
  *                nova cair automaticamente no mesmo grupo visual (chave de
@@ -242,7 +242,7 @@ function formatBytes(bytes) {
 }
 
 // Fase 5 / 7b: rótulo do olho GRAVADO em cada item (mesma convenção OD/OE/AO
-// de EyeImages/Index.vue — ver eye_images.eye_od/eye_oe/eye_ao).
+// de ExamManager/Index.vue — ver eye_images.eye_od/eye_oe/eye_ao).
 function fileLateralityLabel(laterality) {
     if (laterality === 1) return tt('eye_od', 'OD');
     if (laterality === 2) return tt('eye_oe', 'OE');
@@ -655,7 +655,7 @@ onBeforeUnmount(stopCamera);
 // "capturar" tira foto (ou, se já está gravando, encerra e salva — um
 // botão só cobre os dois casos mais comuns). Tecla "avançar" cicla a
 // lateralidade OD→OE→AO pra próxima captura (a MESMA tecla também passa
-// pra próxima imagem no visualizador — EyeImages/Index.vue — já que os
+// pra próxima imagem no visualizador — ExamManager/Index.vue — já que os
 // dois momentos nunca ficam abertos ao mesmo tempo).
 const { getPreference: getPedalPreference, savePreference: savePedalPreference } = useUserPreferences();
 const { date } = useLocaleFormat();

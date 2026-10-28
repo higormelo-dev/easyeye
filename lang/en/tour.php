@@ -39,7 +39,7 @@ return [
         'schedules'              => 'Doctors\' schedules: book, confirm, reschedule and follow the day\'s appointments, with a waiting list.',
         'patients'               => 'Patient records with visit history, medical records and documents.',
         'doctors'                => 'The clinic\'s doctors, with working hours, blocks and absences, and the details used in documents, such as the medical license.',
-        'eye-images'             => 'Images of the exams taken on the ophthalmic equipment, organized by patient.',
+        'exam-manager'           => 'Images of the exams taken on the ophthalmic equipment, organized by patient.',
         'ai'                     => 'AI assistant: follow usage and the credit balance (administrators also buy credits here) and, if you are a doctor, manage your prompts.',
         'stock'                  => 'Stock: products and lenses, stock in and out, purchases, suppliers, counts and reports.',
         'financial'              => 'Financial: management dashboard, cash flow and cash closing, TISS billing, doctor payouts, price table, denials and reports.',
@@ -130,7 +130,7 @@ return [
             ],
             'dashboard-ai-waiting' => [
                 'title'       => 'AI reports waiting for approval',
-                'description' => 'Doctors only, when the clinic uses AI: AI analyses you requested or of your exams and records that are waiting for your review. "Review" opens the exam in Eye Images (or the AI screen), where you approve or reject it. With nothing pending it becomes an "all clear" line.',
+                'description' => 'Doctors only, when the clinic uses AI: AI analyses you requested or of your exams and records that are waiting for your review. "Review" opens the exam in the Exam manager (or the AI screen), where you approve or reject it. With nothing pending it becomes an "all clear" line.',
             ],
             'dashboard-unsigned-records' => [
                 'title'       => 'Unsigned medical records',
@@ -154,7 +154,7 @@ return [
             ],
             'dashboard-shortcuts' => [
                 'title'       => 'Shortcuts',
-                'description' => 'Quick access to the modules your profile can open: Schedule and Patients for those who see or book patients, Eye Images for everyone and Financial, TISS Guides, Claim denials and BI for management and finance (who see them first). "Surgical Center" ("Coming soon") only shows up for management and front desk.',
+                'description' => 'Quick access to the modules your profile can open: Schedule and Patients for those who see or book patients, Exam manager for everyone and Financial, TISS Guides, Claim denials and BI for management and finance (who see them first). "Surgical Center" ("Coming soon") only shows up for management and front desk.',
             ],
         ],
     ],

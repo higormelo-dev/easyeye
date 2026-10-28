@@ -93,7 +93,7 @@ const breadcrumbs = [
 
 // Form de execução manual de IA removido — agora as execuções são iniciadas
 // apenas via contexto clínico (botão "Assistente de IA" no prontuário /
-// eye-images). Esta página é puramente para monitoramento, aprovação/rejeição
+// exam-manager). Esta página é puramente para monitoramento, aprovação/rejeição
 // e gestão de créditos.
 
 const detailLoading = ref(false);

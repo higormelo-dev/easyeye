@@ -16,7 +16,7 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
  * trazer algum campo necessário, reintroduzir um fetch em `loadEditData()`.
  *
  * DECISÃO — autocomplete fabricante/modelo: reaproveita <SearchSelect> em
- * modo remoto (mesmo padrão do filtro de CID-10 em EyeImages/Index.vue), mas
+ * modo remoto (mesmo padrão do filtro de CID-10 em ExamManager/Index.vue), mas
  * o valor selecionado (`option-selected`, ver SearchSelect.vue) só HIDRATA
  * manufacturer/model_name/category/iol_lens_model_id — os três primeiros
  * continuam inputs de texto livres e sempre editáveis por baixo. Isso cobre

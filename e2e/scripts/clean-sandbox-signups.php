@@ -15,7 +15,7 @@
 //   1. APP_ENV local/testing;
 //   2. conexão de banco EFETIVA: TODOS os destinos (DB_URL e suas opções, host, database, read[], write[], mais a conexão
 //      viva) em host local e num banco da lista E2E_ALLOWED_DATABASES (easyeye, easyeye_test, easyeye_e2e) — o mesmo
-//      guard do clean-eye-images.php (um app local apontado a um banco de produção apagaria clínicas de verdade);
+//      guard do clean-exam-manager.php (um app local apontado a um banco de produção apagaria clínicas de verdade);
 //   3. credencial EFETIVA do Asaas = sandbox (`billing:gateway-environment asaas`: https + host do sandbox + chave
 //      `$aact_hmlg_`; a do Manager vence o .env).
 //
@@ -53,7 +53,7 @@ use Illuminate\Support\Facades\{Artisan, DB};
 if (! function_exists('sscDatabaseTargets')) {
     /**
      * Todo destino que a conexão padrão pode alcançar, já RESOLVIDO como o Laravel o resolve (cópia do guard de
-     * clean-eye-images.php): DB_URL passa pelo ConfigurationUrlParser do DatabaseManager (as opções da QUERY sobrepõem o
+     * clean-exam-manager.php): DB_URL passa pelo ConfigurationUrlParser do DatabaseManager (as opções da QUERY sobrepõem o
      * caminho da URL) e read/write (única entrada ou LISTA, cada uma com host e database próprios) são mesclados sobre a
      * base como o ConnectionFactory faz. A conexão viva é conferida DEPOIS (sscGuard), mas só ela não basta: o
      * Connection guarda apenas o destino de escrita sorteado e perde os de leitura.

@@ -216,7 +216,7 @@ describe('Manual do administrador — capturas', () => {
         shot('26-pacientes');
     });
 
-    it('14 imagens oftálmicas: comparar exames e laudo (exclusivo do médico)', () => {
+    it('14 gerenciador de exames: comparar exames e laudo (exclusivo do médico)', () => {
         // Fixture compartilhada com o manual do médico (mesma entidade demo).
         cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, {
             timeout: 40000,
@@ -224,7 +224,7 @@ describe('Manual do administrador — capturas', () => {
             .its('stdout')
             .should('include', 'docsdoc:');
 
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();

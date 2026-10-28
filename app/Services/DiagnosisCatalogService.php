@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Catálogo de diagnósticos do "Diagnóstico do exame" (Gerenciador de Imagens):
+ * Catálogo de diagnósticos do "Diagnóstico do exame" (Gerenciador de exames):
  * combina o catálogo global CID-10 (cid10_codes) com diagnósticos
  * customizados por clínica (entity_custom_diagnoses), ranqueados por
  * frequência de uso da entidade (entity_diagnosis_usages).

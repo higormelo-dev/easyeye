@@ -61,7 +61,7 @@ describe('Perfil clinic.secretary — acesso e navegação', () => {
         cy.get('#sidebar-menu a[href*="/panel/schedules"]').should('exist');
         cy.get('#sidebar-menu a[href*="/panel/patients"]').should('exist');
         cy.get('#sidebar-menu a[href*="/panel/doctors"]').should('exist');
-        cy.get('#sidebar-menu a[href*="/panel/eye-images"]').should('exist');
+        cy.get('#sidebar-menu a[href*="/panel/exam-manager"]').should('exist');
         // IA para secretary = link DIRETO para o dashboard de uso (sem submenu de prompts).
         cy.get('#sidebar-menu a[href*="/panel/ai/usage"]').should('exist');
         cy.get('#sidebar-menu a[href*="/panel/setting/ai-prompts"]').should('not.exist');
@@ -102,13 +102,13 @@ describe('Perfil clinic.secretary — acesso e navegação', () => {
         cy.contains('h4', 'Médicos').should('be.visible');
     });
 
-    it('Imagens oftálmicas: link do menu abre /panel/eye-images', () => {
+    it('Gerenciador de exames: link do menu abre /panel/exam-manager', () => {
         cy.visit('/panel/dashboard');
         cy.expectPanelPage();
-        clickMenuLink('/panel/eye-images');
-        cy.url().should('include', '/panel/eye-images');
+        clickMenuLink('/panel/exam-manager');
+        cy.url().should('include', '/panel/exam-manager');
         cy.expectPanelPage();
-        cy.contains('h4', 'Imagens oftálmicas').should('be.visible');
+        cy.contains('h4', 'Gerenciador de exames').should('be.visible');
     });
 
     it('Assistente de IA: link direto do menu abre /panel/ai/usage', () => {
@@ -808,10 +808,10 @@ describe('Perfil clinic.secretary — procedimentos completos', () => {
         cy.exec(cleanCmd, { failOnNonZeroExit: false, timeout: 40000 });
     });
 
-    // ════════ IMAGENS OFTÁLMICAS ════════
+    // ════════ GERENCIADOR DE EXAMES ════════
     it('imagens: modal de importar exame externo (botão Novo) abre e fecha', () => {
-        cy.visit('/panel/eye-images');
-        cy.expectPanelPage('Imagens oftálmicas');
+        cy.visit('/panel/exam-manager');
+        cy.expectPanelPage('Gerenciador de exames');
 
         cy.contains('button', /^\s*Novo\s*$/)
             .first()
@@ -828,8 +828,8 @@ describe('Perfil clinic.secretary — procedimentos completos', () => {
             .its('stdout')
             .should('include', 'docsdoc:');
 
-        cy.visit('/panel/eye-images');
-        cy.expectPanelPage('Imagens oftálmicas');
+        cy.visit('/panel/exam-manager');
+        cy.expectPanelPage('Gerenciador de exames');
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
 
@@ -875,7 +875,7 @@ describe('Perfil clinic.secretary — procedimentos completos', () => {
         cy.get('body').type('{esc}');
 
         // Exame — allowlist mais amplo (Gate só entra pro tipo laudo).
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();

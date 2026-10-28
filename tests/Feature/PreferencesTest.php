@@ -92,10 +92,10 @@ it('merge parcial preserva as outras preferências do bag', function () {
 });
 
 /**
- * Pedal USB do Gerenciador de Imagens (Fase 5 / 7a) — eye_images_pedal_shortcuts
+ * Pedal USB do Gerenciador de exames (Fase 5 / 7a) — eye_images_pedal_shortcuts
  * {capture_key, advance_key}. Allowlist vem de config('eye_image_capture.pedal.allowed_keys')
  * — nunca pode aceitar Escape/ArrowLeft/ArrowRight (colidem com os atalhos já
- * existentes do visualizador em EyeImages/Index.vue).
+ * existentes do visualizador em ExamManager/Index.vue).
  */
 it('persiste capture_key e advance_key do pedal quando ambos estão na allowlist', function () {
     patchPreferences($this, ['eye_images_pedal_shortcuts' => ['capture_key' => 'Enter', 'advance_key' => ' ']])

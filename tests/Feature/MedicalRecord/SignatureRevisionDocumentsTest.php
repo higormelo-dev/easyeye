@@ -160,7 +160,7 @@ it('bookkeeping de entrega (saveQuietly) NÃO invalida a revisão — assinar co
     $doc                = srdNewDocumentation($this);
     $this->seenRevision = $this->record->fresh()->clinical_revision;
 
-    // Canal de bookkeeping pós-emissão (EyeImageReportController/ResendController):
+    // Canal de bookkeeping pós-emissão (ExamManagerReportController/ResendController):
     // sem eventos, sem guard — não é conteúdo clínico.
     $doc->forceFill(['requesting_doctor_sent_at' => now()])->saveQuietly();
 

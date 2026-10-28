@@ -1,6 +1,6 @@
 // Fase 5 — laudos de exame: fluxo de rascunho, devolução, impressão e ditado.
 //
-// Contrato EXATO do seed e2e/scripts/seed-eye-images.php (idempotente; o clean correspondente remove o cenário):
+// Contrato EXATO do seed e2e/scripts/seed-exam-manager.php (idempotente; o clean correspondente remove o cenário):
 // - clínica ativa e com o recurso de laudos/ditado: CLÍNICA TESTE INTEGRADOR;
 // - médica ativa, vinculada à clínica e apta a emitir: Dra. Ana, dra.ana@clinicateste.com;
 // - secretária ativa, vinculada à clínica e apta a preparar laudos: Secretária CY Reports,
@@ -15,9 +15,9 @@
 //   para que a prop dictation.available seja true. O áudio do teste é interceptado e nunca sai do navegador.
 //
 // Preparo (não roda dentro deste spec):
-//   no dev atual rode o seed com E2E_EXAM_DISK=s3 php artisan tinker --execute="require 'e2e/scripts/seed-eye-images.php';"
+//   no dev atual rode o seed com E2E_EXAM_DISK=s3 php artisan tinker --execute="require 'e2e/scripts/seed-exam-manager.php';"
 // Limpeza:
-//   php artisan tinker --execute="require 'e2e/scripts/clean-eye-images.php';"
+//   php artisan tinker --execute="require 'e2e/scripts/clean-exam-manager.php';"
 
 const PATIENT = 'CY-REPORTS PACIENTE';
 const RETURN_REASON = 'Revise a lateralidade do OE antes de emitir.';
@@ -25,7 +25,7 @@ const DICTATED_TEXT = 'Texto de ditado CY Reports.';
 const FIXTURE_DATE = '2026-10-01';
 
 function eyeImagesUrl() {
-    return `/panel/eye-images?period=custom&date_from=${FIXTURE_DATE}&date_to=${FIXTURE_DATE}`;
+    return `/panel/exam-manager?period=custom&date_from=${FIXTURE_DATE}&date_to=${FIXTURE_DATE}`;
 }
 
 function openDrafts() {
@@ -148,7 +148,7 @@ describe('Fase 5 — secretária: corrigir e reenviar rascunho', () => {
     it('imprime o paciente em folhas de duas imagens', () => {
         cy.visit(eyeImagesUrl());
         cy.expectPanelPage();
-        cy.contains('[data-testid="eye-images-patient"]', PATIENT, { timeout: 15000 }).click();
+        cy.contains('[data-testid="exam-manager-patient"]', PATIENT, { timeout: 15000 }).click();
         cy.get('[data-testid="print-open-button"]').should('be.visible').click();
         cy.window().then((win) => cy.stub(win, 'print').as('print'));
         cy.get('[data-testid="print-per-sheet"]').should('be.visible').contains('button', '1').click();
@@ -168,7 +168,7 @@ describe('Fase 5 — secretária: corrigir e reenviar rascunho', () => {
 describe('Fase 5 — secretária: ditado no rascunho', () => {
     it('mostra o aviso de privacidade e insere a transcrição do servidor no editor', () => {
         cy.loginAs('clinic.secretary');
-        cy.intercept('POST', '**/panel/eye-images/reports/dictate', (req) => {
+        cy.intercept('POST', '**/panel/exam-manager/reports/dictate', (req) => {
             expect(req.headers['content-type']).to.include('multipart/form-data');
             expect(req.body).to.include('name="audio"');
             expect(req.body).to.include('filename="ditado.wav"');

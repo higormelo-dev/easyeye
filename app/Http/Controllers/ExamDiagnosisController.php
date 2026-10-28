@@ -12,12 +12,12 @@ use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\{DB, Gate};
 
 /**
- * "Diagnóstico do exame" (Gerenciador de Imagens): busca combinada
+ * "Diagnóstico do exame" (Gerenciador de exames): busca combinada
  * CID-10 + customizados da clínica, criação de diagnóstico customizado e
  * persistência do diagnóstico do exame (patient_exams.diagnosis_cids).
  *
  * Endpoints auxiliares em JSON puro (sem Inertia::render) — mesmo padrão de
- * Cid10SearchController e EyeImagesController::search().
+ * Cid10SearchController e ExamManagerController::search().
  */
 class ExamDiagnosisController extends Controller
 {

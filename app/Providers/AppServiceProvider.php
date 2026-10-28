@@ -240,7 +240,7 @@ class AppServiceProvider extends ServiceProvider
             fn (Request $r) => Limit::perMinute((int) config('ai.rate_limits.decision_per_minute', 30))->by($aiKey($r)),
         );
 
-        // Panorama e Auto-alinhar do Gerenciador de Imagens: cada chamada sobe um
+        // Panorama e Auto-alinhar do Gerenciador de exames: cada chamada sobe um
         // processo Python/OpenCV (até 1,5 GB, vários núcleos). Os dois endpoints
         // dividem o mesmo balde por usuário+clínica; o teto global de processos
         // simultâneos fica no BoundedVisionProcess.

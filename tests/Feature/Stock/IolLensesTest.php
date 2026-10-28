@@ -39,7 +39,7 @@ use Illuminate\Support\Facades\Storage;
  * route:list`, diferente de covenants/skintypes/lenses/etc. no bloco de
  * Configurações de routes/web.php) — por isso não há teste de restore aqui.
  *
- * Setup/estilo espelha tests/Feature/EyeImages/ExternalExamImportTest.php
+ * Setup/estilo espelha tests/Feature/ExamManager/ExternalExamImportTest.php
  * (Storage::fake, UploadedFile::fake(), helpers createEntityUser/
  * panelSession de tests/Pest.php). Disco usado por
  * IolLensCatalogService::storeImage() é `public` (foto de produto não é

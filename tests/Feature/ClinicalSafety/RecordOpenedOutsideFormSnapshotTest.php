@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 /*
  * Fase 2 / G3 — prontuário aberto FORA do salvar do formulário também nasce
  * com o retrato das alergias e medicações ativas do paciente (mesma regra de
- * MedicalRecordService::store): laudo manual do Gerenciador de Imagens com
+ * MedicalRecordService::store): laudo manual do Gerenciador de exames com
  * "abrir prontuário" (confirm_open_record) e prontuário aberto para o laudo
  * de IA aprovado (panel.ai-runs.record). Ponto único:
  * ConsultationRecordResolver::openRecord.
@@ -79,8 +79,8 @@ function g3fase2AssertSnapshot(MedicalRecord $record): void
         ->and($record->medications_snapshot[0])->toMatchArray(['active_ingredient' => 'CLORIDRATO DE TANSULOSINA', 'posology' => '1 cápsula à noite']);
 }
 
-it('laudo manual do Gerenciador de Imagens com "abrir prontuário": o prontuário nasce com o retrato', function (): void {
-    $res = g3fase2AsDoctor($this)->postJson(route('panel.eye-images.reports.store'), [
+it('laudo manual do Gerenciador de exames com "abrir prontuário": o prontuário nasce com o retrato', function (): void {
+    $res = g3fase2AsDoctor($this)->postJson(route('panel.exam-manager.reports.store'), [
         'patient_id'          => $this->patient->id,
         'exam_ids'            => [$this->exam->id],
         'content'             => '<p>Achados normais.</p>',
@@ -98,7 +98,7 @@ it('paciente que nega alergias: o retrato do prontuário aberto pelo laudo guard
     PatientAllergy::query()->delete();
     $this->patient->forceFill(['allergies_denied_at' => now(), 'allergies_denied_by' => $this->doctorUser->id])->save();
 
-    $res = g3fase2AsDoctor($this)->postJson(route('panel.eye-images.reports.store'), [
+    $res = g3fase2AsDoctor($this)->postJson(route('panel.exam-manager.reports.store'), [
         'patient_id' => $this->patient->id, 'exam_ids' => [$this->exam->id], 'content' => '<p>Ok.</p>', 'confirm_open_record' => true,
     ])->assertCreated();
 

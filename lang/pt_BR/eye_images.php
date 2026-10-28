@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    // Page title (also the module name in titles and breadcrumbs)
+    'module_title' => 'Gerenciador de exames',
+
     // Filter bar
     'search_placeholder'    => 'Nome ou código do paciente...',
     'period_today'          => 'Hoje',
@@ -281,10 +284,10 @@ return [
     'drafts_returned_badge_hint'        => 'Rascunhos devolvidos pelo médico para ajuste',
     'draft_mail_greeting'               => 'Olá, :name!',
     'draft_mail_submitted_subject'      => '[:clinic] Laudo aguardando sua liberação',
-    'draft_mail_submitted_line'         => 'Há um rascunho de laudo de imagem aguardando a sua revisão e liberação no Gerenciador de Imagens.',
+    'draft_mail_submitted_line'         => 'Há um rascunho de laudo de imagem aguardando a sua revisão e liberação no Gerenciador de exames.',
     'draft_mail_returned_subject'       => '[:clinic] Rascunho de laudo devolvido para ajuste',
-    'draft_mail_returned_line'          => 'O médico devolveu um rascunho de laudo de imagem que você preparou. O motivo está no próprio rascunho, no Gerenciador de Imagens.',
-    'draft_mail_action'                 => 'Abrir Gerenciador de Imagens',
+    'draft_mail_returned_line'          => 'O médico devolveu um rascunho de laudo de imagem que você preparou. O motivo está no próprio rascunho, no Gerenciador de exames.',
+    'draft_mail_action'                 => 'Abrir Gerenciador de exames',
     'draft_mail_salutation'             => '— :clinic',
     'dictation_start'                   => 'Ditar',
     'dictation_start_hint'              => 'Dite o laudo; o texto entra onde está o cursor.',

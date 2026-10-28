@@ -122,7 +122,7 @@ class MedicalRecordsController extends Controller
         // abaixo — carregar a relação inteira trazia metadata de TODAS as
         // documentações de TODOS os 10 prontuários da página, inclusive
         // bytes de imagem embutida (~27 MiB em base64 por laudo com imagem
-        // — ReportImageBlockBuilder/EyeImageReportController::store()); 20
+        // — ReportImageBlockBuilder/ExamManagerReportController::store()); 20
         // laudos nessa faixa já excedem o memory_limit configurado, nunca
         // usados pra nada aqui (achado via revisão adversarial Codex).
         $records = MedicalRecord::with(['doctor.person', 'doctor.entityUser'])
@@ -238,7 +238,7 @@ class MedicalRecordsController extends Controller
             'signedBy.user',
             // Projeção de colunas (nunca metadata/content): laudo com
             // imagem embutida pode ter ~27 MiB em base64 no metadata
-            // (ReportImageBlockBuilder/EyeImageReportController::store())
+            // (ReportImageBlockBuilder/ExamManagerReportController::store())
             // — a serialização abaixo nunca lê esse campo, só os listados
             // aqui (achado via revisão adversarial Codex). medical_record_id
             // é obrigatório mesmo sem uso direto: é a FK que o Eloquent usa
@@ -1133,9 +1133,9 @@ class MedicalRecordsController extends Controller
     private function buildFormUrls(Patient $patient, ?MedicalRecord $record, bool $isEdit): array
     {
         $urls = [
-            // Painel "Exames de imagem" do prontuário (módulo Eye Images).
-            'eye_exams'         => route('panel.eye-images.patient-exams', $patient),
-            'eye_images_module' => route('panel.eye-images.index'),
+            // Painel "Exames de imagem" do prontuário (módulo Gerenciador de exames).
+            'eye_exams'         => route('panel.exam-manager.patient-exams', $patient),
+            'eye_images_module' => route('panel.exam-manager.index'),
 
             'store' => route('panel.patients.medicalrecords.store', $patient),
             'list'  => route('panel.patients.medicalrecords.index', $patient),
@@ -1382,9 +1382,9 @@ class MedicalRecordsController extends Controller
                     'panel.patients.medicalrecords.documentations.pdf',
                     [$r->patient_id, $r, $d],
                 ),
-                // Médico solicitante (Fase 5 / Eye Images) — só presente em
+                // Médico solicitante (Fase 5 / Gerenciador de exames) — só presente em
                 // laudos emitidos com e-mail de encaminhamento. O botão de
-                // reenvio na tela do laudo recém-emitido (EyeImageReportModal)
+                // reenvio na tela do laudo recém-emitido (ExamManagerReportModal)
                 // some ao fechar/reabrir o modal; esta é a ÚNICA outra tela
                 // onde um laudo JÁ EMITIDO reaparece depois, então é aqui que
                 // "Reenviar"/renovar o link de 7 dias continua alcançável

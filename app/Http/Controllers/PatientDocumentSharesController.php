@@ -13,11 +13,11 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * Toggle "compartilhar com paciente" disparado pelo staff — drawer do
- * prontuário (laudos) e Gerenciador de Imagens (exames). Único controller
+ * prontuário (laudos) e Gerenciador de exames (exames). Único controller
  * genérico pros 3 tipos compartilháveis (mesma lição da auditoria de 38 IDOR
  * desta sessão: um lugar só, não checagem de posse duplicada por tela).
  *
- * Responde JSON pra chamadas fetch/axios diretas (Gerenciador de Imagens) e
+ * Responde JSON pra chamadas fetch/axios diretas (Gerenciador de exames) e
  * redirect+flash pra chamadas via Inertia router.post/delete (drawer do
  * prontuário, mesmo padrão de PatientPortalInvitationsController).
  */

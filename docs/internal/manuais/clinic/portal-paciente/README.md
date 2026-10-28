@@ -257,11 +257,11 @@ Duas ações, feitas de dentro do `/panel` (perfis Administrador, Médico e Secr
 
 1. **Convidar o paciente** — na ficha do paciente, botão **Convidar para o portal** (exige
    e-mail cadastrado). Documentado em detalhe nos manuais de cada perfil:
-   [Administrador](../manual-administrador/README.md#14-imagens-oftálmicas-e-portal-do-paciente) ·
+   [Administrador](../manual-administrador/README.md#14-gerenciador-de-exames-e-portal-do-paciente) ·
    [Médico](../manual-medico/README.md#9-portal-do-paciente-convite-e-compartilhamento-de-documentos) ·
    [Secretária](../manual-secretaria/README.md#11-portal-do-paciente-convite-e-compartilhamento-de-exame).
 2. **Compartilhar um documento** — o ícone de compartilhamento no prontuário (laudo — exclusivo
-   de Administrador e Médico) ou no Gerenciador de Imagens (exame — Administrador, Médico e
+   de Administrador e Médico) ou no Gerenciador de exames (exame — Administrador, Médico e
    Secretária). Sem esse passo, a conta do paciente existe mas a lista de documentos fica vazia.
 
 ---

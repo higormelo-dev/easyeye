@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  * ajaxList()/show()/edit() (MedicalRecordsController) nunca podem carregar
  * metadata/content das documentações — um laudo com imagem embutida pode
  * ter ~27 MiB em base64 nesse campo (ReportImageBlockBuilder /
- * EyeImageReportController::store(), metadata['image_report']), e nenhum
+ * ExamManagerReportController::store(), metadata['image_report']), e nenhum
  * dos 3 endpoints usa esse campo na serialização. Carregar a relação
  * inteira (ou todas as colunas dela) pra cada documentação de cada
  * prontuário da página multiplicava esse custo e podia exceder o

@@ -1376,7 +1376,7 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
 
                     <!-- Diagnóstico (CID-10) — só no fluxo de imagem ocular; grava em
                          patient_exams no approve, alimenta o filtro de Diagnóstico do
-                         Gerenciador de Imagens. -->
+                         Gerenciador de exames. -->
                     <div v-if="isImageFlow">
                         <Cid10Picker
                             v-model="approvalCids"

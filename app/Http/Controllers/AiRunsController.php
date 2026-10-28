@@ -612,7 +612,7 @@ class AiRunsController extends Controller
             'final_output'   => ['nullable', 'string', 'max:65000'],
             'original_draft' => ['nullable', 'string', 'max:65000'],
             // Diagnóstico (CID-10) do laudo — opcional, populado manualmente pelo
-            // médico no momento do approve (Gerenciador de Imagens). Mesma forma de
+            // médico no momento do approve (Gerenciador de exames). Mesma forma de
             // StoreMedicalRecordRequest::diagnosis_cids.
             'diagnosis_cids'               => ['sometimes', 'nullable', 'array', 'max:20'],
             'diagnosis_cids.*.code'        => ['required_with:diagnosis_cids', 'string', 'max:10'],

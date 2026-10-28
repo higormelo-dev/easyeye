@@ -28,7 +28,7 @@ class PatientExamResource extends JsonResource
                 'availability'                   => $this->archive ? 'original_available' : 'unavailable',
                 'review_state'                   => 'unknown',
                 'fulfillment_state'              => 'unknown',
-                'review_url'                     => '/panel/eye-images?patient_id=' . $this->patient_id . '&exam_id=' . $this->id,
+                'review_url'                     => '/panel/exam-manager?patient_id=' . $this->patient_id . '&exam_id=' . $this->id,
                 'patient_id'                     => $this->patient_id,
                 'doctor_id'                      => $this->doctor_id,
                 'schedule_id'                    => $this->schedule_id,

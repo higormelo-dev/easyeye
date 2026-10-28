@@ -21,6 +21,17 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
             ->assertJsonPath('meta.total', 3);
     });
 
+    it('points review_url at the Exam manager deep link', function () {
+        $exam = PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+
+        $reviewUrl = $this->getJson("/api/integrators/v1/patients/{$this->patient->id}/exams", $this->ctx['headers'])
+            ->assertOk()
+            ->json('data.0.attributes.review_url');
+
+        expect($reviewUrl)->toBe("/panel/exam-manager?patient_id={$this->patient->id}&exam_id={$exam->id}")
+            ->and($reviewUrl)->not->toContain('eye-images');
+    });
+
     it('lists exams for a patient using code', function () {
         PatientExam::factory(2)->create(['patient_id' => $this->patient->id]);
 
@@ -192,7 +203,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
     });
 
     // Exame capturado nasce habilitado: de 02/02 a 30/09/2026 todo exame do
-    // integrador nascia `active=false` e o Gerenciador de Imagens mostrava o
+    // integrador nascia `active=false` e o Gerenciador de exames mostrava o
     // selo "Desabilitada" (fora de laudo, IA e repasse).
     it('exame enviado pelo integrador nasce habilitado', function () {
         $this->postJson(

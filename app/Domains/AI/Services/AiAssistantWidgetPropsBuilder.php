@@ -14,11 +14,11 @@ use App\Support\CurrentDoctor;
  * (HandleInertiaRequests) para o widget flutuante do Assistente Virtual.
  *
  * Diferente de `MedicalRecordsController::buildAiProps()` /
- * `EyeImagesController` (que montavam o bloco `ai` manualmente e duplicado
+ * `ExamManagerController` (que montavam o bloco `ai` manualmente e duplicado
  * em cada controller — só para os workflows record_assist/eye_image_analysis
  * daquela tela específica), este serviço é a ÚNICA fonte para o widget global,
  * que precisa estar disponível em QUALQUER tela do painel (Agenda, Pacientes,
- * Gerenciador de Imagens, Prontuário, ...) sem cada controller replicar a
+ * Gerenciador de exames, Prontuário, ...) sem cada controller replicar a
  * lógica de feature-gate + urls + labels.
  */
 class AiAssistantWidgetPropsBuilder

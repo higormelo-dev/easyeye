@@ -29,7 +29,7 @@ for (const name of [
 }
 
 const SchedulesIndex = (await import('@/Pages/Panel/Schedules/Index.vue')).default;
-const EyeImagesIndex = (await import('@/Pages/Panel/EyeImages/Index.vue')).default;
+const ExamManagerIndex = (await import('@/Pages/Panel/ExamManager/Index.vue')).default;
 const AiAssistantPanel = (await import('@/Components/Panel/AiAssistantPanel.vue')).default;
 
 let pending;
@@ -72,7 +72,7 @@ describe('Agenda: editar agendamento', () => {
 describe('Imagens de exames: imagens do paciente escolhido', () => {
     it('as imagens atrasadas do A não aparecem com o B selecionado', async () => {
         globalThis.fetch = vi.fn((url) => deferred(url));
-        const w = shallowMount(EyeImagesIndex, {
+        const w = shallowMount(ExamManagerIndex, {
             props: {
                 entity: { id: 'e' },
                 patients: [],

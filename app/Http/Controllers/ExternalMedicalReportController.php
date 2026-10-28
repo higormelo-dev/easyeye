@@ -24,7 +24,7 @@ use Illuminate\Http\Response;
  * 404 também enquanto o prontuário dono não está ASSINADO: um laudo que a
  * clínica ainda pode editar ou excluir não é entregue a terceiros (achado via
  * revisão adversarial Codex) — o mesmo link volta a abrir quando o prontuário
- * é assinado. Mesma regra do envio (EyeImageReportResendController) e do
+ * é assinado. Mesma regra do envio (ExamManagerReportResendController) e do
  * compartilhamento com o paciente.
  */
 class ExternalMedicalReportController extends Controller

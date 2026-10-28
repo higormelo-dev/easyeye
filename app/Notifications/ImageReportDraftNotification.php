@@ -16,7 +16,7 @@ use Illuminate\Notifications\Notification;
  * rascunho esperando liberação e o técnico que o médico devolveu o rascunho.
  *
  * O e-mail NUNCA leva nome do paciente, exame, conteúdo do laudo nem o motivo
- * da devolução — só diz que há algo a fazer e abre o Gerenciador de Imagens,
+ * da devolução — só diz que há algo a fazer e abre o Gerenciador de exames,
  * onde o acesso já é autenticado e registrado. Enfileirada depois do commit:
  * a ação que a dispara (enviar/devolver) pode dar rollback e o aviso não
  * pode sair de uma transação desfeita.

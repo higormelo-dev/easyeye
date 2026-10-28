@@ -29,7 +29,7 @@ return [
     // Módulos / Atalhos
     'module_schedule'     => 'Agenda',
     'module_waiting_room' => 'Sala de Espera',
-    'module_eye_images'   => 'Eye Images',
+    'module_eye_images'   => 'Gerenciador de exames',
     'module_tiss'         => 'Guias TISS',
     'module_financial'    => 'Financeiro',
     'module_surgery'      => 'Centro Cirúrgico',

@@ -291,7 +291,7 @@ describe('merge (caminho feliz)', function () {
         mergeAdmin($this, $this->source, $this->target)->assertOk();
 
         $entries = collect($this->actingAs($this->adminUser)->withSession(panelSession($this->adminEu))
-            ->getJson(route('panel.eye-images.patients.audit', ['patient' => $this->target]))->assertOk()->json('entries'));
+            ->getJson(route('panel.exam-manager.patients.audit', ['patient' => $this->target]))->assertOk()->json('entries'));
 
         $code = $entries->first(fn (array $e) => $e['target'] === 'exam' && $e['event'] === 'updated');
 

@@ -217,7 +217,7 @@
 @endif
 
 <!-- ─── EXAMES DO LAUDO ──────────────────────────────────────────────────────
-     Laudo do Gerenciador de Imagens: registra quais exames fizeram parte
+     Laudo do Gerenciador de exames: registra quais exames fizeram parte
      (um laudo pode cobrir vários exames do mesmo paciente). Ver
      App\Services\EyeImages\ReportExamSummary. -->
 @if(! empty($examSummary))

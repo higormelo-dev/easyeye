@@ -129,11 +129,11 @@ class PanelNavigation
         }
 
         $nav[] = [
-            'key'   => 'eye-images',
-            'route' => 'panel.eye-images.index',
+            'key'   => 'exam-manager',
+            'route' => 'panel.exam-manager.index',
             'icon'  => 'ti ti-eye',
             'label' => __('dashboard.module_eye_images'),
-            'match' => ['panel.eye-images.*'],
+            'match' => ['panel.exam-manager.*'],
         ];
 
         // Cirurgias (Fase 4): pedido → autorização → agenda cirúrgica → cirurgia

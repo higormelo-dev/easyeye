@@ -165,7 +165,7 @@ function mrolRecordsOfPatient($test): int
     return MedicalRecord::query()->withoutGlobalScopes()->where('patient_id', $test->patient->id)->count();
 }
 
-describe('laudo manual de imagem (EyeImageReportController::store)', function (): void {
+describe('laudo manual de imagem (ExamManagerReportController::store)', function (): void {
     it('relê sob lock: prontuário aberto por outro fluxo logo após a busca sem lock é reaproveitado, não duplicado', function (): void {
         // Simula a OUTRA requisição confirmando a abertura exatamente entre
         // a busca sem lock (que não achou nada) e a criação.
@@ -190,7 +190,7 @@ describe('laudo manual de imagem (EyeImageReportController::store)', function ()
             ]);
         });
 
-        $response = mrolAsDoctor($this)->postJson(route('panel.eye-images.reports.store'), mrolReportPayload($this));
+        $response = mrolAsDoctor($this)->postJson(route('panel.exam-manager.reports.store'), mrolReportPayload($this));
 
         $response->assertCreated()->assertJsonPath('medical_record_id', $injected);
         expect(mrolRecordsOfPatient($this))->toBe(1)
@@ -203,7 +203,7 @@ describe('laudo manual de imagem (EyeImageReportController::store)', function ()
         try {
             $this->withoutExceptionHandling();
 
-            expect(fn () => mrolAsDoctor($this)->postJson(route('panel.eye-images.reports.store'), mrolReportPayload($this)))
+            expect(fn () => mrolAsDoctor($this)->postJson(route('panel.exam-manager.reports.store'), mrolReportPayload($this)))
                 ->toThrow(fn (QueryException $e) => expect($e->getCode())->toBe('55P03'));
         } finally {
             mrolReleaseProbe($probe);
@@ -218,7 +218,7 @@ describe('laudo manual de imagem (EyeImageReportController::store)', function ()
         $probe    = mrolHoldOpeningLock($this);
 
         try {
-            mrolAsDoctor($this)->postJson(route('panel.eye-images.reports.store'), mrolReportPayload($this))
+            mrolAsDoctor($this)->postJson(route('panel.exam-manager.reports.store'), mrolReportPayload($this))
                 ->assertCreated()
                 ->assertJsonPath('medical_record_id', $existing->id);
         } finally {

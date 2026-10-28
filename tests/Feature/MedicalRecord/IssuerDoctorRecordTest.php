@@ -75,7 +75,7 @@ describe('emissão exige cadastro de médico ativo', function () {
             ['postJson', route('panel.patients.medicalrecords.evolutions.store', [$this->patient, $this->record]), ['content' => 'Evolução']],
             ['postJson', route('panel.patients.medicalrecords.files.store', [$this->patient, $this->record]), ['files' => [UploadedFile::fake()->create('a.pdf', 10, 'application/pdf')]]],
             ['getJson', route('panel.patients.tonometry-pdf', [$this->patient]), []],
-            ['postJson', route('panel.eye-images.reports.store'), ['patient_id' => $this->patient->id, 'exam_ids' => [$exam->id], 'content' => '<p>Laudo</p>', 'confirm_open_record' => true]],
+            ['postJson', route('panel.exam-manager.reports.store'), ['patient_id' => $this->patient->id, 'exam_ids' => [$exam->id], 'content' => '<p>Laudo</p>', 'confirm_open_record' => true]],
             ['postJson', route('panel.patients.medicalrecords.store', $this->patient), ['main_complaint' => 'Nova']],
         ];
 
@@ -116,7 +116,7 @@ describe('emissão exige cadastro de médico ativo', function () {
         expect($run->fresh()->status)->toBe(AiRunStatus::WaitingApproval);
     });
 
-    it('a tela esconde as ações e mostra o aviso (prontuário e Gerenciador de Imagens)', function () {
+    it('a tela esconde as ações e mostra o aviso (prontuário e Gerenciador de exames)', function () {
         issAs($this, $this->euOrphan)
             ->get(route('panel.patients.medicalrecords.index', $this->patient))
             ->assertOk()
@@ -164,10 +164,10 @@ describe('quem emite assina', function () {
             ->and(MedicalRecordProcedure::query()->sole()->doctor_id)->toBe($this->drB->id);
     });
 
-    it('laudo do Gerenciador de Imagens sai no nome de quem emite, não do médico do exame', function () {
+    it('laudo do Gerenciador de exames sai no nome de quem emite, não do médico do exame', function () {
         $exam = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'doctor_id' => $this->drA->id]);
 
-        issAs($this, $this->euB)->postJson(route('panel.eye-images.reports.store'), [
+        issAs($this, $this->euB)->postJson(route('panel.exam-manager.reports.store'), [
             'patient_id' => $this->patient->id, 'exam_ids' => [$exam->id], 'content' => '<p>Normal.</p>', 'confirm_open_record' => true,
         ])->assertCreated();
 
@@ -252,8 +252,8 @@ describe('prontuário assinado', function () {
             ['deleteJson', route('panel.patients.medicalrecords.documentations.destroy', [$this->patient, $this->record, $this->doc]), []],
             ['postJson', route('panel.patients.medicalrecords.files.store', [$this->patient, $this->record]), ['files' => [UploadedFile::fake()->create('b.pdf', 10, 'application/pdf')]]],
             ['deleteJson', route('panel.patients.medicalrecords.files.destroy', [$this->patient, $this->record, $this->file]), []],
-            // Laudo do Gerenciador de Imagens cairia no prontuário assinado do dia.
-            ['postJson', route('panel.eye-images.reports.store'), ['patient_id' => $this->patient->id, 'exam_ids' => [$exam->id], 'content' => '<p>Laudo</p>']],
+            // Laudo do Gerenciador de exames cairia no prontuário assinado do dia.
+            ['postJson', route('panel.exam-manager.reports.store'), ['patient_id' => $this->patient->id, 'exam_ids' => [$exam->id], 'content' => '<p>Laudo</p>']],
             // Aba antiga: a tela esconde "Nova evolução"/"Solicitar", o servidor também recusa.
             ['postJson', route('panel.patients.medicalrecords.evolutions.store', [$this->patient, $this->record]), ['content' => 'Evolução depois de assinar']],
             ['postJson', route('panel.patients.medicalrecords.medicalrecord-procedures.store', [$this->patient, $this->record]), ['procedure_id' => $proc->id]],
@@ -297,7 +297,7 @@ describe('prontuário assinado', function () {
     });
 });
 
-describe('médico solicitante do laudo (Fase 5 / Eye Images) continua alcançável na lista de documentações', function () {
+describe('médico solicitante do laudo (Fase 5 / Gerenciador de exames) continua alcançável na lista de documentações', function () {
     it('[GAP] laudo com e-mail de médico solicitante traz nome/e-mail/sent_at na lista — reenvio continua possível depois de fechar o laudo (achado via revisão Codex)', function () {
         $doc = MedicalRecordDocumentation::create([
             'medical_record_id'         => $this->record->id,
@@ -311,7 +311,7 @@ describe('médico solicitante do laudo (Fase 5 / Eye Images) continua alcançáv
             'requesting_doctor_sent_at' => now(),
         ]);
 
-        // A tela de emissão (EyeImageReportModal) esconde o botão "Reenviar"
+        // A tela de emissão (ExamManagerReportModal) esconde o botão "Reenviar"
         // ao fechar/reabrir o modal — esta é a lista de documentações do
         // prontuário, a ÚNICA outra tela onde o laudo JÁ EMITIDO reaparece
         // depois; sem estes 3 campos aqui, o front não tinha como montar o

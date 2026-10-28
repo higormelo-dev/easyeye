@@ -90,15 +90,19 @@ const examsCard = (mine) => ({
     value: props.stats.exams_pending ?? 0,
     label: mine ? props.t.kpi_my_exams_pending : props.t.kpi_exams_pending,
     caption: props.t.kpi_exams_pending_hint,
-    // O link abre o Gerenciador de Imagens já com o mesmo filtro, para o
+    // O link abre o Gerenciador de exames já com o mesmo filtro, para o
     // número bater com a lista (o do médico, filtrado por ele).
     url: !props.access.eye_images
         ? null
         : mine
           ? props.stats.doctor_id
-              ? route('panel.eye-images.index', { status: 'pendente', period: '30', doctor_id: props.stats.doctor_id })
+              ? route('panel.exam-manager.index', {
+                    status: 'pendente',
+                    period: '30',
+                    doctor_id: props.stats.doctor_id,
+                })
               : null
-          : route('panel.eye-images.index', { status: 'pendente', period: '30' }),
+          : route('panel.exam-manager.index', { status: 'pendente', period: '30' }),
 });
 
 // Retornos a contatar (Fase 6) — só quando o servidor mandou (plano com a feature + perfil que opera o recall).

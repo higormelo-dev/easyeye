@@ -467,7 +467,7 @@ describe('outros documentos que prescrevem medicamento', function () {
         ])->assertUnprocessable()->assertJsonPath('allergy_conflicts.0.match', 'eye_drops');
     });
 
-    it('modelo de RECEITA usado pelo laudo do Gerenciador de Imagens também é checado', function () {
+    it('modelo de RECEITA usado pelo laudo do Gerenciador de exames também é checado', function () {
         cs2pAllergy($this, 'Tobramicina');
 
         $prescription             = ReportSettingContent::query()->whereHas('reportSetting', fn ($q) => $q->where('title', 'PRESCRIÇÃO DE MEDICAMENTOS'))->firstOrFail();
@@ -478,11 +478,11 @@ describe('outros documentos que prescrevem medicamento', function () {
             'content'    => '<p>Tobrex (tobramicina) 1 gota 4x/dia</p>', 'confirm_open_record' => true,
         ];
 
-        cs2pAs($this, $this->docEu)->postJson(route('panel.eye-images.reports.store'), $payload)
+        cs2pAs($this, $this->docEu)->postJson(route('panel.exam-manager.reports.store'), $payload)
             ->assertUnprocessable()
             ->assertJsonPath('allergy_conflicts.0.substance', 'Tobramicina');
 
-        cs2pAs($this, $this->docEu)->postJson(route('panel.eye-images.reports.store'), [...$payload, 'allergy_override_reason' => 'Reação foi ao conservante'])
+        cs2pAs($this, $this->docEu)->postJson(route('panel.exam-manager.reports.store'), [...$payload, 'allergy_override_reason' => 'Reação foi ao conservante'])
             ->assertCreated();
     });
 

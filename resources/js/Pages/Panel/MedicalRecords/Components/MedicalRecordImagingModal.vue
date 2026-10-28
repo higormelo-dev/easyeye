@@ -143,8 +143,8 @@ function pick(exam) {
                                         <!-- Vídeo capturado pela câmera (Fase 5 / 6a) tem display_url/
                                              original_url apontando pro próprio arquivo .webm/.mp4 — sem
                                              is_video, caía aqui como <img> (ícone quebrado). Mesmo padrão
-                                             já usado no painel principal do Gerenciador de Imagens
-                                             (EyeImages/Index.vue): <video controls> em vez de <img>
+                                             já usado no painel principal do Gerenciador de exames
+                                             (ExamManager/Index.vue): <video controls> em vez de <img>
                                              (achado via revisão Codex). -->
                                         <video
                                             v-if="selected.is_video && selected.display_url"

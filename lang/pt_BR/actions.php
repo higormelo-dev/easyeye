@@ -852,7 +852,7 @@ return [
         'doc_title_ph'      => 'Título da documentação',
         'doc_date'          => 'Data',
         'doc_actions'       => 'Ações',
-        // Reenvio ao médico solicitante (laudo do Gerenciador de Imagens,
+        // Reenvio ao médico solicitante (laudo do Gerenciador de exames,
         // Fase 5) — única tela onde um laudo JÁ EMITIDO reaparece depois do
         // modal de emissão fechar, então é aqui que "Reenviar"/renovar o
         // link de 7 dias continua alcançável (achado via revisão Codex).

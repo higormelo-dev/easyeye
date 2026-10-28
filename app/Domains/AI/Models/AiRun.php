@@ -128,8 +128,8 @@ class AiRun extends Model
     /**
      * Documentação gravada no prontuário quando o laudo é aprovado (ver
      * AiRunDocumentationService::writeRunDocumentation, idempotente por
-     * ai_run_id) — usada pra montar o link de PDF do laudo de IA na tela de
-     * Imagens Oftálmicas (EyeImagesController::examAiReport).
+     * ai_run_id) — usada pra montar o link de PDF do laudo de IA na tela do
+     * Gerenciador de exames (ExamManagerController::examAiReport).
      */
     public function documentation(): HasOne
     {

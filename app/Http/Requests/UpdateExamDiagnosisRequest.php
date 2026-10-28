@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\{Rule, Validator};
 
 /**
- * Payload do "Diagnóstico do exame" (Gerenciador de Imagens):
+ * Payload do "Diagnóstico do exame" (Gerenciador de exames):
  * PatientExam::diagnosis_cids, uma lista de {code|custom_diagnosis_id,
  * description, is_primary}. Autorização é feita no controller via
  * Gate::authorize(EntityGate::IssueReport) — mesmo padrão de

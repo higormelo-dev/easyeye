@@ -3,7 +3,7 @@ import { ref } from 'vue';
 /**
  * Ciclo de vida reutilizável de uma execução de IA (estimate → store → poll →
  * approve/reject), alinhado ao AiRunsController. Compartilhado entre o prontuário,
- * o EyeImages e o painel de IA.
+ * o ExamManager e o painel de IA.
  *
  * @param {object} ai  Bloco de props de IA da página: { urls, balance, ... }
  */

@@ -314,8 +314,8 @@ describe('médico', function () {
             ->and($ai['list_url'])->toBe(route('panel.ai-runs.index', ['status' => 'waiting_approval']));
 
         $items = collect($ai['items'])->keyBy('id');
-        // Laudo de imagem abre o exame no Gerenciador de Imagens (onde aprova).
-        expect($items[$mine->id]['url'])->toBe(route('panel.eye-images.index', ['patient_id' => $this->pA1->id, 'exam_id' => $examA->id]))
+        // Laudo de imagem abre o exame no Gerenciador de exames (onde aprova).
+        expect($items[$mine->id]['url'])->toBe(route('panel.exam-manager.index', ['patient_id' => $this->pA1->id, 'exam_id' => $examA->id]))
             ->and($items[$fromMyCase->id]['url'])->toBe($ai['list_url'])
             ->and($items[$mine->id]['patient'])->toBe('ALICE AGUARDANDO');
 

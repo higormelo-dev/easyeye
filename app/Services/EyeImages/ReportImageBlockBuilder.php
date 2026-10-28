@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Storage;
 use League\Flysystem\FilesystemException;
 
 /**
- * Resolve metadata.image_report (Fase 5 / 5b — EyeImageReportController,
- * EyeImageReportDraftController) pra bytes embutidos no PDF assinado.
+ * Resolve metadata.image_report (Fase 5 / 5b — ExamManagerReportController,
+ * ExamManagerReportDraftController) pra bytes embutidos no PDF assinado.
  *
  * Base64 embutido, NUNCA URL remota: wkhtmltopdf não tem acesso de rede ao
  * bucket S3-compatível — mesma decisão (e mesmo motivo) do MontageService,
@@ -41,7 +41,7 @@ class ReportImageBlockBuilder
     }
 
     /**
-     * Resolve e CONGELA os bytes na emissão (EyeImageReportController::
+     * Resolve e CONGELA os bytes na emissão (ExamManagerReportController::
      * store() — 2ª rodada de revisão adversarial Codex): sem isto, o laudo
      * assinado mudava sozinho depois de emitido — exame desabilitado/
      * excluído ou arquivo sumindo do S3 fazia a imagem desaparecer numa
@@ -232,7 +232,7 @@ class ReportImageBlockBuilder
 
     /**
      * Agrupa por exame (mesma chave de examGroupKey() em
-     * Pages/Panel/EyeImages/Index.vue, espelhada em ReportExamSummary::summarize())
+     * Pages/Panel/ExamManager/Index.vue, espelhada em ReportExamSummary::summarize())
      * preservando a ordem de 1ª aparição de cada grupo; dentro do grupo, OD
      * antes de OE antes de AO. Heurística simples de propósito — lateralidade
      * ausente/ambígua cai no fim do grupo, sem forçar além disso.

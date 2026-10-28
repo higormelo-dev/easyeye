@@ -38,8 +38,8 @@ class PreferencesController extends Controller
         // Tour guiado do painel (App\Support\PanelTour): {id: {version, status}}
         // — só o que mudou; o servidor mescla com os demais e grava a data.
         'tours',
-        // Pedal USB do Gerenciador de Imagens (Fase 5 / 7a): {capture_key,
-        // advance_key} — ver ImportExternalExamModal.vue / EyeImages/Index.vue.
+        // Pedal USB do Gerenciador de exames (Fase 5 / 7a): {capture_key,
+        // advance_key} — ver ImportExternalExamModal.vue / ExamManager/Index.vue.
         'eye_images_pedal_shortcuts',
     ];
 

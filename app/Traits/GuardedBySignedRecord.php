@@ -14,7 +14,7 @@ use Illuminate\Events\NullDispatcher;
  * criado, alterado nem excluído quando o prontuário dono está ASSINADO (CFM
  * 2.227/2018 — Signable). Antes só a tela desabilitava; a trava no model cobre
  * todos os caminhos (quick actions, documentação, tonometria, laudo do
- * Gerenciador de Imagens, laudo de IA, anexos, evolução, solicitação de
+ * Gerenciador de exames, laudo de IA, anexos, evolução, solicitação de
  * procedimento). O LockedMedicalRecordException vira 403 traduzido
  * (bootstrap/app.php) quando o caller não trata.
  *
@@ -92,7 +92,7 @@ trait GuardedBySignedRecord
 
         // saveQuietly()/deleteQuietly() (Model::withoutEvents()) são o canal
         // JÁ usado de propósito pra bookkeeping pós-assinatura que não é
-        // conteúdo clínico — ex.: EyeImageReportResendController gravando
+        // conteúdo clínico — ex.: ExamManagerReportResendController gravando
         // requesting_doctor_sent_at num documento de prontuário ASSINADO (o
         // envio ao médico solicitante só existe com o prontuário assinado).
         // O guard antigo (via eventos creating/updating/deleting)

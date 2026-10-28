@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
  * user.name, event, auditable_type, auditable_id, ip_address, user_agent —
  * nunca old_values/new_values. Um laudo de imagem embutida pode duplicar
  * ~27 MiB em base64 nessas 2 colunas (metadata congelado —
- * EyeImageReportController::store()); carregar 500 linhas inteiras por
+ * ExamManagerReportController::store()); carregar 500 linhas inteiras por
  * chunk, mesmo sem usar essas colunas, esgotava o memory_limit conforme
  * laudos de imagem se acumulam em audit_logs (achado via revisão
  * adversarial Codex).

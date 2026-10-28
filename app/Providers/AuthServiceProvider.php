@@ -193,7 +193,7 @@ class AuthServiceProvider extends ServiceProvider
         });
 
         /**
-         * Importar exame externo (upload manual) no Gerenciador de Imagens.
+         * Importar exame externo (upload manual) no Gerenciador de exames.
          * Admin, Doctor e Secretary têm acesso — é ato administrativo de
          * anexar arquivo, não ato clínico — não requer IssueReport.
          */

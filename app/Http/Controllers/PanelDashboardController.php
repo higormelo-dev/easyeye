@@ -46,7 +46,7 @@ use Inertia\{Inertia, Response};
  */
 class PanelDashboardController extends Controller
 {
-    /** Janela do indicador "Exames pendentes" — um dos períodos do Gerenciador de Imagens. */
+    /** Janela do indicador "Exames pendentes" — um dos períodos do Gerenciador de exames. */
     public const int EXAMS_PENDING_DAYS = 30;
 
     /** Teto de consultas de hoje enviadas ao card (agrupadas por turno no front). */
@@ -274,7 +274,7 @@ class PanelDashboardController extends Controller
      *  - financeiro (caixa e faturamento TISS): a rota aceita
      *    permission:financial.manage, mas os controllers ainda exigem o Gate
      *    ViewFinancial (perfil fixo admin/financeiro) — vale a regra efetiva;
-     *  - Gerenciador de Imagens: sem restrição de perfil (rota e menu abertos
+     *  - Gerenciador de exames: sem restrição de perfil (rota e menu abertos
      *    a todo membro da clínica).
      *
      * @return array{schedules: bool, patients: bool, doctors: bool, financial: bool, eye_images: bool}
@@ -472,7 +472,7 @@ class PanelDashboardController extends Controller
         }
 
         if ($profile !== ClientRule::Financial) {
-            // Exames do Gerenciador de Imagens dos últimos 30 dias ainda sem
+            // Exames do Gerenciador de exames dos últimos 30 dias ainda sem
             // laudo (manual, conjunto ou IA aprovada). Janela e critério iguais
             // ao filtro "Últimos 30 dias" + "Sem laudo" do módulo, para o número
             // do card bater com a lista que ele abre.
@@ -823,11 +823,11 @@ class PanelDashboardController extends Controller
                     'patient'  => $run->patient?->person?->full_name ?? $run->patient?->code ?? '—',
                     'workflow' => __('ai.workflow_' . $run->workflow),
                     'created'  => $this->localDateTime($run->created_at),
-                    // Laudo de imagem: abre o exame no Gerenciador de Imagens
+                    // Laudo de imagem: abre o exame no Gerenciador de exames
                     // (reviewTarget), onde o médico revisa e aprova; os demais,
                     // a tela de IA filtrada por "Aguardando aprovação".
                     'url' => $exam && $run->patient_id
-                        ? route('panel.eye-images.index', ['patient_id' => $run->patient_id, 'exam_id' => $exam->id])
+                        ? route('panel.exam-manager.index', ['patient_id' => $run->patient_id, 'exam_id' => $exam->id])
                         : $listUrl,
                 ];
             })

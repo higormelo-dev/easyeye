@@ -6,7 +6,7 @@ O catálogo executável está em `integrators-openapi.yaml`. Todos os endpoints 
 
 | Requisito | Implementação | Prova permanente |
 |---|---|---|
-| C08 / UP08 / A9 | `IntegratorExamArchive`, `EmrReport`, `BoundedExamArchive`, `GenerateExamDerivatives`, `BoundedPdfProcess` | `P2ContractsTest`, `P2BoundariesTest`, testes existentes EyeImages/PDF |
+| C08 / UP08 / A9 | `IntegratorExamArchive`, `EmrReport`, `BoundedExamArchive`, `GenerateExamDerivatives`, `BoundedPdfProcess` | `P2ContractsTest`, `P2BoundariesTest`, testes existentes ExamManager/PDF |
 | C09 / SEC01–03 | Resources próprios, ator autenticado em audit/access logs, leitura agregada, health minimizado | `P2ContractsTest`, `QueueHealthTest`, `EntityIntegratorQueueHealthControllerTest` |
 | C09 finalidade de token | Perfis capture/worklist/support autorizados no Manager; `IntegratorTokenPolicy` e `EnsureTokenScope` | `AuthTest`, `TokenScopeTest`, `P2ContractsTest` |
 | C10 / SEC04–05 / F16 / A8 | Publicação V2 obrigatória, storage verificado, artefato imutável entre coortes, seleção autorizada | testes publisher/CLI/Manager/updates e `P2BoundariesTest` |

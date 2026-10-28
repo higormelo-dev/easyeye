@@ -656,7 +656,7 @@ class ReportSettingService
                 // Sanitiza ANTES de persistir — nunca grava <script>/handler
                 // de evento/javascript: cru. Modelo (não documento clínico
                 // final) usa o mesmo profile 'medical' já usado em
-                // MedicalRecordDocumentationsController/EyeImageReport* —
+                // MedicalRecordDocumentationsController/ExamManagerReport* —
                 // placeholders {{VAR}} são texto puro, nunca afetados
                 // (achado via auditoria de encerramento, EE-01). Linhas já
                 // persistidas antes desta correção são protegidas de novo

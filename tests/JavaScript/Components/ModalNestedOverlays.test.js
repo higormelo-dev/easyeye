@@ -5,7 +5,7 @@ import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import PdfPreviewModal from '@/Pages/Panel/MedicalRecords/Components/PdfPreviewModal.vue';
-import EyeImageReportDraftsModal from '@/Pages/Panel/EyeImages/EyeImageReportDraftsModal.vue';
+import ExamManagerReportDraftsModal from '@/Pages/Panel/ExamManager/ExamManagerReportDraftsModal.vue';
 
 /**
  * Overlays abertos POR CIMA de um diálogo (CenteredModal/OffcanvasPanel):
@@ -139,7 +139,7 @@ describe('SweetAlert2 por cima do diálogo (confirmar assinatura, descartar rasc
         expect(wrapper.emitted('close')).toHaveLength(1);
     });
 
-    it('descartar rascunho (EyeImageReportDraftsModal com o SweetAlert real): a confirmação segura o foco e o DELETE só sai depois de confirmar', async () => {
+    it('descartar rascunho (ExamManagerReportDraftsModal com o SweetAlert real): a confirmação segura o foco e o DELETE só sai depois de confirmar', async () => {
         globalThis.window.Swal = Swal;
         globalThis.window.axios = {
             get: vi.fn(() =>
@@ -160,7 +160,7 @@ describe('SweetAlert2 por cima do diálogo (confirmar assinatura, descartar rasc
             delete: vi.fn(() => Promise.resolve({ data: {} })),
         };
 
-        const wrapper = mount(EyeImageReportDraftsModal, {
+        const wrapper = mount(ExamManagerReportDraftsModal, {
             attachTo: document.body,
             props: { open: false, urls: { index: '/drafts', destroy: '/drafts/__ID__' }, t: {} },
         });

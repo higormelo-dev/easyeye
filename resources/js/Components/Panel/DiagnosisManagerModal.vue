@@ -1,6 +1,6 @@
 <script setup>
 /**
- * DiagnosisManagerModal — "Diagnóstico do exame" (Gerenciador de Imagens).
+ * DiagnosisManagerModal — "Diagnóstico do exame" (Gerenciador de exames).
  *
  * Edita PatientExam::diagnosis_cids do exame em foco, combinando o catálogo
  * CID-10 com diagnósticos customizados da clínica (ExamDiagnosisController).
@@ -10,7 +10,7 @@
  * Props:
  *   open – controla visibilidade
  *   exam – exame em foco (id, diagnosis_cids, exam_type_name, laterality,
- *          created_at_fmt, ...) — ver EyeImagesController::serializePatients()
+ *          created_at_fmt, ...) — ver ExamManagerController::serializePatients()
  *   urls – { search, store, update } já resolvidos pelo pai (Index.vue) a
  *          partir de props.urls.diagnoses_search / diagnoses_store /
  *          exam_diagnosis_update (o __ID__ deste último já substituído pelo

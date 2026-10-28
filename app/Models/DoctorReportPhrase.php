@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Frase rápida do médico pro laudo do Gerenciador de Imagens — ver
+ * Frase rápida do médico pro laudo do Gerenciador de exames — ver
  * migration create_doctor_report_phrases_table para o porquê da tabela
  * nascer vazia (sem terminologia clínica pré-cadastrada).
  */

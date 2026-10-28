@@ -46,7 +46,7 @@ if (typeof window !== 'undefined') {
                 },
                 // insertContent/focus/selection: usados por
                 // TinyMceEditor::insertContent()/getSelectionHtml() (botões
-                // "Inserir imagem"/"Frases rápidas" do Gerenciador de Imagens,
+                // "Inserir imagem"/"Frases rápidas" do Gerenciador de exames,
                 // benchmark 18/09/2026) — sem eles aqui, chamar insertContent()
                 // num teste montado por cima do stub quebra com "is not a
                 // function" bem antes de qualquer asserção rodar.

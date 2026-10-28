@@ -3,7 +3,7 @@
 Guia completo de utilização do sistema para o perfil **Secretária**, passo a passo com telas reais.
 Cobre todas as áreas que o perfil acessa: agenda (com séries de sessões), mural de recados, fila de
 espera, pacientes, retornos e convite de retorno por WhatsApp, importação, médicos (escala e
-bloqueios), imagens oftálmicas, assistente de IA e conta.
+bloqueios), Gerenciador de exames, assistente de IA e conta.
 
 > As capturas deste manual são geradas automaticamente a partir do sistema real
 > (`e2e/cypress/e2e/docs/secretary-manual.cy.js`). Para atualizá-las após mudanças de tela:
@@ -26,7 +26,7 @@ bloqueios), imagens oftálmicas, assistente de IA e conta.
 7. [Pacientes](#7-pacientes)
 8. [Importação de pacientes por planilha](#8-importação-de-pacientes-por-planilha)
 9. [Médicos: consulta, escala e bloqueios](#9-médicos-consulta-escala-e-bloqueios)
-10. [Imagens oftálmicas](#10-imagens-oftálmicas)
+10. [Gerenciador de exames](#10-gerenciador-de-exames)
 11. [Portal do Paciente: convite e compartilhamento de exame](#11-portal-do-paciente-convite-e-compartilhamento-de-exame)
 12. [Retornos: quem precisa voltar à clínica](#12-retornos-quem-precisa-voltar-à-clínica)
 13. [Convite de retorno por WhatsApp](#13-convite-de-retorno-por-whatsapp)
@@ -57,7 +57,7 @@ O **menu lateral** (passe o mouse sobre a barra à esquerda para expandir) mostr
 | Retornos | Pacientes que precisam voltar à clínica (aparece se o plano incluir o recurso — [seção 12](#12-retornos-quem-precisa-voltar-à-clínica)) |
 | Pacientes | Cadastro completo de pacientes |
 | Médicos | Consulta ao corpo clínico, escala e bloqueios |
-| Imagens oftálmicas | Exames de imagem dos pacientes |
+| Gerenciador de exames | Exames de imagem dos pacientes |
 | Assistente de IA | Acompanhamento do uso de IA da clínica |
 
 ---
@@ -385,11 +385,11 @@ Durante um bloqueio o médico não recebe agendamentos. A lixeira remove um bloq
 
 ---
 
-## 10. Imagens oftálmicas
+## 10. Gerenciador de exames
 
-Menu **Imagens oftálmicas** — central de exames de imagem dos pacientes:
+Menu **Gerenciador de exames** — central de exames de imagem dos pacientes:
 
-![Imagens oftálmicas](img/21-imagens-oftalmicas.png)
+![Gerenciador de exames](img/21-imagens-oftalmicas.png)
 
 - Busque o paciente na coluna esquerda para ver os exames dele.
 - **Filtros** refina por olho (OD/OE/AO), tipo de exame, equipamento, médico e período.
@@ -405,7 +405,7 @@ Selecione o paciente e marque **2 exames** nas miniaturas — o botão **Compara
 habilita com essa seleção. O modal compara em **Sobrepor** (opacidade ajustável, arraste
 para alinhar) ou **Lado a lado**:
 
-![Paciente selecionado no Gerenciador de Imagens](img/28-imagens-paciente-selecionado.png)
+![Paciente selecionado no Gerenciador de exames](img/28-imagens-paciente-selecionado.png)
 
 ![Comparar exames](img/29-comparar-exames.png)
 
@@ -461,7 +461,7 @@ ativa no portal. Reenviar é seguro — não cria uma segunda conta.
 
 ### Compartilhar exame de imagem
 
-No Gerenciador de Imagens, cada miniatura tem um selo circular de compartilhamento.
+No Gerenciador de exames, cada miniatura tem um selo circular de compartilhamento.
 Clique para liberar o exame ao paciente pelo portal; clicar de novo revoga o acesso:
 
 ![Exame compartilhado com o paciente](img/32-compartilhar-exame-ativo.png)

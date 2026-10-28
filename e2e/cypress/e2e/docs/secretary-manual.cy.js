@@ -198,8 +198,8 @@ describe('Manual da secretária — capturas', () => {
         shot('20-medico-escala');
     });
 
-    it('11 imagens oftálmicas e assistente de IA', () => {
-        cy.visit('/panel/eye-images');
+    it('11 gerenciador de exames e assistente de IA', () => {
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.wait(800);
         shot('21-imagens-oftalmicas');
@@ -210,7 +210,7 @@ describe('Manual da secretária — capturas', () => {
         shot('22-assistente-ia');
     });
 
-    it('11b imagens oftálmicas: comparar exames', () => {
+    it('11b gerenciador de exames: comparar exames', () => {
         // Fixture compartilhada com o manual do médico (mesma entidade demo).
         cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, {
             timeout: 40000,
@@ -218,7 +218,7 @@ describe('Manual da secretária — capturas', () => {
             .its('stdout')
             .should('include', 'docsdoc:');
 
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
@@ -258,7 +258,7 @@ describe('Manual da secretária — capturas', () => {
         shot('31-convite-enviado');
         cy.get('body').type('{esc}');
 
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();

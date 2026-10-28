@@ -2,7 +2,7 @@
 
 Guia completo de utilização do sistema para o perfil **Médico**, passo a passo com telas reais.
 Cobre o dia inteiro de atendimento: agenda, prontuário eletrônico completo (documentações,
-atestados, evolução, anexos, receitas e laudos), assistente de IA, imagens oftálmicas,
+atestados, evolução, anexos, receitas e laudos), assistente de IA, Gerenciador de exames,
 pacientes e conta.
 
 > As capturas são geradas automaticamente a partir do sistema real
@@ -28,7 +28,7 @@ pacientes e conta.
 5. [Andamento e finalização da consulta](#5-andamento-e-finalização-da-consulta)
 6. [Assistente de IA](#6-assistente-de-ia)
 7. [Meus prompts de IA e consumo](#7-meus-prompts-de-ia-e-consumo)
-8. [Pacientes e imagens oftálmicas](#8-pacientes-e-imagens-oftálmicas)
+8. [Pacientes e Gerenciador de exames](#8-pacientes-e-gerenciador-de-exames)
 9. [Portal do Paciente: convite e compartilhamento de documentos](#9-portal-do-paciente-convite-e-compartilhamento-de-documentos)
 10. [Retornos e acompanhamento de pacientes crônicos](#10-retornos-e-acompanhamento-de-pacientes-crônicos)
 11. [Avisos sobre a assinatura da clínica](#11-avisos-sobre-a-assinatura-da-clínica)
@@ -54,7 +54,7 @@ O **menu lateral** do médico (passe o mouse na barra à esquerda para expandir)
 | Painel de controle | Indicadores e atalhos |
 | Agendas | Sua agenda de atendimentos |
 | Pacientes | Cadastro de pacientes |
-| Imagens oftálmicas | Exames de imagem e diagnóstico |
+| Gerenciador de exames | Exames de imagem e diagnóstico |
 | Assistente de IA | Meus prompts e consumo de IA |
 
 ---
@@ -159,7 +159,7 @@ listados no prontuário.
 ### Exames de imagem do paciente
 
 O botão **Exames de imagem** (barra de documentações) abre os exames do módulo de
-Imagens Oftálmicas do paciente em atendimento — retinografias, OCTs e demais imagens,
+Gerenciador de exames do paciente em atendimento — retinografias, OCTs e demais imagens,
 com tipo, data, olho (OD/OE/AO) e CIDs — sem sair da consulta:
 
 ![Exames de imagem no prontuário](img/22-exames-imagem.png)
@@ -253,23 +253,23 @@ Em **Assistente de IA → consumo**, acompanhe créditos, execuções e aprovaç
 
 ---
 
-## 8. Pacientes e imagens oftálmicas
+## 8. Pacientes e Gerenciador de exames
 
 **Pacientes** — cadastro completo: criar, editar, ver detalhes e abrir o prontuário de
 qualquer paciente da clínica:
 
 ![Pacientes](img/17-pacientes.png)
 
-**Imagens oftálmicas** — exames de imagem por paciente, com visualizador em até 4 painéis,
+**Gerenciador de exames** — exames de imagem por paciente, com visualizador em até 4 painéis,
 importação de exames externos e **emissão de diagnóstico** (CID-10) — a escrita de
 diagnóstico é exclusiva do médico:
 
-![Imagens oftálmicas](img/18-imagens-oftalmicas.png)
+![Gerenciador de exames](img/18-imagens-oftalmicas.png)
 
 Busque o paciente na lista à esquerda e selecione-o para ver os exames de imagem
 sementeados/importados:
 
-![Paciente selecionado no Gerenciador de Imagens](img/23-imagens-paciente-selecionado.png)
+![Paciente selecionado no Gerenciador de exames](img/23-imagens-paciente-selecionado.png)
 
 ### Emitir laudo manual (Novo laudo)
 
@@ -292,8 +292,8 @@ do exame de imagem sem depender de um atendimento em andamento:
 ![Laudo salvo com PDF](img/26-novo-laudo-sucesso-pdf.png)
 
 > Emissão de laudo de imagem é ato médico (CFM Res. 2.227/2018) — por isso o botão é
-> exclusivo do médico, mesmo quando administrador/secretária têm acesso ao módulo de
-> Imagens Oftálmicas para as demais operações (upload, organização, comparação).
+> exclusivo do médico, mesmo quando administrador/secretária têm acesso ao módulo do
+> Gerenciador de exames para as demais operações (upload, organização, comparação).
 
 ### Revisar rascunhos, devolver para ajuste e ditar
 
@@ -382,7 +382,7 @@ está ativo:
 
 ### Compartilhar exame de imagem
 
-No **Gerenciador de Imagens**, cada miniatura tem um selo circular de compartilhamento.
+No **Gerenciador de exames**, cada miniatura tem um selo circular de compartilhamento.
 Clique nele para liberar o exame ao paciente pelo portal — a secretária também pode
 compartilhar exames (diferente do laudo):
 

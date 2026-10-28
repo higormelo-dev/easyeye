@@ -165,7 +165,7 @@ function csrf() {
 }
 
 // Confirmação padrão via SweetAlert2 (já usado no resto do painel — ver
-// Layouts/AppLayout.vue e EyeImages/Index.vue), com fallback pro confirm()
+// Layouts/AppLayout.vue e ExamManager/Index.vue), com fallback pro confirm()
 // nativo do browser se o script não tiver carregado por algum motivo.
 async function confirmDialog({
     icon = 'warning',

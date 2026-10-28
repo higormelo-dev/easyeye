@@ -1,6 +1,6 @@
 // Perfil clinic.doctor (dra.ana@clinicateste.com, rule doctor, CLÍNICA TESTE INTEGRADOR).
 // Matriz: landing /panel/dashboard; allowed: dashboard, agendas, pacientes,
-// imagens oftálmicas, IA (submenu ÚNICO deste perfil: Consumo & dashboard +
+// gerenciador de exames, IA (submenu ÚNICO deste perfil: Consumo & dashboard +
 // Meus prompts), fila de espera (sem menu); forbidden: accesscontrol, setting
 // resources, financeiro, relatórios, compliance, manager.
 // Regra do projeto: menu ≠ autorização — doctor NÃO vê "Médicos" no menu,
@@ -94,14 +94,14 @@ describe('Perfil clinic.doctor — matriz de acesso', () => {
         cy.get('h4').contains('Pacientes').should('be.visible');
     });
 
-    it('menu "Imagens oftálmicas" → /panel/eye-images (h4)', () => {
+    it('menu "Gerenciador de exames" → /panel/exam-manager (h4)', () => {
         cy.visit('/panel/dashboard');
         atPage('/panel/dashboard');
         expandSidebar();
-        cy.get('#sidebar-menu a[href*="/panel/eye-images"]').should('be.visible').click();
-        cy.location('pathname', { timeout: NAV_TIMEOUT }).should('eq', '/panel/eye-images');
+        cy.get('#sidebar-menu a[href*="/panel/exam-manager"]').should('be.visible').click();
+        cy.location('pathname', { timeout: NAV_TIMEOUT }).should('eq', '/panel/exam-manager');
         cy.expectPanelPage();
-        cy.get('h4').contains('Imagens oftálmicas').should('be.visible');
+        cy.get('h4').contains('Gerenciador de exames').should('be.visible');
     });
 
     it('submenu IA (exclusivo do doctor): 2 filhos, ambos navegáveis', () => {
@@ -498,7 +498,7 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
         });
         cy.get('body').type('{esc}');
 
-        // ── Exames de imagem (módulo Eye Images dentro do prontuário) ──────────
+        // ── Exames de imagem (módulo Gerenciador de exames dentro do prontuário) ──────────
         // O modal de anexo não fecha com Esc — fechar pelo botão "Fechar".
         cy.get('.modal.d-block:visible')
             .last()
@@ -506,7 +506,7 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
                 cy.contains('button', 'Fechar').click();
             });
         cy.get('.upload-dropzone').should('not.exist');
-        cy.intercept('GET', '**/eye-images/patient-exams/**').as('eyeExams');
+        cy.intercept('GET', '**/exam-manager/patient-exams/**').as('eyeExams');
         cy.contains('.pmr-doc-img-btn-label', /Exames de/)
             .first()
             .closest('button')
@@ -557,7 +557,7 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
             .its('stdout')
             .should('include', 'docsdoc:');
 
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
@@ -581,7 +581,7 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
                     .type('CY-DEMO: laudo oftalmológico de teste E2E.', { force: true });
             });
 
-        cy.intercept('POST', '**/eye-images/reports').as('storeReport');
+        cy.intercept('POST', '**/exam-manager/reports').as('storeReport');
         cy.contains('button', 'Salvar laudo').should('not.be.disabled').click();
         cy.wait('@storeReport', { timeout: 20000 }).its('response.statusCode').should('be.oneOf', [200, 201, 422]); // 422 só se pedir confirmação de prontuário do dia
 
@@ -597,7 +597,7 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
     });
 
     it('imagens: comparar dois exames (sobrepor / lado a lado)', () => {
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
@@ -646,8 +646,8 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
         cy.get('[title="Revogar acesso do paciente a este documento"]', { timeout: 10000 }).should('exist');
         cy.get('body').type('{esc}');
 
-        // Exame — a partir do Gerenciador de Imagens (badge circular na thumbnail).
-        cy.visit('/panel/eye-images');
+        // Exame — a partir do Gerenciador de exames (badge circular na thumbnail).
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();

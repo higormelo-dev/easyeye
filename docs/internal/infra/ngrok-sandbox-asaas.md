@@ -317,7 +317,7 @@ SANDBOX_CLEAN_DRY_RUN=1 SANDBOX_CLEAN_ALL=1 php artisan tinker --execute="requir
 - **Guardas** (falhou, aborta com exit 1, nesta ordem, antes de qualquer chamada ao Asaas, de ler a credencial e de
   qualquer DELETE): `APP_ENV` local/testing; **todo destino do banco efetivo** — `DB_URL` e suas opções, host, database,
   `read[]`, `write[]` e a conexão viva — em host local e num banco da lista `E2E_ALLOWED_DATABASES` (o mesmo guard do
-  `clean-eye-images.php`: um app local apontado a um banco de produção apagaria clínicas de verdade); e credencial
+  `clean-exam-manager.php`: um app local apontado a um banco de produção apagaria clínicas de verdade); e credencial
   efetiva do Asaas em sandbox (`billing:gateway-environment asaas`).
 - **O que entra:** no modo da rodada (padrão), só os usuários do arquivo de estado, criados depois do início dela — uma
   conta preexistente que apenas combine com `cy-sandbox-%@example.test` **não** é tocada; sem estado (e sem

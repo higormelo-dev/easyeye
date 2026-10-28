@@ -41,7 +41,7 @@ final class AiSystemPromptResolver
     /**
      * Workflows que, até 02/09/2026, NÃO tinham prompt forçado no servidor —
      * o valor gravado em input_summary desses runs pode ter vindo do cliente
-     * (UI da tela Imagens Oftálmicas ou POST direto). Nunca reaproveitar:
+     * (UI da tela Gerenciador de exames ou POST direto). Nunca reaproveitar:
      * sempre re-derivar.
      *
      * @var list<string>

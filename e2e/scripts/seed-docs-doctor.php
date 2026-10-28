@@ -75,7 +75,7 @@ $examType = ExamType::first();
 
 if ($src) {
     // "Hoje" (horas atrás) para caírem no filtro de período padrão
-    // ("Hoje") do Gerenciador de Imagens sem precisar trocar o SearchSelect.
+    // ("Hoje") do Gerenciador de exames sem precisar trocar o SearchSelect.
     foreach ([1 => 2, 2 => 5] as $laterality => $hoursAgo) {
         PatientExam::create([
             'patient_id'        => $pat->id,

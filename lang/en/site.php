@@ -168,7 +168,7 @@ return [
         'enlarge'    => 'Enlarge image',
         'tabs'       => [
             ['key' => 'prontuario', 'icon' => 'ti-report-medical', 'label' => 'Patient record', 'caption' => 'Visual acuity, tonometry, refraction, biomicroscopy and fundoscopy per eye.'],
-            ['key' => 'imagens', 'icon' => 'ti-photo', 'label' => 'Image manager', 'caption' => 'Exams by date and type — OCT, biometry, retinography — tagged OD, OS and OU.'],
+            ['key' => 'imagens', 'icon' => 'ti-photo', 'label' => 'Exam manager', 'caption' => 'Exams by date and type — OCT, biometry, retinography — tagged OD, OS and OU.'],
             ['key' => 'agenda', 'fictitious' => true, 'icon' => 'ti-calendar', 'label' => 'Scheduling', 'caption' => 'The day\'s schedule with time, visit type, insurer and status of each appointment.'],
             ['key' => 'laudos', 'icon' => 'ti-file-text', 'label' => 'Reports and documents', 'caption' => 'Ready-made templates for reports, certificates and specialized exams, with header and signature.'],
         ],
@@ -257,7 +257,7 @@ return [
         'empty_subtitle' => 'We are preparing the best plans for your clinic. Get in touch to learn more.',
         // Modules not gated by plan (checked in the routes: only inventory is per plan).
         'included_all_label' => 'On every plan',
-        'included_all'       => 'Scheduling, ophthalmology record, image manager, reports and documents, TISS billing and finances.',
+        'included_all'       => 'Scheduling, ophthalmology record, exam manager, reports and documents, TISS billing and finances.',
         // Plans after the first list only what they add.
         'everything_in' => 'Everything in :plan, plus:',
         // Optotypes do not exist in the product yet: always "Coming soon", only on the Premium card.
@@ -281,7 +281,7 @@ return [
             ['q' => 'Does EasyEye work offline?', 'a' => 'EasyEye is a 100% cloud solution — it works on any device with a browser and an internet connection. There is no offline mode at the moment: without a connection, you cannot access patient records, the schedule, or any other system data.'],
             ['q' => 'How does technical support work?', 'a' => 'We offer support by email and WhatsApp (on specific plans). Pro and Premium plans get priority support, with a 4-business-hour SLA.'],
             ['q' => 'Is EasyEye certified for TISS yet?', 'a' => 'Not yet. EasyEye integrates tools for TISS 4.03.00 claims, XML batch generation, submission and return processing, but it is not yet certified.'],
-            ['q' => 'How will exams from devices reach EasyEye?', 'a' => 'Coming soon, the exam integrator will send exams from your devices to EasyEye through a closed API reserved exclusively for it; there they stay organized for review. Until then, exam images can be uploaded manually in the Image manager.'],
+            ['q' => 'How will exams from devices reach EasyEye?', 'a' => 'Coming soon, the exam integrator will send exams from your devices to EasyEye through a closed API reserved exclusively for it; there they stay organized for review. Until then, exam images can be uploaded manually in the Exam manager.'],
         ],
     ],
 

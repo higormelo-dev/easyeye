@@ -10,7 +10,7 @@ use Symfony\Component\Process\Process;
 /**
  * Execução de processo filho isolado (setsid + kill do grupo + teto de saída
  * + timeout de parede). Extraído de BoundedPdfProcess para servir também ao
- * BoundedVisionProcess (scripts Python do Gerenciador de Imagens) sem uma
+ * BoundedVisionProcess (scripts Python do Gerenciador de exames) sem uma
  * terceira cópia. Os códigos de falha saem de dois ganchos, para cada classe
  * manter o seu prefixo (`pdf_*`, `vision_*`).
  */

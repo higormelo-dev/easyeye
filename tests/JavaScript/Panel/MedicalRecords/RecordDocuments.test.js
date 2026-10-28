@@ -482,7 +482,7 @@ describe('editor de Documentações', () => {
     });
 });
 
-describe('envio ao médico solicitante (laudo do Gerenciador de Imagens) — só com o prontuário assinado (achado via revisão adversarial Codex)', () => {
+describe('envio ao médico solicitante (laudo do Gerenciador de exames) — só com o prontuário assinado (achado via revisão adversarial Codex)', () => {
     beforeEach(() => {
         globalThis.window.axios = {
             post: vi.fn(() => Promise.resolve({ data: { requesting_doctor_sent_at: '09/10/2026 21:00' } })),
@@ -519,7 +519,7 @@ describe('envio ao médico solicitante (laudo do Gerenciador de Imagens) — só
         // Esta lista é a ÚNICA tela onde um laudo JÁ EMITIDO reaparece
         // depois de fechar o modal de emissão — e, agora, é onde o 1º envio
         // acontece (o laudo nasce num prontuário ainda editável).
-        expect(window.axios.post).toHaveBeenCalledWith('/_routes/panel.eye-images.reports.resend/doc-rep');
+        expect(window.axios.post).toHaveBeenCalledWith('/_routes/panel.exam-manager.reports.resend/doc-rep');
         expect(w.text()).toContain('Enviado em 09/10/2026 21:00');
         expect(window.showSuccessToast).toHaveBeenCalledWith('Laudo enviado ao médico solicitante.');
     });
@@ -539,7 +539,7 @@ describe('envio ao médico solicitante (laudo do Gerenciador de Imagens) — só
         await resendBtn.trigger('click');
         await flushPromises();
 
-        expect(window.axios.post).toHaveBeenCalledWith('/_routes/panel.eye-images.reports.resend/doc-rep');
+        expect(window.axios.post).toHaveBeenCalledWith('/_routes/panel.exam-manager.reports.resend/doc-rep');
         expect(window.showSuccessToast).toHaveBeenCalledWith('Laudo reenviado ao médico solicitante.');
     });
 

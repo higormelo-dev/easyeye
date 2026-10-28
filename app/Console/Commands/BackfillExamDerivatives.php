@@ -16,7 +16,7 @@ use Illuminate\Console\Command;
  * PatientExamService::persistExam()).
  *
  * Sem esse backfill, exames antigos continuam servindo o arquivo original em
- * resolução total no grid do Gerenciador de Imagens (lento), mesmo depois da
+ * resolução total no grid do Gerenciador de exames (lento), mesmo depois da
  * infra de miniatura já existir.
  *
  *   php artisan eye-images:backfill-derivatives --limit=500

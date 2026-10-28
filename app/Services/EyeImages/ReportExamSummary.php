@@ -10,8 +10,8 @@ use Illuminate\Support\{Carbon, Collection};
 /**
  * Lista "quais exames fizeram parte do laudo" em forma legível (PDF do
  * laudo). Um exame, pro médico, é o GRUPO de imagens que a galeria do
- * Gerenciador de Imagens mostra junto — mesma chave de examGroupKey() em
- * Pages/Panel/EyeImages/Index.vue: sessão mesclada (exam_session_id) ou
+ * Gerenciador de exames mostra junto — mesma chave de examGroupKey() em
+ * Pages/Panel/ExamManager/Index.vue: sessão mesclada (exam_session_id) ou
  * data + equipamento + tipo. Cada grupo vira uma linha com os olhos e a
  * quantidade de imagens.
  *

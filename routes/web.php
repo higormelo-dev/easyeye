@@ -11,17 +11,18 @@ use App\Http\Controllers\{
     DoctorWorkScheduleController,
     DoctorsController,
     ExamDiagnosisController,
+    ExamManagerActionsController,
+    ExamManagerAlignController,
+    ExamManagerController,
+    ExamManagerLegacyRedirectController,
+    ExamManagerMontageController,
+    ExamManagerPanoramaController,
+    ExamManagerPatientAuditController,
+    ExamManagerReportController,
+    ExamManagerReportDictationController,
+    ExamManagerReportDraftController,
+    ExamManagerReportResendController,
     ExternalExamImportController,
-    EyeImageAlignController,
-    EyeImageExamActionsController,
-    EyeImageMontageController,
-    EyeImagePanoramaController,
-    EyeImagePatientAuditController,
-    EyeImageReportController,
-    EyeImageReportDictationController,
-    EyeImageReportDraftController,
-    EyeImageReportResendController,
-    EyeImagesController,
     Financial\BillingBulkActionsController,
     Financial\BillingClaimActionsController,
     Financial\BillingController as FinancialBillingController,
@@ -252,171 +253,175 @@ Route::group(
                 Route::get('nfse/{document}/cancel-xml', [NfseDownloadController::class, 'cancelXml'])->whereUuid('document')->middleware('throttle:billing-checkout-read')->name('nfse.cancel-xml');
             });
 
-        Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');
-        Route::get('/eye-images/search', [EyeImagesController::class, 'search'])->name('eye-images.search');
-        Route::get('/eye-images/patient-urls/{patient}', [EyeImagesController::class, 'patientExamUrls'])->name('eye-images.patient-urls');
+        Route::get('/exam-manager', [ExamManagerController::class, 'index'])->name('exam-manager.index');
+        Route::get('/exam-manager/search', [ExamManagerController::class, 'search'])->name('exam-manager.search');
+        Route::get('/exam-manager/patient-urls/{patient}', [ExamManagerController::class, 'patientExamUrls'])->name('exam-manager.patient-urls');
         // Exames com metadados p/ o painel do PRONTUÁRIO (leitura logada — LGPD).
-        Route::get('/eye-images/patient-exams/{patient}', [EyeImagesController::class, 'patientExamsForRecord'])->name('eye-images.patient-exams');
-        Route::get('/eye-images/image-url/{exam}', [EyeImagesController::class, 'imageUrl'])->name('eye-images.image-url');
+        Route::get('/exam-manager/patient-exams/{patient}', [ExamManagerController::class, 'patientExamsForRecord'])->name('exam-manager.patient-exams');
+        Route::get('/exam-manager/image-url/{exam}', [ExamManagerController::class, 'imageUrl'])->name('exam-manager.image-url');
         // Visto/não visto: quem abre o Gerenciador marca ao exibir o exame (sem entity.role;
         // tenant checado no controller). Não é ato clínico nem gera auditoria.
-        Route::put('/eye-images/exams/{exam}/viewed', [EyeImagesController::class, 'markExamViewed'])->name('eye-images.exams.viewed');
+        Route::put('/exam-manager/exams/{exam}/viewed', [ExamManagerController::class, 'markExamViewed'])->name('exam-manager.exams.viewed');
         // Histórico (somente leitura) do cadastro e dos exames do paciente — ACL espelha o grupo
-        // Pacientes; o Gerenciador de Imagens em si não tem entity.role (financeiro também entra).
-        Route::get('/eye-images/patients/{patient}/audit', EyeImagePatientAuditController::class)
+        // Pacientes; o Gerenciador de exames em si não tem entity.role (financeiro também entra).
+        Route::get('/exam-manager/patients/{patient}/audit', ExamManagerPatientAuditController::class)
             ->middleware('permission:patients.manage,admin,financial,doctor,secretary')
-            ->name('eye-images.patients.audit');
+            ->name('exam-manager.patients.audit');
         // Duplicata dedicada da busca de CID-10 (mesmo Cid10SearchController) sem a
         // restrição de role de `cid10.search` (admin,doctor,secretary) — o Gerenciador
         // de Imagens não tem entity.role e não vamos afrouxar a rota usada no
         // prontuário nem restringir quem já acessa Imagens hoje.
-        Route::get('/eye-images/cid10-search', Cid10SearchController::class)->name('eye-images.cid10-search');
+        Route::get('/exam-manager/cid10-search', Cid10SearchController::class)->name('exam-manager.cid10-search');
 
         // Diagnóstico do exame (CID-10 + customizados da clínica). Diferente das
         // rotas de leitura acima, estas escrevem em patient_exams.diagnosis_cids
         // e criam entity_custom_diagnoses — por isso ganham entity.role aqui
-        // mesmo o restante de /eye-images não tendo essa restrição. O Gate
+        // mesmo o restante de /exam-manager não tendo essa restrição. O Gate
         // EntityGate::IssueReport (exclusivo de doctor) é checado dentro do
         // controller, então admin passa pelo middleware mas ainda leva 403
         // no Gate ao tentar criar/gravar diagnóstico — só o médico assina.
-        Route::get('/eye-images/diagnoses/search', [ExamDiagnosisController::class, 'search'])
+        Route::get('/exam-manager/diagnoses/search', [ExamDiagnosisController::class, 'search'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.diagnoses.search');
-        Route::post('/eye-images/diagnoses', [ExamDiagnosisController::class, 'store'])
+            ->name('exam-manager.diagnoses.search');
+        Route::post('/exam-manager/diagnoses', [ExamDiagnosisController::class, 'store'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.diagnoses.store');
-        Route::put('/eye-images/exams/{exam}/diagnosis', [ExamDiagnosisController::class, 'updateDiagnosis'])
+            ->name('exam-manager.diagnoses.store');
+        Route::put('/exam-manager/exams/{exam}/diagnosis', [ExamDiagnosisController::class, 'updateDiagnosis'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.exams.diagnosis.update');
+            ->name('exam-manager.exams.diagnosis.update');
 
         // Ações rápidas por imagem (menu de contexto) — mesmo padrão/Gate do
         // bloco de diagnóstico acima: entity.role no middleware + Gate
         // EntityGate::IssueReport (doctor-only) checado dentro do controller.
-        Route::put('/eye-images/exams/{exam}/laterality', [EyeImageExamActionsController::class, 'updateLaterality'])
+        Route::put('/exam-manager/exams/{exam}/laterality', [ExamManagerActionsController::class, 'updateLaterality'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.exams.laterality.update');
-        Route::put('/eye-images/exams/{exam}/quality-rating', [EyeImageExamActionsController::class, 'updateQualityRating'])
+            ->name('exam-manager.exams.laterality.update');
+        Route::put('/exam-manager/exams/{exam}/quality-rating', [ExamManagerActionsController::class, 'updateQualityRating'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.exams.quality-rating.update');
-        Route::put('/eye-images/exams/{exam}/active', [EyeImageExamActionsController::class, 'toggleActive'])
+            ->name('exam-manager.exams.quality-rating.update');
+        Route::put('/exam-manager/exams/{exam}/active', [ExamManagerActionsController::class, 'toggleActive'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.exams.active.update');
-        Route::put('/eye-images/exams/{exam}/urgent', [EyeImageExamActionsController::class, 'updateUrgent'])
+            ->name('exam-manager.exams.active.update');
+        Route::put('/exam-manager/exams/{exam}/urgent', [ExamManagerActionsController::class, 'updateUrgent'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.exams.urgent.update');
+            ->name('exam-manager.exams.urgent.update');
         // Mesclar/Dividir são em lote (N exam_ids no corpo) — nunca RESTful
         // de um recurso só, por isso sem {exam} na URL.
-        Route::post('/eye-images/exams/merge', [EyeImageExamActionsController::class, 'mergeExams'])
+        Route::post('/exam-manager/exams/merge', [ExamManagerActionsController::class, 'mergeExams'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.exams.merge');
-        Route::post('/eye-images/exams/split', [EyeImageExamActionsController::class, 'splitExams'])
+            ->name('exam-manager.exams.merge');
+        Route::post('/exam-manager/exams/split', [ExamManagerActionsController::class, 'splitExams'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.exams.split');
-        Route::post('/eye-images/exams/ungroup', [EyeImageExamActionsController::class, 'ungroupExams'])
+            ->name('exam-manager.exams.split');
+        Route::post('/exam-manager/exams/ungroup', [ExamManagerActionsController::class, 'ungroupExams'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.exams.ungroup');
+            ->name('exam-manager.exams.ungroup');
 
-        // Montage (benchmark 18/09/2026) — EyeImageMontageController. NÃO é
+        // Montage (benchmark 18/09/2026) — ExamManagerMontageController. NÃO é
         // ato clínico (conveniência de exportação/impressão), por isso
         // secretary também tem acesso, diferente do bloco de laudo abaixo.
-        Route::post('/eye-images/montage', [EyeImageMontageController::class, 'store'])
+        Route::post('/exam-manager/montage', [ExamManagerMontageController::class, 'store'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.montage.store');
+            ->name('exam-manager.montage.store');
 
         // Panorama automático (OpenCV, processo isolado) e Auto-alinhar do
         // Comparar — mesma regra do Montage: conveniência de visualização, não
-        // ato clínico. Ver EyeImagePanoramaController / EyeImageAlignController.
-        Route::post('/eye-images/panorama', [EyeImagePanoramaController::class, 'store'])
+        // ato clínico. Ver ExamManagerPanoramaController / ExamManagerAlignController.
+        Route::post('/exam-manager/panorama', [ExamManagerPanoramaController::class, 'store'])
             ->middleware(['entity.role:admin,doctor,secretary', 'throttle:eye-images-vision'])
-            ->name('eye-images.panorama.store');
-        Route::post('/eye-images/align', [EyeImageAlignController::class, 'store'])
+            ->name('exam-manager.panorama.store');
+        Route::post('/exam-manager/align', [ExamManagerAlignController::class, 'store'])
             ->middleware(['entity.role:admin,doctor,secretary', 'throttle:eye-images-vision'])
-            ->name('eye-images.align.store');
+            ->name('exam-manager.align.store');
 
-        // Laudo manual do Gerenciador de Imagens (Modelos + editor livre) — ver
-        // EyeImageReportController. templates()/previewTemplate() são leitura
+        // Laudo manual do Gerenciador de exames (Modelos + editor livre) — ver
+        // ExamManagerReportController. templates()/previewTemplate() são leitura
         // (mesmo allowlist de diagnósticos acima); store() grava documentação
         // clínica e o Gate::IssueReport (doctor-only) é checado dentro do
         // controller, mesmo padrão do bloco de diagnóstico.
         // Fase 5: secretária também rascunha (Gate DraftImageReport dentro do
         // controller) — "store" fica de fora de propósito, continua só
         // admin,doctor na borda + Gate::IssueReport (doctor-only) dentro.
-        Route::get('/eye-images/report-templates', [EyeImageReportController::class, 'templates'])
+        Route::get('/exam-manager/report-templates', [ExamManagerReportController::class, 'templates'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.report-templates.index');
-        Route::post('/eye-images/report-templates/preview', [EyeImageReportController::class, 'previewTemplate'])
+            ->name('exam-manager.report-templates.index');
+        Route::post('/exam-manager/report-templates/preview', [ExamManagerReportController::class, 'previewTemplate'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.report-templates.preview');
-        Route::post('/eye-images/reports', [EyeImageReportController::class, 'store'])
+            ->name('exam-manager.report-templates.preview');
+        Route::post('/exam-manager/reports', [ExamManagerReportController::class, 'store'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.reports.store');
-        Route::post('/eye-images/reports/extract-pdf-text', [EyeImageReportController::class, 'extractPdfText'])
+            ->name('exam-manager.reports.store');
+        Route::post('/exam-manager/reports/extract-pdf-text', [ExamManagerReportController::class, 'extractPdfText'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.reports.extract-pdf-text');
+            ->name('exam-manager.reports.extract-pdf-text');
         // Ditado por voz do laudo (Fase 5): transcrição no servidor, por provedor da
         // política LGPD — Gate::DraftImageReport checado dentro do controller.
-        Route::post('/eye-images/reports/dictate', EyeImageReportDictationController::class)
+        Route::post('/exam-manager/reports/dictate', ExamManagerReportDictationController::class)
             ->middleware(['entity.role:admin,doctor,secretary', 'throttle:report-dictation'])
-            ->name('eye-images.reports.dictate');
+            ->name('exam-manager.reports.dictate');
         // Reenvio ao médico solicitante (Fase 5) — Gate::SendReportToExternalDoctor
         // (admin/doctor) checado dentro do controller, mesmo padrão do bloco acima.
-        Route::post('/eye-images/reports/{documentation}/resend', EyeImageReportResendController::class)
+        Route::post('/exam-manager/reports/{documentation}/resend', ExamManagerReportResendController::class)
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.reports.resend');
+            ->name('exam-manager.reports.resend');
 
         // Rascunho de laudo (Fase 5 — secretária/admin preparam, médico
         // revisa e emite): mesmo allowlist do Gate DraftImageReport checado
         // dentro do controller. Emitir de fato continua só em
-        // eye-images.reports.store (doctor-only, acima).
-        Route::get('/eye-images/report-drafts', [EyeImageReportDraftController::class, 'index'])
+        // exam-manager.reports.store (doctor-only, acima).
+        Route::get('/exam-manager/report-drafts', [ExamManagerReportDraftController::class, 'index'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.report-drafts.index');
-        Route::post('/eye-images/report-drafts', [EyeImageReportDraftController::class, 'store'])
+            ->name('exam-manager.report-drafts.index');
+        Route::post('/exam-manager/report-drafts', [ExamManagerReportDraftController::class, 'store'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.report-drafts.store');
-        Route::get('/eye-images/report-drafts/{draft}', [EyeImageReportDraftController::class, 'show'])
+            ->name('exam-manager.report-drafts.store');
+        Route::get('/exam-manager/report-drafts/{draft}', [ExamManagerReportDraftController::class, 'show'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.report-drafts.show');
-        Route::put('/eye-images/report-drafts/{draft}', [EyeImageReportDraftController::class, 'update'])
+            ->name('exam-manager.report-drafts.show');
+        Route::put('/exam-manager/report-drafts/{draft}', [ExamManagerReportDraftController::class, 'update'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.report-drafts.update');
-        Route::post('/eye-images/report-drafts/{draft}/submit', [EyeImageReportDraftController::class, 'submit'])
+            ->name('exam-manager.report-drafts.update');
+        Route::post('/exam-manager/report-drafts/{draft}/submit', [ExamManagerReportDraftController::class, 'submit'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.report-drafts.submit');
+            ->name('exam-manager.report-drafts.submit');
         // Médico devolve o rascunho enviado ao técnico, com o motivo — Gate
         // IssueReport (médico com cadastro ativo) checado dentro do controller.
-        Route::post('/eye-images/report-drafts/{draft}/return', [EyeImageReportDraftController::class, 'returnToTechnician'])
+        Route::post('/exam-manager/report-drafts/{draft}/return', [ExamManagerReportDraftController::class, 'returnToTechnician'])
             ->middleware('entity.role:doctor')
-            ->name('eye-images.report-drafts.return');
-        Route::delete('/eye-images/report-drafts/{draft}', [EyeImageReportDraftController::class, 'destroy'])
+            ->name('exam-manager.report-drafts.return');
+        Route::delete('/exam-manager/report-drafts/{draft}', [ExamManagerReportDraftController::class, 'destroy'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.report-drafts.destroy');
+            ->name('exam-manager.report-drafts.destroy');
 
         // Frases rápidas do médico pro laudo (benchmark 18/09/2026 —
         // DoctorReportPhrasesController) — sempre escopado ao PRÓPRIO
         // médico logado (controller resolve doctor_id do usuário, nunca do
         // payload); admin passa no middleware mas leva 403 do controller
         // (mesmo padrão de AiDoctorPromptsController).
-        Route::get('/eye-images/report-phrases', [DoctorReportPhrasesController::class, 'index'])
+        Route::get('/exam-manager/report-phrases', [DoctorReportPhrasesController::class, 'index'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.report-phrases.index');
-        Route::post('/eye-images/report-phrases', [DoctorReportPhrasesController::class, 'store'])
+            ->name('exam-manager.report-phrases.index');
+        Route::post('/exam-manager/report-phrases', [DoctorReportPhrasesController::class, 'store'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.report-phrases.store');
-        Route::put('/eye-images/report-phrases/{phrase}', [DoctorReportPhrasesController::class, 'update'])
+            ->name('exam-manager.report-phrases.store');
+        Route::put('/exam-manager/report-phrases/{phrase}', [DoctorReportPhrasesController::class, 'update'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.report-phrases.update');
-        Route::delete('/eye-images/report-phrases/{phrase}', [DoctorReportPhrasesController::class, 'destroy'])
+            ->name('exam-manager.report-phrases.update');
+        Route::delete('/exam-manager/report-phrases/{phrase}', [DoctorReportPhrasesController::class, 'destroy'])
             ->middleware('entity.role:admin,doctor')
-            ->name('eye-images.report-phrases.destroy');
+            ->name('exam-manager.report-phrases.destroy');
 
         // Importar exame externo (upload manual, sem integrador). entity.role
         // cobre admin/doctor/secretary; o Gate EntityGate::ImportExternalExam
         // (checado dentro do controller) replica a mesma allowlist de roles —
         // redundante de propósito, mesmo padrão do bloco de diagnóstico acima.
-        Route::post('/eye-images/import', [ExternalExamImportController::class, 'store'])
+        Route::post('/exam-manager/import', [ExternalExamImportController::class, 'store'])
             ->middleware('entity.role:admin,doctor,secretary')
-            ->name('eye-images.import.store');
+            ->name('exam-manager.import.store');
+        // Legado: /panel/eye-images[/...] -> /panel/exam-manager[/...] (301, query string preservada).
+        // Dentro do grupo panel (mesmos middlewares), só GET, sem nome de rota; destino sempre no prefixo
+        // fixo do módulo novo (ExamManagerLegacyRedirectController explica a validação do caminho).
+        Route::get('/eye-images/{path?}', ExamManagerLegacyRedirectController::class)->where('path', '.*');
         // ══════════════════════════════════════════════════════════════════════
         // ACL: rotas agrupadas por nível mínimo de acesso
         // Middleware entity.role aplica a role check via EnsureEntityRole.
@@ -736,7 +741,7 @@ Route::group(
                 [MedicalRecordQuickActionsController::class, 'examTemplate'],
             )->name('patients.medicalrecords.exam-template');
 
-            // Endpoints de IA usados pelos modais clínicos (prontuário/eye images).
+            // Endpoints de IA usados pelos modais clínicos (prontuário/Gerenciador de exames).
             // Rate limits por (user_id + entity_id) — definidos em AppServiceProvider.
             Route::prefix('ai')->group(function () {
                 // Tela única de consumo + compra de créditos + monitor de execuções.

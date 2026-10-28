@@ -15,7 +15,7 @@ namespace App\Enums;
  * inteiros ou strings soltos.
  *
  * AO (Both) é a convenção que o produto já usa para "ambos os olhos / não
- * informado" (EyeImagesController, ReportExamSummary): o exame sem lateralidade
+ * informado" (ExamManagerController, ReportExamSummary): o exame sem lateralidade
  * aparece como AO e, para o recall, cobre qualquer olho (`covers()`). É a
  * leitura branda — um exame que ninguém marcou como OD/OE pode suprimir o
  * lembrete do olho que de fato não foi examinado — e está registrada no

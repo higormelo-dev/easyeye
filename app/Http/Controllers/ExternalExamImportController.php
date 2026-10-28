@@ -12,7 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * "Importar exame externo" (Gerenciador de Imagens): upload manual de exame
+ * "Importar exame externo" (Gerenciador de exames): upload manual de exame
  * sem passar pelo integrador. Segue o mesmo par request/redirect de
  * PatientImportsController::store() — o form do front usa useForm().post()
  * com forceFormData: true, então a resposta precisa ser Inertia-friendly
@@ -44,7 +44,7 @@ class ExternalExamImportController extends Controller
         // 'success'/'error' (não 'message') no shared prop `flash` consumido
         // por AppLayout.vue — mesmo padrão de alerta usado no resto do painel.
         return redirect()
-            ->route('panel.eye-images.index')
+            ->route('panel.exam-manager.index')
             ->with('success', __('eye_images.import.success'));
     }
 }

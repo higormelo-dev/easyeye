@@ -215,7 +215,7 @@ it('[GAP] bookkeeping pós-assinatura (saveQuietly/deleteQuietly) continua passa
 
     MedicalRecord::on(SIGC_PROBE_CONNECTION)->find($record->id)->sign($entityUser);
 
-    // Mesmo padrão de EyeImageReportController/EyeImageReportResendController
+    // Mesmo padrão de ExamManagerReportController/ExamManagerReportResendController
     // (bookkeeping de entrega de e-mail num documento de prontuário já
     // assinado) — saveQuietly() precisa continuar funcionando mesmo com
     // o prontuário travado, só a escrita COM eventos (save() normal) é

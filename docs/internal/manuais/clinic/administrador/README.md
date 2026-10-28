@@ -41,7 +41,7 @@ consulte também:
 11. [Financeiro](#11-financeiro)
 12. [Assistente de IA: consumo e créditos](#12-assistente-de-ia-consumo-e-créditos)
 13. [Operação: agenda e pacientes](#13-operação-agenda-e-pacientes)
-14. [Imagens oftálmicas e Portal do Paciente](#14-imagens-oftálmicas-e-portal-do-paciente)
+14. [Gerenciador de exames e Portal do Paciente](#14-gerenciador-de-exames-e-portal-do-paciente)
 15. [Retornos, protocolos e orientações pós-procedimento](#15-retornos-protocolos-e-orientações-pós-procedimento)
 16. [Minha conta e limites do perfil](#16-minha-conta-e-limites-do-perfil)
 17. [Minha assinatura: plano, faturas e pagamento](#17-minha-assinatura-plano-faturas-e-pagamento)
@@ -62,7 +62,7 @@ O menu do administrador é o mais completo do sistema:
 
 | Grupo | Conteúdo |
 |---|---|
-| Operação | Painel, Agendas, Pacientes, Médicos, Imagens oftálmicas |
+| Operação | Painel, Agendas, Pacientes, Médicos, Gerenciador de exames |
 | Assistente de IA | Consumo e compra de créditos |
 | Minha assinatura | Plano do EasyEye, faturas, pagamento e troca de plano |
 | Financeiro | BI, Fluxo de Caixa, Faturamento TISS, Glosas, 2 relatórios |
@@ -381,19 +381,19 @@ Passo a passo completo da operação no [Manual da Secretária](../manual-secret
 
 ---
 
-## 14. Imagens oftálmicas e Portal do Paciente
+## 14. Gerenciador de exames e Portal do Paciente
 
 ### Comparar exames (sem emitir laudo)
 
-O administrador acessa o Gerenciador de Imagens para organizar exames, mas **não** emite
+O administrador acessa o Gerenciador de exames para organizar exames, mas **não** emite
 laudo — **Novo laudo** é ato médico exclusivo (CFM Res. 2.227/2018) e o botão nem existe
 no DOM para este perfil:
 
-![Imagens oftálmicas sem o botão Novo laudo](img/29-imagens-sem-novo-laudo.png)
+![Gerenciador de exames sem o botão Novo laudo](img/29-imagens-sem-novo-laudo.png)
 
 Selecione **2 exames** e clique em **Comparar** para sobrepor ou ver lado a lado (mesma
 ferramenta do médico — passo a passo detalhado no
-[Manual do Médico](../manual-medico/README.md#8-pacientes-e-imagens-oftálmicas)):
+[Manual do Médico](../manual-medico/README.md#8-pacientes-e-gerenciador-de-exames)):
 
 ![Comparar exames](img/30-comparar-exames.png)
 
@@ -422,7 +422,7 @@ Portal do Paciente:
 > **Quem pode compartilhar o quê**: compartilhar **laudo** (conteúdo clínico assinado) é
 > permitido a **Administrador e Médico** — a secretária não tem esse botão (decisão de
 > produto: conteúdo clínico não é decisão dela). Compartilhar **exame de imagem** (sem
-> interpretação clínica) é permitido também à secretária, no Gerenciador de Imagens.
+> interpretação clínica) é permitido também à secretária, no Gerenciador de exames.
 
 ---
 

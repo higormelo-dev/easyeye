@@ -60,7 +60,7 @@ class ComplianceController extends Controller
             // Projeção de colunas: o CSV abaixo nunca usa old_values/
             // new_values, mas um laudo de imagem embutida pode duplicar
             // ~27 MiB em base64 nessas colunas a cada criação (metadata
-            // congelado — EyeImageReportController::store()). Carregar 500
+            // congelado — ExamManagerReportController::store()). Carregar 500
             // linhas inteiras por chunk esgotava o memory_limit configurado
             // conforme laudos de imagem se acumulam (achado via revisão
             // adversarial Codex).

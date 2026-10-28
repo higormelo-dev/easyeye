@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
  * delegável via Permission customizada, nem que a Role tenha todas as
  * permissions existentes atribuídas.
  *
- * Setup espelha tests/Feature/EyeImages/DiagnosisRegistrationTest.php
+ * Setup espelha tests/Feature/ExamManager/DiagnosisRegistrationTest.php
  * (helpers createEntityUser/panelSession de tests/Pest.php).
  */
 beforeEach(function () {

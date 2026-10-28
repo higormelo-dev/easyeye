@@ -16,7 +16,7 @@ use Throwable;
 
 /**
  * Importação manual de exame externo (upload avulso, sem integrador) no
- * Gerenciador de Imagens. Cria uma linha de PatientExam por arquivo enviado
+ * Gerenciador de exames. Cria uma linha de PatientExam por arquivo enviado
  * — archive é string NOT NULL, então "um exame com N arquivos" vira N
  * registros compartilhando o mesmo import_batch_id (agrupamento visual no
  * front, sem tabela própria de "lote").
@@ -24,7 +24,7 @@ use Throwable;
  * Mesmo padrão de storage sensível (LGPD art. 11) de
  * PatientExamService::storeArchive(): disco s3, visibilidade private,
  * diretório "{entity}/{patient}/exams", nome "{time()}_{uuid}.{ext}". Lido
- * depois pelas MESMAS rotas de EyeImagesController (patientExamUrls/imageUrl)
+ * depois pelas MESMAS rotas de ExamManagerController (patientExamUrls/imageUrl)
  * sem qualquer alteração — basta o archive apontar pro path certo.
  */
 class ExternalExamImportService

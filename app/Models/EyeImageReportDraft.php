@@ -50,7 +50,7 @@ class EyeImageReportDraft extends Model
         'report_setting_content_id',
         // Médico usado na ÚLTIMA pré-visualização (Fase 5 / revisão Codex) —
         // só pra comparar contra quem de fato emite e avisar (nunca editar
-        // o texto já resolvido); ver EyeImageReportController::store().
+        // o texto já resolvido); ver ExamManagerReportController::store().
         'resolved_doctor_id',
         'title',
         'content',
@@ -158,7 +158,7 @@ class EyeImageReportDraft extends Model
 
     /**
      * Token de concorrência pro front comparar antes de salvar/emitir (ver
-     * EyeImageReportDraftController::update() e EyeImageReportController::
+     * ExamManagerReportDraftController::update() e ExamManagerReportController::
      * store()) — nunca updated_at: esta tabela usa timestamps() com o
      * precision padrão do Schema Builder (0, sem fração de segundo), então
      * 2 gravações no mesmo segundo gravariam o MESMO updated_at e uma

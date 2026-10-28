@@ -888,7 +888,7 @@ describe('SSR (o Inertia renderiza o prontuário no servidor)', () => {
     });
 });
 
-describe('Local de acesso: Prontuário (não mais o Gerenciador de Imagens)', () => {
+describe('Local de acesso: Prontuário (não mais o Gerenciador de exames)', () => {
     const read = (path) => readFileSync(resolve(process.cwd(), path), 'utf8');
     const form = read('resources/js/Pages/Panel/MedicalRecords/Components/MedicalRecordForm.vue');
 
@@ -910,12 +910,12 @@ describe('Local de acesso: Prontuário (não mais o Gerenciador de Imagens)', ()
         );
     });
 
-    it('Gerenciador de Imagens não tem mais a calculadora', () => {
-        const eyeImages = read('resources/js/Pages/Panel/EyeImages/Index.vue');
+    it('Gerenciador de exames não tem mais a calculadora', () => {
+        const eyeImages = read('resources/js/Pages/Panel/ExamManager/Index.vue');
 
         expect(eyeImages).not.toContain('LensCalculatorModal');
         expect(eyeImages).not.toContain('lens_calc_');
-        expect(existsSync(resolve(process.cwd(), 'resources/js/Pages/Panel/EyeImages/LensCalculatorModal.vue'))).toBe(
+        expect(existsSync(resolve(process.cwd(), 'resources/js/Pages/Panel/ExamManager/LensCalculatorModal.vue'))).toBe(
             false,
         );
     });

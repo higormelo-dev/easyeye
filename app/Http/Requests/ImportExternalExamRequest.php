@@ -12,7 +12,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\{Rule, Validator};
 
 /**
- * Payload de "Importar exame externo" (Gerenciador de Imagens): upload
+ * Payload de "Importar exame externo" (Gerenciador de exames): upload
  * manual de N arquivos de exame para um paciente, sem passar pelo
  * integrador/equipamento. Autorização (Gate EntityGate::ImportExternalExam)
  * é feita no controller — mesmo padrão de ExamDiagnosisController.
@@ -86,7 +86,7 @@ class ImportExternalExamRequest extends FormRequest
             // qual equipamento cadastrado gerou o arquivo. Escopo via
             // integrator_id -> entity_integrators.entity_user_integrator_id ->
             // entity_user_integrators.entity_id (mesma cadeia percorrida por
-            // EyeImagesController::availableEquipments() via integrator.user).
+            // ExamManagerController::availableEquipments() via integrator.user).
             // Note: entity_user_integrators é a tabela de "usuário de API do
             // integrador", distinta de entity_users (usuários do painel).
             'entity_integrator_equipment_id' => [

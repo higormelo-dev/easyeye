@@ -25,7 +25,7 @@ class PatientExam extends Model
 
     /**
      * Exame nasce habilitado (válido para laudo, IA e repasse); desabilitar é
-     * decisão do médico no Gerenciador de Imagens. Default no model, não só no
+     * decisão do médico no Gerenciador de exames. Default no model, não só no
      * banco: um ponto de criação que esqueça a chave não repete o bug de
      * 02/02/2026 (todo exame do integrador nascia "Desabilitada").
      *
@@ -157,7 +157,7 @@ class PatientExam extends Model
      */
     public function aiRuns(): BelongsToMany
     {
-        // image_deidentification no pivot: EyeImagesController::
+        // image_deidentification no pivot: ExamManagerController::
         // examAiReport() precisa saber se ESTE exame foi de fato analisado
         // dentro de cada run (mesmo critério de reportedConstraint() acima
         // — nunca só "o run está Approved", achado via revisão adversarial
@@ -198,7 +198,7 @@ class PatientExam extends Model
     }
 
     /**
-     * Mesma lista de resources/js/Pages/Panel/EyeImages/Index.vue
+     * Mesma lista de resources/js/Pages/Panel/ExamManager/Index.vue
      * (VIDEO_EXTENSIONS) — vídeo capturado pela câmera (Fase 5 / 6a/6c),
      * nunca decodificável como imagem (GD, montagem, análise de IA).
      */

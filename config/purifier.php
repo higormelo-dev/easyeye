@@ -58,7 +58,7 @@ return [
         // valor crú que sobreviveu à purificação (mesmo motivo de
         // ReportImageBlockBuilder nunca confiar em URL: assinada expira/
         // troca depois). Escopado só pra laudo de imagem
-        // (EyeImageReportController, EyeImageReportDraftController): o
+        // (ExamManagerReportController, ExamManagerReportDraftController): o
         // perfil 'medical' compartilhado por atestado/receita/documentação
         // comum continua sem <img>.
         'eye_image_report' => [

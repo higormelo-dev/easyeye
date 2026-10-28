@@ -148,7 +148,7 @@ describe('KpiCards — indicadores por perfil', () => {
         expect(kpi(w, 'my_noshow').find('.db-delta').attributes('data-tone')).toBe('good');
         expect(kpi(w, 'my_today').text()).toContain('1 of 4 attended');
         expect(kpi(w, 'my_waiting').classes()).toContain('db-metric--alert');
-        expect(globalThis.route).toHaveBeenCalledWith('panel.eye-images.index', {
+        expect(globalThis.route).toHaveBeenCalledWith('panel.exam-manager.index', {
             status: 'pendente',
             period: '30',
             doctor_id: 'doc-1',
@@ -342,7 +342,7 @@ describe('ModuleShortcuts', () => {
         expect(labels(mount(ModuleShortcuts, { props: { access: ALL, t: T } }))).toEqual([
             'schedule',
             'patients',
-            'eye-images',
+            'exam-manager',
             'financial',
             'tiss',
             'glosas',
@@ -351,9 +351,9 @@ describe('ModuleShortcuts', () => {
         ]);
         expect(
             labels(mount(ModuleShortcuts, { props: { access: ALL, profile: 'financial', showSoon: false, t: T } })),
-        ).toEqual(['financial', 'tiss', 'glosas', 'bi', 'schedule', 'patients', 'eye-images']);
+        ).toEqual(['financial', 'tiss', 'glosas', 'bi', 'schedule', 'patients', 'exam-manager']);
         expect(labels(mount(ModuleShortcuts, { props: { access: NONE, showSoon: false, t: T } }))).toEqual([
-            'eye-images',
+            'exam-manager',
         ]);
     });
 

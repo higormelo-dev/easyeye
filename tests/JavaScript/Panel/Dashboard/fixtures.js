@@ -28,7 +28,7 @@ export const T = {
     kpi_open_list: 'View :label list',
     module_schedule: 'Schedule',
     module_waiting_room: 'Waiting Room',
-    module_eye_images: 'Eye Images',
+    module_eye_images: 'Gerenciador de exames',
     module_tiss: 'TISS Guides',
     module_financial: 'Financial',
     module_surgery: 'Surgical Center',

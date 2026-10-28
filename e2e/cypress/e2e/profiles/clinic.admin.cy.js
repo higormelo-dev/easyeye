@@ -12,7 +12,7 @@ const ALLOWED = [
     { url: '/panel/schedules', label: 'Agendas', heading: 'Agenda' },
     { url: '/panel/patients', label: 'Pacientes', heading: 'Pacientes' },
     { url: '/panel/doctors', label: 'Médicos', heading: 'Médicos' },
-    { url: '/panel/eye-images', label: 'Imagens oftálmicas', heading: 'Imagens oftálmicas' },
+    { url: '/panel/exam-manager', label: 'Gerenciador de exames', heading: 'Gerenciador de exames' },
     { url: '/panel/ai/usage', label: 'Assistente de IA (consumo)', heading: 'Assistente de IA' },
     { url: '/panel/financial/bi', label: 'Dashboard Gerencial', text: 'Dashboard Gerencial' },
     { url: '/panel/financial/cash-flow', label: 'Fluxo de Caixa', heading: 'Fluxo de Caixa' },
@@ -1331,10 +1331,10 @@ describe('Perfil clinic.admin — clínico (médicos, mural, fila, imagens e IA)
         cy.get('div.border.border-warning').should('not.contain.text', 'CY-ADM FILA TESTE');
     });
 
-    it('imagens oftálmicas: filtros expandem e import externo real (PDF ASCII)', () => {
-        cy.visit('/panel/eye-images');
+    it('gerenciador de exames: filtros expandem e import externo real (PDF ASCII)', () => {
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
-        cy.get('.page-wrapper').contains('h4', 'Imagens oftálmicas').should('be.visible');
+        cy.get('.page-wrapper').contains('h4', 'Gerenciador de exames').should('be.visible');
         // Barra de filtros expande (radios de lateralidade).
         cy.contains('button', 'Filtros').click();
         cy.get('#f-lat-od').should('exist');
@@ -1377,18 +1377,18 @@ describe('Perfil clinic.admin — clínico (médicos, mural, fila, imagens e IA)
             },
             { force: true },
         );
-        cy.intercept('POST', '**/eye-images/import').as('importExam');
+        cy.intercept('POST', '**/exam-manager/import').as('importExam');
         cy.get('.ee-modal__dialog').contains('button', 'Importar').click();
         cy.wait('@importExam').its('response.statusCode').should('be.oneOf', [302, 303]);
         cy.get('.ee-modal__dialog', { timeout: 15000 }).should('not.exist');
     });
 
-    it('imagens oftálmicas: escrever diagnóstico é doctor-only (403 para admin)', () => {
+    it('gerenciador de exames: escrever diagnóstico é doctor-only (403 para admin)', () => {
         cy.visit('/panel/dashboard');
-        csrfRequest('POST', '/panel/eye-images/diagnoses', { name: 'CY-ADM DX' }).its('status').should('eq', 403);
+        csrfRequest('POST', '/panel/exam-manager/diagnoses', { name: 'CY-ADM DX' }).its('status').should('eq', 403);
     });
 
-    it('imagens oftálmicas: comparar exames; "Novo laudo" (ato médico) não existe pro admin', () => {
+    it('gerenciador de exames: comparar exames; "Novo laudo" (ato médico) não existe pro admin', () => {
         // Fixture compartilhada com o manual do médico (mesma entidade demo).
         cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, {
             timeout: 40000,
@@ -1396,7 +1396,7 @@ describe('Perfil clinic.admin — clínico (médicos, mural, fila, imagens e IA)
             .its('stdout')
             .should('include', 'docsdoc:');
 
-        cy.visit('/panel/eye-images');
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
@@ -1450,8 +1450,8 @@ describe('Perfil clinic.admin — clínico (médicos, mural, fila, imagens e IA)
         cy.get('[title="Revogar acesso do paciente a este documento"]', { timeout: 10000 }).should('exist');
         cy.get('body').type('{esc}');
 
-        // Exame — a partir do Gerenciador de Imagens.
-        cy.visit('/panel/eye-images');
+        // Exame — a partir do Gerenciador de exames.
+        cy.visit('/panel/exam-manager');
         cy.expectPanelPage();
         cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
         cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
