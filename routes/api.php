@@ -15,7 +15,7 @@ use App\Http\Controllers\Api\{EquipmentOperationReceiptController, OfflineSnapsh
 use App\Http\Controllers\Api\{GupshupWebhookController, ReceiptReconciliationController};
 use App\Http\Controllers\Billing\WebhookController;
 use App\Http\Controllers\Fiscal\FocusNfeWebhookController;
-use App\Http\Middleware\IntegratorEquipmentOperation;
+use App\Http\Middleware\{CheckJsonResponse, IntegratorEquipmentOperation};
 use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
@@ -76,9 +76,12 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
 // diferente de 200 — inclusive 429 — como falha e pausa a fila depois de 15
 // falhas seguidas (https://docs.asaas.com/docs/penalização-de-filas). Ver
 // RateLimiter "billing-webhook" no AppServiceProvider.
+// Webhooks de gateway (billing, Gupshup, Focus NFe) ficam fora do CheckJsonResponse: o provedor não manda
+// `Accept: application/json` (dava 406) e pode mandar `Content-Type: application/json; charset=utf-8` (dava 415).
 Route::post('billing/webhooks/{gateway}', WebhookController::class)
     ->name('billing.webhooks')
-    ->middleware('throttle:billing-webhook');
+    ->middleware('throttle:billing-webhook')
+    ->withoutMiddleware(CheckJsonResponse::class);
 
 // Webhook v3 da Gupshup (WhatsApp oficial): mensagens do paciente e status
 // das enviadas. URL por configuração (token aleatório) + header de segredo
@@ -89,11 +92,13 @@ Route::post('billing/webhooks/{gateway}', WebhookController::class)
 // RateLimiter "whatsapp-webhook" no AppServiceProvider.
 Route::post('whatsapp/gupshup/webhook/{token}', GupshupWebhookController::class)
     ->name('whatsapp.gupshup.webhook')
-    ->middleware('throttle:whatsapp-webhook');
+    ->middleware('throttle:whatsapp-webhook')
+    ->withoutMiddleware(CheckJsonResponse::class);
 
 // Webhook da Focus NFe (NFS-e do SaaS): avisos de mudança de status da nota. Rota pública idempotente, sem sessão — token
 // aleatório na URL + segredo no cabeçalho (comparados em tempo constante), 2xx imediato e processamento na fila. Limite
 // por TOKEN (não por IP), ver RateLimiter "fiscal-webhook" no AppServiceProvider e FocusNfeWebhookController.
 Route::post('fiscal/focusnfe/webhook/{token}', FocusNfeWebhookController::class)
     ->name('fiscal.focusnfe.webhook')
-    ->middleware('throttle:fiscal-webhook');
+    ->middleware('throttle:fiscal-webhook')
+    ->withoutMiddleware(CheckJsonResponse::class);

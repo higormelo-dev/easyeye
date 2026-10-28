@@ -326,6 +326,14 @@ describe('webhook v3 — resposta do paciente', function () {
         expect(WhatsAppMessage::query()->where('direction', 'in')->count())->toBe(0);
     });
 
+    it('aceita a chamada real da Gupshup: sem Accept JSON e com charset no Content-Type (era 406/415)', function () {
+        $this->postJson('/api/whatsapp/gupshup/webhook/' . $this->setting->webhook_token, ['gs_app_id' => $this->setting->app_id, 'entry' => []], [
+            'Accept'                               => '*/*',
+            'Content-Type'                         => 'application/json; charset=utf-8',
+            WhatsAppSetting::WEBHOOK_SECRET_HEADER => (string) $this->setting->webhook_secret,
+        ])->assertOk();
+    });
+
     it('ignora tipos que o sistema não trata e status "enqueued"', function () {
         postGupshup($this, $this->setting, [
             'messages' => [['from' => '5561999998888', 'id' => 'wamid.IMG', 'type' => 'image', 'image' => ['id' => 'x']]],
