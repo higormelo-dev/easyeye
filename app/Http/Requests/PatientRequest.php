@@ -450,9 +450,9 @@ class PatientRequest extends FormRequest
         }
 
         return match (mb_strtolower(trim($value))) {
-            '1', 'true', 'on', 'yes' => true,
+            '1', 'true', 'on', 'yes'  => true,
             '0', 'false', 'off', 'no' => false,
-            default => $value,
+            default                   => $value,
         };
     }
 }
