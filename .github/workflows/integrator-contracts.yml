@@ -92,7 +92,7 @@ jobs:
       # aqui, em paralelo, e não no caminho crítico dos jobs de Pest (que nunca o leem). Mesmo limite do script `build`.
       - run: node node_modules/vite/bin/vite.js build --ssr
         env:
-          NODE_OPTIONS: --max-old-space-size=1024
+          NODE_OPTIONS: --max-old-space-size=1536
 
   quality:
     runs-on: ubuntu-24.04
