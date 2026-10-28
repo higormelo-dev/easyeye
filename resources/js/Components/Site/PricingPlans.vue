@@ -261,7 +261,11 @@ function comparisonValue(feature) {
         if (feature.value === 0)
             return (feature.key === 'ai_monthly_credits' ? formats.none : formats.unlimited) ?? feature.display_label;
         const key = { max_doctors: 'up_to', max_storage_gb: 'storage', ai_monthly_credits: 'credits' }[feature.key];
-        const count = feature.value.toLocaleString(props.locale.replace('_', '-'));
+        // A franquia de IA vem em centavos de BRL (chave legada "credits"), igual ao display_label do backend.
+        const count =
+            feature.key === 'ai_monthly_credits'
+                ? formatMoney(feature.value / 100)
+                : feature.value.toLocaleString(props.locale.replace('_', '-'));
         return formats[key]?.replace(':count', count) ?? feature.display_label;
     }
     return feature.display_label;

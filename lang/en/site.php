@@ -243,7 +243,7 @@ return [
         'comparison_labels' => [
             'max_doctors'          => 'Doctors',
             'max_storage_gb'       => 'Storage',
-            'ai_monthly_credits'   => 'AI credits',
+            'ai_monthly_credits'   => 'AI balance',
             'has_inventory_module' => 'Inventory',
         ],
         'comparison_values' => [

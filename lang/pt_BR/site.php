@@ -256,7 +256,7 @@ return [
         'comparison_labels' => [
             'max_doctors'          => 'Médicos',
             'max_storage_gb'       => 'Armazenamento',
-            'ai_monthly_credits'   => 'Créditos de IA',
+            'ai_monthly_credits'   => 'Saldo de IA',
             'has_inventory_module' => 'Estoque',
         ],
         'comparison_values' => [

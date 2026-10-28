@@ -10,7 +10,7 @@ const t = {
     comparison_labels: {
         max_doctors: 'Médicos',
         max_storage_gb: 'Armazenamento',
-        ai_monthly_credits: 'Créditos de IA',
+        ai_monthly_credits: 'Saldo de IA',
         has_inventory_module: 'Estoque',
     },
     comparison_values: {
@@ -102,20 +102,20 @@ describe('PricingPlans', () => {
         }
     });
 
-    it('distingue limites ilimitados de créditos ausentes e mantém o detalhamento completo', () => {
+    it('distingue limites ilimitados de saldo ausente e mostra a franquia de IA (centavos) em reais', () => {
         render({
             plans: [
                 plan('Premium', {
                     features: [
                         feature('max_doctors', 'Médicos ilimitados', { value: 0 }),
                         feature('max_storage_gb', 'Armazenamento ilimitado', { value: 0 }),
-                        feature('ai_monthly_credits', '30 créditos de IA por mês', { value: 30 }),
+                        feature('ai_monthly_credits', 'R$ 30,00 de saldo de IA por mês', { value: 3000 }),
                     ],
                 }),
             ],
         });
-        expect(wrapper.findAll('dd').map((row) => row.text())).toEqual(['Ilimitado', 'Ilimitado', '30/mês']);
-        expect(wrapper.get('details [data-feature="ai_monthly_credits"]').text()).toBe('30 créditos de IA por mês');
+        expect(wrapper.findAll('dd').map((row) => row.text())).toEqual(['Ilimitado', 'Ilimitado', 'R$\u00a030,00/mês']);
+        expect(wrapper.get('details [data-feature="ai_monthly_credits"]').text()).toBe('R$ 30,00 de saldo de IA por mês');
     });
 
     it('mantém os recursos comerciais e a descrição em detalhes nativos, sem depender do plano anterior', () => {
