@@ -1,0 +1,64 @@
+{
+  "php": {
+    "exit_code": 0,
+    "tests": 5790,
+    "passed": 5789,
+    "failures": 0,
+    "errors": 0,
+    "skipped": [
+      "it sem Imagick disponível, devolve 422 com mensagem clara (nunca 500)"
+    ],
+    "assertions": 44880,
+    "reported_duration_seconds": 944.23,
+    "integration_test_cases": 10,
+    "env": {
+      "APP_ENV": "testing",
+      "database": "easyeye_audit_20261011",
+      "MAGICK_THREAD_LIMIT": "1",
+      "OMP_NUM_THREADS": "1",
+      "SENTRY": "disabled"
+    }
+  },
+  "javascript": {
+    "initial": {
+      "passed": 2503,
+      "failed": 1
+    },
+    "diagnostic_fixed_clock_file": {
+      "passed": 13
+    },
+    "after_observed_change_local": {
+      "passed": 2506,
+      "failed": 0,
+      "files": 243
+    },
+    "after_observed_change_los_angeles_file": {
+      "passed": 14,
+      "failed": 1,
+      "related_item": "EE-11"
+    }
+  },
+  "build": {
+    "client": "passed",
+    "ssr": "passed"
+  },
+  "composer_validate": "passed",
+  "composer_platform_requirements": "passed on PHP 8.4.26",
+  "lint": {
+    "errors": 219,
+    "warnings": 202,
+    "scope": "initial reference"
+  },
+  "pint": {
+    "failed_files": 37,
+    "scope": "initial reference"
+  },
+  "dependency_audit": {
+    "composer_advisory_records": 44,
+    "composer_packages": 14,
+    "npm_packages": 52,
+    "npm_critical": 3,
+    "npm_high": 33,
+    "npm_moderate": 16
+  }
+}

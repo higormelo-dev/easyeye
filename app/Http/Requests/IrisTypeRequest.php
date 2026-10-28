@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use App\Models\IrisType;
-use App\Models\SkinType;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -25,7 +24,7 @@ class IrisTypeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => [
                 'required_without:type_method',
                 'string',
@@ -36,6 +35,24 @@ class IrisTypeRequest extends FormRequest
                         return $query->whereNull('deleted_at');
                     }),
             ],
+        ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required_without' => trans('validation.custom.generic.required'),
         ];
     }
 
@@ -53,5 +70,17 @@ class IrisTypeRequest extends FormRequest
         }
 
         return null;
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => mb_strtoupper($this->input('name')),
+            ]);
+        }
     }
 }

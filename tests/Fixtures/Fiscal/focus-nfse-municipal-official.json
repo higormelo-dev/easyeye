@@ -1,0 +1,26 @@
+{
+    "data_emissao": "2024-01-15T10:30:00-03:00",
+    "prestador": {
+        "cnpj": "12345678000123",
+        "inscricao_municipal": "123456"
+    },
+    "tomador": {
+        "cnpj": "12345678000123",
+        "razao_social": "Empresa Tomadora LTDA",
+        "endereco": {
+            "logradouro": "Rua das Flores",
+            "numero": "123",
+            "bairro": "Centro",
+            "codigo_municipio": "3550308",
+            "uf": "SP",
+            "cep": "01234-567"
+        }
+    },
+    "servico": {
+        "valor_servicos": 100,
+        "item_lista_servico": "0107",
+        "codigo_tributacao_municipio": "0107",
+        "discriminacao": "Serviço de consultoria em informática",
+        "codigo_municipio": "3550308"
+    }
+}

@@ -2,74 +2,32 @@
 
 namespace App\Services;
 
-use App\Http\Requests\VisitTypeRequest;
 use App\Models\VisitType;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Http\FormRequest;
 
-class VisitTypeService
+class VisitTypeService extends BaseSettingService
 {
-    /**
-     * Create a new record with all related entities
-     *
-     * @throws \Throwable
-     */
-    public function create(VisitTypeRequest $request): VisitType
+    protected function modelClass(): string
     {
-        return DB::transaction(function () use ($request) {
-            return $this->findOrCreate($request);
-        });
+        return VisitType::class;
     }
 
-    /**
-     * Update existing record and related entities
-     *
-     * @throws \Throwable
-     */
-    public function update(VisitType $record, VisitTypeRequest $request): VisitType
+    protected function getCreateData(FormRequest $request): array
     {
-        return DB::transaction(function () use ($record, $request) {
-            $data = [];
-
-            if ($request->has('name')) {
-                $data['name'] = $request->name;
-            }
-
-            if ($request->has('active')) {
-                $data['active'] = $request->boolean('active');
-            }
-
-            $record->update($data);
-
-            return $record;
-        });
-    }
-
-    /**
-     * Find or create record
-     */
-    private function findOrCreate(VisitTypeRequest $request): VisitType
-    {
-        $existingRecord = VisitType::query()->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->where('name', $request->name)
-            ->first();
-
-        $recordData = [
-            'name' => $request->name,
+        return [
+            'name'         => $request->name,
+            'procedure_id' => $request->procedure_id ?: null,
         ];
+    }
 
-        if ($existingRecord) {
-            if ($existingRecord->trashed()) {
-                $existingRecord->restore();
-            }
-            $existingRecord->update($recordData);
+    protected function getUpdateData(FormRequest $request): array
+    {
+        $data = parent::getUpdateData($request);
 
-            return $existingRecord;
+        if ($request->has('procedure_id')) {
+            $data['procedure_id'] = $request->procedure_id ?: null;
         }
 
-        return VisitType::create(array_merge($recordData, [
-            'entity_id' => session()->get('selected_entity_id'),
-            'active'    => true,
-        ]));
+        return $data;
     }
 }

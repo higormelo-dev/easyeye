@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste DataTables Layout</title>
+    <style>
+        body { padding: 20px; background: #f5f5f5; }
+
+        /* SOLUÇÃO: Seletores para DataTables 2.x Bootstrap 5 */
+        .dt-container:has(.dt-info) {
+            display: flex !important;
+            flex-wrap: wrap !important;
+        }
+
+        .dt-container > table {
+            flex: 0 0 100% !important;
+            width: 100% !important;
+        }
+
+        .dt-container > .dt-info {
+            flex: 0 0 auto !important;
+            margin: 1rem 0 0 0 !important;
+            order: 1 !important;
+        }
+
+        .dt-container > .dt-paging {
+            flex: 0 0 auto !important;
+            margin: 1rem 0 0 auto !important;
+            order: 2 !important;
+        }
+
+        /* Visual para teste */
+        .dt-container {
+            background: white;
+            padding: 1rem;
+            border: 2px solid #007bff;
+        }
+
+        .dt-info {
+            background: #d4edda;
+            padding: 0.5rem 1rem;
+            border: 1px solid #28a745;
+        }
+
+        .dt-paging {
+            background: #cce5ff;
+            padding: 0.5rem 1rem;
+            border: 1px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <h2>Teste do Layout DataTables</h2>
+
+    <div id="users_datatable_wrapper" class="dt-container dt-bootstrap5">
+        <table class="table" id="users_datatable">
+            <thead>
+                <tr><th>Coluna 1</th><th>Coluna 2</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Dado 1</td><td>Dado 2</td></tr>
+            </tbody>
+        </table>
+
+        <div class="dt-info" id="users_datatable_info">
+            Mostrando de 1 até 10 de 10 registros
+        </div>
+
+        <div class="dt-paging paging_full_numbers">
+            <nav>
+                <ul class="pagination">
+                    <li class="page-item"><a class="page-link">1</a></li>
+                    <li class="page-item"><a class="page-link">2</a></li>
+                    <li class="page-item"><a class="page-link">3</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <div style="margin-top: 2rem; padding: 1rem; background: #fff3cd; border: 1px solid #ffc107;">
+        <strong>✅ Se a caixa verde (info) está à ESQUERDA e a caixa azul (paginação) à DIREITA, funcionou!</strong><br>
+        ❌ Se estão empilhados um embaixo do outro, o CSS não foi aplicado.
+    </div>
+</body>
+</html>

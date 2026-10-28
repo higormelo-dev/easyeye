@@ -1,0 +1,183 @@
+[
+  {
+    "name": "basic-order",
+    "domain": "easyeye.test.v1",
+    "input": {
+      "b": 1,
+      "a": {
+        "y": true,
+        "x": null
+      },
+      "c": [
+        3,
+        1,
+        2
+      ],
+      "d": "texto"
+    },
+    "canonical": "{\"a\":{\"x\":null,\"y\":true},\"b\":1,\"c\":[3,1,2],\"d\":\"texto\"}",
+    "hash": "1:10133a254a3e85dc26efba26575a635ce1d28e50f0048c718014ce4df14557b7"
+  },
+  {
+    "name": "escapes",
+    "domain": "easyeye.test.v1",
+    "input": "aspas\" barra\\ solta/ lf\n cr\r tab\t bs\b ff\f nul\u0000 us\u001f del\u007f ls\u2028 ps\u2029 emoji\ud83d\ude00 acento \u00e9",
+    "canonical": "\"aspas\\\" barra\\\\ solta/ lf\\n cr\\r tab\\t bs\\b ff\\f nul\\u0000 us\\u001f del\u007f ls\u2028 ps\u2029 emoji\ud83d\ude00 acento \u00e9\"",
+    "hash": "1:fd446a0eea257cd3793e3f6ce93da13ed914912d4ecd19fa4f9dd3aec97b0f24"
+  },
+  {
+    "name": "nfc-values-and-keys",
+    "domain": "easyeye.test.v1",
+    "input": {
+      "e\u0301": "a\u0301\u0302",
+      "z": [
+        "o\u0308",
+        "\u00e7"
+      ]
+    },
+    "canonical": "{\"z\":[\"\u00f6\",\"\u00e7\"],\"\u00e9\":\"\u00e1\u0302\"}",
+    "hash": "1:8258ac18615ecfa77012f4313cdc216ccaac76312dbdbf53e6a7b05f056111e7"
+  },
+  {
+    "name": "key-order-by-code-point",
+    "domain": "easyeye.test.v1",
+    "input": {
+      "\ud800\udc00": 1,
+      "\uffff": 2,
+      "\u00e9": 3,
+      "z": 4,
+      "a": 5,
+      "10": 6,
+      "9": 7,
+      "A": 8
+    },
+    "canonical": "{\"10\":6,\"9\":7,\"A\":8,\"a\":5,\"z\":4,\"\u00e9\":3,\"\uffff\":2,\"\ud800\udc00\":1}",
+    "hash": "1:b906bbe023be65bb1921f22bb19ad37fb3e566f32ed68e8784c08918c1dc98a3"
+  },
+  {
+    "name": "ints-bools-null",
+    "domain": "easyeye.test.v1",
+    "input": [
+      0,
+      -1,
+      9007199254740991,
+      -9007199254740991,
+      true,
+      false,
+      null
+    ],
+    "canonical": "[0,-1,9007199254740991,-9007199254740991,true,false,null]",
+    "hash": "1:2ab0b385ec4654b80a708919232cc7d7145ea9b196014d4bd6b60f6e34fca500"
+  },
+  {
+    "name": "empty-containers",
+    "domain": "easyeye.test.v1",
+    "input": {
+      "a": [],
+      "b": [
+        []
+      ],
+      "c": [
+        {
+          "d": []
+        }
+      ]
+    },
+    "canonical": "{\"a\":[],\"b\":[[]],\"c\":[{\"d\":[]}]}",
+    "hash": "1:18dce979c3d2c58f2c3e36e81cd6c5b4d16259522d92fd54e6977d21f9536baf"
+  },
+  {
+    "name": "protocol-like",
+    "domain": "easyeye.recall.protocol.v1",
+    "input": {
+      "schema_version": 1,
+      "key": "glaucoma_poag",
+      "entry": {
+        "cid": {
+          "strong": [
+            "H40.1",
+            "H40.2"
+          ],
+          "weak": [],
+          "exclude": [
+            "H40.0"
+          ]
+        },
+        "medications": []
+      },
+      "tasks": [
+        {
+          "key": "consulta",
+          "kind": "consultation",
+          "interval": {
+            "unit": "months",
+            "default": 4,
+            "min": 3,
+            "max": 6
+          },
+          "lead_days": 30,
+          "grace_days": 30,
+          "lost_after_days": 180,
+          "recurs": true,
+          "required": true
+        }
+      ],
+      "references": [
+        {
+          "title": "EGS 5\u00aa ed. 2021",
+          "year": 2021
+        }
+      ],
+      "rationale": "Texto com acentua\u00e7\u00e3o: revis\u00e3o semestral \u2248 4\u20136 meses."
+    },
+    "canonical": "{\"entry\":{\"cid\":{\"exclude\":[\"H40.0\"],\"strong\":[\"H40.1\",\"H40.2\"],\"weak\":[]},\"medications\":[]},\"key\":\"glaucoma_poag\",\"rationale\":\"Texto com acentua\u00e7\u00e3o: revis\u00e3o semestral \u2248 4\u20136 meses.\",\"references\":[{\"title\":\"EGS 5\u00aa ed. 2021\",\"year\":2021}],\"schema_version\":1,\"tasks\":[{\"grace_days\":30,\"interval\":{\"default\":4,\"max\":6,\"min\":3,\"unit\":\"months\"},\"key\":\"consulta\",\"kind\":\"consultation\",\"lead_days\":30,\"lost_after_days\":180,\"recurs\":true,\"required\":true}]}",
+    "hash": "1:126ca369210a2dcb743db602c94b3ecfc11bcadff542cb2f152bec7af6c05c02"
+  },
+  {
+    "name": "protocol-like-other-domain",
+    "domain": "easyeye.clinical_review.set.v1",
+    "input": {
+      "schema_version": 1,
+      "key": "glaucoma_poag",
+      "entry": {
+        "cid": {
+          "strong": [
+            "H40.1",
+            "H40.2"
+          ],
+          "weak": [],
+          "exclude": [
+            "H40.0"
+          ]
+        },
+        "medications": []
+      },
+      "tasks": [
+        {
+          "key": "consulta",
+          "kind": "consultation",
+          "interval": {
+            "unit": "months",
+            "default": 4,
+            "min": 3,
+            "max": 6
+          },
+          "lead_days": 30,
+          "grace_days": 30,
+          "lost_after_days": 180,
+          "recurs": true,
+          "required": true
+        }
+      ],
+      "references": [
+        {
+          "title": "EGS 5\u00aa ed. 2021",
+          "year": 2021
+        }
+      ],
+      "rationale": "Texto com acentua\u00e7\u00e3o: revis\u00e3o semestral \u2248 4\u20136 meses."
+    },
+    "canonical": "{\"entry\":{\"cid\":{\"exclude\":[\"H40.0\"],\"strong\":[\"H40.1\",\"H40.2\"],\"weak\":[]},\"medications\":[]},\"key\":\"glaucoma_poag\",\"rationale\":\"Texto com acentua\u00e7\u00e3o: revis\u00e3o semestral \u2248 4\u20136 meses.\",\"references\":[{\"title\":\"EGS 5\u00aa ed. 2021\",\"year\":2021}],\"schema_version\":1,\"tasks\":[{\"grace_days\":30,\"interval\":{\"default\":4,\"max\":6,\"min\":3,\"unit\":\"months\"},\"key\":\"consulta\",\"kind\":\"consultation\",\"lead_days\":30,\"lost_after_days\":180,\"recurs\":true,\"required\":true}]}",
+    "hash": "1:424bc261cb381b67342acf762ffdfe334b3c8dbdf69e599d51c1ea04eb36d42b"
+  }
+]

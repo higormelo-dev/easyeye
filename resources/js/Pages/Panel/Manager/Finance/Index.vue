@@ -1,0 +1,728 @@
+<script setup>
+import { ref, reactive, computed } from 'vue';
+import { router } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import axios from 'axios';
+import AiChatCard from './AiChatCard.vue';
+import AiDigestCard from './AiDigestCard.vue';
+
+const props = defineProps({
+    summary: { type: Object, required: true },
+    period: { type: Object, required: true },
+    expenseCategories: { type: Object, required: true },
+    expenses: { type: Array, default: () => [] },
+    ai: { type: Object, required: true },
+    t: { type: Object, required: true },
+});
+
+const breadcrumbs = [];
+
+// ─────────────────────────────────────────────────────────────────────────
+// Período
+// ─────────────────────────────────────────────────────────────────────────
+const PERIOD_PRESETS = ['this_month', '3m', '6m', '12m', 'custom'];
+const loadingPeriod = ref(false);
+const customFrom = ref(props.period.from);
+const customTo = ref(props.period.to);
+const showCustomPicker = ref(props.period.preset === 'custom');
+
+function selectPeriod(preset) {
+    if (preset === 'custom') {
+        showCustomPicker.value = true;
+        return;
+    }
+    showCustomPicker.value = false;
+    reloadPeriod({ preset });
+}
+
+function applyCustomPeriod() {
+    if (!customFrom.value || !customTo.value) return;
+    reloadPeriod({ preset: 'custom', from: customFrom.value, to: customTo.value });
+}
+
+function reloadPeriod(data) {
+    loadingPeriod.value = true;
+    router.reload({
+        data,
+        preserveScroll: true,
+        preserveState: true,
+        onFinish: () => {
+            loadingPeriod.value = false;
+        },
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Formatação
+// ─────────────────────────────────────────────────────────────────────────
+function brl(value) {
+    return Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+}
+function pct(value) {
+    return Number(value ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+function deltaClass(value) {
+    if (value === null || value === undefined) return 'pf-delta--neutral';
+    return value >= 0 ? 'pf-delta--up' : 'pf-delta--down';
+}
+function deltaIcon(value) {
+    if (value === null || value === undefined) return 'ti-minus';
+    return value >= 0 ? 'ti-trending-up' : 'ti-trending-down';
+}
+
+const isProfit = computed(() => props.summary.profit.amount >= 0);
+
+const maxRevenueByPlan = computed(() => Math.max(1, ...props.summary.revenue.by_plan.map((p) => p.amount)));
+const maxExpenseByCategory = computed(() => Math.max(1, ...props.summary.expenses.by_category.map((c) => c.amount)));
+
+// ─────────────────────────────────────────────────────────────────────────
+// Despesas manuais (CRUD)
+// ─────────────────────────────────────────────────────────────────────────
+const showExpenseModal = ref(false);
+const editingExpense = ref(null);
+const expenseForm = reactive({
+    category: '',
+    description: '',
+    amount: '',
+    effective_at: '',
+    recurring: false,
+    notes: '',
+});
+const expenseSaving = ref(false);
+const expenseErrors = ref({});
+
+function openNewExpense() {
+    editingExpense.value = null;
+    Object.assign(expenseForm, {
+        category: '',
+        description: '',
+        amount: '',
+        effective_at: new Date().toISOString().slice(0, 10),
+        recurring: false,
+        notes: '',
+    });
+    expenseErrors.value = {};
+    showExpenseModal.value = true;
+}
+
+function openEditExpense(expense) {
+    editingExpense.value = expense;
+    Object.assign(expenseForm, {
+        category: expense.category,
+        description: expense.description,
+        amount: expense.amount,
+        effective_at: expense.effective_at,
+        recurring: expense.recurring,
+        notes: expense.notes ?? '',
+    });
+    expenseErrors.value = {};
+    showExpenseModal.value = true;
+}
+
+async function saveExpense() {
+    expenseSaving.value = true;
+    expenseErrors.value = {};
+    try {
+        if (editingExpense.value) {
+            await axios.patch(route('manager.finance.expenses.update', editingExpense.value.id), expenseForm);
+        } else {
+            await axios.post(route('manager.finance.expenses.store'), expenseForm);
+        }
+        showExpenseModal.value = false;
+        router.reload({ preserveScroll: true });
+    } catch (e) {
+        expenseErrors.value = e.response?.data?.errors ?? {};
+    } finally {
+        expenseSaving.value = false;
+    }
+}
+
+async function deleteExpense(expense) {
+    if (!window.confirm(props.t.expenses.confirm_delete)) return;
+    await axios.delete(route('manager.finance.expenses.destroy', expense.id));
+    router.reload({ preserveScroll: true });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// IA — análise e conversa (AiDigestCard / AiChatCard)
+// ─────────────────────────────────────────────────────────────────────────
+const chatCard = ref(null);
+
+// "Perguntar sobre isto" na análise → pergunta pronta no chat (o admin revisa e envia).
+function askChat(text) {
+    chatCard.value?.ask(text);
+}
+</script>
+
+<template>
+    <AppLayout :title="t.title" :breadcrumbs="breadcrumbs">
+        <div class="container-fluid py-3 pf-page">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+                <div>
+                    <h4 class="fw-bold mb-0">{{ t.title }}</h4>
+                    <p class="text-muted mb-0" style="font-size: 0.85rem; max-width: 640px">{{ t.subtitle }}</p>
+                </div>
+
+                <!-- Seletor de período -->
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button
+                            v-for="preset in PERIOD_PRESETS"
+                            :key="preset"
+                            type="button"
+                            class="btn"
+                            :class="period.preset === preset ? 'btn-primary' : 'btn-outline-secondary'"
+                            :disabled="loadingPeriod"
+                            @click="selectPeriod(preset)"
+                        >
+                            {{ t.period[preset] }}
+                        </button>
+                    </div>
+                    <span v-if="loadingPeriod" class="spinner-border spinner-border-sm text-primary"></span>
+                </div>
+            </div>
+
+            <div v-if="showCustomPicker" class="d-flex align-items-end gap-2 mb-3 pf-custom-period">
+                <div>
+                    <label class="form-label small mb-1">{{ t.period.from }}</label>
+                    <input v-model="customFrom" type="date" class="form-control form-control-sm" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1">{{ t.period.to }}</label>
+                    <input v-model="customTo" type="date" class="form-control form-control-sm" />
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" @click="applyCustomPeriod">
+                    {{ t.period.apply }}
+                </button>
+            </div>
+
+            <!-- ═══════════════ KPIs ═══════════════ -->
+            <div class="row g-3 mb-3">
+                <div class="col-6 col-lg-3">
+                    <div class="pf-stat-card pf-stat-card--revenue">
+                        <div class="pf-stat-icon"><i class="ti ti-cash"></i></div>
+                        <div>
+                            <div class="pf-stat-value">{{ brl(summary.revenue.gross) }}</div>
+                            <div class="pf-stat-label">{{ t.kpi.revenue }}</div>
+                            <div
+                                v-if="summary.revenue.delta_pct !== null"
+                                :class="['pf-delta', deltaClass(summary.revenue.delta_pct)]"
+                            >
+                                <i :class="'ti ' + deltaIcon(summary.revenue.delta_pct)"></i>
+                                {{ pct(Math.abs(summary.revenue.delta_pct)) }}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="pf-stat-card pf-stat-card--expenses">
+                        <div class="pf-stat-icon"><i class="ti ti-receipt-2"></i></div>
+                        <div>
+                            <div class="pf-stat-value">{{ brl(summary.expenses.total) }}</div>
+                            <div class="pf-stat-label">{{ t.kpi.expenses }}</div>
+                            <div
+                                v-if="summary.expenses.delta_pct !== null"
+                                :class="['pf-delta', deltaClass(-summary.expenses.delta_pct)]"
+                            >
+                                <i :class="'ti ' + deltaIcon(-summary.expenses.delta_pct)"></i>
+                                {{ pct(Math.abs(summary.expenses.delta_pct)) }}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="pf-stat-card" :class="isProfit ? 'pf-stat-card--profit' : 'pf-stat-card--loss'">
+                        <div class="pf-stat-icon">
+                            <i :class="isProfit ? 'ti ti-trending-up' : 'ti ti-trending-down'"></i>
+                        </div>
+                        <div>
+                            <div class="pf-stat-value">{{ brl(summary.profit.amount) }}</div>
+                            <div class="pf-stat-label">
+                                {{ isProfit ? t.kpi.profit : t.kpi.loss }} · {{ pct(summary.profit.margin) }}%
+                                {{ t.kpi.margin }}
+                            </div>
+                            <div
+                                v-if="summary.profit.delta_pct !== null"
+                                :class="['pf-delta', deltaClass(summary.profit.delta_pct)]"
+                            >
+                                <i :class="'ti ' + deltaIcon(summary.profit.delta_pct)"></i>
+                                {{ pct(Math.abs(summary.profit.delta_pct)) }}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="pf-stat-card pf-stat-card--mrr">
+                        <div class="pf-stat-icon"><i class="ti ti-repeat"></i></div>
+                        <div>
+                            <div class="pf-stat-value">{{ brl(summary.mrr.amount) }}</div>
+                            <div class="pf-stat-label">{{ t.kpi.mrr }}</div>
+                            <div
+                                v-if="summary.mrr.delta_pct !== null"
+                                :class="['pf-delta', deltaClass(summary.mrr.delta_pct)]"
+                            >
+                                <i :class="'ti ' + deltaIcon(summary.mrr.delta_pct)"></i>
+                                {{ pct(Math.abs(summary.mrr.delta_pct)) }}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-6 col-lg-2">
+                    <div class="pf-mini-stat">
+                        <div class="pf-mini-value">{{ brl(summary.arpu) }}</div>
+                        <div class="pf-mini-label">{{ t.kpi.arpu }}</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="pf-mini-stat">
+                        <div class="pf-mini-value">{{ summary.paying_clinics }}</div>
+                        <div class="pf-mini-label">{{ t.kpi.paying_clinics }}</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="pf-mini-stat">
+                        <div class="pf-mini-value text-success">+{{ summary.new_clinics }}</div>
+                        <div class="pf-mini-label">{{ t.kpi.new_clinics }}</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="pf-mini-stat">
+                        <div class="pf-mini-value" :class="summary.cancellations.count > 0 ? 'text-danger' : ''">
+                            {{ summary.cancellations.count }}
+                        </div>
+                        <div class="pf-mini-label">{{ t.kpi.cancellations }}</div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-4">
+                    <div class="pf-mini-stat">
+                        <div class="pf-mini-value" :class="summary.delinquency.count > 0 ? 'text-danger' : ''">
+                            {{ summary.delinquency.count }}
+                            <small class="fw-normal text-muted"
+                                >({{ brl(summary.delinquency.amount_at_risk) }} {{ t.kpi.at_risk }})</small
+                            >
+                        </div>
+                        <div class="pf-mini-label">{{ t.kpi.delinquency }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════ Receita por plano / Despesas por categoria ═══════════════ -->
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <div class="pf-card h-100">
+                        <div class="pf-card-header">{{ t.breakdown.revenue_by_plan }}</div>
+                        <div class="pf-card-body">
+                            <p v-if="!summary.revenue.by_plan.length" class="text-muted small mb-0">
+                                {{ t.breakdown.no_revenue }}
+                            </p>
+                            <div v-for="row in summary.revenue.by_plan" :key="row.plan_name" class="pf-bar-row">
+                                <div class="pf-bar-row-head">
+                                    <span>{{ row.plan_name }}</span>
+                                    <strong>{{ brl(row.amount) }}</strong>
+                                </div>
+                                <div class="pf-bar-track">
+                                    <div
+                                        class="pf-bar-fill pf-bar-fill--revenue"
+                                        :style="`width:${(row.amount / maxRevenueByPlan) * 100}%`"
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="pf-card h-100">
+                        <div class="pf-card-header">{{ t.breakdown.expenses_by_category }}</div>
+                        <div class="pf-card-body">
+                            <p v-if="!summary.expenses.by_category.length" class="text-muted small mb-0">
+                                {{ t.breakdown.no_expenses }}
+                            </p>
+                            <div v-for="row in summary.expenses.by_category" :key="row.category" class="pf-bar-row">
+                                <div class="pf-bar-row-head">
+                                    <span>
+                                        {{ row.label }}
+                                        <i
+                                            v-if="row.auto"
+                                            class="ti ti-bolt pf-auto-icon"
+                                            :title="t.breakdown.auto_hint"
+                                        ></i>
+                                    </span>
+                                    <strong>{{ brl(row.amount) }}</strong>
+                                </div>
+                                <div class="pf-bar-track">
+                                    <div
+                                        class="pf-bar-fill pf-bar-fill--expense"
+                                        :style="`width:${(row.amount / maxExpenseByCategory) * 100}%`"
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════ Despesas manuais ═══════════════ -->
+            <div class="pf-card mb-3">
+                <div class="pf-card-header d-flex align-items-center justify-content-between">
+                    <span>{{ t.expenses.title }}</span>
+                    <button type="button" class="btn btn-primary btn-sm" @click="openNewExpense">
+                        <i class="ti ti-plus me-1"></i>{{ t.expenses.new }}
+                    </button>
+                </div>
+                <div class="pf-card-body p-0">
+                    <div v-if="!expenses.length" class="text-muted small p-3">{{ t.expenses.empty }}</div>
+                    <table v-else class="table table-sm mb-0">
+                        <tbody>
+                            <tr v-for="expense in expenses" :key="expense.id">
+                                <td class="text-muted" style="width: 100px; font-size: 0.8rem">
+                                    {{ expense.effective_at }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">{{ expense.category_label }}</span>
+                                </td>
+                                <td>{{ expense.description }}</td>
+                                <td class="text-end fw-semibold">{{ brl(expense.amount) }}</td>
+                                <td style="width: 70px" class="text-end">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link p-1"
+                                        @click="openEditExpense(expense)"
+                                    >
+                                        <i class="ti ti-pencil"></i>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link text-danger p-1"
+                                        @click="deleteExpense(expense)"
+                                    >
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ═══════════════ IA — análise + conversa (lado a lado em telas largas) ═══════════════ -->
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-xxl-7">
+                    <AiDigestCard :t="t.ai" :period="period" :urls="ai.urls" :initial="ai.last_digest" @ask="askChat" />
+                </div>
+                <div class="col-12 col-xxl-5">
+                    <AiChatCard
+                        ref="chatCard"
+                        :t="t.ai"
+                        :period="period"
+                        :urls="ai.urls"
+                        :max-length="ai.chat_max_length ?? 4000"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════ Modal de despesa ═══════════════ -->
+        <Teleport to="body">
+            <div
+                v-if="showExpenseModal"
+                class="modal fade show d-block"
+                style="background: rgba(0, 0, 0, 0.5)"
+                @click.self="showExpenseModal = false"
+            >
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header py-2">
+                            <h6 class="modal-title">{{ editingExpense ? t.expenses.edit : t.expenses.new }}</h6>
+                            <button type="button" class="btn-close" @click="showExpenseModal = false"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-2">
+                                <label class="form-label small">{{ t.expenses.category }}</label>
+                                <select
+                                    v-model="expenseForm.category"
+                                    class="form-select form-select-sm"
+                                    :class="{ 'is-invalid': expenseErrors.category }"
+                                >
+                                    <option value="" disabled>—</option>
+                                    <option v-for="(label, value) in expenseCategories" :key="value" :value="value">
+                                        {{ label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">{{ t.expenses.description }}</label>
+                                <input
+                                    v-model="expenseForm.description"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    :class="{ 'is-invalid': expenseErrors.description }"
+                                />
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small">{{ t.expenses.amount }}</label>
+                                    <input
+                                        v-model="expenseForm.amount"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        class="form-control form-control-sm"
+                                        :class="{ 'is-invalid': expenseErrors.amount }"
+                                    />
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">{{ t.expenses.effective_at }}</label>
+                                    <input
+                                        v-model="expenseForm.effective_at"
+                                        type="date"
+                                        class="form-control form-control-sm"
+                                        :class="{ 'is-invalid': expenseErrors.effective_at }"
+                                    />
+                                </div>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input
+                                    id="pf-recurring"
+                                    v-model="expenseForm.recurring"
+                                    type="checkbox"
+                                    class="form-check-input"
+                                />
+                                <label class="form-check-label small" for="pf-recurring">{{
+                                    t.expenses.recurring
+                                }}</label>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">{{ t.expenses.notes }}</label>
+                                <textarea
+                                    v-model="expenseForm.notes"
+                                    rows="2"
+                                    class="form-control form-control-sm"
+                                ></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer py-2">
+                            <button type="button" class="btn btn-secondary btn-sm" @click="showExpenseModal = false">
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                :disabled="expenseSaving"
+                                @click="saveExpense"
+                            >
+                                <span v-if="expenseSaving" class="spinner-border spinner-border-sm me-1"></span>
+                                {{ t.expenses.save }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+    </AppLayout>
+</template>
+
+<style scoped>
+.pf-custom-period {
+    background: #f8f9fb;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+.pf-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-top: 3px solid #94a3b8;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    height: 100%;
+}
+.pf-stat-card--revenue {
+    border-top-color: #06b6d4;
+}
+.pf-stat-card--expenses {
+    border-top-color: #f97316;
+}
+.pf-stat-card--profit {
+    border-top-color: #16a34a;
+}
+.pf-stat-card--loss {
+    border-top-color: #dc2626;
+}
+.pf-stat-card--mrr {
+    border-top-color: #7c3aed;
+}
+
+.pf-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 0.65rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    background: #f1f5f9;
+    color: #475569;
+}
+.pf-stat-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #1e293b;
+    line-height: 1.2;
+}
+.pf-stat-label {
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.pf-delta {
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-top: 2px;
+}
+.pf-delta--up {
+    color: #16a34a;
+}
+.pf-delta--down {
+    color: #dc2626;
+}
+.pf-delta--neutral {
+    color: #94a3b8;
+}
+
+.pf-mini-stat {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.6rem;
+    padding: 0.6rem 0.8rem;
+    text-align: center;
+}
+.pf-mini-value {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #1e293b;
+}
+.pf-mini-label {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.pf-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+.pf-card-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #1e293b;
+}
+.pf-card-body {
+    padding: 1rem;
+}
+
+.pf-bar-row {
+    margin-bottom: 0.85rem;
+}
+.pf-bar-row:last-child {
+    margin-bottom: 0;
+}
+.pf-bar-row-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    margin-bottom: 4px;
+}
+.pf-bar-track {
+    height: 8px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.pf-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+}
+.pf-bar-fill--revenue {
+    background: linear-gradient(90deg, #06b6d4, #0891b2);
+}
+.pf-bar-fill--expense {
+    background: linear-gradient(90deg, #f97316, #ea580c);
+}
+.pf-auto-icon {
+    color: #f59e0b;
+    font-size: 0.8rem;
+    margin-left: 3px;
+}
+
+/* ── Dark mode ────────────────────────────────────────────────────────────
+   Página inteira é CSS custom (pf-*) com cor fixa, zero reação a tema —
+   mesma paleta já usada em .pmr-form/inputs globais/SearchSelect (ver
+   _medical-records.scss, system.scss, SearchSelect.vue) pra manter os
+   painéis do sistema consistentes entre si: #121a26 fundo de card,
+   #18212f fundo "recuado" (ícone/track/mensagem), #384559 borda,
+   #dbe4ef texto principal, #8695a8 texto secundário. Cores semânticas
+   (verde/vermelho/laranja/roxo/ciano de KPI, delta, categoria de laudo
+   IA) ficam como estão — já têm contraste bom em fundo escuro também. */
+:root[data-bs-theme='dark'] .pf-custom-period {
+    background: #121a26;
+    border-color: #384559;
+}
+
+:root[data-bs-theme='dark'] .pf-stat-card {
+    background: #121a26;
+    border-color: #384559;
+}
+:root[data-bs-theme='dark'] .pf-stat-icon {
+    background: #18212f;
+    color: #8695a8;
+}
+:root[data-bs-theme='dark'] .pf-stat-value {
+    color: #dbe4ef;
+}
+:root[data-bs-theme='dark'] .pf-stat-label {
+    color: #8695a8;
+}
+:root[data-bs-theme='dark'] .pf-delta--neutral {
+    color: #8695a8;
+}
+
+:root[data-bs-theme='dark'] .pf-mini-stat {
+    background: #121a26;
+    border-color: #384559;
+}
+:root[data-bs-theme='dark'] .pf-mini-value {
+    color: #dbe4ef;
+}
+:root[data-bs-theme='dark'] .pf-mini-label {
+    color: #8695a8;
+}
+
+:root[data-bs-theme='dark'] .pf-card {
+    background: #121a26;
+    border-color: #384559;
+}
+:root[data-bs-theme='dark'] .pf-card-header {
+    border-color: #384559;
+    color: #dbe4ef;
+}
+
+:root[data-bs-theme='dark'] .pf-bar-track {
+    background: #18212f;
+}
+</style>

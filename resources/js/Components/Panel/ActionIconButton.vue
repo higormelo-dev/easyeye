@@ -1,0 +1,184 @@
+<script setup>
+/**
+ * Botão de ação compacto, somente ícone, padrão "flat icon button" do design system.
+ *
+ * Substitui o uso de `btn btn-sm btn-outline-secondary` espalhado pelas listagens.
+ * Área de toque de 32x32px fora de uma região de densidade (`data-ee-density`); dentro dela acompanha
+ * os campos vizinhos (32, 40 ou 44px). O nome acessível vem de `title` (nunca de `label`, que não é
+ * prop). Variantes que se mapeiam às cores do design system em resources/css/system/_variables.scss.
+ *
+ * Suporta:
+ *  - <button> (default): emite `click` ao usuário.
+ *  - <a> via prop `href`: link nativo, respeita `target`.
+ *  - <Link> Inertia via prop `inertiaHref`: navegação SPA preservando state.
+ */
+import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+
+const props = defineProps({
+    icon: { type: String, required: true },
+    title: { type: String, default: '' },
+    variant: { type: String, default: 'default' }, // default | info | success | danger | warning | primary
+    disabled: { type: Boolean, default: false },
+    href: { type: String, default: null }, // link nativo (não-SPA)
+    target: { type: String, default: null },
+    inertiaHref: { type: String, default: null }, // Inertia Link
+    inertiaMethod: { type: String, default: 'get' },
+    as: { type: String, default: null }, // override: button | a | link
+});
+
+const emit = defineEmits(['click']);
+
+const tag = computed(() => {
+    if (props.as) return props.as;
+    if (props.inertiaHref) return 'link';
+    if (props.href) return 'a';
+    return 'button';
+});
+
+const classes = computed(() => [
+    'ee-action-icon',
+    `ee-action-icon--${props.variant}`,
+    props.disabled && 'ee-action-icon--disabled',
+]);
+
+function handleClick(event) {
+    if (props.disabled) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+    }
+    emit('click', event);
+}
+</script>
+
+<template>
+    <Link
+        v-if="tag === 'link'"
+        :href="inertiaHref"
+        :method="inertiaMethod"
+        :class="classes"
+        :title="title"
+        :aria-label="title"
+        :aria-disabled="disabled ? 'true' : null"
+        @click="handleClick"
+    >
+        <i :class="icon" aria-hidden="true"></i>
+    </Link>
+
+    <a
+        v-else-if="tag === 'a'"
+        :href="disabled ? null : href"
+        :target="target"
+        :rel="target === '_blank' ? 'noopener noreferrer' : null"
+        :class="classes"
+        :title="title"
+        :aria-label="title"
+        :aria-disabled="disabled ? 'true' : null"
+        @click="handleClick"
+    >
+        <i :class="icon" aria-hidden="true"></i>
+    </a>
+
+    <button
+        v-else
+        type="button"
+        :class="classes"
+        :title="title"
+        :aria-label="title"
+        :disabled="disabled"
+        @click="handleClick"
+    >
+        <i :class="icon" aria-hidden="true"></i>
+    </button>
+</template>
+
+<style>
+/* Classes globais (sem scoped) para que componentes irmãos como ActionDropdown
+   possam reaproveitar via prop btn-class, mantendo visual consistente em toda
+   a action group. Prefixo `ee-action-icon` evita colisão com outros estilos. */
+.ee-action-icon {
+    /* Fora de uma região de densidade: 32x32 com ícone de 15px (como sempre). Dentro de uma
+       (data-ee-density, ver resources/css/system/_control-tokens.scss) acompanha os campos
+       vizinhos: 32, 40 ou 44px. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--ee-control-min-height, 32px);
+    height: var(--ee-control-min-height, 32px);
+    padding: 0;
+    border-radius: var(--ee-control-radius, 8px);
+    border: 1px solid var(--gray-100);
+    background: var(--white);
+    color: var(--gray-700);
+    font-size: var(--ee-icon-size, 15px);
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.12s ease;
+    text-decoration: none;
+}
+
+.ee-action-icon:hover:not(.ee-action-icon--disabled) {
+    background: var(--primary-transparent);
+    color: var(--primary);
+    border-color: var(--primary-transparent);
+}
+
+.ee-action-icon:focus-visible {
+    outline: var(--ee-focus-width, 2px) solid var(--ee-focus-color, #0b5ed7);
+    outline-offset: 2px;
+}
+
+.ee-action-icon:active:not(.ee-action-icon--disabled) {
+    transform: translateY(1px);
+}
+
+.ee-action-icon--disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Variantes seguem semântica do design system. Apenas pintam o ícone — fundo só
+   muda no hover, mantendo aparência flat consistente em listagens. */
+.ee-action-icon--info:hover:not(.ee-action-icon--disabled) {
+    background: var(--info-transparent);
+    color: var(--info);
+}
+
+.ee-action-icon--success {
+    color: var(--success);
+}
+.ee-action-icon--success:hover:not(.ee-action-icon--disabled) {
+    background: rgba(39, 174, 96, 0.08);
+    color: var(--success);
+}
+
+.ee-action-icon--danger {
+    color: var(--danger);
+}
+.ee-action-icon--danger:hover:not(.ee-action-icon--disabled) {
+    background: var(--danger-transparent);
+    color: var(--danger);
+}
+
+.ee-action-icon--warning {
+    color: var(--warning);
+}
+.ee-action-icon--warning:hover:not(.ee-action-icon--disabled) {
+    background: rgba(226, 185, 59, 0.12);
+    color: var(--warning-hover);
+}
+
+.ee-action-icon--primary {
+    color: var(--primary);
+}
+.ee-action-icon--primary:hover:not(.ee-action-icon--disabled) {
+    background: var(--primary-transparent);
+    color: var(--primary-hover);
+}
+</style>

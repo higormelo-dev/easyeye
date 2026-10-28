@@ -1,0 +1,224 @@
+@use "../variables" as *;
+
+.ant-table-cell.ant-table-column-has-sorters{
+	color: var(--cf-gray-900) ;
+    font-size: 14px;
+    font-weight: 600;
+    // padding: 4px 28px 4px 16px !important;
+    background: var(--cf-light) !important;
+}
+.ant-table-cell{
+	color: var(--cf-gray-900) ;
+    background: var(--cf-light) !important;
+    border-bottom: 1px solid #E2E4E6 !important;
+    // padding: 8px 24px 8px 16px !important;
+}
+// .ant-table-column-sorter.ant-table-column-sorter-full
+[data-bs-theme="dark"] .ant-table-cell {
+    background: #03041a !important;
+    border-bottom: 1px solid #37394d !important;
+    border-top: #37394d !important;
+    color: #D9DCFF  !important;
+}
+[data-bs-theme="dark"] .ant-table-column-title {
+    color: #aab8c5 !important;
+}
+[data-bs-theme="dark"] .ant-table-cell.ant-table-cell-row-hover {
+    background: #03041a !important;
+}
+[data-bs-theme="dark"] .ant-table {
+    border: #37394d !important;
+}
+[data-bs-theme="dark"] .ant-table-cell.ant-table-column-sort.ant-table-cell-row-hover {
+    background: #03041a !important;
+    color: #D9DCFF  !important;
+}
+[data-bs-theme="dark"] .ant-table-tbody tr .ant-table-cell.ant-table-column-sort {
+    background: #03041a !important;
+}
+[data-bs-theme="dark"] .ant-table-row.ant-table-row-selected {
+    background: #03041a !important;
+}
+[data-bs-theme="dark"] .ant-table-row-selected .ant-table-cell{
+    background: #03041a !important;
+}
+[data-bs-theme="dark"] .ant-table-cell.ant-table-column-has-sorters::before{
+    background-color: #17181E !important;
+}
+[data-bs-theme="dark"] .ant-table-content{
+	border: 1px solid #37394d;
+}
+[data-bs-theme="dark"] .anticon.anticon-caret-up.ant-table-column-sorter-up{
+	// color: #37394d;
+    display: none;
+}
+[data-bs-theme="dark"] .anticon.anticon-caret-down.ant-table-column-sorter-down{
+	// color: #37394d;
+    display: none;
+}
+.anticon.anticon-caret-up.ant-table-column-sorter-up{
+	// color: #37394d;
+    display: none;
+}
+.anticon.anticon-caret-down.ant-table-column-sorter-down{
+	// color: #37394d;
+    display: none;
+}
+.ant-table-content{
+	border: 1px solid #E2E4E6;
+}
+.ant-table .ant-table-selection .ant-checkbox-checked .ant-checkbox-inner {
+	background-color: #000000;
+	border: 0px solid #B9B9C3;
+}
+.ant-table-tbody>tr.ant-table-row-selected>td {
+	background: transparent !important;
+}
+.ant-table-cell.ant-table-cell-row-hover {
+	background: transparent !important;
+}
+.ant-table-tbody tr .ant-table-cell.ant-table-column-sort{
+	background: transparent !important;
+}
+.ant-table-cell.ant-table-column-sort.ant-table-cell-row-hover{
+	background: transparent !important;
+}
+.ant-pagination-item.ant-pagination-item-1.ant-pagination-item-active{
+	background: #eae1ff;
+    border-color: #7539FF;
+    color: #7539FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+	min-width: 0px !important;
+	margin: 8px 4px;
+	font-size: 14px;
+    padding: 0;
+	border-radius: 5px !important;
+    width: 24px;
+    height: 24px
+}
+.ant-pagination-item.ant-pagination-item-2.ant-pagination-item-active{
+	background: #eae1ff;
+    border-color: #7539FF;
+    color: #7539FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+	min-width: 0px !important;
+	margin: 8px 4px;
+	font-size: 14px;
+    padding: 0;
+	border-radius: 5px !important;
+    width: 24px;
+    height: 24px
+}
+.ant-pagination-item.ant-pagination-item-3.ant-pagination-item-active{
+	background: #eae1ff;
+    border-color: #7539FF;
+    color: #7539FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+	min-width: 0px !important;
+	margin: 8px 4px;
+	font-size: 14px;
+    padding: 0;
+	border-radius: 5px !important;
+    width: 24px;
+    height: 24px
+}
+.ant-pagination-item.ant-pagination-item-2{
+	background: var(--cf-light);
+    border-color: #E2E4E6;
+    color: var(--cf-gray-900);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+	min-width: 0px !important;
+	margin: 8px 4px;
+	font-size: 14px;
+    padding: 0;
+	border-radius: 5px !important;
+    width: 24px;
+    height: 24px
+}
+.ant-pagination-item.ant-pagination-item-3{
+	background: var(--cf-light);
+    border-color: #E2E4E6;
+    color: var(--cf-gray-900);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+	min-width: 0px !important;
+	margin: 8px 4px;
+	font-size: 14px;
+    padding: 0;
+	border-radius: 5px !important;
+    width: 24px;
+    height: 24px
+}
+.ant-pagination-item.ant-pagination-item-1{
+	background: var(--cf-light);
+    border-color: #E2E4E6;
+    color: var(--cf-gray-900);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+	min-width: 0px !important;
+	margin: 8px 4px;
+	font-size: 14px;
+    padding: 0;
+	border-radius: 5px !important;
+    width: 24px;
+    height: 24px
+}
+.ant-pagination-item-link{
+	width: 0px !important;
+	height: 0px !important;
+	min-width: 0px !important;
+	margin: 2px 11px;
+	font-size: 14px;
+    padding: 0;
+	border-radius: 5px !important;
+    width: 24px;
+    height: 24px
+}
+.ant-table-wrapper .ant-table-pagination.ant-pagination{
+	margin: 1px 0;
+	justify-content: end !important;
+}
+.ant-table .ant-table-container .ant-table-content .ant-table-tbody .ant-table-row .ant-table-cell{
+    font-family: 'Inter',
+}
+.ant-picker-suffix span{
+    display: none;
+}
+.ant-picker-dropdown{
+    z-index: 1055 !important;
+}
+
+[data-bs-theme="dark"] .control{
+    border: 1px solid #37394d;
+    height: 40px;
+    background-color: #03041a;
+    outline: none;
+    color: #fff !important; 
+}
+[data-bs-theme="dark"] .menu-option{
+    color: #fff !important; 
+    background-color: #17181E;
+}
+[data-bs-theme="dark"] .menu-option.focused{
+    color: #fff !important;
+    background-color: #17181E;
+}
+[data-bs-theme="dark"] .menu-option:hover{
+    background-color: #17181E !important;
+}
+[data-bs-theme="dark"] .single-value{
+    color: #fff !important;
+}
+[data-bs-theme="dark"] .control .indicators-container .dropdown-icon{
+    color: #fff !important;
+}

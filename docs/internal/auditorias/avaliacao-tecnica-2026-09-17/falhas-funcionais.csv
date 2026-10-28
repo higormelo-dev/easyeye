@@ -1,0 +1,18 @@
+classe,teste,resumo
+Tests.Feature.AclTest,Doctor nao pode acessar reports,Expected response status code [403] but received 404.
+Tests.Feature.AclTest,Secretary nao pode acessar reports,Expected response status code [403] but received 404.
+Tests.Feature.AclTest,User nao pode acessar reports,Expected response status code [403] but received 404.
+Tests.Feature.AclTest,Financial pode acessar reports,Expected response status code [200] but received 404.
+Tests.Feature.AclTest,Admin pode acessar reports,Expected response status code [200] but received 404.
+Tests.Feature.EyeImages.ExternalExamImportTest,it laterality (OD/OE) enviado no import é persistido no PatientExam; omitido fica null (AO),Failed asserting that 2 is null.
+Tests.Feature.Manager.IntegratorUpdatesControllerTest,it publishes an installer and deactivates previous builds of the same target,Expecting null not to be null .
+Tests.Feature.MedicalRecord.ProcedureSearchTest,it indications.search busca por description (entidade + globais),Colisão de valor sintético de factory no índice entities_subdomain_unique (banco de teste).
+Tests.Feature.PanelDashboardStockAlertsTest,it [GAP] clínica sem o módulo de estoque no plano recebe stockAlerts null mesmo com produto abaixo do mínimo,Property [stockAlerts] does not match the expected value.
+Tests.Feature.Stock.IolLensesTest,it [REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403 ao acessar/cadastrar lente IOL,Expected response status code [403] but received 200.
+Tests.Feature.Stock.ProductCategoriesTest,it [REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403 ao acessar/cadastrar categoria,Expected response status code [403] but received 200.
+Tests.Feature.Stock.ProductImportsTest,it [REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403 em toda rota de importação,Expected response status code [403] but received 200.
+Tests.Feature.Stock.ProductsTest,it clínica SEM o módulo de estoque no plano recebe 403 ao acessar produtos,Expected response status code [403] but received 200.
+Tests.Feature.Stock.ProductsTest,it [GAP][REGRA DE NEGÓCIO] search() sem o módulo de estoque no plano retorna 403,Expected response status code [403] but received 200.
+Tests.Feature.Stock.StockCountsTest,it [REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403,Expected response status code [403] but received 200.
+Tests.Feature.Stock.StockReportsTest,it [REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403,Expected response status code [403] but received 200.
+Tests.Feature.Stock.StockReportsTest,it [GAP][REGRA DE NEGÓCIO] exportCsv() sem o módulo de estoque no plano recebe 403,Expected response status code [403] but received 200.

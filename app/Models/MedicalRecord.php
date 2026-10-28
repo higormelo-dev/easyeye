@@ -1,0 +1,509 @@
+<?php
+
+namespace App\Models;
+
+use App\Domains\Recall\Services\RecallOutbox;
+use App\Models\Concerns\BelongsToEntity;
+use App\Traits\{Auditable, HasAuditColumns, Signable, Versionable};
+use Closure;
+use Illuminate\Database\Connection;
+use Illuminate\Database\Eloquent\{Builder, Factories\HasFactory, Model, SoftDeletes};
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
+
+class MedicalRecord extends Model
+{
+    use Auditable;
+    use BelongsToEntity;
+
+    // use HasFactory;
+    use HasAuditColumns;
+    use HasUuids;
+    use Signable;
+    use SoftDeletes;
+    use Versionable;
+
+    protected $primaryKey = 'id';
+
+    /**
+     * clinical_revision nasce em 1 no PHP, não só no banco (migration
+     * default(1)) — sem isto, a instância recém-criada em memória (antes de
+     * um reload) mostraria null pro primeiro show() da tela, e o 1º
+     * clinical_revision enviado ao assinar não bateria com o que o banco
+     * de fato tem (mesmo achado de EyeImageReportDraft::$attributes).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'clinical_revision' => 1,
+    ];
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'patient_id',
+        'doctor_id',
+        'schedule_id',
+        'entity_id',
+        // Exame físico — seleções
+        'visual_acuity_type_id',
+        'near_point_convergence_id',
+        'cover_test_type_id',
+        'color_vision_type_id',        // CBO: visão cromática (campo corrigido)
+        'visual_acuity_without_correction_right_id',
+        'visual_acuity_without_correction_left_id',
+        'visual_acuity_with_correction_right_id',
+        'visual_acuity_with_correction_left_id',
+        'addition_type_id',
+        'lens_away_id',
+        'lens_near_id',
+        // Multi-características de lente (Multifocal + Antirreflexo...) —
+        // arrays de ids de lenses; os singles acima recebem o 1º item
+        // (retrocompat, ver MedicalRecordService::normalize).
+        'lens_away_ids',
+        'lens_near_ids',
+        'code',
+        // Anamnese — CBO
+        'main_complaint',
+        'hda',                         // CBO: história da doença atual
+        'others_history',              // Outros antecedentes relevantes
+        'diabetic',
+        'diabetic_family',
+        'hypertensive',
+        'hypertensive_family',
+        'glaucomatous',
+        'glaucomatous_family',
+        'ocular_surgical_history',     // CBO: antecedentes cirúrgicos oculares
+        'medications_in_use',          // CBO: medicamentos em uso
+        // Exame físico — texto
+        'ocular_motility',             // CBO: motilidade ocular extrínseca
+        'tonometer_right',
+        'tonometer_left',
+        'tonometer_time',
+        'pachymetry_right',            // CBO: paquimetria OD (μm)
+        'pachymetry_left',             // CBO: paquimetria OE (μm)
+        'gonioscopy_right',            // CBO: gonioscopia OD
+        'gonioscopy_left',             // CBO: gonioscopia OE
+        'dynamic_spherical_right',
+        'dynamic_spherical_left',
+        'dynamic_cylindrical_right',
+        'dynamic_cylindrical_left',
+        'dynamic_axis_right',
+        'dynamic_axis_left',
+        'static_spherical_right',
+        'static_spherical_left',
+        'static_cylindrical_right',
+        'static_cylindrical_left',
+        'static_axis_right',
+        'static_axis_left',
+        'biomicroscopy_right',
+        'biomicroscopy_left',
+        'fundoscopy_right',
+        'fundoscopy_left',
+        'observation_general',
+        'observation_of_lenses',
+        // Cálculo de lentes de contato (entradas + resultados recalculados
+        // no servidor — App\Services\ContactLensCalculator)
+        'contact_lens_calculation',
+        // Uso de lente de contato na anamnese (Fase 2 / A3) — por consulta.
+        'contact_lens_use',
+        // Retrato das medicações ativas e das alergias do paciente no momento
+        // da consulta (Fase 2 / A2) — gravado pelo servidor a cada salvar
+        // (MedicalRecordService), nunca vindo do navegador.
+        'medications_snapshot',
+        'allergies_snapshot',
+        // Diagnóstico — CBO obrigatório (múltiplos CIDs como JSON [{code, description}])
+        'diagnosis_cids',
+        // Conduta — CBO obrigatório
+        'clinical_conduct',            // CBO: conduta clínica / plano terapêutico
+        'follow_up_days',              // CBO: retorno em dias
+        // Assinatura — CFM Res. 2.227/2018
+        'signed_by',
+        'signed_at',
+        'signature_hash',
+        'is_locked',
+    ];
+
+    /** Prefixo do código sequencial do prontuário (`PMR-NNNNNNNNNN`). */
+    private const CODE_PREFIX = 'PMR';
+
+    /** Largura FIXA do sequencial: com largura fixa, ordem textual == ordem numérica. */
+    private const CODE_DIGITS = 10;
+
+    /** Namespaces das chaves de advisory lock (PostgreSQL) deste model. */
+    private const CODE_LOCK_NAMESPACE = 'medical_record_code';
+
+    private const OPENING_LOCK_NAMESPACE = 'medical_record_opening';
+
+    /**
+     * Resolve entity_id + gera code sequencial por entidade.
+     *
+     * Multi-tenancy correto: entity_id é coluna direta (não derivada via
+     * schedule), permitindo prontuário sem agenda (walk-in/admin SaaS).
+     *
+     * Sem entity_id resolvível, fallback global (legado / fixtures de teste).
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $record) {
+            if (blank($record->entity_id)) {
+                $record->entity_id = Schedule::find($record->schedule_id)?->entity_id
+                    ?? session('selected_entity_id');
+            }
+
+            if (blank($record->code)) {
+                $record->code = self::generateCodeForEntity(
+                    $record->getConnection(),
+                    blank($record->entity_id) ? null : (string) $record->entity_id,
+                );
+            }
+        });
+
+        // Token de concorrência do endpoint de assinatura (achado via
+        // revisão adversarial Codex): incrementado a cada atualização bem-
+        // sucedida, pra MedicalRecordsController::sign() exigir a revisão
+        // que o médico de fato revisou (StaleMedicalRecordRevisionException
+        // se outra aba/usuário editou o conteúdo depois). Documento e anexo
+        // (GuardedBySignedRecord) também sobem esta coluna, direto no banco
+        // — por isso quem grava o prontuário precisa de instância FRESCA sob
+        // lock (MedicalRecordService::update), senão o +1 em memória partiria
+        // de um valor defasado. Registrado em
+        // booted() (não num bootXxx() de trait) de propósito: roda DEPOIS
+        // do updating de Signable (guard de prontuário travado, que já
+        // bloqueia esta linha de rodar se is_locked) e DEPOIS do updating de
+        // Versionable (o snapshot precisa capturar a revisão ANTERIOR ao
+        // incremento, não a nova).
+        static::updating(function (self $record) {
+            $record->clinical_revision = ((int) $record->clinical_revision) + 1;
+        });
+    }
+
+    /**
+     * Todo INSERT de prontuário roda numa transação: o lock da numeração
+     * (generateCodeForEntity, pego no `creating`) é de TRANSAÇÃO e precisa
+     * durar até o INSERT ser confirmado. Antes o lock vivia numa transação
+     * própria que terminava ANTES do INSERT — sem transação externa
+     * (MedicalRecordService::store, laudo manual) dois prontuários
+     * simultâneos da mesma clínica saíam com o mesmo código. Com transação
+     * externa (laudo de IA) isto vira savepoint e o lock dura até o commit
+     * externo — quem espera só relê o último código depois disso.
+     *
+     * @param Builder<static> $query
+     */
+    protected function performInsert(Builder $query)
+    {
+        return $this->getConnection()->transaction(fn () => parent::performInsert($query));
+    }
+
+    /**
+     * Gera o próximo code sequencial `PMR-NNNNNNNNNN` da clínica.
+     *
+     * 1. Serializa a numeração da clínica até o fim da transação do INSERT
+     *    (performInsert) — quem espera relê o último código já confirmado.
+     * 2. Considera excluídos (soft delete) e ignora o escopo de tenant da
+     *    sessão: código nunca é reaproveitado.
+     * 3. Só códigos na largura padrão entram na conta — um código fora do
+     *    padrão ("PMR-123") venceria a ordem textual e o próximo repetiria
+     *    um código existente. Usa o índice (entity_id, code): O(1).
+     *
+     * Sem entity_id: fallback global (legado / fixtures de teste).
+     */
+    private static function generateCodeForEntity(Connection $connection, ?string $entityId): string
+    {
+        self::lockCodeNumbering($connection, $entityId);
+
+        $query = static::withoutGlobalScopes()
+            ->where('code', 'like', self::CODE_PREFIX . '-' . str_repeat('_', self::CODE_DIGITS));
+
+        if ($entityId !== null) {
+            $query->where('entity_id', $entityId);
+        }
+
+        $lastCode = $query->orderByDesc('code')->value('code');
+
+        $next = $lastCode !== null
+            ? (int) substr((string) $lastCode, strlen(self::CODE_PREFIX) + 1) + 1
+            : 1;
+
+        return sprintf('%s-%0' . self::CODE_DIGITS . 'd', self::CODE_PREFIX, $next);
+    }
+
+    /**
+     * PostgreSQL: advisory lock de transação por clínica — só quem numera
+     * prontuário na mesma clínica espera (a linha de `entities` fica livre;
+     * um FOR UPDATE nela bloquearia todo INSERT com FK para a clínica).
+     * Demais drivers: lock na linha da entidade (mesmo padrão de
+     * OpenGlosaAppealAction).
+     */
+    private static function lockCodeNumbering(Connection $connection, ?string $entityId): void
+    {
+        if ($connection->getDriverName() === 'pgsql') {
+            $connection->select('select pg_advisory_xact_lock(?)', [self::codeNumberingLockKey($entityId)]);
+
+            return;
+        }
+
+        if ($entityId !== null) {
+            Entity::query()->withoutGlobalScopes()->whereKey($entityId)->lockForUpdate()->first();
+        }
+    }
+
+    /**
+     * Executa $callback numa transação com a abertura de prontuário do
+     * paciente serializada — para fluxos "acha o prontuário da consulta ou
+     * abre um" (laudo manual de imagem, prontuário do laudo de IA). Dentro
+     * do callback o caller RELÊ o prontuário: quem esperou encontra o que a
+     * outra requisição acabou de abrir, em vez de abrir um segundo.
+     *
+     * Chave por paciente (não por agendamento): ConsultationRecordResolver
+     * cai para "qualquer prontuário do mesmo dia", então fluxos com âncoras
+     * diferentes (agendamento X vs. exame avulso) disputam o mesmo prontuário.
+     *
+     * @template TReturn
+     *
+     * @param Closure(): TReturn $callback
+     *
+     * @return TReturn
+     */
+    public static function withRecordOpeningLock(string $entityId, string $patientId, Closure $callback): mixed
+    {
+        $connection = (new static())->getConnection();
+
+        return $connection->transaction(function () use ($connection, $entityId, $patientId, $callback) {
+            if ($connection->getDriverName() === 'pgsql') {
+                $connection->select('select pg_advisory_xact_lock(?)', [self::recordOpeningLockKey($entityId, $patientId)]);
+            } else {
+                Patient::query()->withoutGlobalScopes()->whereKey($patientId)->where('entity_id', $entityId)->lockForUpdate()->first();
+            }
+
+            return $callback();
+        });
+    }
+
+    /**
+     * Trava a linha do prontuário (FOR UPDATE, sem escopos) e diz se ele já
+     * está ASSINADO — a mesma trava que Signable::sign() toma, então quem
+     * escreve conteúdo clínico filho (documento, anexo, evolução,
+     * procedimento) e quem assina se serializam: o que chega depois enxerga o
+     * resultado do outro. O lock vale até o fim da transação ABERTA pelo
+     * caller (sem transação, o FOR UPDATE solta na hora). Prontuário
+     * inexistente ou id nulo contam como não assinado.
+     */
+    public static function lockAndCheckSigned(mixed $recordId): bool
+    {
+        if ($recordId === null) {
+            return false;
+        }
+
+        return (bool) static::query()
+            ->withoutGlobalScopes()
+            ->whereKey($recordId)
+            ->lockForUpdate()
+            ->value('is_locked');
+    }
+
+    private static function codeNumberingLockKey(?string $entityId): int
+    {
+        return self::advisoryLockKey(self::CODE_LOCK_NAMESPACE, $entityId ?? 'global');
+    }
+
+    private static function recordOpeningLockKey(string $entityId, string $patientId): int
+    {
+        return self::advisoryLockKey(self::OPENING_LOCK_NAMESPACE, $entityId . '|' . $patientId);
+    }
+
+    /**
+     * Chave bigint estável (60 bits do sha1, sempre positiva). Colisão entre
+     * escopos só serializaria os dois — nunca mistura números/prontuários.
+     */
+    private static function advisoryLockKey(string $namespace, string $scope): int
+    {
+        return (int) hexdec(substr(sha1($namespace . '|' . $scope), 0, 15));
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'created_at'     => 'datetime',
+            'updated_at'     => 'datetime',
+            'deleted_at'     => 'datetime',
+            'signed_at'      => 'datetime',
+            'is_locked'      => 'boolean',
+            'diagnosis_cids' => 'array',
+            'lens_away_ids'  => 'array',
+            'lens_near_ids'  => 'array',
+            // Cálculo de lentes de contato vinculado à consulta.
+            'contact_lens_calculation' => 'array',
+            'contact_lens_use'         => 'array',
+            'medications_snapshot'     => 'array',
+            'allergies_snapshot'       => 'array',
+            'clinical_revision'        => 'integer',
+        ];
+    }
+
+    /**
+     * Signable: colunas criadas depois de já haver prontuários assinados.
+     * Vazias, ficam fora do hash de integridade — assinaturas anteriores à
+     * coluna seguem conferindo. Coluna nova (nullable) em medical_records
+     * deve entrar aqui.
+     *
+     * @return list<string>
+     */
+    protected function signatureOptionalAttributes(): array
+    {
+        return ['contact_lens_calculation', 'contact_lens_use', 'medications_snapshot', 'allergies_snapshot'];
+    }
+
+    /**
+     * clinical_revision é só o token de concorrência do endpoint de
+     * assinatura (achado via revisão adversarial Codex) — nasce com
+     * default(1) no banco até pra prontuários assinados ANTES desta
+     * coluna existir (backfill da migration, nunca null), então
+     * signatureOptionalAttributes() não bastaria aqui: incluir mudaria o
+     * hash dessas assinaturas antigas sem o conteúdo clínico em si ter
+     * mudado.
+     *
+     * @return list<string>
+     */
+    protected function signatureExcludedAttributes(): array
+    {
+        return ['clinical_revision'];
+    }
+
+    /**
+     * Nomes das características de lente, na ordem escolhida pelo médico,
+     * unidos por " + " (ex.: "MULTIFOCAL + ANTIRREFLEXO"). Fallback pro
+     * single legado quando o array está vazio (registros antigos).
+     */
+    public function lensNamesText(?array $ids, ?string $legacyName): string
+    {
+        $ids = array_values(array_filter($ids ?? []));
+
+        if ($ids === []) {
+            return $legacyName ?? '';
+        }
+
+        $names = Lense::query()->whereIn('id', $ids)->pluck('name', 'id');
+
+        return collect($ids)->map(fn ($id) => $names[$id] ?? null)->filter()->implode(' + ');
+    }
+
+    public function getLensAwayNamesTextAttribute(): string
+    {
+        return $this->lensNamesText($this->lens_away_ids, $this->lensAway?->name);
+    }
+
+    public function getLensNearNamesTextAttribute(): string
+    {
+        return $this->lensNamesText($this->lens_near_ids, $this->lensNear?->name);
+    }
+
+    public function patient(): BelongsTo
+    {
+        return $this->belongsTo(Patient::class, 'patient_id');
+    }
+
+    public function doctor(): BelongsTo
+    {
+        return $this->belongsTo(Doctor::class, 'doctor_id');
+    }
+
+    public function schedule(): BelongsTo
+    {
+        return $this->belongsTo(Schedule::class, 'schedule_id');
+    }
+
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class, 'entity_id');
+    }
+
+    public function visualAcuityType(): BelongsTo
+    {
+        return $this->belongsTo(VisualAcuityType::class, 'visual_acuity_type_id');
+    }
+
+    public function NearPointConvergence(): BelongsTo
+    {
+        return $this->belongsTo(NearPointConvergence::class, 'near_point_convergence_id');
+    }
+
+    public function coverTestType(): BelongsTo
+    {
+        return $this->belongsTo(CoverTestType::class, 'cover_test_type_id');
+    }
+
+    public function colorVisionType(): BelongsTo
+    {
+        return $this->belongsTo(ColorVisionType::class, 'color_vision_type_id');
+    }
+
+    public function visualAcuityTypeWithoutCorrectionRight(): BelongsTo
+    {
+        return $this->belongsTo(VisualAcuityType::class, 'visual_acuity_without_correction_right_id');
+    }
+
+    public function visualAcuityTypeWithoutCorrectionLeft(): BelongsTo
+    {
+        return $this->belongsTo(VisualAcuityType::class, 'visual_acuity_without_correction_left_id');
+    }
+
+    public function visualAcuityTypeWitCorrectionRight(): BelongsTo
+    {
+        return $this->belongsTo(VisualAcuityType::class, 'visual_acuity_with_correction_right_id');
+    }
+
+    public function visualAcuityTypeWitCorrectionLeft(): BelongsTo
+    {
+        return $this->belongsTo(VisualAcuityType::class, 'visual_acuity_with_correction_left_id');
+    }
+
+    public function additionType(): BelongsTo
+    {
+        return $this->belongsTo(AdditionType::class, 'addition_type_id');
+    }
+
+    public function lensAway(): BelongsTo
+    {
+        return $this->belongsTo(Lense::class, 'lens_away_id');
+    }
+
+    public function lensNear(): BelongsTo
+    {
+        return $this->belongsTo(Lense::class, 'lens_near_id');
+    }
+
+    public function documentations(): HasMany
+    {
+        return $this->hasMany(MedicalRecordDocumentation::class);
+    }
+
+    public function files(): HasMany
+    {
+        return $this->hasMany(MedicalRecordFile::class);
+    }
+
+    /** EntityUser que assinou o prontuário (CFM Res. 2.227/2018) */
+    public function signedBy(): BelongsTo
+    {
+        return $this->belongsTo(EntityUser::class, 'signed_by');
+    }
+
+    /**
+     * A assinatura é gravada sem eventos (Signable::sign usa saveQuietly): o recall depende do que está
+     * ASSINADO (a condição por CID só ativa em prontuário assinado), então a marca é explícita, na mesma
+     * transação da assinatura.
+     */
+    protected function afterSignatureWritten(): void
+    {
+        RecallOutbox::mark((string) $this->entity_id, (string) $this->patient_id, 'record_signed');
+    }
+}

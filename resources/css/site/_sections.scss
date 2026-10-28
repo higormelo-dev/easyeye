@@ -1,0 +1,1995 @@
+@use 'variables' as *;
+
+// ─── Hero ────────────────────────────────────────────────────
+.hero {
+    padding: 140px 0 80px;
+    background: linear-gradient(135deg, $navy 0%, $navy-mid 50%, $navy 100%);
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.025'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    @include below($bp-md) {
+        padding: 120px 0 60px;
+    }
+}
+
+.hero-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: .25;
+
+    &-1 { width: 500px; height: 500px; top: -100px; right: -100px; background: $teal; }
+    &-2 { width: 300px; height: 300px; bottom: -50px; left: 10%; background: $purple; }
+}
+
+.hero-inner {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 60px;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+
+    > * { min-width: 0; }
+
+    // Sem o print do prontuário (arquivo ausente), só o texto numa coluna de leitura.
+    &--solo { grid-template-columns: minmax(0, 760px); }
+
+    @include below($bp-xl) { grid-template-columns: 1fr; gap: 40px; }
+}
+
+.hero-text .badge-pill { margin-bottom: 20px; }
+
+.hero-title {
+    @include type-display-hero;
+    color: #fff;
+    margin-bottom: 24px;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+
+    // A caixa do degradê cortava a cauda do "g" de "oftalmológicas":
+    // folga embaixo sem mudar o espaçamento das linhas.
+    em {
+        font-style: normal;
+        background: linear-gradient(135deg, $teal 0%, #00e5ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+        max-width: 100%;
+        padding-bottom: .15em;
+        margin-bottom: -.15em;
+    }
+}
+
+// Texto claro no navy: um pouco mais de entrelinha e de espaço entre letras.
+.hero-sub {
+    font-size: clamp(#{rem(17)}, 1vw + #{rem(14)}, #{rem(20)});
+    color: rgba(#fff, .85);
+    line-height: 1.65;
+    letter-spacing: 0.005em;
+    margin-bottom: 36px;
+    font-weight: 400;
+    max-width: 34em;
+    text-wrap: pretty;
+}
+
+.hero-ctas {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+
+    // No celular os dois botões já quebram de linha: empilhados na largura
+    // toda (alcance do polegar), em vez de dois tamanhos desalinhados.
+    @include below(480px) {
+        flex-direction: column;
+
+        .btn { width: 100%; }
+    }
+}
+
+// Sem plano em teste não há nota: o espaço até a prova social fica o mesmo.
+.hero-ctas + .hero-trust { margin-top: 24px; }
+
+.hero-cta-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 36px;
+    font-size: rem(14);
+    font-weight: 500;
+    color: rgba(#fff, .78);
+
+    i { font-size: 17px; color: $mint; flex-shrink: 0; }
+}
+
+.hero-trust {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: rem(14);
+    color: rgba(#fff, .7);
+}
+
+.hero-trust-avatars {
+    display: flex;
+    flex-shrink: 0;
+
+    span {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        // Branco sobre azul/navy (6:1); o degradê teal→roxo deixava as iniciais em 2,5:1.
+        background: linear-gradient(135deg, $blue, $navy-mid);
+        border: 2px solid rgba(#fff, .4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #fff;
+        font-weight: 700;
+        margin-right: -8px;
+    }
+}
+
+.hero-visual {
+    position: relative;
+    min-width: 0;
+
+    @include below($bp-xl) {
+        width: 100%;
+        max-width: 600px;
+        margin: 20px auto;
+    }
+
+    // No celular, captura e legenda formam um conjunto na mesma largura.
+    @include below($bp-sm) {
+        display: grid;
+        gap: 12px;
+        margin-block: 0;
+    }
+}
+
+.hero-visual-notes {
+    display: contents;
+
+    @include below($bp-sm) {
+        display: grid;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+}
+
+// A camada externa acomoda as marcas sem recortar nem transformar a captura.
+.hero-instrument {
+    position: relative;
+    min-width: 0;
+}
+
+.hero-calibration {
+    position: absolute;
+    inset: -7px;
+    pointer-events: none;
+    color: rgba($teal-lt, .8);
+
+    @include below($bp-sm) { inset: -4px; }
+}
+
+.hero-calibration-corner {
+    position: absolute;
+    display: block;
+    width: 36px;
+    height: 36px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.25;
+    stroke-linecap: round;
+
+    path { vector-effect: non-scaling-stroke; }
+
+    &[data-corner="tl"] { top: 0; left: 0; }
+    &[data-corner="tr"] { top: 0; right: 0; }
+    &[data-corner="br"] { bottom: 0; right: 0; }
+    &[data-corner="bl"] { bottom: 0; left: 0; }
+
+    @include below($bp-sm) { width: 32px; height: 32px; }
+
+    // Estado final completo também antes do JS e ao alterar a preferência.
+    @media (prefers-reduced-motion: reduce) {
+        transform: none !important;
+        opacity: 1 !important;
+    }
+}
+
+// Moldura de navegador em volta do recorte real do prontuário.
+.hero-mockup {
+    background: rgba(#fff, .04);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(#fff, .12);
+    border-radius: $radius-lg;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(#000, .4), inset 0 1px 0 rgba(#fff, .15);
+}
+
+.hero-shot {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #fff;
+}
+
+.mockup-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    background: rgba(#fff, .08);
+    border-bottom: 1px solid rgba(#fff, .08);
+}
+
+.mockup-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+
+    &-r { background: #ff5f57; }
+    &-y { background: #ffbd2e; }
+    &-g { background: #28c840; }
+}
+
+.mockup-url {
+    flex: 1;
+    background: rgba(#fff, .08);
+    border-radius: 4px;
+    height: 22px;
+    margin: 0 8px;
+}
+
+// Legendas estáveis; o único gesto do mockup acontece nas marcas da moldura.
+.hero-float-card {
+    position: absolute;
+    z-index: 10;
+    max-width: 290px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 18px;
+    box-shadow:
+        0 1px 2px rgba(#000, .06),     // contorno crisp próximo ao card
+        0 12px 32px rgba(#000, .14),   // sombra ambiente para destacar do mockup
+        0 24px 56px rgba(#000, .08);   // halo amplo (camada extra de profundidade)
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: $navy;
+
+    > div:last-child { min-width: 0; overflow-wrap: anywhere; }
+
+    .icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    // O recuo das legendas mantém os quatro cantos livres.
+    &.card-top    { top: -20px; left: 32px; }
+    &.card-bottom { bottom: -16px; right: 32px; }
+
+    @include below($bp-xl) {
+        max-width: min(290px, 80%);
+    }
+
+    // Celular: duas linhas de uma única legenda, sem deslocamentos decorativos.
+    @include below($bp-sm) {
+        position: static;
+        max-width: none;
+        min-width: 0;
+        padding: 12px 14px;
+        gap: 10px;
+        border-radius: 0;
+        box-shadow: none;
+
+        &.card-top { border-bottom: 1px solid $border; }
+
+        .icon { width: 30px; height: 30px; font-size: rem(15); border-radius: 8px; }
+    }
+}
+
+.hero-float-lbl {
+    @include type-eyebrow;
+    color: #475569;
+    margin-bottom: 2px;
+}
+
+.hero-float-val {
+    font-size: rem(15);
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    color: $navy;
+
+    @include below($bp-sm) { font-size: rem(14); }
+}
+
+// ─── Metrics ─────────────────────────────────────────────────
+.metrics {
+    background: linear-gradient(90deg, $navy 0%, $navy-mid 100%);
+    padding: 40px 0;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    text-align: center;
+
+    // Quatro colunas precisam acomodar também os rótulos em inglês.
+    @include below($bp-lg) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+
+        .metric-item:nth-child(2) { border-right: none; }
+    }
+}
+
+.metric-item {
+    padding: 20px;
+    border-right: 1px solid rgba(#fff, .12);
+
+    &:last-child { border-right: none; }
+
+    @include below($bp-sm) { padding: 16px 12px; }
+}
+
+.metric-value {
+    font-size: clamp(#{rem(36)}, 5vw, #{rem(48)});
+    @include type-numeral;
+    background: linear-gradient(135deg, #fff 0%, $teal 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+    // Folga para a vírgula de "99,9%" (a caixa do degradê cortava).
+    padding-bottom: .12em;
+    margin-bottom: calc(8px - .12em);
+    display: inline-block;
+
+    @include below($bp-sm) { font-size: clamp(#{rem(32)}, 6vw, #{rem(40)}); }
+}
+
+.metric-label {
+    font-size: rem(15);
+    color: rgba(#fff, .75);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+}
+
+.metrics-context {
+    summary { cursor: pointer; min-height: 44px; padding-block: 12px; font-weight: 600; color: rgba(#fff, .9); }
+    p { margin-top: 8px; }
+    max-width: 36em;
+    margin: 24px auto 0;
+    text-align: center;
+    @include type-meta;
+    color: rgba(#fff, .65);
+    text-wrap: balance;
+}
+
+// ─── Problemas que resolve ──────────────────────────────────────
+.problems {
+    padding: 100px 0;
+    background: $bg-white;
+}
+
+.problems-header { margin-bottom: 48px; }
+
+// 4 dores numa linha no desktop (antes 6 em 3×2); 2×2 no tablet.
+.problems-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 24px;
+
+    @include below($bp-xl) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @include below(600px)  { grid-template-columns: 1fr; gap: 16px; }
+}
+
+.problem-card {
+    min-width: 0;
+    // A linha acompanha o maior conteúdo, mantendo as bases dos cartões
+    // alinhadas sem limitar títulos traduzidos ou detalhes abertos.
+    align-self: stretch;
+    background: $bg;
+    border: 1px solid $border;
+    border-radius: $radius;
+    padding: 24px 20px;
+
+    h3 { @include type-title-sm; min-width: 0; color: $navy; text-wrap: balance; overflow-wrap: anywhere; }
+    p { @include type-body-card; color: $text-muted; margin-top: 16px; text-wrap: pretty; }
+    summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+    .problem-icon { grid-column: 1 / -1; margin: 0; }
+    .disclosure-chevron { font-size: rem(18); line-height: 1.35; }
+
+    @include below($bp-sm) {
+        padding: 18px 16px;
+        summary { grid-template-columns: 36px minmax(0, 1fr) auto; }
+        .problem-icon { grid-column: auto; width: 36px; height: 36px; }
+    }
+}
+
+.problem-card summary,
+.diff-card summary {
+    min-height: 44px;
+    cursor: pointer;
+    list-style: none;
+    &::-webkit-details-marker { display: none; }
+}
+.disclosure-chevron { color: $text-muted; transition: transform $dur-fast ease; }
+details[open] > summary .disclosure-chevron { transform: rotate(180deg); }
+
+.problem-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba($red, .1);
+    color: $red;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 16px;
+    transition: transform $dur-slow $ease-out;
+}
+
+// ─── Demonstração visual (logo depois das dores) ───────────────
+.demo {
+    padding: 100px 0;
+    background: $bg;
+}
+
+.demo-header { margin-bottom: 32px; }
+
+.demo-tabs {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 32px;
+
+    // Abaixo de ~740px as 4 abas não cabem numa linha e quebravam em 2+1+1
+    // de larguras diferentes: grade 2×2, todas visíveis e alinhadas.
+    @include below(740px) {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+
+        .demo-tab {
+            justify-content: center;
+            padding-inline: 12px;
+            text-align: center;
+            line-height: 1.3;
+        }
+    }
+}
+
+.demo-tab {
+    display: flex;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    min-height: 44px;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1.5px solid $border;
+    background: #fff;
+    color: $text-muted;
+    font-weight: 600;
+    font-size: rem(14);
+    cursor: pointer;
+    transition:
+        transform $dur-base $ease-out,
+        box-shadow $dur-base $ease-out,
+        background-color $dur-fast ease,
+        border-color $dur-fast ease,
+        color $dur-fast ease;
+    font-family: inherit;
+
+    i { font-size: rem(16); flex-shrink: 0; }
+
+    &:hover { border-color: $teal; color: $navy; }
+    &:active { transform: scale(.985); transition-duration: $dur-press; }
+
+    &.active {
+        background: $navy;
+        border-color: $navy;
+        color: #fff;
+        box-shadow: 0 4px 12px rgba($navy, .2);
+    }
+}
+
+.demo-panel-wrap {
+    display: grid;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.demo-panel {
+    grid-area: 1 / 1;
+    min-width: 0;
+    opacity: 0;
+    visibility: hidden;
+    translate: 0 4px;
+    transition: opacity $dur-base ease, translate $dur-base $ease-out, visibility 0s linear $dur-base;
+
+    // Deslocamento curto mantém a relação entre aba e captura, sem salto de layout.
+    &.is-active {
+        opacity: 1;
+        visibility: visible;
+        translate: 0 0;
+        transition: opacity $dur-base ease, translate $dur-base $ease-out, visibility 0s;
+    }
+
+    &:focus-visible {
+        outline-offset: 6px;
+        border-radius: $radius-lg;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        &, &.is-active { transition: none; }
+    }
+}
+
+.demo-mockup {
+    background: #fff;
+    border: 1px solid $border;
+    border-radius: $radius-lg;
+    overflow: hidden;
+    box-shadow: $shadow-lg;
+
+    img {
+        display: block;
+        width: 100%;
+        height: auto;
+    }
+}
+
+.demo-mockup-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    background: $bg;
+    border-bottom: 1px solid $border;
+}
+
+.demo-mockup-url {
+    flex: 1;
+    background: $bg-white;
+    border: 1px solid $border;
+    border-radius: 4px;
+    height: 22px;
+    margin: 0 8px;
+}
+
+.demo-caption {
+    max-width: 34em;
+    margin: 20px auto 0;
+    text-align: center;
+    color: $text-muted;
+    @include type-body-card;
+    text-wrap: balance;
+}
+
+// A Inter itálica não é carregada (seriam +80 KB): nada de itálico sintetizado.
+.demo-fictitious { font-weight: 600; white-space: nowrap; }
+
+// Só no celular, onde o print fica pequeno: abre a imagem inteira.
+.demo-enlarge {
+    display: none;
+
+    @include below($bp-sm) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: fit-content;
+        min-height: 44px;
+        margin: 4px auto 0;
+        font-size: rem(14);
+        font-weight: 600;
+        color: $teal-ink;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+}
+
+.hero-enlarge { color: #fff; }
+
+// ─── Funcionalidades por público ─────────────────────────────────
+// Recepção, consultório e faturamento (antes Benefícios + Funcionalidades,
+// 14 cartões repetindo as mesmas capacidades).
+.audiences {
+    padding: 100px 0;
+    background: $bg-white;
+}
+
+.audiences-header { margin-bottom: 40px; }
+
+.audiences-grid {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+
+    @include below($bp-xl) {
+        grid-template-columns: 1fr;
+        max-width: 640px;
+        margin-inline: auto;
+    }
+}
+
+.audience-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 28px;
+    background: $bg;
+    border: 1px solid $border;
+    border-radius: 16px;
+
+    h3 {
+        @include type-title-md;
+        color: $navy;
+        margin: 0 0 8px;
+        text-wrap: balance;
+    }
+
+    @include below($bp-sm) { padding: 24px 20px; }
+}
+
+.audience-details {
+    margin-top: auto;
+    summary {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        min-height: 44px;
+        padding-block: 10px;
+        color: $teal-ink;
+        font-size: rem(15);
+        font-weight: 600;
+        line-height: 1.5;
+        cursor: pointer;
+        list-style: none;
+        transition: color $dur-fast ease;
+
+        &:hover { color: $navy; }
+
+        &::-webkit-details-marker { display: none; }
+        &::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            flex-shrink: 0;
+            border-right: 1.5px solid currentColor;
+            border-bottom: 1.5px solid currentColor;
+            transform: rotate(-45deg);
+            transition: transform $dur-fast $ease-out;
+        }
+        &:focus-visible { outline: 2px solid $teal-ink; outline-offset: 4px; border-radius: 4px; }
+    }
+    &[open] summary::before { transform: rotate(45deg); }
+    .audience-list { margin: 8px 0 0; }
+}
+
+.audience-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: $navy;
+    color: $teal-lt;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.audience-for {
+    @include type-meta;
+    font-weight: 600;
+    color: $teal-ink;
+    margin-bottom: 20px;
+}
+
+.audience-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 0 0 20px;
+    padding: 0;
+
+    li {
+        display: flex;
+        gap: 10px;
+        @include type-body-card;
+        color: $text;
+    }
+
+    li > i { font-size: 18px; color: $mint; flex-shrink: 0; margin-top: 2px; }
+}
+
+// As linhas acompanham o maior conteúdo de cada coluna, sem alturas fixas.
+@media (min-width: 961px) {
+    @supports (grid-template-rows: subgrid) {
+        .audiences-grid { row-gap: 0; }
+        .audience-card {
+            display: grid;
+            grid-template-rows: subgrid;
+            grid-row: span 6;
+        }
+        .audience-card > .audience-list {
+            display: grid;
+            grid-template-rows: subgrid;
+            grid-row: span 2;
+            row-gap: 14px;
+        }
+        .audience-details { margin-top: 0; }
+    }
+}
+
+// "Disponível no Pro e Premium": vem dos planos do banco (Home.vue → availability()).
+.audience-plan {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba($blue, .1);
+    color: $navy-mid;
+    font-size: rem(12);
+    font-weight: 600;
+    line-height: 1.6;
+}
+
+// Fluxo TISS ocupa uma faixa própria, sem alongar apenas o cartão de faturamento.
+.audience-flow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 24px;
+    padding: 24px 0 0;
+    border-top: 1px solid $border;
+
+    @include below($bp-xl) {
+        max-width: 640px;
+        margin-inline: auto;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+}
+
+.audience-flow-label {
+    @include type-title-sm;
+    flex-shrink: 0;
+    color: $navy;
+    margin: 0;
+}
+
+.audience-flow-steps {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 8px;
+    margin: 0;
+    padding: 0;
+
+    li { display: flex; align-items: center; }
+
+    // Seta entre as etapas, desenhada em CSS (fora da pílula).
+    li:not(:last-child)::after {
+        content: '';
+        width: 6px;
+        height: 6px;
+        margin: 0 10px 0 7px;
+        border-top: 1.5px solid $text-muted;
+        border-right: 1.5px solid $text-muted;
+        transform: rotate(45deg);
+        flex-shrink: 0;
+        transition: opacity $dur-base $ease-out;
+    }
+
+    // Estado final (etapa concluída): pílula com o tom do teal.
+    span {
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba($teal, .08);
+        border: 1px solid rgba($teal, .4);
+        font-size: rem(13);
+        font-weight: 600;
+        color: $navy;
+        white-space: nowrap;
+        transition:
+            background-color $dur-base $ease-out,
+            border-color $dur-base $ease-out,
+            color $dur-base $ease-out;
+    }
+}
+
+// Fluxo TISS, momento principal do movimento (Home.vue → tissFlow): antes de
+// entrar na tela as etapas ficam "a fazer" (tracejadas, legíveis a 5,1:1) e,
+// ao entrar, se concluem na ordem da guia ao retorno, uma única vez.
+.audience-flow.is-armed .audience-flow-steps {
+    li:not(:last-child)::after { opacity: .3; }
+
+    span {
+        background: transparent;
+        border-style: dashed;
+        border-color: $border;
+        color: $text-muted;
+    }
+}
+
+.audience-flow.is-played .audience-flow-steps {
+    span,
+    li::after { transition-delay: calc(var(--step, 0) * 120ms); }
+}
+
+// ─── How It Works ─────────────────────────────────────────────
+.how {
+    padding: 100px 0;
+    background: $bg;
+}
+
+.how-inner {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 80px;
+    align-items: center;
+
+    > * { min-width: 0; }
+
+    // Sem o print, os passos ficam sozinhos numa coluna de leitura.
+    &--solo { grid-template-columns: minmax(0, 720px); }
+
+    @include below($bp-lg) { grid-template-columns: 1fr; gap: 40px; }
+}
+
+.how-sub { margin-bottom: 36px; }
+
+// Passos fixos (antes giravam sozinhos e pareciam clicáveis sem fazer nada).
+.how-steps {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+}
+
+.how-step {
+    display: flex;
+    gap: 20px;
+    padding: 24px 0;
+    border-bottom: 1px solid $border;
+
+    &:last-child { border-bottom: none; }
+}
+
+.how-step-num {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: $navy;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.how-step-content {
+    min-width: 0;
+
+    h3 { @include type-title-sm; color: $navy; margin-bottom: 6px; }
+    p  { @include type-body; color: $text-muted; }
+}
+
+.how-visual {
+    border-radius: $radius-lg;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: $shadow-lg;
+
+    img {
+        display: block;
+        width: 100%;
+        height: auto;
+        // O recorte corta a lista na borda direita: esmaece para o branco do quadro.
+        -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent);
+        mask-image: linear-gradient(90deg, #000 78%, transparent);
+    }
+}
+
+// ─── Diferenciais ───────────────────────────────────────────────
+.differentiators {
+    padding: 100px 0;
+    background: $bg-white;
+}
+
+.diff-header { margin-bottom: 48px; }
+
+.diff-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+
+    @include below($bp-md) { grid-template-columns: 1fr; }
+}
+
+.diff-card {
+    align-self: start;
+    padding: 18px 20px;
+    border-radius: $radius;
+    background: $bg;
+
+    summary { display: flex; align-items: center; gap: 16px; }
+    h3 { flex: 1; min-width: 0; @include type-title-sm; color: $navy; text-wrap: balance; }
+    p { @include type-body-card; color: $text-muted; margin-top: 16px; }
+}
+
+.diff-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba($teal, .1);
+    color: $teal-ink;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+    flex-shrink: 0;
+    transition: transform $dur-slow $ease-out;
+}
+
+// Conformidade na prática: mecanismos reais do produto (auditoria, versões,
+// assinatura, consentimentos), no lugar da seção de selos solta.
+.diff-proof {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 24px 48px;
+    align-items: center;
+    padding: 40px 48px;
+    border-radius: $radius-lg;
+    background: linear-gradient(135deg, $navy 0%, $navy-mid 100%);
+    box-shadow: 0 20px 40px rgba($navy, .2);
+
+    @include below($bp-lg) { grid-template-columns: 1fr; gap: 20px; padding: 32px 28px; }
+    @include below($bp-sm) { padding: 28px 20px; }
+}
+
+.diff-proof-title {
+    @include type-title-lg;
+    color: #fff;
+    text-wrap: balance;
+}
+
+.diff-proof-list {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.comp-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: rgba(#fff, .06);
+    border: 1px solid rgba(#fff, .14);
+    font-size: rem(14);
+    font-weight: 600;
+    color: #fff;
+
+    i { font-size: 18px; color: $mint; flex-shrink: 0; }
+}
+
+// ─── Testimonials ─────────────────────────────────────────────
+.testimonials {
+    padding: 100px 0;
+    background: $bg;
+}
+
+.testimonials-header { margin-bottom: 56px; }
+
+// Ressalva, não linha fina: tamanho de metadado e medida curta.
+.section-sub.testimonials-context { @include type-meta; max-width: 34em; text-wrap: balance; }
+
+.testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+
+    @include below($bp-lg) {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        margin: 0 auto;
+    }
+}
+
+.testimonial-card {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: $radius-lg;
+    padding: 28px;
+    border: 1px solid $border;
+    box-shadow: $shadow;
+}
+
+.testimonial-stars {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 14px;
+}
+
+.testimonial-star {
+    width: 16px;
+    height: 16px;
+    fill: $yellow;
+
+    &.is-empty { fill: none; stroke: $yellow; stroke-width: 1.5; }
+}
+
+// Sem itálico sintetizado (a Inter itálica não é carregada); as aspas marcam a citação.
+.testimonial-text {
+    @include type-body-card;
+    line-height: 1.65;
+    color: $text;
+    margin-bottom: 20px;
+}
+
+// Autor sempre no pé do cartão, alinhado entre os três.
+.testimonial-author { display: flex; align-items: center; gap: 12px; margin-top: auto; }
+
+.testimonial-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, $navy, $blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: rem(16);
+    flex-shrink: 0;
+}
+
+.testimonial-name { font-weight: 700; font-size: rem(14); color: $navy; }
+.testimonial-role { @include type-micro; color: $text-muted; }
+
+// ─── Pricing ──────────────────────────────────────────────────
+.pricing {
+    padding: 100px 0;
+    background: $bg-white;
+}
+
+.pricing-header { margin-bottom: 32px; }
+
+// O que todo plano tem, dito uma vez (antes repetido ou ausente em cada card).
+.pricing-included {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 10px;
+    max-width: 72ch;
+    margin: 0 auto 48px;
+    padding: 14px 20px;
+    border-radius: $radius;
+    background: $bg;
+    @include type-body-card;
+    color: $text;
+    text-wrap: pretty;
+
+    i { font-size: 20px; color: $mint; flex-shrink: 0; margin-top: 1px; }
+    strong { color: $navy; }
+}
+
+.pricing-empty {
+    text-align: center;
+    padding: 60px 20px;
+
+    > i { display: block; font-size: 56px; color: $border; margin-bottom: 20px; }
+}
+
+.pricing-empty-title { @include type-title-md; color: $navy; margin-bottom: 12px; }
+.pricing-empty-text  { @include type-body; color: $text-muted; margin-bottom: 32px; }
+
+.pricing-credit-note {
+    margin: 32px 0 0;
+    padding: 32px;
+    background: $bg;
+    border-radius: 16px;
+    border: 1px solid $border;
+    scroll-margin-top: 100px;
+
+    p {
+        @include type-body-card;
+        color: $text-muted;
+        margin: 0;
+        max-width: 68ch;
+        text-wrap: pretty;
+    }
+
+    // Mesma largura e recuos do integrador quando os planos ficam empilhados.
+    @media (max-width: 959px) {
+        max-width: 520px;
+        margin: 24px auto 0;
+        padding: 24px;
+    }
+    @media (max-width: 359px) { padding: 20px; }
+}
+
+.pricing-credit-heading {
+    h3 {
+        @include type-title-lg;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        color: $navy;
+        margin: 0 0 12px;
+        text-wrap: balance;
+    }
+    i { order: 1; font-size: 24px; color: $teal-ink; flex-shrink: 0; margin: 1px 0 0 auto; }
+}
+
+.pricing-credit-rules {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 32px;
+    margin: 24px 0;
+
+    dt { @include type-body; font-weight: 700; color: $navy; margin: 0 0 6px; }
+    dd { @include type-body-card; color: $text-muted; margin: 0; max-width: 68ch; text-wrap: pretty; }
+
+    @media (max-width: 959px) { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+}
+
+.pricing-credit-terms {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 32px;
+    padding-top: 20px;
+    border-top: 1px solid $border;
+
+    p:first-child { grid-row: span 2; }
+
+    @media (max-width: 959px) {
+        grid-template-columns: minmax(0, 1fr);
+        p:first-child { grid-row: auto; }
+    }
+}
+
+// ─── FAQ ──────────────────────────────────────────────────────
+.faq {
+    padding: 100px 0;
+    background: $bg;
+}
+
+.faq-header { margin-bottom: 48px; }
+
+.faq-list {
+    max-width: 760px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.faq-item {
+    background: #fff;
+    border-radius: $radius;
+    border: 1px solid $border;
+    overflow: hidden;
+}
+
+// A pergunta é um <button> dentro de <h3> (acordeão acessível): herda o visual
+// de antes, sem os estilos padrão de título e de botão.
+.faq-heading {
+    margin: 0;
+    font: inherit;
+}
+
+.faq-question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 20px 24px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: rem(18);
+    line-height: 1.4;
+    text-align: left;
+    color: $navy;
+    gap: 16px;
+    transition: background-color $dur-fast ease;
+
+    &:hover { background: $bg; }
+
+    // .faq-item corta o que passa da borda (overflow hidden): anel por dentro.
+    &:focus-visible { outline-offset: -2px; }
+
+    i {
+        font-size: 18px;
+        color: $text-muted;
+        flex-shrink: 0;
+        transition: transform $dur-base $ease-out, color $dur-fast ease;
+    }
+
+    // Aberta: o + gira para ×.
+    &[aria-expanded="true"] i { transform: rotate(45deg); color: $navy; }
+}
+
+// Altura animada sem medir em JS: a linha do grid vai de 0fr a 1fr. Fechar é
+// mais rápido que abrir; fechada, visibility: hidden (fora do Tab e do leitor).
+.faq-answer {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    padding: 0 24px;
+    @include type-body;
+    color: $text-muted;
+    transition: grid-template-rows $dur-base $ease-out, visibility 0s linear $dur-base;
+
+    &.is-open {
+        grid-template-rows: 1fr;
+        visibility: visible;
+        transition: grid-template-rows $dur-base $ease-out, visibility 0s;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        &, &.is-open { transition: none; }
+    }
+}
+
+.faq-answer-clip { min-height: 0; overflow: hidden; }
+
+// Medida de leitura (~70 caracteres); antes a resposta corria os 710px do cartão.
+.faq-answer-inner { max-width: 68ch; padding-bottom: 20px; text-wrap: pretty; }
+
+// ─── Contact ──────────────────────────────────────────────────
+// Fundo branco: alterna com o FAQ ($bg) em vez de emendar duas faixas iguais.
+.contact {
+    padding: 100px 0;
+    background: $bg-white;
+}
+
+.contact-header {
+    grid-area: intro;
+    min-width: 0;
+    text-align: left;
+
+    @include below($bp-xl) {
+        text-align: center;
+        margin-bottom: 16px;
+    }
+}
+
+.contact-header .section-title {
+    margin-inline: 0;
+
+    @include below($bp-xl) { margin-inline: auto; }
+}
+
+.contact-subline {
+    @include type-lead;
+    color: $text-muted;
+    max-width: 34em;
+    margin: 0;
+    text-wrap: balance;
+
+    @include below($bp-xl) { margin-inline: auto; }
+}
+
+.contact-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    // A introdução faz parte da coluna de canais; o formulário inicia ao lado.
+    // Isso equilibra o conteúdo sem depender de depoimentos ou alongar cartões.
+    grid-template-areas: "intro form" "sales form" "aside form";
+    grid-template-rows: auto auto 1fr;
+    gap: 24px 40px;
+    align-items: start;
+    margin-bottom: 48px;
+
+    @include below($bp-xl) {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "intro" "sales" "form" "aside";
+        grid-template-rows: auto;
+        gap: 24px;
+    }
+}
+.contact-sales { grid-area: sales; }
+.contact-aside-item .contact-hours { margin: 10px 0 0; font-size: rem(13); }
+
+// Formulário
+.contact-form-box {
+    grid-area: form;
+    min-width: 0;
+    background: $bg-white;
+    border-radius: $radius-lg;
+    padding: 40px;
+    border: 1px solid $border;
+    box-shadow: $shadow;
+    // Os campos lado a lado dependem da largura do FORMULÁRIO, não da tela:
+    // no tablet deitado (~1024px) a coluna do form é estreita e o e-mail
+    // aparecia cortado ("voce@exemplo.con").
+    container: cf-box / inline-size;
+
+    h3 { @include type-title-md; color: $navy; margin-bottom: 6px; }
+    > p { @include type-body-card; color: $text-muted; margin-bottom: 28px; }
+
+    @include below($bp-sm) { padding: 24px 20px; }
+}
+
+.cf-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    // Só entre colunas: empilhados, o espaço vertical vem da margem do
+    // .cf-group (antes somava 16px a mais só entre os pares de campos).
+    column-gap: 16px;
+
+    @container cf-box (max-width: 420px) { grid-template-columns: 1fr; }
+}
+
+.cf-fields {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.cf-optional {
+    margin: 4px 0 24px;
+    border-block: 1px solid $border;
+    padding-block: 4px;
+
+    // O cargo selecionado não quebra linha no select. Na coluna lateral do
+    // contato, ele precisa de mais espaço que os campos de nome e e-mail.
+    @container cf-box (max-width: 32rem) {
+        .cf-row { grid-template-columns: minmax(0, 1fr); }
+    }
+}
+.cf-optional-title {
+    min-height: 44px;
+    padding-block: 12px;
+    color: $teal-ink;
+    font-size: rem(15);
+    font-weight: 600;
+    cursor: pointer;
+}
+.cf-optional-hint { @include type-meta; color: $text-muted; margin-bottom: 16px; }
+.cf-optional-label { font-size: rem(13); font-weight: 400; color: $text-muted; }
+.cf-optional-fields { padding-top: 4px; }
+
+.cf-message {
+    display: block;
+    resize: vertical;
+    min-height: 140px;
+}
+
+.cf-hint,
+.cf-field-error {
+    margin: 6px 0 0;
+    font-size: rem(14);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.cf-hint { color: $text-muted; }
+.cf-field-error { color: #a11b2b; }
+
+.cf-error-summary {
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    border: 1px solid #e7a8b0;
+    border-radius: 8px;
+    color: #a11b2b;
+    background: #fff5f6;
+    font-size: rem(14);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.cf-control[aria-invalid="true"] {
+    border-color: #a11b2b;
+
+    // Corrigir um campo não apaga seu estado de erro até o usuário editá-lo.
+    &:focus {
+        border-color: #a11b2b;
+        box-shadow: 0 0 0 4px rgba(#a11b2b, .12), 0 1px 2px rgba(#000, .05);
+    }
+}
+
+.cf-group {
+    min-width: 0;
+    margin-bottom: 18px;
+
+    label {
+        display: block;
+        font-size: rem(15);
+        font-weight: 600;
+        color: $navy;
+        margin-bottom: 6px;
+        transition: color $dur-fast ease;
+    }
+
+    &:focus-within > label { color: $teal-ink; }
+}
+
+.cf-control {
+    width: 100%;
+    min-width: 0;
+    padding: 11px 14px;
+    border-radius: 8px;
+    border: 1.5px solid $border;
+    font-size: rem(16);
+    line-height: 1.5;
+    color: $text;
+    caret-color: $teal-ink;
+    background-color: $bg;
+    transition: border-color .18s, box-shadow .18s;
+    font-family: inherit;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+
+    // Placeholder do navegador (#757575) ficava abaixo de 4,5:1 no $bg.
+    &::placeholder { color: $text-muted; opacity: 1; }
+
+    // Só a cor: o shorthand `background` apagaria a seta dos selects.
+    &:focus {
+        border-color: $teal;
+        box-shadow: 0 0 0 4px rgba($teal, .12), 0 1px 2px rgba(0,0,0,.05);
+        background-color: #fff;
+        outline: none;
+    }
+
+    @media (max-width: $bp-sm), (pointer: coarse) {
+        min-height: 44px;
+    }
+}
+
+// appearance: none tirou a seta nativa: sem ela o select parecia campo de texto.
+select.cf-control {
+    padding-right: 40px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231B3A6B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6l6 -6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+    cursor: pointer;
+}
+
+.cf-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 24px;
+
+    input {
+        margin-top: 2px;
+        accent-color: $teal;
+        flex-shrink: 0;
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+
+        @media (pointer: coarse) {
+            width: 24px;
+            height: 24px;
+            margin-top: -2px;
+        }
+    }
+
+    label {
+        font-size: rem(14);
+        color: $text-muted;
+        line-height: 1.5;
+        cursor: pointer;
+    }
+
+    // Link dentro do texto: sublinhado para não depender só da cor.
+    a {
+        color: $teal-ink;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+}
+
+.cf-submit {
+    width: 100%;
+    min-height: 48px;
+    padding: 14px;
+    border-radius: 8px;
+    background: $teal;
+    color: $navy;
+    border: none;
+    font-size: rem(15);
+    // Mesmo peso dos outros botões (.btn).
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition:
+        transform $dur-fast $ease-out,
+        box-shadow $dur-base $ease-out,
+        background-color $dur-fast ease;
+
+    &:hover:not(:disabled) {
+        background: $teal-hover;
+
+        @media (hover: hover) and (pointer: fine) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba($navy, .12);
+        }
+    }
+
+    &:active:not(:disabled) { transform: scale(.985); transition-duration: $dur-press; }
+
+    &:disabled { opacity: .55; cursor: not-allowed; }
+}
+
+.cf-spin {
+    animation: cfSpin .7s linear infinite;
+    display: inline-block;
+}
+
+@keyframes cfSpin { to { transform: rotate(360deg); } }
+
+.cf-success {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.cf-success-icon {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: rgba($mint, .1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: $teal-ink;
+
+    svg {
+        width: 36px;
+        height: 36px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+}
+
+// Um único traço confirma a resposta do servidor. O texto aparece de imediato
+// e o símbolo já nasce completo quando o visitante prefere menos movimento.
+@keyframes cf-confirm-stroke {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .cf-success-ring,
+    .cf-success-check { stroke-dasharray: 1; }
+    .cf-success-ring { animation: cf-confirm-stroke 360ms $ease-out both; }
+    .cf-success-check { animation: cf-confirm-stroke 220ms $ease-out 160ms both; }
+}
+
+// Contact aside
+.contact-aside {
+    grid-area: aside;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+// Na seção branca os cartões laterais ficam no $bg, sem sombra: o formulário
+// é o único elemento elevado.
+.contact-aside-item {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    background: $bg;
+    padding: 24px;
+    border-radius: $radius-lg;
+    border: 1px solid $border;
+
+    > div:last-child { min-width: 0; overflow-wrap: anywhere; }
+
+    h3 { @include type-title-sm; color: $navy; margin-bottom: 4px; }
+
+    p {
+        @include type-body-card;
+        color: $text-muted;
+        margin-bottom: 8px;
+    }
+
+    a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: $teal-ink;
+        font-weight: 600;
+        // O sublinhado aparece (cor) em vez de surgir de uma vez.
+        text-decoration: underline;
+        text-decoration-color: transparent;
+        text-underline-offset: 3px;
+        transition: text-decoration-color $dur-fast ease;
+        &:hover { text-decoration-color: currentColor; }
+
+        // WhatsApp, e-mail e "Criar conta grátis" tinham 20px de altura no toque.
+        @media (pointer: coarse) { min-height: 44px; }
+    }
+}
+
+.contact-aside-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+}
+
+.contact-aside-quote {
+    background: $bg;
+    padding: 24px;
+    border-radius: $radius-lg;
+    border: 1px solid $border;
+
+    p { @include type-body; color: $text; margin-bottom: 8px; }
+    span { @include type-micro; color: $text-muted; font-weight: 600; }
+}
+
+.contact-trust {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+    border-top: 1px solid $border;
+    padding-top: 40px;
+
+    // Quando as 4 garantias não cabem numa linha, 2×2 em vez de 3+1 com órfã.
+    @include below($bp-lg) {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, max-content));
+        gap: 20px 32px;
+
+        // Sem o índice de satisfação, os três itens ficam equilibrados.
+        &--compact { grid-template-columns: repeat(3, minmax(0, max-content)); }
+    }
+
+    @include below($bp-sm) {
+        &--compact { grid-template-columns: minmax(0, max-content); }
+    }
+}
+
+.contact-trust-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    i    { font-size: 18px; color: $mint; }
+    .ti-star { color: $yellow; }
+    span { font-size: rem(14); font-weight: 600; color: $navy; }
+}
+
+// ─── CTA Final ────────────────────────────────────────────────
+.cta-final {
+    padding: 100px 0;
+    background: linear-gradient(135deg, $navy 0%, $navy-mid 60%, #0a1f3f 100%);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+
+    &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Ccircle cx='20' cy='20' r='2'/%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    > .container { position: relative; z-index: 1; }
+
+    // Mesmo papel dos outros h2 (antes 50px/900, maior que os títulos de seção).
+    // Medida curta: a frase de fechamento quebra em duas linhas equilibradas
+    // (em 48px ela ocupava uma linha de ~1.100px).
+    h2 {
+        @include type-title-xl;
+        color: #fff;
+        max-width: 16em;
+        margin: 0 auto 16px;
+        text-wrap: balance;
+        overflow-wrap: anywhere;
+    }
+}
+
+// Classe própria: o antigo `.cta-final p` também pegava a nota de rodapé.
+.cta-final-sub {
+    max-width: 34em;
+    margin: 0 auto 36px;
+    @include type-lead;
+    line-height: 1.65;
+    letter-spacing: 0.005em;
+    color: rgba(#fff, .78);
+    text-wrap: balance;
+}
+
+.cta-final-btns {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+
+    // Mesmo tratamento do hero: empilhados na largura toda no celular.
+    @include below(480px) {
+        flex-direction: column;
+
+        .btn { width: 100%; }
+    }
+}
+
+.cta-note { @include type-micro; letter-spacing: 0.01em; color: rgba(#fff, .65); margin-top: 20px; }
+
+// ─── CTA fixo no celular ──────────────────────────────────────
+// Aparece depois do hero; some no contato, no CTA final e no rodapé
+// (Home.vue observa essas áreas). visibility também tira do Tab e do leitor.
+.mobile-cta {
+    display: none;
+
+    @include below($bp-sm) {
+        display: block;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 900;
+        padding: 12px 16px;
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+        background: rgba(#fff, .96);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 -8px 24px rgba($navy, .12);
+        transform: translateY(110%);
+        visibility: hidden;
+        transition: transform .35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear .35s;
+
+        &.is-visible {
+            transform: none;
+            visibility: visible;
+            transition: transform .35s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
+        }
+
+        .btn { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        &, &.is-visible { transition: none; }
+    }
+}
+
+// ─── Entradas e feedback de estado ────────────────────────────
+// Só a apresentação dos módulos recebe a entrada de lista. O conteúdo já
+// nasce legível, inclusive se a rolagem parar no início da faixa animada.
+@keyframes card-rise {
+    from { opacity: .94; translate: 0 8px; }
+    to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes site-state-in {
+    from { opacity: .85; }
+    to { opacity: 1; }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+    .audience-details[open] > .audience-list,
+    .problem-card[open] > p,
+    .diff-card[open] > p,
+    .cf-optional[open] > .cf-optional-fields,
+    .cf-error-summary,
+    .cf-success { animation: site-state-in $dur-fast ease-out; }
+
+    @supports (animation-timeline: view()) {
+        .audience-card {
+            animation: card-rise both;
+            animation-timing-function: $ease-out;
+            animation-timeline: view();
+            animation-range: entry 5% entry 70%;
+        }
+
+        // Cartões lado a lado entram em sequência: a faixa do seguinte começa depois.
+        .audiences-grid > :nth-child(2) { animation-range: entry 8% entry 73%; }
+        .audiences-grid > :nth-child(3) { animation-range: entry 11% entry 76%; }
+    }
+}
+
+// ─── Reduzir movimento ────────────────────────────────────────
+// Sem deslocamentos no hover; cor, sombra e estados continuam como feedback.
+@media (prefers-reduced-motion: reduce) {
+    .problem-card:hover,
+    .problem-card:hover .problem-icon,
+    .diff-card:hover,
+    .diff-card:hover .diff-icon,
+    .pricing-card:not(.featured):hover,
+    .demo-tab:hover,
+    .demo-tab:active,
+    .cf-submit:hover:not(:disabled),
+    .cf-submit:active:not(:disabled) { transform: none; }
+
+    .cf-spin { animation: none; }
+    .audience-details summary::before,
+    .disclosure-chevron,
+    .faq-question i { transition: color $dur-fast ease; }
+    .audience-flow-steps span,
+    .audience-flow-steps li::after { transition-delay: 0s; }
+    .demo-panel { translate: none; }
+}
+
+// ─── Respiro vertical no tablet e no celular ──────────────────
+// 100px em cima e embaixo é proporção de desktop: no celular somava ~2.400px
+// de rolagem vazia entre as seções. Mesmo ritmo, escala menor.
+.problems,
+.demo,
+.audiences,
+.how,
+.differentiators,
+.testimonials,
+.pricing,
+.faq,
+.contact,
+.cta-final {
+    @include below($bp-lg) { padding-block: 80px; }
+    @include below($bp-sm) { padding-block: 64px; }
+}
+
+// ─── Páginas legais (/privacidade, /termos) ───────────────────
+// Documento oficial vigente em texto puro, na mesma superfície dos cartões do
+// site; medida de leitura ~75 caracteres.
+.legal {
+    padding: 140px 0 100px;
+    background: $bg;
+
+    @include below($bp-md) { padding: 112px 0 64px; }
+}
+
+.legal-inner {
+    max-width: 680px;
+    margin: 0 auto;
+}
+
+.legal-meta {
+    font-size: rem(14);
+    color: $text-muted;
+    margin-bottom: 28px;
+}
+
+.legal-index {
+    margin-bottom: 32px;
+
+    h2 { @include type-title-sm; color: $navy; margin-bottom: 12px; }
+
+    ol {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 24px;
+
+        @include below($bp-sm) { grid-template-columns: 1fr; }
+    }
+
+    a {
+        @include type-meta;
+        display: block;
+        padding-block: 4px;
+        color: $teal-ink;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        overflow-wrap: anywhere;
+    }
+}
+
+.legal-body {
+    background: $bg-white;
+    border: 1px solid $border;
+    border-radius: $radius-lg;
+    box-shadow: $shadow;
+    padding: 40px;
+
+    @include below($bp-sm) { padding: 24px 20px; }
+
+    p, li {
+        @include type-body;
+        line-height: 1.75;
+        color: $text;
+        white-space: pre-line;
+        overflow-wrap: break-word;
+    }
+
+    > * + * { margin-top: 16px; }
+
+    h2 {
+        @include type-title-md;
+        color: $navy;
+        scroll-margin-top: 112px;
+    }
+
+    > h2:not(:first-child) { margin-top: 36px; }
+
+    ul { padding-left: 24px; }
+    li + li { margin-top: 10px; }
+
+    a { color: $teal-ink; font-weight: 600; }
+}
+
+// Aviso de idioma do documento (tradução de cortesia / original em português).
+.legal-language {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 24px;
+    padding: 14px 18px;
+    border-radius: $radius;
+    background: rgba($teal, .08);
+    border: 1px solid rgba($teal, .3);
+    @include type-meta;
+    color: $text;
+
+    i { font-size: 18px; color: $teal-ink; flex-shrink: 0; margin-top: 1px; }
+
+    a {
+        color: $teal-ink;
+        font-weight: 600;
+        text-underline-offset: 3px;
+    }
+}
+
+.legal-unavailable-title {
+    @include type-title-md;
+    color: $navy;
+    margin-bottom: 8px;
+}
+
+.legal-back { margin-top: 32px; }

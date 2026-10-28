@@ -1,0 +1,1135 @@
+.pmr-screen {
+    --pmr-blue: #35a9e1;
+    --pmr-blue-dark: #258dc0;
+    --pmr-panel: #ffffff;
+    --pmr-line: #c8d0d8;
+    --pmr-input: #ffffff;
+    --pmr-text: #334155;
+}
+
+.pmr-screen .pmr-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+}
+
+.pmr-screen .pmr-toolbar-btn {
+    border: 1px solid #b5c0cb;
+    background: #eef2f6;
+    color: #2f3d4f;
+    font-size: .86rem;
+    line-height: 1;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: .36rem .76rem;
+}
+
+.pmr-screen .pmr-toolbar-btn:hover {
+    background: #e3eaf1;
+    color: #1f2937;
+}
+
+.pmr-screen .pmr-toolbar-btn-new {
+    background: var(--pmr-blue);
+    border-color: var(--pmr-blue-dark);
+    color: #fff;
+}
+
+.pmr-screen .pmr-toolbar-btn-new:hover {
+    background: var(--pmr-blue-dark);
+    color: #fff;
+}
+
+.pmr-screen .pmr-content-card {
+    border: 1px solid #cfd6de;
+    border-radius: 2px;
+    background: #ffffff;
+    box-shadow: none;
+}
+
+.pmr-screen .pmr-record-strip {
+    background: #ffffff;
+    border-bottom: 1px solid #d8dee6;
+    color: #5d6978;
+    font-size: .74rem;
+    font-style: italic;
+}
+
+.pmr-form {
+    color: var(--pmr-text);
+}
+
+.pmr-form .pmr-label {
+    color: var(--pmr-blue);
+    font-size: 0.9rem;
+    font-style: italic;
+    font-weight: 700;
+    margin-bottom: .2rem;
+    line-height: 1.1;
+}
+
+.pmr-form .pmr-top-strip {
+    background: #ffffff;
+}
+
+.pmr-form .pmr-risk-wrap {
+    padding-top: .05rem;
+}
+
+.pmr-form .pmr-risk-item .pmr-label {
+    margin-bottom: .15rem;
+    text-align: center;
+}
+
+.pmr-form .pmr-risk-switches {
+    display: flex;
+    flex-direction: column;        /* labels Próprio/Familiar empilhados */
+    align-items: stretch;
+    justify-content: center;
+    gap: .25rem;
+    min-height: 1.7rem;
+}
+
+.pmr-form .pmr-risk-switches .form-check {
+    margin: 0;
+    min-height: 1rem;
+    padding-left: 2.6rem;          /* espaço para o switch ao lado */
+    position: relative;
+}
+
+.pmr-form .pmr-risk-switches .form-check-input {
+    margin: 0;
+    margin-left: -2.6rem;
+    width: 2.35rem;
+    height: 1.2rem;
+    border-color: #b7c1cb;
+    background-color: #eef2f6;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* ── Labels "Próprio" / "Familiar" — sempre visíveis ──────────────────── */
+.pmr-form .pmr-risk-switches .pmr-risk-switch-label {
+    font-size: .68rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    line-height: 1.2;
+    user-select: none;
+}
+
+/* ── Switch "Próprio" (vermelho — paciente TEM a condição) ────────────── */
+.pmr-form .pmr-risk-switch.pmr-risk-self .form-check-input:checked {
+    background-color: #f62d51;     /* danger — alerta clínico */
+    border-color: #f62d51;
+}
+.pmr-form .pmr-risk-switch.pmr-risk-self.pmr-risk-switch--on .pmr-risk-switch-label {
+    color: #f62d51;
+    font-weight: 700;
+}
+
+/* ── Switch "Familiar" (amarelo — histórico hereditário) ──────────────── */
+.pmr-form .pmr-risk-switch.pmr-risk-family .form-check-input:checked {
+    background-color: #ffbc34;     /* warning — atenção/monitoramento */
+    border-color: #ffbc34;
+}
+.pmr-form .pmr-risk-switch.pmr-risk-family.pmr-risk-switch--on .pmr-risk-switch-label {
+    color: #b8860b;                /* amarelo legível em fundo branco */
+    font-weight: 700;
+}
+
+/* ── Título do antecedente (Diabético/Hipertenso/Glaucomatoso) ────────── */
+.pmr-form .pmr-risk-title {
+    font-size: .72rem !important;
+    color: #334155;
+    margin-bottom: .35rem !important;
+}
+
+.pmr-form .pmr-toggle-label {
+    font-size: .66rem;
+    color: #64748b;
+}
+
+.pmr-form .pmr-main-columns {
+    margin-top: .05rem;
+}
+
+.pmr-form .pmr-main-panel {
+    background: var(--pmr-panel);
+    border: 1px solid #d2d9e1;
+    border-radius: 3px;
+    padding: .58rem;
+    // Sem height:100%: a coluna com menos seções terminava com um vão em
+    // branco gigante dentro do card só para igualar a altura da coluna irmã.
+}
+
+.pmr-form .pmr-section {
+    margin-bottom: .38rem !important;
+}
+
+.pmr-form .pmr-main-panel .pmr-section:last-child {
+    margin-bottom: 0 !important;
+}
+
+// Coluna esquerda em fluxo (flex-wrap): cada seção ocupa a linha inteira;
+// as "inline" (A/V sem correção, A/V com correção, Tonometria) dividem a
+// linha quando cabem e a que sobra sozinha numa linha cresce até a largura
+// toda — sem vão em branco no meio. `order` do layout personalizado ("Meu
+// prontuário") vale igual no flex.
+.pmr-form .pmr-main-panel--flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    column-gap: .75rem;
+}
+
+.pmr-form .pmr-main-panel--flow > .pmr-section {
+    flex: 0 0 100%;
+    min-width: 0;
+}
+
+// Mínimos de cada bloco: A/V = um olho por linha (par OD/OE de 150px);
+// Tonometria = OD + OE (hora e impressão descem juntas se faltar espaço).
+// Com os três na mesma linha, todos crescem por igual — mesma altura.
+.pmr-form .pmr-main-panel--flow > .pmr-section--inline {
+    flex: 1 1 150px;
+}
+
+.pmr-form .pmr-main-panel--flow > .pmr-section--tonometry {
+    flex-basis: 184px;
+}
+
+// Campos da Tonometria ocupam a largura do bloco: OD e OE dividem a linha
+// (mínimo para "00,0") e hora + impressão crescem juntas — na mesma linha
+// quando cabe, senão na linha de baixo, de ponta a ponta.
+.pmr-form .pmr-tono-eye {
+    flex: 1 1 84px;
+    min-width: 84px;
+}
+
+.pmr-form .pmr-tono-time {
+    flex: 1 1 150px;
+    min-width: 150px;
+}
+
+.pmr-form .pmr-tono-time input[type="time"] {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+// Adição, Longe, Perto e botões (calculadora/receituário) numa linha só
+// quando cabem — como os blocos da coluna esquerda: cada campo tem uma base
+// mínima, todos crescem até a borda e a linha quebra quando falta espaço.
+// Longe/Perto ficam numa linha só por mais lentes que se escolha (resumo
+// "A, B, … [n]" do SearchSelect multiple); a base garante ao menos um nome
+// legível ao lado da quantidade. Adição é um valor curto (0.25 a 5.00).
+// (fatores de crescimento >= 1: o campo que sobra sozinho numa linha — no
+// celular — vai até a borda.)
+.pmr-form .pmr-lens-field {
+    flex: 1.3 1 150px;
+    min-width: 0;
+}
+
+.pmr-form .pmr-lens-field--short {
+    flex: 1 1 120px;
+}
+
+.pmr-form .form-control,
+.pmr-form .form-select,
+.pmr-form .input-group-text,
+.pmr-form .btn {
+    min-height: 30px;
+    font-size: .84rem;
+}
+
+.pmr-form .form-control,
+.pmr-form .form-select {
+    border-color: var(--pmr-line);
+    background: var(--pmr-input);
+    color: #374151;
+    padding-top: .18rem;
+    padding-bottom: .18rem;
+}
+
+.pmr-form textarea.form-control {
+    min-height: 38px;
+}
+
+.pmr-form .input-group-sm > .input-group-text,
+.pmr-form .input-group-sm > .form-control,
+.pmr-form .input-group-sm > .form-select,
+.pmr-form .input-group-sm > .btn {
+    font-size: .84rem;
+}
+
+.pmr-eye-badge {
+    font-size: .73rem;
+    font-weight: 700;
+    color: #3b4e63;
+    min-width: 30px;
+    text-align: center;
+    background: #e7edf3;
+    border-color: #ccd4dc;
+}
+
+.pmr-eye-inline {
+    font-size: .73rem;
+    font-weight: 700;
+    color: #3b4e63;
+    min-width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #e7edf3;
+    border: 1px solid #ccd4dc;
+    border-radius: .2rem;
+    padding: 0 5px;
+    flex-shrink: 0;
+}
+
+.pmr-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 2px;
+    font-size: .84rem;
+}
+
+.pmr-table th {
+    padding: 0 3px 2px;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    color: #374151;
+    font-weight: 500;
+    font-size: .84rem;
+}
+
+.pmr-table td {
+    border: 0;
+    padding: 0 1px;
+    vertical-align: middle;
+}
+
+.pmr-table td.pmr-od {
+    text-align: center;
+    font-weight: 700;
+    color: #4b5563;
+    font-size: .82rem;
+    width: 32px;
+    background: transparent;
+}
+
+.pmr-table td input {
+    width: 100%;
+    border: 1px solid var(--pmr-line);
+    border-radius: .2rem;
+    outline: none;
+    text-align: left;
+    padding: .2rem .4rem;
+    font-size: .84rem;
+    background: var(--pmr-input);
+}
+
+.pmr-table td input:focus {
+    background: #fff;
+    border-color: #8eb4d0;
+}
+
+.pmr-form .pmr-collapse-toggle {
+    cursor: pointer;
+    padding: 4px 0;
+    border-top: 1px solid #d8dde3;
+    display: flex;
+    align-items: center;
+}
+
+.pmr-form .pmr-collapse-toggle .pmr-collapse-icon {
+    transition: transform .2s;
+    font-size: .72rem;
+    color: var(--pmr-blue);
+}
+
+.pmr-form .pmr-collapse-toggle[aria-expanded='true'] .pmr-collapse-icon {
+    transform: rotate(180deg);
+}
+
+.pmr-form .pmr-bottom-bar {
+    background: #ffffff;
+    border-top: 1px solid #d5dbe3;
+    border-bottom: 1px solid #d5dbe3;
+    /* Corredor pro FAB do Assistente de IA (fixed, canto inferior direito):
+       sem isso o FAB cobria o botão verde Salvar/Finalizar — o médico
+       clicava pra finalizar e abria a IA (ticket "separar IA de finalizar"). */
+    padding-right: 84px !important;
+}
+
+.pmr-bottom-bar-row {
+    /* Ícone-only + nowrap: a barra inteira cabe numa linha só mesmo com
+       todas as quick actions + o grupo Salvar/Dilatar/Exame/Finalizar.
+       overflow-x é só rede de segurança pra viewport muito estreito —
+       nunca deve disparar no fluxo normal. */
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap !important;
+    scrollbar-width: thin;
+}
+
+.pmr-form .pmr-bottom-bar .pmr-label {
+    font-size: 1.02rem;
+    margin-bottom: 0;
+}
+
+.pmr-doc-img-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Ícone-only (rótulo é visually-hidden no template — some da tela,
+       continua acessível a leitor de tela; title dá o tooltip no hover). */
+    flex-shrink: 0;
+    width: 40px;
+    min-height: 40px;
+    border: 0;
+    background: transparent;
+    border-radius: .4rem;
+    padding: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform .14s ease, background-color .14s ease;
+}
+
+.pmr-doc-img-btn:hover:not(:disabled) {
+    background: rgba(15, 23, 42, .05);
+}
+
+
+/* Slot do ícone: tamanho fixo para `<img>` E `<i>` (Font Awesome) — força
+   icones SVG e fonte ao mesmo footprint visual. !important sobrepõe estilos
+   inline `font-size:1.6rem` nos botões legados de quick-action. */
+.pmr-doc-img-btn img,
+.pmr-doc-img-btn > i {
+    width: 28px;
+    height: 28px;
+    line-height: 28px !important;
+    font-size: 1.4rem !important;
+    object-fit: contain;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Label: 2 linhas reservadas (line-height × 2) — botões com 1 linha
+   ("Medicamentos") e 2 linhas ("Atestado<br>Médico") ficam com mesma
+   altura total. white-space:normal default; nowrap só se label muito curto. */
+.pmr-doc-img-btn-label {
+    font-size: .58rem;
+    line-height: 1.1;
+    min-height: calc(.58rem * 1.1 * 2);
+    text-align: center;
+    color: #64748b;
+    font-weight: 600;
+    max-width: 70px;
+    word-break: break-word;
+    white-space: normal !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.pmr-doc-img-btn.pmr-doc-annexo .pmr-doc-img-btn-label {
+    color: #b45309;
+}
+
+
+.pmr-doc-preview,
+.pmr-doc-img-btn:disabled,
+.pmr-doc-img-btn[disabled] {
+    opacity: .42;
+    pointer-events: none;
+    cursor: not-allowed !important;
+}
+
+/* F4b — Hub de Laudos de Exame (cards) */
+.pmr-exam-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: .6rem .4rem;
+    min-height: 88px;
+    background: #fff;
+    border: 1px solid #e3eaf1;
+    border-radius: 10px;
+    color: #495057;
+    font-weight: 500;
+    transition: all .15s;
+}
+.pmr-exam-card:hover {
+    background: #f0f8ff;
+    border-color: #03a9f3;
+    color: #03a9f3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(3, 169, 243, .15);
+}
+.pmr-exam-card-icon {
+    font-size: 1.6rem;
+    color: #03a9f3;
+    margin-bottom: .35rem;
+}
+.pmr-exam-card-label {
+    font-size: .72rem;
+    line-height: 1.15;
+    text-align: center;
+    word-break: break-word;
+}
+/* F4e — card com subtipos: caret inline + visual cue de variantes */
+.pmr-exam-card.pmr-exam-card-multi {
+    position: relative;
+}
+.pmr-exam-card.pmr-exam-card-multi::after {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    font-size: .55rem;
+    color: #03a9f3;
+    opacity: .6;
+}
+.pmr-exam-card.pmr-exam-card-multi.dropdown-toggle::after {
+    margin-left: 0;
+    vertical-align: middle;
+}
+.pmr-exam-subtypes-menu {
+    min-width: 220px;
+    font-size: .82rem;
+}
+:root[data-bs-theme=dark] .pmr-exam-card {
+    background: #1f2933;
+    border-color: #2f3b47;
+    color: #c9d3dd;
+}
+:root[data-bs-theme=dark] .pmr-exam-card:hover {
+    background: #243340;
+    border-color: #03a9f3;
+}
+
+.pmr-save-btn {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 1px solid #2f8444;
+    background: #3aa655;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.55rem;
+    transition: all .15s;
+}
+
+.pmr-save-btn:hover {
+    background: #2f8444;
+    color: #fff;
+    transform: scale(1.03);
+}
+
+/* Andamento do atendimento (barra inferior): Salvar ≠ Finalizar.
+   Botões com rótulo visível — o médico precisa ler o que cada um faz. */
+.pmr-flow-group {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    align-items: center;
+    gap: .35rem;
+}
+
+/* Ícone-only, igual ao antigo botão único de salvar (46px, círculo) —
+   rótulo vira visually-hidden no template; cor de cada botão já distingue
+   a ação (verde=salva, roxo=etapa intermediária, azul=finaliza) e o title
+   leva o nome da ação + a explicação no hover. */
+.pmr-flow-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.05rem;
+    transition: all .15s;
+}
+
+.pmr-flow-btn--save {
+    border: 1px solid #2f8444;
+    background: #3aa655;
+    color: #fff;
+}
+
+.pmr-flow-btn--save:hover {
+    background: #2f8444;
+    color: #fff;
+}
+
+.pmr-flow-btn--finish {
+    border: 1px solid #0d6efd;
+    background: #0d6efd;
+    color: #fff;
+}
+
+.pmr-flow-btn--finish:hover {
+    background: #0b5ed7;
+    color: #fff;
+}
+
+.pmr-flow-btn--stage {
+    border: 1px solid #6f42c1;
+    background: #fff;
+    color: #6f42c1;
+}
+
+.pmr-flow-btn--stage:hover {
+    background: #6f42c1;
+    color: #fff;
+}
+
+:root[data-bs-theme=dark] .pmr-flow-btn--stage {
+    background: transparent;
+    color: #b197fc;
+    border-color: #b197fc;
+}
+
+/* Modal de destino pós-"Salvar" — cartões ícone+rótulo+hint, mesmo padrão
+   visual do modal de saída do ScheduleFlowGuard (.sfg-option). */
+.pmr-save-modal-dialog {
+    max-width: 480px;
+}
+
+.pmr-save-modal-option {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    padding: .7rem .9rem;
+    text-align: start;
+    white-space: normal;
+    line-height: 1.35;
+    border-radius: .6rem;
+    transition: transform .12s, box-shadow .12s;
+}
+
+.pmr-save-modal-option:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+}
+
+.pmr-save-modal-option__icon {
+    flex-shrink: 0;
+    width: 2.1rem;
+    height: 2.1rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .2);
+    font-size: 1rem;
+}
+
+.pmr-save-modal-option.btn-outline-primary .pmr-save-modal-option__icon,
+.pmr-save-modal-option.btn-outline-secondary .pmr-save-modal-option__icon {
+    background: rgba(13, 110, 253, .1);
+}
+
+.pmr-save-modal-option__text {
+    display: block;
+    min-width: 0;
+}
+
+.pmr-save-modal-option__label {
+    display: block;
+    font-weight: 600;
+}
+
+.pmr-save-modal-option__hint {
+    display: block;
+    font-size: .8rem;
+    opacity: .8;
+    overflow-wrap: anywhere;
+}
+
+/* Autosave (rascunho no servidor) — status discreto ao lado da barra de andamento. */
+.pmr-autosave {
+    align-self: center;
+    font-size: .75rem;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+    min-height: 1rem;
+}
+
+.pmr-autosave--error {
+    color: var(--bs-warning-text-emphasis);
+}
+
+@media (max-width: 575.98px) {
+    .pmr-autosave {
+        flex-basis: 100%;
+        order: 99;
+        text-align: end;
+        white-space: normal;
+    }
+}
+
+/* "Finalizar consulta": o que vai acontecer, item por item. */
+.pmr-finish-list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: .45rem;
+}
+
+.pmr-finish-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: .5rem;
+    line-height: 1.35;
+}
+
+.pmr-finish-list li > i {
+    width: 1rem;
+    margin-top: .15rem;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+/* Cronômetro do atendimento no cabeçalho do prontuário. */
+.pmr-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .2rem .6rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 999px;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    font-size: .8rem;
+    line-height: 1.3;
+}
+
+.pmr-timer__label {
+    color: var(--bs-secondary-color);
+}
+
+.pmr-timer__value {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.pmr-timer--running .pmr-timer__icon {
+    color: var(--bs-success);
+}
+
+.btn-pink {
+    background-color: #de6a79;
+    border-color: #cc5868;
+    color: #fff;
+}
+
+.btn-pink:hover,
+.btn-pink:focus {
+    background-color: #ca5566;
+    border-color: #bb4c5d;
+    color: #fff;
+}
+
+.pmr-file-thumb {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid #d3d8de;
+    border-radius: .3rem;
+    overflow: hidden;
+    background: #fff;
+    text-decoration: none;
+    color: #6b7280;
+}
+
+.pmr-file-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.pmr-file-thumb i {
+    font-size: 1.3rem;
+}
+
+.pmr-docs-table {
+    font-size: .8rem;
+}
+
+.pmr-docs-table th {
+    font-size: .72rem;
+    font-weight: 600;
+}
+
+.pmr-patient-card {
+    border: 1px solid #cfd5dd;
+    border-radius: 2px;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.pmr-patient-avatar-wrap {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #d0d4d9;
+    border-bottom: 1px solid #c8ced6;
+}
+
+.pmr-patient-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.pmr-patient-body {
+    padding: .7rem .85rem;
+}
+
+.pmr-patient-label {
+    color: #334155;
+    font-size: .82rem;
+    font-weight: 500;
+    margin-bottom: .1rem;
+}
+
+.pmr-patient-value {
+    color: #475569;
+    font-size: .78rem;
+    word-break: break-word;
+}
+
+.pmr-patient-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .45rem;
+}
+
+.pmr-patient-divider {
+    height: 1px;
+    background: #d4dae2;
+    margin: .5rem 0;
+}
+
+:root[data-bs-theme=dark] .pmr-screen {
+    --pmr-blue: #66c7ff;
+    --pmr-blue-dark: #4ea9da;
+    --pmr-panel: #1f2733;
+    --pmr-line: #3a4555;
+    --pmr-input: #121922;
+    --pmr-text: #d6dde7;
+}
+
+:root[data-bs-theme=dark] .pmr-screen .pmr-toolbar-btn {
+    border-color: #425062;
+    background: #1a2230;
+    color: #d6dde7;
+}
+
+:root[data-bs-theme=dark] .pmr-screen .pmr-toolbar-btn:hover {
+    background: #222c3d;
+    color: #ecf2fb;
+}
+
+:root[data-bs-theme=dark] .pmr-screen .pmr-toolbar-btn-new {
+    background: #1b89c2;
+    border-color: #1574a4;
+    color: #fff;
+}
+
+:root[data-bs-theme=dark] .pmr-screen .pmr-toolbar-btn-new:hover {
+    background: #1574a4;
+}
+
+:root[data-bs-theme=dark] .pmr-screen .pmr-content-card {
+    background: #111827;
+    border-color: #2a3547;
+}
+
+:root[data-bs-theme=dark] .pmr-screen .pmr-record-strip {
+    background: #0f172a;
+    border-bottom-color: #2a3547;
+    color: #9fb0c9;
+}
+
+:root[data-bs-theme=dark] .pmr-form .pmr-top-strip {
+    background: #111827;
+}
+
+:root[data-bs-theme=dark] .pmr-form .pmr-main-panel {
+    background: #1b2432;
+    border-color: #2f3a4d;
+}
+
+:root[data-bs-theme=dark] .pmr-form .form-control,
+:root[data-bs-theme=dark] .pmr-form .form-select {
+    background: #121a26;
+    border-color: #384559;
+    color: #dbe4ef;
+}
+
+:root[data-bs-theme=dark] .pmr-form .form-control::placeholder {
+    color: #8695a8;
+}
+
+:root[data-bs-theme=dark] .pmr-form .input-group-text {
+    background: #18212f;
+    border-color: #384559;
+    color: #b9c7d8;
+}
+
+:root[data-bs-theme=dark] .pmr-form .pmr-risk-switches .form-check-input {
+    border-color: #506178;
+    background-color: #1c2533;
+}
+
+:root[data-bs-theme=dark] .pmr-form .pmr-risk-switches .form-check-input:checked {
+    background-color: #1890cf;
+    border-color: #157db3;
+}
+
+:root[data-bs-theme=dark] .pmr-table th {
+    color: #c8d4e6;
+}
+
+:root[data-bs-theme=dark] .pmr-table td.pmr-od {
+    color: #b3c1d4;
+}
+
+:root[data-bs-theme=dark] .pmr-table td input {
+    background: #121a26;
+    border-color: #384559;
+    color: #dbe4ef;
+}
+
+:root[data-bs-theme=dark] .pmr-table td input:focus {
+    background: #162031;
+    border-color: #5b8db5;
+}
+
+:root[data-bs-theme=dark] .pmr-form .pmr-collapse-toggle {
+    border-top-color: #2f3a4d;
+}
+
+:root[data-bs-theme=dark] .pmr-form .pmr-bottom-bar {
+    background: #0f172a;
+    border-top-color: #2a3547;
+    border-bottom-color: #2a3547;
+}
+
+:root[data-bs-theme=dark] .pmr-doc-img-btn-label {
+    color: #b7c4d5;
+}
+
+:root[data-bs-theme=dark] .pmr-doc-img-btn.pmr-doc-annexo .pmr-doc-img-btn-label {
+    color: #f2bb70;
+}
+
+:root[data-bs-theme=dark] .pmr-file-thumb {
+    background: #101827;
+    border-color: #354258;
+    color: #9dafc7;
+}
+
+:root[data-bs-theme=dark] .pmr-docs-table thead th {
+    background: #101827;
+    color: #9fb0c9;
+    border-color: #2a3547;
+}
+
+:root[data-bs-theme=dark] .pmr-docs-table tbody td {
+    border-color: #2a3547;
+    color: #d6dde7;
+}
+
+:root[data-bs-theme=dark] .pmr-patient-card {
+    background: #111827;
+    border-color: #2a3547;
+}
+
+:root[data-bs-theme=dark] .pmr-patient-avatar-wrap {
+    background: #1b2432;
+    border-bottom-color: #2a3547;
+}
+
+:root[data-bs-theme=dark] .pmr-patient-label {
+    color: #c8d4e6;
+}
+
+:root[data-bs-theme=dark] .pmr-patient-value {
+    color: #aebcd0;
+}
+
+:root[data-bs-theme=dark] .pmr-patient-divider {
+    background: #2a3547;
+}
+
+@media (max-width: 1199.98px) {
+    .pmr-form .pmr-label {
+        font-size: .9rem;
+    }
+
+    .pmr-form .pmr-bottom-bar .pmr-label {
+        font-size: .92rem;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .pmr-screen .pmr-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .pmr-screen .pmr-toolbar-btn {
+        font-size: .8rem;
+        padding: .32rem .6rem;
+    }
+
+    .pmr-form .pmr-main-panel {
+        padding: .5rem;
+    }
+
+    .pmr-form .pmr-label {
+        font-size: .88rem;
+    }
+
+    .pmr-doc-img-btn {
+        width: 60px;
+        min-height: 52px;
+    }
+
+    .pmr-doc-img-btn img,
+    .pmr-doc-img-btn > i {
+        width: 24px;
+        height: 24px;
+        line-height: 24px !important;
+        font-size: 1.2rem !important;
+    }
+
+    .pmr-doc-img-btn-label {
+        font-size: .54rem;
+        max-width: 58px;
+        min-height: calc(.54rem * 1.1 * 2);
+    }
+}
+
+// ── Responsividade do prontuário ────────────────────────────────────────────
+// Barra de modos (Padrão/Meu prontuário/Texto livre): btn-group do Bootstrap
+// não quebra linha por padrão e estourava em telas estreitas (< ~420px).
+.pmr-mode-bar .btn-group {
+    flex-wrap: wrap;
+}
+
+// Par OD/OE (chip + select): o input-group do Bootstrap quebra linha
+// internamente quando aperta, descolando o chip do seu select. flex-nowrap
+// no grupo + largura mínima aqui: o PAR inteiro quebra como unidade.
+.pmr-form .pmr-eye-group {
+    flex: 1 1 150px;
+    min-width: 150px;
+}
+
+// Grupos da área expansível do prontuário (Anamnese/Histórico × Conclusão
+// da consulta) — só organização visual, mesmos campos de sempre.
+.pmr-form .pmr-field-group {
+    border-left: 3px solid #d8e2ec;
+    padding-left: .75rem;
+}
+
+.pmr-form .pmr-field-group-title {
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--pmr-blue-dark, #258dc0);
+    margin-bottom: .5rem;
+}
+
+// ── Padronização de altura dos selects (29/08/2026) ─────────────────────────
+// Os inputs do prontuário são `form-control-sm`, mas os selects (SearchSelect/
+// AcuitySelect = @vueform/multiselect, e <select class="form-select">) vinham
+// na métrica padrão (~38px) — maiores que os inputs ao lado. Este bloco iguala
+// tudo à métrica sm do Bootstrap: padding .25/.5rem, fonte .875rem,
+// min-height calc(1.5em + .5rem + 2px).
+.pmr-screen {
+    .search-select.multiselect {
+        --ms-py: .25rem;
+        --ms-px: .5rem;
+        --ms-font-size: .875rem;
+        --ms-option-font-size: .875rem;
+        --ms-line-height: 1.5;
+        --ms-radius: .25rem;
+        // height (não só min-height): o wrapper interno do @vueform soma ~2px
+        // e deixava o controle em 33px vs 31px do form-control-sm.
+        height: calc(1.5em + .5rem + 2px);
+        min-height: calc(1.5em + .5rem + 2px);
+    }
+
+    .search-select.multiselect .multiselect-wrapper {
+        min-height: 0;
+        height: 100%;
+    }
+
+    // Caret/clear do multiselect acompanham a altura reduzida.
+    .search-select.multiselect .multiselect-caret,
+    .search-select.multiselect .multiselect-clear {
+        transform: scale(.85);
+    }
+
+    select.form-select:not(.form-select-sm) {
+        padding-top: .25rem;
+        padding-bottom: .25rem;
+        padding-left: .5rem;
+        font-size: .875rem;
+        border-radius: .25rem;
+        min-height: calc(1.5em + .5rem + 2px);
+    }
+}
+
+// ── Segurança clínica (Fase 2): alergia no receituário e uso de LC ─────────
+// Variáveis do Bootstrap 5.3 (*-bg-subtle / *-text-emphasis) já trocam no
+// tema escuro — o alerta segue legível sem regra própria.
+.pmr-rx-allergy {
+    padding: .45rem .65rem;
+    border: 2px solid var(--bs-danger);
+    border-left-width: 6px;
+    border-radius: .4rem;
+    background: var(--bs-danger-bg-subtle);
+    color: var(--bs-danger-text-emphasis);
+    font-size: .8rem;
+}
+
+.pmr-cl-use {
+    border-color: var(--bs-border-color) !important;
+
+    legend {
+        font-size: .72rem;
+    }
+}
+
+.pmr-med-list li {
+    padding: .1rem 0;
+}
+
+// O `background:` do .pmr-form apaga a seta dos <select> nativos — no bloco
+// de uso de LC eles precisam parecer lista suspensa (claro e escuro).
+.pmr-form .pmr-cl-use .form-select,
+:root[data-bs-theme=dark] .pmr-form .pmr-cl-use .form-select {
+    background-image: var(--bs-form-select-bg-img);
+    background-repeat: no-repeat;
+    background-position: right .5rem center;
+    background-size: 16px 12px;
+    padding-right: 2rem;
+}

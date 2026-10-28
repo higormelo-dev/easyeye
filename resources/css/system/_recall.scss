@@ -1,0 +1,325 @@
+@use 'sass:list';
+
+// Retornos / protocolos de acompanhamento (Fase 6): selos, avisos e botões com contraste AA nos dois temas.
+//
+// O template Preclinic tem cores de estado claras demais para texto pequeno (branco sobre o primário ≈ 3,9:1;
+// amarelo e ciano de "emphasis" ≈ 2:1; o "secundário" é um verde-água ≈ 1,7:1 sobre o branco). Aqui o texto é
+// escuro sobre fundo claro no tema claro, e o inverso no escuro. O significado nunca fica só na cor: o texto do
+// selo sempre diz o estado.
+
+// nome: ((cor do texto, fundo) no claro, (cor do texto, fundo) no escuro)
+$recall-tones: (
+    'info': (
+        (#0a4a6e, #dcf0fb),
+        (#a9ddf5, #0f3b52),
+    ),
+    'success': (
+        (#0a4d2c, #d4f0e0),
+        (#9fe0bd, #0e3b25),
+    ),
+    'warning': (
+        (#6b4200, #ffe9b3),
+        (#ffd98a, #4a3500),
+    ),
+    'danger': (
+        (#8a1c1c, #fddede),
+        (#ffb8b8, #4d1616),
+    ),
+    'muted': (
+        (#3b4250, #e4e8ee),
+        (#d3d9e3, #353b47),
+    ),
+);
+
+// `.recall-state` é o nome antigo (tela de Retornos); os dois significam o mesmo selo.
+.recall-tone,
+.recall-state {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+@each $name, $tone in $recall-tones {
+    $light: list.nth($tone, 1);
+    $dark: list.nth($tone, 2);
+
+    .recall-tone--#{$name},
+    .recall-state--#{$name} {
+        color: list.nth($light, 1);
+        background-color: list.nth($light, 2);
+    }
+
+    :root[data-bs-theme='dark'] .recall-tone--#{$name},
+    :root[data-bs-theme='dark'] .recall-state--#{$name} {
+        color: list.nth($dark, 1);
+        background-color: list.nth($dark, 2);
+    }
+}
+
+// Aviso em bloco: texto na cor normal da página, só a faixa lateral leva a cor (não é ela que carrega o sentido).
+.recall-notice {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-left: 0.3rem solid var(--recall-notice-accent, #1d6fd6);
+    border-radius: var(--bs-border-radius, 0.375rem);
+    background-color: var(--bs-body-bg, #fff);
+    color: var(--bs-body-color, #212529);
+}
+
+.recall-notice--info {
+    --recall-notice-accent: #1d6fd6;
+}
+
+.recall-notice--warning {
+    --recall-notice-accent: #b45309;
+}
+
+:root[data-bs-theme='dark'] .recall-notice--info {
+    --recall-notice-accent: #6ea8fe;
+}
+
+:root[data-bs-theme='dark'] .recall-notice--warning {
+    --recall-notice-accent: #ffc107;
+}
+
+// Botão neutro de contorno (o "secundário" do template não passa no contraste).
+.btn.recall-btn {
+    border: 1px solid var(--bs-border-color, #ced4da);
+    background-color: transparent;
+    color: var(--bs-body-color, #212529);
+}
+
+.btn.recall-btn:hover,
+.btn.recall-btn:focus-visible,
+.btn.recall-btn:active {
+    border-color: var(--bs-body-color, #212529);
+    background-color: var(--bs-tertiary-bg, #e9ecef);
+    color: var(--bs-body-color, #212529);
+}
+
+.btn.recall-btn--danger {
+    border-color: #a52834;
+    color: #a52834;
+}
+
+.btn.recall-btn--danger:hover,
+.btn.recall-btn--danger:focus-visible,
+.btn.recall-btn--danger:active {
+    border-color: #a52834;
+    background-color: #fddede;
+    color: #7a1c26;
+}
+
+:root[data-bs-theme='dark'] .btn.recall-btn--danger {
+    border-color: #ff9aa4;
+    color: #ff9aa4;
+}
+
+:root[data-bs-theme='dark'] .btn.recall-btn--danger:hover,
+:root[data-bs-theme='dark'] .btn.recall-btn--danger:focus-visible,
+:root[data-bs-theme='dark'] .btn.recall-btn--danger:active {
+    background-color: #4d1616;
+    color: #ffc2c8;
+}
+
+// Botão que parece link (mostrar/esconder a regra): herda a cor do texto ao redor, que já tem contraste nos dois temas.
+.btn.recall-link {
+    padding-left: 0;
+    padding-right: 0;
+    color: inherit;
+    text-decoration: underline;
+}
+
+.btn.recall-link:hover,
+.btn.recall-link:focus-visible {
+    color: inherit;
+    text-decoration: none;
+}
+
+// Código inline dentro da regra e da diferença: a cor rosa padrão do `code` não passa no contraste sobre fundo escuro.
+.recall-rule code,
+.recall-diff code {
+    color: inherit;
+}
+
+// Bordas dos campos: o template usa cinza quase branco (≈1,2:1) e a WCAG 1.4.11 pede 3:1 para o limite do controle.
+.recall-form {
+    .form-control,
+    .form-select,
+    .form-check-input:not(:checked) {
+        border-color: #6b7685;
+    }
+}
+
+:root[data-bs-theme='dark'] .recall-form {
+    .form-control,
+    .form-select,
+    .form-check-input:not(:checked) {
+        border-color: #8695a8;
+    }
+}
+
+// Botão ativo da barra de visões (a cor do "secundário" do template é um verde-água ≈ 1,7:1 sobre o branco).
+.btn.recall-btn--active {
+    border-color: var(--bs-body-color, #212529);
+    background-color: var(--bs-body-color, #212529);
+    color: var(--bs-body-bg, #fff);
+}
+
+// Cores de ação e texto auxiliar das telas de Retornos, protocolos, curso de injeções e orientações: o primário do
+// template (#2f80ed) dá 3,9:1 com texto branco, o verde de sucesso 2,9:1 sobre o branco e o cinza de apoio 4,2:1 sobre
+// o fundo da página — todos abaixo dos 4,5:1 do texto pequeno (WCAG 1.4.3). Valem só dentro de `.recall-form`, que cada
+// uma dessas telas usa na raiz; o resto do sistema segue com a paleta do template.
+.recall-form {
+    .btn-primary {
+        --bs-btn-bg: #1d5fc4;
+        --bs-btn-border-color: #1d5fc4;
+        --bs-btn-hover-bg: #174ea3;
+        --bs-btn-hover-border-color: #174ea3;
+        --bs-btn-active-bg: #174ea3;
+        --bs-btn-active-border-color: #174ea3;
+        --bs-btn-disabled-bg: #1d5fc4;
+        --bs-btn-disabled-border-color: #1d5fc4;
+        background-color: #1d5fc4;
+        border-color: #1d5fc4;
+    }
+
+    .btn-primary:hover,
+    .btn-primary:focus-visible,
+    .btn-primary:active {
+        background-color: #174ea3;
+        border-color: #174ea3;
+    }
+
+    .btn-outline-primary {
+        --bs-btn-color: #1d5fc4;
+        --bs-btn-border-color: #1d5fc4;
+        --bs-btn-hover-bg: #1d5fc4;
+        --bs-btn-hover-border-color: #1d5fc4;
+        color: #1d5fc4;
+        border-color: #1d5fc4;
+    }
+
+    .btn-outline-primary:hover,
+    .btn-outline-primary:focus-visible,
+    .btn-outline-primary:active {
+        background-color: #1d5fc4;
+        color: #fff;
+    }
+
+    .btn-outline-success {
+        --bs-btn-color: #1b6b3d;
+        --bs-btn-border-color: #1b6b3d;
+        --bs-btn-hover-bg: #1b6b3d;
+        --bs-btn-hover-border-color: #1b6b3d;
+        color: #1b6b3d;
+        border-color: #1b6b3d;
+    }
+
+    .btn-outline-success:hover,
+    .btn-outline-success:focus-visible,
+    .btn-outline-success:active {
+        background-color: #1b6b3d;
+        color: #fff;
+    }
+
+    .text-muted {
+        color: #566073 !important;
+    }
+
+    .text-danger {
+        color: #b42323 !important;
+    }
+}
+
+:root[data-bs-theme='dark'] .recall-form {
+    .btn-outline-primary {
+        --bs-btn-color: #8ab4f8;
+        --bs-btn-border-color: #8ab4f8;
+        color: #8ab4f8;
+        border-color: #8ab4f8;
+    }
+
+    .btn-outline-primary:hover,
+    .btn-outline-primary:focus-visible,
+    .btn-outline-primary:active {
+        background-color: #8ab4f8;
+        color: #0f1729;
+    }
+
+    .btn-outline-success {
+        --bs-btn-color: #7fd6a2;
+        --bs-btn-border-color: #7fd6a2;
+        color: #7fd6a2;
+        border-color: #7fd6a2;
+    }
+
+    .btn-outline-success:hover,
+    .btn-outline-success:focus-visible,
+    .btn-outline-success:active {
+        background-color: #7fd6a2;
+        color: #0f1729;
+    }
+
+    .text-muted {
+        color: #a9b4c4 !important;
+    }
+
+    .text-danger {
+        color: #ff8a8a !important;
+    }
+}
+
+// Botões de contorno "secundário" e "perigo" do template (verde-água ≈ 1,9:1 e vermelho ≈ 4,3:1 sobre o branco):
+// nas telas do recall o neutro é o mesmo de `.recall-btn` e o perigo usa o vermelho AA de `.recall-btn--danger`.
+.recall-form {
+    .btn-outline-secondary {
+        --bs-btn-color: var(--bs-body-color, #212529);
+        --bs-btn-border-color: var(--bs-border-color, #ced4da);
+        color: var(--bs-body-color, #212529);
+        border-color: var(--bs-border-color, #ced4da);
+    }
+
+    .btn-outline-secondary:hover,
+    .btn-outline-secondary:focus-visible,
+    .btn-outline-secondary:active {
+        border-color: var(--bs-body-color, #212529);
+        background-color: var(--bs-tertiary-bg, #e9ecef);
+        color: var(--bs-body-color, #212529);
+    }
+
+    .btn-outline-danger {
+        --bs-btn-color: #a52834;
+        --bs-btn-border-color: #a52834;
+        color: #a52834;
+        border-color: #a52834;
+    }
+
+    .btn-outline-danger:hover,
+    .btn-outline-danger:focus-visible,
+    .btn-outline-danger:active {
+        border-color: #a52834;
+        background-color: #fddede;
+        color: #7a1c26;
+    }
+}
+
+:root[data-bs-theme='dark'] .recall-form {
+    .btn-outline-danger {
+        --bs-btn-color: #ff9aa4;
+        --bs-btn-border-color: #ff9aa4;
+        color: #ff9aa4;
+        border-color: #ff9aa4;
+    }
+
+    .btn-outline-danger:hover,
+    .btn-outline-danger:focus-visible,
+    .btn-outline-danger:active {
+        background-color: #4d1616;
+        color: #ffc2c8;
+    }
+}

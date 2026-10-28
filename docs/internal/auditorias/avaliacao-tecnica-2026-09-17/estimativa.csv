@@ -1,0 +1,17 @@
+entregavel,horas_min,horas_max,custo_min_120_brl_h,custo_max_160_brl_h
+"Fundação, identidade, tenants e autorização",220,360,26400,57600
+"Pacientes, médicos, agenda e recepção",280,440,33600,70400
+"Prontuário, documentos e templates",380,600,45600,96000
+"Imagens, exames e API servidor",180,300,21600,48000
+"Portal paciente, privacidade e auditoria",180,300,21600,48000
+Financeiro e estrutura TISS,220,380,26400,60800
+"Estoque, compras, cirurgia e IOL",180,300,21600,48000
+"Planos, assinaturas e gateways",240,400,28800,64000
+"IA, créditos e custos",240,400,28800,64000
+"WhatsApp, parceiros, dashboards e site",160,260,19200,41600
+Frontend compartilhado e SSR,100,180,12000,28800
+Integrador núcleo e HTTP,260,420,31200,67200
+Integrador equipamentos e DICOM,120,220,14400,35200
+Integrador UI e distribuição,160,280,19200,44800
+Regressão integrada e entrega,200,360,24000,57600
+TOTAL,3120,5200,374400,832000

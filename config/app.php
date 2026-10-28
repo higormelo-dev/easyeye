@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Application Name
@@ -27,6 +26,21 @@ return [
     */
 
     'env' => env('APP_ENV', 'production'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Senhas fixas dos seeders (SEED_FIXED_CREDENTIALS)
+    |--------------------------------------------------------------------------
+    |
+    | As senhas fixas do repositório (Clínica Teste Integrador, admins do
+    | SaaS) só valem em APP_ENV=local ou com esta chave = true (testes
+    | automatizados — phpunit.xml). Homologação (APP_ENV=testing!) e
+    | produção: senha aleatória mostrada uma vez. Em produção a chave é
+    | ignorada. Ver App\Support\SeedCredentials.
+    |
+    */
+
+    'seed_fixed_credentials' => (bool) env('SEED_FIXED_CREDENTIALS', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -101,7 +115,7 @@ return [
 
     'previous_keys' => [
         ...array_filter(
-            explode(',', env('APP_PREVIOUS_KEYS', ''))
+            explode(',', env('APP_PREVIOUS_KEYS', '')),
         ),
     ],
 
@@ -122,5 +136,4 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store'  => env('APP_MAINTENANCE_STORE', 'database'),
     ],
-
 ];

@@ -3,7 +3,6 @@
 use Illuminate\Support\Str;
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Default Session Driver
@@ -71,9 +70,20 @@ return [
     | connection that should be used to manage these sessions. This should
     | correspond to a connection in your database configuration options.
     |
+    | "database" lê um nome de config/database.php → connections; "redis", um
+    | de config/database.php → redis. SESSION_CONNECTION vale para os dois e
+    | manda sempre. Sem ela, só o driver redis ganha o padrão próprio
+    | (REDIS_SESSION_CONNECTION, "session" = banco 3 do Redis): aplicá-lo
+    | também ao driver database apontava a sessão para uma conexão de banco
+    | chamada "session", que não existe ("Database connection [session] not
+    | configured") e derrubava toda requisição com sessão. env() puro, como
+    | no resto do arquivo: config é carregada antes do container ter o 'env'.
+    |
     */
 
-    'connection' => env('SESSION_CONNECTION'),
+    'connection' => env('SESSION_CONNECTION', env('SESSION_DRIVER', 'database') === 'redis'
+        ? env('REDIS_SESSION_CONNECTION', 'session')
+        : null),
 
     /*
     |--------------------------------------------------------------------------
@@ -129,7 +139,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'laravel'), '_') . '_session'
+        Str::slug(env('APP_NAME', 'laravel'), '_') . '_session',
     ),
 
     /*
@@ -169,7 +179,23 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // BUGFIX (revisão de segurança): sem fallback, secure ficava null e o
+    // Symfony Cookie assume `false` (envia o cookie de sessão — que carrega
+    // two_factor_verified_at, auth.password_confirmed_at, selected_entity_id
+    // e impersonating.* — mesmo em HTTP puro).
+    //
+    // BUGFIX 2 (achado real, localhost pedindo SSL sem precisar): a v1 deste
+    // fix usava nome de ambiente (production/testing) como proxy pra "é
+    // HTTPS?", igual o AppServiceProvider::boot() fazia — mas isso quebra
+    // qualquer setup local com APP_ENV=testing sem TLS (docker nginx local só
+    // com `listen 80`). A fonte de verdade correta é o scheme que APP_URL já
+    // declara — AppServiceProvider::boot() foi corrigido pra usar a mesma
+    // regra. env() puro aqui (nunca app()->environment()): arquivos de config
+    // são require'd por LoadConfiguration ANTES de detectEnvironment() rodar,
+    // então o container ainda não tem 'env' ligado nesse momento (isso
+    // derrubava o boot inteiro da aplicação — pego pelo teste antes do commit).
+    // .env pode sempre sobrescrever via SESSION_SECURE_COOKIE se necessário.
+    'secure' => env('SESSION_SECURE_COOKIE', str_starts_with((string) env('APP_URL', ''), 'https://')),
 
     /*
     |--------------------------------------------------------------------------
@@ -213,5 +239,4 @@ return [
     */
 
     'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
-
 ];

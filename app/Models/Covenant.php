@@ -2,79 +2,80 @@
 
 namespace App\Models;
 
+use App\Concerns\{HasEntityCode, HasUppercaseFields};
+use App\Domains\Tiss\Models\TissOperator;
+use App\Enums\CovenantSource;
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
 
 class Covenant extends Model
 {
+    use Auditable;
+    use HasAuditColumns;
+    use HasEntityCode;
     use HasFactory;
+    use HasUppercaseFields;
     use HasUuids;
     use SoftDeletes;
 
-    protected $primaryKey = 'id';
+    protected string $codePrefix = 'CV';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
+    protected string $codePrefixGlobal = 'CVP';
+
     protected $fillable = [
-        'entity_id',
-        'code',
-        'name',
-        'color',
-        'table',
-        'active',
+        'entity_id', 'code', 'name', 'color', 'table', 'active', 'tiss_operator_id',
+        // Vigência do contrato da clínica com o convênio (só datas).
+        'contract_starts_at', 'contract_ends_at',
+        // Dados oficiais da operadora (ANS) — preenchidos pelo manager
+        // (Manager\CovenantsController) e pela importação da ANS.
+        'company_name', 'trade_name', 'national_registry', 'ans_registry', 'ans_modality', 'city', 'uf',
+        'ans_registered_at', 'ans_status', 'ans_cancelled_at', 'ans_cancellation_reason', 'source', 'source_synced_at',
     ];
 
-    /**
-     * Generated code for the entity_id field
-     */
-    protected static function booted(): void
-    {
-        static::creating(function (self $covenant) {
-            if (blank($covenant->code)) {
-                $prefix = $covenant->entity_id ? 'CV' : 'CVP';
+    protected array $uppercaseFields = ['name', 'color'];
 
-                $lastType = static::withoutGlobalScopes()
-                    ->when(
-                        $covenant->entity_id !== null,
-                        fn ($q) => $q->where('entity_id', $covenant->entity_id),
-                        fn ($q) => $q->whereNull('entity_id')
-                    )
-                    ->where('code', 'like', $prefix . '-%')
-                    ->orderBy('code', 'desc')
-                    ->first();
-
-                if ($lastType) {
-                    $lastNumber = (int) substr($lastType->code, strlen($prefix) + 1);
-                    $newNumber  = $lastNumber + 1;
-                } else {
-                    $newNumber = 1;
-                }
-
-                $covenant->code = sprintf('%s-%010d', $prefix, $newNumber);
-            }
-        });
-    }
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
+            'created_at'         => 'datetime',
+            'updated_at'         => 'datetime',
+            'deleted_at'         => 'datetime',
+            'ans_registered_at'  => 'date',
+            'ans_cancelled_at'   => 'date',
+            'contract_starts_at' => 'date:Y-m-d',
+            'contract_ends_at'   => 'date:Y-m-d',
+            'source_synced_at'   => 'datetime',
+            'source'             => CovenantSource::class,
         ];
+    }
+
+    /**
+     * O PARTICULAR global (sem registro ANS) — várias regras dependem dele
+     * pelo nome (cadastro de paciente, importações, repasse médico), então o
+     * manager não deixa renomear, desativar nem excluir.
+     */
+    public function isParticular(): bool
+    {
+        return $this->entity_id === null
+            && blank($this->ans_registry)
+            && mb_strtoupper(trim((string) $this->name)) === 'PARTICULAR';
     }
 
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id', 'id');
+    }
+
+    public function tissOperator(): BelongsTo
+    {
+        return $this->belongsTo(TissOperator::class, 'tiss_operator_id');
+    }
+
+    /** Planos do convênio (globais da ANS/manager + próprios das clínicas). */
+    public function plans(): HasMany
+    {
+        return $this->hasMany(CovenantPlan::class);
     }
 }

@@ -1,52 +1,94 @@
-FROM php:8.4-fpm
+FROM php:8.4-fpm-bookworm
 
-# set your user name, ex: user=higor
-ARG user=medicare
-ARG uid=1000
+ARG APP_USER=easyeye
+ARG UID=1000
+ARG GID=1000
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    apt-utils \
-	build-essential \
-	git \
-	curl \
-	libcurl4 \
-	libcurl4-openssl-dev \
-    libpq-dev \
-	zlib1g-dev \
-	libzip-dev \
-	zip \
-	libbz2-dev \
-	locales \
-	libmcrypt-dev \
-	libicu-dev \
-	libonig-dev \
-	libxml2-dev
+ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        libcurl4-openssl-dev \
+        libpq-dev \
+        libzip-dev \
+        libbz2-dev \
+        libonig-dev \
+        libicu-dev \
+        libxml2-dev \
+        libfreetype6-dev \
+        libjpeg62-turbo-dev \
+        libpng-dev \
+        libwebp-dev \
+        libxpm-dev \
+        # Deps de renderização para wkhtmltopdf
+        fontconfig \
+        libxrender1 \
+        libxext6 \
+        xfonts-75dpi \
+        xfonts-base \
+        supervisor \
+        netcat-openbsd \
+        # Panorama (stitching de imagens de retina — benchmark Ger Exames/
+        # iWayBrasil, aba "Montage") — python3-opencv traz libopencv já
+        # compilada; evita build from source do pip opencv-python no runtime.
+        python3 \
+        python3-opencv \
+        python3-numpy \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo_pgsql pdo_mysql
-RUN docker-php-ext-install mbstring zip exif pcntl bcmath bz2 intl xml
+# wkhtmltopdf com patches Qt — usa .deb oficial Bookworm (glibc nativo)
+RUN curl -fsSL https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
+    -o /tmp/wkhtmltox.deb \
+    && apt-get update && apt-get install -y --no-install-recommends /tmp/wkhtmltox.deb \
+    && rm -f /tmp/wkhtmltox.deb \
+    && rm -rf /var/lib/apt/lists/*
 
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN docker-php-ext-configure gd \
+        --with-freetype \
+        --with-jpeg \
+        --with-webp \
+        --with-xpm \
+    && docker-php-ext-install -j"$(nproc)" \
+        bcmath \
+        bz2 \
+        calendar \
+        dom \
+        exif \
+        gd \
+        intl \
+        mbstring \
+        opcache \
+        pcntl \
+        pdo \
+        pdo_mysql \
+        pdo_pgsql \
+        simplexml \
+        soap \
+        xml \
+        zip \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && rm -rf /tmp/pear
 
-# Create system user to run Composer and Artisan Commands
-RUN useradd -G www-data,root -u $uid -d /home/$user $user
-RUN mkdir -p /home/$user/.composer && \
-    chown -R $user:$user /home/$user
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Install redis
-RUN pecl install -o -f redis \
-    &&  rm -rf /tmp/pear \
-    &&  docker-php-ext-enable redis
+RUN groupadd -g "${GID}" "${APP_USER}" \
+    && useradd -u "${UID}" -g "${APP_USER}" -G www-data -m -d "/home/${APP_USER}" "${APP_USER}" \
+    && mkdir -p "/home/${APP_USER}/.composer" \
+    && mkdir -p /var/log/supervisor /var/run/supervisor /etc/supervisor/conf.d \
+    && chown -R "${APP_USER}:${APP_USER}" "/home/${APP_USER}" /var/log/supervisor /var/run/supervisor
 
-# Set working directory
 WORKDIR /var/www/html/app
 
-# Copy custom configurations PHP
 COPY .docker/php/custom.ini /usr/local/etc/php/conf.d/custom.ini
+COPY .docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+COPY .docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
 
-USER $user
+USER root
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+USER ${APP_USER}
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["php-fpm"]

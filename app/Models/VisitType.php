@@ -2,70 +2,39 @@
 
 namespace App\Models;
 
+use App\Concerns\{HasEntityCode, HasUppercaseName};
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class VisitType extends Model
 {
+    use Auditable;
+    use HasAuditColumns;
+    use HasEntityCode;
+    use HasUppercaseName;
     use HasUuids;
     use SoftDeletes;
 
-    protected $primaryKey = 'id';
+    protected string $codePrefix = 'VT';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'entity_id',
-        'code',
-        'name',
-        'active',
-    ];
+    protected string $codePrefixGlobal = 'VTP';
 
-    /**
-     * Generated code for the entity_id field
-     */
-    protected static function booted(): void
-    {
-        static::creating(function (self $visitType) {
-            if (empty($visitType->code)) {
-                $prefix = $visitType->entity_id ? 'VT' : 'VTP';
+    protected $fillable = ['entity_id', 'code', 'name', 'procedure_id', 'active'];
 
-                $lastType = static::withoutGlobalScopes()
-                    ->when(
-                        $visitType->entity_id !== null,
-                        fn ($q) => $q->where('entity_id', $visitType->entity_id),
-                        fn ($q) => $q->whereNull('entity_id')
-                    )
-                    ->where('code', 'like', $prefix . '-%')
-                    ->orderBy('code', 'desc')
-                    ->first();
-
-                if ($lastType) {
-                    $lastNumber = (int) substr($lastType->code, strlen($prefix) + 1);
-                    $newNumber  = $lastNumber + 1;
-                } else {
-                    $newNumber = 1;
-                }
-
-                $visitType->code = sprintf('%s-%010d', $prefix, $newNumber);
-            }
-        });
-    }
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
-        return [
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
-        ];
+        return ['created_at' => 'datetime', 'updated_at' => 'datetime', 'deleted_at' => 'datetime'];
+    }
+
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class, 'entity_id', 'id');
+    }
+
+    /** Procedimento padrão usado para pré-preencher o lançamento de caixa. */
+    public function procedure(): BelongsTo
+    {
+        return $this->belongsTo(Procedure::class);
     }
 }

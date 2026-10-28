@@ -1,0 +1,300 @@
+//
+// control-tokens.scss — densidade dos controles do painel
+//
+// Contrato: design-system/MASTER.md §1 (medidas), §2 (tipografia/espaço) e §6 (adoção).
+//
+// Uma REGIÃO de densidade é qualquer elemento com data-ee-density="compact | default | comfortable"
+// (a página, uma barra de filtros, um modal). Dentro dela campo, select, select com busca, dinheiro,
+// botão, botão de ícone, paginação e abas têm a MESMA altura externa, e as classes -sm e -lg do
+// Bootstrap deixam de decidir o tamanho: quem decide é a região. Fora de uma região NADA muda, então o painel
+// migra módulo a módulo, sem trocar nenhum `sm` por busca e substituição.
+//
+// Os tokens só existem DENTRO de regiões (nunca em :root). Componentes com CSS próprio leem
+// `var(--ee-token, <valor legado>)`: dentro da região seguem o padrão, fora mantêm o que sempre tiveram.
+//
+// As alturas são MÍNIMAS (rem): zoom, tradução e fonte maior podem crescer o controle.
+//   altura = line-height + 2 × padding-y + 2 × borda de 1px
+//   compact 20+10+2 = 32 | default 20+18+2 = 40 | comfortable 24+18+2 = 44
+
+@mixin -density($min-height, $font-size, $line-height, $padding-x, $padding-y, $icon-size, $table-x, $table-y, $choice-size) {
+    --ee-control-min-height: #{$min-height};
+    --ee-control-font-size: #{$font-size};
+    --ee-control-line-height: #{$line-height};
+    --ee-control-padding-x: #{$padding-x};
+    --ee-control-padding-y: #{$padding-y};
+    --ee-icon-size: #{$icon-size};
+    --ee-table-padding-x: #{$table-x};
+    --ee-table-padding-y: #{$table-y};
+    --ee-choice-size: #{$choice-size};
+}
+
+// Qualquer valor de data-ee-density (inclusive um erro de digitação) cai no padrão de 40px.
+[data-ee-density] {
+    @include -density(2.5rem, 0.875rem, 1.25rem, 0.75rem, 0.5625rem, 1.125rem, 1rem, 0.96875rem, 1.125rem);
+    --ee-control-radius: 0.5rem;
+    --ee-surface-radius: 0.75rem;
+    --ee-control-gap: 0.5rem;
+}
+
+[data-ee-density="compact"] {
+    @include -density(2rem, 0.875rem, 1.25rem, 0.5rem, 0.3125rem, 1rem, 0.75rem, 0.71875rem, 1.125rem);
+}
+
+[data-ee-density="comfortable"] {
+    @include -density(2.75rem, 1rem, 1.5rem, 0.75rem, 0.5625rem, 1.25rem, 1rem, 0.96875rem, 1.25rem);
+}
+
+// Toque ou tela pequena: confortável em TODA região, inclusive a compacta. Fonte de 16px também
+// evita o zoom automático ao focar um campo no iOS. Não depende só de breakpoint: um tablet largo
+// tem ponteiro impreciso e cai aqui.
+@media (pointer: coarse), (max-width: 575.98px) {
+    [data-ee-density] {
+        @include -density(2.75rem, 1rem, 1.5rem, 0.75rem, 0.5625rem, 1.25rem, 1rem, 0.96875rem, 1.25rem);
+    }
+}
+
+// ─── Controles dentro de uma região ─────────────────────────────────────────────────────────────
+// Os seletores repetem as variantes legadas (-sm, input-group-sm, select com altura fixa) de
+// propósito: a região precisa ganhar delas em especificidade, sem !important.
+[data-ee-density] {
+    // Campos: input, select nativo e prefixo/sufixo de input-group.
+    .form-control,
+    .form-select,
+    .form-control-sm,
+    .form-select-sm,
+    .input-group-text,
+    .input-group-sm > .form-control,
+    .input-group-sm > .form-select,
+    .input-group-sm > .input-group-text,
+    select.form-control:not([size]):not([multiple]),
+    select.form-control-sm:not([size]):not([multiple]) {
+        height: auto;
+        min-height: var(--ee-control-min-height);
+        padding-top: var(--ee-control-padding-y);
+        padding-bottom: var(--ee-control-padding-y);
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
+        border-radius: var(--ee-control-radius);
+    }
+
+    .form-control,
+    .form-control-sm,
+    .input-group-text,
+    .input-group-sm > .form-control,
+    .input-group-sm > .input-group-text {
+        padding-left: var(--ee-control-padding-x);
+        padding-right: var(--ee-control-padding-x);
+    }
+
+    // O select reserva o lado direito para a seta.
+    .form-select,
+    .form-select-sm,
+    .input-group-sm > .form-select {
+        padding-left: var(--ee-control-padding-x);
+    }
+
+    // Ícone de erro/sucesso do Bootstrap: `.is-invalid` e `.is-valid` reservam o lado direito para o
+    // ícone (1.5em + padding). Sem esta regra o padding da região o come (33px viravam 12px) e o texto
+    // passa por baixo do ícone.
+    .form-control.is-invalid,
+    .form-control.is-valid,
+    .was-validated .form-control:invalid,
+    .was-validated .form-control:valid {
+        padding-right: calc(1.5em + var(--ee-control-padding-x));
+    }
+
+    // Texto longo: três linhas legíveis (MASTER §1); o usuário ainda pode esticar na vertical.
+    textarea.form-control,
+    textarea.form-control-sm {
+        min-height: 6rem;
+        resize: vertical;
+    }
+
+    // Seletor de cor: mesma altura dos campos vizinhos (antes: 38/39px locais; _forms.scss fixa
+    // min-height: 39px em input.form-control[type="color"], por isso o min-height também é redito aqui).
+    input.form-control[type="color"],
+    .form-control.form-control-color {
+        height: var(--ee-control-min-height);
+        min-height: var(--ee-control-min-height);
+        padding: 0.25rem;
+    }
+
+    // Botão do input de arquivo: o CSS legado supõe padding de .5rem/.77rem no campo (margens negativas
+    // iguais). Aqui ele acompanha o padding da região, para preencher o campo sem folga nem estouro.
+    .form-control::file-selector-button {
+        margin-block: calc(-1 * var(--ee-control-padding-y));
+        margin-inline: calc(-1 * var(--ee-control-padding-x)) var(--ee-control-padding-x);
+        padding-block: var(--ee-control-padding-y);
+        padding-inline: var(--ee-control-padding-x);
+    }
+
+    // Rótulo, ajuda e erro (MASTER §2): rótulo 6px acima do campo, ajuda 4px abaixo.
+    .form-label {
+        margin-bottom: 0.375rem;
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
+        font-weight: 500;
+    }
+
+    .form-text,
+    .invalid-feedback,
+    .valid-feedback {
+        margin-top: 0.25rem;
+        font-size: 0.75rem;
+        line-height: 1.125rem;
+    }
+
+    // Botões com texto. `-sm` e `-lg` seguem a região (o `btn-lg` legado tem 39px, abaixo do padrão de
+    // 40px); .btn-xs (ação mínima em chip), .btn-link e .btn-close ficam como estão. O raio está no fim
+    // do arquivo, onde há o motivo.
+    .btn:not(.btn-xs, .btn-link, .btn-icon, .btn-close) {
+        min-height: var(--ee-control-min-height);
+        padding: var(--ee-control-padding-y) var(--ee-control-padding-x);
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
+    }
+
+    // Botão somente com ícone: quadrado do tamanho do campo. `.ee-btn-square` é para ícone dentro
+    // de input-group (ex.: limpar busca), onde o botão não é .btn-icon.
+    .btn.btn-icon:not(.btn-xs),
+    .btn.ee-btn-square {
+        width: var(--ee-control-min-height);
+        height: var(--ee-control-min-height);
+        padding: 0;
+        border-radius: var(--ee-control-radius);
+    }
+
+    // Paginação e alternância de visualização (tabela/cards).
+    .pagination .page-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--ee-control-min-height);
+        min-height: var(--ee-control-min-height);
+        padding: 0 0.5rem;
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
+    }
+
+    // O contêiner tem borda de 1px: os botões internos descontam para a caixa externa fechar na medida.
+    .page-header-toggle {
+        min-height: var(--ee-control-min-height);
+        border-radius: var(--ee-control-radius);
+    }
+
+    .page-header-toggle > button {
+        justify-content: center;
+        min-width: var(--ee-control-min-height);
+        min-height: calc(var(--ee-control-min-height) - 2px);
+    }
+
+    // Abas de página também seguem a região; o modal conserva sua regra mais específica abaixo.
+    .nav-tabs .nav-link,
+    .nav-pills .nav-link {
+        display: flex;
+        align-items: center;
+        min-height: var(--ee-control-min-height);
+        padding: var(--ee-control-padding-y) var(--ee-control-padding-x);
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
+    }
+
+    // Abas do modal: o CSS escopado do componente fixa 13px e padding próprio (especificidade 0,3,0).
+    .ee-modal__tabs .nav-tabs .nav-link {
+        display: flex;
+        align-items: center;
+        min-height: var(--ee-control-min-height);
+        padding: 0 var(--ee-control-padding-x);
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
+        border-radius: var(--ee-control-radius) var(--ee-control-radius) 0 0;
+    }
+
+    // Indicador separado do alvo: o label associado ocupa a linha clicavel da regiao.
+    .form-check {
+        display: flex;
+        align-items: center;
+        gap: var(--ee-control-gap);
+        min-height: var(--ee-control-min-height);
+        padding-left: 0;
+    }
+
+    input[type="checkbox"]:not(.btn-check),
+    input[type="radio"]:not(.btn-check) {
+        width: var(--ee-choice-size);
+        height: var(--ee-choice-size);
+        flex-shrink: 0;
+    }
+
+    .form-check .form-check-input {
+        float: none;
+        margin: 0;
+    }
+
+    .form-check-label {
+        display: flex;
+        align-items: center;
+        min-height: var(--ee-control-min-height);
+        cursor: pointer;
+    }
+
+    .form-check > .form-check-label {
+        flex: 1;
+    }
+
+    .form-switch .form-check-input {
+        width: calc(2 * var(--ee-choice-size));
+        height: var(--ee-choice-size);
+    }
+
+    // Referencia de linha textual = entrelinha + paddings + borda inferior Bootstrap (1px).
+    // Nao fixa altura: celulas com controles ou varias linhas crescem naturalmente.
+    .table > :not(caption) > * > * {
+        padding: var(--ee-table-padding-y) var(--ee-table-padding-x);
+        line-height: var(--ee-control-line-height);
+        vertical-align: middle;
+    }
+
+    .ee-tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        min-height: var(--ee-control-min-height);
+        padding: var(--ee-control-padding-y) var(--ee-control-padding-x);
+        font-size: var(--ee-control-font-size);
+        line-height: var(--ee-control-line-height);
+    }
+
+    // Select com busca (@vueform/multiselect via SearchSelect). A lib soma a borda no wrapper interno e
+    // a variante `sm` fixava 31px: aqui o contêiner e o wrapper fecham juntos na altura da região.
+    .search-select.multiselect {
+        --ms-font-size: var(--ee-control-font-size);
+        --ms-option-font-size: var(--ee-control-font-size);
+        --ms-px: var(--ee-control-padding-x);
+        --ms-py: var(--ee-control-padding-y);
+        --ms-radius: var(--ee-control-radius);
+        --ms-dropdown-radius: var(--ee-control-radius);
+        height: auto;
+        min-height: var(--ee-control-min-height);
+
+        .multiselect-wrapper {
+            height: auto;
+            min-height: calc(var(--ee-control-min-height) - 2 * var(--ms-border-width, 1px));
+        }
+
+        .multiselect-option {
+            min-height: var(--ee-control-min-height);
+        }
+    }
+}
+
+// O raio do botão fica FORA do bloco acima de propósito. Com `:where()` a especificidade é (0,2,0), igual
+// à dos `-sm` legados (que a região precisa vencer, e vence pela ordem do arquivo) e menor que a dos cantos
+// internos de `.btn-group` do Bootstrap (0,3,0), que precisam continuar vencendo. Com o prefixo normal o
+// raio de 8px arredondava os cantos de dentro do grupo.
+:where([data-ee-density]) .btn:not(.btn-xs, .btn-link, .btn-icon, .btn-close) {
+    border-radius: var(--ee-control-radius);
+}

@@ -2,20 +2,29 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\{DoctorRequest};
-use App\Http\Resources\EntityUserResource;
-use App\Models\{Doctor, EntityUser, Patient, People, User};
-use App\Services\DoctorService;
-use Illuminate\Contracts\View\{Factory, View};
+use App\DTOs\ActionPolicy;
+use App\Enums\EntityGate;
+use App\Http\Controllers\Concerns\RedirectsToListing;
+use App\Http\Requests\DoctorRequest;
+use App\Http\Resources\{DoctorResource, EntityUserResource};
+use App\Models\{Doctor, DoctorInvitation, Entity, EntityUser, People, User};
+use App\Services\{DoctorService, PatientService};
+use App\Support\BrazilianFormat;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Illuminate\Support\Facades\{DB, Gate, Storage, Vite};
+use Inertia\{Inertia, Response};
 
 class DoctorsController extends Controller
 {
-    protected string $titleController = 'Médicos';
+    use RedirectsToListing;
+
+    /** Parâmetros da listagem preservados ao voltar de uma ação (RedirectsToListing). */
+    private const LISTING_PARAMS = ['search', 'sort', 'direction', 'page'];
 
     /**
      * Instance of the standard model.
@@ -26,118 +35,313 @@ class DoctorsController extends Controller
 
     public function __construct(Doctor $doctor, DoctorService $doctorService)
     {
-        $this->model   = $doctor;
-        $this->service = $doctorService;
+        $this->titleController = __('actions.sidemenu.doctors');
+        $this->model           = $doctor;
+        $this->service         = $doctorService;
+    }
+
+    /** Colunas ordenáveis (whitelist) → coluna real no banco. */
+    private const SORTABLE = [
+        'created_at' => 'doctors.created_at',
+        'full_name'  => 'users.name',
+        'email'      => 'users.email',
+        'code'       => 'doctors.code',
+        'record'     => 'doctors.record',
+        'cellphone'  => 'people.cellphone',
+    ];
+
+    /**
+     * Return paginated JSON for the card view — mesma query, busca e linha
+     * da tabela (toTableRow), para os dois modos exibirem os mesmos dados.
+     */
+    public function cards(Request $request): JsonResponse
+    {
+        $entityId = session()->get('selected_entity_id');
+
+        $doctors = $this->searchListing($this->listingQuery($entityId), $request->string('search')->trim()->value())
+            ->orderBy('doctors.created_at', 'desc')
+            ->orderBy('doctors.id');
+        $doctors = $this->paginateClamped($doctors, 12);
+
+        return response()->json([
+            'data' => $doctors->getCollection()->map(fn (Doctor $d) => $this->toTableRow($d, $entityId))->values(),
+            'meta' => [
+                'total'        => $doctors->total(),
+                'per_page'     => $doctors->perPage(),
+                'current_page' => $doctors->currentPage(),
+                'last_page'    => $doctors->lastPage(),
+            ],
+        ]);
     }
 
     /**
      * Display a listing of the resource.
      */
-    public function index(): Factory|Application|View
+    public function index(Request $request): Response
     {
-        $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.accesscontrol.users.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.records'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
-        ];
+        $entityId = session('selected_entity_id');
+        $search   = $request->string('search')->trim()->value();
+        $sortBy   = $request->string('sort', 'created_at')->value();
+        $sortDir  = $request->string('direction', 'desc')->value();
 
-        return view('system.doctors.index', compact('meta'));
+        $sortBy  = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : 'created_at';
+        $sortDir = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
+
+        // `id` desempata valores iguais (nome, telefone...) — sem ele a ordem
+        // entre páginas não é determinística no PostgreSQL.
+        $doctors = $this->searchListing($this->listingQuery($entityId), $search)
+            ->orderBy(self::SORTABLE[$sortBy], $sortDir)
+            ->orderBy('doctors.id');
+        $doctors = $this->paginateClamped($doctors, 15)->withQueryString();
+
+        return Inertia::render('Panel/Doctors/Index', [
+            'doctors'      => $doctors->through(fn ($d) => $this->toTableRow($d, $entityId)),
+            'totalDoctors' => fn () => Doctor::query()
+                ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+                ->where('entity_users.entity_id', $entityId)
+                ->count(),
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
+            // Normalizados: a UI mostra o ícone da ordenação realmente aplicada.
+            'filters' => ['search' => $search, 'sort' => $sortBy, 'direction' => $sortDir],
+            't'       => trans('doctors'),
+            // Convites a médicos com login no EasyEye aguardando aceite — só o
+            // que esta clínica digitou (nome/CRM), nada do cadastro do médico.
+            'pendingInvitations' => fn () => DoctorInvitation::query()
+                ->where('entity_id', $entityId)
+                ->where('status', DoctorInvitation::STATUS_PENDING)
+                ->where('expires_at', '>', now())
+                ->latest('updated_at')
+                ->get()
+                ->map(fn (DoctorInvitation $invitation): array => [
+                    'id'         => $invitation->id,
+                    'name'       => $invitation->payload['name'] ?? '—',
+                    'record'     => $invitation->payload['record'] ?? '—',
+                    'sent_at'    => $invitation->updated_at?->toIso8601String(),
+                    'expires_at' => $invitation->expires_at?->toIso8601String(),
+                ])
+                ->values(),
+        ]);
+    }
+
+    /** Médicos da clínica ativa com os dados de usuário/pessoa usados na listagem. */
+    private function listingQuery(?string $entityId): Builder
+    {
+        return Doctor::query()
+            ->select(
+                'doctors.*',
+                'entity_users.entity_id',
+                'entity_users.user_id',
+                'users.name as full_name',
+                'users.email',
+                'people.cellphone',
+                'people.whatsapp',
+            )
+            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+            ->join('users', 'entity_users.user_id', '=', 'users.id')
+            ->join('people', 'doctors.person_id', '=', 'people.id')
+            ->where('entity_users.entity_id', $entityId);
+    }
+
+    /** Busca por nome, e-mail, código ou CRM — mesma na tabela e nos cards. */
+    private function searchListing(Builder $query, string $search): Builder
+    {
+        return $query->when($search !== '', fn ($q) => $q->where(
+            fn ($w) => $w
+                ->whereLikeUnaccent('users.name', $search)
+                ->orWhereLikeUnaccent('users.email', $search)
+                ->orWhereLikeUnaccent('doctors.code', $search)
+                ->orWhereLikeUnaccent('doctors.record', $search)
+                ->orWhereLikeUnaccent('people.cellphone', $search)
+                ->when(
+                    BrazilianFormat::searchDigits($search),
+                    fn ($q, $digits) => $q->orWhereLikeUnaccent('people.cellphone', $digits),
+                ),
+        ));
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Pagina e, se a página pedida passou da última (ex.: excluiu o único
+     * médico da última página e o redirect manteve ?page=N), usa a última válida.
      */
-    public function create(): Factory|Application|View|JsonResponse
+    private function paginateClamped(Builder $query, int $perPage): LengthAwarePaginator
     {
-        try {
-            $genders         = People::$genders;
-            $maritalStatuses = People::$maritalStatuses;
-            $statesOfBrazil  = People::$statesOfBrazil;
+        $paginator = (clone $query)->paginate($perPage);
 
-            return view(
-                'system.doctors.form',
-                compact('genders', 'maritalStatuses', 'statesOfBrazil')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if ($paginator->isEmpty() && $paginator->currentPage() > 1 && $paginator->lastPage() >= 1) {
+            $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
         }
+
+        return $paginator;
+    }
+
+    private function toTableRow(Doctor $d, string $entityId): array
+    {
+        $policy        = ActionPolicy::from($d, $entityId);
+        $userPhotoPath = 'users/' . $d->user_id . '.jpg';
+
+        return [
+            'id'               => $d->id,
+            'code'             => $d->code,
+            'record'           => $d->record,
+            'record_specialty' => $d->record_specialty,
+            'color'            => $d->color,
+            'active'           => (bool) $d->active,
+            'deleted_at'       => $d->deleted_at,
+            'created_at'       => $d->created_at?->format('d/m/Y'),
+            'full_name'        => $d->full_name,
+            'email'            => $d->email,
+            'cellphone'        => BrazilianFormat::phone($d->cellphone),
+            'whatsapp'         => (bool) $d->whatsapp,
+            'user_id'          => $d->user_id,
+            'photo_url'        => Storage::disk('public')->exists($userPhotoPath)
+                ? Storage::disk('public')->url($userPhotoPath)
+                : Vite::asset('resources/img/system/team.png'),
+            'work_schedule_url' => route('panel.doctors.work-schedule.index', $d->id),
+            'mode'              => $policy->mode,
+            'is_owned'          => $policy->isOwned,
+            'is_global'         => $policy->isGlobal,
+            'deleted'           => $policy->deleted,
+        ];
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(DoctorRequest $request): JsonResponse|EntityUserResource
+    public function store(DoctorRequest $request): JsonResponse|RedirectResponse
     {
-        try {
-            $entityUser = $this->service->create($request);
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
 
-            return new EntityUserResource($entityUser);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        $entityUser = $this->service->create($request);
+        $message    = $this->getCreateMessage();
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => $message, 'data' => new EntityUserResource($entityUser)]);
         }
 
+        return $this->redirectToListing('panel.doctors.index', self::LISTING_PARAMS)->with('success', $message);
     }
 
     /**
-     * Display the specified resource.
+     * Display the specified resource (JSON only — viewed via modal drawer on index).
      */
-    public function show(string $id): Application|View|JsonResponse
+    public function show(string $id): JsonResponse|RedirectResponse
     {
-        try {
-            $record = $this->findDoctor($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            return view(
-                'system.doctors.show',
-                compact('record')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (! request()->wantsJson()) {
+            return redirect()->route('panel.doctors.index');
         }
+
+        $person        = $record->person;
+        $userPhotoPath = 'users/' . $record->user_id . '.jpg';
+        $photoUrl      = Storage::disk('public')->exists($userPhotoPath)
+            ? Storage::disk('public')->url($userPhotoPath)
+            : Vite::asset('resources/img/system/team.png');
+
+        return response()->json([
+            'data' => [
+                'id'                => $record->id,
+                'code'              => $record->code,
+                'record'            => $record->record,
+                'record_specialty'  => $record->record_specialty,
+                'color'             => $record->color,
+                'observation'       => $record->observation,
+                'partner'           => (bool) $record->partner,
+                'active'            => (bool) $record->active,
+                'photo_url'         => $photoUrl,
+                'created_at'        => $record->created_at?->format('d/m/Y H:i'),
+                'updated_at'        => $record->updated_at?->format('d/m/Y H:i'),
+                'deleted_at'        => $record->deleted_at?->format('d/m/Y H:i'),
+                'full_name'         => $person->full_name,
+                'nickname'          => $person->nickname,
+                'cpf'               => BrazilianFormat::cpf($person->national_registry),
+                'birth_date'        => $person->birth_date ? $person->present()->getBirthDate() : null,
+                'age'               => $person->birth_date ? $person->present()->getAge() : null,
+                'gender'            => $person->present()->getGender(),
+                'marital_status'    => $person->present()->getMaritalStatus(),
+                'email'             => $record->email,
+                'mother_name'       => $person->mother_name,
+                'father_name'       => $person->father_name,
+                'rg'                => $person->state_registry,
+                'rg_agency'         => $person->state_registry_agency,
+                'rg_state'          => $person->state_registry_initial,
+                'rg_date'           => $person->state_registry_date ? $person->present()->getStateRegistryDate() : null,
+                'telephone'         => BrazilianFormat::phone($person->telephone),
+                'cellphone'         => BrazilianFormat::phone($person->cellphone),
+                'whatsapp'          => (bool) $person->whatsapp,
+                'zipcode'           => $person->zipcode ? $person->present()->getZipcode() : null,
+                'address'           => $person->address,
+                'number'            => $person->number,
+                'complement'        => $person->complement,
+                'district'          => $person->district,
+                'city'              => $person->city,
+                'state'             => $person->state,
+                'work_schedule_url' => route('panel.doctors.work-schedule.index', $record->id),
+            ],
+        ]);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Return flat JSON for the crudForm edit modal.
      */
-    public function edit(string $id): Application|View|JsonResponse
+    public function editData(string $id): JsonResponse
     {
-        try {
-            $record = $this->findDoctor($id);
+        $record = $this->service->findByIdOrCode($id);
+        $person = $record->person;
+        $user   = $record->entityUser->user;
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
+        return response()->json(['data' => [
+            'name'                   => $person->full_name,
+            'nickname'               => $person->nickname,
+            'national_registry'      => $person->national_registry,
+            'birth_date'             => $person->birth_date?->format('Y-m-d'),
+            'gender'                 => $person->gender,
+            'marital_status'         => $person->marital_status,
+            'email'                  => $user->email,
+            'mother_name'            => $person->mother_name,
+            'father_name'            => $person->father_name,
+            'state_registry'         => $person->state_registry,
+            'state_registry_agency'  => $person->state_registry_agency,
+            'state_registry_initial' => $person->state_registry_initial,
+            'state_registry_date'    => $person->state_registry_date?->format('Y-m-d'),
+            'telephone'              => $person->telephone,
+            'cellphone'              => $person->cellphone,
+            'whatsapp'               => (bool) $person->whatsapp,
+            'zipcode'                => $person->zipcode,
+            'address'                => $person->address,
+            'number'                 => $person->number,
+            'complement'             => $person->complement,
+            'district'               => $person->district,
+            'city'                   => $person->city,
+            'state'                  => $person->state,
+            'record'                 => $record->record,
+            'record_specialty'       => $record->record_specialty,
+            'color'                  => $record->color,
+            'observation'            => $record->observation,
+            'partner'                => (bool) $record->partner,
+            'active'                 => (bool) $record->active,
+        ]]);
+    }
 
-            $genders         = People::$genders;
-            $maritalStatuses = People::$maritalStatuses;
-            $statesOfBrazil  = People::$statesOfBrazil;
-
-            return view(
-                'system.doctors.form',
-                compact('record', 'genders', 'maritalStatuses', 'statesOfBrazil')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+    /**
+     * Return doctor data for the edit modal (JSON only — UI is Vue/Inertia).
+     */
+    public function edit(string $id): JsonResponse|RedirectResponse
+    {
+        if (! request()->wantsJson()) {
+            return redirect()->route('panel.doctors.index');
         }
+
+        $record = $this->service->findByIdOrCode($id);
+
+        return response()->json([
+            'data'            => new DoctorResource($record),
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
+        ]);
     }
 
     /**
@@ -145,246 +349,62 @@ class DoctorsController extends Controller
      */
     public function update(DoctorRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
-        try {
-            $record = $this->findDoctor($id);
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
+        $record        = $this->service->findByIdOrCode($id);
+        $updatedRecord = $this->service->update($record, $request);
+        $updatedRecord->refresh();
 
-            $updatedRecord = $this->service->update($record, $request);
+        $messageReturn = $this->getUpdateMessage($request);
 
-            $messageReturn = $this->getUpdateMessage($request);
-
-            if (request()->wantsJson()) {
-                return response()->json([
-                    'message' => $messageReturn,
-                    'data'    => (new EntityUserResource($updatedRecord))['data'],
-                ]);
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => new DoctorResource($updatedRecord),
+            ]);
         }
+
+        return $this->redirectToListing('panel.doctors.index', self::LISTING_PARAMS)->with('message', $messageReturn);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): Application|View|JsonResponse
+    public function destroy(string $id, PatientService $patientService): Application|View|JsonResponse|RedirectResponse
     {
-        try {
-            $record = $this->findDoctor($id);
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
 
-            if (! $record) {
-                return $this->notFoundResponse();
+        $record = $this->service->findByIdOrCode($id);
+
+        return DB::transaction(function () use ($record, $patientService) {
+            $userId     = $record->entityUser->user_id;
+            $recordData = $record->toArray();
+
+            $userHasOtherEntityUsers = EntityUser::query()
+                ->where('user_id', $userId)
+                ->count();
+
+            $record->entityUser->delete();
+            $record->delete();
+
+            if ($userHasOtherEntityUsers <= 1) {
+                $user = User::query()->find($userId);
+                $user?->delete();
             }
 
-            return DB::transaction(function () use ($record) {
-                $userId     = $record->entityUser->user_id;
-                $recordData = $record->toArray();
+            // People é identidade GLOBAL: antes contava só Patients da clínica
+            // atual (EntityScope) e ignorava médicos — excluir o médico em A
+            // apagava o People do paciente/médico de B (ou do paciente de A).
+            $patientService->deletePersonIfUnused($record->person_id, exceptDoctorId: $record->id);
 
-                $userHasOtherEntityUsers = EntityUser::query()
-                    ->where('user_id', $userId)
-                    ->count();
-                $patientHasOtherEntityUsers = Patient::query()
-                    ->where('person_id', $record->person_id)
-                    ->count();
-
-                $record->entityUser->delete();
-                $record->delete();
-
-                if ($userHasOtherEntityUsers <= 1) {
-                    $user = User::query()->find($userId);
-
-                    if ($user) {
-                        $user->delete();
-                    }
-                }
-
-                if ($patientHasOtherEntityUsers <= 1) {
-                    $person = People::query()->find($record->person_id);
-
-                    if ($person) {
-                        $person->delete();
-                    }
-                }
-
-                // Retornar resposta
-                if (request()->wantsJson()) {
-                    return response()->json([
-                        'message' => $this->titleController . ' deletado(a) com sucesso.',
-                        'deleted' => $recordData,
-                    ]);
-                }
-
-                return redirect(action('\\' . static::class . '@index'))
-                    ->with('message', $this->titleController . ' deletado(a) com sucesso.');
-            });
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
-    }
-
-    public function ajaxDatatable(Request $request): JsonResponse
-    {
-        $columns = [
-            0 => 'created_at',
-            1 => 'name',
-            2 => 'record',
-            3 => 'email',
-            4 => 'active',
-            5 => 'action',
-        ];
-
-        $totalRecords = $this->model->query()
-            ->select(
-                'doctors.*', 'users.name as user_name', 'users.email',
-                'people.full_name', 'people.nickname'
-            )
-            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-            ->join('users', 'entity_users.user_id', '=', 'users.id')
-            ->join('people', 'doctors.person_id', '=', 'people.id')
-            ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-            ->count();
-
-        $limit = $request->get('length');
-        $start = $request->get('start');
-        $order = $columns[$request->get('order')[0]['column']];
-        $dir   = $request->get('order')[0]['dir'];
-
-        if (empty($request->get('search')['value'])) {
-            $records = $this->model->query()
-                ->select(
-                    'doctors.*', 'users.name as user_name', 'users.email',
-                    'people.full_name', 'people.nickname'
-                )
-                ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-                ->join('users', 'entity_users.user_id', '=', 'users.id')
-                ->join('people', 'doctors.person_id', '=', 'people.id')
-                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->get();
-
-            $totalFiltered = $totalRecords;
-        } else {
-            $search = $request->get('search')['value'];
-            $query  = $this->model->query()
-                ->select(
-                    'doctors.*', 'users.name as user_name', 'users.email',
-                    'people.full_name', 'people.nickname'
-                )
-                ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-                ->join('users', 'entity_users.user_id', '=', 'users.id')
-                ->join('people', 'doctors.person_id', '=', 'people.id')
-                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                ->where(function ($query) use ($search) {
-                    $query->where('people.full_name', 'like', "%{$search}%")
-                        ->orWhere('people.nickname', 'like', "%{$search}%")
-                        ->orWhere('users.email', 'like', "%{$search}%")
-                        ->orWhere('doctors.record', 'like', "%{$search}%");
-                });
-
-            $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
-            $totalFiltered = $query->count();
-
-        }
-        $data = [];
-
-        if (count($records)) {
-            foreach ($records as $record) {
-                $information['created_at'] = $record->created_at->format('d/m/Y H:i');
-                $information['name']       = $record->user_name;
-                $information['record']     = $record->record;
-                $information['email']      = $record->email;
-                $information['active']     = $record->active ?
-                    '<span class="badge bg-success">SIM</span>' :
-                    '<span class="badge bg-dark">NÃO</span>';
-                $information['action'] = $this->buildActionButtons($record);
-                $data[]                = $information;
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message' => $this->getDeleteMessage(),
+                    'deleted' => $recordData,
+                ]);
             }
 
-        }
-
-        return response()->json([
-            'draw'            => (int) $request->get('draw'),
-            'recordsTotal'    => (int) $totalRecords,
-            'recordsFiltered' => (int) $totalFiltered,
-            'data'            => $data,
-        ]);
-
-    }
-
-    /**
-     * Find doctor by ID
-     */
-    private function findDoctor(string $id): ?Doctor
-    {
-        return $this->model->query()->withTrashed()
-            ->with(['person', 'entityUser.user'])
-            ->whereHas('entityUser', function ($query) {
-                $query->where('entity_id', session()->get('selected_entity_id'));
-            })
-            ->find($id);
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Doctor not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
-    }
-
-    /**
-     * Get update message based on request type
-     */
-    private function getUpdateMessage(Request $request): string
-    {
-        if ($request->has('type_method')) {
-            return $this->titleController .
-                ($request->active ? ' desbloqueado(a) ' : ' bloqueado(a) ') . ' com sucesso.';
-        }
-
-        return $this->titleController . ' alterado(a) com sucesso.';
-    }
-
-    /**
-     * Build action buttons for datatable
-     */
-    private function buildActionButtons($record): string
-    {
-        $btnActions = '';
-        $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Editar"><i class="fa fa-edit"></i></a>';
-        $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Visualizar"><i class="fa fa-eye"></i></a>';
-        $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
-                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
-                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-        $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-danger btn-danger btn-xs m-1 btn-trash"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
-
-        return $btnActions;
+            return $this->redirectToListing('panel.doctors.index', self::LISTING_PARAMS)->with('message', $this->getDeleteMessage());
+        });
     }
 }

@@ -1,0 +1,779 @@
+<script setup>
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { usePage, router } from '@inertiajs/vue3';
+import logoSvg from '@img/system/logo.svg';
+import logoSmallSvg from '@img/system/logo-small.svg';
+import logoWhiteSvg from '@img/system/logo-white.svg';
+import AiFloatingAssistant from '@/Components/Panel/AiFloatingAssistant.vue';
+import SubscriptionBanner from '@/Components/Panel/SubscriptionBanner.vue';
+import SupportButton from '@/Components/Panel/SupportButton.vue';
+import { usePanelTour } from '@/composables/usePanelTour.js';
+
+defineProps({
+    title: { type: String, default: '' },
+    breadcrumbs: { type: Array, default: () => [] },
+});
+
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui ?? {});
+const auth = computed(() => page.props.auth ?? {});
+const user = computed(() => auth.value.user ?? {});
+const entity = computed(() => auth.value.entity ?? {});
+const nav = computed(() => page.props.nav ?? []);
+const locales = computed(() => page.props.locales ?? []);
+const flash = computed(() => page.props.flash ?? {});
+const entities = computed(() => auth.value.entities ?? []);
+const aiAssistant = computed(() => page.props.aiAssistant ?? { enabled: false });
+const support = computed(() => page.props.support ?? null);
+// Situação da assinatura (pagamento pendente/em atraso, acesso limitado,
+// trial terminando) — só empresa cliente no painel; null no resto.
+const subscriptionBanner = computed(() => page.props.subscriptionBanner ?? null);
+
+// ── Dark mode ──────────────────────────────────────────────────────────────
+const isDark = ref(false);
+
+onMounted(() => {
+    isDark.value =
+        document.documentElement.getAttribute('data-bs-theme') === 'dark' ||
+        document.documentElement.getAttribute('data-sidebar') === 'dark';
+});
+
+function toggleDark() {
+    isDark.value = !isDark.value;
+    const theme = isDark.value ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-bs-theme', theme);
+    try {
+        localStorage.setItem('ee-panel-theme', theme);
+        // Manter o config do preclinic-theme-script em sincronia — ele tem
+        // precedência no próximo boot (sessionStorage __THEME_CONFIG__) e
+        // reaplicaria o tema antigo por cima do que o usuário escolheu aqui.
+        const raw = sessionStorage.getItem('__THEME_CONFIG__');
+        if (raw) {
+            const cfg = JSON.parse(raw);
+            cfg.theme = theme;
+            sessionStorage.setItem('__THEME_CONFIG__', JSON.stringify(cfg));
+        }
+        if (window.config) window.config.theme = theme;
+    } catch {
+        /* storage indisponível: tema vale só até o reload */
+    }
+}
+
+// ── Session timeout ────────────────────────────────────────────────────────
+let warningTimer = null;
+let expireTimer = null;
+let warningShown = false;
+const lifetime = window.sessionLifetimeMs ?? 120 * 60 * 1000;
+const warnBefore = 2 * 60 * 1000;
+
+function resetTimers() {
+    clearTimeout(warningTimer);
+    clearTimeout(expireTimer);
+    warningShown = false;
+    warningTimer = setTimeout(showSessionWarning, lifetime - warnBefore);
+    expireTimer = setTimeout(() => window.location.reload(), lifetime);
+}
+
+function showSessionWarning() {
+    if (warningShown || typeof window.Swal === 'undefined') return;
+    warningShown = true;
+    let remaining = 120;
+    window.Swal.fire({
+        title: window.translations?.messages?.session_expiring_title ?? 'Sessão expirando',
+        icon: 'warning',
+        showCancelButton: true,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen() {
+            const interval = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) clearInterval(interval);
+            }, 1000);
+            window.Swal.getPopup().__countdownInterval = interval;
+        },
+        willClose() {
+            clearInterval(window.Swal.getPopup().__countdownInterval);
+        },
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(safeRoute('session.ping'), {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+            })
+                .then((r) => (r.ok ? resetTimers() : window.location.reload()))
+                .catch(() => window.location.reload());
+        } else {
+            window.location.reload();
+        }
+    });
+}
+
+const sessionEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+
+onMounted(() => {
+    resetTimers();
+    sessionEvents.forEach((e) => document.addEventListener(e, resetTimers, { passive: true }));
+});
+
+onUnmounted(() => {
+    clearTimeout(warningTimer);
+    clearTimeout(expireTimer);
+    sessionEvents.forEach((e) => document.removeEventListener(e, resetTimers));
+});
+
+// BUG — item de menu com nome de rota inexistente/desatualizado no Ziggy
+// (deploy com bundle JS obsoleto, drift entre routes/web.php e
+// PanelNavigation.php) fazia `route()` lançar exceção não capturada dentro
+// do render do menu. Como o menu é renderizado uma única vez pro array
+// inteiro, UM item quebrado derrubava a árvore de componentes inteira —
+// tela fica preta/em branco (nada monta, nem header nem conteúdo). Um item
+// com rota inválida agora vira link inerte (href="#") em vez de quebrar a
+// página toda; erro é reportado ao Sentry para investigação.
+function safeRoute(name, params) {
+    try {
+        return route(name, params);
+    } catch (error) {
+        window.Sentry?.captureException?.(error, { extra: { route: name } });
+        console.error(`[AppLayout] Rota de menu inválida: "${name}"`, error);
+        return '#';
+    }
+}
+
+// ── Sidebar active state ───────────────────────────────────────────────────
+function isActive(matchPatterns) {
+    // Guard: se o helper route() estiver indisponível/quebrado, item fica
+    // inativo em vez de derrubar a árvore (mesma classe de bug do safeRoute).
+    let current = null;
+    try {
+        current = route().current();
+    } catch {
+        /* menu sem estado ativo é melhor que tela em branco */
+    }
+    return matchPatterns.some((p) => {
+        if (p.endsWith('*')) return current?.startsWith(p.slice(0, -2).replace('.*', ''));
+        return current === p;
+    });
+}
+
+function isGroupActive(item) {
+    if (item.match && isActive(item.match)) return true;
+    if (item.children) return item.children.some((c) => c.match && isActive(c.match));
+    return false;
+}
+
+// ── Sidebar submenu toggle ─────────────────────────────────────────────────
+const openMenus = ref({});
+
+onMounted(() => {
+    // Pré-abre grupos com rota filha ativa
+    nav.value.forEach((item) => {
+        if (item.children && isGroupActive(item)) {
+            openMenus.value[item.key] = true;
+        }
+    });
+});
+
+function toggleMenu(key) {
+    openMenus.value = { ...openMenus.value, [key]: !openMenus.value[key] };
+}
+
+function isMenuOpen(item) {
+    return isGroupActive(item) || !!openMenus.value[item.key];
+}
+
+// ── Entity switch ──────────────────────────────────────────────────────────
+function switchEntity(entityUserId) {
+    router.post(
+        safeRoute('selectentity.store'),
+        { entity_user_id: entityUserId },
+        {
+            preserveScroll: false,
+            onSuccess: () => router.visit(safeRoute('panel.dashboard')),
+        },
+    );
+}
+
+function entityInitials(name) {
+    return name
+        .split(' ')
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase();
+}
+
+// ── Logout ─────────────────────────────────────────────────────────────────
+function logout() {
+    router.post(safeRoute('logout'));
+}
+
+// ── Impersonation exit ─────────────────────────────────────────────────────
+function exitImpersonation() {
+    router.delete(safeRoute('manager.impersonate.destroy'));
+}
+
+// ── Flash messages (Vue-controlled + auto-dismiss 6s) ─────────────────────
+const flashSuccessOpen = ref(false);
+const flashErrorOpen = ref(false);
+let flashSuccessTimer = null;
+let flashErrorTimer = null;
+
+function dismissSuccess() {
+    flashSuccessOpen.value = false;
+    clearTimeout(flashSuccessTimer);
+}
+
+function dismissError() {
+    flashErrorOpen.value = false;
+    clearTimeout(flashErrorTimer);
+}
+
+// Reabre/reseta o timer sempre que o flash muda (nova navegação Inertia)
+watch(
+    () => flash.value.success,
+    (val) => {
+        clearTimeout(flashSuccessTimer);
+        if (val) {
+            flashSuccessOpen.value = true;
+            flashSuccessTimer = setTimeout(() => {
+                flashSuccessOpen.value = false;
+            }, 6000);
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    () => flash.value.error,
+    (val) => {
+        clearTimeout(flashErrorTimer);
+        if (val) {
+            flashErrorOpen.value = true;
+            flashErrorTimer = setTimeout(() => {
+                flashErrorOpen.value = false;
+            }, 6000);
+        }
+    },
+    { immediate: true },
+);
+
+// ── Toast programático (window.showSuccessToast/showErrorToast) ──────────
+// Várias páginas com fetch (Financeiro, prontuário, manager) chamam esses
+// helpers globais para feedback SEM navegação Inertia — mas eles nunca foram
+// definidos: o "sucesso" saía silencioso ou caía no alert() nativo do
+// browser. Define-os aqui reutilizando OS MESMOS alerts do flash do layout
+// (visual idêntico ao restante do sistema, auto-dismiss 6s).
+const localSuccess = ref('');
+const localError = ref('');
+
+function pushLocalToast(type, message) {
+    if (type === 'success') {
+        localSuccess.value = String(message ?? '');
+        clearTimeout(flashSuccessTimer);
+        flashSuccessOpen.value = true;
+        flashSuccessTimer = setTimeout(() => {
+            flashSuccessOpen.value = false;
+        }, 6000);
+    } else {
+        localError.value = String(message ?? '');
+        clearTimeout(flashErrorTimer);
+        flashErrorOpen.value = true;
+        flashErrorTimer = setTimeout(() => {
+            flashErrorOpen.value = false;
+        }, 6000);
+    }
+}
+
+const successText = computed(() => flash.value.success || localSuccess.value);
+const errorText = computed(() => flash.value.error || localError.value);
+
+onMounted(() => {
+    window.showSuccessToast = (msg) => pushLocalToast('success', msg);
+    window.showErrorToast = (msg) => pushLocalToast('error', msg);
+});
+
+onUnmounted(() => {
+    clearTimeout(flashSuccessTimer);
+    clearTimeout(flashErrorTimer);
+    delete window.showSuccessToast;
+    delete window.showErrorToast;
+});
+
+// ── Tour guiado (driver.js — ver composables/usePanelTour.js) ──────────────
+// Botão de ajuda no cabeçalho sempre que o painel de clínica tem tour; abre
+// sozinho uma vez no painel inicial para quem ainda não viu a versão atual.
+const panelTour = usePanelTour();
+const tourAvailable = panelTour.available;
+const tourLabels = computed(() => page.props.tour?.t?.ui ?? {});
+
+onMounted(() => {
+    let onDashboard = false;
+    try {
+        onDashboard = route().current('panel.dashboard');
+    } catch {
+        /* sem Ziggy: não abre sozinho */
+    }
+
+    if (onDashboard) {
+        requestAnimationFrame(() => panelTour.autoStart());
+    }
+});
+
+onUnmounted(() => panelTour.stop());
+
+// A verificação de WhatsApp saiu do banner: virou etapa de onboarding com
+// gate próprio (middleware phone.verified → página Auth/VerifyPhone) — quem
+// chega ao painel já confirmou e-mail e WhatsApp.
+</script>
+
+<template>
+    <div class="main-wrapper">
+        <!-- ═══════════════════ HEADER ═══════════════════ -->
+        <header class="navbar-header">
+            <div class="page-container topbar-menu">
+                <div class="d-flex align-items-center gap-2">
+                    <a :href="safeRoute('panel.dashboard')" class="logo">
+                        <span class="logo-light">
+                            <span class="logo-lg"><img :src="logoSvg" alt="EasyEye" /></span>
+                            <span class="logo-sm"><img :src="logoSmallSvg" alt="EasyEye" /></span>
+                        </span>
+                        <span class="logo-dark">
+                            <span class="logo-lg"><img :src="logoWhiteSvg" alt="EasyEye" /></span>
+                        </span>
+                    </a>
+                    <a
+                        id="mobile_btn"
+                        :aria-label="ui.open_menu || 'Abrir menu'"
+                        aria-controls="sidebar"
+                        class="mobile-btn"
+                        href="#sidebar"
+                        data-tour="mobile-menu"
+                    >
+                        <i aria-hidden="true" class="ti ti-menu-deep fs-24"></i>
+                    </a>
+                    <button
+                        id="toggle_btn2"
+                        type="button"
+                        :aria-label="ui.toggle_sidebar || 'Recolher ou expandir menu lateral'"
+                        aria-controls="sidebar"
+                        class="sidenav-toggle-btn btn border-0 p-0 active"
+                    >
+                        <i aria-hidden="true" class="ti ti-arrow-right"></i>
+                    </button>
+                </div>
+
+                <div class="d-flex align-items-center">
+                    <!-- Contextual top actions (ex.: IA em páginas clínicas) -->
+                    <slot name="top-actions" />
+
+                    <div v-if="support" class="header-item me-2">
+                        <SupportButton :support="support" />
+                    </div>
+
+                    <!-- Tour guiado: rever quando quiser -->
+                    <div v-if="tourAvailable" class="header-item me-2" data-tour="help">
+                        <button
+                            type="button"
+                            class="topbar-link btn btn-icon"
+                            :title="tourLabels.start"
+                            :aria-label="tourLabels.start"
+                            data-test="tour-start"
+                            @click="panelTour.start()"
+                        >
+                            <i class="ti ti-help-circle fs-16" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <!-- Locale selector -->
+                    <div v-if="locales.length > 1" class="header-item" data-tour="locale">
+                        <div class="dropdown me-2">
+                            <button
+                                type="button"
+                                :aria-label="ui.language || 'Idioma'"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                class="topbar-link btn btn-icon dropdown-toggle drop-arrow-none"
+                                data-bs-toggle="dropdown"
+                                data-bs-offset="0,24"
+                            >
+                                <i aria-hidden="true" class="ti ti-world fs-16"></i>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end p-2">
+                                <a
+                                    v-for="locale in locales"
+                                    :key="locale.code"
+                                    :href="locale.url"
+                                    class="dropdown-item"
+                                    :class="{ active: locale.active }"
+                                >
+                                    {{ locale.flag }} {{ locale.native }}
+                                    <i v-if="locale.active" class="ti ti-check ms-2"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dark mode -->
+                    <div class="header-item d-none d-sm-flex me-2" data-tour="theme">
+                        <button
+                            class="topbar-link btn btn-icon"
+                            type="button"
+                            :aria-label="ui.theme_toggle || 'Alternar tema'"
+                            :aria-pressed="isDark"
+                            :title="
+                                isDark ? ui.theme_light || 'Ativar tema claro' : ui.theme_dark || 'Ativar tema escuro'
+                            "
+                            @click="toggleDark"
+                        >
+                            <i aria-hidden="true" :class="isDark ? 'ti ti-sun fs-16' : 'ti ti-moon fs-16'"></i>
+                        </button>
+                    </div>
+
+                    <!-- User dropdown -->
+                    <div
+                        class="dropdown profile-dropdown d-flex align-items-center justify-content-center"
+                        data-tour="user-menu"
+                    >
+                        <a
+                            href="#"
+                            class="topbar-link dropdown-toggle drop-arrow-none position-relative"
+                            data-bs-toggle="dropdown"
+                            data-bs-offset="0,22"
+                        >
+                            <img :src="user.photo_url" width="32" class="rounded-circle d-flex" :alt="user.name" />
+                            <span class="online text-success">
+                                <i
+                                    class="ti ti-circle-dot d-flex bg-white rounded-circle border border-1 border-white"
+                                ></i>
+                            </span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-md p-2">
+                            <div class="d-flex align-items-center bg-light rounded-3 p-2 mb-2">
+                                <img
+                                    :src="user.photo_url"
+                                    class="rounded-circle"
+                                    width="42"
+                                    height="42"
+                                    :alt="user.name"
+                                />
+                                <div class="ms-2">
+                                    <p class="fw-medium text-dark mb-0">{{ user.name }}</p>
+                                    <span class="d-block fs-13">{{ user.email }}</span>
+                                </div>
+                            </div>
+                            <a :href="safeRoute('panel.profile.edit')" class="dropdown-item">
+                                <i class="ti ti-user-circle me-1 align-middle"></i>
+                                <span class="align-middle">Editar perfil</span>
+                            </a>
+                            <!-- Atalhos de configuração — só admin da clínica (mesmo
+                                 gate do grupo Configurações da sidebar) -->
+                            <template v-if="entity.is_client && entity.rule === 'admin'">
+                                <div class="dropdown-divider"></div>
+                                <a :href="safeRoute('panel.setting.resources.index')" class="dropdown-item">
+                                    <i class="ti ti-settings me-1 align-middle"></i>
+                                    <span class="align-middle">Configurações da clínica</span>
+                                </a>
+                                <a :href="safeRoute('panel.accesscontrol.users.index')" class="dropdown-item">
+                                    <i class="ti ti-shield-lock me-1 align-middle"></i>
+                                    <span class="align-middle">Usuários e permissões</span>
+                                </a>
+                            </template>
+                            <template v-if="auth.impersonating">
+                                <div class="dropdown-divider"></div>
+                                <button type="button" class="dropdown-item text-danger" @click="exitImpersonation">
+                                    <i class="ti ti-user-x me-1 align-middle"></i>
+                                    <span class="align-middle">Sair da impersonação</span>
+                                </button>
+                            </template>
+                            <div class="pt-2 mt-2 border-top">
+                                <button type="button" class="dropdown-item text-danger" @click="logout">
+                                    <i class="ti ti-logout me-1 fs-17 align-middle"></i>
+                                    <span class="align-middle">Sair</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <!-- ═══════════════════ END HEADER ═══════════════════ -->
+
+        <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+        <div id="sidebar" class="sidebar">
+            <div class="sidebar-logo">
+                <div>
+                    <a :href="safeRoute('panel.dashboard')" class="logo logo-normal">
+                        <img :src="logoSvg" alt="EasyEye" />
+                    </a>
+                    <a :href="safeRoute('panel.dashboard')" class="logo-small">
+                        <img :src="logoSmallSvg" alt="EasyEye" />
+                    </a>
+                    <a :href="safeRoute('panel.dashboard')" class="dark-logo">
+                        <img :src="logoWhiteSvg" alt="EasyEye" />
+                    </a>
+                </div>
+                <button
+                    id="toggle_btn"
+                    type="button"
+                    :aria-label="ui.toggle_sidebar || 'Recolher ou expandir menu lateral'"
+                    aria-controls="sidebar"
+                    class="sidenav-toggle-btn btn border-0 p-0 active"
+                    data-tour="sidebar-toggle"
+                >
+                    <i aria-hidden="true" class="ti ti-arrow-left"></i>
+                </button>
+                <button
+                    class="sidebar-close"
+                    type="button"
+                    :aria-label="ui.close_menu || 'Fechar menu'"
+                    aria-controls="sidebar"
+                >
+                    <i aria-hidden="true" class="ti ti-x align-middle"></i>
+                </button>
+            </div>
+
+            <div class="sidebar-inner" data-simplebar style="padding-top: 45px">
+                <!-- ── Avatar compacto (mini-sidebar) ────────────────────── -->
+                <div class="sidebar-mini-avatar">
+                    <span
+                        class="avatar rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                        style="width: 36px; height: 36px; font-size: 0.75rem"
+                        :style="entity.logo_url ? { background: 'transparent' } : {}"
+                        :title="entity.name"
+                    >
+                        <img
+                            v-if="entity.logo_url"
+                            :src="entity.logo_url"
+                            :alt="entity.name"
+                            class="rounded-circle"
+                            style="width: 36px; height: 36px; object-fit: cover"
+                        />
+                        <span v-else>{{ entityInitials(entity.name) }}</span>
+                    </span>
+                </div>
+
+                <!-- ── Seletor de empresa (sidebar expandido) ─────────────── -->
+                <div class="sidebar-top p-2 mx-3 mb-3 dropend" data-tour="entity-switcher">
+                    <a
+                        href="javascript:void(0);"
+                        class="drop-arrow-none"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        data-bs-offset="0,22"
+                        aria-haspopup="false"
+                        aria-expanded="false"
+                    >
+                        <div class="d-flex align-items-center gap-2">
+                            <!-- Logo ou iniciais -->
+                            <span
+                                class="avatar rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center text-white fw-bold"
+                                style="width: 36px; height: 36px; font-size: 0.75rem"
+                                :style="entity.logo_url ? { background: 'transparent' } : {}"
+                            >
+                                <img
+                                    v-if="entity.logo_url"
+                                    :src="entity.logo_url"
+                                    :alt="entity.name"
+                                    class="rounded-circle"
+                                    style="width: 36px; height: 36px; object-fit: cover"
+                                />
+                                <span v-else>{{ entityInitials(entity.name) }}</span>
+                            </span>
+                            <div class="overflow-hidden flex-grow-1">
+                                <h6 class="mb-0 text-truncate">{{ entity.name }}</h6>
+                                <p class="fs-11 mb-0 text-truncate">
+                                    {{ entity.plan ?? entity.city ?? '—' }}
+                                </p>
+                            </div>
+                            <i class="ti ti-arrows-transfer-up flex-shrink-0"></i>
+                        </div>
+                    </a>
+
+                    <!-- Dropdown com todas as entidades do usuário -->
+                    <div v-if="entities.length > 1" class="dropdown-menu dropdown-menu-lg p-2">
+                        <p class="text-muted small px-2 mb-1 fw-medium">Trocar empresa</p>
+                        <button
+                            v-for="e in entities"
+                            :key="e.entity_user_id"
+                            type="button"
+                            class="dropdown-item d-flex align-items-center justify-content-between rounded-1 p-2"
+                            :class="{ 'bg-primary bg-opacity-10': e.is_selected }"
+                            @click="switchEntity(e.entity_user_id)"
+                        >
+                            <span class="d-flex align-items-center overflow-hidden">
+                                <span
+                                    class="avatar avatar-xs rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center text-white fw-bold me-2"
+                                    style="width: 28px; height: 28px; font-size: 0.65rem; background: var(--bs-primary)"
+                                >
+                                    {{ entityInitials(e.name) }}
+                                </span>
+                                <span class="overflow-hidden">
+                                    <span
+                                        class="fw-semibold text-dark d-block text-truncate"
+                                        style="font-size: 0.8125rem"
+                                        >{{ e.name }}</span
+                                    >
+                                    <small class="text-muted d-block" style="font-size: 0.72rem">{{
+                                        e.city || '—'
+                                    }}</small>
+                                </span>
+                            </span>
+                            <i v-if="e.is_selected" class="ti ti-check text-primary flex-shrink-0 ms-2"></i>
+                        </button>
+                    </div>
+                </div>
+                <!-- ── Fim seletor de empresa ───────────────────────────── -->
+
+                <div id="sidebar-menu" class="sidebar-menu">
+                    <ul>
+                        <li class="menu-title"><span>Menu</span></li>
+                        <li>
+                            <ul>
+                                <template v-for="item in nav" :key="item.key ?? item.section">
+                                    <!-- Section divider -->
+                                    <li v-if="item.section" class="menu-title">
+                                        <span>{{ item.section }}</span>
+                                    </li>
+
+                                    <!-- Item with submenu -->
+                                    <li v-else-if="item.children" class="submenu">
+                                        <a
+                                            href="#"
+                                            :class="{ 'subdrop active': isMenuOpen(item) }"
+                                            :data-tour="`nav-${item.key}`"
+                                            @click.prevent="toggleMenu(item.key)"
+                                        >
+                                            <i :class="item.icon"></i>
+                                            <span>{{ item.label }}</span>
+                                            <span v-if="item.badge" class="badge text-bg-danger rounded-pill ms-auto">{{
+                                                item.badge
+                                            }}</span>
+                                            <span class="menu-arrow"></span>
+                                        </a>
+                                        <ul :style="isMenuOpen(item) ? 'display:block;' : ''">
+                                            <li v-for="child in item.children" :key="child.route">
+                                                <a
+                                                    :href="safeRoute(child.route)"
+                                                    :class="{ active: isActive(child.match) }"
+                                                >
+                                                    <i v-if="child.icon" :class="child.icon + ' me-1'"></i>
+                                                    {{ child.label }}
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
+
+                                    <!-- Simple item -->
+                                    <li v-else>
+                                        <a
+                                            :href="safeRoute(item.route)"
+                                            :class="{ active: isActive(item.match) }"
+                                            :data-tour="`nav-${item.key}`"
+                                        >
+                                            <i :class="item.icon"></i>
+                                            <span>{{ item.label }}</span>
+                                            <span v-if="item.badge" class="badge text-bg-danger rounded-pill ms-auto">{{
+                                                item.badge
+                                            }}</span>
+                                        </a>
+                                    </li>
+                                </template>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <!-- ═══════════════════ END SIDEBAR ═══════════════════ -->
+
+        <!-- ═══════════════════ PAGE WRAPPER ═══════════════════ -->
+        <div class="page-wrapper">
+            <!-- Impersonation banner -->
+            <div
+                v-if="auth.impersonating"
+                class="alert alert-warning alert-dismissible m-0 rounded-0 border-0 border-bottom d-flex align-items-center gap-2 py-2 px-3"
+            >
+                <i class="ti ti-user-check fs-16"></i>
+                <span
+                    >Você está visualizando como <strong>{{ user.name }}</strong> ({{ user.email }})</span
+                >
+                <button type="button" class="btn btn-sm btn-warning ms-auto" @click="exitImpersonation">
+                    <i class="ti ti-user-x me-1"></i> Sair
+                </button>
+            </div>
+
+            <!-- Situação da assinatura -->
+            <SubscriptionBanner v-if="subscriptionBanner" :banner="subscriptionBanner" />
+
+            <!-- Flash messages (Vue-controlled — auto-dismiss 6s + botão X funcional) -->
+            <transition name="flash">
+                <div
+                    v-if="flashSuccessOpen && successText"
+                    class="alert alert-success m-3 mb-0 d-flex align-items-center gap-2"
+                    role="alert"
+                >
+                    <i class="ti ti-circle-check fs-16"></i>
+                    <span class="flex-grow-1">{{ successText }}</span>
+                    <button type="button" class="btn-close" :aria-label="'Fechar'" @click="dismissSuccess"></button>
+                </div>
+            </transition>
+            <transition name="flash">
+                <div
+                    v-if="flashErrorOpen && errorText"
+                    class="alert alert-danger m-3 mb-0 d-flex align-items-center gap-2"
+                    role="alert"
+                >
+                    <i class="ti ti-alert-circle fs-16"></i>
+                    <span class="flex-grow-1">{{ errorText }}</span>
+                    <button type="button" class="btn-close" :aria-label="'Fechar'" @click="dismissError"></button>
+                </div>
+            </transition>
+
+            <div class="content">
+                <!-- Breadcrumbs -->
+                <nav v-if="breadcrumbs.length" aria-label="breadcrumb" class="d-flex justify-content-end mb-2">
+                    <ol class="breadcrumb mb-0 app-breadcrumb">
+                        <li
+                            v-for="(crumb, i) in breadcrumbs"
+                            :key="i"
+                            class="breadcrumb-item"
+                            :class="{ active: crumb.active }"
+                        >
+                            <!-- Sem destino ("#"): texto, não link — o "#" criava entrada no
+                                 histórico e o Voltar seguinte remontava a tela. -->
+                            <a v-if="!crumb.active && crumb.url && crumb.url !== '#'" :href="crumb.url">{{
+                                crumb.label
+                            }}</a>
+                            <span v-else :class="{ 'breadcrumb-active': crumb.active }">{{ crumb.label }}</span>
+                        </li>
+                    </ol>
+                </nav>
+
+                <!-- Page content -->
+                <slot />
+            </div>
+        </div>
+        <!-- ═══════════════════ END PAGE WRAPPER ═══════════════════ -->
+
+        <!-- Assistente Virtual de IA — montado uma única vez aqui (layout
+             persistente do Inertia), sobrevive à navegação entre páginas do
+             painel sem perder a conversa. Gate (isDoctor + feature) já vem
+             resolvido do backend em page.props.aiAssistant.enabled. -->
+        <AiFloatingAssistant v-if="aiAssistant.enabled" :ai="aiAssistant" />
+    </div>
+</template>
+
+<style scoped>
+/* Flash messages: fade + slide suave */
+.flash-enter-active,
+.flash-leave-active {
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+}
+.flash-enter-from,
+.flash-leave-to {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+</style>

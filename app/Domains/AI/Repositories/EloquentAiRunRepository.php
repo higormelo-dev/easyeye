@@ -1,0 +1,83 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domains\AI\Repositories;
+
+use App\Domains\AI\Contracts\AiRunRepositoryInterface;
+use App\Domains\AI\Models\AiRun;
+use App\Enums\AI\AiRunStatus;
+
+class EloquentAiRunRepository implements AiRunRepositoryInterface
+{
+    public function find(string $id): ?AiRun
+    {
+        return AiRun::query()->find($id);
+    }
+
+    public function markRunning(AiRun $run): void
+    {
+        $payload = [
+            'status'        => AiRunStatus::Running->value,
+            'error_message' => null,
+        ];
+
+        // started_at é setado apenas no primeiro markRunning para preservar o
+        // tempo real de execução em caso de retry do job.
+        if ($run->started_at === null) {
+            $payload['started_at'] = now();
+        }
+
+        $run->update($payload);
+    }
+
+    /** @param array<string, mixed> $dispatch */
+    public function recordDispatch(AiRun $run, array $dispatch): void
+    {
+        // Só esta coluna muda: a trilha (Auditable) não copia o conteúdo clínico.
+        $run->update(['dispatch_audit' => $dispatch]);
+    }
+
+    public function markWaitingApproval(
+        AiRun $run,
+        string $finalOutput,
+        array $safetyNotes,
+        int $consumedChargeCents,
+        ?string $errorMessage = null,
+        ?float $actualCostUsd = null,
+    ): void {
+        $run->update([
+            'status'                => AiRunStatus::WaitingApproval->value,
+            'final_output'          => $finalOutput,
+            'safety_notes'          => $safetyNotes,
+            'consumed_charge_cents' => $consumedChargeCents,
+            'actual_cost_usd'       => $actualCostUsd,
+            'error_message'         => $errorMessage,
+        ]);
+    }
+
+    public function markFailed(AiRun $run, string $errorMessage): void
+    {
+        $run->update([
+            'status'           => AiRunStatus::Failed->value,
+            'current_role'     => null,
+            'current_provider' => null,
+            'error_message'    => mb_substr($errorMessage, 0, 2000),
+        ]);
+    }
+
+    public function markCancelled(AiRun $run): void
+    {
+        $payload = [
+            'status'           => AiRunStatus::Cancelled->value,
+            'current_role'     => null,
+            'current_provider' => null,
+        ];
+
+        if ($run->cancelled_at === null) {
+            $payload['cancelled_at'] = now();
+        }
+
+        $run->update($payload);
+    }
+}

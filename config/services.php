@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
@@ -35,4 +34,53 @@ return [
         ],
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+    ],
+
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'version' => env('ANTHROPIC_API_VERSION', '2023-06-01'),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+    ],
+
+    // Provedores "compatíveis com OpenAI" (lista pronta — App\Enums\AI\AiProvider).
+    // Chave só no .env: a tela Manager → Provedores de IA mostra se está
+    // definida (e os 4 últimos caracteres), nunca o valor.
+    'mistral' => [
+        'api_key' => env('MISTRAL_API_KEY'),
+    ],
+
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+    ],
+
+    'xai' => [
+        'api_key' => env('XAI_API_KEY'),
+    ],
+
+    'azure_openai' => [
+        'api_key' => env('AZURE_OPENAI_API_KEY'),
+    ],
+
+    'maritaca' => [
+        'api_key' => env('MARITACA_API_KEY'),
+    ],
+
+    'integrator_updates' => [
+        // Chave pública ed25519 (hex, 32 bytes) que assina os builds do
+        // EasyEye Integrator — mesmo valor de UPDATE_PUBLIC_KEY_HEX em
+        // integrator/src/updater/mod.rs (repositório separado). É seguro
+        // manter aqui como default: é a metade PÚBLICA do par, só serve pra
+        // VERIFICAR assinatura, nunca pra assinar. A privada correspondente
+        // nunca passa pelo SaaS (fica só na máquina do operador de release —
+        // ver integrator/scripts/sign-update.sh).
+        'public_key' => env(
+            'INTEGRATOR_UPDATE_PUBLIC_KEY',
+            'c62b4de90f8cacd4bf0f4d408a2dec22f80c181f19e0f64156124a00aedbe2b9',
+        ),
+    ],
 ];

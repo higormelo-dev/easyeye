@@ -1,0 +1,19 @@
+{
+  "note": "Alterações observadas fora das ações desta auditoria; referência original preservada. JS rerodado após mudança de teste; não houve correção de código funcional pela auditoria.",
+  "differences": [
+    {
+      "path": "tests/JavaScript/Panel/MedicalRecords/RecordDocuments.test.js",
+      "original_sha256": "ca2c2d15302a59e3872476f1b9839b281f6dfbbaa6f6a0dd18fcb3583605e375",
+      "observed_sha256": "c87554e779c1dbf25e55b1841a4f92b2f62b75354b2d8cc03002f345b3ae4309"
+    }
+  ],
+  "javascript_local": {
+    "files_passed": 243,
+    "tests_passed": 2506
+  },
+  "javascript_los_angeles": {
+    "tests_passed": 14,
+    "tests_failed": 1,
+    "related_item": "EE-11"
+  }
+}

@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Default Mailer
@@ -15,6 +14,12 @@ return [
     */
 
     'default' => env('MAIL_MAILER', 'log'),
+
+    'contact_address' => env('MAIL_CONTACT_ADDRESS', 'contato@easyeye.app'),
+
+    // Suporte técnico (site: cartão "Suporte Técnico" e páginas legais).
+    // Vendas/comercial usam o contact_address acima.
+    'support_address' => env('MAIL_SUPPORT_ADDRESS', 'suporte@easyeye.app'),
 
     /*
     |--------------------------------------------------------------------------
@@ -36,7 +41,6 @@ return [
     */
 
     'mailers' => [
-
         'smtp' => [
             'transport'    => 'smtp',
             'scheme'       => env('MAIL_SCHEME'),
@@ -45,7 +49,7 @@ return [
             'port'         => env('MAIL_PORT', 2525),
             'username'     => env('MAIL_USERNAME'),
             'password'     => env('MAIL_PASSWORD'),
-            'timeout'      => null,
+            'timeout'      => (int) env('MAIL_TIMEOUT', 10),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
@@ -94,7 +98,6 @@ return [
                 'postmark',
             ],
         ],
-
     ],
 
     /*
@@ -112,5 +115,4 @@ return [
         'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
         'name'    => env('MAIL_FROM_NAME', 'Example'),
     ],
-
 ];

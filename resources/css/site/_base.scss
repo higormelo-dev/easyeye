@@ -1,0 +1,314 @@
+@use 'variables' as *;
+
+// Reserva com as métricas da Inter (Arial ajustada): enquanto a Inter carrega,
+// o texto já ocupa quase o mesmo espaço. O system-ui é ~12% mais estreito e
+// fazia o título do hero trocar de quebra (e mover a página) na troca de fonte.
+@font-face {
+    font-family: 'Inter Fallback';
+    src: local('Arial'), local('ArialMT');
+    size-adjust: 107%;
+    ascent-override: 90.5%;
+    descent-override: 22.6%;
+    line-gap-override: 0%;
+}
+
+// ─── Reset ───────────────────────────────────────────────────
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 96px;
+    // iOS não aumenta o texto sozinho ao girar para paisagem.
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    font-family: $font-sans;
+    color: $text;
+    background: $bg-white;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+    background: rgba($teal, .25);
+    color: $navy-dark;
+}
+
+// Foco de teclado visível nos dois tipos de fundo: navy nas seções claras
+// (o teal dava 2,5:1 no branco) e teal claro nas escuras. :where() =
+// especificidade zero; mouse e toque não mostram o anel (:focus-visible).
+:where(a, button, [tabindex]):focus-visible {
+    outline: 2px solid $navy-mid;
+    outline-offset: 2px;
+}
+
+:where(.hero, .metrics, .cta-final, footer, .diff-proof, .pricing-card.featured, #navbar:not(.scrolled)) :where(a, button, [tabindex]):focus-visible {
+    outline-color: $teal-lt;
+}
+
+// Destino do "Pular para o conteúdo": recebe o foco sem desenhar anel na página inteira.
+main[tabindex="-1"]:focus { outline: none; }
+
+// "Pular para o conteúdo": fora da tela até receber foco pelo teclado.
+.skip-link {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    max-width: calc(100% - 24px);
+    z-index: 1100;
+    padding: 12px 18px;
+    border-radius: 8px;
+    background: $navy;
+    color: #fff;
+    font-weight: 600;
+    font-size: rem(15);
+    text-decoration: none;
+    box-shadow: $shadow-lg;
+    transform: translateY(calc(-100% - 24px));
+
+    &:focus { transform: none; outline: 2px solid $teal-lt; outline-offset: 2px; }
+}
+
+// Texto só para leitor de tela (ex.: "Não incluído" nos planos).
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: $bg-white;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba($navy, .2);
+    border-radius: 8px;
+    
+    &:hover { background: rgba($navy, .35); }
+}
+
+// ─── Container ───────────────────────────────────────────────
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+
+    @include below(480px) { padding-inline: 16px; }
+}
+
+// ─── Botões ──────────────────────────────────────────────────
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    max-width: 100%;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: rem(15);
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    text-align: center;
+    transition:
+        transform $dur-base $ease-out,
+        box-shadow $dur-base $ease-out,
+        background-color $dur-fast ease,
+        border-color $dur-fast ease,
+        color $dur-fast ease;
+
+    // Pressionar responde na hora (90ms) e solta com a desaceleração normal.
+    &:active { transform: scale(0.97); transition-duration: $dur-press; }
+
+    i { flex-shrink: 0; transition: transform $dur-base $ease-out; }
+
+    &-lg { padding: 16px 32px; font-size: rem(16); }
+    &-sm { padding: 10px 20px; font-size: rem(14); }
+
+    &-primary {
+        background: $teal;
+        color: #fff;
+
+        &:hover {
+            background: $teal-dark;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba($teal, .35);
+            
+            i { transform: translateX(3px); }
+        }
+    }
+
+    &-outline {
+        background: transparent;
+        color: $navy;
+        border: 2px solid $navy-mid;
+
+        &:hover { 
+            background: $navy; 
+            color: #fff; 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba($navy, .2);
+        }
+    }
+
+    &-outline-white {
+        background: transparent;
+        color: #fff;
+        border: 2px solid rgba(#fff, .5);
+
+        &:hover { 
+            background: rgba(#fff, .1); 
+            border-color: #fff; 
+            transform: translateY(-2px);
+        }
+    }
+
+    &-featured {
+        background: $teal;
+        color: #fff;
+        border: none;
+
+        &:hover { 
+            background: #00a0c2; 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba($teal, .35);
+        }
+    }
+}
+
+// Site institucional (SiteLayout): texto navy no teal. Branco no #00B4D8 dá
+// 2,46:1 e reprova até para texto grande; navy dá 6,07:1 (7,05:1 no hover,
+// que clareia em vez de escurecer). As telas de login usam o mesmo .btn-primary
+// e ficam como estão, fora do escopo desta revisão.
+.site-shell {
+    // Com texto ampliado, termos longos não devem impor uma largura mínima
+    // às colunas de leitura nem empurrar a página para fora da tela.
+    overflow-wrap: anywhere;
+
+    .btn {
+        transition-duration: $dur-fast;
+
+        &:hover { transform: none; box-shadow: none; }
+        &:hover i { transform: none; }
+
+        @media (hover: hover) and (pointer: fine) {
+            &:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba($navy, .12); }
+            &:is(:hover, :focus-visible) .ti-arrow-right { transform: translateX(2px); }
+        }
+
+        // Depois do hover: pressionar sempre recebe resposta imediata.
+        &:active { transform: scale(.985); transition-duration: $dur-press; }
+
+        @media (prefers-reduced-motion: reduce) {
+            &:hover,
+            &:active,
+            &:is(:hover, :focus-visible) i { transform: none; }
+        }
+    }
+
+    .btn-primary,
+    .btn-featured {
+        color: $navy;
+
+        &:hover {
+            background: $teal-hover;
+            color: $navy;
+        }
+    }
+}
+
+// ─── Tipografia de seção ──────────────────────────────────────
+.badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba($teal, .12);
+    color: $teal-lt;
+    border: 1px solid rgba($teal, .25);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: rem(13);
+    font-weight: 600;
+}
+
+.section-label {
+    display: inline-block;
+    background: rgba($teal, .1);
+    color: $teal-ink;
+    padding: 6px 16px;
+    border-radius: 999px;
+    @include type-eyebrow;
+    margin-bottom: 16px;
+}
+
+// Mesmo papel para todo h2 de seção. break-word (e não anywhere) só quebra
+// uma palavra se ela sozinha não couber na linha.
+.section-title {
+    @include type-title-xl;
+    color: $navy;
+    margin-bottom: 20px;
+    max-width: 30ch;
+    overflow-wrap: break-word;
+    text-wrap: balance;
+}
+
+.section-sub {
+    @include type-lead;
+    color: $text-muted;
+    max-width: 60ch;
+    text-wrap: pretty;
+}
+
+.text-center {
+    text-align: center;
+
+    .section-sub { margin: 0 auto; }
+    .section-title { margin-inline: auto; }
+}
+
+// ─── Ícones coloridos (hero e contato) ────────────────────────
+.icon-blue   { background: rgba($blue, .1);   color: $blue; }
+.icon-teal   { background: rgba($teal, .1);   color: $teal; }
+.icon-mint   { background: rgba($mint, .1);   color: $mint; }
+.icon-orange { background: rgba($orange, .1); color: $orange; }
+.icon-solid  { background: $teal;             color: $navy; }
+
+// Reduzir movimento: botões mantêm cor e sombra como feedback, sem deslocar.
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+
+    .btn,
+    .btn i { transition-property: box-shadow, background-color, border-color, color; }
+
+    .btn:hover,
+    .btn:active,
+    .btn:hover i { transform: none; }
+}
+
+// ─── Transições Vue ───────────────────────────────────────────
+.fade-enter-active,
+.fade-leave-active { transition: opacity .2s; }
+
+.fade-enter-from,
+.fade-leave-to { opacity: 0; }

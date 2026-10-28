@@ -1,0 +1,113 @@
+<?php
+
+namespace App\Enums;
+
+/**
+ * Chaves de features/limites de plano.
+ *
+ * Tipo integer: 0 significa ilimitado.
+ * Tipo boolean: '1' = habilitado, '0' = desabilitado.
+ */
+enum FeatureKey: string
+{
+    // Limites quantitativos (integer, 0 = ilimitado)
+    case MaxUsers     = 'max_users';
+    case MaxPatients  = 'max_patients';
+    case MaxDoctors   = 'max_doctors';
+    case MaxStorageGB = 'max_storage_gb'; // Armazenamento total em GB (0 = ilimitado)
+
+    // Features booleanas
+    case HasAiExamAssistant    = 'has_ai_exam_assistant';
+    case HasAiReportDrafting   = 'has_ai_report_drafting';
+    case HasAiConsensus        = 'has_ai_consensus';
+    case HasAiEyeImageAnalysis = 'has_ai_eye_image_analysis';
+    // Assistente virtual flutuante (chat livre, disponível em qualquer tela do
+    // painel) — independente das outras flags de IA porque é um produto à
+    // parte (chat de apoio geral, não workflow de laudo/prontuário estruturado).
+    case HasAiChatAssistant = 'has_ai_chat_assistant';
+    case HasApiIntegrator   = 'has_api_integrator';
+    // Módulo de gestão de estoque (produtos/materiais/OPM, movimentação,
+    // compras). Feature paga independente — clínica sem o módulo continua
+    // operando normalmente (estoque é opcional, não trava agenda/prontuário).
+    case HasInventoryModule = 'has_inventory_module';
+    // Módulo cirúrgico (Fase 4): pré-operatório, autorização, agenda de
+    // centro cirúrgico, rastreabilidade de implante e pós-operatório. Recurso
+    // de plano superior (Premium) — clínica sem o módulo opera normalmente.
+    case HasSurgery = 'has_surgery';
+    // Retorno de pacientes crônicos (recall): lista de retornos vencidos por
+    // condição (glaucoma, DMRI...), contato e convite por WhatsApp — Fase 6.
+    // Os protocolos só agem depois de validados por Revisor Clínico (ADR 0002);
+    // o "retorno pedido pelo médico" também vive aqui.
+    case HasPatientRecall = 'has_patient_recall';
+
+    // Limites mensais de créditos IA (integer, 0 = ilimitado)
+    case AiMonthlyCredits = 'ai_monthly_credits';
+
+    // Limite mensal de envios de exames pela API — store + update contam (integer, 0 = ilimitado)
+    case ApiMonthlyExamSends = 'api_monthly_exam_sends';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::MaxUsers              => __('subscriptions.features.max_users'),
+            self::MaxPatients           => __('subscriptions.features.max_patients'),
+            self::MaxDoctors            => __('subscriptions.features.max_doctors'),
+            self::MaxStorageGB          => __('subscriptions.features.max_storage_gb'),
+            self::HasAiExamAssistant    => __('subscriptions.features.has_ai_exam_assistant'),
+            self::HasAiReportDrafting   => __('subscriptions.features.has_ai_report_drafting'),
+            self::HasAiConsensus        => __('subscriptions.features.has_ai_consensus'),
+            self::HasAiEyeImageAnalysis => __('subscriptions.features.has_ai_eye_image_analysis'),
+            self::HasAiChatAssistant    => __('subscriptions.features.has_ai_chat_assistant'),
+            self::HasApiIntegrator      => __('subscriptions.features.has_api_integrator'),
+            self::HasInventoryModule    => __('subscriptions.features.has_inventory_module'),
+            self::HasSurgery            => __('subscriptions.features.has_surgery'),
+            self::HasPatientRecall      => __('subscriptions.features.has_patient_recall'),
+            self::AiMonthlyCredits      => __('subscriptions.features.ai_monthly_credits'),
+            self::ApiMonthlyExamSends   => __('subscriptions.features.api_monthly_exam_sends'),
+        };
+    }
+
+    /** True = chave representa um valor booleano (0/1). */
+    public function isBoolean(): bool
+    {
+        return in_array($this, [
+            self::HasAiExamAssistant,
+            self::HasAiReportDrafting,
+            self::HasAiConsensus,
+            self::HasAiEyeImageAnalysis,
+            self::HasAiChatAssistant,
+            self::HasApiIntegrator,
+            self::HasInventoryModule,
+            self::HasSurgery,
+            self::HasPatientRecall,
+        ]);
+    }
+
+    /** True = chave representa um limite numérico (0 = ilimitado). */
+    public function isNumeric(): bool
+    {
+        return ! $this->isBoolean();
+    }
+
+    /**
+     * Recurso de IA — fica indisponível quando o acesso está limitado pela
+     * régua de cobrança (cliente pagante em atraso).
+     */
+    public function isAi(): bool
+    {
+        return in_array($this, [
+            self::HasAiExamAssistant,
+            self::HasAiReportDrafting,
+            self::HasAiConsensus,
+            self::HasAiEyeImageAnalysis,
+            self::HasAiChatAssistant,
+            self::AiMonthlyCredits,
+        ], true);
+    }
+
+    /** True = limite deve ser redefinido mensalmente (créditos IA). */
+    public function isMonthlyReset(): bool
+    {
+        return in_array($this, [self::AiMonthlyCredits, self::ApiMonthlyExamSends]);
+    }
+}

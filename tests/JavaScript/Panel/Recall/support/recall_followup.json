@@ -1,0 +1,9 @@
+{
+    "title": "Sugestão dos protocolos de acompanhamento",
+    "line": ":title (:eye): consulta a cada :interval :unit",
+    "days": "cerca de :days dias",
+    "use": "Usar :days dias",
+    "in_use": "Valor atual",
+    "cap": "Retorno acima de :days dias vale :days dias na lista de retornos (máximo validado do protocolo).",
+    "cap_hit": "O valor passa de :days dias: na lista de retornos ele vale :days dias (máximo validado do protocolo)."
+}

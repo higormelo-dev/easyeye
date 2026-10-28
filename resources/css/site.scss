@@ -1,0 +1,6 @@
+// Ordem importa: variables primeiro (tokens + :root), depois base, layout e seções.
+// Cada partial faz @use 'variables' as * para acessar os tokens diretamente.
+@use 'site/variables';
+@use 'site/base';
+@use 'site/layout';
+@use 'site/sections';

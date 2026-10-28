@@ -2,14 +2,17 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\Doctor;
-use Illuminate\Contracts\Validation\Validator;
+use App\Models\{EntityIntegratorEquipment, ExamType, Patient, Schedule};
+use App\Rules\IntegratorExamArchive;
+use App\Support\IntegratorClinicalIdentifier;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class ExamRequest extends FormRequest
 {
+    use ValidatesIntegratorCapture;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -21,122 +24,197 @@ class ExamRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         $integrator = request()->attributes->get('integrator');
+        $entityId   = $integrator->user->entity_id;
 
         return [
-            'patient_id' => [
-                'nullable',
-                'uuid',
-                Rule::exists('patients', 'id')->where(function ($query) use ($integrator) {
-                    return $query->where('entity_id', $integrator->entity_id)
-                        ->whereNull('deleted_at');
-                }),
-            ],
-            'patient_code' => [
-                'nullable',
-                'string',
-                Rule::exists('patients', 'code')->where(function ($query) use ($integrator) {
-                    return $query->where('entity_id', $integrator->entity_id)
-                        ->whereNull('deleted_at');
-                }),
-            ],
-            'doctor_id' => [
-                'nullable',
-                'uuid',
-                function ($attribute, $value, $fail) use ($integrator) {
-                    $exists = Doctor::query()
-                        ->where('id', $value)
-                        ->whereHas('entityUser', function ($query) use ($integrator) {
-                            $query->where('entity_id', $integrator->entity_id)
-                                ->whereNull('deleted_at');
-                        })
-                        ->whereNull('deleted_at')
-                        ->exists();
+            ...$this->captureRules(),
+            'exam_identifier' => [
+                'required',
+                function ($attribute, $value, $fail) use ($entityId) {
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
 
-                    if (! $exists) {
-                        $fail('O médico selecionado é inválido.');
+                        return;
+                    }
+                    $value = (string) $value;
+
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
+                    $query = ExamType::query()
+                        ->where(function ($query) use ($entityId) {
+                            $query->where('entity_id', $entityId)
+                                ->orWhereNull('entity_id');
+                        })
+                        ->whereNull('deleted_at');
+
+                    [$column, $lookupValue] = match (true) {
+                        Str::isUuid($value) => ['id', $value],
+                        ctype_digit($value) => ['code', sprintf('ETP-%010d', (int) $value)],
+                        default             => ['code', $value],
+                    };
+                    $query->where($column, $lookupValue);
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_exam_identifier'));
                     }
                 },
             ],
-            'doctor_code' => [
-                'nullable',
-                'string',
-                function ($attribute, $value, $fail) use ($integrator) {
-                    $exists = Doctor::query()
-                        ->where('code', $value)
-                        ->whereHas('entityUser', function ($query) use ($integrator) {
-                            $query->where('entity_id', $integrator->entity_id)
-                                ->whereNull('deleted_at');
-                        })
-                        ->whereNull('deleted_at')
-                        ->exists();
+            'patient_identifier' => [
+                'required_without:schedule_identifier',
+                function ($attribute, $value, $fail) use ($entityId) {
+                    if ($value === null) {
+                        return;
+                    }
 
-                    if (! $exists) {
-                        $fail('O médico selecionado é inválido.');
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
+
+                        return;
+                    }
+                    $value = (string) $value;
+
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
+                    $matches = IntegratorClinicalIdentifier::matches(Patient::class, (string) $entityId, $value, 'PAC', $this->input('patient_identifier_namespace'));
+
+                    if ($matches->isEmpty()) {
+                        $fail(__('validation.custom.validation_invalid.not_patient_identifier'));
+                    } elseif ($matches->count() > 1) {
+                        $fail(__('record_codes.ambiguous_identifier.patient'));
                     }
                 },
             ],
-            'schedule_id' => [
-                'nullable',
-                'uuid',
-                Rule::exists('schedules', 'id')->where(function ($query) use ($integrator) {
-                    return $query->where('entity_id', $integrator->entity_id)
-                        ->whereNull('deleted_at');
-                }),
+            'schedule_identifier' => [
+                'required_without:patient_identifier',
+                function ($attribute, $value, $fail) use ($entityId) {
+                    if ($value === null) {
+                        return;
+                    }
+
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
+
+                        return;
+                    }
+                    $value = (string) $value;
+
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
+                    $matches = IntegratorClinicalIdentifier::matches(Schedule::class, (string) $entityId, $value, 'SDL', $this->input('schedule_identifier_namespace'));
+
+                    if ($matches->isEmpty()) {
+                        $fail(__('validation.custom.validation_invalid.not_schedule_identifier'));
+                    } elseif ($matches->count() > 1) {
+                        $fail(__('record_codes.ambiguous_identifier.schedule'));
+                    }
+                },
             ],
-            'schedule_code' => [
+            'laterality' => ['nullable', 'integer', 'in:0,1,2'],
+            // Data/hora real da captura, lida pelo integrador do arquivo do
+            // equipamento (ex.: "Exam Date"/"Exam Time" do .EMR). ISO-8601 com
+            // offset, ou só a data. Limites contra relógio do PC do aparelho
+            // desregulado: 1 dia de folga no futuro, nada antes de 2000.
+            'exam_performed_at' => [
                 'nullable',
-                'string',
-                Rule::exists('schedules', 'code')->where(function ($query) use ($integrator) {
-                    return $query->where('entity_id', $integrator->entity_id)
-                        ->whereNull('deleted_at');
-                }),
+                'date',
+                'after_or_equal:2000-01-01',
+                'before_or_equal:' . now()->addDay()->toIso8601String(),
             ],
-            'name'    => 'nullable|string|max:255|min:3',
-            'archive' => 'required|file|mimes:jpg,jpeg,png|max:10240',
+            // Descrição do exame vinda do equipamento (ex.: "Display: Topo 4-Maps").
+            'observation'          => ['nullable', 'string', 'max:1000'],
+            'equipment_identifier' => [
+                'nullable',
+                function ($attribute, $value, $fail) use ($integrator) {
+                    if ($value === null) {
+                        return;
+                    }
+
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail('Identificador clínico deve ser um texto ou número.');
+
+                        return;
+                    }
+                    $value = (string) $value;
+
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
+                    $query = EntityIntegratorEquipment::query()
+                        ->where('integrator_id', $integrator->id)
+                        ->whereNull('deleted_at');
+
+                    [$column, $lookupValue] = match (true) {
+                        Str::isUuid($value) => ['id', $value],
+                        ctype_digit($value) => ['code', sprintf('EIQ-%010d', (int) $value)],
+                        default             => ['code', $value],
+                    };
+                    $query->where($column, $lookupValue);
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_equipment_identifier'));
+                    }
+                },
+            ],
+            'name'    => ['required', 'string', 'max:255', 'min:3'],
+            'archive' => ['required', 'file', new IntegratorExamArchive()],
         ];
+    }
+
+    private function isUuidLike(string $value): bool
+    {
+        return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-/i', $value);
     }
 
     protected function prepareForValidation(): void
     {
-        // Limpar campos que vieram com valores inválidos do multipart
         $data = [];
 
         foreach ($this->all() as $key => $value) {
             if ($key === 'archive') {
-                // Não mexer no arquivo
                 $data[$key] = $value;
 
                 continue;
             }
 
+            if ($key === 'laterality' && is_numeric($value)) {
+                $data[$key] = (int) $value;
+
+                continue;
+            }
+
             if (is_string($value)) {
-                // Limpar strings com caracteres inválidos
                 $cleanValue = trim($value);
                 $cleanValue = trim($cleanValue, '-');
                 $cleanValue = trim($cleanValue);
 
-                // Se ficou vazio, definir como null
                 $data[$key] = $cleanValue === '' ? null : $cleanValue;
+            } elseif (is_null($value)) {
+                $data[$key] = null;
             } else {
                 $data[$key] = $value;
             }
         }
 
-        $this->merge($data);
-    }
-
-    protected function failedValidation(Validator $validator): mixed
-    {
-        throw new HttpResponseException(
-            response()->json([
-                'message' => 'Dados de validação inválidos.',
-                'errors'  => $validator->errors(),
-            ], 422)
-        );
+        $this->replace($data);
     }
 }

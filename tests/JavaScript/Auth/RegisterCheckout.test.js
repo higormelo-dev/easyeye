@@ -1,0 +1,218 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import axios from 'axios';
+import Register from '@/Pages/Auth/Register.vue';
+
+/**
+ * Cadastro no site: "Testar grátis" (trial) ou "Contratar agora" (sem trial,
+ * segue para o pagamento no próprio site — signup-checkout.*).
+ */
+vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn(), defaults: { headers: { common: {} } } } }));
+vi.mock('@/Layouts/SiteLayout.vue', () => ({ default: { template: '<div><slot /></div>' } }));
+vi.mock('@inertiajs/vue3', () => ({ Head: { render: () => null } }));
+vi.mock('@/echo.js', () => ({}));
+vi.mock('@/Components/Security/TurnstileWidget.vue', () => ({
+    default: {
+        name: 'TurnstileWidget',
+        props: ['siteKey', 'label', 'language'],
+        emits: ['token'],
+        template: '<div data-test="turnstile-stub" />',
+        methods: { reset() {} },
+    },
+}));
+vi.mock('@/Components/Billing/SignupCheckout.vue', () => ({
+    default: {
+        name: 'SignupCheckout',
+        props: ['t', 'labels', 'planId', 'cycle', 'redirect'],
+        template: '<div data-test="signup-checkout-stub" />',
+    },
+}));
+
+const plans = [
+    {
+        id: 'pro',
+        name: 'Pro',
+        price: 299.9,
+        price_period_label: '/mês',
+        default_cycle: 'yearly',
+        prices: [
+            { cycle: 'monthly', label: 'Mensal', months: 1, price: 299.9, period_label: '/mês' },
+            {
+                cycle: 'yearly',
+                label: 'Anual',
+                months: 12,
+                price: 2990,
+                period_label: '/ano',
+                monthly_equivalent: 249.17,
+                savings_percent: 16,
+            },
+        ],
+        features: [],
+    },
+];
+
+const tAuth = {
+    register: {
+        start_mode_label: 'Como você quer começar?',
+        mode_trial: 'Testar grátis por :days dias',
+        mode_checkout: 'Contratar agora',
+        cnpj: 'CNPJ',
+        document: 'CPF ou CNPJ',
+        document_required: 'Informe o CPF ou CNPJ para contratar agora.',
+        optional: 'opcional',
+        field_required: 'Campo obrigatório.',
+        create_and_pay: 'Criar conta e ir para o pagamento',
+        start_trial: 'Iniciar período grátis',
+        step_payment: 'Pagamento',
+        checkout_title: 'Pagamento da assinatura',
+        checkout_subtitle: ':plan — :cycle',
+    },
+};
+
+let wrapper;
+
+async function mountAtCompanyStep(extraProps = {}) {
+    wrapper = mount(Register, {
+        props: {
+            ...extraProps,
+            plans,
+            selectedPlanId: 'pro',
+            trialDays: 14,
+            routes: { siteHome: '/' },
+            t: { nav: {}, testimonials: { items: [] }, contact: {} },
+            tAuth,
+            tCheckout: { ui: {}, errors: {} },
+        },
+        global: { directives: { mask: {} }, stubs: { Transition: { template: '<div><slot /></div>' } } },
+    });
+    const fields = wrapper.findAll('input');
+    await fields[0].setValue('Pessoa de Teste');
+    await fields[1].setValue('pessoa@example.com');
+    await fields[2].setValue('Password1!');
+    await fields[3].setValue('Password1!');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    const company = wrapper.findAll('input');
+    await company[0].setValue('Clínica de Teste');
+    await company[1].setValue('11988887777');
+}
+
+beforeEach(() => vi.clearAllMocks());
+afterEach(() => {
+    wrapper?.unmount();
+    document.querySelector('meta[name="csrf-token"]')?.remove();
+    delete axios.defaults.headers.common['X-CSRF-TOKEN'];
+});
+
+describe('Cadastro — como começar', () => {
+    it('padrão é o teste grátis (start_mode=trial) e segue para o painel', async () => {
+        const assign = vi.fn();
+        Object.defineProperty(window, 'location', { value: { href: '', assign }, writable: true, configurable: true });
+        axios.post.mockResolvedValue({ data: { redirect: '/panel/dashboard', checkout: null } });
+        await mountAtCompanyStep();
+
+        expect(wrapper.get('[data-mode="trial"]').attributes('aria-checked')).toBe('true');
+        expect(wrapper.get('[data-mode="trial"]').text()).toContain('Testar grátis por 14 dias');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(axios.post).toHaveBeenCalledWith(
+            '/register',
+            expect.objectContaining({ start_mode: 'trial', company_cnpj: '' }),
+        );
+        expect(window.location.href).toBe('/panel/dashboard');
+    });
+
+    it('"Contratar agora" exige CPF ou CNPJ antes do POST e mostra o erro no campo', async () => {
+        await mountAtCompanyStep();
+
+        await wrapper.get('[data-mode="checkout"]').trigger('click');
+        await wrapper.get('form').trigger('submit');
+
+        expect(axios.post).not.toHaveBeenCalled();
+        expect(wrapper.get('[data-testid="register-company-cnpj"]').classes()).toContain('is-error');
+        expect(wrapper.get('[data-testid="register-company-cnpj"]').element.parentElement.textContent).toContain(
+            'Informe o CPF ou CNPJ para contratar agora.',
+        );
+        expect(
+            wrapper.get('[data-testid="register-company-cnpj"]').element.previousElementSibling.textContent,
+        ).toContain('CPF ou CNPJ');
+    });
+
+    it('"Contratar agora": cria a conta sem trial e abre o pagamento no próprio site', async () => {
+        const meta = document.createElement('meta');
+        meta.name = 'csrf-token';
+        meta.content = 'csrf-anterior-ao-login';
+        document.head.appendChild(meta);
+        axios.defaults.headers.common['X-CSRF-TOKEN'] = meta.content;
+        axios.post.mockResolvedValue({
+            data: {
+                redirect: '/panel/dashboard',
+                csrf_token: 'csrf-renovado-pelo-login',
+                checkout: { contract: '/signup-checkout/contract', options: '/signup-checkout/options' },
+            },
+        });
+        await mountAtCompanyStep();
+
+        await wrapper.get('[data-mode="checkout"]').trigger('click');
+        expect(wrapper.get('[data-mode="checkout"]').attributes('aria-checked')).toBe('true');
+        expect(wrapper.find('[data-test="register-step-payment"]').exists()).toBe(true);
+        expect(wrapper.get('.reg-btn-primary').text()).toContain('Criar conta e ir para o pagamento');
+        expect(wrapper.find('.reg-quick-start').exists()).toBe(false);
+
+        // O CNPJ é o documento do pagador no gateway (o Asaas recusa a assinatura sem CPF/CNPJ): o E2E do sandbox
+        // preenche pelo data-testid, e o valor segue no POST /register.
+        await wrapper.get('[data-testid="register-company-cnpj"]').setValue('68292482000134');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+        // Checkout carregado sob demanda (chunk separado, com o Echo).
+        await vi.dynamicImportSettled();
+        await flushPromises();
+
+        expect(axios.post).toHaveBeenCalledWith(
+            '/register',
+            expect.objectContaining({
+                start_mode: 'checkout',
+                plan_id: 'pro',
+                billing_cycle: 'yearly',
+                company_cnpj: '68292482000134',
+            }),
+        );
+        const checkout = wrapper.getComponent({ name: 'SignupCheckout' });
+        expect(axios.defaults.headers.common['X-CSRF-TOKEN']).toBe('csrf-renovado-pelo-login');
+        expect(meta.content).toBe('csrf-renovado-pelo-login');
+        expect(checkout.props()).toMatchObject({ planId: 'pro', cycle: 'yearly', redirect: '/panel/dashboard' });
+        expect(wrapper.get('.reg-card-title').text()).toBe('Pagamento da assinatura');
+        expect(wrapper.get('.reg-card-subtitle').text()).toBe('Pro — Anual');
+    });
+});
+
+describe('Cadastro — captcha (Turnstile)', () => {
+    it('com a site key: mostra o widget e envia o token no POST /register', async () => {
+        axios.post.mockResolvedValue({ data: { redirect: '/panel/dashboard', checkout: null } });
+        Object.defineProperty(window, 'location', { value: { href: '' }, writable: true, configurable: true });
+        await mountAtCompanyStep({ turnstileSiteKey: '0x4AAA' });
+
+        const widget = wrapper.getComponent({ name: 'TurnstileWidget' });
+        expect(widget.props('siteKey')).toBe('0x4AAA');
+        widget.vm.$emit('token', 'tok-abc');
+        await flushPromises();
+
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(axios.post).toHaveBeenCalledWith('/register', expect.objectContaining({ turnstile_token: 'tok-abc' }));
+    });
+
+    it('sem a site key: nenhum widget nem campo extra', async () => {
+        axios.post.mockResolvedValue({ data: { redirect: '/panel/dashboard', checkout: null } });
+        Object.defineProperty(window, 'location', { value: { href: '' }, writable: true, configurable: true });
+        await mountAtCompanyStep();
+
+        expect(wrapper.find('[data-test="turnstile-stub"]').exists()).toBe(false);
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+
+        expect(axios.post.mock.calls[0][1]).not.toHaveProperty('turnstile_token');
+    });
+});

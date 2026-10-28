@@ -1,0 +1,1672 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Domains\AI\Services\{AiCreditWalletService, AiPaywallService, AiProviderSettings, AiQuotaService};
+use App\Domains\Recall\Services\FollowUpSuggestionService;
+use App\Enums\AI\AiRunMode;
+use App\Enums\{ClientRule, DataAccessPurpose, EntityGate, ExamReportRegistry, FeatureKey, ScheduleSituation};
+use App\Enums\ClinicalSafety\{AllergyCategory, AllergySeverity, AllergyStatus, MedicationSource};
+use App\Exceptions\{AttendanceRequiresCashEntryException, LockedMedicalRecordException, StaleMedicalRecordRevisionException};
+use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
+use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
+    MedicalRecord, MedicalRecordDocumentation, NearPointConvergence, Patient, PatientDocumentShare, Schedule, ScheduleSituationLog, User, VisualAcuityType};
+use App\Models\{ReportSetting, ReportSettingContent};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
+use App\Services\Documents\DoctorDocumentTemplateService;
+use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, MedicalRecordSignatureService, ProcedureSolicitationService, ScheduleService, UsageMeterService};
+use App\Services\MedicalRecords\MedicalRecordDraftService;
+use App\Support\{BrazilianFormat, ContactLensUse, CurrentDoctor, PatientAccess};
+use App\Support\Documents\DocumentDate;
+use App\Traits\LogsDataAccess;
+use Carbon\{Carbon, CarbonImmutable};
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
+use Inertia\{Inertia, Response as InertiaResponse};
+
+class MedicalRecordsController extends Controller
+{
+    use LogsDataAccess;
+
+    public function __construct(
+        private readonly MedicalRecordService $service,
+        private readonly MedicalRecordDocumentationService $documentationService,
+        private readonly MedicalRecordPdfService $pdfService,
+        private readonly LensFormatterService $lensFormatter,
+        private readonly FeatureGateService $featureGate,
+        private readonly UsageMeterService $usageMeter,
+        private readonly AiCreditWalletService $aiWallet,
+        private readonly AiProviderSettings $aiProviderSettings,
+        private readonly AiQuotaService $aiQuotaService,
+        private readonly ScheduleService $scheduleService,
+        private readonly AiPaywallService $aiPaywall,
+        private readonly MedicalRecordDraftService $drafts,
+        private readonly PatientClinicalSafetyService $clinicalSafety,
+        private readonly MedicalRecordSignatureService $signatureService,
+    ) {
+    }
+
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Patient $patient): InertiaResponse
+    {
+        // Achado de segurança (auditoria panel.* IDOR) — ver mesmo comentário em
+        // assertMedicalRecordBelongsToPatient() logo abaixo. Aqui não há
+        // MedicalRecord ainda pra passar pelo helper, então a checagem vem direto.
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
+        $patient->load(['person', 'covenant', 'covenantPlan', 'skinType', 'irisType']);
+
+        return Inertia::render('Panel/MedicalRecords/Index', [
+            'breadcrumbs' => [
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.patients'), 'url' => route('panel.patients.index'), 'active' => false],
+                ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#', 'active' => false],
+                ['label' => __('actions.medical_records.title'), 'url' => '#', 'active' => true],
+            ],
+            'patient' => [
+                'id'                 => (string) $patient->id,
+                'code'               => $patient->code,
+                'full_name'          => $patient->person?->full_name,
+                'birth_date'         => $patient->person?->birth_date?->format('d/m/Y'),
+                'age'                => $patient->person?->birth_date?->age,
+                'gender'             => $patient->person?->gender,
+                'cpf'                => $patient->person?->cpf,
+                'phone'              => BrazilianFormat::phone($patient->person?->cellphone ?: $patient->person?->telephone),
+                'email'              => $patient->person?->email,
+                'covenant_name'      => $patient->covenant?->name,
+                'covenant_plan_name' => $patient->covenantPlan?->displayName(),
+                'skin_type'          => $patient->skinType?->name,
+                'iris_type'          => $patient->irisType?->name,
+            ],
+            'urls' => [
+                'ajax_list' => route('panel.patients.medicalrecords.ajaxlist', $patient),
+                'create'    => route('panel.patients.medicalrecords.create', $patient),
+                'patients'  => route('panel.patients.index'),
+                'schedules' => route('panel.schedules.index'),
+            ],
+            // Apenas médicos podem criar/editar/excluir prontuário (CFM Res. 2.227/2018).
+            // A UI consome essa flag para esconder botões e o backend valida via
+            // middleware `entity.role:doctor` nas rotas write.
+            // Perfil médico SEM cadastro de médico ativo não cria/edita (o Gate
+            // IssueReport e o doctor_id barram) — a tela esconde e avisa.
+            'isDoctor'          => CurrentDoctor::canIssue(),
+            'doctorMissing'     => CurrentDoctor::issuerMissing(),
+            'doctorMissingText' => CurrentDoctor::missingMessage(),
+            // Alergias + alertas de risco (Fase 2 / A1-A2): todos que atendem veem.
+            'clinicalSafety' => $this->clinicalSafetyProps($patient, withCheck: false),
+            't'              => trans('actions.medical_records'),
+        ]);
+    }
+
+    /**
+     * Retorna prontuários paginados como JSON puro para a timeline Vue.
+     * O frontend renderiza cada item (não vem HTML do servidor).
+     */
+    public function ajaxList(Request $request, Patient $patient): JsonResponse
+    {
+        // Achado de segurança (auditoria panel.* IDOR, rodada 2 — regressão
+        // minha: faltou nas correções anteriores). Sem isso não vazava PHI (a
+        // query de MedicalRecord abaixo já é escopada pelo EntityScope), mas
+        // servia de oráculo de existência de patient_id cross-tenant (200 em
+        // vez de 404) e sujava data_access_logs com entity_id do atacante
+        // referenciando paciente de outra clínica.
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
+        // CFM Res. 2.227/2018 + LGPD Art. 37 — registra acesso à lista de prontuários do paciente
+        $this->logAccess($patient, DataAccessPurpose::PatientCare);
+
+        // withCount() (não ->with('documentations')): só a CONTAGEM é usada
+        // abaixo — carregar a relação inteira trazia metadata de TODAS as
+        // documentações de TODOS os 10 prontuários da página, inclusive
+        // bytes de imagem embutida (~27 MiB em base64 por laudo com imagem
+        // — ReportImageBlockBuilder/ExamManagerReportController::store()); 20
+        // laudos nessa faixa já excedem o memory_limit configurado, nunca
+        // usados pra nada aqui (achado via revisão adversarial Codex).
+        $records = MedicalRecord::with(['doctor.person', 'doctor.entityUser'])
+            ->withCount('documentations')
+            ->where('patient_id', $patient->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->integer('per_page', 10));
+
+        return response()->json([
+            'data' => $records->getCollection()->map(fn (MedicalRecord $r) => [
+                'id'                   => (string) $r->id,
+                'code'                 => $r->code,
+                'created_at'           => $r->created_at?->format('d/m/Y H:i'),
+                'created_at_iso'       => $r->created_at?->toIso8601String(),
+                'doctor_name'          => $r->doctor?->person?->full_name,
+                'main_complaint'       => $r->main_complaint,
+                'diagnosis_cids'       => $r->diagnosis_cids ?? [],
+                'clinical_conduct'     => $r->clinical_conduct,
+                'is_signed'            => $r->isSigned(),
+                'is_locked'            => $r->isLocked(),
+                'signed_at'            => $r->signed_at?->format('d/m/Y H:i'),
+                'documentations_count' => $r->documentations_count,
+                'edit_url'             => route('panel.patients.medicalrecords.edit', [$patient, $r]),
+                'show_url'             => route('panel.patients.medicalrecords.show', [$patient, $r]),
+                'pdf_url'              => route('panel.patients.medicalrecords.pdf', [$patient, $r]),
+                'destroy_url'          => route('panel.patients.medicalrecords.destroy', [$patient, $r]),
+            ]),
+            'has_more'  => $records->hasMorePages(),
+            'next_page' => $records->currentPage() + 1,
+            'total'     => $records->total(),
+        ]);
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create(Patient $patient): InertiaResponse
+    {
+        // Achado de segurança (auditoria panel.* IDOR) — mesma checagem de index().
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
+        // As props levam o resumo clínico das consultas anteriores (refração,
+        // PIO, cálculo de lentes…): leitura de dado sensível. patientId explícito:
+        // com o próprio Patient como recurso, o log não infere o paciente.
+        $this->logAccess($patient, DataAccessPurpose::PatientCare, patientId: (string) $patient->id);
+
+        $patient->load(['person', 'covenant', 'covenantPlan', 'skinType', 'irisType']);
+        $props                  = $this->buildFormProps($patient, null);
+        $props['breadcrumbs'][] = [
+            'label'  => __('actions.medical_records.create'),
+            'url'    => '#',
+            'active' => true,
+        ];
+
+        return Inertia::render('Panel/MedicalRecords/Create', $props);
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(StoreMedicalRecordRequest $request, Patient $patient): RedirectResponse
+    {
+        // Achado de segurança (auditoria panel.* IDOR) — mesma checagem de index().
+        // Sem isso, o service persistia um MedicalRecord com patient_id de outra
+        // entity misturado ao entity_id da sessão do atacante (escrita cross-tenant).
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
+        $validated = $request->validated();
+
+        // Intenções de fluxo não são colunas do prontuário.
+        $flowAction     = $validated['flow_action'] ?? null;
+        $postSaveAction = $validated['post_save_action'] ?? null;
+        unset($validated['flow_action'], $validated['post_save_action']);
+
+        $record = $this->service->store($validated, $patient);
+
+        // Salvou: o rascunho (autosave) desta tela não serve mais.
+        $this->clearDrafts($record, created: true);
+
+        return $this->redirectAfterSave(
+            $patient,
+            $record,
+            __('actions.medical_records.saved'),
+            $flowAction,
+            $postSaveAction,
+        );
+    }
+
+    /**
+     * Display the specified resource as JSON for the detail offcanvas.
+     */
+    public function show(Patient $patient, MedicalRecord $medicalrecord): JsonResponse
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+        $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
+
+        $medicalrecord->load([
+            'doctor.person',
+            'visualAcuityType',
+            'nearPointConvergence',
+            'coverTestType',
+            'colorVisionType',
+            // NOTA: relations do model nomeadas `visualAcuityTypeWith*` /
+            // `WitCorrection` (typo legado preservado por compat — não
+            // renomear sem migration). Eager-load usa nomes EXATOS do model.
+            'visualAcuityTypeWithoutCorrectionRight',
+            'visualAcuityTypeWithoutCorrectionLeft',
+            'visualAcuityTypeWitCorrectionRight',
+            'visualAcuityTypeWitCorrectionLeft',
+            'additionType',
+            'lensAway',
+            'lensNear',
+            'signedBy.user',
+            // Projeção de colunas (nunca metadata/content): laudo com
+            // imagem embutida pode ter ~27 MiB em base64 no metadata
+            // (ReportImageBlockBuilder/ExamManagerReportController::store())
+            // — a serialização abaixo nunca lê esse campo, só os listados
+            // aqui (achado via revisão adversarial Codex). medical_record_id
+            // é obrigatório mesmo sem uso direto: é a FK que o Eloquent usa
+            // pra casar cada linha de volta ao prontuário certo no hasMany.
+            'documentations' => fn ($query) => $query
+                ->select([
+                    'id', 'medical_record_id', 'doctor_id', 'type', 'title', 'created_at',
+                    'document_date', 'ai_run_id',
+                    'requesting_doctor_name', 'requesting_doctor_email', 'requesting_doctor_sent_at',
+                ])
+                ->with(['doctor.person', 'aiRun']),
+        ]);
+
+        // Portal do Paciente (Fase 2) — grant ativo por documentação, numa
+        // única query em lote (não 1 por linha da tabela).
+        $sharedDocShareIds = PatientDocumentShare::query()
+            ->where('shareable_type', MedicalRecordDocumentation::class)
+            ->whereIn('shareable_id', $medicalrecord->documentations->pluck('id'))
+            ->whereNull('revoked_at')
+            ->pluck('id', 'shareable_id');
+
+        return response()->json([
+            'id'                   => $medicalrecord->id,
+            'code'                 => $medicalrecord->code,
+            'created_at_formatted' => $medicalrecord->created_at?->format('d/m/Y H:i'),
+            'doctor_name'          => $medicalrecord->doctor?->person?->full_name ?? '',
+            // Anamnese
+            'main_complaint'          => $medicalrecord->main_complaint,
+            'hda'                     => $medicalrecord->hda,
+            'diabetic'                => $medicalrecord->diabetic,
+            'diabetic_family'         => $medicalrecord->diabetic_family,
+            'hypertensive'            => $medicalrecord->hypertensive,
+            'hypertensive_family'     => $medicalrecord->hypertensive_family,
+            'glaucomatous'            => $medicalrecord->glaucomatous,
+            'glaucomatous_family'     => $medicalrecord->glaucomatous_family,
+            'ocular_surgical_history' => $medicalrecord->ocular_surgical_history,
+            'medications_in_use'      => $medicalrecord->medications_in_use,
+            // Retrato do momento da consulta (Fase 2 / A2) e uso de LC (A3).
+            ...$this->snapshotForView($medicalrecord),
+            'contact_lens_use_rows' => ContactLensUse::rows($medicalrecord->contact_lens_use),
+            // Exame físico
+            'visual_acuity_type'     => $medicalrecord->visualAcuityType?->name,
+            'near_point_convergence' => $medicalrecord->nearPointConvergence?->name,
+            'cover_test_type'        => $medicalrecord->coverTestType?->name,
+            'color_vision_type'      => $medicalrecord->colorVisionType?->name,
+            'ocular_motility'        => $medicalrecord->ocular_motility,
+            'tonometer_right'        => $medicalrecord->tonometer_right,
+            'tonometer_left'         => $medicalrecord->tonometer_left,
+            'tonometer_time'         => $medicalrecord->tonometer_time,
+            'pachymetry_right'       => $medicalrecord->pachymetry_right,
+            'pachymetry_left'        => $medicalrecord->pachymetry_left,
+            'gonioscopy_right'       => $medicalrecord->gonioscopy_right,
+            'gonioscopy_left'        => $medicalrecord->gonioscopy_left,
+            // Refração
+            'visual_acuity_without_correction_right' => $medicalrecord->visualAcuityTypeWithoutCorrectionRight?->name,
+            'visual_acuity_without_correction_left'  => $medicalrecord->visualAcuityTypeWithoutCorrectionLeft?->name,
+            'visual_acuity_with_correction_right'    => $medicalrecord->visualAcuityTypeWitCorrectionRight?->name,
+            'visual_acuity_with_correction_left'     => $medicalrecord->visualAcuityTypeWitCorrectionLeft?->name,
+            // Refração dinâmica/estática: bloco TODO em default (0.00/0.00/0°,
+            // valores pré-preenchidos do form) = não preenchido de verdade →
+            // vira null e o histórico esconde (ticket "não mostrar vazios").
+            ...$this->refractionBlockOrNull($medicalrecord, 'dynamic'),
+            'addition_type' => $medicalrecord->additionType?->name,
+            ...$this->refractionBlockOrNull($medicalrecord, 'static'),
+            // Multi-características: "MULTIFOCAL + ANTIRREFLEXO" (fallback
+            // interno pro single de registros antigos)
+            'lens_away' => $medicalrecord->lens_away_names_text ?: null,
+            'lens_near' => $medicalrecord->lens_near_names_text ?: null,
+            // Achados
+            'biomicroscopy_right'   => $medicalrecord->biomicroscopy_right,
+            'biomicroscopy_left'    => $medicalrecord->biomicroscopy_left,
+            'fundoscopy_right'      => $medicalrecord->fundoscopy_right,
+            'fundoscopy_left'       => $medicalrecord->fundoscopy_left,
+            'observation_general'   => $medicalrecord->observation_general,
+            'observation_of_lenses' => $medicalrecord->observation_of_lenses,
+            // Cálculo de lentes de contato da consulta (ContactLensCalculator)
+            'contact_lens_calculation' => $medicalrecord->contact_lens_calculation,
+            // Diagnóstico & conduta
+            'diagnosis_cids'   => $medicalrecord->diagnosis_cids ?? [],
+            'clinical_conduct' => $medicalrecord->clinical_conduct,
+            'follow_up_days'   => $medicalrecord->follow_up_days,
+            // Assinatura (CFM Res. 2.227/2018)
+            'is_locked'           => $medicalrecord->isLocked(),
+            'is_signed'           => $medicalrecord->isSigned(),
+            'signed_at_formatted' => $medicalrecord->signed_at?->format('d/m/Y H:i'),
+            'signed_by_name'      => $medicalrecord->signedBy?->user?->name,
+            'sign_url'            => route('panel.patients.medicalrecords.sign', [$patient, $medicalrecord]),
+            // Token de concorrência (achado via revisão adversarial Codex):
+            // a tela precisa devolver EXATAMENTE isto ao assinar, pra
+            // MedicalRecordsController::sign() rejeitar um clique sobre
+            // conteúdo que outra sessão já editou nesse meio-tempo.
+            'clinical_revision' => $medicalrecord->clinical_revision,
+            // Documentações
+            'documentations' => $medicalrecord->documentations->map(fn ($d) => [
+                'id'          => $d->id,
+                'type'        => $d->type,
+                'type_label'  => $d->getTypeLabel(),
+                'title'       => $d->title,
+                'doctor_name' => $d->doctor?->person?->full_name ?? '',
+                'created_at'  => $d->created_at?->format('d/m/Y H:i'),
+                // Data alternativa impressa (Fase 2 / B3) — null = a da emissão.
+                'document_date'       => $d->hasAlternativeDate() ? $d->document_date?->format('d/m/Y') : null,
+                'document_date_label' => $d->hasAlternativeDate()
+                    ? __('clinical_documents.date.printed', ['date' => $d->document_date?->copy()->locale(app()->getLocale())->isoFormat('L')])
+                    : null,
+                'is_ai'             => $d->ai_run_id !== null,
+                'ai_workflow_label' => $d->ai_run_id && $d->aiRun ? __('ai.workflow_' . $d->aiRun->workflow) : null,
+                'pdf_url'           => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $medicalrecord, $d]),
+                // Portal do Paciente (Fase 2) — grant de leitura pro titular.
+                'shared_with_patient' => $sharedDocShareIds->has($d->id),
+                'document_share_id'   => $sharedDocShareIds->get($d->id),
+            ]),
+            // URLs de ação
+            'edit_url'      => route('panel.patients.medicalrecords.edit', [$patient, $medicalrecord]),
+            'pdf_url'       => route('panel.patients.medicalrecords.pdf', [$patient, $medicalrecord]),
+            'templates_url' => route('panel.patients.medicalrecords.templates', [$patient, $medicalrecord]),
+            // Rótulos: prop `t` (actions.medical_records) de quem abre a consulta.
+        ]);
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(Patient $patient, MedicalRecord $medicalrecord): InertiaResponse
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+        $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
+
+        $patient->load(['person', 'covenant', 'covenantPlan', 'skinType', 'irisType']);
+        $medicalrecord->load([
+            'doctor.person',
+            // Mesma projeção de colunas de show() acima (nunca metadata/
+            // content) — report_setting_content_id entra aqui porque,
+            // diferente de show(), esta tela também carrega
+            // reportSettingContent (belongsTo — precisa da própria FK
+            // presente pra resolver, mesmo sem ela aparecer na seleção).
+            'documentations' => fn ($query) => $query
+                ->select([
+                    'id', 'medical_record_id', 'doctor_id', 'type', 'title', 'created_at',
+                    'document_date', 'ai_run_id', 'report_setting_content_id',
+                    'requesting_doctor_name', 'requesting_doctor_email', 'requesting_doctor_sent_at',
+                ])
+                ->with(['doctor.person', 'reportSettingContent', 'aiRun']),
+            'files',
+        ]);
+
+        $props                  = $this->buildFormProps($patient, $medicalrecord);
+        $props['breadcrumbs'][] = [
+            'label'  => __('actions.medical_records.edit'),
+            'url'    => '#',
+            'active' => true,
+        ];
+
+        return Inertia::render('Panel/MedicalRecords/Edit', $props);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(UpdateMedicalRecordRequest $request, Patient $patient, MedicalRecord $medicalrecord): RedirectResponse
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+        $validated = $request->validated();
+
+        $flowAction     = $validated['flow_action'] ?? null;
+        $postSaveAction = $validated['post_save_action'] ?? null;
+        unset($validated['flow_action'], $validated['post_save_action']);
+
+        try {
+            // O service grava numa instância FRESCA e travada e devolve ela: o
+            // que vem a seguir (rascunho, Finalizar/Dilatar/Exame) tem que ler
+            // o prontuário como ficou salvo — um schedule_id novo só existe
+            // nessa instância, não no $medicalrecord resolvido no início da
+            // requisição (achado via revisão adversarial Codex).
+            $medicalrecord = $this->service->update($medicalrecord, $validated);
+        } catch (LockedMedicalRecordException) {
+            return back()->with('error', __('actions.medical_records.locked'));
+        }
+
+        $this->clearDrafts($medicalrecord, created: false);
+
+        return $this->redirectAfterSave(
+            $patient,
+            $medicalrecord,
+            __('actions.medical_records.updated'),
+            $flowAction,
+            $postSaveAction,
+        );
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Patient $patient, MedicalRecord $medicalrecord): RedirectResponse
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+
+        try {
+            $this->service->delete($medicalrecord);
+        } catch (LockedMedicalRecordException) {
+            return back()->with('error', __('actions.medical_records.locked'));
+        }
+
+        return redirect()
+            ->route('panel.patients.medicalrecords.index', $patient)
+            ->with('message', __('actions.medical_records.deleted'));
+    }
+
+    /**
+     * Restore a soft-deleted record.
+     */
+    public function restore(Patient $patient, string $medicalrecord): RedirectResponse
+    {
+        // Mesmo guard do destroy: paciente da clínica ativa e prontuário DESTE
+        // paciente (antes restaurava qualquer prontuário da clínica pelo id,
+        // com qualquer paciente na URL). Só médico chega aqui (rota no grupo
+        // entity.role:doctor, como o destroy — CFM 2.227/2018).
+        abort_unless(Str::isUuid($medicalrecord), 404);
+
+        $record = MedicalRecord::withTrashed()->whereKey($medicalrecord)->firstOrFail();
+        $this->assertMedicalRecordBelongsToPatient($patient, $record);
+
+        $this->service->restore((string) $record->id);
+
+        return redirect()
+            ->route('panel.patients.medicalrecords.index', $patient)
+            ->with('message', __('actions.medical_records.restored'));
+    }
+
+    /**
+     * Assinatura eletrônica do prontuário (CFM Res. 2.227/2018). A rota é
+     * aberta a admin/doctor/secretary (mesmo grupo de leitura), mas o ato em
+     * si é exclusivo do médico — Gate IssueReport, mesmo padrão já usado em
+     * evoluções e procedimentos estruturados. Achado via auditoria de
+     * encerramento (EE-06): o serviço de assinatura e a UI já existiam, mas
+     * nenhuma rota chamava o serviço.
+     *
+     * clinical_revision é OBRIGATÓRIO (achado via revisão adversarial
+     * Codex): sem ele, o clique em "Assinar" travava em definitivo o que
+     * estivesse no banco na hora da requisição, nunca o que o médico de
+     * fato tinha revisado na tela — outra aba/usuário podia ter editado o
+     * conteúdo entre o carregamento da tela e o clique. A comparação de
+     * verdade roda sob o MESMO lock de Signable::whileUnlocked() (ver
+     * Signable::sign()), nunca aqui fora da transação.
+     */
+    public function sign(Request $request, Patient $patient, MedicalRecord $medicalrecord): RedirectResponse
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+
+        $entity = Entity::findOrFail((string) session('selected_entity_id'));
+        Gate::authorize(EntityGate::IssueReport->value, $entity);
+
+        $doctor = CurrentDoctor::issuer()?->loadMissing('entityUser');
+        abort_if($doctor === null, 403, CurrentDoctor::missingMessage());
+
+        $validated = $request->validate([
+            'clinical_revision' => ['required', 'integer', 'min:1'],
+        ]);
+
+        try {
+            $this->signatureService->sign($medicalrecord, $doctor->entityUser, (int) $validated['clinical_revision']);
+        } catch (LockedMedicalRecordException) {
+            return back()->with('error', __('actions.medical_records.already_signed'));
+        } catch (StaleMedicalRecordRevisionException) {
+            return back()->with('error', __('actions.medical_records.sign_stale_revision'));
+        }
+
+        return back()->with('success', __('actions.medical_records.sign_success'));
+    }
+
+    /**
+     * Generate and stream a PDF of the full clinical record.
+     */
+    public function pdf(Patient $patient, MedicalRecord $medicalrecord): Response
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+        $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
+
+        return $this->pdfService->generateRecord($medicalrecord);
+    }
+
+    /**
+     * Generate and stream a Laudo de Tonômetria PDF.
+     * Accepts ?time=HH:MM to stamp the measurement time captured at print moment.
+     */
+    public function tonometryPdf(Request $request, Patient $patient, MedicalRecord $medicalrecord): Response
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+        $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
+
+        // Auto-resolve doctor_id se prontuário ainda não tem (admin precisa selecionar
+        // antes; médico logado é resolvido automaticamente).
+        if (! $medicalrecord->doctor_id) {
+            $entityId = session('selected_entity_id');
+            $doctor   = Doctor::whereHas('entityUser', fn ($q) => $q
+                ->where('entity_id', $entityId)
+                ->where('user_id', auth()->id()))
+                ->first();
+            abort_if(! $doctor, 422, __('actions.medical_records.doctor_required_for_print'));
+            $medicalrecord->doctor_id = $doctor->id;
+        }
+
+        $time = $request->string('time')->trim()->value() ?: now()->format('H:i');
+
+        return $this->pdfService->generateTonometry($medicalrecord, $time);
+    }
+
+    /**
+     * Format lens reference (esférico / cilíndrico / eixo) following oftalmological convention.
+     */
+    public function lensFormat(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'kind'  => ['required', 'in:spherical,cylindrical,axis'],
+            'value' => ['nullable', 'string', 'max:16'],
+        ]);
+
+        return response()->json([
+            'value' => $this->lensFormatter->format($validated['kind'], $validated['value'] ?? null),
+        ]);
+    }
+
+    /**
+     * Calculate presbyopia addition and return static sphericals as JSON.
+     */
+    public function calculatePresbyopia(Request $request, Patient $patient): JsonResponse
+    {
+        $validated = $request->validate([
+            'dynamic_spherical_right' => ['nullable', 'numeric'],
+            'dynamic_spherical_left'  => ['nullable', 'numeric'],
+            'addition'                => ['nullable', 'numeric'],
+        ]);
+
+        $result = $this->service->calculatePresbyopia(
+            isset($validated['dynamic_spherical_right']) ? (float) $validated['dynamic_spherical_right'] : null,
+            isset($validated['dynamic_spherical_left']) ? (float) $validated['dynamic_spherical_left'] : null,
+            isset($validated['addition']) ? (float) $validated['addition'] : null,
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * Return available documentation templates for a medical record.
+     */
+    public function templates(Patient $patient, MedicalRecord $medicalrecord): JsonResponse
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+        $entityId  = session('selected_entity_id');
+        $templates = $this->documentationService->getActiveTemplates($entityId);
+
+        // Modelos PESSOAIS do médico que emite (Fase 2 / B3), listados junto
+        // dos modelos da clínica no mesmo seletor.
+        $personal = app(DoctorDocumentTemplateService::class)->forSelector((string) $entityId, CurrentDoctor::issuer());
+
+        if ($personal !== []) {
+            array_unshift($templates, [
+                'report_setting_id'    => 'personal',
+                'report_setting_title' => __('clinical_documents.templates.mine'),
+                'personal'             => true,
+                'contents'             => $personal,
+            ]);
+        }
+
+        return response()->json($templates);
+    }
+
+    /**
+     * Preview a resolved template before saving a documentation.
+     */
+    public function templatePreview(Request $request, Patient $patient, MedicalRecord $medicalrecord): JsonResponse
+    {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+        $validated = $request->validate([
+            'report_setting_content_id' => ['required', 'uuid', 'exists:report_setting_contents,id'],
+            'doctor_id'                 => ['nullable', 'uuid'],
+            // Data alternativa (Fase 2 / B3): as datas do texto do modelo saem
+            // com ela; modelo pessoal do médico (B3) usado como conteúdo.
+            'document_date' => DocumentDate::rules(),
+            'template_id'   => ['nullable', 'uuid'],
+        ], DocumentDate::messages());
+
+        $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
+        $this->assertTemplateBelongsToCurrentEntity($content);
+        $entity = Entity::findOrFail(session('selected_entity_id'));
+        // doctor_id do request só vale para médico DESTA clínica (antes:
+        // Doctor::find sem escopo resolvia nome/CRM de médico de outra clínica
+        // no preview; valor não-UUID virava erro 500 do banco).
+        $doctor = $medicalrecord->doctor ?? (
+            filled($validated['doctor_id'] ?? null)
+                ? Doctor::query()->ofEntity((string) $entity->id)->find($validated['doctor_id'])
+                : null
+        );
+
+        // Sem médico o resolver de variáveis (MEDICO_NOME/CRM) não tem autor:
+        // antes estourava TypeError (HTTP 500).
+        if ($doctor === null) {
+            return response()->json(['message' => __('actions.medical_records.doctor_required_for_template')], 422);
+        }
+
+        $documentDate = DocumentDate::alternative($validated['document_date'] ?? null);
+        $personalHtml = false;
+
+        if (filled($validated['template_id'] ?? null)) {
+            $template = app(DoctorDocumentTemplateService::class)->ownedOrFail((string) $entity->id, CurrentDoctor::issuer(), (string) $validated['template_id']);
+            abort_if((string) $template->report_setting_content_id !== (string) $content->id, 422, __('clinical_documents.templates.base_mismatch'));
+
+            $content = clone $content;
+
+            // HTML salvo pelo editor (já sanitizado e com as variáveis no
+            // lugar dos dados do paciente de origem) é resolvido para ESTE
+            // paciente; texto salvo nos modais de receita/pedido vai no lugar
+            // da lista, como HTML.
+            if ($template->body_format === 'html') {
+                $content->content = (string) $template->body;
+                $personalHtml     = true;
+            } elseif ($template->kind === 'procedure') {
+                // `body` do modelo de pedido é só a lista de exames — caráter,
+                // indicação e observações ficam no payload e a prévia os
+                // perdia (3ª revisão Codex, P2). renderRequestHtml() usa o que
+                // já foi validado contra o catálogo ao SALVAR o modelo (sem
+                // bater no banco de novo aqui: isto é prévia, não emissão).
+                $payload = is_array($template->payload) ? $template->payload : [];
+                $items   = is_array($payload['items'] ?? null) ? $payload['items'] : [];
+
+                $procedures     = app(ProcedureSolicitationService::class);
+                $indicationText = implode('; ', array_filter([
+                    implode('; ', array_column(is_array($payload['indications'] ?? null) ? $payload['indications'] : [], 'description')),
+                    trim((string) ($payload['indication_text'] ?? '')),
+                ]));
+                $typeLabel = $procedures->resolveTypeLabel(is_string($payload['type'] ?? null) ? $payload['type'] : null);
+                $cids      = is_array($payload['cids'] ?? null) ? $payload['cids'] : [];
+                $notes     = trim((string) ($payload['notes'] ?? ''));
+
+                // Modelo de pedido SEM payload.items (só corpo) é combinação
+                // válida (API aceita; PersonalTemplatesTest cobre) — mas
+                // caráter/indicação/CID/observações do payload têm que ir pra
+                // prévia igual na emissão real, senão ficava só a lista de
+                // exames vazia OU (11ª revisão Codex, P2) só o corpo, sem o
+                // resto do payload (16ª revisão Codex, P2 — mesmo gap da
+                // emissão, aqui na prévia).
+                $html = $items === []
+                    ? $procedures->renderTextOnlyRequestHtml((string) $template->body, $typeLabel, $indicationText, $cids, $notes)
+                    : $procedures->renderRequestHtml($items, $typeLabel, $indicationText, $cids, $notes);
+
+                $content->content = str_replace('{{PROCEDIMENTOS_SOLICITADOS}}', $html, (string) $content->content);
+            } else {
+                $content->content = str_replace(
+                    ['{{LISTA_MEDICAMENTOS}}', '{{PROCEDIMENTOS_SOLICITADOS}}', '{{CONTEUDO_LIVRE}}'],
+                    nl2br(e(trim($template->body))),
+                    (string) $content->content,
+                );
+            }
+        }
+
+        $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $medicalrecord, $documentDate);
+
+        // Strip placeholders restantes ({{CONTEUDO_LIVRE}}, {{LISTA_MEDICAMENTOS}}, etc.)
+        // que não são resolvidos pelo TemplateVariableResolver (são preenchidos
+        // dinamicamente via quick-actions). Em fluxo livre via select, médico
+        // edita manualmente — placeholder literal só polui o textarea.
+        $html = preg_replace('/\{\{[A-Z_][A-Z0-9_]*\}\}/u', '', $resolved['html']) ?? $resolved['html'];
+
+        // Remove o cabeçalho de data já resolvido pelo TemplateVariableResolver
+        // (`<p style="text-align:right">SÃO PAULO/SP, 21 de maio de 2026</p>` e
+        // o `<p>&nbsp;</p>` espaçador que segue). Motivo: a data e localização
+        // já aparecem no bloco de assinatura do PDF (`_signature.blade.php`) —
+        // mostrar no topo do editor duplica visualmente e polui o textarea.
+        // Modelo pessoal do editor: o cabeçalho de data já saiu ao salvar — o
+        // 1º parágrafo à direita é do médico.
+        if (! $personalHtml) {
+            $html = $this->stripResolvedDateHeader($html);
+        }
+
+        return response()->json(['content' => $html, 'unresolved' => $resolved['unresolved']]);
+    }
+
+    /**
+     * Remove o `<p style="text-align:right">{LOCAL_DATA já resolvido}</p>` e o
+     * `<p>&nbsp;</p>` que normalmente o sucede no template. Pareia o cabeçalho
+     * pela posição (início do HTML) + alinhamento à direita, sem hardcoded
+     * de cidade ou mês — funciona para qualquer entity.
+     */
+    private function stripResolvedDateHeader(string $html): string
+    {
+        // Padrão: <p ... text-align:right ...>QUALQUER COISA</p>(\s*<p>&nbsp;</p>)?
+        // Só remove se estiver no INÍCIO do conteúdo (no máximo após whitespace).
+        $pattern = '/^\s*<p\s+[^>]*text-align\s*:\s*right[^>]*>[^<]*<\/p>\s*(?:<p[^>]*>&nbsp;<\/p>)?\s*/iu';
+
+        return preg_replace($pattern, '', $html, 1) ?? $html;
+    }
+
+    /**
+     * Constrói o payload de props para Inertia (Create e Edit).
+     * Substitui o antigo commonFormData() do fluxo Blade — agora retorna tudo
+     * serializado em arrays puros prontos para consumo Vue.
+     */
+    /**
+     * Prontuários anteriores do paciente (somente visualização via modal).
+     * Exclui o registro em edição; escopo de tenant garantido pelo patient_id
+     * (o paciente já vem resolvido dentro da entidade ativa).
+     */
+    private function serializePreviousRecords(Patient $patient, ?MedicalRecord $record): array
+    {
+        return MedicalRecord::query()
+            ->where('patient_id', $patient->id)
+            ->when($record, fn ($q) => $q->where('id', '!=', $record->id))
+            ->with([
+                'doctor.person',
+                // Nomes das acuidades pro RESUMO CLÍNICO lateral — o caso de
+                // uso do painel é "quanto estava o grau/PIO/AV na última
+                // consulta?" sem abrir modal nem sair do prontuário atual.
+                'visualAcuityTypeWithoutCorrectionRight:id,name',
+                'visualAcuityTypeWithoutCorrectionLeft:id,name',
+                'visualAcuityTypeWitCorrectionRight:id,name',
+                'visualAcuityTypeWitCorrectionLeft:id,name',
+                'additionType:id,name',
+            ])
+            ->orderByDesc('created_at')
+            ->limit(6)
+            ->get()
+            ->map(fn (MedicalRecord $mr) => [
+                'id'                   => (string) $mr->id,
+                'code'                 => $mr->code,
+                'created_at_formatted' => $mr->created_at?->format('d/m/Y'),
+                'created_at_time'      => $mr->created_at?->format('H:i'),
+                'doctor_name'          => $mr->doctor?->person?->full_name ?? '—',
+                'main_complaint'       => Str::limit((string) $mr->main_complaint, 90) ?: null,
+                'diagnosis_count'      => is_array($mr->diagnosis_cids) ? count($mr->diagnosis_cids) : 0,
+                'is_signed'            => $mr->isSigned(),
+                'show_url'             => route('panel.patients.medicalrecords.show', [$patient, $mr]),
+                // ── Resumo clínico (comparação rápida durante o atendimento) ──
+                'summary' => [
+                    'av_sc' => $this->eyePair($mr->visualAcuityTypeWithoutCorrectionRight?->name, $mr->visualAcuityTypeWithoutCorrectionLeft?->name),
+                    'av_cc' => $this->eyePair($mr->visualAcuityTypeWitCorrectionRight?->name, $mr->visualAcuityTypeWitCorrectionLeft?->name),
+                    // Refração POR OLHO em linhas separadas (ticket "grau
+                    // cortado"): melhor uma linha a mais que esconder o grau.
+                    'refraction_od' => $this->refractionText($mr->dynamic_spherical_right, $mr->dynamic_cylindrical_right, $mr->dynamic_axis_right),
+                    'refraction_oe' => $this->refractionText($mr->dynamic_spherical_left, $mr->dynamic_cylindrical_left, $mr->dynamic_axis_left),
+                    'addition'      => $mr->additionType?->name,
+                    'pio'           => $this->eyePair($mr->tonometer_right, $mr->tonometer_left, ' mmHg'),
+                    // Cálculo de lentes de contato da consulta — o painel mostra o
+                    // resultado por olho (contactLensCompact); null = sem cálculo.
+                    'contact_lens' => $mr->contact_lens_calculation,
+                    // "H40.1 – Glaucoma..." — código + descrição juntos.
+                    'diagnoses' => collect(is_array($mr->diagnosis_cids) ? $mr->diagnosis_cids : [])
+                        ->map(fn ($d) => trim(implode(' – ', array_filter([(string) ($d['code'] ?? ''), (string) ($d['description'] ?? '')]))))
+                        ->filter()
+                        ->values()
+                        ->all(),
+                    'conduct' => Str::limit((string) $mr->clinical_conduct, 140) ?: null,
+                ],
+            ])
+            ->all();
+    }
+
+    /**
+     * Bloco de refração (dynamic|static) pro show(): quando os 6 valores do
+     * bloco são apenas o DEFAULT do form (0.00 / 0.00 / 0°) ou vazios, o
+     * bloco inteiro vira null — o histórico (modal/drawer) esconde as linhas.
+     * Bloco com QUALQUER valor real preenchido sai íntegro. Nada é apagado
+     * do banco — é só exibição.
+     *
+     * @return array<string, ?string>
+     */
+    private function refractionBlockOrNull(MedicalRecord $record, string $prefix): array
+    {
+        $fields = [
+            "{$prefix}_spherical_right", "{$prefix}_spherical_left",
+            "{$prefix}_cylindrical_right", "{$prefix}_cylindrical_left",
+            "{$prefix}_axis_right", "{$prefix}_axis_left",
+        ];
+
+        $isDefault = function (?string $value): bool {
+            $v = trim((string) $value);
+
+            if ($v === '') {
+                return true;
+            }
+
+            // 0.00 / 0,00 / 0 / 0° / 0º / +0.00 / -0,00...
+            $normalized = str_replace(['°', 'º', ','], ['', '', '.'], $v);
+
+            return is_numeric($normalized) && (float) $normalized === 0.0;
+        };
+
+        $allDefault = collect($fields)->every(fn (string $f) => $isDefault($record->{$f}));
+
+        return collect($fields)
+            ->mapWithKeys(fn (string $f) => [$f => $allDefault ? null : $record->{$f}])
+            ->all();
+    }
+
+    /**
+     * "OD x | OE y" (en: "OD x | OS y") — omite o olho sem dado; null quando
+     * ambos vazios (a UI esconde a linha inteira).
+     */
+    private function eyePair(mixed $right, mixed $left, string $suffix = ''): ?string
+    {
+        $parts = [];
+
+        if ($right !== null && $right !== '') {
+            $parts[] = __('actions.medical_records.od') . ' ' . $right;
+        }
+
+        if ($left !== null && $left !== '') {
+            $parts[] = __('actions.medical_records.oe') . ' ' . $left;
+        }
+
+        return $parts === [] ? null : implode(' | ', $parts) . $suffix;
+    }
+
+    /**
+     * "-1,50 / -0,50 × 180°" a partir de esférico/cilíndrico/eixo (refração
+     * dinâmica) — campos livres formatados pelo próprio form (formatLens).
+     */
+    private function refractionText(?string $spherical, ?string $cylindrical, ?string $axis): ?string
+    {
+        $out = trim((string) $spherical);
+
+        if (trim((string) $cylindrical) !== '') {
+            $out .= ($out !== '' ? ' / ' : '') . trim((string) $cylindrical);
+        }
+
+        if (trim((string) $axis) !== '') {
+            $out .= ' × ' . trim((string) $axis);
+        }
+
+        return $out === '' ? null : $out;
+    }
+
+    /**
+     * @return array{suggestions: list<array<string, mixed>>, max_days: ?int, t: array<string, mixed>}|null
+     */
+    private function followUpProps(string $entityId, Patient $patient, ?MedicalRecord $record, ?Schedule $flowSchedule): ?array
+    {
+        $today = CarbonImmutable::now()->startOfDay();
+        $on    = CarbonImmutable::parse($flowSchedule?->date_time ?? $record?->created_at ?? $today)->startOfDay();
+
+        $result = app(FollowUpSuggestionService::class)->forPatient($entityId, (string) $patient->id, $on->greaterThan($today) ? $today : $on);
+
+        return $result['suggestions'] === [] ? null : $result + ['t' => trans('recall_followup')];
+    }
+
+    private function buildFormProps(Patient $patient, ?MedicalRecord $record): array
+    {
+        $entityId = (string) session('selected_entity_id');
+        $entity   = Entity::find($entityId);
+        $isEdit   = (bool) $record;
+
+        // ── Fluxo Agenda ↔ Prontuário ────────────────────────────────────
+        // Quando o atendimento está vinculado a um agendamento (edit: pelo
+        // record; create: ?schedule_id= vindo da Agenda), o front usa isso
+        // pra: (a) marcar "Em consulta" automaticamente quando o médico abre
+        // o prontuário e (b) perguntar o destino do paciente ao sair
+        // (Finalizar/Dilatar/Exame/Continuar). Situação atual vai junto pra
+        // guarda no front: estados terminais nunca são rebaixados.
+        $flowScheduleId = $record?->schedule_id ?? request('schedule_id');
+        // Agendamento DESTE paciente (mesma regra do schedule_id ao salvar):
+        // ?schedule_id= de outro paciente não liga o fluxo, o cronômetro nem o
+        // rascunho a esta tela.
+        $flowSchedule = $flowScheduleId && Str::isUuid((string) $flowScheduleId)
+            ? Schedule::query()->where('entity_id', $entityId)->where('patient_id', $patient->id)->find($flowScheduleId)
+            : null;
+
+        // Prontuário sempre no nome do médico que registra: perfil médico vê só
+        // ele mesmo (cadastro ativo); os demais perfis, só médicos ATIVOS da
+        // clínica (mesma regra do doctor_id em Store/UpdateMedicalRecordRequest).
+        $currentDoctor = CurrentDoctor::issuer();
+        $doctors       = CurrentDoctor::isDoctorProfile()
+            ? collect($currentDoctor ? [$currentDoctor->loadMissing(['person', 'entityUser'])] : [])
+            : Doctor::with(['person', 'entityUser'])
+                ->whereHas('entityUser', fn ($q) => $q->where('entity_id', $entityId))
+                ->where('active', true)
+                ->get();
+
+        $canChooseDoctor = $entity && auth()->user()?->hasRoleInEntity($entity, ClientRule::Admin);
+        $isDoctor        = CurrentDoctor::canIssue();
+
+        return [
+            'breadcrumbs' => [
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.patients'), 'url' => route('panel.patients.index'), 'active' => false],
+                ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#', 'active' => false],
+                ['label' => __('actions.medical_records.title'), 'url' => route('panel.patients.medicalrecords.index', $patient), 'active' => false],
+            ],
+            'patient'       => $this->serializePatient($patient),
+            'medicalrecord' => $record ? $this->serializeRecord($record) : null,
+            // Alergias, "nega alergias", medicações em uso e alertas de risco
+            // ocular (Fase 2 / A1-A2) — cabeçalho, anamnese e receituário.
+            'clinicalSafety' => $this->clinicalSafetyProps($patient, withCheck: CurrentDoctor::canIssue()),
+            // Uso de LC da última consulta (Fase 2 / A3) — pré-preenche o novo.
+            'contactLensUsePrevious' => $this->previousContactLensUse($patient, $record),
+            'previousRecords'        => $this->serializePreviousRecords($patient, $record),
+            'doctors'                => $this->serializeCatalog($doctors, fn (Doctor $d) => [
+                'id'   => (string) $d->id,
+                'name' => $d->person?->full_name,
+            ]),
+            'currentDoctorId' => $currentDoctor ? (string) $currentDoctor->id : null,
+            'canChooseDoctor' => (bool) $canChooseDoctor,
+            'isDoctor'        => $isDoctor,
+            // Sugestão do campo "Retorno" (Fase 6): intervalo que a clínica escolheu para a consulta de cada condição
+            // crônica ATIVA do paciente — só para o médico, só com protocolo em uso.
+            'followUp'          => $isDoctor ? $this->followUpProps($entityId, $patient, $record, $flowSchedule) : null,
+            'doctorMissing'     => CurrentDoctor::issuerMissing(),
+            'doctorMissingText' => CurrentDoctor::missingMessage(),
+            'isEdit'            => $isEdit,
+            'scheduleFlow'      => $flowSchedule ? [
+                'id'         => (string) $flowSchedule->id,
+                'situation'  => $flowSchedule->situation->value,
+                'update_url' => route('panel.schedules.situation', $flowSchedule),
+                // Modal de "Finalizar consulta": quem, e se a trava de caixa
+                // da clínica vai segurar o "Atendido".
+                'patient_name' => $flowSchedule->full_name ?: ($patient->person?->full_name ?? $patient->code),
+                'cash_blocked' => ! $flowSchedule->situation->isTerminal()
+                    && $this->scheduleService->attendedBlockedByCash($flowSchedule),
+                // Cronômetro do cabeçalho: início do atendimento (1ª vez "Em
+                // consulta") e, se já atendido, o fim.
+                ...$this->attendanceTimes($flowSchedule),
+            ] : null,
+            // Autosave: rascunho do autor mais novo que o prontuário (só a
+            // data — o conteúdo vem no "Recuperar", GET do rascunho).
+            'draft' => $this->draftMeta($patient, $record, $flowSchedule),
+            // BUGFIX (tenant isolation): estas queries não filtravam entity_id —
+            // tipos CUSTOMIZADOS cadastrados por uma clínica em panel/setting/*
+            // apareciam nos dropdowns do prontuário de TODAS as outras clínicas
+            // (vazamento de dado entre tenants + poluição da lista). Escopo agora
+            // espelha o do BaseSettingController: globais (null) + os da clínica.
+            //
+            // Acuidade visual: orderBy scale + name — scale ordena da melhor
+            // (20/15) pra pior (20/400) e depois os qualitativos (ver
+            // VisualAcuityTypesSeeder); `name` desempata os customizados de
+            // clínica, que ficam com scale default 0.
+            'catalogs' => [
+                'visual_acuity_types' => $this->serializeCatalog($this->scopedCatalog(VisualAcuityType::query(), $entityId)->orderBy('scale')->orderBy('name')->get()),
+                // Normal-first (ticket "opções normais primeiro"): a maioria
+                // dos pacientes tem resultado normal — NORMAL/NORMAL (ORTOFORIA)
+                // abre a lista; alterações seguem em ordem alfabética.
+                'color_vision_types'  => $this->serializeCatalog($this->scopedCatalog(ColorVisionType::query(), $entityId)->orderByRaw("(CASE WHEN name ILIKE 'NORMAL%' THEN 0 ELSE 1 END), name")->get()),
+                'cover_test_types'    => $this->serializeCatalog($this->scopedCatalog(CoverTestType::query(), $entityId)->orderByRaw("(CASE WHEN name ILIKE 'NORMAL%' THEN 0 ELSE 1 END), name")->get()),
+                'near_point_types'    => $this->serializeCatalog($this->scopedCatalog(NearPointConvergence::query(), $entityId)->orderByRaw("(CASE WHEN name ILIKE 'NORMAL%' THEN 0 ELSE 1 END), name")->get()),
+                'addition_types'      => $this->serializeCatalog($this->scopedCatalog(AdditionType::query(), $entityId)->orderBy('name')->get()),
+                'lenses'              => $this->serializeCatalog($this->scopedCatalog(Lense::query(), $entityId)->orderBy('name')->get()),
+                'documentation_types' => $this->documentationService->getTypes(),
+                'available_templates' => $this->documentationService->getActiveTemplates($entityId),
+                'exam_reports'        => array_map(
+                    fn (ExamReportRegistry $exam) => [
+                        'value'    => $exam->value,
+                        'label'    => $exam->label(),
+                        'icon'     => $exam->icon(),
+                        'subtypes' => $exam->subtypes(),
+                    ],
+                    ExamReportRegistry::examsForHub(),
+                ),
+            ],
+            'urls'    => $this->buildFormUrls($patient, $record, $isEdit),
+            'storage' => $this->buildStorageQuota($entityId),
+            'ai'      => $this->buildAiProps($entityId),
+            't'       => trans('actions.medical_records'),
+            // Documentos do atendimento (Fase 2 / Bloco B): faixa da data
+            // alternativa, chegada do paciente (atestado de comparecimento),
+            // convênio do pedido de exames e limites — o servidor revalida.
+            'documents' => [
+                'date'           => DocumentDate::clientConfig(),
+                'arrived_at'     => $flowSchedule?->arrived_at?->copy()->setTimezone((string) config('app.timezone'))->format('H:i'),
+                'covenant'       => $this->requestCovenant($patient, $flowSchedule),
+                'dilation_hours' => config('clinical_documents.dilation_hours'),
+                'request_limits' => [
+                    'items'       => ProcedureSolicitationService::MAX_PROCEDURES,
+                    'indications' => ProcedureSolicitationService::MAX_INDICATIONS,
+                    'cids'        => ProcedureSolicitationService::MAX_CIDS,
+                    'kits'        => ProcedureSolicitationService::MAX_KITS,
+                ],
+            ],
+            't_documents' => trans('clinical_documents'),
+        ];
+    }
+
+    /**
+     * Convênio do pedido de exames (Fase 2 / B2): o do atendimento
+     * (agendamento) e, sem ele, o do cadastro do paciente.
+     *
+     * @return array{id: string, name: string}|null
+     */
+    private function requestCovenant(Patient $patient, ?Schedule $schedule): ?array
+    {
+        $covenant = ($schedule?->covenant_id ? $schedule->covenant : null) ?? $patient->covenant;
+
+        return $covenant ? ['id' => (string) $covenant->id, 'name' => (string) $covenant->name] : null;
+    }
+
+    /**
+     * Props do Assistente de IA no prontuário (análise do caso, rascunho de laudo,
+     * apoio em campos). Reaproveita os feature gates e o AiRunsController. Retorna
+     * apenas { enabled:false } quando a entity não tem nenhum recurso de IA.
+     */
+    private function buildAiProps(string $entityId): array
+    {
+        $hasExamAssistant  = $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant);
+        $hasReportDrafting = $this->featureGate->can($entityId, FeatureKey::HasAiReportDrafting);
+        $canConsensus      = $this->aiProviderSettings->isModeAvailable(AiRunMode::Consensus)
+            && $this->featureGate->can($entityId, FeatureKey::HasAiConsensus);
+
+        if (! $hasExamAssistant && ! $hasReportDrafting && ! $canConsensus) {
+            return ['enabled' => false];
+        }
+
+        $modes = [];
+
+        foreach ($this->aiProviderSettings->availableModes() as $mode) {
+            if ($mode === AiRunMode::Consensus && ! $canConsensus) {
+                continue;
+            }
+            $modes[] = ['value' => $mode->value, 'label' => __('ai.mode_' . $mode->value)];
+        }
+
+        $workflows = array_values(array_filter([
+            $hasExamAssistant ? 'record_assist' : null,    // Análise do caso + sugestões
+            $hasReportDrafting ? 'report_drafting' : null, // Rascunho de laudo
+        ]));
+
+        return [
+            'enabled'          => true,
+            'can_analysis'     => $hasExamAssistant,   // Análise do caso + apoio inline
+            'can_report'       => $hasReportDrafting,   // Rascunho de laudo
+            'can_consensus'    => $canConsensus,
+            'default_mode'     => AiRunMode::Economy->value,
+            'default_workflow' => $workflows[0] ?? 'record_assist',
+            'workflows'        => $workflows,
+            'modes'            => $modes,
+            'balance'          => $this->aiWallet->balance($entityId),
+            'quota'            => $this->aiQuotaService->snapshot($entityId),
+            'paywall'          => $this->aiPaywall->describe($entityId),
+            'urls'             => [
+                'estimate'   => route('panel.ai-runs.estimate'),
+                'store'      => route('panel.ai-runs.store'),
+                'show'       => route('panel.ai-runs.show', ['aiRun' => '__ID__']),
+                'approve'    => route('panel.ai-runs.approve', ['aiRun' => '__ID__']),
+                'reject'     => route('panel.ai-runs.reject', ['aiRun' => '__ID__']),
+                'cancel'     => route('panel.ai-runs.cancel', ['aiRun' => '__ID__']),
+                'by_patient' => route('panel.ai-runs.by-patient', ['patient' => '__ID__']),
+                // Onda 3 — endpoints inline
+                'my_prompts_index'   => route('panel.ai-runs.my-prompts.index'),
+                'my_prompts_store'   => route('panel.ai-runs.my-prompts.store'),
+                'my_prompts_destroy' => route('panel.ai-runs.my-prompts.destroy', ['aiPrompt' => '__ID__']),
+                'escalate'           => route('panel.ai-runs.escalate', ['aiRun' => '__ID__']),
+                'feedback'           => route('panel.ai-runs.feedback', ['aiRun' => '__ID__']),
+            ],
+            // Rótulos do painel compartilhado (AiAssistantPanel).
+            'assistant'       => trans('ai.assistant'),
+            'workflow_labels' => [
+                'record_assist'      => __('ai.workflow_record_assist'),
+                'report_drafting'    => __('ai.workflow_report_drafting'),
+                'eye_image_analysis' => __('ai.workflow_eye_image_analysis'),
+            ],
+        ];
+    }
+
+    /**
+     * Payload de cota de armazenamento para o modal de upload de anexos.
+     * Espelha as restrições do backend ({@see MedicalRecordFilesController::store})
+     * para que a UI valide antes de enviar e mostre o consumo atual.
+     */
+    private function buildStorageQuota(string $entityId): array
+    {
+        $status     = $this->featureGate->status($entityId, FeatureKey::MaxStorageGB);
+        $usedBytes  = $this->usageMeter->getStorageUsedBytes($entityId);
+        $limitBytes = $status->isUnlimited ? 0 : $status->limit * 1024 * 1024 * 1024;
+        $percent    = $status->isUnlimited || $limitBytes === 0
+            ? 0
+            : min(100, (int) round(($usedBytes / $limitBytes) * 100));
+
+        return [
+            'used_bytes'      => $usedBytes,
+            'limit_bytes'     => $limitBytes,
+            'limit_gb'        => $status->limit,
+            'is_unlimited'    => $status->isUnlimited,
+            'percent'         => $percent,
+            'remaining_bytes' => $status->isUnlimited ? null : max(0, $limitBytes - $usedBytes),
+            // Espelha validações do backend (MedicalRecordFilesController::store)
+            'max_file_size_bytes' => 10 * 1024 * 1024,
+            'max_files_per_batch' => 10,
+            'accept'              => '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx',
+            'accept_mimes'        => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'],
+        ];
+    }
+
+    /**
+     * URLs consumidas pelo formulário Vue. Em CREATE muitas URLs ainda não
+     * existem (depende de UUID do registro) — só são populadas após edit.
+     */
+    private function buildFormUrls(Patient $patient, ?MedicalRecord $record, bool $isEdit): array
+    {
+        $urls = [
+            // Painel "Exames de imagem" do prontuário (módulo Gerenciador de exames).
+            'eye_exams'         => route('panel.exam-manager.patient-exams', $patient),
+            'eye_images_module' => route('panel.exam-manager.index'),
+
+            'store' => route('panel.patients.medicalrecords.store', $patient),
+            'list'  => route('panel.patients.medicalrecords.index', $patient),
+            // Destino após Finalizar/Dilatar/Exame — o médico segue pro próximo paciente.
+            'schedules'         => route('panel.schedules.index'),
+            'create'            => route('panel.patients.medicalrecords.create', $patient),
+            'validation_rules'  => route('panel.medical-records.validation-rules', ['mode' => $isEdit ? 'update' : 'store']),
+            'calc_presbyopia'   => route('panel.patients.medicalrecords.calculate-presbyopia', $patient),
+            'lens_format'       => route('panel.medicalrecords.lens-format'),
+            'tonometry_pdf'     => route('panel.patients.tonometry-pdf', $patient),
+            'medicine_search'   => route('panel.medicines.search'),
+            'medication_format' => route('panel.medication-prescription.format-line'),
+            // Presets do médico no receituário (Recentes | Favoritos + posologia)
+            'medication_presets'          => route('panel.medication-presets.index'),
+            'medication_presets_use'      => route('panel.medication-presets.use'),
+            'medication_presets_posology' => route('panel.medication-presets.posology'),
+            'medication_presets_favorite' => route('panel.medication-presets.favorite'),
+            'procedure_search'            => route('panel.procedures.search'),
+            'indication_search'           => route('panel.indications.search'),
+            'procedure_format'            => route('panel.procedure-solicitation.format-line'),
+            'cid10_search'                => route('panel.cid10.search'),
+            // Histórico de evoluções é por PACIENTE (atravessa prontuários) —
+            // disponível também no create, antes de salvar o prontuário atual.
+            'evolutions_index' => route('panel.patients.evolutions.index', $patient),
+            // Procedimento ESTRUTURADO (Fase 3 — estoque ↔ prontuário): mesmo
+            // desenho de evolutions_index (histórico por PACIENTE, disponível
+            // antes de salvar). `procedure_bom_template` não depende do
+            // prontuário — é lookup de sugestão de consumo por procedimento
+            // do CATÁLOGO, disponível assim que o médico escolhe um.
+            'medicalrecordprocedures_index' => route('panel.patients.medicalrecord-procedures.index', $patient),
+            'procedure_bom_template'        => route('panel.procedures.bom', '__PROCEDURE_ID__'),
+            // Cursos de injeções intravítreas (anti-VEGF): leitura do painel por paciente; encerrar e agendar a
+            // próxima levam o id do curso no lugar de __COURSE_ID__.
+            // Orientações pós-procedimento (S14): estado e emissão de UM procedimento.
+            'care_guidance_template'                     => route('panel.patients.medicalrecord-procedures.care-guidance', [$patient, '__PROCEDURE_ID__']),
+            'intravitreal_courses_index'                 => route('panel.patients.intravitreal-courses.index', $patient),
+            'intravitreal_course_close_template'         => route('panel.patients.intravitreal-courses.close', [$patient, '__COURSE_ID__']),
+            'intravitreal_course_schedule_next_template' => route('panel.patients.intravitreal-courses.schedule-next', [$patient, '__COURSE_ID__']),
+            // Autosave (rascunho do autor): GET recupera, PUT grava, DELETE
+            // descarta — só para quem pode salvar o prontuário.
+            'draft' => CurrentDoctor::canIssue() ? route('panel.patients.medicalrecord-draft.save', $patient) : null,
+        ];
+
+        if ($isEdit && $record) {
+            $urls['update']                = route('panel.patients.medicalrecords.update', [$patient, $record]);
+            $urls['destroy']               = route('panel.patients.medicalrecords.destroy', [$patient, $record]);
+            $urls['pdf']                   = route('panel.patients.medicalrecords.pdf', [$patient, $record]);
+            $urls['templates']             = route('panel.patients.medicalrecords.templates', [$patient, $record]);
+            $urls['template_preview']      = route('panel.patients.medicalrecords.template-preview', [$patient, $record]);
+            $urls['store_doc']             = route('panel.patients.medicalrecords.documentations.store', [$patient, $record]);
+            $urls['store_file']            = route('panel.patients.medicalrecords.files.store', [$patient, $record]);
+            $urls['store_tonometry']       = route('panel.patients.medicalrecords.tonometry.store', [$patient, $record]);
+            $urls['quick_action_template'] = route(
+                'panel.patients.medicalrecords.quick-actions.issue',
+                [$patient, $record, '__ACTION__'],
+            );
+            $urls['evolutions_store'] = route(
+                'panel.patients.medicalrecords.evolutions.store',
+                [$patient, $record],
+            );
+            $urls['medicalrecordprocedures_store'] = route(
+                'panel.patients.medicalrecords.medicalrecord-procedures.store',
+                [$patient, $record],
+            );
+            $urls['medicalrecordprocedure_mark_done_template'] = route(
+                'panel.patients.medicalrecord-procedures.mark-done',
+                [$patient, '__PROCEDURE_ID__'],
+            );
+            $urls['medicalrecordprocedure_cancel_template'] = route(
+                'panel.patients.medicalrecord-procedures.cancel',
+                [$patient, '__PROCEDURE_ID__'],
+            );
+            $urls['exam_template_template'] = route(
+                'panel.patients.medicalrecords.exam-template',
+                [$patient, $record, '__EXAM__'],
+            );
+            $urls['day_extension_preview'] = route('panel.medical-records.day-extension-preview');
+            // Kits de exames do pedido (Fase 2 / B2), filtrados pelo convênio
+            // do atendimento no servidor.
+            $urls['exam_kits'] = route('panel.patients.medicalrecords.exam-kits', [$patient, $record]);
+        }
+
+        // Modelos pessoais do médico (Fase 2 / B3) — só quem emite.
+        if (CurrentDoctor::canIssue()) {
+            $urls['personal_templates']         = route('panel.doctor-document-templates.index');
+            $urls['personal_template_template'] = route('panel.doctor-document-templates.update', ['template' => '__ID__']);
+        }
+
+        return $urls;
+    }
+
+    /**
+     * @template T of \Illuminate\Database\Eloquent\Model
+     */
+    /**
+     * Escopo de tenant para catálogos clínicos do prontuário: registros
+     * GLOBAIS (entity_id null, seedados) + os CUSTOMIZADOS da clínica ativa.
+     * Mesmo recorte usado em BaseSettingController::fetchTableRows().
+     */
+    private function scopedCatalog($query, string $entityId)
+    {
+        return $query->where(
+            fn ($q) => $q->where('entity_id', $entityId)->orWhereNull('entity_id'),
+        );
+    }
+
+    private function serializeCatalog($collection, ?callable $mapper = null): array
+    {
+        $mapper ??= fn ($item) => [
+            'id'   => (string) $item->id,
+            'name' => $item->name,
+        ];
+
+        return $collection->map($mapper)->values()->all();
+    }
+
+    private function serializePatient(Patient $patient): array
+    {
+        return [
+            'id'                 => (string) $patient->id,
+            'code'               => $patient->code,
+            'full_name'          => $patient->person?->full_name,
+            'birth_date'         => $patient->person?->birth_date?->format('d/m/Y'),
+            'age'                => $patient->person?->birth_date?->age,
+            'gender'             => $patient->person?->gender,
+            'cpf'                => $patient->person?->cpf,
+            'phone'              => BrazilianFormat::phone($patient->person?->cellphone ?: $patient->person?->telephone),
+            'email'              => $patient->person?->email,
+            'covenant_name'      => $patient->covenant?->name,
+            'covenant_plan_name' => $patient->covenantPlan?->displayName(),
+            'skin_type'          => $patient->skinType?->name,
+            'iris_type'          => $patient->irisType?->name,
+        ];
+    }
+
+    /**
+     * Serializa o MedicalRecord para o frontend Vue. Inclui todos os campos
+     * editáveis + flags de compliance (locked/signed) + documentações.
+     */
+    private function serializeRecord(MedicalRecord $r): array
+    {
+        return [
+            // Identificação
+            'id'          => (string) $r->id,
+            'code'        => $r->code,
+            'doctor_id'   => $r->doctor_id ? (string) $r->doctor_id : null,
+            'doctor_name' => $r->doctor?->person?->full_name,
+
+            // Anamnese
+            'main_complaint'          => $r->main_complaint,
+            'hda'                     => $r->hda,
+            'diabetic'                => (bool) $r->diabetic,
+            'diabetic_family'         => (bool) $r->diabetic_family,
+            'hypertensive'            => (bool) $r->hypertensive,
+            'hypertensive_family'     => (bool) $r->hypertensive_family,
+            'glaucomatous'            => (bool) $r->glaucomatous,
+            'glaucomatous_family'     => (bool) $r->glaucomatous_family,
+            'others_history'          => $r->others_history,
+            'ocular_surgical_history' => $r->ocular_surgical_history,
+            'medications_in_use'      => $r->medications_in_use,
+
+            // Acuidade visual e refração
+            'visual_acuity_type_id'                     => $r->visual_acuity_type_id ? (string) $r->visual_acuity_type_id : null,
+            'visual_acuity_without_correction_right_id' => $r->visual_acuity_without_correction_right_id ? (string) $r->visual_acuity_without_correction_right_id : null,
+            'visual_acuity_without_correction_left_id'  => $r->visual_acuity_without_correction_left_id ? (string) $r->visual_acuity_without_correction_left_id : null,
+            'visual_acuity_with_correction_right_id'    => $r->visual_acuity_with_correction_right_id ? (string) $r->visual_acuity_with_correction_right_id : null,
+            'visual_acuity_with_correction_left_id'     => $r->visual_acuity_with_correction_left_id ? (string) $r->visual_acuity_with_correction_left_id : null,
+            'near_point_convergence_id'                 => $r->near_point_convergence_id ? (string) $r->near_point_convergence_id : null,
+            'cover_test_type_id'                        => $r->cover_test_type_id ? (string) $r->cover_test_type_id : null,
+            'color_vision_type_id'                      => $r->color_vision_type_id ? (string) $r->color_vision_type_id : null,
+            'addition_type_id'                          => $r->addition_type_id ? (string) $r->addition_type_id : null,
+            'lens_away_id'                              => $r->lens_away_id ? (string) $r->lens_away_id : null,
+            'lens_near_id'                              => $r->lens_near_id ? (string) $r->lens_near_id : null,
+            'lens_away_ids'                             => $r->lens_away_ids ?? ($r->lens_away_id ? [(string) $r->lens_away_id] : []),
+            'lens_near_ids'                             => $r->lens_near_ids ?? ($r->lens_near_id ? [(string) $r->lens_near_id] : []),
+
+            // Refração dinâmica
+            'dynamic_spherical_right'   => $r->dynamic_spherical_right,
+            'dynamic_spherical_left'    => $r->dynamic_spherical_left,
+            'dynamic_cylindrical_right' => $r->dynamic_cylindrical_right,
+            'dynamic_cylindrical_left'  => $r->dynamic_cylindrical_left,
+            'dynamic_axis_right'        => $r->dynamic_axis_right,
+            'dynamic_axis_left'         => $r->dynamic_axis_left,
+
+            // Refração estática
+            'static_spherical_right'   => $r->static_spherical_right,
+            'static_spherical_left'    => $r->static_spherical_left,
+            'static_cylindrical_right' => $r->static_cylindrical_right,
+            'static_cylindrical_left'  => $r->static_cylindrical_left,
+            'static_axis_right'        => $r->static_axis_right,
+            'static_axis_left'         => $r->static_axis_left,
+
+            // Exame físico
+            'ocular_motility'  => $r->ocular_motility,
+            'tonometer_right'  => $r->tonometer_right,
+            'tonometer_left'   => $r->tonometer_left,
+            'tonometer_time'   => $r->tonometer_time,
+            'pachymetry_right' => $r->pachymetry_right,
+            'pachymetry_left'  => $r->pachymetry_left,
+            'gonioscopy_right' => $r->gonioscopy_right,
+            'gonioscopy_left'  => $r->gonioscopy_left,
+
+            // Achados
+            'biomicroscopy_right'      => $r->biomicroscopy_right,
+            'biomicroscopy_left'       => $r->biomicroscopy_left,
+            'fundoscopy_right'         => $r->fundoscopy_right,
+            'fundoscopy_left'          => $r->fundoscopy_left,
+            'observation_general'      => $r->observation_general,
+            'observation_of_lenses'    => $r->observation_of_lenses,
+            'contact_lens_calculation' => $r->contact_lens_calculation,
+            // Uso de lente de contato na anamnese (Fase 2 / A3).
+            'contact_lens_use' => $r->contact_lens_use,
+
+            // Vínculo com a agenda (hidrata o form no edit — sem isso o
+            // update mandava '' e desvinculava o agendamento).
+            'schedule_id' => $r->schedule_id,
+
+            // Diagnóstico & conduta
+            'diagnosis_cids'   => $r->diagnosis_cids ?? [],
+            'clinical_conduct' => $r->clinical_conduct,
+            'follow_up_days'   => $r->follow_up_days,
+
+            // Compliance CFM
+            'is_signed'           => $r->isSigned(),
+            'is_locked'           => $r->isLocked(),
+            'signed_at_formatted' => $r->signed_at?->format('d/m/Y H:i'),
+
+            // Documentações já anexadas
+            'documentations' => $r->documentations->map(fn ($d) => [
+                'id'          => (string) $d->id,
+                'type'        => $d->type,
+                'type_label'  => $d->getTypeLabel(),
+                'title'       => $d->title,
+                'doctor_name' => $d->doctor?->person?->full_name ?? '',
+                'created_at'  => $d->created_at?->format('d/m/Y H:i'),
+                // Data alternativa impressa (Fase 2 / B3) — null = a da emissão.
+                'document_date'       => $d->hasAlternativeDate() ? $d->document_date?->format('d/m/Y') : null,
+                'document_date_label' => $d->hasAlternativeDate()
+                    ? __('clinical_documents.date.printed', ['date' => $d->document_date?->copy()->locale(app()->getLocale())->isoFormat('L')])
+                    : null,
+                'is_ai'             => $d->ai_run_id !== null,
+                'ai_workflow_label' => $d->ai_run_id && $d->aiRun ? __('ai.workflow_' . $d->aiRun->workflow) : null,
+                'pdf_url'           => route(
+                    'panel.patients.medicalrecords.documentations.pdf',
+                    [$r->patient_id, $r, $d],
+                ),
+                // Médico solicitante (Fase 5 / Gerenciador de exames) — só presente em
+                // laudos emitidos com e-mail de encaminhamento. O botão de
+                // reenvio na tela do laudo recém-emitido (ExamManagerReportModal)
+                // some ao fechar/reabrir o modal; esta é a ÚNICA outra tela
+                // onde um laudo JÁ EMITIDO reaparece depois, então é aqui que
+                // "Reenviar"/renovar o link de 7 dias continua alcançável
+                // (achado via revisão Codex).
+                'requesting_doctor_name'    => $d->requesting_doctor_name,
+                'requesting_doctor_email'   => $d->requesting_doctor_email,
+                'requesting_doctor_sent_at' => $d->requesting_doctor_sent_at?->format('d/m/Y H:i'),
+            ])->all(),
+
+            // Anexos já enviados — consumido pela lista no rodapé do form
+            'files' => $r->files->map(fn ($f) => [
+                'id'            => (string) $f->id,
+                'original_name' => $f->original_name,
+                'mime_type'     => $f->mime_type,
+                'file_size'     => $f->file_size,
+                'is_image'      => $f->isImage(),
+                'show_url'      => route(
+                    'panel.patients.medicalrecords.files.show',
+                    [$r->patient_id, $r, $f],
+                ),
+            ])->all(),
+        ];
+    }
+
+    /**
+     * Início (1ª transição para "Em consulta") e fim ("Atendido") do
+     * atendimento do agendamento, pelo histórico de situações.
+     *
+     * @return array{started_at: ?string, finished_at: ?string}
+     */
+    private function attendanceTimes(Schedule $schedule): array
+    {
+        $started = ScheduleSituationLog::query()
+            ->where('schedule_id', $schedule->id)
+            ->where('to_situation', ScheduleSituation::InProgress->value)
+            ->min('created_at');
+
+        $finished = $schedule->situation === ScheduleSituation::Attended
+            ? ScheduleSituationLog::query()
+                ->where('schedule_id', $schedule->id)
+                ->where('to_situation', ScheduleSituation::Attended->value)
+                ->max('created_at')
+            : null;
+
+        return [
+            'started_at'  => $started ? Carbon::parse($started)->toIso8601String() : null,
+            'finished_at' => $finished ? Carbon::parse($finished)->toIso8601String() : null,
+        ];
+    }
+
+    /**
+     * Rascunho do autor para esta tela (edição: prontuário; novo: agendamento
+     * ou "novo") — só a data, e só se for mais novo que o prontuário. Quem não
+     * pode salvar o prontuário, ou prontuário assinado: nada.
+     *
+     * @return array{updated_at: string, updated_at_label: string}|null
+     */
+    private function draftMeta(Patient $patient, ?MedicalRecord $record, ?Schedule $flowSchedule): ?array
+    {
+        $user = auth()->user();
+
+        // Assinado = imutável: rascunho dele não serve para mais nada.
+        if ($record?->isLocked()) {
+            $this->drafts->purgeForRecord($record);
+
+            return null;
+        }
+
+        if (! $user instanceof User || ! CurrentDoctor::canIssue()) {
+            return null;
+        }
+
+        $draft = $this->drafts->find($user, (string) session('selected_entity_id'), $patient, $record, $record ? null : $flowSchedule);
+
+        if ($draft === null) {
+            return null;
+        }
+
+        return [
+            'updated_at'       => $draft->updated_at->toIso8601String(),
+            'updated_at_label' => $draft->updated_at->locale(app()->getLocale())->isoFormat('L LT'),
+        ];
+    }
+
+    /** Rascunho do autor para a tela que acabou de salvar (autosave). */
+    private function clearDrafts(MedicalRecord $record, bool $created): void
+    {
+        $user = auth()->user();
+
+        if ($user instanceof User) {
+            $this->drafts->clearAfterSave($user, (string) session('selected_entity_id'), $record, $created, $record->schedule_id ? (string) $record->schedule_id : null);
+        }
+    }
+
+    /**
+     * Alergias, medicações e alertas de risco para a tela (Fase 2 / A1-A2).
+     * Perfil sem acesso a Pacientes não recebe a lista (PatientAccess).
+     * `check`: termos da checagem de alergia do receituário (só quem emite).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function clinicalSafetyProps(Patient $patient, bool $withCheck): ?array
+    {
+        if (! app(PatientAccess::class)->current()) {
+            return null;
+        }
+
+        return [
+            ...$this->clinicalSafety->summary($patient),
+            'patient_id' => (string) $patient->id,
+            'can_review' => CurrentDoctor::canIssue(),
+            'check'      => $withCheck ? $this->clinicalSafety->clientCheck($patient) : null,
+        ];
+    }
+
+    /**
+     * Uso de LC da consulta anterior mais recente que o registrou — o novo
+     * atendimento começa com ele (o médico confere). Edição: a consulta
+     * anterior a esta.
+     *
+     * @return array{value: array<string, mixed>, date: ?string}|null
+     */
+    private function previousContactLensUse(Patient $patient, ?MedicalRecord $record): ?array
+    {
+        $previous = MedicalRecord::query()
+            ->where('patient_id', $patient->id)
+            ->whereNotNull('contact_lens_use')
+            ->when($record, fn ($q) => $q->where('id', '!=', $record->id)->where('created_at', '<', $record->created_at))
+            ->orderByDesc('created_at')
+            ->first(['id', 'contact_lens_use', 'created_at']);
+
+        if ($previous === null || ! is_array($previous->contact_lens_use)) {
+            return null;
+        }
+
+        return [
+            'value' => $previous->contact_lens_use,
+            'date'  => $previous->created_at?->locale(app()->getLocale())->isoFormat('L'),
+        ];
+    }
+
+    /**
+     * Retrato da consulta (alergias e medicações) com rótulos no idioma da
+     * tela — histórico da consulta (modal/drawer).
+     *
+     * @return array{allergies_snapshot: ?array<string, mixed>, medications_snapshot: ?list<array<string, mixed>>}
+     */
+    private function snapshotForView(MedicalRecord $record): array
+    {
+        $allergies = is_array($record->allergies_snapshot) ? $record->allergies_snapshot : null;
+
+        return [
+            'allergies_snapshot' => $allergies === null ? null : [
+                'state' => $allergies['state'] ?? 'unknown',
+                'items' => collect($allergies['items'] ?? [])->map(fn (array $a) => [
+                    'substance'      => $a['substance'] ?? '',
+                    'category_label' => AllergyCategory::tryFrom((string) ($a['category'] ?? ''))?->label(),
+                    'reaction'       => $a['reaction'] ?? null,
+                    'severity_label' => AllergySeverity::tryFrom((string) ($a['severity'] ?? ''))?->label(),
+                    'status_label'   => AllergyStatus::tryFrom((string) ($a['status'] ?? ''))?->label(),
+                ])->values()->all(),
+            ],
+            'medications_snapshot' => is_array($record->medications_snapshot)
+                ? collect($record->medications_snapshot)->map(fn (array $m) => [
+                    'name'              => $m['name'] ?? '',
+                    'active_ingredient' => $m['active_ingredient'] ?? null,
+                    'posology'          => $m['posology'] ?? null,
+                    'source_label'      => MedicationSource::tryFrom((string) ($m['source'] ?? ''))?->label(),
+                    'confirmed'         => (bool) ($m['confirmed'] ?? false),
+                ])->values()->all()
+                : null,
+        ];
+    }
+
+    private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void
+    {
+        // Achado de segurança (auditoria panel.* IDOR): $patient chega via route
+        // model binding, que roda ANTES de tenant.bind (SubstituteBindings tem
+        // prioridade fixa do Laravel) — o EntityScope global fica inerte nesse
+        // momento e $patient pode ser de QUALQUER entity. Sem esta comparação,
+        // um $patient de outra clínica (com um medicalrecord seu batendo o
+        // patient_id) passava direto. Ver mesmo padrão em PatientsController::editData().
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+        abort_if($medicalrecord->patient_id !== $patient->id, 404);
+    }
+
+    /**
+     * Redireciona após save — "Salvar" NÃO é "finalizar":
+     *
+     *   - save (padrão): volta pro EDIT do prontuário com a barra de
+     *     documentos liberada — a consulta segue aberta. Com
+     *     `post_save_action`, o edit abre a ação escolhida (?action=).
+     *   - finish / dilate / exam: aplica a transição no agendamento vinculado
+     *     (Atendido / Dilatando / Em exame) e volta pra AGENDA, onde o médico
+     *     segue pro próximo paciente. Dilatando/Em exame mantêm o prontuário
+     *     editável pra quando o paciente voltar (reabrir → Em consulta).
+     *
+     * "Finalizar" respeita a trava de caixa da clínica
+     * (requires_cash_to_complete): o prontuário fica salvo, mas o status não
+     * muda e o médico volta pro edit com o aviso.
+     */
+    private function redirectAfterSave(
+        Patient $patient,
+        MedicalRecord $record,
+        string $message,
+        ?string $flowAction = null,
+        ?string $postSaveAction = null,
+    ): RedirectResponse {
+        $editUrl = route('panel.patients.medicalrecords.edit', [$patient, $record]);
+
+        $target = match ($flowAction) {
+            'finish' => ScheduleSituation::Attended,
+            'dilate' => ScheduleSituation::Dilating,
+            'exam'   => ScheduleSituation::Exam,
+            default  => null,
+        };
+
+        if ($target && $record->schedule_id) {
+            // Escopo de tenant: um schedule_id de outra clínica nunca transita.
+            $schedule = Schedule::query()
+                ->where('entity_id', (string) session('selected_entity_id'))
+                ->find($record->schedule_id);
+
+            if ($schedule) {
+                // Aba antiga / request forjado: a recepção já encerrou o
+                // atendimento (Atendido/Faltou/Cancelado) — o prontuário é
+                // salvo, mas o status não é reaberto/rebaixado por aqui.
+                if ($schedule->situation->isTerminal()) {
+                    return redirect($editUrl)->with('error', __('actions.medical_records.flow_already_closed', [
+                        'status' => $schedule->situation->label(),
+                    ]));
+                }
+
+                try {
+                    $this->scheduleService->changeSituation(
+                        $schedule,
+                        $target,
+                        session('selected_entity_user_id'),
+                    );
+                } catch (AttendanceRequiresCashEntryException) {
+                    // Trava de caixa (regra única em ScheduleService::changeSituation,
+                    // checada antes de qualquer escrita). Um único aviso: o
+                    // prontuário ficou salvo, a consulta segue aberta.
+                    return redirect($editUrl)->with('error', __('actions.medical_records.flow_cash_blocked'));
+                }
+
+                return redirect()
+                    ->route('panel.schedules.index')
+                    ->with('success', __('actions.medical_records.flow_done_' . $flowAction, [
+                        'name' => $schedule->full_name ?: ($patient->person?->full_name ?? $patient->code),
+                    ]));
+            }
+        }
+
+        $redirect = redirect($editUrl)->with('success', $message);
+
+        // Ação da barra pendente vai por flash de sessão (one-shot), nunca na
+        // URL — um link compartilhado/F5 não pode reemitir um documento.
+        if ($postSaveAction) {
+            $redirect->with('post_save_action', $postSaveAction);
+        }
+
+        return $redirect;
+    }
+
+    /**
+     * SEGURANÇA: ReportSetting tem EntityScope global (TenantScopeServiceProvider)
+     * — pra um content de OUTRA clínica, a relação normal `reportSetting`
+     * (sujeita ao scope) resolve pra null, não pro dono real. Confiar nisso
+     * faria "de outra clínica" passar como "sem dono" — vazando o `content`
+     * de um template privado de outro tenant pra quem soubesse/adivinhasse o
+     * UUID. `withoutEntityScope()` vê o dono verdadeiro, scope ou não.
+     */
+    private function assertTemplateBelongsToCurrentEntity(ReportSettingContent $content): void
+    {
+        $selectedEntityId = (string) session('selected_entity_id');
+
+        $settingEntityId = (string) (ReportSetting::query()
+            ->withoutEntityScope()
+            ->whereKey($content->report_setting_id)
+            ->value('entity_id') ?? '');
+
+        abort_if($settingEntityId !== '' && $settingEntityId !== $selectedEntityId, 404);
+    }
+}

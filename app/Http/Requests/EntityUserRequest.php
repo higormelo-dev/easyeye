@@ -2,8 +2,11 @@
 
 namespace App\Http\Requests;
 
-use App\Models\EntityUser;
+use App\Enums\EntityGate;
+use App\Models\{Entity, EntityUser};
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -11,50 +14,51 @@ class EntityUserRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
+     *
+     * Client entities  → gate ManageUsers (admin do cliente).
+     * SaaS entities    → gate SaasAdminPanel (admin do SaaS gerencia o próprio time).
      */
     public function authorize(): bool
     {
-        return true;
+        $entity = Entity::find(session('selected_entity_id'));
+
+        if (! $entity) {
+            return false;
+        }
+
+        $gate = $entity->isClient()
+            ? EntityGate::ManageUsers->value
+            : EntityGate::SaasAdminPanel->value;
+
+        return Gate::allows($gate, $entity);
     }
 
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
-        $rules = [
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            'email' => [
-                'required',
-                'string',
-                'email',
-                'max:255',
-                Rule::unique('users', 'email')
-                    ->ignore($this->getIgnoredUserId(), 'id')
-                    ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
-                    }),
-            ],
+        $rules          = [];
+        $rules['name']  = ['required_without:type_method', 'string', 'min:2', 'max:255'];
+        $rules['email'] = [
+            'required_without:type_method',
+            'string',
+            'email',
+            'max:255',
+            Rule::unique('users', 'email')
+                ->ignore($this->getIgnoredUserId(), 'id'),
+        ];
+        $rules['rule'] = [
+            'required_without:type_method',
+            'string',
+            'in:admin,financial,doctor,secretary,support,user',
         ];
 
         if ($this->isMethod('POST')) {
             $rules['password'] = [
-                'required',
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols()
-                    ->uncompromised(),
-            ];
-            $rules['password_confirmation'] = [
-                'required',
+                'required_without:type_method',
                 'confirmed',
                 Password::min(8)
                     ->letters()
@@ -63,16 +67,30 @@ class EntityUserRequest extends FormRequest
                     ->symbols()
                     ->uncompromised(),
             ];
-            $rules['rule'] = [
-                'required',
-                'string',
-                'in:admin,financial,doctor,secretary,support,user',
+            $rules['password_confirmation'] = [
+                'required_without:type_method',
             ];
         } elseif ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
             $rules['active'] = ['required', 'boolean'];
         }
 
         return $rules;
+    }
+
+    /**
+     * Get the error messages for the defined validation rules.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required_without'                  => trans('validation.custom.generic.required'),
+            'email.required_without'                 => trans('validation.custom.generic.required'),
+            'password.required_without'              => trans('validation.custom.generic.required'),
+            'password_confirmation.required_without' => trans('validation.custom.generic.required'),
+            'rule.required_without'                  => trans('validation.custom.generic.required'),
+        ];
     }
 
     private function getIgnoredUserId()
@@ -92,5 +110,17 @@ class EntityUserRequest extends FormRequest
         }
 
         return null;
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => mb_strtoupper($this->input('name')),
+            ]);
+        }
     }
 }

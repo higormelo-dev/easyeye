@@ -1,0 +1,463 @@
+@use 'variables' as *;
+
+// ─── Navbar ──────────────────────────────────────────────────
+#navbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 1000;
+    padding: 16px 0;
+    transition: background .35s, box-shadow .35s, padding .35s;
+
+    &.scrolled {
+        background: rgba(#fff, .97);
+        backdrop-filter: blur(12px);
+        box-shadow: 0 2px 20px rgba($navy, .08);
+        padding: 12px 0;
+    }
+
+    // Estado inicial (topo da página, sobre o hero escuro)
+    &:not(.scrolled) {
+        .logo-v-dark  { opacity: 0; }
+        .logo-v-white { opacity: 1; }
+
+        .nav-links a {
+            color: rgba(#fff, .85);
+            &:is(:hover, :focus-visible, [aria-current='location']) {
+                color: #fff;
+                background: rgba(#fff, .1);
+                text-decoration-color: $teal-lt;
+            }
+        }
+
+        .lang-btn {
+            color: rgba(#fff, .75);
+            &:hover { color: #fff; background: rgba(#fff, .12); }
+        }
+
+        .nav-right .btn-outline {
+            color: #fff;
+            border-color: rgba(#fff, .5);
+            background: rgba(#fff, .12);
+
+            &:hover {
+                color: #fff;
+                border-color: rgba(#fff, .85);
+                background: rgba(#fff, .22);
+                box-shadow: 0 4px 16px rgba(#000, .18);
+            }
+        }
+
+        .nav-mobile-btn { color: rgba(#fff, .9); }
+    }
+}
+
+.nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+// Logo — cross-fade entre versão escura (scrolled) e branca (topo)
+.nav-logo {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.nav-logo-imgs {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+
+.logo-v-dark {
+    display: block;
+    height: 32px;
+    width: auto;
+    opacity: 1;
+    transition: opacity .35s ease;
+}
+
+.logo-v-white {
+    display: block;
+    height: 32px;
+    width: auto;
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity .35s ease;
+}
+
+// Links desktop
+.nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-width: 0;
+    align-items: center;
+    gap: 2px;
+    list-style: none;
+
+    a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        color: #3a4a6b;
+        font-weight: 500;
+        font-size: rem(14);
+        text-decoration: none;
+        transition: color .2s, background .2s;
+        white-space: nowrap;
+
+        &:is(:hover, :focus-visible) { color: $navy; background: rgba($navy, .06); }
+    }
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex-shrink: 1;
+
+    .btn { white-space: normal; }
+}
+
+// Language switcher
+.lang-switcher { position: relative; }
+
+.lang-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    color: $text-muted;
+    transition: background .2s, color .2s;
+
+    &:hover { background: rgba($navy, .06); color: $navy; }
+}
+
+.lang-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: #fff;
+    border: 1px solid $border;
+    border-radius: $radius;
+    box-shadow: $shadow-lg;
+    min-width: 160px;
+    padding: 6px;
+    z-index: 100;
+}
+
+.lang-item {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: rem(14);
+    font-weight: 500;
+    color: $text;
+    text-decoration: none;
+    transition: background .15s;
+
+    &:hover { background: $bg; }
+
+    &.active {
+        background: rgba($teal, .08);
+        color: $teal-ink;
+        font-weight: 600;
+    }
+
+    .check { margin-left: auto; font-size: rem(14); color: $teal-ink; }
+}
+
+// Botão mobile
+.nav-mobile-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: $navy;
+    font-size: 24px;
+    transition: color .2s;
+}
+
+.nav-mobile-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    background: #fff;
+    box-shadow: 0 20px 40px rgba($navy, .12);
+    padding: 16px 24px 24px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    // O menu absoluto usa a altura real do navbar (100%), inclusive quando
+    // os botões crescem com texto ampliado ou a tela muda de orientação.
+    max-height: calc(100vh - 100%);
+    max-height: calc(100dvh - 100%);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    border-top: 1px solid $border;
+    z-index: 999;
+
+    ul {
+        list-style: none;
+
+        li a {
+            display: block;
+            padding: 12px 0;
+            color: $text;
+            font-weight: 500;
+            text-decoration: none;
+            font-size: rem(16);
+            border-bottom: 1px solid $border;
+        }
+    }
+}
+
+// A seção sob leitura deixa uma referência discreta; sublinhado não muda
+// a largura dos links nem a altura do menu ao alternar o destino atual.
+.nav-links a,
+.nav-mobile-menu ul li a {
+    text-decoration-line: underline;
+    text-decoration-color: transparent;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+    transition: color $dur-fast ease, background-color $dur-fast ease, text-decoration-color $dur-fast ease;
+
+    &:is(:hover, :focus-visible, [aria-current='location']) {
+        color: $teal-ink;
+        text-decoration-color: $teal-ink;
+    }
+
+    @media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+.mobile-lang {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 0;
+    border-bottom: 1px solid $border;
+
+    a {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: rem(13);
+        font-weight: 600;
+        border: 1.5px solid $border;
+        color: $text-muted;
+        text-decoration: none;
+        transition: border-color $dur-fast ease, color $dur-fast ease, background-color $dur-fast ease;
+
+        &.active,
+        &:hover { border-color: $teal; color: $teal-ink; background: rgba($teal, .06); }
+    }
+}
+
+.mobile-ctas {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+// O conteúdo completo da navegação precisa da largura máxima do container.
+@include below(1200px) {
+    .nav-links { display: none; }
+    .nav-right { margin-left: auto; }
+    .nav-mobile-btn { display: flex; }
+    .nav-mobile-menu.open { display: block; animation: menu-in $dur-base $ease-out; }
+}
+
+@include below($bp-sm) {
+    .nav-right { display: none; }
+}
+
+// Menu móvel desce 8px enquanto aparece (fechar é imediato: saída mais rápida).
+@keyframes menu-in {
+    from { opacity: 0; translate: 0 -8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-mobile-menu.open { animation: none; }
+}
+
+// Menu móvel aberto: a página de trás não rola (SiteLayout alterna a classe).
+html.site-menu-open { overflow: hidden; }
+
+// ─── Footer ──────────────────────────────────────────────────
+footer {
+    background: $navy-dark;
+    padding: 64px 0 32px;
+}
+
+.footer-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
+    gap: 40px;
+    margin-bottom: 48px;
+
+    &.footer-inner--compact {
+        grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+
+        @include below($bp-lg) {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    // Tablet: marca na linha de cima e as 3 listas lado a lado (antes 2+1,
+    // com "Empresa" sozinha e meia largura vazia).
+    @include below($bp-lg) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    // Celular: 2 listas por linha. Em coluna única o rodapé passava de
+    // 1.300px de rolagem só de links.
+    @include below(560px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 32px 16px;
+    }
+
+    > * { min-width: 0; overflow-wrap: anywhere; }
+}
+
+.footer-brand {
+    @include below($bp-lg) { grid-column: 1 / -1; }
+
+    .nav-logo {
+        color: #fff;
+        margin-bottom: 16px;
+
+        img {
+            height: 32px;
+            width: auto;
+            display: block;
+            position: static;
+            opacity: 1 !important;
+        }
+    }
+
+    // Branco a 45% no navy dava 4,49:1; 60% dá 7:1.
+    p {
+        font-size: rem(14);
+        color: rgba(#fff, .6);
+        line-height: 1.7;
+        max-width: 280px;
+    }
+}
+
+.footer-social {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+
+    a {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: rgba(#fff, .06);
+        color: rgba(#fff, .6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: rem(16);
+        transition: background-color $dur-fast ease, color $dur-fast ease;
+        text-decoration: none;
+
+        &:hover { background: $teal; color: $navy; }
+    }
+}
+
+.footer-col {
+    // h2 na hierarquia (antes h5 solto depois do h2 da última seção), mesmo visual.
+    h2 {
+        @include type-eyebrow;
+        color: rgba(#fff, .9);
+        margin-bottom: 16px;
+    }
+
+    ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        a {
+            font-size: rem(14);
+            color: rgba(#fff, .6);
+            text-decoration: none;
+            transition: color .18s;
+
+            &:hover { color: $teal; }
+        }
+    }
+}
+
+.footer-bottom {
+    border-top: 1px solid rgba(#fff, .08);
+    padding-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+
+    // 13px claro no escuro fica fino a 50%: 60% (.3 dava 2,6:1).
+    p { font-size: rem(13); color: rgba(#fff, .6); }
+}
+
+.footer-legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+
+    a {
+        font-size: rem(13);
+        color: rgba(#fff, .6);
+        text-decoration: none;
+
+        &:hover { color: rgba(#fff, .85); }
+    }
+}
+
+@include below(500px) {
+    .footer-bottom  { flex-direction: column; text-align: center; }
+    .footer-legal   { justify-content: center; }
+}
+
+@media (pointer: coarse) {
+    .nav-logo { min-height: 44px; } // alvo de toque (a imagem tem 32px)
+    .footer-social a { width: 44px; height: 44px; }
+    .footer-col ul { gap: 0; }
+    .footer-col a,
+    .footer-legal a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+}

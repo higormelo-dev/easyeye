@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\EntityIntegratorEquipmentRequest;
 use App\Http\Resources\EntityIntegratorEquipmentResource;
-use App\Models\{EntityIntegratorEquipment};
+use App\Models\EntityIntegratorEquipment;
 use App\Services\Api\EntityIntegratorEquipmentService;
-use Illuminate\Http\{JsonResponse};
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Throwable;
 
 class EntityIntegratorEquipmentsController extends Controller
 {
@@ -35,13 +36,16 @@ class EntityIntegratorEquipmentsController extends Controller
         $equipments = $this->model->query()->where('integrator_id', $integrator->id);
 
         if (request()->has('search')) {
-            $equipments = $equipments->where(function ($query) {
-                $query->where('name', 'like', '%' . request()->search . '%')
-                    ->orWhere('code', 'like', '%' . request()->search . '%');
+            // ilike: case-insensitive direto no PG. O antigo mb_strtoupper + like
+            // só encontrava nomes salvos em maiúsculas.
+            $search     = request()->search;
+            $equipments = $equipments->where(function ($query) use ($search) {
+                $query->whereLikeUnaccent('name', $search)
+                    ->orWhereLikeUnaccent('code', $search);
             });
         }
 
-        $equipments = $equipments->paginate(request()->get('per_page', 10));
+        $equipments = $equipments->paginate($this->perPage());
 
         return EntityIntegratorEquipmentResource::collection($equipments);
     }
@@ -51,7 +55,6 @@ class EntityIntegratorEquipmentsController extends Controller
      */
     public function store(EntityIntegratorEquipmentRequest $request): EntityIntegratorEquipmentResource|JsonResponse
     {
-
         $record = $this->service->create($request);
 
         return new EntityIntegratorEquipmentResource($record);
@@ -70,7 +73,7 @@ class EntityIntegratorEquipmentsController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function update(EntityIntegratorEquipmentRequest $request, string $id): EntityIntegratorEquipmentResource|JsonResponse
     {

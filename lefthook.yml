@@ -1,0 +1,27 @@
+# Git hooks versionados do projeto (substitui hook pessoal em ~/.codex/git-hooks).
+# Instalado automaticamente via `npm install` (script "prepare").
+# Docs: https://lefthook.dev
+
+pre-push:
+  parallel: true
+  commands:
+    php-style:
+      # Só nos arquivos do push, não no repo inteiro: há dívida de formatação
+      # pré-existente (não relacionada ao que você está enviando agora) que
+      # travaria todo mundo se rodasse `pint --test` sem escopo.
+      glob: "*.php"
+      # --diff-filter=d: arquivo apagado no push não existe para o Pint
+      # ("path is not readable") e travava o push.
+      # Branch nova ainda não tem upstream: `@{push}` não resolve ("no upstream
+      # configured") e o primeiro publish falhava aqui. Sem ele, compara com
+      # origin/desenv (nesta ordem, para o --diff-filter=d tirar só os apagados).
+      files: git diff --name-only --diff-filter=d HEAD @{push} 2>/dev/null || git diff --name-only --diff-filter=d origin/desenv HEAD
+      run: vendor/bin/pint --test {files}
+
+    js-tests:
+      run: npm run test
+
+    # PHP (pest) fica de fora de propósito: mesmo a suíte "Unit" deste projeto
+    # tem testes que batem no Postgres (ex. PreValidateTissGuideServiceTest),
+    # então rodar aqui trava o push sempre que a máquina não tiver DB de teste
+    # no ar. Fica pro CI, onde a infra sempre está disponível.

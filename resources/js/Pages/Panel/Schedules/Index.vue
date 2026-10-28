@@ -1,0 +1,1307 @@
+<script setup>
+import { ref, computed, watch, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
+import { router } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import ScheduleCard from './ScheduleCard.vue';
+import EventCard from './EventCard.vue';
+import ScheduleFormModal from './ScheduleFormModal.vue';
+
+// Lazy: FullCalendar (~77 kB gz) só é carregado quando o utilizador activa a vista calendário.
+const CalendarView = defineAsyncComponent(() => import('./CalendarView.vue'));
+import RescheduleModal from './RescheduleModal.vue';
+import CancelModal from './CancelModal.vue';
+import BulkCancelModal from './BulkCancelModal.vue';
+import BulkRescheduleModal from './BulkRescheduleModal.vue';
+import NoticesPanel from './NoticesPanel.vue';
+import WaitingListPanel from './WaitingListPanel.vue';
+import WaitingListFormModal from './WaitingListFormModal.vue';
+import ScheduleDetailDrawer from './ScheduleDetailDrawer.vue';
+import CashEntryModal from './CashEntryModal.vue';
+import { useDashboardPolling } from '@/composables/useDashboardPolling.js';
+import MiniCalendar from '@/Components/Panel/MiniCalendar.vue';
+import AgendaCounters from './AgendaCounters.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
+
+const props = defineProps({
+    scheduleItems: { type: Array, default: () => [] },
+    doctors: { type: Array, default: () => [] },
+    covenants: { type: Array, default: () => [] },
+    visitTypes: { type: Array, default: () => [] },
+    specialties: { type: Array, default: () => [] },
+    skinTypes: { type: Array, default: () => [] },
+    irisTypes: { type: Array, default: () => [] },
+    genders: { type: Object, default: () => ({}) },
+    maritalStatuses: { type: Object, default: () => ({}) },
+    statesOfBrazil: { type: Object, default: () => ({}) },
+    procedures: { type: Array, default: () => [] },
+    procedurePrices: { type: Object, default: () => ({}) },
+    paymentMethods: { type: Array, default: () => [] },
+    incomeCategories: { type: Array, default: () => [] },
+    situations: { type: Array, default: () => [] },
+    moods: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({}) },
+    isDoctor: { type: Boolean, default: false },
+    // Perfil médico sem cadastro de médico: o servidor não manda nada da
+    // clínica (SchedulesController::index / App\Support\CurrentDoctor) — a
+    // tela só mostra o aviso e esconde as ações de criar/importar.
+    doctorMissing: { type: Boolean, default: false },
+    isStaff: { type: Boolean, default: false },
+    canRegisterCash: { type: Boolean, default: false },
+    // Dropdown "Relatórios" ao lado de "Novo" (GAP fechado — antes página-
+    // hub solta em /panel/reports). null = sem acesso financeiro, botão
+    // nem renderiza — ver SchedulesController::index().
+    reportsUrls: { type: Object, default: null },
+    // Painel de chamadas (TV) habilitado nesta clínica — mostra o "Chamar paciente"
+    callPanelEnabled: { type: Boolean, default: false },
+    // Contadores do topo (mesma conta do Dashboard) — também são os chips de filtro.
+    counters: { type: Object, default: () => ({}) },
+    // Salas/equipamentos ativos (filtro).
+    resourceOptions: { type: Array, default: () => [] },
+    // Telefone/WhatsApp/ficha do paciente só para quem tem acesso a Pacientes.
+    canSeePatients: { type: Boolean, default: false },
+    /** Retorno a agendar (vindo da tela de Retornos, `?recall=<id>`): paciente e retorno já escolhidos. */
+    recallPrefill: { type: Object, default: null },
+    urls: { type: Object, default: () => ({}) },
+    t: { type: Object, default: () => ({}) },
+});
+
+// ── Polling ────────────────────────────────────────────────────────────────────
+useDashboardPolling(['scheduleItems', 'counters'], 30_000);
+
+// ── View mode (list | calendar) — persistido no localStorage ──────────────────
+function readViewMode() {
+    try {
+        return localStorage.getItem('schedules_view_mode') ?? 'list';
+    } catch {
+        return 'list';
+    }
+}
+
+const viewMode = ref(readViewMode());
+
+watch(viewMode, (mode) => {
+    try {
+        localStorage.setItem('schedules_view_mode', mode);
+    } catch {
+        /* armazenamento indisponível: só não lembra a escolha */
+    }
+    if (mode === 'calendar') {
+        selectionMode.value = false;
+        selectedIds.value = [];
+    } else if (range.value !== 'day') {
+        // A lista é sempre do dia: volta o período para "dia".
+        range.value = 'day';
+        applyFilters(true);
+    }
+});
+
+// ── Filters ────────────────────────────────────────────────────────────────────
+function localToday() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+const date = ref(props.filters.date ?? localToday());
+const doctor = ref(props.filters.doctor ?? 'tudo');
+const bout = ref(props.filters.bout ?? 1);
+const search = ref(props.filters.search ?? '');
+// Chip de situação (contador), especialidade, sala e período do calendário.
+const status = ref(props.filters.status ?? null);
+const specialty = ref(props.filters.specialty ?? '');
+const resource = ref(props.filters.resource ?? '');
+const range = ref(viewMode.value === 'calendar' ? (props.filters.range ?? 'day') : 'day');
+
+let searchDebounce = null;
+
+function filterParams() {
+    return Object.fromEntries(
+        Object.entries({
+            date: date.value,
+            doctor: doctor.value,
+            bout: bout.value,
+            search: search.value,
+            status: status.value,
+            specialty: specialty.value,
+            resource: resource.value,
+            range: range.value,
+        }).filter(([, value]) => value !== null && value !== '' && value !== undefined),
+    );
+}
+
+function applyFilters(partial = false) {
+    router.get(route('panel.schedules.index'), filterParams(), {
+        preserveState: true,
+        replace: true,
+        only: partial ? ['scheduleItems', 'filters', 'counters'] : undefined,
+    });
+}
+
+function setStatus(key) {
+    status.value = key;
+    applyFilters(true);
+}
+
+function onScopeFilterChange() {
+    applyFilters(true);
+}
+
+// "Contagem do período: 11/10/2026 a 17/10/2026" (semana/mês do calendário).
+const { date: formatDate } = useLocaleFormat();
+const periodLabel = computed(() =>
+    (props.t.counters_period ?? ':from — :to')
+        .replace(':from', formatDate(props.filters.from))
+        .replace(':to', formatDate(props.filters.to)),
+);
+
+// "Total" do título = linhas que a lista mostra (agendamentos; no chip
+// "Bloqueados", os bloqueios/compromissos) — bate com o contador ativo.
+const listedTotal = computed(() =>
+    status.value === 'blocked'
+        ? props.scheduleItems.length
+        : props.scheduleItems.filter((item) => item.type === 'schedule').length,
+);
+
+const hasExtraFilters = computed(() => Boolean(status.value || specialty.value || resource.value || search.value));
+
+function clearFilters() {
+    status.value = null;
+    specialty.value = '';
+    resource.value = '';
+    search.value = '';
+    applyFilters(true);
+}
+
+// Impressão da agenda do dia com os mesmos filtros (abre o PDF em outra aba).
+const printUrl = computed(() => {
+    // A impressão é sempre do dia: o período do calendário não vai junto.
+    const params = filterParams();
+    delete params.range;
+    return `${props.urls.print ?? route('panel.schedules.print')}?${new URLSearchParams(params)}`;
+});
+
+// ── Vagas do mês (calendário lateral) ─────────────────────────────────────────
+const availability = ref(null);
+const availabilityDoctorDays = ref(null);
+const availabilityLoading = ref(false);
+const availabilityMonth = ref(null);
+let availabilityScope = null;
+let availabilityTicket = 0;
+const isAggregateAvailability = computed(() => !props.isDoctor && (!doctor.value || doctor.value === 'tudo'));
+const availabilityScopeLabel = computed(() =>
+    isAggregateAvailability.value
+        ? (props.t.avail_scope_all ?? 'Vagas — todos os médicos')
+        : (props.t.avail_scope_doctor ?? 'Vagas — :doctor').replace(
+              ':doctor',
+              props.doctors.find((d) => d.id === doctor.value)?.name ?? '',
+          ),
+);
+
+async function loadAvailability() {
+    if (!availabilityMonth.value || props.doctorMissing) return;
+    const ticket = ++availabilityTicket;
+    const scope = `${availabilityMonth.value}|${props.isDoctor ? 'own' : doctor.value}`;
+    if (scope !== availabilityScope) {
+        availability.value = null;
+        availabilityDoctorDays.value = null;
+        availabilityScope = scope;
+    }
+    availabilityLoading.value = true;
+    try {
+        const qs = new URLSearchParams({ month: availabilityMonth.value });
+        if (!props.isDoctor && doctor.value && doctor.value !== 'tudo') qs.set('doctor', doctor.value);
+        const res = await fetch(`${props.urls.availability ?? route('panel.schedules.availability')}?${qs}`, {
+            headers: { Accept: 'application/json' },
+        });
+        const data = res.ok ? await res.json() : null;
+        if (ticket !== availabilityTicket) return;
+        availability.value = data?.days ?? null;
+        availabilityDoctorDays.value = data?.doctor_days ? Object.fromEntries(Object.entries(data.doctor_days)) : null;
+    } catch {
+        if (ticket === availabilityTicket) {
+            availability.value = null;
+            availabilityDoctorDays.value = null;
+        }
+    } finally {
+        if (ticket === availabilityTicket) availabilityLoading.value = false;
+    }
+}
+onBeforeUnmount(() => availabilityTicket++);
+
+// Vagas por médico — mesmo texto que o card "Vagas por médico" (removido)
+// mostrava, agora junto do nome na lista de médicos (sem repetir em dois
+// lugares). Só tem dado em modo agregado (ScheduleAvailabilityService só
+// detalha por médico quando `doctor` não é filtrado — ver availability()).
+function doctorAvailabilityText(doctorId) {
+    const day = availabilityDoctorDays.value?.[doctorId]?.[date.value];
+    if (!day) return null;
+    const label = props.t[`avail_${day.state}`] ?? day.state;
+    if (!['available', 'few', 'full'].includes(day.state)) return label;
+    const counts = (props.t.avail_free_of ?? ':free livres de :capacity')
+        .replace(':free', day.free)
+        .replace(':capacity', day.capacity);
+    return `${label} · ${counts}`;
+}
+
+const clinicTotalText = computed(() => {
+    const total = availability.value?.[date.value];
+    if (!total || !['available', 'few', 'full'].includes(total.state)) return null;
+    return (props.t.avail_clinic_total ?? 'Total da clínica: :free livres de :capacity')
+        .replace(':free', total.free)
+        .replace(':capacity', total.capacity);
+});
+
+function onMonthChange(month) {
+    availabilityMonth.value = month;
+    loadAvailability();
+}
+
+// Lista mudou (polling, salvar, remarcar…): as vagas podem ter mudado.
+watch(
+    () => props.scheduleItems,
+    () => loadAvailability(),
+);
+
+function onSearchInput() {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => applyFilters(true), 400);
+}
+onBeforeUnmount(() => clearTimeout(searchDebounce));
+
+function setDoctor(id) {
+    doctor.value = id;
+    applyFilters(true);
+    loadAvailability();
+}
+function setBout(b) {
+    bout.value = b;
+    applyFilters(true);
+}
+
+// ── Date navigation ────────────────────────────────────────────────────────────
+function goToDate(d) {
+    date.value = d;
+    applyFilters(true);
+}
+
+// ── Locale para o MiniCalendar (resolvido fora do template — `window` não é exposto) ──
+const sessionLocale = typeof window !== 'undefined' && window.sessionLocale ? window.sessionLocale : 'pt-BR';
+
+// ── Painel de recados ──────────────────────────────────────────────────────────
+const noticesPanelRef = ref(null);
+const noticesUnread = ref(0);
+
+// ── Lista de espera ────────────────────────────────────────────────────────────
+const wlPanelRef = ref(null);
+const wlCount = ref(0);
+const wlFormOpen = ref(false);
+
+function onScheduleFromWaiting(entry) {
+    prefillData.value = entry;
+    editSchedule.value = null;
+    formOpen.value = true;
+}
+
+function onWlSaved() {
+    wlFormOpen.value = false;
+    wlPanelRef.value?.fetch();
+}
+
+// ── Bulk selection ─────────────────────────────────────────────────────────────
+const selectionMode = ref(false);
+const selectedIds = ref([]);
+
+function toggleSelectionMode() {
+    selectionMode.value = !selectionMode.value;
+    selectedIds.value = [];
+}
+
+function toggleSelect(id) {
+    const idx = selectedIds.value.indexOf(id);
+    if (idx === -1) selectedIds.value.push(id);
+    else selectedIds.value.splice(idx, 1);
+}
+
+function isSelected(id) {
+    return selectedIds.value.includes(id);
+}
+
+async function bulkUpdate(situation) {
+    if (selectedIds.value.length === 0) return;
+    const res = await fetch(route('panel.schedules.bulk-update'), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: JSON.stringify({ ids: selectedIds.value, situation }),
+    });
+    const json = await res.json();
+    showToast(json.message, res.ok ? 'success' : 'error');
+    if (res.ok) {
+        selectedIds.value = [];
+        selectionMode.value = false;
+        router.reload({ only: ['scheduleItems', 'counters'] });
+    }
+}
+
+// ── Bulk cancel ────────────────────────────────────────────────────────────────
+const bulkCancelOpen = ref(false);
+
+function onBulkCancelled(json) {
+    bulkCancelOpen.value = false;
+    showToast(json.message, 'success');
+    selectedIds.value = [];
+    selectionMode.value = false;
+    router.reload({ only: ['scheduleItems', 'counters'] });
+}
+
+// ── Bulk reschedule ────────────────────────────────────────────────────────────
+const bulkRescheduleOpen = ref(false);
+
+function onBulkRescheduled(json) {
+    bulkRescheduleOpen.value = false;
+    showToast(json.message, 'success');
+    selectedIds.value = [];
+    selectionMode.value = false;
+    router.reload({ only: ['scheduleItems', 'counters'] });
+}
+
+// ── Schedule form modal ────────────────────────────────────────────────────────
+const formOpen = ref(false);
+const editSchedule = ref(null);
+const prefillData = ref(null);
+
+function openCreate() {
+    if (props.doctorMissing) return;
+    editSchedule.value = null;
+    prefillData.value = null;
+    formOpen.value = true;
+}
+
+// ?new=1 — "Novo agendamento" do Dashboard abre o formulário vazio. A URL
+// volta limpa com uma visita leve (replace + preserveState, como em
+// Pacientes) para recarregar a página não reabrir o formulário.
+onMounted(() => {
+    // Link com período de calendário aberto em modo lista: a lista é do dia.
+    if (viewMode.value === 'list' && (props.filters.range ?? 'day') !== 'day') applyFilters(true);
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') !== '1') return;
+
+    openCreate();
+    // Vindo de "Agendar" na tela de Retornos: o formulário abre com o paciente e o retorno escolhidos.
+    if (props.recallPrefill) prefillData.value = { ...props.recallPrefill };
+    params.delete('new');
+    params.delete('recall');
+    router.get(route('panel.schedules.index'), Object.fromEntries(params.entries()), {
+        replace: true,
+        preserveState: true,
+        preserveScroll: true,
+    });
+});
+
+// Clicou em editar A e logo em B: só o último clique abre (a resposta
+// atrasada do A não troca o formulário do B).
+const editReq = latestRequest();
+
+async function openEdit(item) {
+    const req = editReq.begin();
+    let json;
+    try {
+        const res = await fetch(item.show_url, { headers: { Accept: 'application/json' }, signal: req.signal });
+        json = res.ok ? await res.json() : null;
+    } catch (error) {
+        if (isAbortError(error)) return;
+        throw error;
+    }
+    if (!req.current()) return;
+    if (json) editSchedule.value = json.data;
+    prefillData.value = null;
+    formOpen.value = true;
+}
+
+// ── Detail drawer ──────────────────────────────────────────────────────────────
+const detailOpen = ref(false);
+const viewScheduleId = ref(null);
+
+function onView(item) {
+    viewScheduleId.value = item.id;
+    detailOpen.value = true;
+}
+
+function closeDetail() {
+    detailOpen.value = false;
+    viewScheduleId.value = null;
+}
+
+function onSaved() {
+    formOpen.value = false;
+    editSchedule.value = null;
+    prefillData.value = null;
+    router.reload({ only: ['scheduleItems', 'counters'] });
+}
+
+// ── Interação com CalendarView ─────────────────────────────────────────────────
+// Clique num agendamento abre o detalhe (drawer), em qualquer período.
+function onCalendarEventClick(item) {
+    if (item.type !== 'schedule') return;
+    onView(item);
+}
+
+function onCalendarRangeChange(next) {
+    range.value = next;
+    applyFilters(true);
+}
+
+// Número do dia (semana/mês): abre aquele dia.
+function onCalendarDateClick(day) {
+    date.value = day;
+    range.value = 'day';
+    applyFilters(true);
+}
+
+// Drawer: remarcar uma sessão da série / série alterada.
+function onDrawerReschedule(item) {
+    openReschedule(item);
+}
+
+function onDrawerChanged() {
+    router.reload({ only: ['scheduleItems', 'counters'] });
+}
+
+function onCalendarSlotClick({ datetime }) {
+    if (props.doctorMissing) return;
+    editSchedule.value = null;
+    prefillData.value = { date_time: datetime };
+    formOpen.value = true;
+}
+
+// ── Reschedule modal ───────────────────────────────────────────────────────────
+const rescheduleItem = ref(null);
+
+function openReschedule(item) {
+    rescheduleItem.value = item;
+}
+
+function onRescheduled(json) {
+    rescheduleItem.value = null;
+    showToast(json.message, 'success');
+    const newId = json.anchor_id ?? json.new_schedule?.id;
+    if (detailOpen.value && newId) viewScheduleId.value = newId;
+    router.reload({ only: ['scheduleItems', 'counters'] });
+}
+
+// ── Cancel modal ───────────────────────────────────────────────────────────────
+const cancelItem = ref(null);
+
+function openCancel(item) {
+    cancelItem.value = item;
+}
+
+function onCancelled(json) {
+    cancelItem.value = null;
+    showToast(json.message, 'success');
+    router.reload({ only: ['scheduleItems', 'counters'] });
+}
+
+// ── Caixa: entrada vinculada ao agendamento ─────────────────────────────────────
+const cashItem = ref(null);
+const cashOpen = ref(false);
+// Transição de situação que aguarda o lançamento no caixa (ex.: marcar "Atendido").
+const pendingAfterCash = ref(null);
+
+function openCashEntry(item) {
+    cashItem.value = item;
+    cashOpen.value = true;
+}
+
+async function onCashSaved() {
+    cashOpen.value = false;
+    cashItem.value = null;
+
+    // Se o caixa foi aberto porque faltava lançamento para concluir o atendimento,
+    // retoma a transição pendente (agora o lançamento já existe).
+    const pending = pendingAfterCash.value;
+    pendingAfterCash.value = null;
+    if (pending) {
+        await onChangeSituation(pending);
+        return;
+    }
+
+    router.reload({ only: ['scheduleItems', 'counters'] });
+}
+
+// ── Chamar paciente (painel/TV da sala de espera) ─────────────────────────────
+async function onCallPatient(item) {
+    const res = await fetch(item.call_url, {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+    });
+    const json = await res.json().catch(() => ({}));
+    showToast(json.message ?? (res.ok ? 'Chamada enviada.' : 'Erro ao chamar.'), res.ok ? 'success' : 'error');
+}
+
+// ── Situation / mood change ────────────────────────────────────────────────────
+async function onChangeSituation({ item, to }) {
+    const res = await fetch(item.situation_url, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: JSON.stringify({ situation: to }),
+    });
+    const json = await res.json();
+
+    if (!res.ok) {
+        // Conclusão bloqueada por falta de caixa: abre o lançamento e retoma depois.
+        if (res.status === 422 && json.requires_cash_entry) {
+            if (props.canRegisterCash) {
+                pendingAfterCash.value = { item, to };
+                openCashEntry(item);
+            } else {
+                showToast(json.message, 'error');
+            }
+            return;
+        }
+        showToast(json.message, 'error');
+        return;
+    }
+
+    // Fluxo "Chegou -> abre caixa": ao marcar Aguardando (3), abre a entrada
+    // no caixa pré-preenchida, desde que o utilizador tenha permissão financeira
+    // e ainda não exista lançamento. NÃO auto-abre para convênio cobrável
+    // (faturado via guia) — nesse caso o lançamento é manual/co-participação.
+    const continueFlow = () => {
+        if (to === 3 && props.canRegisterCash && !item.has_cash_entry && !item.bills_covenant) {
+            openCashEntry(item);
+        }
+        router.reload({ only: ['scheduleItems', 'counters'] });
+    };
+
+    // Sucesso da mudança de situação: modal (em vez de toast).
+    if (window.Swal) {
+        window.Swal.fire({
+            icon: 'success',
+            title: json.message,
+            confirmButtonText: 'OK',
+        }).then(continueFlow);
+    } else {
+        showToast(json.message, 'success');
+        continueFlow();
+    }
+}
+
+async function onChangeMood({ item, mood }) {
+    const res = await fetch(item.mood_url, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: JSON.stringify({ mood }),
+    });
+    const json = await res.json();
+    showToast(json.message, res.ok ? 'success' : 'error');
+    if (res.ok) router.reload({ only: ['scheduleItems', 'counters'] });
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function showToast(msg, type = 'success') {
+    if (type === 'success' && window.showSuccessToast) return window.showSuccessToast(msg);
+    if (type === 'error' && window.showErrorToast) return window.showErrorToast(msg);
+    alert(msg);
+}
+
+const storeUrl = route('panel.schedules.store');
+const breadcrumbs = [
+    { label: props.t.breadcrumb_home ?? 'Dashboard', url: route('panel.dashboard'), active: false },
+    { label: props.t.breadcrumb_current ?? 'Agenda', url: '#', active: true },
+];
+</script>
+
+<template>
+    <AppLayout :title="t.page_title" :breadcrumbs="breadcrumbs">
+        <div>
+            <!-- ════════════════════════════════════════════════════════════
+                 LINHA 1 — Ação principal + navegação de datas
+                 ════════════════════════════════════════════════════════════ -->
+            <div class="d-flex align-items-center gap-2 pb-3 mb-0 border-bottom flex-wrap">
+                <div class="d-flex align-items-center gap-2 me-auto">
+                    <h4 class="mb-0 fw-bold">{{ t.page_title }}</h4>
+                    <span
+                        style="
+                            font-size: 0.78rem;
+                            font-weight: 600;
+                            color: #0d6efd;
+                            background: #eff4ff;
+                            border: 1.5px solid #0d6efd;
+                            border-radius: 20px;
+                            padding: 2px 12px;
+                            white-space: nowrap;
+                            line-height: 1.6;
+                        "
+                        >Total: {{ listedTotal }}</span
+                    >
+                </div>
+
+                <!-- Toggle lista / calendário -->
+                <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
+                    <button
+                        type="button"
+                        class="rounded p-1 d-flex align-items-center border-0"
+                        :class="viewMode === 'list' ? 'bg-light' : 'bg-white'"
+                        :title="t.view_list"
+                        @click="viewMode = 'list'"
+                    >
+                        <i class="ti ti-list fs-14 text-body"></i>
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded p-1 d-flex align-items-center border-0"
+                        :class="viewMode === 'calendar' ? 'bg-light' : 'bg-white'"
+                        :title="t.view_calendar"
+                        @click="viewMode = 'calendar'"
+                    >
+                        <i class="ti ti-calendar fs-14 text-body"></i>
+                    </button>
+                </div>
+
+                <button v-if="!doctorMissing" type="button" class="btn btn-primary btn-sm" @click="openCreate">
+                    <i class="ti ti-plus me-1"></i>{{ t.btn_new }}
+                </button>
+
+                <!-- Relatórios de Agenda (GAP fechado — antes página-hub
+                     solta em /panel/reports, agora dropdown ao lado de
+                     "Novo"; null quando sem acesso financeiro — ver
+                     SchedulesController::index()). Full-page <a> de
+                     propósito (mesmas telas cru, filtro+tabela+resumo —
+                     nenhuma delas é componente Vue desta página). -->
+                <div v-if="reportsUrls" class="btn-group" role="group">
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                    >
+                        <i class="ti ti-report-analytics me-1"></i>{{ t.btn_reports }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li v-if="reportsUrls.production">
+                            <a class="dropdown-item" :href="reportsUrls.production"
+                                ><i class="ti ti-report-analytics me-2"></i>{{ t.report_production }}</a
+                            >
+                        </li>
+                        <li v-if="reportsUrls.absenteeism">
+                            <a class="dropdown-item" :href="reportsUrls.absenteeism"
+                                ><i class="ti ti-user-x me-2"></i>{{ t.report_absenteeism }}</a
+                            >
+                        </li>
+                        <li v-if="reportsUrls.first_consultations">
+                            <a
+                                class="dropdown-item"
+                                :href="reportsUrls.first_consultations"
+                                data-testid="report-first-consultations"
+                                ><i class="ti ti-user-plus me-2"></i>{{ t.report_first_consultations }}</a
+                            >
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Importação em lote de agendamentos (dados históricos via CSV) -->
+                <a
+                    v-if="!doctorMissing"
+                    :href="route('panel.schedules.import.index')"
+                    class="btn btn-outline-secondary btn-sm"
+                >
+                    <i class="ti ti-file-import me-1"></i>Importar
+                </a>
+            </div>
+
+            <div
+                v-if="doctorMissing"
+                class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0"
+                role="alert"
+                data-testid="doctor-missing-alert"
+            >
+                <i class="ti ti-user-exclamation fs-4 flex-shrink-0" aria-hidden="true"></i>
+                <div>
+                    <strong class="d-block">{{ t.doctor_missing_title }}</strong>
+                    {{ t.doctor_missing }}
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════════════════════════════
+                 Contadores do dia (também são os filtros por situação) +
+                 especialidade, sala/equipamento e impressão
+                 ════════════════════════════════════════════════════════════ -->
+            <div v-if="!doctorMissing" class="agenda-filters py-2 border-bottom" data-testid="agenda-filters">
+                <AgendaCounters
+                    :counters="counters"
+                    :active="status"
+                    :urgent-care-url="urls.urgentCare ?? null"
+                    :t="t"
+                    @select="setStatus"
+                />
+                <p
+                    v-if="range !== 'day' && viewMode === 'calendar' && filters.from"
+                    class="small text-muted mt-1 mb-0"
+                    data-testid="counters-period"
+                >
+                    {{ periodLabel }}
+                </p>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
+                    <label class="visually-hidden" for="agenda-specialty">{{ t.filter_specialty }}</label>
+                    <select
+                        id="agenda-specialty"
+                        v-model="specialty"
+                        class="form-select form-select-sm agenda-filter-select"
+                        data-testid="filter-specialty"
+                        @change="onScopeFilterChange"
+                    >
+                        <option value="">{{ t.filter_specialty_all ?? 'Todas as especialidades' }}</option>
+                        <option v-for="option in specialties" :key="option.id" :value="option.id">
+                            {{ option.name }}
+                        </option>
+                    </select>
+
+                    <template v-if="resourceOptions.length">
+                        <label class="visually-hidden" for="agenda-resource">{{ t.filter_resource }}</label>
+                        <select
+                            id="agenda-resource"
+                            v-model="resource"
+                            class="form-select form-select-sm agenda-filter-select"
+                            data-testid="filter-resource"
+                            @change="onScopeFilterChange"
+                        >
+                            <option value="">{{ t.filter_resource_all ?? 'Todas as salas e equipamentos' }}</option>
+                            <option v-for="option in resourceOptions" :key="option.id" :value="option.id">
+                                {{ option.name }}
+                            </option>
+                        </select>
+                    </template>
+
+                    <button
+                        v-if="hasExtraFilters"
+                        type="button"
+                        class="btn btn-sm btn-link text-decoration-none px-1"
+                        data-testid="filter-clear"
+                        @click="clearFilters"
+                    >
+                        <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear ?? 'Limpar filtros' }}
+                    </button>
+
+                    <a
+                        :href="printUrl"
+                        target="_blank"
+                        rel="noopener"
+                        class="btn btn-sm btn-outline-secondary ms-auto"
+                        data-testid="print-agenda"
+                        :title="t.print_agenda_hint ?? 'Imprimir a agenda do dia com os filtros aplicados'"
+                    >
+                        <i class="ti ti-printer me-1" aria-hidden="true"></i>{{ t.print_agenda ?? 'Imprimir' }}
+                    </a>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════════════════════════════
+                 LINHA 2 — Painéis, busca e seleção
+                 Alterna entre modo normal e modo de seleção em massa
+                 ════════════════════════════════════════════════════════════ -->
+            <div class="d-flex align-items-center gap-2 py-2 border-bottom mb-3 flex-wrap">
+                <!-- MODO NORMAL -->
+                <template v-if="!selectionMode">
+                    <!-- Mural de recados -->
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary position-relative"
+                        @click="noticesPanelRef?.toggle()"
+                    >
+                        <i class="fas fa-bullhorn me-1"></i>{{ t.notices_title }}
+                        <span
+                            v-if="noticesUnread > 0"
+                            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                            style="font-size: 0.6rem"
+                        >
+                            {{ noticesUnread }}
+                        </span>
+                    </button>
+
+                    <!-- Lista de espera (somente não-médicos) -->
+                    <template v-if="!isDoctor">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-warning position-relative"
+                            @click="wlPanelRef?.toggle()"
+                        >
+                            <i class="fas fa-hourglass-half me-1"></i>{{ t.waiting_title }}
+                            <span
+                                v-if="wlCount > 0"
+                                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                style="font-size: 0.6rem"
+                            >
+                                {{ wlCount }}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            :title="t.waiting_add_queue"
+                            @click="wlFormOpen = true"
+                        >
+                            <i class="fas fa-user-plus me-1"></i>{{ t.waiting_add_queue }}
+                        </button>
+                    </template>
+
+                    <!-- Separador -->
+                    <div class="vr mx-1 d-none d-sm-block flex-shrink-0"></div>
+
+                    <!-- Busca + Selecionar agrupados à direita -->
+                    <div class="d-flex align-items-center gap-2 ms-auto">
+                        <div class="input-group input-group-sm" style="min-width: 180px; max-width: 240px">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input
+                                v-model="search"
+                                type="text"
+                                class="form-control"
+                                :placeholder="t.search_placeholder"
+                                @input="onSearchInput"
+                            />
+                            <button
+                                v-if="search"
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                @click="
+                                    search = '';
+                                    applyFilters(true);
+                                "
+                            >
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <button
+                            v-if="isStaff && viewMode === 'list'"
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                            @click="toggleSelectionMode"
+                        >
+                            <i class="fas fa-check-square me-1"></i>{{ t.btn_select }}
+                        </button>
+                    </div>
+                </template>
+
+                <!-- MODO SELEÇÃO EM MASSA -->
+                <template v-else>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="toggleSelectionMode">
+                        <i class="fas fa-times me-1"></i>{{ t.btn_cancel_select }}
+                    </button>
+
+                    <span class="badge bg-secondary rounded-pill">
+                        {{ selectedIds.length }} {{ t.selected_count }}
+                    </span>
+
+                    <div class="vr flex-shrink-0"></div>
+
+                    <button
+                        type="button"
+                        class="btn btn-info btn-sm"
+                        :disabled="selectedIds.length === 0"
+                        @click="bulkUpdate(2)"
+                    >
+                        <i class="fas fa-check-circle me-1"></i>{{ t.btn_bulk_confirm }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-warning btn-sm text-dark"
+                        :disabled="selectedIds.length === 0"
+                        @click="bulkUpdate(8)"
+                    >
+                        <i class="fas fa-user-times me-1"></i>{{ t.btn_bulk_noshow }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-danger btn-sm"
+                        :disabled="selectedIds.length === 0"
+                        @click="bulkCancelOpen = true"
+                    >
+                        <i class="fas fa-ban me-1"></i>{{ t.btn_bulk_cancel }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        :disabled="selectedIds.length === 0"
+                        @click="bulkRescheduleOpen = true"
+                    >
+                        <i class="fas fa-calendar-alt me-1"></i>{{ t.btn_bulk_change_date }}
+                    </button>
+                </template>
+            </div>
+
+            <!-- ════════════════════════════════════════════════════════════
+                 Painéis colapsíveis (abrem abaixo da barra, largura total)
+                 ════════════════════════════════════════════════════════════ -->
+            <NoticesPanel ref="noticesPanelRef" :t="t" @update:unread-count="noticesUnread = $event" />
+
+            <WaitingListPanel
+                v-if="!isDoctor"
+                ref="wlPanelRef"
+                :doctor="doctor"
+                :t="t"
+                @update:count="wlCount = $event"
+                @schedule-from-waiting="onScheduleFromWaiting"
+            />
+
+            <!-- ════════════════════════════════════════════════════════════
+                 Layout principal: sidebar médicos + coluna de agendamentos
+                 ════════════════════════════════════════════════════════════ -->
+            <div class="row g-3">
+                <!-- Sidebar — calendário para todos (o médico também escolhe a
+                     data direto, sem ir dia a dia); a lista de médicos só para
+                     quem vê a agenda de vários (o médico vê só a dele — o
+                     servidor força o filtro). -->
+                <div class="col-12 col-md-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div v-if="!isDoctor && !doctorMissing" class="mb-2" data-testid="availability-scope">
+                                <div class="small fw-semibold">{{ availabilityScopeLabel }}</div>
+                                <p v-if="isAggregateAvailability" class="small text-muted mb-0">
+                                    {{
+                                        t.avail_aggregate_hint ??
+                                        'As cores somam as vagas dos médicos com escala. Confira abaixo cada médico no dia selecionado.'
+                                    }}
+                                </p>
+                            </div>
+                            <!-- Mini calendário mensal -->
+                            <MiniCalendar
+                                :model-value="date"
+                                :locale="sessionLocale"
+                                :availability="doctorMissing ? null : availability"
+                                :loading="availabilityLoading"
+                                :t="t"
+                                @update:model-value="goToDate"
+                                @month-change="onMonthChange"
+                            />
+
+                            <!-- Médicos — só para quem vê vários médicos. Vagas de cada um
+                                 (antes num card duplicado "Vagas por médico" acima) ficam
+                                 junto do nome aqui, não repetidas em dois lugares. -->
+                            <template v-if="!isDoctor && doctors.length > 0">
+                                <hr class="my-3" />
+
+                                <!-- Médicos -->
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <h6 class="fw-bold text-uppercase mb-0">{{ t.sidebar_doctors }}</h6>
+                                    <span
+                                        v-if="isAggregateAvailability && availabilityLoading"
+                                        class="small text-muted"
+                                        role="status"
+                                    >
+                                        {{ t.avail_loading ?? 'Atualizando vagas…' }}
+                                    </span>
+                                </div>
+
+                                <!-- Todos — fundo marca o selecionado (borda 1↔2px sozinha não
+                                     se via; o destaque de "quem tá selecionado" tem que estar
+                                     aqui na lista, não só no texto acima do calendário). -->
+                                <div
+                                    class="d-flex align-items-center mb-3 gap-2 rounded-3 p-2"
+                                    :style="{
+                                        cursor: 'pointer',
+                                        backgroundColor:
+                                            doctor === 'tudo' ? 'var(--bs-tertiary-bg, #e9ecef)' : 'transparent',
+                                    }"
+                                    @click="setDoctor('tudo')"
+                                >
+                                    <div
+                                        class="rounded d-flex align-items-center justify-content-center flex-shrink-0"
+                                        style="width: 42px; height: 42px"
+                                        :style="{ border: doctor === 'tudo' ? '2px solid #333' : '1px solid #ccc' }"
+                                    >
+                                        <i class="fas fa-users text-muted"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold small">{{ t.sidebar_all }}</div>
+                                        <div
+                                            class="text-muted"
+                                            style="font-size: 0.75rem"
+                                            data-testid="availability-clinic-total"
+                                        >
+                                            {{ clinicTotalText ?? t.sidebar_select_all }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    v-for="d in doctors"
+                                    :key="d.id"
+                                    class="d-flex align-items-center mb-3 gap-2 rounded-3 p-2"
+                                    :style="{
+                                        cursor: 'pointer',
+                                        backgroundColor: doctor === d.id ? `${d.color}1f` : 'transparent',
+                                    }"
+                                    :data-doctor="d.id"
+                                    @click="setDoctor(d.id)"
+                                >
+                                    <div
+                                        class="rounded d-flex align-items-center justify-content-center flex-shrink-0 overflow-hidden"
+                                        style="width: 42px; height: 42px"
+                                        :style="{
+                                            border: doctor === d.id ? `2px solid ${d.color}` : `1px solid ${d.color}`,
+                                        }"
+                                    >
+                                        <img
+                                            v-if="d.photo_url"
+                                            :src="d.photo_url"
+                                            :alt="d.name"
+                                            style="width: 100%; height: 100%; object-fit: cover"
+                                        />
+                                        <i v-else class="fas fa-user" :style="{ color: d.color }"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold small" :style="{ color: d.color }">{{ d.name }}</div>
+                                        <div class="text-muted" style="font-size: 0.72rem">{{ d.record }}</div>
+                                        <div
+                                            v-if="doctorAvailabilityText(d.id)"
+                                            class="text-muted"
+                                            style="font-size: 0.72rem"
+                                        >
+                                            {{ doctorAvailabilityText(d.id) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Turno — médico também filtra a própria agenda -->
+                            <template v-if="isDoctor || doctors.length > 0">
+                                <hr class="my-3" />
+
+                                <!-- Turno -->
+                                <h6 class="fw-bold text-uppercase mb-2">{{ t.sidebar_time }}</h6>
+                                <div class="d-flex w-100 border rounded overflow-hidden" role="group">
+                                    <button
+                                        v-for="(icon, b) in {
+                                            1: 'fa-th',
+                                            2: 'fa-sun',
+                                            3: 'fa-cloud-sun',
+                                            4: 'fa-moon',
+                                        }"
+                                        :key="b"
+                                        type="button"
+                                        class="flex-fill btn btn-sm rounded-0 border-0 py-2 px-1 text-center"
+                                        :class="bout == b ? 'btn-dark' : 'btn-light'"
+                                        @click="setBout(Number(b))"
+                                    >
+                                        <i class="fas d-block" :class="icon" style="font-size: 1rem"></i>
+                                        <span
+                                            class="d-block"
+                                            style="
+                                                font-size: 0.6rem;
+                                                font-weight: 700;
+                                                letter-spacing: 0.05em;
+                                                margin-top: 0.2rem;
+                                            "
+                                        >
+                                            {{
+                                                {
+                                                    1: t.sidebar_all,
+                                                    2: t.sidebar_morning,
+                                                    3: t.sidebar_afternoon,
+                                                    4: t.sidebar_evening,
+                                                }[b]
+                                            }}
+                                        </span>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coluna principal de agendamentos -->
+                <div class="col-12 col-md-9">
+                    <!-- ── Vista calendário ───────────────────────────────── -->
+                    <CalendarView
+                        v-if="viewMode === 'calendar'"
+                        :schedule-items="scheduleItems"
+                        :date="date"
+                        :range="range"
+                        :t="t"
+                        @event-click="onCalendarEventClick"
+                        @slot-click="onCalendarSlotClick"
+                        @range-change="onCalendarRangeChange"
+                        @date-click="onCalendarDateClick"
+                    />
+
+                    <!-- ── Vista lista ────────────────────────────────────── -->
+                    <template v-else>
+                        <!-- Estado vazio -->
+                        <div v-if="scheduleItems.length === 0" class="text-center py-5 text-muted">
+                            <i class="fas fa-calendar-times fa-3x mb-3 opacity-25"></i>
+                            <p>{{ hasExtraFilters ? (t.empty_filtered ?? t.empty) : t.empty }}</p>
+                            <button
+                                v-if="hasExtraFilters"
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm me-2"
+                                @click="clearFilters"
+                            >
+                                <i class="ti ti-filter-off me-1"></i>{{ t.filter_clear ?? 'Limpar filtros' }}
+                            </button>
+                            <button
+                                v-if="!doctorMissing"
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                @click="openCreate"
+                            >
+                                <i class="fas fa-plus me-1"></i>{{ t.btn_new }}
+                            </button>
+                        </div>
+
+                        <!-- Itens -->
+                        <template v-else>
+                            <template v-for="item in scheduleItems" :key="item.id">
+                                <ScheduleCard
+                                    v-if="item.type === 'schedule'"
+                                    :item="item"
+                                    :is-staff="isStaff"
+                                    :is-doctor="isDoctor"
+                                    :can-register-cash="canRegisterCash"
+                                    :call-panel-enabled="callPanelEnabled"
+                                    :situations="situations"
+                                    :moods="moods"
+                                    :selection-mode="selectionMode"
+                                    :selected="isSelected(item.id)"
+                                    :can-see-patients="canSeePatients"
+                                    :t="t"
+                                    @toggle-select="toggleSelect"
+                                    @view="onView"
+                                    @edit="openEdit"
+                                    @reschedule="openReschedule"
+                                    @cancel="openCancel"
+                                    @change-situation="onChangeSituation"
+                                    @change-mood="onChangeMood"
+                                    @register-cash="openCashEntry"
+                                    @call="onCallPatient"
+                                />
+                                <EventCard v-else :item="item" :t="t" />
+                            </template>
+                        </template>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Modais / Painéis deslizantes ──────────────────────────────────── -->
+
+        <ScheduleFormModal
+            :open="formOpen"
+            :edit-schedule="editSchedule"
+            :prefill-data="prefillData"
+            :default-date="date"
+            :doctors="doctors"
+            :covenants="covenants"
+            :visit-types="visitTypes"
+            :specialties="specialties"
+            :skin-types="skinTypes"
+            :iris-types="irisTypes"
+            :genders="genders"
+            :marital-statuses="maritalStatuses"
+            :states-of-brazil="statesOfBrazil"
+            :store-url="storeUrl"
+            :t="t"
+            @close="
+                formOpen = false;
+                editSchedule = null;
+                prefillData = null;
+            "
+            @saved="onSaved"
+        />
+
+        <RescheduleModal
+            :item="rescheduleItem"
+            :doctors="doctors"
+            :t="t"
+            @close="rescheduleItem = null"
+            @rescheduled="onRescheduled"
+        />
+
+        <CancelModal :item="cancelItem" :t="t" @close="cancelItem = null" @cancelled="onCancelled" />
+
+        <BulkCancelModal
+            :open="bulkCancelOpen"
+            :selected-ids="selectedIds"
+            :t="t"
+            @close="bulkCancelOpen = false"
+            @done="onBulkCancelled"
+        />
+
+        <BulkRescheduleModal
+            :open="bulkRescheduleOpen"
+            :selected-ids="selectedIds"
+            :t="t"
+            @close="bulkRescheduleOpen = false"
+            @done="onBulkRescheduled"
+        />
+
+        <WaitingListFormModal
+            :open="wlFormOpen"
+            :doctors="doctors"
+            :covenants="covenants"
+            :visit-types="visitTypes"
+            :t="t"
+            @close="wlFormOpen = false"
+            @saved="onWlSaved"
+        />
+
+        <!-- ── Schedule Detail Drawer ─────────────────────────────────────── -->
+        <ScheduleDetailDrawer
+            :open="detailOpen"
+            :schedule-id="viewScheduleId"
+            :t="t"
+            @close="closeDetail"
+            @reschedule="onDrawerReschedule"
+            @changed="onDrawerChanged"
+        />
+
+        <!-- ── Entrada no caixa (fluxo "Chegou -> caixa") ──────────────────── -->
+        <CashEntryModal
+            :open="cashOpen"
+            :item="cashItem"
+            :procedures="procedures"
+            :procedure-prices="procedurePrices"
+            :doctors="doctors"
+            :covenants="covenants"
+            :payment-methods="paymentMethods"
+            :income-categories="incomeCategories"
+            :t="t"
+            @close="
+                cashOpen = false;
+                cashItem = null;
+            "
+            @saved="onCashSaved"
+        />
+    </AppLayout>
+</template>
+
+<style scoped>
+.agenda-filter-select {
+    width: auto;
+    min-width: 12rem;
+    max-width: 100%;
+}
+
+/* Celular: especialidade e sala lado a lado. */
+@media (max-width: 575.98px) {
+    .agenda-filter-select {
+        flex: 1 1 calc(50% - 0.5rem);
+        min-width: 0;
+    }
+}
+</style>

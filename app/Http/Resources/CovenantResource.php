@@ -14,11 +14,12 @@ class CovenantResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'type'       => 'doctor',
+        $data = [
+            'type'       => 'covenant',
             'id'         => $this->id,
             'attributes' => [
                 'entity_id'  => $this->entity_id,
+                'code'       => $this->code,
                 'name'       => $this->name,
                 'color'      => $this->color,
                 'table'      => (bool) $this->table,
@@ -26,9 +27,14 @@ class CovenantResource extends JsonResource
                 'created_at' => $this->created_at,
                 'updated_at' => $this->updated_at,
             ],
-            'relationships' => [
-                'entity' => $this->entity->toArray(),
-            ],
         ];
+
+        if (! $request->routeIs('*.index')) {
+            $data['relationships'] = [
+                'entity' => $this->entity?->toArray() ?? (object) [],
+            ];
+        }
+
+        return $data;
     }
 }

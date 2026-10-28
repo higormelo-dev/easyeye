@@ -1,0 +1,815 @@
+<?php
+
+namespace App\Support;
+
+use App\Enums\{ClientRule, FeatureKey, Permission, SaasRule};
+use App\Models\Entity;
+use App\Services\Billing\SubscriptionNoticeService;
+use App\Services\FeatureGateService;
+use Illuminate\Support\Facades\Route;
+
+class PanelNavigation
+{
+    public static function build(): array
+    {
+        $rule          = session('selected_entity_user_rule');
+        $isClient      = (bool) session('selected_entity_is_client');
+        $isAdmin       = $rule === ClientRule::Admin->value;
+        $isFinancial   = in_array($rule, [ClientRule::Admin->value, ClientRule::Financial->value], true);
+        $canSeeDoctors = in_array($rule, [ClientRule::Admin->value, ClientRule::Secretary->value], true);
+        $canSeeAi      = self::canSeeAi($rule);
+
+        if (! $isClient) {
+            return self::managerNav();
+        }
+
+        // GAP fechado (revisão "relatório direto no módulo"):
+        // App\Http\Controllers\ReportsController tinha uma página-hub
+        // PRÓPRIA ("Relatórios", 2 cards — Produção e Absenteísmo)
+        // inteiramente sobre dado de AGENDA, vivendo num menu SOLTO,
+        // separado de "Agendas". Página-hub removida
+        // (ReportsController::index() + Panel/Reports/Index.vue); URL das
+        // 2 rotas migrou pra baixo de /panel/schedules (nome de rota
+        // panel.schedules.reports.*).
+        //
+        // DECISÃO FINAL (pedido explícito do usuário, revertendo uma
+        // tentativa anterior de virar submenu aqui): "Agendas" continua
+        // link DIRETO — 1 clique pro calendário, a tela mais usada do
+        // painel, sem virar dropdown. Acesso aos 2 relatórios não é mais
+        // pelo menu lateral nenhum: fica só no dropdown "Relatórios" ao
+        // lado do botão "Novo" dentro da própria tela de Agendas (ver
+        // SchedulesController::index() prop `reportsUrls` +
+        // Panel/Schedules/Index.vue) — mesmo gate (EntityGate::ViewFinancial)
+        // decide se o botão aparece, então quem não tem acesso simplesmente
+        // não vê a opção, sem precisar de lógica condicional aqui no menu.
+        $schedulesItem = [
+            'key'   => 'schedules',
+            'route' => 'panel.schedules.index',
+            'icon'  => 'ti ti-calendar',
+            'label' => __('actions.sidemenu.schedules'),
+            // Wildcard cobre panel.schedules.reports.* também (item
+            // continua "ativo" no menu enquanto o usuário está num
+            // relatório de agenda — não há mais submenu pra destacar em
+            // separado).
+            'match' => ['panel.schedules.*'],
+        ];
+
+        // Agenda e Pacientes espelham o middleware das rotas (senão o item
+        // leva a um 403 — ex.: perfil financeiro/usuário viam "Agendas"):
+        // agenda = entity.role:admin,doctor,secretary; pacientes =
+        // permission:patients.manage,admin,financial,doctor,secretary.
+        $canSeeSchedules = in_array($rule, [ClientRule::Admin->value, ClientRule::Doctor->value, ClientRule::Secretary->value], true);
+        $canSeePatients  = in_array($rule, [ClientRule::Admin->value, ClientRule::Financial->value, ClientRule::Doctor->value, ClientRule::Secretary->value], true)
+            || self::hasEntityPermission(Permission::PatientsManage);
+
+        $nav = [
+            [
+                'key'   => 'dashboard',
+                'route' => 'panel.dashboard',
+                'icon'  => 'ti ti-layout-dashboard',
+                'label' => __('actions.sidemenu.dashboard'),
+                'match' => ['panel.dashboard'],
+            ],
+        ];
+
+        if ($canSeeSchedules) {
+            $nav[] = $schedulesItem;
+            // Pronto atendimento (fila de demanda espontânea do dia) — mesmo
+            // grupo de rota da Agenda (entity.role:admin,doctor,secretary).
+            $nav[] = [
+                'key'   => 'urgent-care',
+                'route' => 'panel.urgent-care.index',
+                'icon'  => 'ti ti-urgent',
+                'label' => __('actions.sidemenu.urgent_care'),
+                'match' => ['panel.urgent-care.*'],
+            ];
+
+            // Retornos (Fase 6) — mesmo grupo de rota da Agenda e a mesma feature do plano da rota.
+            if (self::hasRecallFeature()) {
+                $nav[] = [
+                    'key'   => 'recall',
+                    'route' => 'panel.recall.index',
+                    'icon'  => 'ti ti-phone-call',
+                    'label' => __('actions.sidemenu.recall'),
+                    'match' => ['panel.recall.*'],
+                ];
+            }
+        }
+
+        if ($canSeePatients) {
+            $nav[] = [
+                'key'   => 'patients',
+                'route' => 'panel.patients.index',
+                'icon'  => 'ti ti-users',
+                'label' => __('actions.sidemenu.patients'),
+                'match' => ['panel.patients.*'],
+            ];
+        }
+
+        // Prontuários (busca geral) — mesmo acesso de leitura de hoje aos
+        // prontuários (entity.role:admin,doctor,secretary); o médico vê os dele.
+        if ($canSeeSchedules) {
+            $nav[] = [
+                'key'   => 'medical-records',
+                'route' => 'panel.medical-records.index',
+                'icon'  => 'ti ti-report-medical',
+                'label' => __('actions.sidemenu.medical_records'),
+                'match' => ['panel.medical-records.index'],
+            ];
+        }
+
+        if ($canSeeDoctors) {
+            $nav[] = [
+                'key'   => 'doctors',
+                'route' => 'panel.doctors.index',
+                'icon'  => 'ti ti-stethoscope',
+                'label' => __('actions.sidemenu.doctors'),
+                'match' => ['panel.doctors.*'],
+            ];
+        }
+
+        $nav[] = [
+            'key'   => 'exam-manager',
+            'route' => 'panel.exam-manager.index',
+            'icon'  => 'ti ti-eye',
+            'label' => __('dashboard.module_eye_images'),
+            'match' => ['panel.exam-manager.*'],
+        ];
+
+        // Cirurgias (Fase 4): pedido → autorização → agenda cirúrgica → cirurgia
+        // → pós-operatório. Espelha o middleware das rotas (entity.role:admin,
+        // doctor,secretary + feature:has_surgery): menu que levaria a 403 não aparece.
+        if ($canSeeSchedules && self::hasSurgeryFeature()) {
+            $surgeryChildren = [
+                ['route' => 'panel.surgery.index', 'icon' => 'ti ti-list-details', 'label' => __('actions.sidemenu.surgery_cases'), 'match' => ['panel.surgery.index', 'panel.surgery.show']],
+            ];
+
+            if (Route::has('panel.surgery.agenda')) {
+                $surgeryChildren[] = ['route' => 'panel.surgery.agenda', 'icon' => 'ti ti-calendar-event', 'label' => __('actions.sidemenu.surgery_agenda'), 'match' => ['panel.surgery.agenda*']];
+            }
+
+            if (Route::has('panel.surgery.indicators')) {
+                $surgeryChildren[] = ['route' => 'panel.surgery.indicators', 'icon' => 'ti ti-chart-bar', 'label' => __('actions.sidemenu.surgery_indicators'), 'match' => ['panel.surgery.indicators*']];
+            }
+
+            $nav[] = [
+                'key'      => 'surgery',
+                'icon'     => 'ti ti-heartbeat',
+                'label'    => __('actions.sidemenu.surgery'),
+                'match'    => ['panel.surgery.*'],
+                'children' => $surgeryChildren,
+            ];
+        } elseif (self::hasSurgeryFeature() && in_array($rule, [ClientRule::Financial->value], true) && Route::has('panel.surgery.indicators')) {
+            // Financeiro não opera cirurgias, mas vê os indicadores (ViewSurgeryIndicators).
+            $nav[] = [
+                'key'   => 'surgery-indicators',
+                'route' => 'panel.surgery.indicators',
+                'icon'  => 'ti ti-chart-bar',
+                'label' => __('actions.sidemenu.surgery_indicators'),
+                'match' => ['panel.surgery.indicators*'],
+            ];
+        }
+
+        if ($canSeeAi) {
+            $isDoctor = $rule === ClientRule::Doctor->value;
+
+            // Médicos veem submenu (Dashboard + Meus prompts). Demais roles
+            // só veem o link direto para o dashboard de uso.
+            if ($isDoctor) {
+                $nav[] = [
+                    'key'      => 'ai',
+                    'icon'     => 'ti ti-robot',
+                    'label'    => __('actions.sidemenu.ai_assistant'),
+                    'match'    => ['panel.ai-runs.*', 'panel.setting.ai-prompts.*'],
+                    'children' => [
+                        ['route' => 'panel.ai-runs.index', 'icon' => 'ti ti-chart-pie', 'label' => __('actions.sidemenu.ai_usage'), 'match' => ['panel.ai-runs.index']],
+                        ['route' => 'panel.setting.ai-prompts.index', 'icon' => 'ti ti-bookmark', 'label' => __('actions.sidemenu.ai_prompts'), 'match' => ['panel.setting.ai-prompts.*']],
+                    ],
+                ];
+            } else {
+                $nav[] = [
+                    'key'   => 'ai',
+                    'route' => 'panel.ai-runs.index',
+                    'icon'  => 'ti ti-robot',
+                    'label' => __('actions.sidemenu.ai_assistant'),
+                    'match' => ['panel.ai-runs.*'],
+                ];
+            }
+        }
+
+        // Estoque (Fase 1): produtos/materiais + movimentação. Gate duplo já
+        // acontece no middleware da rota (permission:stock.manage +
+        // feature:has_inventory_module); aqui decide VISIBILIDADE do item de
+        // menu — e precisa espelhar OS DOIS, não só a permission.
+        //
+        // BUG REAL (achado ao investigar "clico no menu e não acontece
+        // nada"): a condição aqui só checava $isAdmin/hasStockManagePermission()
+        // — igual a AI Assistant (canSeeAi() abaixo) já fazia certo pro CASO
+        // DELE, mas o Estoque tinha ficado sem o `&& hasInventoryModuleFeature()`.
+        // Resultado: pra QUALQUER clínica cujo plano não tem
+        // has_inventory_module habilitado (nenhum dos 3 planos reais tinha,
+        // na revisão desta correção), o admin via o menu inteiro (bypass de
+        // permission), clicava num filho, o middleware `feature:` da rota
+        // barrava com FeatureDeniedException, e essa exception faz
+        // `back()->withErrors(...)` — MAS nenhuma tela do painel renderiza
+        // `errors.feature_denied`/`flash.feature_denied` (confirmado: zero
+        // ocorrência em resources/js). O navegador dá a volta completa e
+        // devolve o usuário pro MESMO lugar, sem nenhuma mensagem — daí a
+        // sensação de "não acontece nada". Fix aqui deixa o menu já nascer
+        // condizente com o que a rota realmente permite; o plano do usuário
+        // também precisou ganhar a feature habilitada (dado, não código —
+        // feito via Manager > Planos).
+        //
+        // Posição ACIMA de Financeiro (pedido explícito do usuário): estoque
+        // é rotina operacional mais frequente que fluxo de caixa/faturamento
+        // pro perfil que usa este módulo — ver ordem do array $nav abaixo.
+        if (($isAdmin || self::hasStockManagePermission()) && self::hasInventoryModuleFeature()) {
+            $nav[] = [
+                'key' => 'stock',
+                // BUG REAL (achado ao investigar "sem ícone nenhum" no
+                // sidebar recolhido): `ti-boxes` NÃO EXISTE no set Tabler
+                // Icons deste projeto (confirmado em
+                // node_modules/@tabler/icons-webfont — só `ti-box`/
+                // `ti-box-multiple`, nunca a forma plural "boxes"; provável
+                // confusão com `fa-boxes` do FontAwesome, usado em outras
+                // partes do painel). `<i>` sem classe CSS válida renderiza
+                // vazio — some só no modo colapsado (ícone é a ÚNICA coisa
+                // visível ali; expandido, o texto ao lado escondia o buraco).
+                'icon'     => 'ti ti-building-warehouse',
+                'label'    => __('actions.sidemenu.stock'),
+                'match'    => ['panel.stock.*'],
+                'children' => [
+                    ['route' => 'panel.stock.products.index', 'icon' => 'ti ti-package', 'label' => __('actions.sidemenu.products'), 'match' => ['panel.stock.products.*']],
+                    // Categorias de produto — MOVIDO de Configurações >
+                    // Atendimento (era `panel.setting.product-categories.*`,
+                    // sempre visível). Sem consumidor fora de Estoque (ver
+                    // docblock de ProductCategoriesController), então herda o
+                    // gate do grupo sem custo real pra quem não usa o módulo.
+                    ['route' => 'panel.stock.product-categories.index', 'icon' => 'ti ti-category', 'label' => __('actions.sidemenu.product_categories'), 'match' => ['panel.stock.product-categories.*']],
+                    // Lentes de Catarata (IOL) — MOVIDO de Configurações >
+                    // Atendimento (era `panel.setting.iollenses.*`, sempre
+                    // visível). Cada lente É um EntityProduct real (ver
+                    // App\Services\IolLensStockBridgeService), então cabe
+                    // como catálogo especializado dentro do próprio Estoque;
+                    // herda o gate do grupo (permission:stock.manage +
+                    // feature:has_inventory_module) — decisão do usuário de
+                    // tornar o cadastro de lente parte do módulo pago (ver
+                    // doc "Plano de Migração IOL → Estoque").
+                    ['route' => 'panel.stock.iollenses.index', 'icon' => 'ti ti-eyeglass', 'label' => __('actions.sidemenu.iol_lenses'), 'match' => ['panel.stock.iollenses.*']],
+                    ['route' => 'panel.stock.movements.index', 'icon' => 'ti ti-transfer-in', 'label' => __('actions.sidemenu.stock_movements'), 'match' => ['panel.stock.movements.*']],
+                    ['route' => 'panel.stock.purchase-orders.index', 'icon' => 'ti ti-shopping-cart', 'label' => __('actions.sidemenu.purchase_orders'), 'match' => ['panel.stock.purchase-orders.*']],
+                    ['route' => 'panel.stock.suppliers.index', 'icon' => 'ti ti-truck-delivery', 'label' => __('actions.sidemenu.suppliers'), 'match' => ['panel.stock.suppliers.*']],
+                    ['route' => 'panel.stock.reports.index', 'icon' => 'ti ti-chart-bar', 'label' => __('actions.sidemenu.stock_reports'), 'match' => ['panel.stock.reports.*']],
+                    // GAP fechado (revisão pós-Fase 4 — "melhorar o módulo
+                    // de estoque"): contagem física em massa, ver
+                    // App\Http\Controllers\Stock\StockCountsController.
+                    ['route' => 'panel.stock.counts.index', 'icon' => 'ti ti-clipboard-check', 'label' => __('actions.sidemenu.stock_counts'), 'match' => ['panel.stock.counts.*']],
+                ],
+            ];
+        }
+
+        if ($isFinancial) {
+            $nav[] = [
+                'key'      => 'financial',
+                'icon'     => 'ti ti-cash-register',
+                'label'    => __('actions.sidemenu.financial'),
+                'match'    => ['panel.financial.*'],
+                'children' => [
+                    ['route' => 'panel.financial.bi.index', 'icon' => 'ti ti-layout-dashboard', 'label' => __('actions.sidemenu.management_dashboard'), 'match' => ['panel.financial.bi.*']],
+                    ['route' => 'panel.financial.cash-flow.index', 'icon' => 'ti ti-building-bank', 'label' => __('actions.sidemenu.cash_flow'), 'match' => ['panel.financial.cash-flow.*']],
+                    ['route' => 'panel.financial.cash-closing.index', 'icon' => 'ti ti-lock', 'label' => __('actions.sidemenu.cash_closing'), 'match' => ['panel.financial.cash-closing.*']],
+                    ['route' => 'panel.financial.billing.index', 'icon' => 'ti ti-file-invoice', 'label' => __('actions.sidemenu.tiss_billing'), 'match' => ['panel.financial.billing.*']],
+                    ['route' => 'panel.financial.doctor-payouts.index', 'icon' => 'ti ti-stethoscope', 'label' => __('actions.sidemenu.doctor_payouts'), 'match' => ['panel.financial.doctor-payouts.*']],
+                    ['route' => 'panel.financial.procedure-prices.index', 'icon' => 'ti ti-tags', 'label' => __('actions.sidemenu.procedure_prices'), 'match' => ['panel.financial.procedure-prices.*']],
+                    ['route' => 'panel.financial.tiss.glosas.index', 'icon' => 'ti ti-gavel', 'label' => __('actions.sidemenu.tiss_glosas'), 'match' => ['panel.financial.tiss.glosas.*']],
+                    ['route' => 'panel.financial.reports.cash-flow', 'icon' => 'ti ti-chart-arcs', 'label' => __('actions.sidemenu.report_cash_flow'), 'match' => ['panel.financial.reports.cash-flow*']],
+                    ['route' => 'panel.financial.reports.covenants', 'icon' => 'ti ti-report-money', 'label' => __('actions.sidemenu.report_billing'), 'match' => ['panel.financial.reports.covenants*']],
+                ],
+            ];
+        }
+
+        // Minha assinatura (checkout transparente): só quem paga a assinatura
+        // do EasyEye — admin, financeiro ou dono (mesma regra do middleware
+        // billing.contact da rota; sem ela o item levaria a um 403).
+        if (self::isBillingContact($isFinancial)) {
+            $nav[] = [
+                'key'   => 'my-subscription',
+                'route' => 'panel.my-subscription.index',
+                'icon'  => 'ti ti-receipt',
+                'label' => __('actions.sidemenu.my_subscription'),
+                'match' => ['panel.my-subscription.*'],
+            ];
+        }
+
+        // Novidades: o que mudou em cada versão (todos os perfis). O badge
+        // "novo" vale até o usuário abrir a página (users.changelog_seen_version).
+        $nav[] = [
+            'key'   => 'news',
+            'route' => 'panel.news.index',
+            'icon'  => 'ti ti-speakerphone',
+            'label' => __('actions.sidemenu.news'),
+            'match' => ['panel.news.*'],
+            'badge' => Changelog::hasUnseen(auth()->user()) ? __('actions.sidemenu.news_badge') : null,
+        ];
+
+        if ($isAdmin) {
+            // ── Configurações reorganizadas em 5 categorias (era 1 grupo
+            // flat com 12+ itens soltos + "Controle de acesso" à parte).
+            // "Usuários" e "Segurança" saem do antigo grupo solto e entram
+            // nas categorias semanticamente corretas abaixo.
+
+            // Clínica: recursos físicos da clínica (salas/equipamentos) +
+            // painel de chamadas (MOVIDO de Atendimento — pedido do usuário:
+            // painel de chamadas é infra física exibida em telão/recepção da
+            // clínica, cabe melhor junto de Unidades/salas). Gateways
+            // próprios da clínica: REMOVIDO — a funcionalidade não existe
+            // mais para clínicas. Segurança/2FA MOVIDO pra Usuários e
+            // permissões (era item fixo aqui) — 2FA é configuração de
+            // conta/identidade, não de recurso físico da clínica.
+            $clinicalChildren = [
+                // Rota/controller continuam "resources" — só o label do menu
+                // muda para "Unidades / salas" (ClinicResource não é renomeado).
+                ['route' => 'panel.setting.resources.index', 'label' => __('actions.sidemenu.clinic_resources'), 'match' => ['panel.setting.resources.*', 'panel.resources.work-schedule.*']],
+                ['route' => 'panel.setting.call-panel.index', 'label' => __('schedules.call_panel_title'), 'match' => ['panel.setting.call-panel.*']],
+            ];
+
+            // Cirurgia (Fase 4): locais e salas cirúrgicas — só com o recurso do plano.
+            if (self::hasSurgeryFeature()) {
+                $clinicalChildren[] = ['route' => 'panel.setting.surgery-facilities.index', 'label' => __('actions.sidemenu.surgery_facilities'), 'match' => ['panel.setting.surgery-facilities.*']];
+            }
+
+            // Atendimento: catálogos ligados ao fluxo de agendamento/atendimento.
+            $attendanceChildren = [
+                // Agenda: limiar de "poucas vagas" do calendário lateral.
+                ['route' => 'panel.setting.schedule.index', 'label' => __('schedules.settings_title'), 'match' => ['panel.setting.schedule.*']],
+                ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants'), 'match' => ['panel.setting.covenants.*', 'panel.setting.covenant-plans.*']],
+                ['route' => 'panel.setting.visittypes.index', 'label' => __('actions.sidemenu.visittypes'), 'match' => ['panel.setting.visittypes.*']],
+                // 'Tipos de cirurgia' MOVIDO pra virar 9ª aba dentro de
+                // "Parâmetros oftalmológicos" (era item solto aqui) — pedido
+                // do usuário; ver $ophthalmologyMatch/$ophthalmologyChildren
+                // abaixo e o $tabsGroup replicado nos 9 controllers do grupo
+                // (SurgeryTypesController incluso).
+                // 'Lentes de Catarata' e 'Categorias de produto' MOVIDOS pro
+                // menu Estoque (eram itens fixos aqui, sempre visíveis
+                // independente de plano) — agora vivem dentro do bloco
+                // `stock` abaixo, atrás do mesmo gate (permission:stock.manage
+                // + feature:has_inventory_module). Decisão do usuário:
+                // cadastro de lente/categoria vira parte do módulo pago — ver
+                // doc "Plano de Migração IOL → Estoque".
+            ];
+
+            // Usuários e permissões: identidade + RBAC granular (roles) +
+            // segurança/2FA (MOVIDO de Clínica — ver comentário acima).
+            $usersChildren = [
+                ['route' => 'panel.accesscontrol.users.index', 'label' => __('actions.users'), 'match' => ['panel.accesscontrol.users.*']],
+                ['route' => 'panel.accesscontrol.roles.index', 'label' => __('actions.sidemenu.roles'), 'match' => ['panel.accesscontrol.roles.*']],
+                ['route' => 'panel.setting.security.index', 'label' => __('manager_hardening.entity_2fa_section'), 'match' => ['panel.setting.security.*']],
+            ];
+
+            // Documentos: modelos de documentação clínica (receituários,
+            // laudos, atestados...) via DocumentationType — um único item.
+            $documentsChildren = [
+                ['route' => 'panel.setting.report-settings.index', 'label' => __('actions.report_settings.title'), 'match' => ['panel.setting.report-settings.*']],
+                // Kits de exames por convênio do pedido de exames (Fase 2 / B2).
+                ['route' => 'panel.setting.exam-kits.index', 'label' => __('clinical_documents.kits.menu'), 'match' => ['panel.setting.exam-kits.*']],
+                // Orientações pós-procedimento: texto, local, colírios e PDFs entregues ao paciente (Fase 6 / S14).
+                ['route' => 'panel.setting.care-guidance.index', 'label' => __('care_guidance.menu'), 'match' => ['panel.setting.care-guidance.*']],
+            ];
+
+            // Modelos de TCLE e orientações cirúrgicas (Fase 4) — rota registrada pelo módulo de documentos.
+            if (self::hasSurgeryFeature() && Route::has('panel.setting.surgery-templates.index')) {
+                $documentsChildren[] = ['route' => 'panel.setting.surgery-templates.index', 'label' => __('actions.sidemenu.surgery_templates'), 'match' => ['panel.setting.surgery-templates.*']];
+            }
+
+            // Oftalmologia: os 9 sub-catálogos clínicos viram ABAS dentro de
+            // uma única página ("Parâmetros oftalmológicos"), não itens soltos
+            // no menu (ver BaseSettingController::$tabsGroup). O match cobre
+            // as 9 rotas para o item de menu ficar "ativo" em qualquer aba.
+            // 'Tipos de cirurgia' (surgerytypes) é a 9ª — MOVIDO de
+            // Atendimento (pedido do usuário).
+            $ophthalmologyMatch = [
+                'panel.setting.skintypes.*',
+                'panel.setting.iristypes.*',
+                'panel.setting.additiontypes.*',
+                'panel.setting.visualacuitytypes.*',
+                'panel.setting.colorvisiontypes.*',
+                'panel.setting.nearpointconvergences.*',
+                'panel.setting.covertesttypes.*',
+                'panel.setting.lenses.*',
+                'panel.setting.surgerytypes.*',
+            ];
+            $ophthalmologyChildren = [
+                ['route' => 'panel.setting.skintypes.index', 'label' => __('actions.sidemenu.ophthalmology_parameters'), 'match' => $ophthalmologyMatch],
+            ];
+
+            $nav[] = ['section' => __('actions.sidemenu.settings')];
+            $nav[] = [
+                'key'      => 'settings-clinical',
+                'icon'     => 'ti ti-building-hospital',
+                'label'    => __('actions.sidemenu.settings_clinical'),
+                'match'    => array_merge(...array_column($clinicalChildren, 'match')),
+                'children' => $clinicalChildren,
+            ];
+            $nav[] = [
+                'key'      => 'settings-attendance',
+                'icon'     => 'ti ti-clipboard-list',
+                'label'    => __('actions.sidemenu.settings_attendance'),
+                'match'    => array_merge(...array_column($attendanceChildren, 'match')),
+                'children' => $attendanceChildren,
+            ];
+            $nav[] = [
+                'key'      => 'settings-users',
+                'icon'     => 'ti ti-users-group',
+                'label'    => __('actions.sidemenu.settings_users'),
+                'match'    => array_merge(...array_column($usersChildren, 'match')),
+                'children' => $usersChildren,
+            ];
+            $nav[] = [
+                'key'      => 'settings-documents',
+                'icon'     => 'ti ti-file-text',
+                'label'    => __('actions.sidemenu.settings_documents'),
+                'match'    => array_merge(...array_column($documentsChildren, 'match')),
+                'children' => $documentsChildren,
+            ];
+            $nav[] = [
+                'key'      => 'settings-ophthalmology',
+                'icon'     => 'ti ti-eye',
+                'label'    => __('actions.sidemenu.settings_ophthalmology'),
+                'match'    => $ophthalmologyMatch,
+                'children' => $ophthalmologyChildren,
+            ];
+        }
+
+        // Meus repasses: só médico e só se a clínica expôs os repasses aos
+        // médicos (entities.doctor_payouts_visible) — a rota devolve 404 no
+        // mesmo caso, então o item nunca aparece sem funcionar. Último item
+        // do menu (pedido do usuário), depois de IA e dos demais módulos.
+        if ($rule === ClientRule::Doctor->value && self::doctorPayoutsVisible()) {
+            $nav[] = [
+                'key'   => 'my-payouts',
+                'route' => 'panel.my-payouts.index',
+                'icon'  => 'ti ti-receipt-2',
+                'label' => __('actions.sidemenu.my_payouts'),
+                'match' => ['panel.my-payouts.*'],
+            ];
+        }
+
+        return $nav;
+    }
+
+    /**
+     * `is_owner` do usuário logado na entity SaaS selecionada — checagem sob
+     * demanda (não cacheada em sessão, ao contrário de selected_entity_user_rule),
+     * usada só para decidir se o item "Finanças" aparece no menu.
+     */
+    private static function currentUserOwnsSelectedEntity(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        $entity = Entity::find(session('selected_entity_id'));
+
+        return $entity && $user->isOwnerOfEntity($entity);
+    }
+
+    private static function canSeeAi(?string $rule): bool
+    {
+        if (! in_array($rule, [ClientRule::Admin->value, ClientRule::Doctor->value, ClientRule::Secretary->value], true)) {
+            return false;
+        }
+
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        $featureGate = app(FeatureGateService::class);
+
+        return $featureGate->can((string) $entityId, FeatureKey::HasAiExamAssistant)
+            || $featureGate->can((string) $entityId, FeatureKey::HasAiReportDrafting);
+    }
+
+    /**
+     * True pra admin (bypass interno de hasPermissionInEntity()) OU usuário
+     * com Role customizada portando a permission granular `stock.manage`.
+     * `auth()->user()` (não passado como parâmetro) porque build() é
+     * chamado sem argumentos por HandleInertiaRequests — mesmo padrão de
+     * canSeeAi() acima resolvendo tudo a partir de session()/helpers globais.
+     */
+    private static function hasStockManagePermission(): bool
+    {
+        return self::hasEntityPermission(Permission::StockManage);
+    }
+
+    /** Permissão (perfil customizado) do usuário logado na clínica da sessão. */
+    private static function hasEntityPermission(Permission $permission): bool
+    {
+        $entityId = session('selected_entity_id');
+        $user     = auth()->user();
+
+        if (! $entityId || ! $user) {
+            return false;
+        }
+
+        $entity = Entity::find($entityId);
+
+        if (! $entity) {
+            return false;
+        }
+
+        return $user->hasPermissionInEntity($entity, $permission);
+    }
+
+    /** Espelha o middleware `feature:has_patient_recall` das rotas de Retornos (sem a feature o item some). */
+    private static function hasRecallFeature(): bool
+    {
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        return app(FeatureGateService::class)->can((string) $entityId, FeatureKey::HasPatientRecall);
+    }
+
+    /**
+     * Espelha o middleware `feature:has_inventory_module` das rotas de
+     * estoque (routes/web.php) — mesmo padrão de canSeeAi() acima pras
+     * features de IA. Sem isso o menu aparece pra quem tem
+     * stock.manage/é admin mas o PLANO da clínica não inclui o módulo, e
+     * clicar em qualquer item bate no gate da rota e devolve o usuário pro
+     * mesmo lugar sem aviso nenhum (ver comentário no bloco de montagem do
+     * menu acima).
+     */
+    /** Espelha `feature:has_surgery` das rotas do módulo cirúrgico. */
+    private static function hasSurgeryFeature(): bool
+    {
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        return app(FeatureGateService::class)->can((string) $entityId, FeatureKey::HasSurgery);
+    }
+
+    private static function hasInventoryModuleFeature(): bool
+    {
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        return app(FeatureGateService::class)->can((string) $entityId, FeatureKey::HasInventoryModule);
+    }
+
+    /**
+     * Contato de cobrança da clínica da sessão (admin, financeiro ou dono,
+     * vínculo ativo). Admin/financeiro pela sessão; o dono (is_owner, não
+     * guardado em sessão) consulta o vínculo.
+     */
+    private static function isBillingContact(bool $isAdminOrFinancial): bool
+    {
+        $entityId = (string) session('selected_entity_id', '');
+
+        if ($entityId === '') {
+            return false;
+        }
+
+        return $isAdminOrFinancial || app(SubscriptionNoticeService::class)->canSeeBilling(auth()->user(), $entityId);
+    }
+
+    /** A clínica da sessão deixa os médicos verem os próprios repasses? */
+    private static function doctorPayoutsVisible(): bool
+    {
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        return (bool) Entity::query()->whereKey($entityId)->value('doctor_payouts_visible');
+    }
+
+    /**
+     * Grupo "IA" do manager: uma entrada por tela, cada uma visível só pra
+     * quem passa no Gate da própria tela (link que cairia em 403 não aparece):
+     * Uso e custos (SaasOwnerFinancial — admin ou dono), Compras de créditos
+     * (SaasAccess — toda a equipe do SaaS), Provedores e modelos
+     * (SaasAdminPanel — admin; antes aparecia pra todos e dava 403).
+     *
+     * @return array<string, mixed>
+     */
+    private static function managerAiGroup(bool $isSaasAdmin, bool $isOwnerOrAdmin): array
+    {
+        $children = [];
+
+        if ($isOwnerOrAdmin) {
+            $children[] = ['route' => 'manager.ai-usage.index', 'icon' => 'ti ti-chart-dots-3', 'label' => __('actions.sidemenu.ai_menu_usage'), 'match' => ['manager.ai-usage.*']];
+            $children[] = ['route' => 'manager.ai-pricing.index', 'icon' => 'ti ti-calculator', 'label' => __('actions.sidemenu.ai_menu_pricing'), 'match' => ['manager.ai-pricing.*']];
+        }
+
+        $children[] = ['route' => 'manager.ai-credit-purchases.index', 'icon' => 'ti ti-coin', 'label' => __('actions.sidemenu.ai_menu_credits'), 'match' => ['manager.ai-credit-purchases.*']];
+
+        if ($isSaasAdmin) {
+            $children[] = ['route' => 'manager.ai-providers.index', 'icon' => 'ti ti-plug-connected', 'label' => __('actions.sidemenu.ai_menu_providers'), 'match' => ['manager.ai-providers.*']];
+        }
+
+        return [
+            'key'      => 'ai',
+            'icon'     => 'ti ti-sparkles',
+            'label'    => __('actions.sidemenu.ai_group'),
+            'match'    => ['manager.ai-usage.*', 'manager.ai-pricing.*', 'manager.ai-credit-purchases.*', 'manager.ai-providers.*'],
+            'children' => $children,
+        ];
+    }
+
+    /**
+     * Catálogos globais (medicamentos, CID-10, convênios) — rotas saas.role:admin
+     * (admin ou dono); para o resto da equipe o link só daria 403.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function managerCatalogItems(bool $isOwnerOrAdmin): array
+    {
+        if (! $isOwnerOrAdmin) {
+            return [];
+        }
+
+        return [
+            [
+                'key'   => 'medicines',
+                'route' => 'manager.medicines.index',
+                'icon'  => 'ti ti-pill',
+                'label' => __('manager_medicines.menu'),
+                'match' => ['manager.medicines.*'],
+            ],
+            [
+                'key'   => 'cid10',
+                'route' => 'manager.cid10.index',
+                'icon'  => 'ti ti-stethoscope',
+                'label' => __('manager_cid10.menu'),
+                'match' => ['manager.cid10.*'],
+            ],
+            [
+                'key'   => 'exam-kits',
+                'route' => 'manager.exam-kits.index',
+                'icon'  => 'ti ti-list-check',
+                'label' => __('clinical_documents.kits.menu'),
+                'match' => ['manager.exam-kits.*'],
+            ],
+            [
+                'key'   => 'covenants',
+                'route' => 'manager.covenants.index',
+                'icon'  => 'ti ti-building-hospital',
+                'label' => __('manager_covenants.menu'),
+                'match' => ['manager.covenants.*'],
+            ],
+        ];
+    }
+
+    /**
+     * Governança clínica (Fase 6): protocolos de retorno e, adiante, as revisões do
+     * Revisor Clínico. Só admin SaaS — as rotas são saas.role:admin, então o item não
+     * pode aparecer para quem receberia 403 ao clicar.
+     */
+    private static function managerGovernanceItems(bool $isSaasAdmin): array
+    {
+        if (! $isSaasAdmin) {
+            return [];
+        }
+
+        return [
+            [
+                'key'   => 'recall-protocols',
+                'route' => 'manager.recall-protocols.index',
+                'icon'  => 'ti ti-calendar-repeat',
+                'label' => __('manager_recall.menu'),
+                'match' => ['manager.recall-protocols.*'],
+            ],
+            [
+                'key'   => 'clinical-reviews',
+                'route' => 'manager.clinical-reviews.index',
+                'icon'  => 'ti ti-stethoscope',
+                'label' => __('manager_reviews.menu'),
+                'match' => ['manager.clinical-reviews.*', 'manager.clinical-reviewers.*'],
+            ],
+        ];
+    }
+
+    private static function managerNav(): array
+    {
+        $nav = [
+            [
+                'key'   => 'dashboard',
+                'route' => 'panel.dashboard',
+                'icon'  => 'ti ti-layout-dashboard',
+                'label' => __('actions.sidemenu.dashboard'),
+                'match' => ['panel.dashboard'],
+            ],
+        ];
+
+        // P&L interno do EasyEye: item de menu só aparece pra quem realmente
+        // vai passar no Gate SaasOwnerFinancial (admin OU dono) — evita um
+        // Financial/Support ver o link e cair num 403 ao clicar. Única
+        // checagem deste arquivo que consulta o banco (is_owner não é
+        // cacheado em sessão como selected_entity_user_rule) — aceitável:
+        // só roda pra staff do manager, não no hot path das clínicas.
+        $rule           = session('selected_entity_user_rule');
+        $isSaasAdmin    = $rule === SaasRule::Admin->value;
+        $isOwnerOrAdmin = $isSaasAdmin || self::currentUserOwnsSelectedEntity();
+
+        if ($isOwnerOrAdmin) {
+            $nav[] = [
+                'key'   => 'finance',
+                'route' => 'manager.finance.index',
+                'icon'  => 'ti ti-report-money',
+                'label' => __('actions.sidemenu.finance'),
+                'match' => ['manager.finance.*'],
+            ];
+        }
+
+        return array_merge($nav, [
+            [
+                'key'   => 'entities',
+                'route' => 'manager.entities.index',
+                'icon'  => 'ti ti-building',
+                'label' => __('actions.sidemenu.entities'),
+                'match' => ['manager.entities.*'],
+            ],
+            // Planos e Assinaturas são um fluxo só (abas no topo das duas telas):
+            // um item abre Assinaturas — liberada também para o financeiro — e
+            // fica ativo nas duas. Planos é só admin; a aba some para o resto.
+            [
+                'key'   => 'subscriptions',
+                'route' => 'manager.subscriptions.index',
+                'icon'  => 'ti ti-file-invoice',
+                'label' => __('actions.sidemenu.plans_subscriptions'),
+                'match' => ['manager.subscriptions.*', 'manager.plans.*'],
+            ],
+            [
+                'key'   => 'gateways',
+                'route' => 'manager.gateways.index',
+                'icon'  => 'ti ti-credit-card',
+                'label' => __('actions.sidemenu.gateways'),
+                'match' => ['manager.gateways.*'],
+            ],
+            [
+                'key'   => 'nfse',
+                'route' => 'manager.nfse.index',
+                'icon'  => 'ti ti-receipt',
+                'label' => __('actions.sidemenu.nfse'),
+                'match' => ['manager.nfse.*'],
+            ],
+            [
+                'key'   => 'report-settings',
+                'route' => 'manager.report-settings.index',
+                'icon'  => 'ti ti-file-description',
+                'label' => __('actions.report_settings.title'),
+                'match' => ['manager.report-settings.*'],
+            ],
+            ...self::managerCatalogItems($isOwnerOrAdmin),
+            ...self::managerGovernanceItems($isSaasAdmin),
+            [
+                'key'   => 'partners',
+                'route' => 'manager.partners.index',
+                'icon'  => 'ti ti-affiliate',
+                'label' => __('actions.sidemenu.partners'),
+                'match' => ['manager.partners.*'],
+            ],
+            self::managerAiGroup($isSaasAdmin, $isOwnerOrAdmin),
+            [
+                'key'   => 'whatsapp',
+                'route' => 'manager.whatsapp.index',
+                'icon'  => 'ti ti-brand-whatsapp',
+                'label' => __('whatsapp.title'),
+                'match' => ['manager.whatsapp.*'],
+            ],
+
+            // ── Controle de acesso ──────────────────────────────────────────
+            // Agrupa identidade + autenticação (usuários + 2FA da entity SaaS).
+            // Forçar 2FA em uma clínica cliente continua sendo via aba
+            // "Segurança" no EntityFormModal de /panel/manager/entities.
+            ['section' => __('actions.sidemenu.access_control')],
+            [
+                'key'   => 'users',
+                'route' => 'panel.accesscontrol.users.index',
+                'icon'  => 'ti ti-users-group',
+                'label' => __('actions.sidemenu.users'),
+                'match' => ['panel.accesscontrol.users.*'],
+            ],
+            [
+                'key'   => 'security',
+                'route' => 'panel.setting.security.index',
+                'icon'  => 'ti ti-shield-lock',
+                'label' => __('manager_hardening.entity_2fa_section'),
+                'match' => ['panel.setting.security.*'],
+            ],
+        ]);
+    }
+}

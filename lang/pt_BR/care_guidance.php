@@ -1,0 +1,100 @@
+<?php
+
+/*
+ * Orientações pós-procedimento (Fase 6 / S14): modelos da clínica (Configurações), emissão no prontuário e o PDF.
+ * Enviado às telas como `t` (Configurações › Orientações) e `t_guidance` (modal de procedimentos do prontuário).
+ * Mesmas chaves em lang/en/care_guidance.php.
+ */
+
+return [
+    'menu' => 'Orientações pós-procedimento',
+
+    'settings' => [
+        'title'              => 'Orientações pós-procedimento',
+        'subtitle'           => 'Modelos que o médico entrega ao paciente depois do procedimento: texto, local, colírios e PDFs. O que o paciente recebe fica congelado no momento da emissão.',
+        'new'                => 'Novo modelo',
+        'empty'              => 'A clínica ainda não tem modelos de orientação.',
+        'edit'               => 'Editar',
+        'delete'             => 'Excluir',
+        'delete_confirm'     => 'Excluir o modelo ":title"? As orientações já entregues não mudam.',
+        'cancel'             => 'Cancelar',
+        'save'               => 'Salvar',
+        'active'             => 'Ativo',
+        'inactive'           => 'Desativado',
+        'any_procedure'      => 'Qualquer procedimento',
+        'saved'              => 'Modelo salvo.',
+        'deleted'            => 'Modelo excluído.',
+        'attachment_added'   => 'PDF anexado.',
+        'attachment_removed' => 'PDF removido.',
+        'save_first'         => 'Salve o modelo para anexar PDFs.',
+        'fields'             => [
+            'title'          => 'Título',
+            'procedure'      => 'Procedimento',
+            'procedure_hint' => 'Em branco, o modelo serve a qualquer procedimento. Digite 2 letras para buscar no catálogo.',
+            'location'       => 'Local',
+            'location_hint'  => 'Texto livre: onde o paciente deve ir (ex.: "Sala de curativos, 2º andar").',
+            'body'           => 'Orientações',
+            'body_hint'      => 'Texto que o paciente recebe. O médico pode ajustar para cada paciente na hora de entregar.',
+            'eye_drops'      => 'Colírios',
+            'drop_name'      => 'Colírio',
+            'drop_how'       => 'Como usar',
+            'drop_times'     => 'Vezes ao dia',
+            'drop_days'      => 'Dias',
+            'add_drop'       => 'Adicionar colírio',
+            'remove_drop'    => 'Remover colírio',
+            'attachments'    => 'PDFs que acompanham',
+            'attach_pdf'     => 'Anexar PDF',
+            'attach_hint'    => 'Até :max PDFs de 5 MB cada.',
+            'remove_pdf'     => 'Remover PDF',
+        ],
+    ],
+
+    'issue' => [
+        'open'        => 'Orientações',
+        'title'       => 'Orientações ao paciente',
+        'none'        => 'Nenhum modelo serve a este procedimento. Cadastre em Configurações › Orientações pós-procedimento.',
+        'choose'      => 'Modelo',
+        'adjust'      => 'Ajuste para este paciente (opcional)',
+        'body'        => 'Texto',
+        'location'    => 'Local',
+        'eye_drops'   => 'Colírios',
+        'issue'       => 'Emitir orientação',
+        'issuing'     => 'Emitindo…',
+        'issued'      => 'Orientação emitida.',
+        'previous'    => 'Já entregues',
+        'no_previous' => 'Nenhuma orientação entregue para este procedimento.',
+        'pdf'         => 'Abrir PDF',
+        'attachment'  => 'PDF anexo',
+        'frozen_hint' => 'O que for emitido fica congelado: mudar o modelo depois não altera a orientação entregue.',
+        'back'        => 'Voltar',
+        'loading'     => 'Carregando orientações…',
+        'load_error'  => 'Não foi possível carregar as orientações.',
+    ],
+
+    'pdf' => [
+        'location'    => 'Local',
+        'eye'         => 'Olho',
+        'eyes'        => ['right' => 'Olho direito (OD)', 'left' => 'Olho esquerdo (OE)', 'both' => 'Ambos os olhos (AO)'],
+        'eye_drops'   => 'Colírios',
+        'drop_name'   => 'Colírio',
+        'drop_how'    => 'Como usar',
+        'drop_times'  => 'Vezes ao dia',
+        'drop_days'   => 'Por quantos dias',
+        'attachments' => 'Acompanham esta orientação',
+        'issued_on'   => 'Entregue em :date',
+    ],
+
+    'errors' => [
+        'generic'                 => 'Não foi possível concluir. Tente de novo.',
+        'template_not_found'      => 'Modelo não encontrado nesta clínica.',
+        'template_inactive'       => 'O modelo está desativado.',
+        'procedure_mismatch'      => 'Este modelo é de outro procedimento.',
+        'procedure_cancelled'     => 'Procedimento cancelado não tem orientação.',
+        'attachment_not_pdf'      => 'O arquivo não é um PDF.',
+        'attachment_too_large'    => 'O PDF passa de 5 MB.',
+        'attachment_limit'        => 'Cada modelo aceita no máximo 5 PDFs.',
+        'attachment_not_found'    => 'Anexo não encontrado neste modelo.',
+        'attachment_missing_file' => 'O arquivo do PDF não está mais disponível: envie o anexo de novo.',
+        'too_many_drops'          => 'No máximo 10 colírios por orientação.',
+    ],
+];

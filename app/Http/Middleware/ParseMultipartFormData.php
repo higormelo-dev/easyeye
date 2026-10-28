@@ -11,7 +11,7 @@ class ParseMultipartFormData
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param Closure(Request): (Response) $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -29,7 +29,7 @@ class ParseMultipartFormData
         $contentType = $request->header('Content-Type');
         preg_match('/boundary=(.+)$/', $contentType, $matches);
 
-        if (!isset($matches[1])) {
+        if (! isset($matches[1])) {
             return;
         }
 
@@ -73,7 +73,7 @@ class ParseMultipartFormData
             $contentDisposition = $headers['content-disposition'] ?? '';
 
             // Extract name
-            if (!preg_match('/name="([^"]+)"/', $contentDisposition, $nameMatch)) {
+            if (! preg_match('/name="([^"]+)"/', $contentDisposition, $nameMatch)) {
                 continue;
             }
 
@@ -83,7 +83,7 @@ class ParseMultipartFormData
             if (preg_match('/filename="([^"]*)"/', $contentDisposition, $filenameMatch)) {
                 $filename = $filenameMatch[1];
 
-                if (!empty($filename) && !empty($body)) {
+                if (! empty($filename) && ! empty($body)) {
                     // Create temporary file
                     $tempFile = tempnam(sys_get_temp_dir(), 'upload_');
                     file_put_contents($tempFile, $body);
@@ -95,7 +95,7 @@ class ParseMultipartFormData
                         $filename,
                         $mimeType,
                         null,
-                        true
+                        true,
                     );
 
                     $files[$name] = $uploadedFile;
@@ -108,8 +108,8 @@ class ParseMultipartFormData
                 $cleanBody = preg_replace('/[\r\n]+/', '', $cleanBody);
 
                 // Remove dashes do boundary que podem ter sobrado
-                $cleanBody = ltrim($cleanBody, "-");
-                $cleanBody = rtrim($cleanBody, "-");
+                $cleanBody = ltrim($cleanBody, '-');
+                $cleanBody = rtrim($cleanBody, '-');
 
                 // Trim final
                 $cleanBody = trim($cleanBody);

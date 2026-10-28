@@ -1,0 +1,496 @@
+<?php
+
+use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
+use App\Enums\Permission;
+use App\Models\{Entity, Plan, PlanFeature, Subscription, User};
+use App\Models\{PermissionRecord, Role};
+use App\Support\PanelNavigation;
+use Database\Seeders\PermissionsSeeder;
+use Illuminate\Support\Facades\Route;
+
+/**
+ * Teste de regressão do PanelNavigation (app/Support/PanelNavigation.php).
+ *
+ * Bug original ("página preta"): PanelNavigation::build() referenciava uma
+ * rota com nome errado (label/nome digitado incorretamente) e isso derrubava
+ * a renderização INTEIRA do menu — a página inertia inteira ficava preta,
+ * sem nenhum fallback. Ver App\Support\PanelNavigation e
+ * resources/js/Layouts/AppLayout.vue::safeRoute() (hardening no front).
+ *
+ * Este arquivo cobre:
+ *  1. build() nunca lança exceção pra sessão de admin cliente.
+ *  2. As 5 categorias reorganizadas de Configurações (Clínica/Atendimento/
+ *     Usuários e permissões/Documentos/Oftalmologia) existem e têm children.
+ *  3. TODA rota referenciada no array retornado (recursivo, incluindo
+ *     children) existe de fato no route list — o teste mais importante,
+ *     pega qualquer nome de rota digitado errado.
+ *  4. Labels de "covertesttypes" e "colorvisiontypes" não ficam duplicados.
+ *  5. Os 9 sub-catálogos oftalmológicos não viram itens soltos no menu
+ *     (9º = "Tipos de cirurgia", MOVIDO de Atendimento — pedido do usuário).
+ *  6. "visittypes" usa o label "Tipos de atendimento" (não mais "Tipos de visita").
+ *  7. Request HTTP real: página do catálogo responde 200 e o prop Inertia
+ *     `tabsGroup` vem populado com as 9 entradas.
+ */
+
+/**
+ * Percorre recursivamente um array de navegação (item + children) e coleta
+ * todo valor de 'route' encontrado.
+ *
+ * @param array<int, array<string, mixed>> $nav
+ *
+ * @return list<string>
+ */
+function collectNavRoutes(array $nav): array
+{
+    $routes = [];
+
+    foreach ($nav as $item) {
+        if (isset($item['route']) && is_string($item['route'])) {
+            $routes[] = $item['route'];
+        }
+
+        if (isset($item['children']) && is_array($item['children'])) {
+            $routes = [...$routes, ...collectNavRoutes($item['children'])];
+        }
+    }
+
+    return array_values(array_unique($routes));
+}
+
+/**
+ * Localiza o item de navegação de nível superior cuja 'key' bate.
+ *
+ * @param array<int, array<string, mixed>> $nav
+ *
+ * @return array<string, mixed>|null
+ */
+function findNavItemByKey(array $nav, string $key): ?array
+{
+    foreach ($nav as $item) {
+        if (($item['key'] ?? null) === $key) {
+            return $item;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Assert que cada nome de rota da lista existe no route list real da
+ * aplicação — nem `Route::has()` mente, nem `route()` deixa passar nome
+ * inválido sem estourar RouteNotFoundException.
+ *
+ * @param list<string> $routeNames
+ */
+function assertAllRoutesResolve(array $routeNames): void
+{
+    expect($routeNames)->not->toBeEmpty();
+
+    foreach ($routeNames as $routeName) {
+        expect(Route::has($routeName))
+            ->toBeTrue("Rota '{$routeName}' referenciada no menu não existe no route list.");
+
+        expect(fn () => route($routeName))
+            ->not->toThrow(Throwable::class, null, "route('{$routeName}') lançou exceção — nome de rota quebrado.");
+    }
+}
+
+/**
+ * Cria uma Entity cliente ativa com assinatura habilitando as features
+ * informadas — usado pra exercitar os ramos condicionais do menu (IA,
+ * gateways próprios) que dependem de FeatureGateService.
+ *
+ * @param list<FeatureKey> $enabledFeatures
+ */
+function entityWithFeatures(array $enabledFeatures): Entity
+{
+    $entity = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $plan   = Plan::factory()->create(['active' => true]);
+
+    foreach ($enabledFeatures as $feature) {
+        PlanFeature::factory()->enabled($feature)->for($plan)->create();
+    }
+
+    Subscription::factory()->create([
+        'entity_id' => $entity->id,
+        'plan_id'   => $plan->id,
+        'status'    => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(),
+        'ends_at'   => now()->addMonth(),
+    ]);
+
+    return $entity;
+}
+
+beforeEach(function () {
+    $this->entity          = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $this->adminUser       = User::factory()->create();
+    $this->adminEntityUser = createEntityUser($this->entity, $this->adminUser, ClientRule::Admin->value);
+});
+
+// ── 1. Regressão "página preta": build() nunca lança exceção ───────────────
+
+it('PanelNavigation::build() não lança nenhuma exceção pra sessão de admin cliente', function () {
+    session(panelSession($this->adminEntityUser));
+
+    $nav = null;
+
+    expect(function () use (&$nav) {
+        $nav = PanelNavigation::build();
+    })->not->toThrow(Throwable::class);
+
+    expect($nav)->toBeArray()->not->toBeEmpty();
+});
+
+// ── 2. As 5 categorias de Configurações, cada uma com children ─────────────
+
+it('expõe as 5 categorias de Configurações com children não vazios', function () {
+    session(panelSession($this->adminEntityUser));
+
+    $nav = PanelNavigation::build();
+
+    $expectedCategories = [
+        'settings-clinical'      => 'Clínica',
+        'settings-attendance'    => 'Atendimento',
+        'settings-users'         => 'Usuários e permissões',
+        'settings-documents'     => 'Documentos',
+        'settings-ophthalmology' => 'Oftalmologia',
+    ];
+
+    foreach ($expectedCategories as $key => $expectedLabel) {
+        $item = findNavItemByKey($nav, $key);
+
+        expect($item)->not->toBeNull("Categoria '{$key}' não encontrada no menu.");
+        expect($item['label'])->toBe($expectedLabel);
+        expect($item['children'] ?? [])->not->toBeEmpty("Categoria '{$key}' está sem children.");
+    }
+});
+
+// ── 3. Toda rota referenciada no menu existe — o teste mais importante ─────
+
+it('nenhuma rota referenciada no menu de admin cliente está quebrada', function () {
+    session(panelSession($this->adminEntityUser));
+
+    assertAllRoutesResolve(collectNavRoutes(PanelNavigation::build()));
+});
+
+it('nenhuma rota do menu de Assistente de IA (médico) está quebrada', function () {
+    $entity           = entityWithFeatures([FeatureKey::HasAiExamAssistant]);
+    $doctor           = User::factory()->create();
+    $doctorEntityUser = createEntityUser($entity, $doctor, ClientRule::Doctor->value);
+
+    session(panelSession($doctorEntityUser));
+
+    $routes = collectNavRoutes(PanelNavigation::build());
+
+    // Confirma que o ramo condicional de IA (médico vê submenu com 2 rotas)
+    // realmente foi exercitado — senão o teste passaria vazio, sem valor.
+    expect(array_filter($routes, fn ($r) => str_starts_with($r, 'panel.ai-runs.') || str_starts_with($r, 'panel.setting.ai-prompts.')))
+        ->not->toBeEmpty();
+
+    assertAllRoutesResolve($routes);
+});
+
+it('gateways de pagamento próprios da clínica NÃO existem mais (menu e rotas removidos)', function () {
+    $entity          = entityWithFeatures([]);
+    $admin           = User::factory()->create();
+    $adminEntityUser = createEntityUser($entity, $admin, ClientRule::Admin->value);
+
+    session(panelSession($adminEntityUser));
+
+    $routes = collectNavRoutes(PanelNavigation::build());
+
+    // Funcionalidade retirada do produto: nem item de menu, nem rota registrada.
+    expect($routes)->not->toContain('panel.setting.gateways.index')
+        ->and(Route::has('panel.setting.gateways.index'))->toBeFalse();
+});
+
+it('nenhuma rota do menu de gestão SaaS (manager, entity não-cliente) está quebrada', function () {
+    $saasEntity     = Entity::factory()->create(['is_client' => false, 'active' => true]);
+    $saasUser       = User::factory()->create();
+    $saasEntityUser = createEntityUser($saasEntity, $saasUser, ClientRule::Admin->value);
+
+    session([
+        'selected_entity_id'        => $saasEntityUser->entity_id,
+        'selected_entity_user_id'   => $saasEntityUser->id,
+        'selected_entity_user_rule' => $saasEntityUser->rule,
+        'selected_entity_is_client' => false,
+    ]);
+
+    $routes = collectNavRoutes(PanelNavigation::build());
+
+    // Garante que caímos mesmo no ramo managerNav() (rotas manager.*).
+    expect(array_filter($routes, fn ($r) => str_starts_with($r, 'manager.')))->not->toBeEmpty();
+
+    assertAllRoutesResolve($routes);
+});
+
+it('manager: Planos e Assinaturas são um item só, ativo nas duas telas e abrindo Assinaturas', function () {
+    $saasEntity     = Entity::factory()->create(['is_client' => false, 'active' => true]);
+    $saasEntityUser = createEntityUser($saasEntity, User::factory()->create(), 'admin');
+
+    session([
+        'selected_entity_id'        => $saasEntityUser->entity_id,
+        'selected_entity_user_id'   => $saasEntityUser->id,
+        'selected_entity_user_rule' => 'admin',
+        'selected_entity_is_client' => false,
+    ]);
+
+    $nav  = PanelNavigation::build();
+    $item = findNavItemByKey($nav, 'subscriptions');
+
+    expect(findNavItemByKey($nav, 'plans'))->toBeNull()
+        ->and($item['route'])->toBe('manager.subscriptions.index')
+        ->and($item['label'])->toBe(__('actions.sidemenu.plans_subscriptions'))
+        ->and($item['match'])->toContain('manager.plans.*', 'manager.subscriptions.*');
+});
+
+// ── 4. Labels de covertesttypes/colorvisiontypes não duplicados/trocados ───
+
+it('labels de "Tipos de teste de cobertura" e "Tipos de visão cromática" não ficam duplicados ou trocados', function () {
+    $response = $this->actingAs($this->adminUser)
+        ->withSession(panelSession($this->adminEntityUser))
+        ->get(route('panel.setting.skintypes.index'));
+
+    $response->assertOk();
+
+    $tabsGroup = collect($response->inertiaProps('tabsGroup'))->keyBy('url');
+
+    $coverTestEntry   = $tabsGroup->get(route('panel.setting.covertesttypes.index'));
+    $colorVisionEntry = $tabsGroup->get(route('panel.setting.colorvisiontypes.index'));
+
+    expect($coverTestEntry)->not->toBeNull()
+        ->and($colorVisionEntry)->not->toBeNull();
+
+    expect($coverTestEntry['label'])->toBe('Tipos de teste de cobertura');
+    expect($colorVisionEntry['label'])->toBe('Tipos de visão cromática');
+    expect($coverTestEntry['label'])->not->toBe($colorVisionEntry['label']);
+});
+
+// ── 5. Os 9 sub-catálogos não aparecem soltos em Oftalmologia ──────────────
+
+it('os 9 sub-catálogos oftalmológicos não têm entrada própria nos children de Oftalmologia', function () {
+    session(panelSession($this->adminEntityUser));
+
+    $nav           = PanelNavigation::build();
+    $ophthalmology = findNavItemByKey($nav, 'settings-ophthalmology');
+
+    expect($ophthalmology)->not->toBeNull();
+
+    // Só existe 1 item ("Parâmetros oftalmológicos") nos children — os 9
+    // sub-catálogos viraram abas dentro dele (BaseSettingController::$tabsGroup),
+    // não itens soltos no nível de children de Oftalmologia.
+    expect($ophthalmology['children'])->toHaveCount(1);
+    expect($ophthalmology['children'][0]['label'])->toBe('Parâmetros oftalmológicos');
+
+    // As rotas diretas (campo 'route') dentro de children de Oftalmologia
+    // não incluem os 9 sub-catálogos como entradas independentes — só a
+    // única rota-âncora do item "Parâmetros oftalmológicos".
+    $directChildRoutes = collectNavRoutes($ophthalmology['children']);
+    expect($directChildRoutes)->toHaveCount(1);
+
+    $subCatalogRoutes = [
+        'panel.setting.skintypes.index',
+        'panel.setting.iristypes.index',
+        'panel.setting.additiontypes.index',
+        'panel.setting.visualacuitytypes.index',
+        'panel.setting.colorvisiontypes.index',
+        'panel.setting.nearpointconvergences.index',
+        'panel.setting.covertesttypes.index',
+        'panel.setting.lenses.index',
+        'panel.setting.surgerytypes.index',
+    ];
+
+    // No máximo 1 dos 9 pode ser a rota-âncora do item único; os outros 8
+    // definitivamente não podem aparecer como 'route' de um child separado.
+    $matchedSubCatalogRoutes = array_intersect($directChildRoutes, $subCatalogRoutes);
+    expect(count($matchedSubCatalogRoutes))->toBeLessThanOrEqual(1);
+});
+
+// ── 6. "visittypes" usa o label correto ─────────────────────────────────────
+
+it('rota visittypes usa o label "Tipos de atendimento" (não mais "Tipos de visita")', function () {
+    session(panelSession($this->adminEntityUser));
+
+    $nav        = PanelNavigation::build();
+    $attendance = findNavItemByKey($nav, 'settings-attendance');
+
+    expect($attendance)->not->toBeNull();
+
+    $visitTypesItem = collect($attendance['children'])->firstWhere('route', 'panel.setting.visittypes.index');
+
+    expect($visitTypesItem)->not->toBeNull();
+    expect($visitTypesItem['label'])->toBe('Tipos de atendimento');
+    expect($visitTypesItem['label'])->not->toBe('Tipos de visita');
+});
+
+// ── 7. Requisição HTTP real: 200 + tabsGroup com as 9 entradas ─────────────
+// (9ª = Tipos de cirurgia, MOVIDO de Atendimento — pedido do usuário)
+
+it('GET panel.setting.skintypes.index retorna 200 e o prop tabsGroup vem populado com as 9 entradas', function () {
+    $response = $this->actingAs($this->adminUser)
+        ->withSession(panelSession($this->adminEntityUser))
+        ->get(route('panel.setting.skintypes.index'));
+
+    $response->assertOk();
+    // NOTA: não usamos `->component(...)` aqui — config/inertia.php aponta
+    // `pages.paths` para `resource_path('js/pages')` (minúsculo) enquanto o
+    // diretório real é `resources/js/Pages` (maiúsculo); em filesystem
+    // case-sensitive isso faz QUALQUER assertInertia()->component(...) falhar
+    // com "component file does not exist", mesmo pra páginas que existem e
+    // renderizam normalmente em produção (lá `ensure_pages_exist` é false).
+    // Ver relato no report final do agente de testes — não é bug do
+    // PanelNavigation, está fora do escopo desta tarefa.
+    $response->assertInertia(fn ($page) => $page->has('tabsGroup', 9));
+
+    $tabsGroup = $response->inertiaProps('tabsGroup');
+
+    expect($tabsGroup)->toHaveCount(9);
+
+    foreach ($tabsGroup as $tab) {
+        expect($tab)->toHaveKeys(['url', 'label', 'active']);
+        expect($tab['label'])->not->toBeEmpty();
+        expect($tab['url'])->not->toBeEmpty();
+    }
+
+    // Exatamente uma aba ativa (a do próprio catálogo — skintypes).
+    $activeTabs = collect($tabsGroup)->where('active', true);
+    expect($activeTabs)->toHaveCount(1);
+    expect($activeTabs->first()['url'])->toBe(route('panel.setting.skintypes.index'));
+});
+
+// ── 11. GAP fechado nesta revisão: visibilidade do menu "Estoque" pra Role
+// customizada com a permission granular stock.manage (antes só $isAdmin via
+// cargo fixo enxergava o item — usuário com Role customizada acessava a
+// rota digitando a URL, mas nunca via o item no menu) ──────────────────────
+
+it('secretária SEM Role customizada não vê o menu "Estoque"; COM Role tendo stock.manage E plano com o módulo, vê', function () {
+    $this->seed(PermissionsSeeder::class);
+
+    // entityWithFeatures() (não $this->entity) DE PROPÓSITO: o gate do menu
+    // agora espelha os DOIS lados do middleware da rota (permission:stock.manage
+    // + feature:has_inventory_module — ver PanelNavigation::hasInventoryModuleFeature(),
+    // BUG real corrigido nesta revisão: o menu aparecia sem checar a feature
+    // do plano, então clicar num item batia no gate da rota e devolvia o
+    // usuário pro mesmo lugar sem aviso nenhum).
+    $entity              = entityWithFeatures([FeatureKey::HasInventoryModule]);
+    $secretary           = User::factory()->create();
+    $secretaryEntityUser = createEntityUser($entity, $secretary, ClientRule::Secretary->value);
+
+    session(panelSession($secretaryEntityUser));
+    $this->actingAs($secretary);
+
+    $navWithout = PanelNavigation::build();
+    expect(findNavItemByKey($navWithout, 'stock'))->toBeNull();
+
+    $stockPermission = PermissionRecord::where('key', Permission::StockManage->value)->firstOrFail();
+    $role            = Role::query()->create(['entity_id' => $entity->id, 'name' => 'Gestor de Estoque']);
+    $role->permissions()->sync([$stockPermission->id]);
+    $secretaryEntityUser->roles()->sync([$role->id]);
+
+    // hasPermissionInEntity() cacheia por instância de User (ver
+    // App\Traits\HasEntityRoles) — busca um User fresco pra simular uma
+    // nova requisição real, mesmo padrão de RolesTest.php.
+    $this->actingAs(User::find($secretary->id));
+
+    $navWith = PanelNavigation::build();
+    $item    = findNavItemByKey($navWith, 'stock');
+    expect($item)->not->toBeNull();
+    assertAllRoutesResolve(collectNavRoutes([$item]));
+});
+
+it('[GAP][BUGFIX] admin COM permission mas SEM o módulo de estoque no plano NÃO vê o menu — antes aparecia e todo clique voltava pro mesmo lugar sem aviso', function () {
+    // $this->adminEntityUser/$this->entity (do beforeEach) NÃO tem
+    // Subscription nenhuma — reproduz exatamente o estado real encontrado
+    // em produção (nenhum dos 3 planos reais tinha has_inventory_module
+    // habilitado até esta correção).
+    session(panelSession($this->adminEntityUser));
+    $this->actingAs($this->adminUser);
+
+    $nav = PanelNavigation::build();
+
+    expect(findNavItemByKey($nav, 'stock'))->toBeNull();
+});
+
+it('[GAP] admin COM o módulo de estoque no plano vê o menu normalmente (bypass de permission já existia; feature agora também precisa bater)', function () {
+    $entity          = entityWithFeatures([FeatureKey::HasInventoryModule]);
+    $adminUser       = User::factory()->create();
+    $adminEntityUser = createEntityUser($entity, $adminUser, ClientRule::Admin->value);
+
+    session(panelSession($adminEntityUser));
+    $this->actingAs($adminUser);
+
+    $nav  = PanelNavigation::build();
+    $item = findNavItemByKey($nav, 'stock');
+
+    expect($item)->not->toBeNull();
+    assertAllRoutesResolve(collectNavRoutes([$item]));
+});
+
+// ── 12. GAP fechado nesta revisão: "Relatórios" deixa de ser página-hub
+// solta (nem vira submenu de "Agendas" — decisão final do usuário: menu
+// lateral continua 1 clique direto pro calendário; os 2 relatórios saem
+// inteiramente do menu, acessíveis só pelo dropdown "Relatórios" dentro da
+// própria tela de Agendas — ver SchedulesReportsButtonTest.php) ──────────
+
+it('[BUGFIX] "Agendas" e "Pacientes" espelham as rotas: financeiro não vê Agendas; perfil usuário só vê Pacientes com patients.manage', function () {
+    $this->seed(PermissionsSeeder::class);
+
+    $financial   = User::factory()->create();
+    $financialEu = createEntityUser($this->entity, $financial, ClientRule::Financial->value);
+    session(panelSession($financialEu));
+    $this->actingAs($financial);
+
+    $nav = PanelNavigation::build();
+    expect(findNavItemByKey($nav, 'schedules'))->toBeNull()
+        ->and(findNavItemByKey($nav, 'patients'))->not->toBeNull();
+
+    // O item existia e levava a um 403 (entity.role:admin,doctor,secretary).
+    $this->withSession(panelSession($financialEu))->get(route('panel.schedules.index'))->assertForbidden();
+
+    $plain   = User::factory()->create();
+    $plainEu = createEntityUser($this->entity, $plain, ClientRule::User->value);
+    session(panelSession($plainEu));
+    $this->actingAs($plain);
+
+    $nav = PanelNavigation::build();
+    expect(findNavItemByKey($nav, 'schedules'))->toBeNull()
+        ->and(findNavItemByKey($nav, 'patients'))->toBeNull();
+
+    $permission = PermissionRecord::where('key', Permission::PatientsManage->value)->firstOrFail();
+    $role       = Role::query()->create(['entity_id' => $this->entity->id, 'name' => 'Cadastro de pacientes']);
+    $role->permissions()->sync([$permission->id]);
+    $plainEu->roles()->sync([$role->id]);
+
+    // hasPermissionInEntity() cacheia por instância de User: usuário fresco.
+    $this->actingAs(User::find($plain->id));
+
+    expect(findNavItemByKey(PanelNavigation::build(), 'patients'))->not->toBeNull();
+});
+
+it('[GAP] "Agendas" é SEMPRE link direto (nunca submenu) — admin/financeiro e secretária', function () {
+    session(panelSession($this->adminEntityUser));
+    $adminItem = findNavItemByKey(PanelNavigation::build(), 'schedules');
+
+    $secretary           = User::factory()->create();
+    $secretaryEntityUser = createEntityUser($this->entity, $secretary, ClientRule::Secretary->value);
+    session(panelSession($secretaryEntityUser));
+    $secretaryItem = findNavItemByKey(PanelNavigation::build(), 'schedules');
+
+    foreach ([$adminItem, $secretaryItem] as $item) {
+        expect($item)->not->toBeNull()
+            ->and($item['route'] ?? null)->toBe('panel.schedules.index')
+            ->and($item['children'] ?? null)->toBeNull();
+    }
+
+    // A página-hub solta ("Relatórios") não deve mais existir como item de
+    // menu — nem key 'reports', nem rota panel.reports.index (removida).
+    expect(findNavItemByKey(PanelNavigation::build(), 'reports'))->toBeNull();
+    expect(Route::has('panel.reports.index'))->toBeFalse();
+
+    // Os relatórios em si continuam existindo (rota + tela) — só saíram do
+    // menu; acesso é só pelo dropdown dentro de Agendas (ver
+    // SchedulesReportsButtonTest.php).
+    expect(Route::has('panel.schedules.reports.production'))->toBeTrue();
+    expect(Route::has('panel.schedules.reports.absenteeism'))->toBeTrue();
+});

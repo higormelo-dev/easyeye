@@ -1,2 +1,13 @@
+# EasyEye — Robots.txt
+# Permitir indexação das páginas públicas e bloquear áreas internas.
+
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /panel/
+Disallow: /manager/
+Disallow: /sanctum/
+Disallow: /api/
+Disallow: /broadcasting/
+Disallow: /up
+
+Sitemap: https://easyeye.com.br/sitemap.xml

@@ -20,8 +20,11 @@ class EntityFactory extends Factory
         $name = $this->faker->company();
 
         return [
-            'name'                   => $name,
-            'subdomain'              => Str::slug($name),
+            'name' => $name,
+            // Sufixo aleatório evita colisão em entities_subdomain_unique: o
+            // pool de nomes fake()->company() é limitado e se repete em
+            // suítes grandes, enquanto Str::slug($name) sozinho não é único.
+            'subdomain'              => Str::slug($name) . '-' . Str::lower(Str::random(8)),
             'zipcode'                => str(fake()->postcode())->replaceMatches('/\D/', ''),
             'address'                => fake()->streetName(),
             'number'                 => fake()->buildingNumber(),
@@ -29,7 +32,7 @@ class EntityFactory extends Factory
             'district'               => fake()->cityPrefix() . ' ' . fake()->citySuffix(),
             'city'                   => fake()->city(),
             'state'                  => fake()->stateAbbr(),
-            'country'                => fake()->country(),
+            'country'                => fake()->countryCode(),
             'national_registration'  => str(fake()->cnpj())->replaceMatches('/\D/', ''),
             'state_registration'     => fake()->numerify('###########'),
             'municipal_registration' => fake()->numerify('#########'),
@@ -40,6 +43,7 @@ class EntityFactory extends Factory
             'logo'                   => null,
             'is_client'              => true,
             'active'                 => true,
+            'schedule_interval'      => fake()->randomElement([15, 20, 30]),
         ];
     }
 }

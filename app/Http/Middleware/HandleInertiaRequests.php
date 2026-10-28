@@ -1,0 +1,271 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use App\Domains\AI\Services\AiAssistantWidgetPropsBuilder;
+use App\Models\{Entity, Partner};
+use App\Services\Billing\SubscriptionNoticeService;
+use App\Services\SubscriptionService;
+use App\Support\{PanelNavigation, PanelTour, SupportContact};
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\{Storage, Vite};
+use Inertia\Middleware;
+use Tighten\Ziggy\Ziggy;
+
+class HandleInertiaRequests extends Middleware
+{
+    protected $rootView = 'app';
+
+    public function rootView(Request $request): string
+    {
+        // A tela de acesso bloqueado fica fora de /panel, mas usa o mesmo
+        // AppLayout do painel — no rootView 'app' (só site.scss) ela abria sem
+        // nenhum estilo do painel.
+        if ($request->routeIs('panel.*') || $request->routeIs('manager.*') || $request->routeIs('subscription.expired')) {
+            return 'panel-app';
+        }
+
+        // Fluxos de identidade/autenticação (login, register, verify, 2FA setup)
+        // usam o rootView guest-app, que carrega vendor.css + system.scss —
+        // necessário para o GuestLayout renderizar com Bootstrap grid + estilos
+        // ee-auth-*. O rootView default 'app' carrega só site.scss (marketing).
+        if ($request->routeIs('security.*') || $request->routeIs('clinical-review.*')) {
+            return 'guest-app';
+        }
+
+        // Portal de Parceiros: layout próprio (gradient teal/blue + nav simples).
+        // Compartilha vendor + system com painel, mas tem chrome distinto.
+        if ($request->routeIs('portal.*')) {
+            return 'portal-app';
+        }
+
+        // Portal do Paciente: reaproveita o MESMO template do painel staff
+        // (panel-app — bundle panel.js, @routes/ZiggyVue, <meta noindex> já
+        // presente por LGPD/CFM). O guard ainda é "patient" (nunca "web") —
+        // isso é decidido pelas rotas/middleware, não pelo rootView; o
+        // compartilhamento de props (`auth`, `nav`) já é filtrado por
+        // routeIs('patient-portal.*') em share() abaixo, então nenhum dado
+        // de staff vaza pra cá só por usar o mesmo HTML/bundle.
+        if ($request->routeIs('patient-portal.*')) {
+            return 'panel-app';
+        }
+
+        return 'app';
+    }
+
+    public function version(Request $request): ?string
+    {
+        return parent::version($request);
+    }
+
+    public function share(Request $request): array
+    {
+        $locales       = SetLocale::getSupportedLocales();
+        $currentLocale = app()->getLocale();
+
+        return [
+            ...parent::share($request),
+
+            'ziggy' => function () use ($request) {
+                return array_merge((new Ziggy())->toArray(), [
+                    'location' => $request->url(),
+                ]);
+            },
+
+            'locale'  => $currentLocale,
+            'locales' => collect($locales)->map(fn ($l, $code) => [
+                'code'   => $code,
+                'flag'   => $l['flag'] ?? '🌐',
+                'native' => $l['native'],
+                'url'    => route('locale.switch', $code),
+                'active' => $code === $currentLocale,
+            ])->values()->toArray(),
+
+            'flash' => [
+                'success' => session('success'),
+                'error'   => session('error'),
+                'status'  => session('status'),
+                // Vários controllers (ex.: Stock/*, Doctors) usam ->with('message').
+                'message' => session('message'),
+                // Prontuário: ação da barra a abrir após o 1º save (one-shot).
+                'post_save_action' => session('post_save_action'),
+            ],
+
+            // BUGFIX (revisão de segurança): authProps() lê $request->user()
+            // do guard "web" (default) INCONDICIONALMENTE. Sem este guard,
+            // se o mesmo navegador tiver uma sessão de staff aberta em outra
+            // aba, uma página do Portal do Paciente (guard "patient") também
+            // recebia o perfil de STAFF nesse prop (autodivulgação do
+            // próprio usuário, não vazamento cross-user, mas o portal nunca
+            // deveria depender do guard "web" pra nada).
+            //
+            // Idem para a página PÚBLICA do Revisor Clínico (clinical-review.*): quem
+            // abre o link é uma pessoa de fora, e o HTML dela (data-page) não pode carregar
+            // o perfil de um usuário da EasyEye que por acaso esteja logado nesse navegador.
+            'auth' => fn () => $request->routeIs('patient-portal.*') || $request->routeIs('clinical-review.*') ? [] : $this->authProps($request),
+
+            'nav' => fn () => ($request->routeIs('panel.*') || $request->routeIs('manager.*')) && $request->user()
+                ? PanelNavigation::build()
+                : [],
+
+            // Tour guiado do painel da clínica (driver.js): textos, id por
+            // perfil e se o usuário já viu a versão atual. Null fora do painel
+            // de clínica — ver App\Support\PanelTour.
+            'tour' => fn () => PanelTour::props($request),
+
+            // Widget flutuante do Assistente Virtual de IA — disponível em
+            // QUALQUER tela do painel (não manager.*: gestão SaaS não é
+            // rotina clínica). Lazy (fn ()) + gate interno no builder
+            // (isDoctor + feature) evita custo em toda request de quem não vê o widget.
+            'aiAssistant' => fn () => $request->routeIs('panel.*') && $request->user() && session('selected_entity_id')
+                ? app(AiAssistantWidgetPropsBuilder::class)->build(
+                    (string) session('selected_entity_id'),
+                    session('selected_entity_user_rule'),
+                )
+                : ['enabled' => false],
+
+            // Botão de suporte (WhatsApp oficial ou e-mail) no topo do painel da
+            // clínica. Null fora do painel (manager.*, site, visitante) e quando
+            // não há contato configurado — ver App\Support\SupportContact.
+            'support' => fn () => $request->routeIs('panel.*') && $request->user()
+                ? SupportContact::props()
+                : null,
+
+            // Aviso da situação da assinatura no topo do painel da clínica
+            // (pagamento pendente/em atraso, acesso limitado, trial
+            // terminando). Só empresa cliente no painel; null no resto. Valor
+            // e link da fatura só para admin, financeiro e dono (LGPD).
+            'subscriptionBanner' => fn () => $request->routeIs('panel.*') && $request->user()
+                && session('selected_entity_is_client') && session('selected_entity_id')
+                ? app(SubscriptionNoticeService::class)->banner(
+                    app(SubscriptionService::class)->currentAccessFor($request, (string) session('selected_entity_id')),
+                    $request->user(),
+                )
+                : null,
+
+            // Portal de Parceiros: partner ativo da sessão (compartilhado pelo
+            // PortalLayout para mostrar nome/email/code no header).
+            'partner' => fn () => $request->routeIs('portal.*')
+                ? $this->portalPartnerProps()
+                : null,
+
+            // Traduções do hardening (modal de confirmação com reason etc.)
+            // Carregadas em todo request para que o ConfirmationWithReasonModal
+            // funcione em qualquer página sem precisar passar t={} manualmente.
+            't_hardening' => fn () => trans('manager_hardening'),
+
+            // Textos dos componentes compartilhados (rótulo "Fechar" dos modais,
+            // "Carregando..."), no idioma do usuário em qualquer página.
+            't_ui' => fn () => trans('ui'),
+
+            // Segurança clínica (Fase 2): rótulos dos componentes de alergias,
+            // medicações em uso e alertas — usados por Pacientes, Agenda, Pronto
+            // atendimento e Prontuário. Só no painel da clínica.
+            't_clinical' => fn () => $request->routeIs('panel.*') && ! $request->routeIs('panel.manager.*')
+                ? trans('clinical_safety')
+                : null,
+        ];
+    }
+
+    private function authProps(Request $request): array
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return [];
+        }
+
+        $selectedEntityId = session('selected_entity_id');
+        $entity           = Entity::find($selectedEntityId);
+        $photoPath        = 'users/' . $user->id . '.jpg';
+
+        $entityUsers = $user->entityUsers()
+            ->with('entity')
+            ->where('active', true)
+            ->get();
+
+        return [
+            'user' => [
+                'id'        => $user->id,
+                'name'      => $user->name,
+                'email'     => $user->email,
+                'photo_url' => Storage::disk('public')->exists($photoPath)
+                    ? Storage::disk('public')->url($photoPath)
+                    : Vite::asset('resources/img/system/team.png'),
+                // Item MELHORIA "mais humano" — bag de preferências pessoais
+                // (ordem do Dashboard, atalhos favoritos...). Ver UserPreference.
+                'preferences' => $user->preference?->data ?? [],
+                // Verificação do WhatsApp do responsável (código OTP via
+                // WhatsApp oficial) — alimenta o banner de confirmação do AppLayout.
+                // has_phone distingue "sem número cadastrado" (nada a
+                // confirmar) de "pendente de confirmação".
+                'has_phone'      => filled($user->phone),
+                'phone_verified' => $user->phone_verified_at !== null,
+            ],
+            'entity' => [
+                'id'       => $selectedEntityId,
+                'name'     => $entity?->name ?? config('app.name'),
+                'city'     => $entity?->city ?? '',
+                'plan'     => $this->planName($request, $entity),
+                'logo_url' => $entity?->logo
+                    ? Storage::disk('public')->url($entity->logo)
+                    : null,
+                'is_client' => (bool) session('selected_entity_is_client'),
+                'rule'      => session('selected_entity_user_rule'),
+            ],
+            'entities' => $entityUsers->map(fn ($eu) => [
+                'entity_user_id' => $eu->id,
+                'entity_id'      => $eu->entity_id,
+                'name'           => $eu->entity->name,
+                'city'           => $eu->entity->city ?? '',
+                'is_selected'    => $eu->entity_id === $selectedEntityId,
+            ])->values()->toArray(),
+            'impersonating' => session()->has('impersonating')
+                ? ['original_name' => session('impersonating.original_user_name')]
+                : null,
+        ];
+    }
+
+    /**
+     * Plano da empresa no cabeçalho: o da assinatura que dá acesso hoje
+     * (inclui a contratação aguardando o 1º pagamento e o atraso dentro da
+     * régua), a mesma consulta do CheckSubscription. Sem acesso, o da última
+     * assinatura vigente (tela de acesso bloqueado).
+     */
+    private function planName(Request $request, ?Entity $entity): ?string
+    {
+        if (! $entity) {
+            return null;
+        }
+
+        return app(SubscriptionService::class)->currentAccessFor($request, $entity)?->plan?->name
+            ?? $entity->subscription?->plan?->name;
+    }
+
+    /**
+     * Dados do partner ativo no portal (vem da sessão setada pelo middleware
+     * EnsureIsPartner). Carregamento lazy — só executa quando o request é
+     * de uma rota portal.*.
+     */
+    private function portalPartnerProps(): ?array
+    {
+        $partnerId = session('portal_partner_id');
+
+        if (! $partnerId) {
+            return null;
+        }
+
+        $partner = Partner::find($partnerId);
+
+        if (! $partner) {
+            return null;
+        }
+
+        return [
+            'id'    => (string) $partner->id,
+            'code'  => $partner->code,
+            'name'  => $partner->name,
+            'email' => $partner->email,
+        ];
+    }
+}

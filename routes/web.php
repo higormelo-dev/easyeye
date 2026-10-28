@@ -1,19 +1,164 @@
 <?php
 
-use App\Http\Controllers\{CovenantsController,
-	DoctorsController,
-	IrisTypesController,
-	Manager\EntitiesController,
-	PatientsController,
-	ProfileController,
-	SkinTypesController,
-	UsersController,
-	VisitTypesController};
+use App\Http\Controllers\{
+    AccessControl\RolesController,
+    AiRunPromptsController,
+    AiRunsController,
+    ComplianceController,
+    DoctorImportsController,
+    DoctorInvitationsController,
+    DoctorReportPhrasesController,
+    DoctorWorkScheduleController,
+    DoctorsController,
+    ExamDiagnosisController,
+    ExamManagerActionsController,
+    ExamManagerAlignController,
+    ExamManagerController,
+    ExamManagerLegacyRedirectController,
+    ExamManagerMontageController,
+    ExamManagerPanoramaController,
+    ExamManagerPatientAuditController,
+    ExamManagerReportController,
+    ExamManagerReportDictationController,
+    ExamManagerReportDraftController,
+    ExamManagerReportResendController,
+    ExternalExamImportController,
+    Financial\BillingBulkActionsController,
+    Financial\BillingClaimActionsController,
+    Financial\BillingController as FinancialBillingController,
+    Financial\CashClosingController,
+    Financial\CashFlowController,
+    Financial\ClinicBiController,
+    Financial\DoctorPayouts\DoctorPayoutAdjustmentsController,
+    Financial\DoctorPayouts\DoctorPayoutAllocationsController,
+    Financial\DoctorPayouts\DoctorPayoutClosingsController,
+    Financial\DoctorPayouts\DoctorPayoutDeductionRatesController,
+    Financial\DoctorPayouts\DoctorPayoutPaymentsController,
+    Financial\DoctorPayouts\DoctorPayoutRulesController,
+    Financial\DoctorPayouts\DoctorPayoutSettingsController,
+    Financial\DoctorPayouts\DoctorPayoutsController,
+    Financial\FinancialReportsController,
+    Financial\ProcedurePricesController,
+    Financial\TissGlosasController,
+    Financial\TissGuidePreValidateController,
+    LocaleController,
+    MyPayoutsController,
+    NoticesController,
+    PatientClinicalSafetyController,
+    PatientConditionController,
+    PatientDocumentSharesController,
+    PatientImportCovenantsController,
+    PatientImportsController,
+    PatientPortalInvitationsController,
+    PatientsController,
+    ProfileController,
+    RecallController,
+    RecallSettingsController,
+    ReportsController,
+    ResourceWorkScheduleController,
+    ScheduleEventsController,
+    ScheduleImportsController,
+    SchedulePrintController,
+    SchedulesController,
+    UrgentCareController,
+    UserInvitationsController,
+    UsersController,
+    WaitingListController
+};
+use App\Http\Controllers\{
+    CareGuidanceController,
+    IntravitrealCoursesController,
+    MedicalRecordDocumentationsController,
+    MedicalRecordDraftsController,
+    MedicalRecordEvolutionsController,
+    MedicalRecordFilesController,
+    MedicalRecordProceduresController,
+    MedicalRecordQuickActionsController,
+    MedicalRecordsController,
+    MedicalRecordsSearchController,
+    SiteController,
+    SiteLegalController,
+    SubscriptionExpiredController,
+};
+use App\Http\Controllers\Billing\{CheckoutController, NfseDownloadController};
+use App\Http\Controllers\{CallPanelDisplayController, DoctorDocumentTemplatesController, MedicalRecordExamKitsController, MedicationPresetsController};
+use App\Http\Controllers\{ChangelogController, Cid10SearchController, CovenantPlanSearchController, CovenantSearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
+use App\Http\Controllers\Docs\ApiDocsController;
+use App\Http\Controllers\{PanelDashboardController, PreferencesController};
+use App\Http\Controllers\Security\TwoFactorController;
+use App\Http\Controllers\Setting\{AdditionTypesController,
+    ColorVisionTypesController,
+    CovenantPlansController,
+    CovenantsController,
+    CoverTestTypesController,
+    IrisTypesController,
+    LensesController,
+    NearPointConvergencesController,
+    ResourcesController,
+    SkinTypesController,
+    SurgeryTypesController,
+    VisitTypesController,
+    VisualAcuityTypesController};
+use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController, ScheduleSettingsController};
+use App\Http\Controllers\Setting\{CareGuidanceTemplatesController, ExamKitsController, ReportSettingsController, SecurityController};
+use App\Http\Controllers\Stock\{IolLensesController, ProcedureProductsController, ProductCategoriesController, ProductImportsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockCountsController, StockMovementsController, StockReportsController, SuppliersController};
+use App\Http\Middleware\SetLocale;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, Route};
 
-Route::get('/', function () {
-    if (Auth::check() && session()->has('selected_entity_user_id') &&
-        session()->has('selected_entity_id')) {
+// Rota para trocar o idioma (sem autenticação necessária)
+Route::get('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
+
+// Rotas para gerenciar locale (requer autenticação)
+Route::middleware(['auth'])->group(function () {
+    Route::post('/locale/entity', [LocaleController::class, 'setEntityLocale'])->name('locale.entity');
+    Route::delete('/locale/user', [LocaleController::class, 'clearUserLocale'])->name('locale.user.clear');
+});
+
+Route::get('/', [SiteController::class, 'index'])->name('site.home');
+// Documentos oficiais vigentes (term_versions). Outras páginas do rodapé
+// aparecem sozinhas quando ganharem rota nomeada (ver App\Support\Site\SiteLinks).
+Route::get('/privacidade', [SiteLegalController::class, 'privacy'])->name('site.privacy');
+Route::get('/termos', [SiteLegalController::class, 'terms'])->name('site.terms');
+Route::post('/contato', [SiteController::class, 'contactStore'])->middleware('throttle:5,1')->name('contact.store');
+
+// SEO: Sitemap XML dinâmico
+Route::get('/sitemap.xml', function () {
+    $baseUrl = rtrim(config('app.url'), '/');
+    $locales = SetLocale::SUPPORTED_LOCALES;
+    $now     = now()->toW3cString();
+
+    $urls = [
+        ['loc' => $baseUrl . '/', 'priority' => '1.0', 'changefreq' => 'weekly'],
+    ];
+
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL;
+    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . PHP_EOL;
+    $xml .= '        xmlns:xhtml="http://www.w3.org/1999/xhtml">' . PHP_EOL;
+
+    foreach ($urls as $entry) {
+        $xml .= '  <url>' . PHP_EOL;
+        $xml .= '    <loc>' . htmlspecialchars($entry['loc']) . '</loc>' . PHP_EOL;
+
+        foreach ($locales as $code => $meta) {
+            $hreflang = str_replace('_', '-', $code);
+            $href     = $entry['loc'] . '?lang=' . $code;
+            $xml .= '    <xhtml:link rel="alternate" hreflang="' . $hreflang . '" href="' . htmlspecialchars($href) . '"/>' . PHP_EOL;
+        }
+
+        $xml .= '    <lastmod>' . $now . '</lastmod>' . PHP_EOL;
+        $xml .= '    <changefreq>' . $entry['changefreq'] . '</changefreq>' . PHP_EOL;
+        $xml .= '    <priority>' . $entry['priority'] . '</priority>' . PHP_EOL;
+        $xml .= '  </url>' . PHP_EOL;
+    }
+
+    $xml .= '</urlset>';
+
+    return response($xml, 200)->header('Content-Type', 'application/xml');
+})->name('sitemap');
+Route::get('/go', function () {
+    if (Auth::check() && session()->has('selected_entity_user_id')
+        && session()->has('selected_entity_id')) {
         return redirect()->route('panel.dashboard');
     }
 
@@ -26,65 +171,1305 @@ Route::get('/', function () {
     }
 
     return redirect()->route('login');
-});
+})->name('go');
+
+// Página exibida quando a assinatura está inativa/expirada
+// ── Painel/TV de chamadas da sala de espera (público por token da clínica) ──
+// Sem auth: roda na TV da recepção. Token aleatório + 404 genérico
+// anti-enumeração; só snapshots de nome passam por aqui (ver controller).
+Route::get('/call-panel/{token}', [CallPanelDisplayController::class, 'show'])->name('call-panel.show');
+Route::get('/call-panel/{token}/feed', [CallPanelDisplayController::class, 'feed'])->name('call-panel.feed');
+
+// Mesmos controles de segurança do painel (WhatsApp confirmado e 2FA quando
+// a empresa exige): a tela mostra valor e link da fatura. Sem loop — as telas
+// de confirmação/2FA ficam fora desses gates, e depois delas o dashboard
+// passa pelo check.subscription e volta para cá.
+Route::get('/subscription/expired', SubscriptionExpiredController::class)
+    ->middleware(['auth', 'verified', 'phone.verified', 'entity.selected', '2fa', 'checkout.csp'])
+    ->name('subscription.expired');
+
+Route::post('/session/ping', function () {
+    return response()->json(['ok' => true]);
+})->middleware(['auth'])->name('session.ping');
 
 Route::group(
-    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'entity.selected'], 'as' => 'panel.'],
+    // 2fa entra DEPOIS de entity.selected (precisa da entity na sessão para
+    // decidir se exige 2FA via Entity.requires_two_factor).
+    // phone.verified logo após verified: onboarding = confirma e-mail →
+    // confirma WhatsApp → painel (ver EnsurePhoneVerified para os bypasses).
+    // check.subscription por último: clínica sem assinatura com acesso (trial
+    // vencido, período encerrado) vai para /subscription/expired.
+    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'phone.verified', 'entity.selected', 'tenant.bind', '2fa', 'check.subscription'], 'as' => 'panel.'],
     function () {
         Route::get('/', function () {
             return redirect()->route('panel.dashboard');
         });
-        Route::get('/dashboard', function () {
-            if (session()->get('selected_entity_is_client')) {
-                return view('system.dashboard');
+        // Dashboard exclusivo para clínicas (usuários SaaS são redirecionados para /panel/manager/dashboard)
+        Route::get('/dashboard', function (Request $request) {
+            if (! session()->get('selected_entity_is_client')) {
+                return redirect()->route('manager.dashboard');
             }
 
-            return view('system.manager.dashboard');
+            return app(PanelDashboardController::class)($request);
         })->name('dashboard');
 
-        Route::resource('doctors', DoctorsController::class);
-        Route::resource('patients', PatientsController::class);
-        Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
-            Route::resource('users', UsersController::class);
-        });
-        Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
-            Route::resource('covenants', CovenantsController::class);
-            Route::get('covenants/{covenant}/restore', [CovenantsController::class, 'restore'])
-                ->name('covenants.restore');
-            Route::resource('skintypes', SkinTypesController::class);
-            Route::get('skintypes/{skintype}/restore', [SkinTypesController::class, 'restore'])
-                ->name('skintypes.restore');
-            Route::resource('iristypes', IrisTypesController::class);
-            Route::get('iristypes/{iristype}/restore', [IrisTypesController::class, 'restore'])
-                ->name('iristypes.restore');
-            Route::resource('visittypes', VisitTypesController::class);
-            Route::get('visittypes/{visittype}/restore', [VisitTypesController::class, 'restore'])
-                ->name('visittypes.restore');
+        // Preferências pessoais (item MELHORIA "mais humano") — endpoint único,
+        // ver PreferencesController.
+        Route::patch('/preferences', [PreferencesController::class, 'update'])->name('preferences.update');
+
+        // Novidades: o que mudou em cada versão. Qualquer usuário do painel;
+        // o POST marca a versão atual como vista (badge do menu).
+        Route::get('/novidades', [ChangelogController::class, 'index'])->name('news.index');
+        Route::post('/novidades/visto', [ChangelogController::class, 'markSeen'])->name('news.seen');
+
+        // Módulo cirúrgico (Fase 4) — ver routes/surgery.php.
+        require __DIR__ . '/surgery.php';
+
+        // Minha assinatura — checkout transparente (Pix, boleto e cartão
+        // tokenizado no navegador). Só admin, financeiro e dono
+        // (billing.contact); liberado mesmo com o acesso bloqueado ou limitado
+        // (CheckSubscription::ALWAYS_ALLOWED) — é por aqui que se paga.
+        Route::prefix('my-subscription')
+            ->name('my-subscription.')
+            ->middleware('billing.contact')
+            ->group(function () {
+                Route::get('/', [CheckoutController::class, 'page'])->middleware('checkout.csp')->name('index');
+                Route::get('summary', [CheckoutController::class, 'summary'])->middleware('throttle:billing-checkout-read')->name('summary');
+                Route::get('options', [CheckoutController::class, 'options'])->middleware('throttle:billing-checkout-read')->name('options');
+                Route::get('invoices/{invoice}/instructions', [CheckoutController::class, 'instructions'])->middleware('throttle:billing-checkout-read')->name('instructions');
+                Route::post('invoices/{invoice}/charge', [CheckoutController::class, 'issueCharge'])->middleware('throttle:billing-checkout-pay')->name('charge');
+                Route::post('invoices/{invoice}/card', [CheckoutController::class, 'payWithCard'])->middleware('throttle:billing-checkout-pay')->name('card');
+                Route::put('card', [CheckoutController::class, 'replaceCard'])->middleware('throttle:billing-checkout-pay')->name('replace-card');
+                Route::post('contract', [CheckoutController::class, 'contract'])->middleware('throttle:billing-checkout-pay')->name('contract');
+                // CPF/CNPJ da clínica sem documento (o 422 document_required do contract): só PREENCHE, nunca troca.
+                Route::put('payer-document', [CheckoutController::class, 'payerDocument'])->middleware('throttle:billing-checkout-pay')->name('payer-document');
+                // Pacote de créditos de IA no mesmo checkout (só com acesso total — AiCreditPackCheckoutService).
+                Route::get('ai-credits', [CheckoutController::class, 'aiCreditOptions'])->middleware('throttle:billing-checkout-read')->name('ai-credits.options');
+                Route::post('ai-credits', [CheckoutController::class, 'aiCreditPurchase'])->middleware('throttle:billing-checkout-pay')->name('ai-credits.purchase');
+                // Descartar o pedido de pacote ainda não pago (cancela a cobrança no gateway quando possível).
+                Route::delete('ai-credits/{invoice}', [CheckoutController::class, 'aiCreditDiscard'])->middleware('throttle:billing-checkout-pay')->name('ai-credits.discard');
+                // NFS-e do SaaS emitida para a clínica: XML pela rota autenticada (nunca URL pública nem token no navegador).
+                Route::get('nfse/{document}/xml', [NfseDownloadController::class, 'xml'])->whereUuid('document')->middleware('throttle:billing-checkout-read')->name('nfse.xml');
+                Route::get('nfse/{document}/cancel-xml', [NfseDownloadController::class, 'cancelXml'])->whereUuid('document')->middleware('throttle:billing-checkout-read')->name('nfse.cancel-xml');
+            });
+
+        Route::get('/exam-manager', [ExamManagerController::class, 'index'])->name('exam-manager.index');
+        Route::get('/exam-manager/search', [ExamManagerController::class, 'search'])->name('exam-manager.search');
+        Route::get('/exam-manager/patient-urls/{patient}', [ExamManagerController::class, 'patientExamUrls'])->name('exam-manager.patient-urls');
+        // Exames com metadados p/ o painel do PRONTUÁRIO (leitura logada — LGPD).
+        Route::get('/exam-manager/patient-exams/{patient}', [ExamManagerController::class, 'patientExamsForRecord'])->name('exam-manager.patient-exams');
+        Route::get('/exam-manager/image-url/{exam}', [ExamManagerController::class, 'imageUrl'])->name('exam-manager.image-url');
+        // Visto/não visto: quem abre o Gerenciador marca ao exibir o exame (sem entity.role;
+        // tenant checado no controller). Não é ato clínico nem gera auditoria.
+        Route::put('/exam-manager/exams/{exam}/viewed', [ExamManagerController::class, 'markExamViewed'])->name('exam-manager.exams.viewed');
+        // Histórico (somente leitura) do cadastro e dos exames do paciente — ACL espelha o grupo
+        // Pacientes; o Gerenciador de exames em si não tem entity.role (financeiro também entra).
+        Route::get('/exam-manager/patients/{patient}/audit', ExamManagerPatientAuditController::class)
+            ->middleware('permission:patients.manage,admin,financial,doctor,secretary')
+            ->name('exam-manager.patients.audit');
+        // Duplicata dedicada da busca de CID-10 (mesmo Cid10SearchController) sem a
+        // restrição de role de `cid10.search` (admin,doctor,secretary) — o Gerenciador
+        // de Imagens não tem entity.role e não vamos afrouxar a rota usada no
+        // prontuário nem restringir quem já acessa Imagens hoje.
+        Route::get('/exam-manager/cid10-search', Cid10SearchController::class)->name('exam-manager.cid10-search');
+
+        // Diagnóstico do exame (CID-10 + customizados da clínica). Diferente das
+        // rotas de leitura acima, estas escrevem em patient_exams.diagnosis_cids
+        // e criam entity_custom_diagnoses — por isso ganham entity.role aqui
+        // mesmo o restante de /exam-manager não tendo essa restrição. O Gate
+        // EntityGate::IssueReport (exclusivo de doctor) é checado dentro do
+        // controller, então admin passa pelo middleware mas ainda leva 403
+        // no Gate ao tentar criar/gravar diagnóstico — só o médico assina.
+        Route::get('/exam-manager/diagnoses/search', [ExamDiagnosisController::class, 'search'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.diagnoses.search');
+        Route::post('/exam-manager/diagnoses', [ExamDiagnosisController::class, 'store'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.diagnoses.store');
+        Route::put('/exam-manager/exams/{exam}/diagnosis', [ExamDiagnosisController::class, 'updateDiagnosis'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.exams.diagnosis.update');
+
+        // Ações rápidas por imagem (menu de contexto) — mesmo padrão/Gate do
+        // bloco de diagnóstico acima: entity.role no middleware + Gate
+        // EntityGate::IssueReport (doctor-only) checado dentro do controller.
+        Route::put('/exam-manager/exams/{exam}/laterality', [ExamManagerActionsController::class, 'updateLaterality'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.exams.laterality.update');
+        Route::put('/exam-manager/exams/{exam}/quality-rating', [ExamManagerActionsController::class, 'updateQualityRating'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.exams.quality-rating.update');
+        Route::put('/exam-manager/exams/{exam}/active', [ExamManagerActionsController::class, 'toggleActive'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.exams.active.update');
+        Route::put('/exam-manager/exams/{exam}/urgent', [ExamManagerActionsController::class, 'updateUrgent'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.exams.urgent.update');
+        // Mesclar/Dividir são em lote (N exam_ids no corpo) — nunca RESTful
+        // de um recurso só, por isso sem {exam} na URL.
+        Route::post('/exam-manager/exams/merge', [ExamManagerActionsController::class, 'mergeExams'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.exams.merge');
+        Route::post('/exam-manager/exams/split', [ExamManagerActionsController::class, 'splitExams'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.exams.split');
+        Route::post('/exam-manager/exams/ungroup', [ExamManagerActionsController::class, 'ungroupExams'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.exams.ungroup');
+
+        // Montage (benchmark 18/09/2026) — ExamManagerMontageController. NÃO é
+        // ato clínico (conveniência de exportação/impressão), por isso
+        // secretary também tem acesso, diferente do bloco de laudo abaixo.
+        Route::post('/exam-manager/montage', [ExamManagerMontageController::class, 'store'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.montage.store');
+
+        // Panorama automático (OpenCV, processo isolado) e Auto-alinhar do
+        // Comparar — mesma regra do Montage: conveniência de visualização, não
+        // ato clínico. Ver ExamManagerPanoramaController / ExamManagerAlignController.
+        Route::post('/exam-manager/panorama', [ExamManagerPanoramaController::class, 'store'])
+            ->middleware(['entity.role:admin,doctor,secretary', 'throttle:eye-images-vision'])
+            ->name('exam-manager.panorama.store');
+        Route::post('/exam-manager/align', [ExamManagerAlignController::class, 'store'])
+            ->middleware(['entity.role:admin,doctor,secretary', 'throttle:eye-images-vision'])
+            ->name('exam-manager.align.store');
+
+        // Laudo manual do Gerenciador de exames (Modelos + editor livre) — ver
+        // ExamManagerReportController. templates()/previewTemplate() são leitura
+        // (mesmo allowlist de diagnósticos acima); store() grava documentação
+        // clínica e o Gate::IssueReport (doctor-only) é checado dentro do
+        // controller, mesmo padrão do bloco de diagnóstico.
+        // Fase 5: secretária também rascunha (Gate DraftImageReport dentro do
+        // controller) — "store" fica de fora de propósito, continua só
+        // admin,doctor na borda + Gate::IssueReport (doctor-only) dentro.
+        Route::get('/exam-manager/report-templates', [ExamManagerReportController::class, 'templates'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.report-templates.index');
+        Route::post('/exam-manager/report-templates/preview', [ExamManagerReportController::class, 'previewTemplate'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.report-templates.preview');
+        Route::post('/exam-manager/reports', [ExamManagerReportController::class, 'store'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.reports.store');
+        Route::post('/exam-manager/reports/extract-pdf-text', [ExamManagerReportController::class, 'extractPdfText'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.reports.extract-pdf-text');
+        // Ditado por voz do laudo (Fase 5): transcrição no servidor, por provedor da
+        // política LGPD — Gate::DraftImageReport checado dentro do controller.
+        Route::post('/exam-manager/reports/dictate', ExamManagerReportDictationController::class)
+            ->middleware(['entity.role:admin,doctor,secretary', 'throttle:report-dictation'])
+            ->name('exam-manager.reports.dictate');
+        // Reenvio ao médico solicitante (Fase 5) — Gate::SendReportToExternalDoctor
+        // (admin/doctor) checado dentro do controller, mesmo padrão do bloco acima.
+        Route::post('/exam-manager/reports/{documentation}/resend', ExamManagerReportResendController::class)
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.reports.resend');
+
+        // Rascunho de laudo (Fase 5 — secretária/admin preparam, médico
+        // revisa e emite): mesmo allowlist do Gate DraftImageReport checado
+        // dentro do controller. Emitir de fato continua só em
+        // exam-manager.reports.store (doctor-only, acima).
+        Route::get('/exam-manager/report-drafts', [ExamManagerReportDraftController::class, 'index'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.report-drafts.index');
+        Route::post('/exam-manager/report-drafts', [ExamManagerReportDraftController::class, 'store'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.report-drafts.store');
+        Route::get('/exam-manager/report-drafts/{draft}', [ExamManagerReportDraftController::class, 'show'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.report-drafts.show');
+        Route::put('/exam-manager/report-drafts/{draft}', [ExamManagerReportDraftController::class, 'update'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.report-drafts.update');
+        Route::post('/exam-manager/report-drafts/{draft}/submit', [ExamManagerReportDraftController::class, 'submit'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.report-drafts.submit');
+        // Médico devolve o rascunho enviado ao técnico, com o motivo — Gate
+        // IssueReport (médico com cadastro ativo) checado dentro do controller.
+        Route::post('/exam-manager/report-drafts/{draft}/return', [ExamManagerReportDraftController::class, 'returnToTechnician'])
+            ->middleware('entity.role:doctor')
+            ->name('exam-manager.report-drafts.return');
+        Route::delete('/exam-manager/report-drafts/{draft}', [ExamManagerReportDraftController::class, 'destroy'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.report-drafts.destroy');
+
+        // Frases rápidas do médico pro laudo (benchmark 18/09/2026 —
+        // DoctorReportPhrasesController) — sempre escopado ao PRÓPRIO
+        // médico logado (controller resolve doctor_id do usuário, nunca do
+        // payload); admin passa no middleware mas leva 403 do controller
+        // (mesmo padrão de AiDoctorPromptsController).
+        Route::get('/exam-manager/report-phrases', [DoctorReportPhrasesController::class, 'index'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.report-phrases.index');
+        Route::post('/exam-manager/report-phrases', [DoctorReportPhrasesController::class, 'store'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.report-phrases.store');
+        Route::put('/exam-manager/report-phrases/{phrase}', [DoctorReportPhrasesController::class, 'update'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.report-phrases.update');
+        Route::delete('/exam-manager/report-phrases/{phrase}', [DoctorReportPhrasesController::class, 'destroy'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('exam-manager.report-phrases.destroy');
+
+        // Importar exame externo (upload manual, sem integrador). entity.role
+        // cobre admin/doctor/secretary; o Gate EntityGate::ImportExternalExam
+        // (checado dentro do controller) replica a mesma allowlist de roles —
+        // redundante de propósito, mesmo padrão do bloco de diagnóstico acima.
+        Route::post('/exam-manager/import', [ExternalExamImportController::class, 'store'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('exam-manager.import.store');
+        // Legado: /panel/eye-images[/...] -> /panel/exam-manager[/...] (301, query string preservada).
+        // Dentro do grupo panel (mesmos middlewares), só GET, sem nome de rota; destino sempre no prefixo
+        // fixo do módulo novo (ExamManagerLegacyRedirectController explica a validação do caminho).
+        Route::get('/eye-images/{path?}', ExamManagerLegacyRedirectController::class)->where('path', '.*');
+        // ══════════════════════════════════════════════════════════════════════
+        // ACL: rotas agrupadas por nível mínimo de acesso
+        // Middleware entity.role aplica a role check via EnsureEntityRole.
+        // Controllers adicionam Gate::authorize() para restrições mais finas.
+        // ══════════════════════════════════════════════════════════════════════
+
+        // ── admin + secretary + doctor + financial: pacientes e médicos ───────
+        // permission:patients.manage,... — RBAC granular ADITIVO (ver App\Enums\
+        // Permission): quem tem a permission customizada patients.manage acessa
+        // mesmo sem esses roles fixos; os roles fixos abaixo continuam com o
+        // MESMO acesso que já tinham (fallback puramente aditivo, zero regressão).
+        // ── Médicos: SEM o rule doctor ────────────────────────────────────────
+        // Decisão de produto (29/08/2026): médico não lista/gerencia o cadastro
+        // de MÉDICOS — isso é gestão administrativa (admin/secretária/
+        // financeiro). O médico continua vendo colegas no contexto da AGENDA
+        // (schedules/resources) e mantém sua escala editável pelos fluxos
+        // administrativos. O menu já escondia; agora a rota também nega.
+        Route::middleware('permission:patients.manage,admin,financial,secretary')->group(function () {
+            Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');
+            // Convite a médico que já tem login no EasyEye (outra clínica) —
+            // DoctorInvitationService. Limite de envios por clínica.
+            Route::post('doctors/invitations', [DoctorInvitationsController::class, 'store'])
+                ->middleware('throttle:doctor-invitations')
+                ->name('doctors.invitations.store');
+            Route::delete('doctors/invitations/{invitation}', [DoctorInvitationsController::class, 'destroy'])
+                ->name('doctors.invitations.destroy');
+            Route::get('doctors/{doctor}/edit-data', [DoctorsController::class, 'editData'])->name('doctors.editData');
+            Route::get('doctors/{doctor}/work-schedule/data', [DoctorWorkScheduleController::class, 'data'])->name('doctors.work-schedule.data');
+            Route::get('doctors/{doctor}/work-schedule', [DoctorWorkScheduleController::class, 'index'])->name('doctors.work-schedule.index');
+            // Importação em lote — rotas específicas antes do resource para não conflitar com {doctor}
+            Route::get('doctors/import', [DoctorImportsController::class, 'index'])->name('doctors.import.index');
+            Route::post('doctors/import', [DoctorImportsController::class, 'store'])->name('doctors.import.store');
+            Route::get('doctors/import/template', [DoctorImportsController::class, 'template'])->name('doctors.import.template');
+            Route::post('doctors/import/{doctorImport}/confirm', [DoctorImportsController::class, 'confirm'])->name('doctors.import.confirm');
+            Route::delete('doctors/import/{doctorImport}/cancel', [DoctorImportsController::class, 'cancel'])->name('doctors.import.cancel');
+            Route::get('doctors/import/{doctorImport}/errors', [DoctorImportsController::class, 'errors'])->name('doctors.import.errors');
+            // store com limite próprio: a validação diz se o e-mail/CPF já tem
+            // login de médico no EasyEye — sem limite, viraria varredura.
+            Route::post('doctors', [DoctorsController::class, 'store'])
+                ->middleware('throttle:doctor-registrations')
+                ->name('doctors.store');
+            Route::resource('doctors', DoctorsController::class)->except('store');
         });
 
-        require __DIR__ . '/manager.php';
+        // ── admin + secretary + doctor + financial: pacientes ─────────────────
+        Route::middleware('permission:patients.manage,admin,financial,doctor,secretary')->group(function () {
+            Route::get('patients/cards', [PatientsController::class, 'cards'])->name('patients.cards');
+            Route::get('patients/search', [PatientsController::class, 'search'])->name('patients.search');
+            // Planos do convênio escolhido no cadastro do paciente (ANS + próprios da clínica).
+            Route::get('covenant-plans/search', CovenantPlanSearchController::class)->name('covenant-plans.search');
+            // Convênios ativos (próprios + globais) para o de-para da importação de pacientes.
+            Route::get('covenants/search', CovenantSearchController::class)->name('covenants.search');
+            Route::post('patients/quick', [PatientsController::class, 'quickStore'])->name('patients.quick');
+            // Importação em lote — rotas específicas antes do resource para não conflitar com {patient}
+            Route::get('patients/import', [PatientImportsController::class, 'index'])->name('patients.import.index');
+            Route::post('patients/import', [PatientImportsController::class, 'store'])->name('patients.import.store');
+            Route::get('patients/import/template', [PatientImportsController::class, 'template'])->name('patients.import.template');
+            Route::post('patients/import/{patientImport}/confirm', [PatientImportsController::class, 'confirm'])->name('patients.import.confirm');
+            Route::delete('patients/import/{patientImport}/cancel', [PatientImportsController::class, 'cancel'])->name('patients.import.cancel');
+            Route::get('patients/import/{patientImport}/errors', [PatientImportsController::class, 'errors'])->name('patients.import.errors');
+            // Convênios da importação: relatório, de-para em lote e reprocessamento das linhas com erro de convênio.
+            Route::get('patients/import/{patientImport}/covenants', [PatientImportCovenantsController::class, 'show'])->name('patients.import.covenants.show');
+            Route::put('patients/import/{patientImport}/covenants', [PatientImportCovenantsController::class, 'update'])->name('patients.import.covenants.update');
+            Route::post('patients/import/{patientImport}/covenants/reprocess', [PatientImportCovenantsController::class, 'reprocess'])->name('patients.import.covenants.reprocess');
+            Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
+            // Estrela de prioridade/triagem (benchmark 18/09/2026) — mesmo
+            // grupo de permissão de patients.manage; tenant checado no
+            // controller (route model binding de {patient} sozinho não é
+            // filtrado por entidade — ver comentário em editData() acima).
+            Route::put('patients/{patient}/priority', [PatientsController::class, 'updatePriority'])->name('patients.priority.update');
+            // Restaurar paciente excluído (a listagem mostra "Restaurar") —
+            // mesmo grupo de permissão da exclusão.
+            Route::patch('patients/{patient}/restore', [PatientsController::class, 'restore'])->name('patients.restore');
+            // Mesclar cadastro (dedup): só administrador da clínica. As duas rotas antes do
+            // Route::resource; o tenant e a regra de candidatos são conferidos no controller/service.
+            Route::get('patients/{patient}/merge-candidates', [PatientsController::class, 'mergeCandidates'])
+                ->middleware('entity.role:admin')
+                ->name('patients.merge-candidates');
+            Route::post('patients/{patient}/merge', [PatientsController::class, 'merge'])
+                ->middleware('entity.role:admin')
+                ->name('patients.merge');
+            // Segurança clínica (Fase 2 / A1-A2): alergias, "nega alergias" e
+            // medicações em uso. Mesma regra de acesso a Pacientes (recepção
+            // registra como informado); confirmar/descartar/suspender exige o
+            // médico com cadastro ativo — checado no controller.
+            Route::get('patients/{patient}/clinical-safety', [PatientClinicalSafetyController::class, 'show'])->name('patients.clinical-safety.show');
+            Route::post('patients/{patient}/allergies', [PatientClinicalSafetyController::class, 'storeAllergy'])->name('patients.allergies.store');
+            Route::put('patients/{patient}/allergies/{allergy}', [PatientClinicalSafetyController::class, 'updateAllergy'])->name('patients.allergies.update');
+            Route::post('patients/{patient}/allergies/{allergy}/confirm', [PatientClinicalSafetyController::class, 'confirmAllergy'])->name('patients.allergies.confirm');
+            Route::post('patients/{patient}/allergies/{allergy}/discard', [PatientClinicalSafetyController::class, 'discardAllergy'])->name('patients.allergies.discard');
+            Route::put('patients/{patient}/allergy-status', [PatientClinicalSafetyController::class, 'updateAllergyStatus'])->name('patients.allergy-status.update');
+            Route::post('patients/{patient}/medications', [PatientClinicalSafetyController::class, 'storeMedication'])->name('patients.medications.store');
+            Route::put('patients/{patient}/medications/{medication}', [PatientClinicalSafetyController::class, 'updateMedication'])->name('patients.medications.update');
+            Route::post('patients/{patient}/medications/{medication}/confirm', [PatientClinicalSafetyController::class, 'confirmMedication'])->name('patients.medications.confirm');
+            Route::post('patients/{patient}/medications/{medication}/status', [PatientClinicalSafetyController::class, 'updateMedicationStatus'])->name('patients.medications.status');
+            Route::resource('patients', PatientsController::class);
+
+            // Portal do Paciente (Fase 1): convite disparado pelo staff. O
+            // route model binding de {patient} já resolve só dentro da entity
+            // ativa (EntityScope + tenant.bind do grupo panel.), mesma
+            // proteção que as demais rotas de patients acima.
+            Route::post('patients/{patient}/portal-invitation', [PatientPortalInvitationsController::class, 'store'])
+                ->name('patients.portal-invitation.store');
+        });
+
+        // ── admin + doctor + secretary: agenda, prontuários, fila de espera ──
+        Route::middleware('entity.role:admin,doctor,secretary')->group(function () {
+            Route::get('patients/{patient}/tonometry-pdf', TonometryPdfController::class)
+                ->name('patients.tonometry-pdf');
+
+            Route::get('cid10/search', Cid10SearchController::class)
+                ->name('cid10.search');
+
+            // F5 — Receituário de medicamentos (autocomplete + format-line)
+            Route::get('medicines/search', MedicineSearchController::class)
+                ->name('medicines.search');
+            Route::post('medication-prescription/format-line', MedicationPrescriptionFormatController::class)
+                ->name('medication-prescription.format-line');
+
+            // Presets do médico no receituário (Recentes | Favoritos + "minha
+            // posologia") — prescrição é ato médico, role doctor obrigatória.
+            Route::middleware('entity.role:doctor')->group(function () {
+                Route::get('medication-presets', [MedicationPresetsController::class, 'index'])
+                    ->name('medication-presets.index');
+                Route::post('medication-presets/use', [MedicationPresetsController::class, 'recordUse'])
+                    ->name('medication-presets.use');
+                Route::post('medication-presets/posology', [MedicationPresetsController::class, 'savePosology'])
+                    ->name('medication-presets.posology');
+                Route::post('medication-presets/favorite', [MedicationPresetsController::class, 'toggleFavorite'])
+                    ->name('medication-presets.favorite');
+
+                // Modelos PESSOAIS do médico (Fase 2 / B3 — "Salvar como
+                // modelo" na receita, no pedido e no editor de documentos).
+                // Só o dono (médico com cadastro ativo) — conferido no controller.
+                Route::get('doctor-document-templates', [DoctorDocumentTemplatesController::class, 'index'])
+                    ->name('doctor-document-templates.index');
+                Route::post('doctor-document-templates', [DoctorDocumentTemplatesController::class, 'store'])
+                    ->name('doctor-document-templates.store');
+                Route::put('doctor-document-templates/{template}', [DoctorDocumentTemplatesController::class, 'update'])
+                    ->whereUuid('template')
+                    ->name('doctor-document-templates.update');
+                Route::delete('doctor-document-templates/{template}', [DoctorDocumentTemplatesController::class, 'destroy'])
+                    ->whereUuid('template')
+                    ->name('doctor-document-templates.destroy');
+            });
+
+            // F6 — Solicitação de procedimentos (autocomplete + format-line)
+            Route::get('procedures/search', ProcedureSearchController::class)
+                ->name('procedures.search');
+            Route::get('indications/search', IndicationSearchController::class)
+                ->name('indications.search');
+            Route::post('procedure-solicitation/format-line', ProcedureSolicitationFormatController::class)
+                ->name('procedure-solicitation.format-line');
+
+            Route::get(
+                'patients/{patient}/medicalrecords/ajaxlist',
+                [MedicalRecordsController::class, 'ajaxList'],
+            )->name('patients.medicalrecords.ajaxlist');
+            Route::post(
+                'patients/{patient}/medicalrecords/calculate-presbyopia',
+                [MedicalRecordsController::class, 'calculatePresbyopia'],
+            )->name('patients.medicalrecords.calculate-presbyopia');
+            Route::post(
+                'medicalrecords/lens-format',
+                [MedicalRecordsController::class, 'lensFormat'],
+            )->name('medicalrecords.lens-format');
+            // ── Prontuário: ordem IMPORTA ─────────────────────────────────────
+            // ATENÇÃO: a ordem das declarações abaixo é crítica.
+            //
+            // O `show` usa pattern `/medicalrecords/{medicalrecord}` — se for
+            // declarado ANTES de `create`, a URL `/medicalrecords/create` é
+            // capturada pelo `show` tentando bindar "create" como ID do model,
+            // resultando em "No query results for model MedicalRecord [create]".
+            //
+            // Por isso registramos as rotas write (que incluem `create`/`edit`
+            // com path estático) PRIMEIRO, deixando `show`/`index` por último.
+
+            // Escrita exclusiva para médico (CFM Res. 2.227/2018 — apenas médico
+            // habilitado pode redigir, alterar e excluir prontuário clínico).
+            Route::middleware('entity.role:doctor')->group(function () {
+                Route::resource('patients.medicalrecords', MedicalRecordsController::class)
+                    ->only(['create', 'store', 'edit', 'update', 'destroy']);
+                // Restaurar desfaz um destroy: mesma regra de quem pode excluir
+                // (antes ficava fora deste grupo — admin/secretária restauravam).
+                Route::patch(
+                    'patients/{patient}/medicalrecords/{medicalrecord}/restore',
+                    [MedicalRecordsController::class, 'restore'],
+                )->name('patients.medicalrecords.restore');
+
+                // Autosave (rascunho do autor, separado do prontuário): grava
+                // a cada ~30 s/ao ocultar a aba, recupera e descarta. Contexto
+                // (?medical_record_id= | ?schedule_id=) — ver
+                // MedicalRecordDraftsController.
+                Route::middleware('throttle:medical-record-drafts')->group(function () {
+                    Route::get('patients/{patient}/medicalrecord-draft', [MedicalRecordDraftsController::class, 'show'])
+                        ->name('patients.medicalrecord-draft.show');
+                    Route::put('patients/{patient}/medicalrecord-draft', [MedicalRecordDraftsController::class, 'save'])
+                        ->name('patients.medicalrecord-draft.save');
+                    Route::delete('patients/{patient}/medicalrecord-draft', [MedicalRecordDraftsController::class, 'destroy'])
+                        ->name('patients.medicalrecord-draft.destroy');
+                });
+            });
+
+            // Leitura aberta para admin/doctor/secretary — útil para admin/secretária
+            // consultar histórico clínico do paciente sem poder editar.
+            Route::resource('patients.medicalrecords', MedicalRecordsController::class)
+                ->only(['index', 'show']);
+            Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/pdf',
+                [MedicalRecordsController::class, 'pdf'],
+            )->name('patients.medicalrecords.pdf');
+            Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/tonometry-pdf',
+                [MedicalRecordsController::class, 'tonometryPdf'],
+            )->name('patients.medicalrecords.tonometry-pdf');
+            Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/templates',
+                [MedicalRecordsController::class, 'templates'],
+            )->name('patients.medicalrecords.templates');
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/template-preview',
+                [MedicalRecordsController::class, 'templatePreview'],
+            )->name('patients.medicalrecords.template-preview');
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/quick-actions/{action}',
+                [MedicalRecordQuickActionsController::class, 'issue'],
+            )->name('patients.medicalrecords.quick-actions.issue');
+            // Assinatura eletrônica (CFM Res. 2.227/2018) — rota aberta a
+            // admin/doctor/secretary (mesmo grupo de leitura do prontuário);
+            // o ato em si é restrito a médico pelo Gate IssueReport DENTRO do
+            // controller (mesmo padrão de evoluções/procedimentos abaixo).
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/sign',
+                [MedicalRecordsController::class, 'sign'],
+            )->name('patients.medicalrecords.sign');
+            // Kits do pedido de exames (Fase 2 / B2), pelo convênio do atendimento.
+            Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/exam-kits',
+                MedicalRecordExamKitsController::class,
+            )->name('patients.medicalrecords.exam-kits');
+            // Evoluções clínicas (texto livre, append-only). Leitura no grupo
+            // admin/doctor/secretary; escrita restringida a médico DENTRO do
+            // controller via Gate IssueReport (mesmo padrão das quick actions).
+            Route::get(
+                'patients/{patient}/evolutions',
+                [MedicalRecordEvolutionsController::class, 'index'],
+            )->name('patients.evolutions.index');
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/evolutions',
+                [MedicalRecordEvolutionsController::class, 'store'],
+            )->name('patients.medicalrecords.evolutions.store');
+
+            // Procedimento ESTRUTURADO (Fase 3 — estoque ↔ prontuário):
+            // solicitado→executado/cancelado, com consumo de material
+            // opcional na execução. Mesmo padrão de evoluções acima: leitura
+            // aqui, escrita restrita a médico DENTRO do controller (Gate
+            // IssueReport). `bom` fica fora de `permission:stock.manage` de
+            // propósito — ver docblock de MedicalRecordProceduresController.
+            Route::get(
+                'patients/{patient}/medicalrecord-procedures',
+                [MedicalRecordProceduresController::class, 'index'],
+            )->name('patients.medicalrecord-procedures.index');
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/medicalrecord-procedures',
+                [MedicalRecordProceduresController::class, 'store'],
+            )->name('patients.medicalrecords.medicalrecord-procedures.store');
+            Route::post(
+                'patients/{patient}/medicalrecord-procedures/{medicalRecordProcedure}/mark-done',
+                [MedicalRecordProceduresController::class, 'markDone'],
+            )->name('patients.medicalrecord-procedures.mark-done');
+            Route::post(
+                'patients/{patient}/medicalrecord-procedures/{medicalRecordProcedure}/cancel',
+                [MedicalRecordProceduresController::class, 'cancel'],
+            )->name('patients.medicalrecord-procedures.cancel');
+            Route::get(
+                'procedures/{procedure}/bom',
+                [MedicalRecordProceduresController::class, 'bom'],
+            )->name('procedures.bom');
+
+            // Orientações pós-procedimento (Fase 6 / S14): ver o que foi entregue e o PDF no grupo do prontuário
+            // (a recepção entrega o papel); emitir e listar os modelos é ato do médico (Gate IssueReport).
+            Route::get(
+                'patients/{patient}/medicalrecord-procedures/{medicalRecordProcedure}/care-guidance',
+                [CareGuidanceController::class, 'procedure'],
+            )->name('patients.medicalrecord-procedures.care-guidance');
+            Route::post(
+                'patients/{patient}/medicalrecord-procedures/{medicalRecordProcedure}/care-guidance',
+                [CareGuidanceController::class, 'issue'],
+            )->name('patients.medicalrecord-procedures.care-guidance.issue');
+            Route::get(
+                'patients/{patient}/care-guidance/{issue}/pdf',
+                [CareGuidanceController::class, 'pdf'],
+            )->whereUuid('issue')->name('patients.care-guidance.pdf');
+            Route::get(
+                'patients/{patient}/care-guidance/{issue}/attachments/{index}',
+                [CareGuidanceController::class, 'attachment'],
+            )->whereUuid('issue')->whereNumber('index')->name('patients.care-guidance.attachment');
+
+            // Cursos de injeções intravítreas (anti-VEGF — Fase 6): leitura no grupo do prontuário; encerrar o curso e
+            // agendar a próxima aplicação são atos do médico (Gate IssueReport no FormRequest). A execução de cada
+            // aplicação entra pelo mark-done do procedimento, acima.
+            Route::get(
+                'patients/{patient}/intravitreal-courses',
+                [IntravitrealCoursesController::class, 'index'],
+            )->name('patients.intravitreal-courses.index');
+            Route::post(
+                'patients/{patient}/intravitreal-courses/{course}/close',
+                [IntravitrealCoursesController::class, 'close'],
+            )->name('patients.intravitreal-courses.close');
+            Route::post(
+                'patients/{patient}/intravitreal-courses/{course}/schedule-next',
+                [IntravitrealCoursesController::class, 'scheduleNext'],
+            )->name('patients.intravitreal-courses.schedule-next');
+
+            Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/exam-template/{exam}',
+                [MedicalRecordQuickActionsController::class, 'examTemplate'],
+            )->name('patients.medicalrecords.exam-template');
+
+            // Endpoints de IA usados pelos modais clínicos (prontuário/Gerenciador de exames).
+            // Rate limits por (user_id + entity_id) — definidos em AppServiceProvider.
+            Route::prefix('ai')->group(function () {
+                // Tela única de consumo + compra de créditos + monitor de execuções.
+                // URL canônica: /panel/ai/usage. Sem rota raiz /panel/ai — dashboard
+                // analítico antigo descontinuado.
+                // CSP do checkout: a tela compra pacotes de créditos com o SDK de cartão do gateway.
+                Route::get('usage', [AiRunsController::class, 'index'])->middleware('checkout.csp')->name('ai-runs.index');
+                // Compra de créditos: só pelo checkout de Minha assinatura
+                // (panel.my-subscription.ai-credits.*). O antigo POST
+                // /panel/ai/credit-purchases foi removido (criava pedido fora do
+                // checkout, sem a regra de acesso total).
+
+                Route::as('ai-runs.')->group(function () {
+                    Route::post('runs/estimate', [AiRunsController::class, 'estimate'])
+                        ->middleware('throttle:ai-estimate')->name('estimate');
+                    Route::post('runs', [AiRunsController::class, 'store'])
+                        ->middleware('throttle:ai-store')->name('store');
+                    Route::get('runs/{aiRun}', [AiRunsController::class, 'show'])->name('show');
+                    Route::get('runs/by-patient/{patient}', [AiRunsController::class, 'listByPatient'])
+                        ->middleware('throttle:ai-estimate')->name('by-patient');
+
+                    // Autocomplete remoto do dashboard /panel/usage (Onda 3, P3)
+                    Route::get('runs/search/patients', [AiRunsController::class, 'searchPatients'])
+                        ->middleware('throttle:ai-estimate')->name('search.patients');
+                    Route::get('runs/search/medical-records', [AiRunsController::class, 'searchMedicalRecords'])
+                        ->middleware('throttle:ai-estimate')->name('search.medical-records');
+
+                    // Prompts favoritos inline para o painel do AiAssistantPanel (Onda 3, P1)
+                    Route::get('runs/my-prompts', [AiRunPromptsController::class, 'index'])
+                        ->middleware('throttle:ai-estimate')->name('my-prompts.index');
+                    Route::post('runs/my-prompts', [AiRunPromptsController::class, 'store'])
+                        ->middleware('throttle:ai-decision')->name('my-prompts.store');
+                    Route::delete('runs/my-prompts/{aiPrompt}', [AiRunPromptsController::class, 'destroy'])
+                        ->middleware('throttle:ai-decision')->name('my-prompts.destroy');
+                    Route::post('runs/{aiRun}/approve', [AiRunsController::class, 'approve'])
+                        ->middleware('throttle:ai-decision')->name('approve');
+                    Route::post('runs/{aiRun}/reject', [AiRunsController::class, 'reject'])
+                        ->middleware('throttle:ai-decision')->name('reject');
+                    Route::post('runs/{aiRun}/cancel', [AiRunsController::class, 'cancel'])
+                        ->middleware('throttle:ai-decision')->name('cancel');
+                    Route::post('runs/{aiRun}/escalate', [AiRunsController::class, 'escalate'])
+                        ->middleware('throttle:ai-store')->name('escalate');
+                    Route::post('runs/{aiRun}/feedback', [AiRunsController::class, 'feedback'])
+                        ->middleware('throttle:ai-decision')->name('feedback');
+                    Route::post('runs/{aiRun}/record', [AiRunsController::class, 'openRecordForRun'])
+                        ->middleware('throttle:ai-decision')->name('record');
+                });
+            });
+
+            // F7 — preview "X (extenso) dias" para atestado médico
+            Route::post(
+                'medical-records/day-extension-preview',
+                [MedicalRecordQuickActionsController::class, 'dayExtensionPreview'],
+            )->name('medical-records.day-extension-preview');
+
+            // "Prontuários" no menu: busca geral dos prontuários da clínica
+            // (escopo de médico por CurrentDoctor — ver MedicalRecordsSearchController).
+            Route::get('medical-records', [MedicalRecordsSearchController::class, 'index'])
+                ->name('medical-records.index');
+
+            // F9 — regras de validação client-safe do FormRequest do prontuário
+            Route::get(
+                'medical-records/validation-rules',
+                MedicalRecordValidationRulesController::class,
+            )->name('medical-records.validation-rules');
+
+            // Documentações de prontuário
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/tonometry',
+                [MedicalRecordDocumentationsController::class, 'storeTonometry'],
+            )->name('patients.medicalrecords.tonometry.store');
+            Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/documentations/{documentation}/pdf',
+                [MedicalRecordDocumentationsController::class, 'pdf'],
+            )->name('patients.medicalrecords.documentations.pdf');
+            Route::resource('patients.medicalrecords.documentations', MedicalRecordDocumentationsController::class)
+                ->only(['store', 'show', 'destroy']);
+
+            // Arquivos de prontuário
+            Route::resource('patients.medicalrecords.files', MedicalRecordFilesController::class)
+                ->only(['store', 'show', 'destroy']);
+
+            // Portal do Paciente (Fase 2) — toggle "compartilhar com paciente"
+            // pra laudo/exame/anexo. Controller único pros 3 tipos (ver
+            // PatientDocumentSharesController).
+            Route::post('document-shares', [PatientDocumentSharesController::class, 'store'])
+                ->name('document-shares.store');
+            Route::delete('document-shares/{share}', [PatientDocumentSharesController::class, 'destroy'])
+                ->name('document-shares.destroy');
+
+            // Importação em lote — rotas específicas antes do resource para não conflitar com {schedule}
+            Route::get('schedules/import', [ScheduleImportsController::class, 'index'])->name('schedules.import.index');
+            Route::post('schedules/import', [ScheduleImportsController::class, 'store'])->name('schedules.import.store');
+            Route::get('schedules/import/template', [ScheduleImportsController::class, 'template'])->name('schedules.import.template');
+            Route::post('schedules/import/{scheduleImport}/confirm', [ScheduleImportsController::class, 'confirm'])->name('schedules.import.confirm');
+            Route::delete('schedules/import/{scheduleImport}/cancel', [ScheduleImportsController::class, 'cancel'])->name('schedules.import.cancel');
+            Route::get('schedules/import/{scheduleImport}/errors', [ScheduleImportsController::class, 'errors'])->name('schedules.import.errors');
+
+            Route::post('schedules/bulk-update', [SchedulesController::class, 'bulkUpdate'])->name('schedules.bulk-update');
+            Route::post('schedules/bulk-reschedule', [SchedulesController::class, 'bulkReschedule'])->name('schedules.bulk-reschedule');
+            Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
+            // Agenda do médico: iniciar atendimento (abre o prontuário do
+            // agendamento) e chamar paciente pro painel/TV da sala de espera.
+            Route::get('schedules/{schedule}/attend', [SchedulesController::class, 'attend'])->name('schedules.attend');
+            Route::post('schedules/{schedule}/call', [SchedulesController::class, 'callPatient'])->name('schedules.call');
+            Route::post('schedules/{schedule}/reschedule', [SchedulesController::class, 'reschedule'])->name('schedules.reschedule');
+            Route::patch('schedules/{schedule}/mood', [SchedulesController::class, 'updateMood'])->name('schedules.mood');
+            Route::post('schedules/{schedule}/cash-entry', [SchedulesController::class, 'storeCashEntry'])->name('schedules.cash-entry.store');
+            Route::get('schedules/slots', [SchedulesController::class, 'slots'])->name('schedules.slots');
+            Route::get('schedules/resources', [SchedulesController::class, 'resources'])->name('schedules.resources');
+            // Vagas do mês (calendário lateral), prévia da série de sessões e
+            // "Cancelar as futuras" da série.
+            Route::get('schedules/availability', [SchedulesController::class, 'availability'])->name('schedules.availability');
+            Route::get('schedules/series/preview', [SchedulesController::class, 'seriesPreview'])->name('schedules.series.preview');
+            Route::post('schedules/{schedule}/series/cancel-future', [SchedulesController::class, 'cancelSeriesFuture'])->name('schedules.series.cancel-future');
+            Route::post('schedules/{schedule}/series/add-session', [SchedulesController::class, 'addSeriesSession'])->name('schedules.series.add-session');
+            // "Reagendar" a sessão e as seguintes da série: prévia (sem gravar; valida o lote inteiro, por isso com limite por
+            // usuário) e confirmação.
+            Route::get('schedules/{schedule}/series/reschedule-preview', [SchedulesController::class, 'seriesReschedulePreview'])->middleware('throttle:60,1')->name('schedules.series.reschedule-preview');
+            Route::post('schedules/{schedule}/series/reschedule', [SchedulesController::class, 'seriesReschedule'])->name('schedules.series.reschedule');
+            // Impressão: agenda do dia (com os filtros da tela) e ficha do
+            // paciente a partir do agendamento — ambas com log de acesso.
+            Route::get('schedules/print', [SchedulePrintController::class, 'agenda'])->name('schedules.print');
+            Route::get('schedules/{schedule}/patient-sheet', [SchedulePrintController::class, 'patientSheet'])->name('schedules.patient-sheet');
+            Route::resource('schedules', SchedulesController::class);
+
+            // Pronto atendimento: fila de demanda espontânea do dia (chamar,
+            // atender → agendamento de urgência + prontuário, desistiu/removido).
+            Route::get('urgent-care', [UrgentCareController::class, 'index'])->name('urgent-care.index');
+            Route::post('urgent-care', [UrgentCareController::class, 'store'])->name('urgent-care.store');
+            Route::put('urgent-care/{urgentCareEntry}', [UrgentCareController::class, 'update'])->name('urgent-care.update');
+            Route::post('urgent-care/{urgentCareEntry}/call', [UrgentCareController::class, 'call'])->name('urgent-care.call');
+            Route::post('urgent-care/{urgentCareEntry}/attend', [UrgentCareController::class, 'attend'])->name('urgent-care.attend');
+            Route::post('urgent-care/{urgentCareEntry}/close', [UrgentCareController::class, 'close'])->name('urgent-care.close');
+
+            // Retornos (Fase 6): quem precisa voltar à clínica — lista, contato, adiar, dispensar, "feito fora".
+            // Mesmo grupo da Agenda (admin, médico, secretária) atrás da feature `has_patient_recall`. A regra de
+            // quem opera é o Gate OperateRecall (conferido na tela e em cada FormRequest).
+            Route::middleware('feature:has_patient_recall')->prefix('recall')->name('recall.')->group(function () {
+                Route::get('/', [RecallController::class, 'index'])->name('index');
+
+                // Configuração: ativar/desativar protocolos validados (ato do médico), retorno pedido pelo médico e
+                // mapeamento dos exames. Ver é de quem opera o recall; cada ação confere o Gate no FormRequest.
+                Route::get('settings', [RecallSettingsController::class, 'index'])->name('settings.index');
+                Route::middleware('throttle:recall-write')->whereUuid('protocol')->group(function () {
+                    Route::put('settings/general', [RecallSettingsController::class, 'updateGeneral'])->name('settings.general');
+                    Route::put('settings/exam-mappings', [RecallSettingsController::class, 'updateExamMappings'])->name('settings.exam-mappings');
+                    Route::post('settings/protocols/{protocol}/activate', [RecallSettingsController::class, 'activate'])->name('settings.protocols.activate');
+                    Route::post('settings/protocols/{protocol}/deactivate', [RecallSettingsController::class, 'deactivate'])->name('settings.protocols.deactivate');
+                });
+
+                // Convite por WhatsApp (uma pessoa decide): prévia do que sairia e envio; teto próprio por usuário.
+                Route::middleware('throttle:recall-invite')->whereUuid('recall')->group(function () {
+                    Route::get('{recall}/invite-preview', [RecallController::class, 'invitePreview'])->name('invite-preview');
+                    Route::post('{recall}/invite', [RecallController::class, 'invite'])->name('invite');
+                });
+
+                Route::middleware('throttle:recall-write')->whereUuid('recall')->group(function () {
+                    Route::post('{recall}/contacts', [RecallController::class, 'contact'])->name('contact');
+                    Route::post('{recall}/snooze', [RecallController::class, 'snooze'])->name('snooze');
+                    Route::post('{recall}/dismiss', [RecallController::class, 'dismiss'])->name('dismiss');
+                    Route::post('{recall}/reopen', [RecallController::class, 'reopen'])->name('reopen');
+                    Route::post('{recall}/done-elsewhere', [RecallController::class, 'doneElsewhere'])->name('done-elsewhere');
+                });
+            });
+
+            // Condições crônicas do paciente (Fase 6): o médico vê o que o sistema detectou, confirma, descarta, dá alta,
+            // registra à mão e corrige olho/início. JSON para a gaveta do cadastro. Ato clínico: só o médico com cadastro
+            // ativo (Gate DecideRecall, conferido no FormRequest — vale também para ler); atrás da feature do recall.
+            Route::middleware('feature:has_patient_recall')->prefix('patients/{patient}/recall-conditions')->name('patients.recall-conditions.')->group(function () {
+                Route::get('/', [PatientConditionController::class, 'index'])->name('index');
+
+                Route::middleware('throttle:recall-write')->group(function () {
+                    Route::post('/', [PatientConditionController::class, 'store'])->name('store');
+                    Route::put('{condition}', [PatientConditionController::class, 'update'])->whereUuid('condition')->name('update');
+                    Route::post('{condition}/confirm', [PatientConditionController::class, 'confirm'])->whereUuid('condition')->name('confirm');
+                    Route::post('{condition}/reject', [PatientConditionController::class, 'reject'])->whereUuid('condition')->name('reject');
+                    Route::post('{condition}/discharge', [PatientConditionController::class, 'discharge'])->whereUuid('condition')->name('discharge');
+                });
+            });
+
+            Route::patch('waiting-list/reorder', [WaitingListController::class, 'reorder'])->name('waiting-list.reorder');
+            Route::get('waiting-list', [WaitingListController::class, 'index'])->name('waiting-list.index');
+            Route::post('waiting-list', [WaitingListController::class, 'store'])->name('waiting-list.store');
+            Route::delete('waiting-list/{waitingList}', [WaitingListController::class, 'destroy'])->name('waiting-list.destroy');
+
+            // Compromissos não-clínicos
+            Route::post('schedule-events', [ScheduleEventsController::class, 'store'])->name('schedule-events.store');
+            Route::put('schedule-events/{scheduleEvent}', [ScheduleEventsController::class, 'update'])->name('schedule-events.update');
+            Route::delete('schedule-events/{scheduleEvent}', [ScheduleEventsController::class, 'destroy'])->name('schedule-events.destroy');
+
+            // Agenda de recursos (salas, equipamentos) — página "Escala e
+            // bloqueios" aberta por Configurações › Recursos (ação da linha).
+            Route::get('resources/{resource}/work-schedule', [ResourceWorkScheduleController::class, 'index'])->name('resources.work-schedule.index');
+            Route::get('resources/{resource}/work-schedule/data', [ResourceWorkScheduleController::class, 'data'])->name('resources.work-schedule.data');
+            Route::put('resources/{resource}/work-schedule', [ResourceWorkScheduleController::class, 'sync'])->name('resources.work-schedule.sync');
+            Route::post('resources/{resource}/blocks', [ResourceWorkScheduleController::class, 'storeBlock'])->name('resources.blocks.store');
+            Route::delete('resources/{resource}/blocks/{block}', [ResourceWorkScheduleController::class, 'destroyBlock'])->name('resources.blocks.destroy');
+
+            // Horário de médico (write — admin pode também)
+            Route::put('doctors/{doctor}/work-schedule', [DoctorWorkScheduleController::class, 'sync'])->name('doctors.work-schedule.sync');
+            Route::post('doctors/{doctor}/blocks', [DoctorWorkScheduleController::class, 'storeBlock'])->name('doctors.blocks.store');
+            Route::delete('doctors/{doctor}/blocks/{block}', [DoctorWorkScheduleController::class, 'destroyBlock'])->name('doctors.blocks.destroy');
+        });
+
+        // ── Mural de recados: todos os membros ────────────────────────────────
+        Route::get('notices', [NoticesController::class, 'index'])->name('notices.index');
+        Route::post('notices', [NoticesController::class, 'store'])->name('notices.store');
+        Route::post('notices/{notice}/read', [NoticesController::class, 'markRead'])->name('notices.read');
+        Route::delete('notices/{notice}', [NoticesController::class, 'destroy'])->name('notices.destroy');
+
+        // ── admin + financial: relatórios gerenciais ──────────────────────────
+        // permission:financial.manage,... — mesmo padrão do bloco de pacientes
+        // acima: fallback aditivo, os roles fixos mantêm o acesso que já tinham.
+        //
+        // GAP fechado (revisão "relatório direto no módulo"): página-hub
+        // "reports.index" (App\Http\Controllers\ReportsController::index(),
+        // Panel/Reports/Index.vue) removida — dado 100% de Agenda vivendo
+        // num menu solto, separado de "Agendas". Depois disso, URL/nome de
+        // rota também migraram pra baixo de `schedules.` (antes
+        // `panel.reports.schedules`/`panel.reports.absenteeism`, órfãos de
+        // `/panel/reports/*` mesmo já sendo filhos de "Agendas" no menu —
+        // pedido explícito: URL precisa refletir o dono do dado, não só o
+        // menu). Controller/métodos (ReportsController::schedules()/
+        // absenteeism()) continuam os mesmos, só o registro de rota mudou.
+        // Relatório de primeira consulta (Fase 1 / B3): gestão (admin/financeiro,
+        // mesmo Gate dos demais relatórios de agenda) e o médico — este só com
+        // as primeiras consultas dele (ReportsController::firstConsultations).
+        Route::middleware('permission:financial.manage,admin,financial,doctor')->group(function () {
+            Route::get('schedules/reports/first-consultations', [ReportsController::class, 'firstConsultations'])
+                ->name('schedules.reports.first-consultations');
+            Route::get('schedules/reports/first-consultations/export', [ReportsController::class, 'exportFirstConsultations'])
+                ->name('schedules.reports.first-consultations.export');
+        });
+
+        Route::middleware('permission:financial.manage,admin,financial')->group(function () {
+            Route::get('schedules/reports/production', [ReportsController::class, 'schedules'])->name('schedules.reports.production');
+            Route::get('schedules/reports/absenteeism', [ReportsController::class, 'absenteeism'])->name('schedules.reports.absenteeism');
+
+            Route::prefix('financial')->as('financial.')->group(function () {
+                // Dashboard Gerencial (BI)
+                Route::get('bi', [ClinicBiController::class, 'index'])->name('bi.index');
+
+                // Fluxo de caixa
+                Route::get('cash-flow', [CashFlowController::class, 'index'])->name('cash-flow.index');
+
+                // Telas de leitura fora do throttle financial-write (30/min): o
+                // limite de gravação derrubava a navegação com 429 no meio do trabalho.
+                Route::get('procedure-prices', [ProcedurePricesController::class, 'index'])->name('procedure-prices.index');
+                Route::get('cash-closing', [CashClosingController::class, 'index'])->name('cash-closing.index');
+                Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');
+                // Repasse médico: apuração, fechamentos (histórico e demonstrativo) e regras.
+                Route::get('doctor-payouts', [DoctorPayoutsController::class, 'index'])->name('doctor-payouts.index');
+                Route::get('doctor-payouts/closings', [DoctorPayoutClosingsController::class, 'index'])->name('doctor-payouts.closings.index');
+                Route::get('doctor-payouts/closings/{payout}', [DoctorPayoutClosingsController::class, 'show'])->name('doctor-payouts.closings.show');
+                Route::get('doctor-payouts/rules', [DoctorPayoutRulesController::class, 'index'])->name('doctor-payouts.rules.index');
+                // Listas/prévia dos modais em lote do faturamento (JSON, só leitura).
+                Route::get('billing/batches/{batch}/attachable-claims', [BillingBulkActionsController::class, 'attachableClaims'])->name('billing.batches.attachable-claims');
+                Route::get('billing/claims/{claim}/attach-targets', [BillingBulkActionsController::class, 'attachTargets'])->name('billing.claims.attach-targets');
+                Route::get('billing/batches/{batch}/receipt-preview', [BillingBulkActionsController::class, 'batchReceiptPreview'])->name('billing.batches.receipt-preview');
+                // CID-10 da guia TISS (indicação clínica) para quem fatura: mesmo
+                // Cid10SearchController, sob a permissão do financeiro — a rota do
+                // prontuário (cid10.search) exige admin/médico/secretária.
+                Route::get('cid10/search', Cid10SearchController::class)->name('cid10.search');
+
+                // Preço/período de procedimento, faturamento, fechamento de caixa,
+                // recurso de glosa, exportação e importação de retorno: throttle
+                // financial-write (30/min/usuário) — sem teto, sessão comprometida
+                // automatizava parsing de XML ou geração de relatório sem barreira.
+                Route::middleware('throttle:financial-write')->group(function () {
+                    Route::post('cash-flow', [CashFlowController::class, 'store'])->name('cash-flow.store');
+                    Route::match(['PUT', 'PATCH'], 'cash-flow/{entry}', [CashFlowController::class, 'update'])->name('cash-flow.update');
+                    Route::delete('cash-flow/{entry}', [CashFlowController::class, 'destroy'])->name('cash-flow.destroy');
+
+                    // Tabela de preço por procedimento × convênio
+                    Route::post('procedure-prices', [ProcedurePricesController::class, 'store'])->name('procedure-prices.store');
+
+                    // Fechamento de caixa (lock por período)
+                    Route::post('cash-closing', [CashClosingController::class, 'store'])->name('cash-closing.store');
+                    // Reabrir período: só admin da clínica e com motivo (ReopenCashCloseRequest).
+                    Route::delete('cash-closing/{cashClose}', [CashClosingController::class, 'destroy'])
+                        ->middleware('entity.role:admin')
+                        ->name('cash-closing.destroy');
+
+                    // Faturamento TISS (individual e lote)
+                    Route::post('billing/individual', [FinancialBillingController::class, 'storeIndividual'])->name('billing.individual.store');
+                    Route::post('billing/batch', [FinancialBillingController::class, 'storeBatch'])->name('billing.batch.store');
+                    Route::post('billing/batches/{batch}/submit', [FinancialBillingController::class, 'submitBatch'])->name('billing.batches.submit');
+                    Route::get('billing/batches/{batch}/xml', [FinancialBillingController::class, 'exportBatchXml'])->name('billing.batches.xml');
+                    Route::post('billing/claims/{claim}/paid', [FinancialBillingController::class, 'markClaimPaid'])->name('billing.claims.paid');
+                    Route::post('billing/claims/{claim}/denied', [FinancialBillingController::class, 'markClaimDenied'])->name('billing.claims.denied');
+                    // Cancelar guia/lote em rascunho (motivo) e corrigir pendência TISS da guia.
+                    Route::post('billing/claims/{claim}/cancel', [BillingClaimActionsController::class, 'cancelClaim'])->name('billing.claims.cancel');
+                    Route::post('billing/claims/{claim}/fix-pending', [BillingClaimActionsController::class, 'fixPending'])->name('billing.claims.fix-pending');
+                    Route::post('billing/batches/{batch}/cancel', [BillingClaimActionsController::class, 'cancelBatch'])->name('billing.batches.cancel');
+                    // Ações em lote: anexar guias ao lote, reprocessar pendentes e recebimento em massa.
+                    Route::post('billing/batches/{batch}/attach-claims', [BillingBulkActionsController::class, 'attachClaims'])->name('billing.batches.attach-claims');
+                    Route::post('billing/batches/{batch}/reprocess-pending', [BillingBulkActionsController::class, 'reprocessPending'])->name('billing.batches.reprocess-pending');
+                    Route::post('billing/claims/bulk-receipt', [BillingBulkActionsController::class, 'bulkReceipt'])->name('billing.claims.bulk-receipt');
+                    Route::post('billing/batches/{batch}/receipt', [BillingBulkActionsController::class, 'batchReceipt'])->name('billing.batches.receipt');
+
+                    // Conciliação de glosas
+                    Route::post('tiss/glosas/{glosa}/appeal', [TissGlosasController::class, 'appeal'])->name('tiss.glosas.appeal');
+                    Route::post('tiss/glosas/appeals/{appeal}/submit', [TissGlosasController::class, 'submitAppeal'])->name('tiss.glosas.appeals.submit');
+                    Route::post('tiss/glosas/appeals/{appeal}/resolve', [TissGlosasController::class, 'resolveAppeal'])->name('tiss.glosas.appeals.resolve');
+
+                    // Importação manual de retorno TISS (demonstrativo de glosa)
+                    Route::post('billing/import-return', [FinancialBillingController::class, 'importReturn'])->name('billing.import-return');
+
+                    // Relatórios financeiros (exportação com drill-down)
+                    Route::get('reports/cash-flow/export', [FinancialReportsController::class, 'exportCashFlowCsv'])->name('reports.cash-flow.export');
+                    Route::get('reports/covenants/export', [FinancialReportsController::class, 'exportCovenantsCsv'])->name('reports.covenants.export');
+
+                    // Repasse médico: regras, fechamento, ajustes, pagamento, planilhas e PDF.
+                    Route::post('doctor-payouts/rules', [DoctorPayoutRulesController::class, 'store'])->name('doctor-payouts.rules.store');
+                    Route::put('doctor-payouts/rules/{rule}', [DoctorPayoutRulesController::class, 'update'])->name('doctor-payouts.rules.update');
+                    Route::delete('doctor-payouts/rules/{rule}', [DoctorPayoutRulesController::class, 'destroy'])->name('doctor-payouts.rules.destroy');
+                    Route::post('doctor-payouts/closings', [DoctorPayoutClosingsController::class, 'store'])->name('doctor-payouts.closings.store');
+                    Route::post('doctor-payouts/closings/{payout}/adjustments', [DoctorPayoutAdjustmentsController::class, 'store'])->name('doctor-payouts.closings.adjustments.store');
+                    Route::delete('doctor-payouts/closings/{payout}/adjustments/{adjustment}', [DoctorPayoutAdjustmentsController::class, 'destroy'])
+                        ->whereUuid('adjustment')
+                        ->name('doctor-payouts.closings.adjustments.destroy');
+                    Route::post('doctor-payouts/closings/{payout}/payments', [DoctorPayoutPaymentsController::class, 'store'])->name('doctor-payouts.closings.payments.store');
+                    Route::delete('doctor-payouts/closings/{payout}/payments/{payment}', [DoctorPayoutPaymentsController::class, 'destroy'])
+                        ->whereUuid('payment')
+                        ->name('doctor-payouts.closings.payments.destroy');
+                    // Taxas de dedução antes de dividir (cartão, imposto, taxa administrativa), com vigência.
+                    Route::post('doctor-payouts/deduction-rates', [DoctorPayoutDeductionRatesController::class, 'store'])->name('doctor-payouts.deduction-rates.store');
+                    Route::delete('doctor-payouts/deduction-rates/{rate}', [DoctorPayoutDeductionRatesController::class, 'destroy'])
+                        ->whereUuid('rate')
+                        ->name('doctor-payouts.deduction-rates.destroy');
+                    // Recebimento manual (alocar receita avulsa a atos; estorno por admin ou financeiro, com motivo).
+                    Route::post('doctor-payouts/allocations', [DoctorPayoutAllocationsController::class, 'store'])->name('doctor-payouts.allocations.store');
+                    Route::delete('doctor-payouts/allocations/{allocation}', [DoctorPayoutAllocationsController::class, 'destroy'])
+                        ->whereUuid('allocation')
+                        ->name('doctor-payouts.allocations.destroy');
+                    Route::get('doctor-payouts/export', [DoctorPayoutsController::class, 'export'])->name('doctor-payouts.export');
+                    Route::get('doctor-payouts/closings/{payout}/pdf', [DoctorPayoutClosingsController::class, 'pdf'])->name('doctor-payouts.closings.pdf');
+                    Route::get('doctor-payouts/closings/{payout}/export', [DoctorPayoutClosingsController::class, 'export'])->name('doctor-payouts.closings.export');
+                    // Reabrir fechamento e expor repasses ao médico: só admin. (Estornar
+                    // pagamento: admin ou financeiro, com motivo — decisão de 2026-09-29.)
+                    Route::middleware('entity.role:admin')->group(function () {
+                        Route::delete('doctor-payouts/closings/{payout}', [DoctorPayoutClosingsController::class, 'destroy'])->name('doctor-payouts.closings.destroy');
+                        Route::patch('doctor-payouts/settings', [DoctorPayoutSettingsController::class, 'update'])->name('doctor-payouts.settings.update');
+                    });
+                });
+
+                // Pré-validação TISS (motor anti-glosa)
+                Route::get('tiss/guides/{guide}/pre-validate', TissGuidePreValidateController::class)->name('tiss.guides.pre-validate');
+
+                // Conciliação de glosas
+                Route::get('tiss/glosas', [TissGlosasController::class, 'index'])->name('tiss.glosas.index');
+
+                // Relatórios financeiros
+                Route::get('reports/cash-flow', [FinancialReportsController::class, 'cashFlow'])->name('reports.cash-flow');
+                Route::get('reports/covenants', [FinancialReportsController::class, 'covenants'])->name('reports.covenants');
+                // Guias do convênio no período (linha expandida do relatório; JSON paginado).
+                Route::get('reports/covenants/claims', [FinancialReportsController::class, 'covenantClaims'])->name('reports.covenants.claims');
+            });
+        });
+
+        // ── Configurações pessoais do médico (não exige role admin) ──────────
+        // Prompts favoritos do Assistente de IA (Onda 3, P1) — acessíveis ao
+        // próprio médico autenticado. O controller faz o cross-doctor guard.
+        Route::middleware('entity.role:doctor')
+            ->group(function () {
+                Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
+                    Route::post('ai-prompts/reorder', [AiDoctorPromptsController::class, 'reorder'])
+                        ->name('ai-prompts.reorder');
+                    Route::resource('ai-prompts', AiDoctorPromptsController::class)
+                        ->parameters(['ai-prompts' => 'aiPrompt'])
+                        ->only(['index', 'store', 'update', 'destroy']);
+                });
+            });
+
+        // Meus repasses: o médico vê os PRÓPRIOS fechamentos se a clínica permitir
+        // (entities.doctor_payouts_visible — desligado, o controller devolve 404).
+        Route::middleware('entity.role:doctor')->group(function () {
+            Route::get('my-payouts', [MyPayoutsController::class, 'index'])->name('my-payouts.index');
+            Route::get('my-payouts/{payout}', [MyPayoutsController::class, 'show'])->name('my-payouts.show');
+            Route::get('my-payouts/{payout}/pdf', [MyPayoutsController::class, 'pdf'])
+                ->middleware('throttle:financial-write')
+                ->name('my-payouts.pdf');
+        });
+
+        // ── admin only: compliance, controle de acesso, segurança, gateways ───
+        // "Chave do cofre" do RBAC — gestão de Roles/atribuição de perfil e o
+        // CRUD de usuários NUNCA são delegáveis via Permission customizada
+        // (auto-escalonamento: um usuário com essas permissões poderia criar
+        // uma Role com todas as permissions e se auto-atribuir). Segurança
+        // (2FA) e Gateways de pagamento seguem a mesma regra — ficam
+        // estritamente admin-only, sem exceção.
+        Route::middleware('entity.role:admin')->group(function () {
+            Route::get('reports/compliance', [ComplianceController::class, 'index'])->name('reports.compliance');
+            Route::get('reports/compliance/audit', [ComplianceController::class, 'exportAuditLogs'])->name('reports.compliance.audit');
+            Route::get('reports/compliance/access', [ComplianceController::class, 'exportDataAccessLogs'])->name('reports.compliance.access');
+
+            Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
+                // Tabela e cards usam o mesmo paginator do index (o antigo
+                // endpoint JSON `users/cards` saiu). Restaurar é PATCH: devolve
+                // o acesso à clínica e precisa do token CSRF (GET não tem).
+                // Convite a usuário que já tem login no EasyEye (outra
+                // clínica) — UserInvitationService. Resposta sempre igual.
+                Route::post('users/invitations', [UserInvitationsController::class, 'store'])
+                    ->middleware('throttle:user-invitations')
+                    ->name('users.invitations.store');
+                Route::delete('users/invitations/{invitation}', [UserInvitationsController::class, 'destroy'])
+                    ->name('users.invitations.destroy');
+                Route::resource('users', UsersController::class);
+                Route::patch('users/{user}/restore', [UsersController::class, 'restore'])->name('users.restore');
+                Route::patch('users/{user}/roles', [UsersController::class, 'updateRoles'])->name('users.roles.update');
+
+                // Gestão de Roles customizadas (RBAC granular ADITIVO) — CRUD
+                // completo é "chave do cofre", igual accesscontrol.users acima.
+                Route::resource('roles', RolesController::class)->except(['create', 'edit', 'show']);
+            });
+
+            Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
+                // ── Segurança da empresa (2FA opt-in/out) ────────────────────
+                Route::get('security', [SecurityController::class, 'index'])->name('security.index');
+                Route::patch('security/two-factor', [SecurityController::class, 'toggleTwoFactor'])
+                    ->middleware('throttle:manager-destructive') // ação rara e de alto impacto
+                    ->name('security.two-factor.toggle');
+
+                // WhatsApp (Gupshup): a configuração NÃO fica aqui — é exclusiva
+                // do dono do SaaS em /panel/manager/whatsapp (a conta de
+                // parceiro Gupshup é da empresa dona do SaaS; a clínica usa o
+                // número do EasyEye ou o próprio sem nunca ver credencial).
+
+                // Gateways de pagamento próprios da clínica: REMOVIDO — a
+                // funcionalidade não existe mais para clínicas (todas usam o
+                // gateway centralizado do SaaS). Os gateways do próprio SaaS
+                // continuam em /panel/manager/gateways (manager.gateways.*).
+            });
+        });
+
+        // ── piloto RBAC granular: catálogos administrativos simples ───────────
+        // `permission:settings.manage` (App\Http\Middleware\EnsureEntityPermission)
+        // troca o antigo `entity.role:admin` SÓ para estes 11 catálogos +
+        // report-settings. hasPermissionInEntity() faz bypass de admin
+        // internamente, então admin continua com acesso total; agora uma Role
+        // customizada com a permission `settings.manage` também libera.
+        // NÃO estender este middleware a nenhuma outra rota sem revisar a
+        // regra de compliance em App\Enums\Permission — Roles customizadas
+        // são uma camada ADITIVA puramente administrativa, nunca clínica.
+        Route::middleware('permission:settings.manage')->group(function () {
+            Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
+                // Painel de chamadas da sala de espera (TV) — opcional por clínica
+                Route::get('call-panel', [CallPanelController::class, 'index'])->name('call-panel.index');
+                Route::patch('call-panel', [CallPanelController::class, 'update'])->name('call-panel.update');
+
+                // Agenda: limiar de "poucas vagas" do calendário lateral.
+                Route::get('schedule', [ScheduleSettingsController::class, 'index'])->name('schedule.index');
+                Route::patch('schedule', [ScheduleSettingsController::class, 'update'])->name('schedule.update');
+
+                Route::get('covenants/cards', [CovenantsController::class, 'cards'])->name('covenants.cards');
+                Route::resource('covenants', CovenantsController::class);
+                Route::get('covenants/{covenant}/restore', [CovenantsController::class, 'restore'])->name('covenants.restore');
+
+                // Planos próprios da clínica (os da ANS vêm do catálogo global).
+                Route::get('covenant-plans/cards', [CovenantPlansController::class, 'cards'])->name('covenant-plans.cards');
+                Route::resource('covenant-plans', CovenantPlansController::class);
+                Route::get('covenant-plans/{covenant_plan}/restore', [CovenantPlansController::class, 'restore'])->name('covenant-plans.restore');
+
+                Route::get('skintypes/cards', [SkinTypesController::class, 'cards'])->name('skintypes.cards');
+                Route::resource('skintypes', SkinTypesController::class);
+                Route::get('skintypes/{skintype}/restore', [SkinTypesController::class, 'restore'])->name('skintypes.restore');
+
+                Route::get('iristypes/cards', [IrisTypesController::class, 'cards'])->name('iristypes.cards');
+                Route::resource('iristypes', IrisTypesController::class);
+                Route::get('iristypes/{iristype}/restore', [IrisTypesController::class, 'restore'])->name('iristypes.restore');
+
+                Route::get('visittypes/cards', [VisitTypesController::class, 'cards'])->name('visittypes.cards');
+                Route::resource('visittypes', VisitTypesController::class);
+                Route::get('visittypes/{visittype}/restore', [VisitTypesController::class, 'restore'])->name('visittypes.restore');
+
+                Route::get('additiontypes/cards', [AdditionTypesController::class, 'cards'])->name('additiontypes.cards');
+                Route::resource('additiontypes', AdditionTypesController::class);
+                Route::get('additiontypes/{additiontype}/restore', [AdditionTypesController::class, 'restore'])->name('additiontypes.restore');
+
+                Route::get('surgerytypes/cards', [SurgeryTypesController::class, 'cards'])->name('surgerytypes.cards');
+                Route::resource('surgerytypes', SurgeryTypesController::class);
+                Route::get('surgerytypes/{surgerytype}/restore', [SurgeryTypesController::class, 'restore'])->name('surgerytypes.restore');
+
+                Route::get('covertesttypes/cards', [CoverTestTypesController::class, 'cards'])->name('covertesttypes.cards');
+                Route::resource('covertesttypes', CoverTestTypesController::class);
+                Route::get('covertesttypes/{covertesttype}/restore', [CoverTestTypesController::class, 'restore'])->name('covertesttypes.restore');
+
+                Route::get('colorvisiontypes/cards', [ColorVisionTypesController::class, 'cards'])->name('colorvisiontypes.cards');
+                Route::resource('colorvisiontypes', ColorVisionTypesController::class);
+                Route::get('colorvisiontypes/{colorvisiontype}/restore', [ColorVisionTypesController::class, 'restore'])->name('colorvisiontypes.restore');
+
+                Route::get('visualacuitytypes/cards', [VisualAcuityTypesController::class, 'cards'])->name('visualacuitytypes.cards');
+                Route::resource('visualacuitytypes', VisualAcuityTypesController::class);
+                Route::get('visualacuitytypes/{colorvisiontype}/restore', [VisualAcuityTypesController::class, 'restore'])->name('visualacuitytypes.restore');
+
+                Route::get('lenses/cards', [LensesController::class, 'cards'])->name('lenses.cards');
+                Route::resource('lenses', LensesController::class);
+                Route::get('lenses/{lens}/restore', [LensesController::class, 'restore'])->name('lenses.restore');
+
+                Route::get('nearpointconvergences/cards', [NearPointConvergencesController::class, 'cards'])->name('nearpointconvergences.cards');
+                Route::resource('nearpointconvergences', NearPointConvergencesController::class);
+                Route::get('nearpointconvergences/{nearpointconvergence}/restore', [NearPointConvergencesController::class, 'restore'])->name('nearpointconvergences.restore');
+
+                Route::get('resources/cards', [ResourcesController::class, 'cards'])->name('resources.cards');
+                Route::resource('resources', ResourcesController::class);
+                Route::get('resources/{resource}/restore', [ResourcesController::class, 'restore'])->name('resources.restore');
+
+                // Modelos de documentação (receituários, atestados, etc.) — tabela
+                // e cards usam o paginator do index (o endpoint JSON `cards`,
+                // que a tela nem chamava, saiu).
+                Route::get('report-settings/{report_setting}/preview', [ReportSettingsController::class, 'preview'])->name('report-settings.preview');
+                Route::post('report-settings/{report_setting}/adopt', [ReportSettingsController::class, 'adopt'])->name('report-settings.adopt');
+                Route::post('report-settings/{report_setting}/reimport', [ReportSettingsController::class, 'reimport'])->name('report-settings.reimport');
+                // Atualização do modelo padrão em conteúdo PERSONALIZADO pela
+                // clínica: ver, aplicar ou manter o da clínica (auditado).
+                Route::get('report-settings/{report_setting}/contents/{content}/upstream', [ReportSettingsController::class, 'upstream'])
+                    ->whereUuid('content')->name('report-settings.contents.upstream');
+                Route::post('report-settings/{report_setting}/contents/{content}/apply-update', [ReportSettingsController::class, 'applyUpdate'])
+                    ->whereUuid('content')->name('report-settings.contents.apply-update');
+                Route::post('report-settings/{report_setting}/contents/{content}/keep', [ReportSettingsController::class, 'keepMine'])
+                    ->whereUuid('content')->name('report-settings.contents.keep');
+                Route::resource('report-settings', ReportSettingsController::class);
+
+                // Kits de exames da clínica (Fase 2 / B2): CRUD, cópia do
+                // padrão do EasyEye e vínculo com convênios.
+                Route::get('exam-kits', [ExamKitsController::class, 'index'])->name('exam-kits.index');
+                Route::post('exam-kits', [ExamKitsController::class, 'store'])->name('exam-kits.store');
+                Route::put('exam-kits/{kit}', [ExamKitsController::class, 'update'])->whereUuid('kit')->name('exam-kits.update');
+                Route::delete('exam-kits/{kit}', [ExamKitsController::class, 'destroy'])->whereUuid('kit')->name('exam-kits.destroy');
+                Route::post('exam-kits/{kit}/copy', [ExamKitsController::class, 'copy'])->whereUuid('kit')->name('exam-kits.copy');
+
+                // Orientações pós-procedimento (Fase 6 / S14): modelos da clínica, com PDFs anexos.
+                Route::get('care-guidance', [CareGuidanceTemplatesController::class, 'index'])->name('care-guidance.index');
+                Route::post('care-guidance', [CareGuidanceTemplatesController::class, 'store'])->name('care-guidance.store');
+                Route::put('care-guidance/{template}', [CareGuidanceTemplatesController::class, 'update'])->whereUuid('template')->name('care-guidance.update');
+                Route::delete('care-guidance/{template}', [CareGuidanceTemplatesController::class, 'destroy'])->whereUuid('template')->name('care-guidance.destroy');
+                Route::post('care-guidance/{template}/attachments', [CareGuidanceTemplatesController::class, 'storeAttachment'])->whereUuid('template')->name('care-guidance.attachments.store');
+                Route::delete('care-guidance/{template}/attachments/{attachment}', [CareGuidanceTemplatesController::class, 'destroyAttachment'])->whereUuid(['template', 'attachment'])->name('care-guidance.attachments.destroy');
+                Route::get('care-guidance/{template}/attachments/{attachment}', [CareGuidanceTemplatesController::class, 'downloadAttachment'])->whereUuid(['template', 'attachment'])->name('care-guidance.attachments.download');
+            });
+        });
+
+        // Redirect 301: cadastro de lente IOL e categorias de produto
+        // mudaram de local (eram `panel.setting.iollenses.*` e
+        // `panel.setting.product-categories.*`, agora `panel.stock.*` —
+        // ver bloco "Módulo de estoque" abaixo) — evita quebrar link salvo/
+        // compartilhado de quem já usava a tela antiga. Só a página de
+        // listagem (GET, o que de fato se salva/compartilha); a rota antiga
+        // deixa de existir pros demais verbos (store/update/destroy/search),
+        // que não fazem sentido "redirecionar".
+        Route::permanentRedirect('setting/iollenses', '/panel/stock/iollenses');
+        Route::permanentRedirect('setting/product-categories', '/panel/stock/product-categories');
+
+        // ── Módulo de estoque (Fase 1: catálogo de produtos + movimentação
+        // manual) ─────────────────────────────────────────────────────────
+        // Dupla trava: `permission:stock.manage` (RBAC — admin sempre passa,
+        // Role customizada precisa da permission) + `feature:has_inventory_module`
+        // (plano — feature paga, ver App\Enums\FeatureKey). Produtos/
+        // movimentação NÃO entram no grupo `setting.` acima: não são um
+        // catálogo de configuração, são dado operacional (saldo/ledger) —
+        // mesma separação que Financeiro já usa fora de `setting.`.
+        Route::middleware(['permission:stock.manage', 'feature:has_inventory_module'])
+            ->prefix('stock')
+            ->name('stock.')
+            ->group(function () {
+                // Autocomplete (GAP-FILL pós-Fase 4) — consumido pelo vínculo
+                // opcional Lente IOL ↔ Produto (ver EntityIolLensRequest).
+                // Registrado ANTES do resource() abaixo: senão o
+                // `GET products/{entityProduct}` do show casaria com
+                // "search" como se fosse um ID (ordem de rota importa).
+                Route::get('products/search', [ProductsController::class, 'search'])->name('products.search');
+                // GAP fechado (revisão pós-Fase 4) — leitor de código de
+                // barras na tela de movimentação, ver
+                // ProductsController::scanBarcode().
+                Route::get('products/scan-barcode', [ProductsController::class, 'scanBarcode'])->name('products.scan-barcode');
+                // GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de
+                // estoque"): importação em massa via CSV, ver
+                // App\Http\Controllers\Stock\ProductImportsController.
+                // Registrado ANTES do resource() de propósito — mesmo
+                // motivo de products/search acima.
+                Route::prefix('products/import')->name('products.import.')->group(function () {
+                    Route::get('/', [ProductImportsController::class, 'index'])->name('index');
+                    Route::get('template', [ProductImportsController::class, 'template'])->name('template');
+                    Route::post('preview', [ProductImportsController::class, 'preview'])->name('preview');
+                    Route::post('confirm', [ProductImportsController::class, 'confirm'])->name('confirm');
+                });
+
+                Route::resource('products', ProductsController::class)
+                    ->parameters(['products' => 'entityProduct'])
+                    ->except(['create', 'edit']);
+
+                // Inventário de lentes IOL (catarata) da clínica — dado DA
+                // CLÍNICA (entity_id obrigatório), diferente do catálogo
+                // GLOBAL de modelos (iol_lens_models, sem escopo). Movido
+                // pra dentro do módulo de Estoque (era `setting.iollenses.*`,
+                // fora do gate `feature:has_inventory_module` de propósito —
+                // ver histórico no docblock de IolLensesController) —
+                // DECISÃO revertida a pedido do usuário: cadastro de lente
+                // agora É parte do módulo pago de Estoque, sujeito ao mesmo
+                // gate duplo do grupo (permission:stock.manage +
+                // feature:has_inventory_module) que o resto daqui. Redirect
+                // 301 da URL antiga logo abaixo do grupo evita quebrar link
+                // salvo/compartilhado de quem já usava a tela.
+                //
+                // `search` fica ANTES do resource pra não colidir com
+                // `iollenses/{id}`. `show` é mantido (fora do `except`) pro
+                // modal de detalhe/edição abrir via JSON ao clicar num card —
+                // ver decisão em IolLensesController::show(). `create`/`edit`
+                // ficam de fora: é SPA/modal (Inertia), não há tela dedicada
+                // server-rendered.
+                Route::get('iollenses/search', [IolLensesController::class, 'search'])->name('iollenses.search');
+                // parameters(): binding implícito casa pelo NOME do parâmetro
+                // da rota com o do método do controller — sem isso, o
+                // wildcard viraria `{iollense}` (singular automático) mas os
+                // métodos tipam `EntityIolLens $entityIolLens`, e o model
+                // nunca seria resolvido. Mesmo ajuste já usado em ai-prompts.
+                Route::resource('iollenses', IolLensesController::class)
+                    ->parameters(['iollenses' => 'entityIolLens'])
+                    ->except(['create', 'edit']);
+
+                // Categorias de produto/estoque — catálogo simples
+                // name/active (BaseSettingController genérico). MOVIDO de
+                // Configurações > Atendimento (era `panel.setting.
+                // product-categories.*`, fora do gate) — sem consumidor
+                // fora de Estoque (ver docblock de ProductCategoriesController).
+                Route::get('product-categories/cards', [ProductCategoriesController::class, 'cards'])->name('product-categories.cards');
+                Route::resource('product-categories', ProductCategoriesController::class)
+                    ->parameters(['product-categories' => 'productcategory']);
+                Route::get('product-categories/{productcategory}/restore', [ProductCategoriesController::class, 'restore'])->name('product-categories.restore');
+
+                // Lotes/validade (Fase 2) — JSON puro, chamado via
+                // window.axios de dentro do modal de produto (ver doc de
+                // ProductLotsController). Sem create/destroy: lote nasce de
+                // uma entrada de movimentação (findOrCreateLot), não de
+                // cadastro solto; sem destroy nesta fase (não remove lote
+                // com histórico de movimentação).
+                Route::get('products/{entityProduct}/lots', [ProductLotsController::class, 'index'])->name('products.lots.index');
+                Route::put('lots/{stockLot}', [ProductLotsController::class, 'update'])->name('lots.update');
+
+                Route::resource('movements', StockMovementsController::class)
+                    ->only(['index', 'store']);
+
+                // BOM por procedimento (Fase 3) — gestão admin da lista
+                // padrão de consumo. Leitura CLÍNICA (durante o atendimento,
+                // pra pré-preencher a confirmação de consumo) é uma rota
+                // SEPARADA fora deste grupo — ver
+                // MedicalRecordProceduresController::bom() e o comentário no
+                // bloco de rotas do prontuário.
+                Route::get('procedures/{procedure}/bom', [ProcedureProductsController::class, 'index'])->name('procedures.bom.index');
+                Route::post('procedures/{procedure}/bom', [ProcedureProductsController::class, 'store'])->name('procedures.bom.store');
+                Route::delete('procedure-products/{procedureProduct}', [ProcedureProductsController::class, 'destroy'])->name('procedure-products.destroy');
+
+                // ── Fase 4: fornecedores + pedidos de compra ────────────────
+                Route::resource('suppliers', SuppliersController::class)
+                    ->except(['create', 'edit']);
+
+                Route::resource('purchase-orders', PurchaseOrdersController::class)
+                    ->parameters(['purchase-orders' => 'purchaseOrder'])
+                    ->except(['create', 'edit']);
+                // Ações de transição de estado — sempre POST (efeito
+                // colateral real: send/cancel mudam status; receive baixa
+                // estoque + tenta lançamento financeiro), nunca PUT/PATCH de
+                // recurso (não é "editar o pedido", é um ATO sobre ele).
+                Route::post('purchase-orders/{purchaseOrder}/send', [PurchaseOrdersController::class, 'send'])->name('purchase-orders.send');
+                Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrdersController::class, 'cancel'])->name('purchase-orders.cancel');
+                Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrdersController::class, 'receive'])->name('purchase-orders.receive');
+                // GAP fechado (revisão pós-Fase 4): status "Enviado" existia
+                // mas nada gerava um documento de verdade pra mandar ao
+                // fornecedor — ver PurchaseOrdersController::pdf().
+                Route::get('purchase-orders/{purchaseOrder}/pdf', [PurchaseOrdersController::class, 'pdf'])->name('purchase-orders.pdf');
+
+                // GAP fechado nesta revisão — relatório previsto na Fase 4
+                // original (curva ABC/giro/custo por procedimento), deixado
+                // de fora até agora. Ver App\Services\Stock\StockReportService.
+                Route::get('reports', [StockReportsController::class, 'index'])->name('reports.index');
+                // GAP fechado (revisão pós-Fase 4) — exportação CSV, mesmo
+                // padrão de FinancialReportsController::exportCashFlowCsv().
+                Route::get('reports/export', [StockReportsController::class, 'exportCsv'])->name('reports.export');
+
+                // GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de
+                // estoque"): contagem física em massa, ver
+                // App\Http\Controllers\Stock\StockCountsController.
+                Route::get('counts', [StockCountsController::class, 'index'])->name('counts.index');
+                Route::post('counts', [StockCountsController::class, 'store'])->name('counts.store');
+            });
 
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-
-        Route::group(['prefix' => 'ajax', 'as' => 'ajax.'], function () {
-            Route::group(['prefix' => 'datatables', 'as' => 'datatables'], function () {
-                Route::post('/users', [UsersController::class, 'ajaxDatatable'])->name('.users');
-                Route::post('/doctors', [DoctorsController::class, 'ajaxDatatable'])->name('.doctors');
-                Route::post('/patients', [PatientsController::class, 'ajaxDatatable'])->name('.patients');
-                Route::post('/entities', [EntitiesController::class, 'ajaxDatatable'])->name('.entities');
-                Route::post('/covenants', [CovenantsController::class, 'ajaxDatatable'])->name('.covenants');
-                Route::post('/skintypes', [SkinTypesController::class, 'ajaxDatatable'])->name('.skintypes');
-                Route::post('/iristypes', [IrisTypesController::class, 'ajaxDatatable'])->name('.iristypes');
-                Route::post('/visittypes', [VisitTypesController::class, 'ajaxDatatable'])->name('.visittypes');
-                Route::post(
-                    '/entity_integrators',
-                    [App\Http\Controllers\Manager\EntityIntegratorsController::class, 'ajaxDatatable']
-                )->name('.integrators');
-            });
-        });
-    }
+    },
 );
 
+// 2FA: rotas DEVEM ficar fora dos grupos protegidos por `2fa` (catch-22).
+// Estão sob auth+verified — usuário precisa estar logado para configurar.
+Route::middleware(['auth', 'verified'])->prefix('security/two-factor')->name('security.two-factor.')->group(function () {
+    Route::get('/setup', [TwoFactorController::class, 'setup'])->name('setup');
+    Route::post('/setup', [TwoFactorController::class, 'regenerateSecret'])->name('setup.store');
+    Route::post('/confirm', [TwoFactorController::class, 'confirm'])->name('confirm');
+    Route::get('/verify', [TwoFactorController::class, 'verify'])->name('verify');
+    Route::post('/verify', [TwoFactorController::class, 'verifyStore'])
+        ->middleware('throttle:6,1') // 6 tentativas/min — defesa anti-brute-force
+        ->name('verify.store');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Documentação Swagger da API de integradores — protegida por senha
+// (DOCS_API_PASSWORD). Sem a senha configurada, todas as rotas respondem 404.
+// Cada liberação de acesso é registrada em log (IP + user agent).
+// ─────────────────────────────────────────────────────────────────────────────
+Route::prefix('docs/api')->name('docs.api.')->group(function () {
+    // Formulário de senha fica fora do gate (senão loop de redirect)
+    Route::get('/auth', [ApiDocsController::class, 'showAuthForm'])->name('auth');
+    Route::post('/auth', [ApiDocsController::class, 'authenticate'])
+        ->middleware('throttle:10,1') // anti brute-force
+        ->name('auth.store');
+
+    Route::middleware('docs.access')->group(function () {
+        Route::get('/', [ApiDocsController::class, 'index'])->name('index');
+        Route::get('/spec', [ApiDocsController::class, 'spec'])->name('spec');
+        Route::post('/logout', [ApiDocsController::class, 'logout'])->name('logout');
+    });
+});
+
+require __DIR__ . '/manager.php';
+require __DIR__ . '/portal.php';
+require __DIR__ . '/patient-portal-auth.php';
+require __DIR__ . '/patient-portal.php';
+require __DIR__ . '/external-reports.php';
+require __DIR__ . '/clinical-review.php';
 require __DIR__ . '/auth.php';

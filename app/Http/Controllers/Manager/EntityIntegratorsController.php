@@ -1,303 +1,259 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Manager;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EntityIntegratorRequest;
-use App\Models\{Entity, EntityIntegrator};
-use Illuminate\Contracts\View\{View};
-use Illuminate\Foundation\Application;
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
-use Illuminate\Routing\Redirector;
-use Random\RandomException;
+use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator};
+use Illuminate\Http\{JsonResponse, Request};
+use Inertia\{Inertia, Response as InertiaResponse};
 
+/**
+ * Gestão de Integradores (Manager SaaS).
+ *
+ * Integrator = identidade do equipamento/PMS/RIS que se conecta à API EasyEye.
+ * Vive sob um EntityUserIntegrator (que detém credenciais email/senha + code).
+ *
+ * Auth real: POST /api/integrators (email+password+code) gera Sanctum token
+ * em personal_access_tokens. Esta tela Manager apenas gerencia identidade do
+ * integrator — não emite tokens (segurança: tokens só nascem via login).
+ *
+ * Rotas: /panel/manager/entities/{entity}/user-integrators/{userIntegrator}/integrators/...
+ */
 class EntityIntegratorsController extends Controller
 {
-    protected string $titleController = 'Integradores';
-
-    /**
-     * Instance of the standard model.
-     */
-    protected EntityIntegrator $model;
-
-    public function __construct(EntityIntegrator $entityIntegrator)
-    {
-        $this->model = $entityIntegrator;
+    public function __construct(
+        protected EntityIntegrator $model,
+    ) {
     }
 
     /**
-     * Display a listing of the resource.
+     * Listagem Inertia paginada com busca por nome/IP/MAC/code.
      */
-    public function index(string $entityId): Application|View
+    public function index(string $entityId, string $userIntegrator, Request $request): InertiaResponse
     {
-        $entity = Entity::query()->findOrFail($entityId);
-        $meta   = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.sidemenu.entities'),
-                    'url'    => route('panel.manager.entities.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.manager.entities.integrators.index', $entity->id),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.records'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
+        $search = $request->string('search')->trim()->value();
+
+        $query = EntityIntegrator::query()
+            ->withTrashed()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id);
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search): void {
+                $q->whereLikeUnaccent('name', $search)
+                    ->orWhereLikeUnaccent('ip', $search)
+                    ->orWhereLikeUnaccent('mac', $search)
+                    ->orWhereLikeUnaccent('code', $search);
+            });
+        }
+
+        $items = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
+
+        return Inertia::render('Panel/Manager/EntityIntegrators/Index', [
+            'entity' => [
+                'id'   => $entity->id,
+                'code' => $entity->code,
+                'name' => $entity->name,
             ],
-        ];
+            'userIntegrator' => [
+                'id'    => $userIntegratorModel->id,
+                'code'  => $userIntegratorModel->code,
+                'name'  => $userIntegratorModel->name,
+                'email' => $userIntegratorModel->email,
+            ],
+            'items'   => $items->through(fn (EntityIntegrator $i) => $this->toRow($i)),
+            'filters' => ['search' => $search],
+            't'       => trans('manager_entity_integrators'),
+        ]);
+    }
 
-        return view(
-            'system.manager.entity_integrators.index',
-            compact('meta', 'entity')
-        );
+    public function store(EntityIntegratorRequest $request, string $entityId, string $userIntegrator): JsonResponse
+    {
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
+        $attributes = array_merge($request->validated(), [
+            'entity_user_integrator_id' => $userIntegratorModel->id,
+            'active'                    => true,
+        ]);
+
+        $model = $this->model->create($attributes);
+
+        return response()->json([
+            'message' => trans('manager_entity_integrators.created'),
+            'data'    => $this->toRow($model->fresh()),
+        ]);
+    }
+
+    public function show(string $entityId, string $userIntegrator, string $integrator): JsonResponse
+    {
+        $entity              = Entity::query()->withTrashed()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()->withTrashed()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
+        $record = $this->model->query()->withTrashed()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
+            ->findOrFail($integrator);
+
+        // Conta tokens Sanctum ativos do EntityUserIntegrator dono, filtrados por
+        // ability do integrator_id atual — espelha a forma como o login emite tokens.
+        $activeTokens = $record->user
+            ->tokens()
+            ->where(function ($q) use ($integrator) {
+                $q->whereJsonContains('abilities', 'integrator_id:' . $integrator);
+            })
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->count();
+
+        return response()->json([
+            'data' => array_merge($this->toRow($record), [
+                'equipments_count' => $record->equipments()->count(),
+                'active_tokens'    => $activeTokens,
+            ]),
+        ]);
+    }
+
+    public function update(EntityIntegratorRequest $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
+    {
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
+        $record = $this->model->query()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
+            ->findOrFail($integrator);
+
+        $record->update($request->validated());
+
+        return response()->json([
+            'message' => trans('manager_entity_integrators.updated'),
+            'data'    => $this->toRow($record->fresh()),
+        ]);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Dados planos para preenchimento do FormModal de edição.
      */
-    public function create(string $entityId): Application|View
+    public function editData(string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        return view('system.manager.entity_integrators.form');
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
+        $record = $this->model->query()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
+            ->findOrFail($integrator);
+
+        return response()->json(['data' => [
+            'name'           => $record->name,
+            'ip'             => $record->ip,
+            'mac'            => $record->mac,
+            'active'         => (bool) $record->active,
+            'token_profile'  => $record->token_profile,
+            'update_channel' => $record->update_channel,
+            'update_cohort'  => $record->update_cohort,
+        ]]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @throws RandomException
-     */
-    public function store(EntityIntegratorRequest $request, string $entityId): Application|JsonResponse|Redirector|RedirectResponse
+    public function activate(Request $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $entity          = Entity::query()->findOrFail($entityId);
-        $parameterExtras = [
-            'entity_id' => $entity->id,
-            'token'     => $this->generateUniqueToken(),
-            'active'    => true,
-        ];
-        $attributes        = array_merge($request->except(['_token', 'mac']), $parameterExtras);
-        $attributes['mac'] = strtoupper($attributes['mac']);
-        $model             = $this->model->create($attributes);
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
 
-        if (request()->wantsJson()) {
-            return response()->json(
-                [
-                    'message' => $this->titleController . ' cadastrado(a) com sucesso.',
-                    'data'    => $model->toArray(),
-                ]
-            );
-        }
+        $record = $this->model->query()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
+            ->findOrFail($integrator);
 
-        return redirect(action('\\' . static::class . '@index'))
-            ->with('message', $this->titleController . ' cadastrado(a) com sucesso.');
+        $active = (bool) $request->input('active', ! $record->active);
+        $record->update(['active' => $active]);
+
+        return response()->json([
+            'message' => trans($active
+                ? 'manager_entity_integrators.activated'
+                : 'manager_entity_integrators.deactivated'),
+            'active' => $record->fresh()->active,
+        ]);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $entityId, string $id): View|Application|JsonResponse
+    public function restore(Request $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $entity = Entity::query()->withTrashed()->findOrFail($entityId);
-        $record = $this->model->query()->withTrashed()->where('entity_id', $entity->id)->findOrFail($id);
+        $entity              = Entity::query()->withTrashed()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()->withTrashed()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
 
-        if (request()->wantsJson()) {
-            return response()->json(
-                [
-                    'data' => $record->toArray(),
-                ]
-            );
-        }
+        $record = $this->model->query()->withTrashed()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
+            ->findOrFail($integrator);
 
-        return view('system.manager.entity_integrators.show', compact('entity', 'record'));
+        $record->restore();
+
+        return response()->json(['message' => trans('manager_entity_integrators.restored')]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $entityId, string $id)
+    public function destroy(string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $entity = Entity::query()->findOrFail($entityId);
-        $record = $this->model->query()->where('entity_id', $entity->id)->findOrFail($id);
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
 
-        return view('system.manager.entity_integrators.form', compact('entity', 'record'));
-    }
+        $record = $this->model->query()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
+            ->findOrFail($integrator);
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(EntityIntegratorRequest $request, string $entityId, string $id): Application|JsonResponse|Redirector|RedirectResponse
-    {
-        $entity          = Entity::query()->findOrFail($entityId);
-        $parameterExtras = [
-            'entity_id' => $entity->id,
-        ];
-        $attributes        = array_merge($request->except(['_token', 'mac']), $parameterExtras);
-        $attributes['mac'] = strtoupper($attributes['mac']);
-        $model             = $this->model->update($attributes);
-
-        if (request()->wantsJson()) {
-            return response()->json(
-                [
-                    'message' => $this->titleController . ' cadastrado(a) com sucesso.',
-                    'data'    => $model->toArray(),
-                ]
-            );
-        }
-
-        return redirect(action('\\' . static::class . '@index'))
-            ->with('message', $this->titleController . ' cadastrado(a) com sucesso.');
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $entityId, string $id)
-    {
-        $entity = Entity::query()->findOrFail($entityId);
-        $record = $this->model->query()->where('entity_id', $entity->id)->findOrFail($id);
         $record->delete();
 
-        if (request()->wantsJson()) {
-            return response()->json(
-                [
-                    'message' => $this->titleController . ' deletada(a) com sucesso.',
-                    'deleted' => $record->toArray(),
-                ]
-            );
-        }
-
-        return redirect(action('\\' . static::class . '@index'))
-            ->with('message-error', $this->titleController . ' deletada(a) com sucesso.');
-
+        return response()->json(['message' => trans('manager_entity_integrators.deleted')]);
     }
 
     /**
-     * AJAX Datatable
+     * @return array<string, mixed>
      */
-    public function ajaxDatatable(Request $request): JsonResponse
+    private function toRow(EntityIntegrator $integrator): array
     {
-        $columns = [
-            0 => 'created_at',
-            1 => 'name',
-            2 => 'active',
-            3 => 'action',
+        $entityId     = (string) $integrator->user?->entity_id;
+        $userId       = (string) $integrator->entity_user_integrator_id;
+        $integratorId = (string) $integrator->id;
+        $isDeleted    = $integrator->deleted_at !== null;
+        $mode         = $isDeleted ? 'restore' : 'full';
+
+        return [
+            'token_profile'    => $integrator->token_profile ?? 'capture', 'update_channel' => $integrator->update_channel ?? 'stable', 'update_cohort' => $integrator->update_cohort ?? 'all',
+            'id'               => $integratorId,
+            'code'             => (string) $integrator->code,
+            'name'             => (string) $integrator->name,
+            'ip'               => $integrator->ip,
+            'mac'              => $integrator->mac,
+            'active'           => (bool) $integrator->active,
+            'deleted'          => $isDeleted,
+            'created_at'       => $integrator->created_at?->format('d/m/Y H:i'),
+            'mode'             => $mode,
+            'edit_data_url'    => route('manager.entities.user-integrators.integrators.edit-data', [$entityId, $userId, $integratorId]),
+            'update_url'       => route('manager.entities.user-integrators.integrators.update', [$entityId, $userId, $integratorId]),
+            'destroy_url'      => route('manager.entities.user-integrators.integrators.destroy', [$entityId, $userId, $integratorId]),
+            'activate_url'     => route('manager.entities.user-integrators.integrators.activate', [$entityId, $userId, $integratorId]),
+            'restore_url'      => route('manager.entities.user-integrators.integrators.restore', [$entityId, $userId, $integratorId]),
+            'show_url'         => route('manager.entities.user-integrators.integrators.show', [$entityId, $userId, $integratorId]),
+            'commands_url'     => route('manager.entities.user-integrators.integrators.commands.index', [$entityId, $userId, $integratorId]),
+            'queue_health_url' => route('manager.entities.user-integrators.integrators.queue-health', [$entityId, $userId, $integratorId]),
+            'equipments_url'   => route('manager.entities.user-integrators.integrators.equipments.index', [$entityId, $userId, $integratorId]),
         ];
-
-        $entity       = Entity::query()->findOrFail(session()->get('selected_entity_id'));
-        $totalRecords = $this->model->query()->withTrashed()
-            ->where('entity_id', $entity->id)->count();
-        $limit = $request->get('length');
-        $start = $request->get('start');
-        $order = $columns[$request->get('order')[0]['column']];
-        $dir   = $request->get('order')[0]['dir'];
-
-        if (empty($request->get('search')['value'])) {
-            $records = $this->model->query()->withTrashed()
-                ->where('entity_id', $entity->id)
-                ->skip($start)->take($limit)
-                ->orderBy($order, $dir)->get();
-            $totalFiltered = $this->model->count();
-        } else {
-            $search  = $request->get('search')['value'];
-            $records = $this->model->query()->withTrashed()
-                ->where('entity_id', $entity->id)
-                ->where('name', 'like', "%{$search}%")
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->get();
-            $totalFiltered = $this->model->query()->withTrashed()
-                ->where('entity_id', $entity->id)
-                ->where('name', 'like', "%{$search}%")
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->count();
-        }
-        $data = [];
-
-        if (count($records)) {
-            foreach ($records as $record) {
-                $btnActions                = '';
-                $information['created_at'] = $record->created_at->format('d/m/Y H:i');
-                $information['name']       = $record->name;
-                $information['active']     = !$record->deleted_at ?
-                    (
-                        $record->active ?
-                            '<span class="badge bg-success">SIM</span>' :
-                            '<span class="badge bg-dark">NÃO</span>'
-                    ) :
-                    '<span class="badge bg-light text-dark">Inativo</span>';
-
-                if (!$record->deleted_at) {
-                    $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Editar"><i class="fa fa-edit"></i></a>';
-
-                }
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Visualizar"><i class="fa fa-eye"></i></a>';
-
-                if (!$record->deleted_at) {
-                    $btnActions .= '<a
-	                    href="' . route('panel.manager.entities.integrators.equipments.index', [$entity->id, $record->id])
-                        . '"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Equipamentos"><i class="fas fa-satellite-dish"></i></a>';
-                    $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
-	                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
-	                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
-	                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-                    $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-danger btn-danger btn-xs m-1 btn-trash"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
-
-                }
-                $information['action'] = $btnActions;
-                $data[]                = $information;
-            }
-
-        }
-
-        return response()->json(
-            [
-                'draw'            => (int) $request->get('draw'),
-                'recordsTotal'    => (int) $totalRecords,
-                'recordsFiltered' => (int) $totalFiltered,
-                'data'            => $data,
-            ]
-        );
-    }
-
-    /**
-     * @throws RandomException
-     */
-    private function generateUniqueToken(): string
-    {
-        do {
-            $token = hash(
-                'sha256',
-                microtime(true) . random_bytes(32) . uniqid('', true) . mt_rand()
-            );
-        } while (EntityIntegrator::query()->where('token', $token)->exists());
-
-        return $token;
     }
 }

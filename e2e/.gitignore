@@ -1,0 +1,6 @@
+node_modules/
+videos/
+screenshots/
+downloads/
+results/
+cypress/.sandbox-run/

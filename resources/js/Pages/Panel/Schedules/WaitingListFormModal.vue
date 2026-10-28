@@ -1,0 +1,445 @@
+<script setup>
+import { ref, watch, computed, onBeforeUnmount } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import QuickAllergyFields from '@/Components/Panel/ClinicalSafety/QuickAllergyFields.vue';
+import { quickAllergyPayload } from '@/Support/clinicalSafety.js';
+
+const props = defineProps({
+    open: { type: Boolean, required: true },
+    doctors: { type: Array, default: () => [] },
+    covenants: { type: Array, default: () => [] },
+    visitTypes: { type: Array, default: () => [] },
+    t: { type: Object, required: true },
+});
+
+const emit = defineEmits(['close', 'saved']);
+
+const saving = ref(false);
+const errors = ref({});
+
+const form = ref(emptyForm());
+
+function emptyForm() {
+    return {
+        doctor_id: '',
+        patient_id: '',
+        full_name: '',
+        telephone: '',
+        cellphone: '',
+        cellphone_whatsapp: false,
+        covenant_id: '',
+        visit_id: '',
+        notes: '',
+        preferred_date_from: '',
+        preferred_date_until: '',
+    };
+}
+
+watch(
+    () => props.open,
+    (val) => {
+        if (val) {
+            form.value = emptyForm();
+            errors.value = {};
+            saving.value = false;
+            patientSearch.value = '';
+            patientResults.value = [];
+            showQuickReg.value = false;
+            quickName.value = '';
+            resetQuick();
+        }
+    },
+);
+
+// ── Patient search ─────────────────────────────────────────────────────────────
+const patientSearch = ref('');
+const patientResults = ref([]);
+const showQuickReg = ref(false);
+const quickName = ref('');
+let searchDebounce = null;
+
+function onPatientInput() {
+    clearTimeout(searchDebounce);
+    if (patientSearch.value.length < 2) {
+        patientResults.value = [];
+        return;
+    }
+    searchDebounce = setTimeout(searchPatients, 350);
+}
+
+async function searchPatients() {
+    try {
+        const res = await fetch(`/panel/patients/search?q=${encodeURIComponent(patientSearch.value)}`, {
+            headers: { Accept: 'application/json' },
+        });
+        patientResults.value = res.ok ? await res.json() : [];
+    } catch {
+        patientResults.value = [];
+    }
+}
+onBeforeUnmount(() => clearTimeout(searchDebounce));
+
+function selectPatient(p) {
+    form.value.patient_id = p.id;
+    form.value.full_name = p.full_name;
+    form.value.cellphone = p.cellphone ?? '';
+    form.value.telephone = p.telephone ?? '';
+    patientSearch.value = p.full_name;
+    patientResults.value = [];
+}
+
+function clearPatient() {
+    form.value.patient_id = '';
+    form.value.full_name = '';
+    patientSearch.value = '';
+    patientResults.value = [];
+}
+
+// Cadastro rápido (PatientsController::quickStore): nome + celular. Mesma
+// regra de duplicidade do cadastro completo — homônimo só com a confirmação
+// "é outra pessoa" (erro em confirm_homonym até reenviar confirmado).
+const ui = computed(() => usePage()?.props?.t_ui?.patient_form ?? {});
+const quickCellphone = ref('');
+const quickConfirmHomonym = ref(false);
+const quickErrors = ref({});
+const quickSaving = ref(false);
+// Alergias informadas pelo paciente ou "nega alergias" (Fase 2 / G2) —
+// nenhum dos dois = "sem registro de alergias".
+const quickAllergies = ref('');
+const quickAllergiesDenied = ref(false);
+
+function resetQuick() {
+    quickCellphone.value = '';
+    quickConfirmHomonym.value = false;
+    quickErrors.value = {};
+    quickAllergies.value = '';
+    quickAllergiesDenied.value = false;
+}
+
+watch(quickName, () => {
+    quickConfirmHomonym.value = false;
+});
+
+async function quickRegister() {
+    if (!quickName.value.trim() || quickSaving.value) return;
+    quickSaving.value = true;
+    quickErrors.value = {};
+    try {
+        const res = await fetch(route('panel.patients.quick'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify({
+                name: quickName.value.trim(),
+                cellphone: quickCellphone.value,
+                confirm_homonym: quickConfirmHomonym.value,
+                ...quickAllergyPayload(quickAllergies.value, quickAllergiesDenied.value),
+            }),
+        });
+        const json = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+            const p = json.patient ?? {};
+            selectPatient({
+                id: p.id,
+                full_name: p.full_name,
+                cellphone: p.cellphone ?? '',
+                telephone: p.telephone ?? '',
+            });
+            showQuickReg.value = false;
+            quickName.value = '';
+            resetQuick();
+        } else if (res.status === 422) {
+            quickErrors.value = json.errors ?? {};
+        } else if (window.showErrorToast) {
+            window.showErrorToast(json.message ?? props.t.wl_conn_error);
+        }
+    } catch {
+        if (window.showErrorToast) window.showErrorToast(props.t.wl_conn_error);
+    } finally {
+        quickSaving.value = false;
+    }
+}
+
+// ── Submit ─────────────────────────────────────────────────────────────────────
+async function onSubmit() {
+    if (saving.value) return;
+    saving.value = true;
+    errors.value = {};
+
+    const res = await fetch(route('panel.waiting-list.store'), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: JSON.stringify(form.value),
+    });
+    const json = await res.json();
+    saving.value = false;
+
+    if (res.ok) {
+        if (window.showSuccessToast) window.showSuccessToast(json.message);
+        emit('saved', json.data);
+    } else if (res.status === 422) {
+        errors.value = json.errors ?? {};
+    } else {
+        if (window.showErrorToast) window.showErrorToast(json.message ?? 'Erro ao salvar.');
+    }
+}
+</script>
+
+<template>
+    <OffcanvasPanel :open="open" :width="560" @close="emit('close')">
+        <template #header>
+            <h5 class="mb-0 fw-bold"><i class="fas fa-hourglass-half me-2 text-warning"></i>{{ t.wl_title }}</h5>
+        </template>
+
+        <form @submit.prevent="onSubmit">
+            <!-- Doctor -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">{{ t.wl_doctor }} <span class="text-danger">*</span></label>
+                <SearchSelect
+                    v-model="form.doctor_id"
+                    :options="doctors"
+                    :placeholder="t.form_select"
+                    :clearable="false"
+                    :invalid="!!errors.doctor_id"
+                />
+                <div v-if="errors.doctor_id" class="invalid-feedback d-block">{{ errors.doctor_id[0] }}</div>
+            </div>
+
+            <!-- Preferred period -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">
+                    {{ t.wl_period }} <small class="text-muted fw-normal">{{ t.wl_period_opt }}</small>
+                </label>
+                <div class="input-group">
+                    <input
+                        v-model="form.preferred_date_from"
+                        type="date"
+                        class="form-control"
+                        :class="{ 'is-invalid': errors.preferred_date_from }"
+                    />
+                    <span class="input-group-text">{{ t.wl_until }}</span>
+                    <input
+                        v-model="form.preferred_date_until"
+                        type="date"
+                        class="form-control"
+                        :class="{ 'is-invalid': errors.preferred_date_until }"
+                    />
+                </div>
+                <div v-if="errors.preferred_date_from || errors.preferred_date_until" class="invalid-feedback d-block">
+                    {{ (errors.preferred_date_from ?? errors.preferred_date_until)?.[0] }}
+                </div>
+            </div>
+
+            <!-- Patient search -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">{{ t.wl_patient }}</label>
+                <div class="position-relative">
+                    <input
+                        v-model="patientSearch"
+                        type="text"
+                        class="form-control"
+                        :placeholder="t.wl_patient_search"
+                        autocomplete="off"
+                        @input="onPatientInput"
+                    />
+                    <button
+                        v-if="form.patient_id"
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary position-absolute end-0 top-0 mt-1 me-1"
+                        @click="clearPatient"
+                    >
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <ul
+                        v-if="patientResults.length > 0"
+                        class="list-group position-absolute w-100 shadow-sm"
+                        style="z-index: 1060; max-height: 200px; overflow-y: auto"
+                    >
+                        <li
+                            v-for="p in patientResults"
+                            :key="p.id"
+                            class="list-group-item list-group-item-action py-2 px-3"
+                            style="cursor: pointer"
+                            @mousedown.prevent="selectPatient(p)"
+                        >
+                            <div class="fw-semibold small">{{ p.full_name }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem">
+                                {{ p.cellphone || p.telephone || '—' }} &bull; {{ p.code }}
+                            </div>
+                        </li>
+                        <li
+                            class="list-group-item list-group-item-action text-primary py-2 px-3"
+                            style="cursor: pointer"
+                            @mousedown.prevent="
+                                showQuickReg = true;
+                                quickName = patientSearch;
+                                patientResults = [];
+                            "
+                        >
+                            <i class="fas fa-plus-circle me-1"></i>
+                            {{ t.wl_register }} "{{ patientSearch }}"
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Quick registration -->
+                <div v-if="showQuickReg" class="card card-body bg-body-tertiary mt-2 p-3" data-testid="wl-quick">
+                    <p class="mb-2 fw-semibold small">{{ t.wl_quick_register }}</p>
+                    <div class="row g-2">
+                        <div class="col-12 col-sm-7">
+                            <input
+                                v-model="quickName"
+                                type="text"
+                                class="form-control form-control-sm"
+                                :class="{ 'is-invalid': quickErrors.name }"
+                                :placeholder="t.wl_full_name + ' *'"
+                                :aria-label="t.wl_full_name"
+                                data-testid="wl-quick-name"
+                                @keyup.enter="quickRegister"
+                            />
+                            <div v-if="quickErrors.name" class="invalid-feedback">{{ quickErrors.name[0] }}</div>
+                        </div>
+                        <div class="col-12 col-sm-5">
+                            <input
+                                v-model="quickCellphone"
+                                v-mask="'phone'"
+                                type="tel"
+                                class="form-control form-control-sm"
+                                :class="{ 'is-invalid': quickErrors.cellphone }"
+                                :placeholder="t.wl_cellphone + ' *'"
+                                :aria-label="t.wl_cellphone"
+                                data-testid="wl-quick-cellphone"
+                            />
+                            <div v-if="quickErrors.cellphone" class="invalid-feedback">
+                                {{ quickErrors.cellphone[0] }}
+                            </div>
+                        </div>
+                    </div>
+                    <QuickAllergyFields
+                        v-model:allergies="quickAllergies"
+                        v-model:denied="quickAllergiesDenied"
+                        :errors="quickErrors"
+                        class="mt-2"
+                    />
+                    <div
+                        v-if="quickErrors.confirm_homonym"
+                        class="alert alert-warning py-2 px-3 mt-2 mb-0 small"
+                        role="alert"
+                        data-testid="wl-quick-homonym"
+                    >
+                        <p class="mb-1">{{ quickErrors.confirm_homonym[0] }}</p>
+                        <div class="form-check mb-0">
+                            <input
+                                id="wl-quick-homonym-confirm"
+                                v-model="quickConfirmHomonym"
+                                type="checkbox"
+                                class="form-check-input"
+                            />
+                            <label class="form-check-label fw-semibold" for="wl-quick-homonym-confirm">
+                                {{ ui.homonym_confirm ?? 'Confirmo que é outro paciente' }}
+                            </label>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-2">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-primary"
+                            :disabled="quickSaving"
+                            data-testid="wl-quick-save"
+                            @click="quickRegister"
+                        >
+                            {{ t.wl_save_link }}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @click="showQuickReg = false">
+                            {{ t.wl_cancel }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full name -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">{{ t.wl_full_name }} <span class="text-danger">*</span></label>
+                <input
+                    v-model="form.full_name"
+                    type="text"
+                    class="form-control"
+                    :class="{ 'is-invalid': errors.full_name }"
+                    :placeholder="t.wl_patient_name"
+                />
+                <div v-if="errors.full_name" class="invalid-feedback">{{ errors.full_name[0] }}</div>
+            </div>
+
+            <!-- Covenant + visit type -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label fw-semibold">{{ t.wl_covenant }}</label>
+                    <SearchSelect v-model="form.covenant_id" :options="covenants" :placeholder="t.wl_none" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-semibold">{{ t.wl_visit_type }}</label>
+                    <SearchSelect v-model="form.visit_id" :options="visitTypes" :placeholder="t.wl_none" />
+                </div>
+            </div>
+
+            <!-- Phone -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label fw-semibold">{{ t.wl_telephone }}</label>
+                    <input
+                        v-model="form.telephone"
+                        v-mask="'phone'"
+                        type="text"
+                        inputmode="numeric"
+                        class="form-control"
+                        placeholder="(00) 0000-0000"
+                    />
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-semibold">{{ t.wl_cellphone }}</label>
+                    <input
+                        v-model="form.cellphone"
+                        v-mask="'phone'"
+                        type="text"
+                        inputmode="numeric"
+                        class="form-control"
+                        placeholder="(00) 00000-0000"
+                    />
+                </div>
+            </div>
+
+            <div class="form-check mb-3">
+                <input id="wl-whatsapp" v-model="form.cellphone_whatsapp" type="checkbox" class="form-check-input" />
+                <label for="wl-whatsapp" class="form-check-label small">
+                    <i class="fab fa-whatsapp text-success me-1"></i>{{ t.wl_whatsapp }}
+                </label>
+            </div>
+
+            <!-- Notes -->
+            <div class="mb-3">
+                <label class="form-label fw-semibold">{{ t.wl_notes }}</label>
+                <textarea v-model="form.notes" class="form-control" rows="2" :placeholder="t.wl_notes_ph"></textarea>
+            </div>
+        </form>
+
+        <template #footer>
+            <button type="button" class="btn btn-secondary" @click="emit('close')">
+                {{ t.wl_cancel }}
+            </button>
+            <button type="button" class="btn btn-warning px-4" :disabled="saving" @click="onSubmit">
+                <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+                <i class="fas fa-hourglass-half me-1"></i>{{ t.wl_add_btn }}
+            </button>
+        </template>
+    </OffcanvasPanel>
+</template>

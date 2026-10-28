@@ -1,0 +1,112 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\DTOs;
+
+use App\Enums\ExamSource;
+use Illuminate\Http\Request;
+
+/**
+ * Filtros do Gerenciador de exames (ExamManagerController), normalizados a
+ * partir do request. Faz a allowlist de tudo que chega cru do cliente antes
+ * de virar cláusula SQL — ver ExamManagerController::queryPatients().
+ */
+final readonly class ExamManagerFilters
+{
+    private const array EYES = ['od', 'oe', 'ao'];
+
+    private const array STATUSES = ['laudado', 'pendente'];
+
+    private const array VIEWED = ['vistos', 'nao_vistos'];
+
+    private const int REQUESTING_DOCTOR_MAX = 80;
+
+    public function __construct(
+        public string $period = 'hoje',
+        public string $search = '',
+        public ?string $dateFrom = null,
+        public ?string $dateTo = null,
+        public ?string $eye = null,
+        public ?string $examTypeId = null,
+        public ?string $equipmentId = null,
+        public ?string $doctorId = null,
+        public ?string $cidCode = null,
+        public ?string $customDiagnosisId = null,
+        public ?string $status = null,
+        public ?string $source = null,
+        public ?string $viewed = null,
+        public bool $urgent = false,
+        public ?string $requestingDoctor = null,
+        public int $page = 1,
+        public int $perPage = 25,
+    ) {
+    }
+
+    public static function fromRequest(Request $request): self
+    {
+        $eye    = $request->string('eye')->trim()->lower()->value();
+        $status = $request->string('status')->trim()->lower()->value();
+        $source = $request->string('source')->trim()->lower()->value();
+        $viewed = $request->string('viewed')->trim()->lower()->value();
+
+        // Texto livre (nome do solicitante): array no query string não vira "Array".
+        $requester = $request->input('requesting_doctor');
+        $requester = is_string($requester) ? mb_substr(trim($requester), 0, self::REQUESTING_DOCTOR_MAX) : '';
+
+        return new self(
+            period: $request->string('period', 'hoje')->trim()->value() ?: 'hoje',
+            search: $request->string('search')->trim()->value(),
+            dateFrom: self::validDate($request->string('date_from')->trim()->value()),
+            dateTo: self::validDate($request->string('date_to')->trim()->value()),
+            eye: in_array($eye, self::EYES, true) ? $eye : null,
+            examTypeId: $request->string('exam_type_id')->trim()->value() ?: null,
+            equipmentId: $request->string('equipment_id')->trim()->value() ?: null,
+            doctorId: $request->string('doctor_id')->trim()->value() ?: null,
+            cidCode: $request->string('cid_code')->trim()->value() ?: null,
+            customDiagnosisId: $request->string('custom_diagnosis_id')->trim()->value() ?: null,
+            status: in_array($status, self::STATUSES, true) ? $status : null,
+            source: ExamSource::tryFrom($source) !== null ? $source : null,
+            viewed: in_array($viewed, self::VIEWED, true) ? $viewed : null,
+            urgent: $request->boolean('urgent'),
+            requestingDoctor: $requester !== '' ? $requester : null,
+            page: max(1, $request->integer('page', 1)),
+            perPage: min(100, max(10, $request->integer('per_page', 25))),
+        );
+    }
+
+    /** Allowlist estrita de formato (Y-m-d) — evita repassar lixo pro Carbon::parse(). */
+    private static function validDate(string $value): ?string
+    {
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : null;
+    }
+
+    /**
+     * Eco pro front — permite exibir os filtros ativos e, futuramente,
+     * espelhar em history.replaceState() para sobreviver a refresh/bookmark.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'period'              => $this->period,
+            'search'              => $this->search,
+            'date_from'           => $this->dateFrom,
+            'date_to'             => $this->dateTo,
+            'eye'                 => $this->eye,
+            'exam_type_id'        => $this->examTypeId,
+            'equipment_id'        => $this->equipmentId,
+            'doctor_id'           => $this->doctorId,
+            'cid_code'            => $this->cidCode,
+            'custom_diagnosis_id' => $this->customDiagnosisId,
+            'status'              => $this->status,
+            'source'              => $this->source,
+            'viewed'              => $this->viewed,
+            'urgent'              => $this->urgent,
+            'requesting_doctor'   => $this->requestingDoctor,
+            'page'                => $this->page,
+            'per_page'            => $this->perPage,
+        ];
+    }
+}

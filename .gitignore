@@ -1,14 +1,29 @@
+/bootstrap/ssr
 /.phpunit.cache
 /node_modules
 /public/build
 /public/hot
+/public/hot.*
 /public/storage
+/public/vendor/tinymce
+/public/vendor/tinymce-langs
+# Imagens estáticas geradas pelo Vite a partir de resources/img/ — não commitar
+/public/system/images/*
+!/public/system/images/users
+/public/site/images/*
+# Screenshots reais do sistema usados na landing (hero, demo, como funciona) — commitar
+!/public/site/images/demo-*.png
+!/public/site/images/how-it-works.png
+!/public/site/images/*.webp
 /storage/*.key
 /storage/pail
 /vendor
 .env
 .env.backup
 .env.production
+.env.testing
+.env.local
+.env.docker
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
@@ -21,3 +36,30 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# macOS: metadados de pasta do Finder (qualquer diretório)
+.DS_Store
+
+# Claude Code agent worktrees (artefatos de runtime)
+.claude/worktrees/
+# Claude Code: aprovações de comando e hooks desta máquina (não compartilhar)
+.claude/settings.json
+# Ruflo/claude-flow: estado de sessão do agente (runtime)
+.claude-flow/
+# Saída de `php artisan ziggy:generate` (rotas chegam em runtime via @routes/prop)
+resources/js/ziggy.js
+
+# Maestri: papéis e estado do time de agentes (local, não entra no repo)
+/.maestri/
+
+
+# Ignorar arquivos env
+.env.bak.*
+*.env.bak*
+
+# Grafo local: pode conter estrutura e trechos privados do projeto.
+/graphify-out/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+# Bytecode do Python (tests/Python, scripts/)
+__pycache__/

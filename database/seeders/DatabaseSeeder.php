@@ -13,14 +13,57 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(EntityAndUserAdministratorSeeder::class);
+        $this->call(PermissionsSeeder::class);
+        $this->call(SystemProfilesSeeder::class);
+        $this->call(SubscriptionSettingSeeder::class);
+        $this->call(PrivacyPolicySeeder::class);
+        $this->call(TermsOfUseSeeder::class);
+        $this->call(LegalDocumentTranslationsSeeder::class);
+        $this->call(PlanSeeder::class);
+        $this->call(BillingGatewaysSeeder::class);
+        $this->call(AiModelPriceSeeder::class);
         $this->call(CovenantsSeeder::class);
         $this->call(SkinTypesSeeder::class);
         $this->call(IrisTypesSeeder::class);
         $this->call(VisitTypesSeeder::class);
         $this->call(ExamTypesSeeder::class);
+        $this->call(AdditionTypesSeeder::class);
+        $this->call(SurgeryTypesSeeder::class);
+        $this->call(ProcedureSeeder::class);
+        $this->call(CoverTestTypesSeeder::class);
+        $this->call(ColorVisionTypesSeeder::class);
+        $this->call(VisualAcuityTypesSeeder::class);
+        // Base global de medicamentos oftalmológicos (receituário — busca +
+        // sugestão de posologia). Idempotente.
+        $this->call(OphthalmicMedicinesSeeder::class);
+        $this->call(LensesSeeder::class);
+        $this->call(NearPointConvergencesSeeder::class);
+        $this->call(MedicinePresentationsSeeder::class);
+        $this->call(Cid10CodesSeeder::class);
+        $this->call(FinancialCategoriesSeeder::class);
+        $this->call(TissReferenceSeeder::class);
+        // Kits de exames padrão (pedido de exames — Fase 2 / B2). Idempotente.
+        $this->call(ExamKitsSeeder::class);
+        // Protocolos de retorno (recall) propostos — só RASCUNHOS, a validar pelo Revisor Clínico. Idempotente.
+        $this->call(RecallProtocolDraftsSeeder::class);
+        // Declaração do Revisor Clínico (term_versions) — o fluxo também a instala sozinho no 1º uso. Idempotente.
+        $this->call(ClinicalReviewerAttestationSeeder::class);
+        $this->call(ReportSettingSeeder::class);
+        $this->call(ReportSettingContentSeeder::class);
+        $this->call(ReportSettingVariableSeeder::class);
+
+        // Clínica de testes da API, treinamento e demonstração — também em
+        // homologação/produção. Senhas fixas só em local/testes automatizados
+        // (SEED_FIXED_CREDENTIALS); fora disso, aleatórias mostradas uma vez
+        // (e a fixa de um seed antigo é substituída). Idempotente.
+        $this->call(IntegratorTestClinicSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DataFakersSeeder::class);
         }
+
+        // Executa por último para considerar clínicas eventualmente criadas
+        // por seeders de dados faker.
+        $this->call(AdoptGlobalReportSettingsForEntitiesSeeder::class);
     }
 }

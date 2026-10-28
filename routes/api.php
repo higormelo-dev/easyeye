@@ -1,33 +1,99 @@
 <?php
 
-use App\Http\Controllers\Api\{EntityIntegratorEquipmentsController,
+use App\Http\Controllers\Api\{ClinicResourcesController,
+    EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
+    ExamTypesController,
     ExamsController,
+    IntegratorCommandsController,
+    IntegratorQueueHealthController,
+    IntegratorUpdatesController,
     PatientExamsController,
-    PatientsController};
-use Illuminate\Http\Request;
+    PatientsController,
+    SchedulesController};
+use App\Http\Controllers\Api\{EquipmentOperationReceiptController, OfflineSnapshotController};
+use App\Http\Controllers\Api\{GupshupWebhookController, ReceiptReconciliationController};
+use App\Http\Controllers\Billing\WebhookController;
+use App\Http\Controllers\Fiscal\FocusNfeWebhookController;
+use App\Http\Middleware\IntegratorEquipmentOperation;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
 Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
-    Route::post('signin', [EntityIntegratorsController::class, 'store'])->name('auth');
-    Route::group(['middleware' => ['auth:integrator', 'auth_with_integrator', 'token.expiration']], static function () {
-        Route::delete('signout', [EntityIntegratorsController::class, 'destroy'])->name('signout');
-        Route::group(['prefix' => 'v1', 'as' => 'v1.'], function () {
-            Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)->except(['create', 'edit']);
+    Route::post('signin', [EntityIntegratorsController::class, 'store'])->name('auth')->middleware('throttle:10,1');
+    Route::post('check-token', [EntityIntegratorsController::class, 'checkToken'])->name('checktoken')->middleware('throttle:30,1');
+    Route::group(['middleware' => ['token.precheck', 'auth:sanctum', 'auth_with_integrator', 'token.expiration', 'api.plan']], static function () {
+        // throttle:integrators-api aqui só por consistência com o resto do
+        // grupo autenticado (signout já roda depois de auth_with_integrator,
+        // então o limiter tem 'integrator' pra chavear por device, igual v1) —
+        // sem isso era o único endpoint autenticado sem nenhum rate limit.
+        Route::delete('signout', [EntityIntegratorsController::class, 'destroy'])
+            ->name('signout')
+            ->withoutMiddleware('api.plan')
+            ->middleware('throttle:integrators-api');
+        Route::group([
+            'prefix'     => 'v1',
+            'as'         => 'v1.',
+            'middleware' => ['throttle:integrators-api', 'token.scope', IntegratorEquipmentOperation::class, 'idempotency'],
+        ], function () {
+            Route::get('equipment-operations/{operation}', [EquipmentOperationReceiptController::class, 'show'])->name('equipment-operations.show');
+            Route::get('offline-snapshot', [OfflineSnapshotController::class, 'index'])->name('offline-snapshot.index');
+            Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)
+                ->except(['create', 'edit']);
+            // Recursos de agenda (type=equipment) disponíveis para vincular a
+            // um equipamento do integrador — só leitura, escopado à entity_id
+            // do integrador autenticado (ver ClinicResourcesController).
+            Route::apiResource('clinic-resources', ClinicResourcesController::class)->only('index');
             Route::apiResource('patients', PatientsController::class)->only('index', 'show');
-            Route::apiResource('patients.exams', PatientExamsController::class)->except(['create', 'edit']);
-            Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])->name('patients.exams.update');
+            Route::apiResource('patients.exams', PatientExamsController::class)
+                ->except(['create', 'edit']);
+            Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])
+                ->name('patients.exams.update_multipart');
+            Route::apiResource('examtypes', ExamTypesController::class)->only(['index', 'show']);
+            Route::apiResource('schedules', SchedulesController::class)->only('index', 'show');
             Route::apiResource('exams', ExamsController::class)->only('store');
+            Route::post('exams/{exam}/receipt-reconciliation', [ReceiptReconciliationController::class, 'store'])
+                ->name('exams.receipt-reconciliation');
+            // Auto-atualização do desktop: manifesto do último build publicado
+            Route::get('updates', [IntegratorUpdatesController::class, 'index'])->name('updates.index');
+            // Retrato do estado atual da fila local (pendentes/falhas/
+            // bloqueados/enviados) — upsert periódico, nunca histórico.
+            Route::put('queue-health', [IntegratorQueueHealthController::class, 'store'])->name('queue-health.store');
+            // Canal de comando do backend pro desktop — único fluxo em que o
+            // SaaS pede pro cliente fazer algo (ver
+            // Manager\EntityIntegratorCommandsController pro lado que
+            // enfileira). Poll + ack, nunca push de verdade.
+            Route::apiResource('commands', IntegratorCommandsController::class)->only('index');
+            Route::post('commands/{command}/ack', [IntegratorCommandsController::class, 'ack'])->name('commands.ack');
 
-            Route::get('profile', static function (Request $request) {
-                return response()->json($request->user());
-            });
-
-            // Adicione outras rotas protegidas aqui
+            // Route::get('profile', static function (Request $request) {
+            //     return response()->json($request->user());
+            // });
         });
     });
 });
+
+// Limite por GATEWAY (não por IP) e folgado: o Asaas trata qualquer resposta
+// diferente de 200 — inclusive 429 — como falha e pausa a fila depois de 15
+// falhas seguidas (https://docs.asaas.com/docs/penalização-de-filas). Ver
+// RateLimiter "billing-webhook" no AppServiceProvider.
+Route::post('billing/webhooks/{gateway}', WebhookController::class)
+    ->name('billing.webhooks')
+    ->middleware('throttle:billing-webhook');
+
+// Webhook v3 da Gupshup (WhatsApp oficial): mensagens do paciente e status
+// das enviadas. URL por configuração (token aleatório) + header de segredo
+// + gs_app_id do app — ver GupshupWebhookController. Sem auth de sessão:
+// rota pública idempotente, mesmo padrão do webhook de billing acima. Limite
+// por TOKEN da URL (não por IP, forjável atrás do proxy) e folgado: cada
+// mensagem enviada gera até 3 status (sent, delivered, read) — ver
+// RateLimiter "whatsapp-webhook" no AppServiceProvider.
+Route::post('whatsapp/gupshup/webhook/{token}', GupshupWebhookController::class)
+    ->name('whatsapp.gupshup.webhook')
+    ->middleware('throttle:whatsapp-webhook');
+
+// Webhook da Focus NFe (NFS-e do SaaS): avisos de mudança de status da nota. Rota pública idempotente, sem sessão — token
+// aleatório na URL + segredo no cabeçalho (comparados em tempo constante), 2xx imediato e processamento na fila. Limite
+// por TOKEN (não por IP), ver RateLimiter "fiscal-webhook" no AppServiceProvider e FocusNfeWebhookController.
+Route::post('fiscal/focusnfe/webhook/{token}', FocusNfeWebhookController::class)
+    ->name('fiscal.focusnfe.webhook')
+    ->middleware('throttle:fiscal-webhook');

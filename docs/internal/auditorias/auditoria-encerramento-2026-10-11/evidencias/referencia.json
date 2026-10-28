@@ -1,0 +1,7 @@
+{
+  "reference_date": "2026-10-11",
+  "head": "2bc6a86ea4805f44d51d4c6a609259934324dc5f",
+  "files_hashed": 3223,
+  "manifest_sha256": "732f0e63aff8251040e77de9d9172074bd7386270b45842177a0233a0fa82b8b",
+  "note": "Hashes de código e configuração pública; sem .env, dados clínicos ou conteúdo de credenciais. Estado Git inclui alterações anteriores à auditoria."
+}

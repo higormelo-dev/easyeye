@@ -1,0 +1,135 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Enums\EntityGate;
+use App\Models\{AuditLog, DataAccessLog, Entity};
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Inertia\{Inertia, Response as InertiaResponse};
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class ComplianceController extends Controller
+{
+    public function index(): InertiaResponse
+    {
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
+
+        return Inertia::render('Panel/Compliance/Index', [
+            'breadcrumbs' => [
+                // GAP fechado (revisão "relatório direto no módulo"): a
+                // página-hub "Relatórios" (panel.reports.index) foi
+                // removida — ver docblock de App\Support\PanelNavigation.
+                // Compliance não pertence a nenhum módulo com relatório
+                // próprio, então o breadcrumb some direto pro Dashboard
+                // (esta página também não tem entrada no menu lateral —
+                // pré-existente, fora do escopo desta correção).
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => 'Compliance & Auditoria', 'url' => '#', 'active' => true],
+            ],
+            'exports' => [
+                'audit'       => route('panel.reports.compliance.audit'),
+                'data_access' => route('panel.reports.compliance.access'),
+            ],
+        ]);
+    }
+
+    public function exportAuditLogs(Request $request): StreamedResponse
+    {
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
+
+        $request->validate([
+            'date_from'  => ['required', 'date'],
+            'date_until' => ['required', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $entityId  = session('selected_entity_id');
+        $dateFrom  = Carbon::parse($request->input('date_from'))->startOfDay();
+        $dateUntil = Carbon::parse($request->input('date_until'))->endOfDay();
+        $filename  = 'auditoria_' . $dateFrom->format('Ymd') . '_' . $dateUntil->format('Ymd') . '.csv';
+
+        return response()->streamDownload(function () use ($entityId, $dateFrom, $dateUntil): void {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF"); // BOM UTF-8 para Excel
+
+            fputcsv($output, ['Data/Hora', 'Usuário', 'Evento', 'Modelo', 'ID do Registro', 'IP', 'User-Agent'], ';');
+
+            // Projeção de colunas: o CSV abaixo nunca usa old_values/
+            // new_values, mas um laudo de imagem embutida pode duplicar
+            // ~27 MiB em base64 nessas colunas a cada criação (metadata
+            // congelado — ExamManagerReportController::store()). Carregar 500
+            // linhas inteiras por chunk esgotava o memory_limit configurado
+            // conforme laudos de imagem se acumulam (achado via revisão
+            // adversarial Codex).
+            AuditLog::select(['id', 'created_at', 'user_id', 'event', 'auditable_type', 'auditable_id', 'ip_address', 'user_agent'])
+                ->with('user:id,name')
+                ->where('entity_id', $entityId)
+                ->whereBetween('created_at', [$dateFrom, $dateUntil])
+                ->orderBy('created_at')
+                ->chunk(500, function ($logs) use ($output): void {
+                    foreach ($logs as $log) {
+                        fputcsv($output, [
+                            $log->created_at?->format('d/m/Y H:i:s'),
+                            $log->user?->name ?? 'Sistema',
+                            $log->event,
+                            class_basename($log->auditable_type),
+                            $log->auditable_id,
+                            $log->ip_address,
+                            $log->user_agent,
+                        ], ';');
+                    }
+                });
+
+            fclose($output);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    public function exportDataAccessLogs(Request $request): StreamedResponse
+    {
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
+
+        $request->validate([
+            'date_from'  => ['required', 'date'],
+            'date_until' => ['required', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $entityId  = session('selected_entity_id');
+        $dateFrom  = Carbon::parse($request->input('date_from'))->startOfDay();
+        $dateUntil = Carbon::parse($request->input('date_until'))->endOfDay();
+        $filename  = 'acessos_dados_' . $dateFrom->format('Ymd') . '_' . $dateUntil->format('Ymd') . '.csv';
+
+        return response()->streamDownload(function () use ($entityId, $dateFrom, $dateUntil): void {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF"); // BOM UTF-8 para Excel
+
+            fputcsv($output, [
+                'Data/Hora', 'Usuário', 'Paciente', 'Tipo de Recurso',
+                'ID do Recurso', 'Finalidade', 'Justificativa', 'IP',
+            ], ';');
+
+            DataAccessLog::with(['user', 'patient.person'])
+                ->where('entity_id', $entityId)
+                ->whereBetween('accessed_at', [$dateFrom, $dateUntil])
+                ->orderBy('accessed_at')
+                ->chunk(500, function ($logs) use ($output): void {
+                    foreach ($logs as $log) {
+                        fputcsv($output, [
+                            $log->accessed_at?->format('d/m/Y H:i:s'),
+                            $log->user?->name ?? '—',
+                            $log->patient?->person?->full_name ?? '—',
+                            class_basename($log->resource_type),
+                            $log->resource_id,
+                            $log->purpose?->label() ?? '—',
+                            $log->justification ?? '—',
+                            $log->ip_address,
+                        ], ';');
+                    }
+                });
+
+            fclose($output);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+}

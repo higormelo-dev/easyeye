@@ -2,26 +2,78 @@
 
 namespace App\Services;
 
+use App\Enums\ConsentType;
 use App\Http\Requests\PatientRequest;
-use App\Models\{Covenant, Patient, People};
+use App\Models\{Covenant, Doctor, EntityUser, Patient, People};
+use App\Models\Scopes\EntityScope;
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\{Collection, Str};
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PatientService
 {
     /**
-     * Create a new patient with all related entities
+     * Create a new patient with all related entities.
      */
     public function create(PatientRequest $request): Patient
     {
         return DB::transaction(function () use ($request) {
-            $person = $this->findOrCreatePerson($request);
+            Patient::lockRegistrations((string) session()->get('selected_entity_id'));
 
-            return $this->findOrCreate($person->id, $request);
+            $person  = $this->findOrCreatePerson($request);
+            $patient = $this->findOrCreate($person->id, $request);
+
+            // Alergias/"nega alergias"/medicações informadas na aba Clínico
+            // do cadastro novo (Fase 2 / A1-A2) — sempre como informadas.
+            $allergies   = array_values((array) $request->validated('allergies', []));
+            $medications = array_values((array) $request->validated('medications', []));
+            $denied      = (bool) $request->validated('allergies_denied', false);
+
+            if ($allergies !== [] || $medications !== [] || $denied) {
+                app(PatientClinicalSafetyService::class)->registerFromPatientForm($patient, $allergies, $denied, $medications);
+            }
+
+            $this->syncCareRemindersConsent($patient, $request);
+
+            return $patient;
         });
     }
 
     /**
-     * Update existing patient and related entities
+     * Autorização de lembretes de retorno por WhatsApp, marcada no cadastro (LGPD art. 8, ADR 0002 item 9): só age
+     * quando o campo vem (nulo/ausente = não mexe). Marcar registra o consentimento (quem coletou, canal presencial,
+     * IP); desmarcar revoga o vigente. Nada se faz sem uma pessoa da clínica na sessão (importação e API não coletam).
+     *
+     * O campo é um ATO, não o estado do formulário: o cadastro (usePatientForm) só o envia quando a pessoa mudou a
+     * caixa. Quem manda o valor de sempre a cada salvamento restaura em silêncio uma autorização que o titular retirou
+     * (SAIR) com a tela aberta — e, ao contrário, revoga uma que outra pessoa acabou de registrar.
+     */
+    private function syncCareRemindersConsent(Patient $patient, PatientRequest $request): void
+    {
+        if (! $request->has('care_reminders_consent') || $request->input('care_reminders_consent') === null) {
+            return;
+        }
+
+        $collectedBy = EntityUser::query()->find((string) session('selected_entity_user_id'));
+
+        if ($collectedBy === null) {
+            return;
+        }
+
+        $consents = app(ConsentService::class);
+        $active   = $consents->hasActiveConsent($patient, ConsentType::CareReminders);
+
+        if ($request->boolean('care_reminders_consent') && ! $active) {
+            $consents->grant($patient, ConsentType::CareReminders, $collectedBy, 'in_person', 'care_reminders_v1');
+        } elseif (! $request->boolean('care_reminders_consent') && $active) {
+            $consents->revoke($patient, ConsentType::CareReminders, $collectedBy, (string) __('consent.revoked.patient_form', [], 'pt_BR'));
+        }
+    }
+
+    /**
+     * Update existing patient and related entities.
      */
     public function update(Patient $patient, PatientRequest $request): Patient
     {
@@ -46,37 +98,182 @@ class PatientService
 
             if ($request->has('covenant_id') && $request->has('card_number')) {
                 $covenant            = Covenant::query()->find($request->covenant_id);
-                $data['card_number'] = $covenant !== null && $covenant->name !== 'Particular' ?
+                $data['card_number'] = $covenant !== null && ! $this->isParticular($covenant) ?
                     $request->card_number : null;
+            }
+
+            // Plano acompanha o convênio (o validador já garantiu que o plano
+            // enviado é dele). Quem não manda o plano (ex.: integração antiga)
+            // não o apaga — a não ser que troque de convênio.
+            if ($request->has('covenant_plan_id')) {
+                $data['covenant_plan_id'] = $this->planFor(
+                    $request->has('covenant_id') ? $request->covenant_id : $patient->covenant_id,
+                    $request->covenant_plan_id,
+                );
+            } elseif ($request->has('covenant_id') && (string) $request->covenant_id !== (string) $patient->covenant_id) {
+                $data['covenant_plan_id'] = null;
             }
 
             $patient->update($data);
 
             if (! $request->has('type_method')) {
-                $this->updatePersonData($patient->person, $request);
+                $this->updatePersonData($patient, $request);
             }
+
+            $this->syncCareRemindersConsent($patient, $request);
 
             return $patient;
         });
     }
 
     /**
-     * Find or create patient
+     * Find by ID or Code including soft-deleted records.
+     */
+    public function findByIdOrCode(string $idOrCode): ?Patient
+    {
+        /** @var Patient $record */
+        $record = Patient::query()
+            ->withTrashed()
+            ->where('entity_id', session()->get('selected_entity_id'))
+            ->when(
+                Str::isUuid($idOrCode),
+                static fn ($q) => $q->where('id', $idOrCode),
+                static fn ($q) => $q->where('code', $idOrCode),
+            )
+            ->firstOrFail();
+
+        return $record;
+    }
+
+    // ── People: identidade GLOBAL compartilhada entre clínicas ───────────────
+    //
+    // People não tem entity_id: o mesmo registro pode ser o paciente/médico de
+    // várias clínicas (e o titular do Portal do Paciente). Toda consulta de
+    // vínculo abaixo ignora o EntityScope, que esconderia justamente os
+    // vínculos das OUTRAS clínicas.
+
+    /**
+     * O People pode ser vinculado a um cadastro desta clínica a partir de dado
+     * informado pelo cliente (CPF/nome+telefone de planilha)? Só se já for
+     * desta clínica ou não pertencer a nenhuma — vincular o cadastro de outra
+     * clínica expunha os dados dela (e o portal do titular) sem prova de posse.
+     * Vínculos excluídos (soft delete) contam: os dados continuam sendo da
+     * clínica que os coletou.
+     */
+    public function personLinkableToEntity(string $personId, string $entityId): bool
+    {
+        $entityIds = $this->personEntityIds($personId, withTrashed: true);
+
+        return $entityIds->isEmpty() || $entityIds->contains($entityId);
+    }
+
+    /**
+     * O People está em uso por paciente/médico ATIVO de outra clínica? Nesse
+     * caso uma clínica não pode reescrevê-lo sozinha (alteraria o cadastro que
+     * a outra vê — e o e-mail para onde vai o convite do portal).
+     */
+    public function personSharedWithOtherEntities(string $personId, string $entityId): bool
+    {
+        return $this->personEntityIds($personId, withTrashed: false)
+            ->contains(fn (string $id): bool => $id !== $entityId);
+    }
+
+    /**
+     * Restringe uma query de People aos cadastros com vínculo (paciente ou
+     * médico, inclusive excluído) com a clínica.
+     *
+     * @param Builder<People> $people
+     *
+     * @return Builder<People>
+     */
+    public function whereLinkedToEntity(Builder $people, string $entityId): Builder
+    {
+        return $people->where(fn (Builder $q) => $q
+            ->whereIn('people.id', $this->patientPersonIds($entityId, withTrashed: true))
+            ->orWhereIn('people.id', $this->doctorPersonIds($entityId, withTrashed: true)));
+    }
+
+    /**
+     * Restringe uma query de People aos cadastros de MÉDICO (inclusive
+     * excluídos) da clínica — sem os de paciente: o formulário de médico não
+     * reescreve a ficha de paciente da mesma pessoa.
+     *
+     * @param Builder<People> $people
+     *
+     * @return Builder<People>
+     */
+    public function whereDoctorOfEntity(Builder $people, string $entityId): Builder
+    {
+        return $people->whereIn('people.id', $this->doctorPersonIds($entityId, withTrashed: true));
+    }
+
+    /**
+     * Exclusão de paciente/médico: o People só sai (soft delete) quando nenhum
+     * paciente/médico ATIVO de QUALQUER clínica o usa. Antes a contagem passava
+     * pelo EntityScope e só enxergava a clínica atual — excluir o paciente em A
+     * apagava o People que a clínica B ainda usava ($patient->person = null).
+     */
+    public function deletePersonIfUnused(string $personId, ?string $exceptPatientId = null, ?string $exceptDoctorId = null): void
+    {
+        $patientInUse = Patient::query()
+            ->withoutGlobalScope(EntityScope::class)
+            ->where('person_id', $personId)
+            ->when($exceptPatientId, fn (Builder $q, string $id) => $q->whereKeyNot($id))
+            ->exists();
+
+        $doctorInUse = Doctor::query()
+            ->where('person_id', $personId)
+            ->when($exceptDoctorId, fn (Builder $q, string $id) => $q->whereKeyNot($id))
+            ->exists();
+
+        if ($patientInUse || $doctorInUse) {
+            return;
+        }
+
+        People::query()->find($personId)?->delete();
+    }
+
+    /**
+     * Preenche o People e barra a gravação quando ela ALTERARIA um cadastro em
+     * uso ativo por outra clínica (sem alteração real, segue normalmente — o
+     * formulário reenvia todos os campos). Não salva: o chamador decide.
+     *
+     * @param array<string, mixed> $data
+     *
+     * @throws ValidationException
+     */
+    public function fillPersonGuarded(People $person, array $data, string $entityId, string $errorField): People
+    {
+        $person->fill($data);
+
+        if ($person->exists && $this->hasRealChanges($person) && $this->personSharedWithOtherEntities($person->id, $entityId)) {
+            throw ValidationException::withMessages([
+                $errorField => __('shared_identity.person_shared_readonly'),
+            ]);
+        }
+
+        return $person;
+    }
+
+    /**
+     * Find or create patient.
      */
     private function findOrCreate(string $personId, PatientRequest $request): Patient
     {
         $entityId              = session()->get('selected_entity_id');
         $covenant              = Covenant::query()->find($request->covenant_id);
-        $existingPatientEntity = Patient::query()->withTrashed()
+        $existingPatientEntity = Patient::query()
+            ->withTrashed()
             ->where('entity_id', $entityId)
             ->where('person_id', $personId)
             ->first();
 
         $patientData = [
-            'covenant_id' => $request->covenant_id,
-            'skin_id'     => $request->skin_id,
-            'iris_id'     => $request->iris_id,
-            'card_number' => ($covenant !== null && $covenant->name !== 'Particular') ? $request->card_number : null,
+            'covenant_id'      => $request->covenant_id,
+            'skin_id'          => $request->skin_id,
+            'iris_id'          => $request->iris_id,
+            'card_number'      => ($covenant !== null && ! $this->isParticular($covenant)) ? $request->card_number : null,
+            'covenant_plan_id' => $this->planFor($request->covenant_id, $request->covenant_plan_id),
         ];
 
         if ($existingPatientEntity) {
@@ -86,7 +283,7 @@ class PatientService
 
             $existingPatientEntity->update($patientData);
 
-            return $existingPatientEntity;
+            return $existingPatientEntity->fresh();
         }
 
         return Patient::create(
@@ -96,36 +293,52 @@ class PatientService
                     'entity_id' => $entityId,
                     'person_id' => $personId,
                     'active'    => true,
-                ]
-            )
+                ],
+            ),
         );
     }
 
     /**
-     * Find or create person
+     * Find or create person — SÓ entre os cadastros desta clínica.
+     *
+     * O mesmo paciente pode ser atendido em várias clínicas, cada uma com o
+     * SEU People: um People de outra clínica (ativo ou excluído) nunca é
+     * reaproveitado, restaurado nem sobrescrito — o CPF existir em outro lugar
+     * só significa que esta clínica cria o próprio cadastro. Reaproveita apenas
+     * People de PACIENTE desta clínica (inclusive excluído) — o de um médico
+     * da clínica não, para o formulário do paciente não reescrever os dados
+     * dele; se o People também for usado por outra clínica (cadastro
+     * compartilhado antigo), fillPersonGuarded barra a alteração (422).
+     *
+     * @throws ValidationException
      */
     private function findOrCreatePerson(PatientRequest $request): People
     {
-        $existingPerson = People::query()->withTrashed()
-            ->where('national_registry', $request->national_registry)
-            ->first();
-
+        $entityId   = (string) session()->get('selected_entity_id');
         $personData = $this->getPersonDataFromRequest($request);
 
-        if ($existingPerson) {
-            if ($existingPerson->trashed()) {
-                $existingPerson->restore();
-            }
-            $existingPerson->update($personData);
+        $existingPerson = People::query()
+            ->withTrashed()
+            ->whereIn('people.id', $this->patientPersonIds($entityId, withTrashed: true))
+            ->where('national_registry', $request->national_registry)
+            ->orderBy('created_at')
+            ->first();
 
-            return $existingPerson;
+        if (! $existingPerson) {
+            return People::create($personData);
         }
 
-        return People::create($personData);
+        if ($existingPerson->trashed()) {
+            $existingPerson->restore();
+        }
+
+        $this->fillPersonGuarded($existingPerson, $personData, $entityId, 'national_registry')->save();
+
+        return $existingPerson->fresh();
     }
 
     /**
-     * Extract person data from request
+     * Extract person data from request.
      */
     private function getPersonDataFromRequest(PatientRequest $request): array
     {
@@ -138,6 +351,7 @@ class PatientService
             'email'                  => $request->email,
             'mother_name'            => $request->mother_name,
             'father_name'            => $request->father_name,
+            'occupation'             => $request->occupation,
             'national_registry'      => $request->national_registry,
             'state_registry'         => $request->state_registry,
             'state_registry_agency'  => $request->state_registry_agency,
@@ -158,35 +372,103 @@ class PatientService
     }
 
     /**
-     * Update person data
+     * Update person data — barrado (422) quando o People é usado por cadastro
+     * ativo de outra clínica e o formulário altera algum dado pessoal.
+     *
+     * @throws ValidationException
      */
-    private function updatePersonData(People $person, PatientRequest $request): void
+    private function updatePersonData(Patient $patient, PatientRequest $request): void
     {
-        $person->update([
-            'full_name'              => $request->name,
-            'nickname'               => $request->nickname,
-            'birth_date'             => $request->birth_date,
-            'gender'                 => $request->gender,
-            'marital_status'         => $request->marital_status,
-            'email'                  => $request->email,
-            'mother_name'            => $request->mother_name,
-            'father_name'            => $request->father_name,
-            'national_registry'      => $request->national_registry,
-            'state_registry'         => $request->state_registry,
-            'state_registry_agency'  => $request->state_registry_agency,
-            'state_registry_initial' => $request->state_registry_initial,
-            'state_registry_date'    => $request->state_registry_date,
-            'telephone'              => $request->telephone,
-            'cellphone'              => $request->cellphone,
-            'whatsapp'               => $request->whatsapp,
-            'zipcode'                => $request->zipcode,
-            'address'                => $request->address,
-            'number'                 => $request->number,
-            'complement'             => $request->complement,
-            'district'               => $request->district,
-            'city'                   => $request->city,
-            'state'                  => $request->state,
-            'country'                => $request->country,
-        ]);
+        // withTrashed: People apagado indevidamente (exclusão em outra clínica,
+        // antes do deletePersonIfUnused) não pode virar TypeError/500 na edição.
+        $this->fillPersonGuarded(
+            $patient->person()->withTrashed()->firstOrFail(),
+            $this->getPersonDataFromRequest($request),
+            (string) $patient->entity_id,
+            'name',
+        )->save();
+    }
+
+    /**
+     * Houve mudança real? getDirty() já compara com os casts (datas, números);
+     * aqui só se ignora whatsapp nulo (cadastro rápido/importação) reenviado
+     * como false pelo formulário.
+     */
+    private function hasRealChanges(People $person): bool
+    {
+        foreach (array_keys($person->getDirty()) as $field) {
+            if ($field === 'whatsapp' && (bool) $person->getOriginal($field) === (bool) $person->getAttribute($field)) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Clínicas (entity_id) em que o People é paciente ou médico.
+     *
+     * @return Collection<int, string>
+     */
+    private function personEntityIds(string $personId, bool $withTrashed): Collection
+    {
+        $patientEntities = Patient::query()
+            ->withoutGlobalScope(EntityScope::class)
+            ->when($withTrashed, fn (Builder $q) => $q->withTrashed())
+            ->where('person_id', $personId)
+            ->distinct()
+            ->pluck('entity_id');
+
+        $doctorEntities = Doctor::query()
+            ->when($withTrashed, fn (Builder $q) => $q->withTrashed())
+            ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+            ->where('doctors.person_id', $personId)
+            ->distinct()
+            ->pluck('entity_users.entity_id');
+
+        return $patientEntities->merge($doctorEntities)
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->values();
+    }
+
+    /** Subquery: person_id dos pacientes da clínica. */
+    private function patientPersonIds(string $entityId, bool $withTrashed): Builder
+    {
+        return Patient::query()
+            ->withoutGlobalScope(EntityScope::class)
+            ->when($withTrashed, fn (Builder $q) => $q->withTrashed())
+            ->where('entity_id', $entityId)
+            ->select('person_id');
+    }
+
+    /** Subquery: person_id dos médicos da clínica. */
+    private function doctorPersonIds(string $entityId, bool $withTrashed): Builder
+    {
+        return Doctor::query()
+            ->when($withTrashed, fn (Builder $q) => $q->withTrashed())
+            ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+            ->where('entity_users.entity_id', $entityId)
+            ->select('doctors.person_id');
+    }
+
+    /** Plano só existe para convênio que não é Particular. */
+    private function planFor(?string $covenantId, ?string $planId): ?string
+    {
+        if (blank($planId) || blank($covenantId)) {
+            return null;
+        }
+
+        $covenant = Covenant::query()->find($covenantId);
+
+        return $covenant !== null && ! $this->isParticular($covenant) ? $planId : null;
+    }
+
+    /** Covenant grava `name` em maiúsculas (HasUppercaseFields) — comparar sem caixa. */
+    private function isParticular(Covenant $covenant): bool
+    {
+        return mb_strtoupper(trim((string) $covenant->name), 'UTF-8') === 'PARTICULAR';
     }
 }

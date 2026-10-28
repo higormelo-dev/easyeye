@@ -2,9 +2,35 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Concerns\{HasEntityCode, HasUppercaseFields};
+use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class CoverTestType extends Model
 {
-    //
+    use Auditable;
+    use HasAuditColumns;
+    use HasEntityCode;
+    use HasUppercaseFields;
+    use HasUuids;
+    use SoftDeletes;
+
+    protected string $codePrefix = 'CT';
+
+    protected string $codePrefixGlobal = 'CTP';
+
+    protected $fillable = ['entity_id', 'code', 'name', 'abbreviation', 'active'];
+
+    protected array $uppercaseFields = ['name', 'abbreviation'];
+
+    protected function casts(): array
+    {
+        return ['created_at' => 'datetime', 'updated_at' => 'datetime', 'deleted_at' => 'datetime'];
+    }
+
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class, 'entity_id', 'id');
+    }
 }

@@ -1,0 +1,522 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domains\AI\Services;
+
+use App\Domains\AI\Models\AiRun;
+use App\Enums\AI\{AiRunMode, AiRunStatus};
+use App\Enums\{ClientRule, EntityGate, FeatureKey};
+use App\Models\{Entity, MedicalRecord, Patient, PatientExam};
+use App\Models\User;
+use App\Services\FeatureGateService;
+use App\Support\CurrentDoctor;
+use Illuminate\Support\Facades\Gate;
+
+/**
+ * Centraliza o enriquecimento + sanitização do payload de execução de IA.
+ *
+ * Responsabilidades:
+ *  - autorizar exam_ids do fluxo de imagem ocular (cross-tenant guard)
+ *  - forçar system_prompt server-side por workflow (eye_image/record_assist)
+ *  - validar feature gates por workflow
+ *  - validar ownership cross-tenant de patient_id / medical_record_id
+ *  - construir contexto clínico minimizado via AiMedicalContextBuilder
+ *  - aplicar guardrails do prompt (mascara PII, bloqueia jailbreak)
+ *
+ * Não persiste nada — devolve o payload pronto para o controller criar o AiRun.
+ */
+class AiPayloadEnricher
+{
+    /**
+     * Workflows de chat livre multi-turno (têm histórico de conversa via
+     * conversation_id — ver buildConversationHistory()). assistant_chat é o
+     * assistente clínico do médico; platform_finance_chat é o "converse com
+     * os dados" do P&L interno do SaaS — mesma mecânica, contextos disjuntos.
+     *
+     * @var list<string>
+     */
+    private const CHAT_WORKFLOWS = ['assistant_chat', 'platform_finance_chat'];
+
+    /**
+     * Workflows do P&L interno do EasyEye — NUNCA gated por FeatureKey de
+     * plano de clínica (não é benefício vendável a clientes) e SEMPRE gated
+     * pelo Gate SaasOwnerFinancial (dono/admin do SaaS), não por qualquer
+     * ClientRule de clínica. Ver EntityGate::SaasOwnerFinancial.
+     *
+     * @var list<string>
+     */
+    private const PLATFORM_FINANCE_WORKFLOWS = ['platform_finance_digest', 'platform_finance_chat'];
+
+    /**
+     * Runs de plataforma do manager (SaaS, sem clínica nem paciente): ficam
+     * fora da trava de cadastro de médico dos runs clínicos.
+     */
+    private const PLATFORM_WORKFLOWS = [...self::PLATFORM_FINANCE_WORKFLOWS, 'medicine_posology'];
+
+    public function __construct(
+        private readonly AiMedicalContextBuilder $contextBuilder,
+        private readonly AiPromptGuardrailService $promptGuardrails,
+        private readonly FeatureGateService $featureGate,
+        private readonly AiProviderSettings $providerSettings,
+        private readonly AiSystemPromptResolver $promptResolver,
+    ) {
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
+     */
+    public function enrich(array $payload, string $entityId, bool $canConsensus): array
+    {
+        // Antes de qualquer outra coisa (defaults, contexto, crédito): perfil
+        // médico sem cadastro de médico ativo não abre run clínico.
+        $this->assertClinicalRequesterHasDoctorRecord((string) ($payload['workflow'] ?? ''), $entityId);
+
+        $payload = $this->applyWorkflowDefaults($payload, $entityId);
+        $payload = $this->resolveModeAndAuthorize($payload, $canConsensus);
+
+        $this->validateFeatureByWorkflow((string) $payload['workflow'], $entityId);
+        $this->validateContextOwnership($payload, $entityId);
+
+        $payload['context'] = $this->buildContext($payload, $entityId);
+
+        // Nome do paciente digitado no pedido/texto livre sai como iniciais.
+        $patient = ! empty($payload['patient_id']) ? Patient::query()->find((string) $payload['patient_id']) : null;
+
+        $guarded                           = $this->promptGuardrails->sanitizePayload($payload, $this->contextBuilder->protectedNames($patient));
+        $guarded['payload']['_guardrails'] = $guarded['guardrails'];
+
+        return $guarded['payload'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
+     */
+    private function applyWorkflowDefaults(array $payload, string $entityId): array
+    {
+        $workflow = (string) ($payload['workflow'] ?? '');
+
+        // SEGURANÇA: system_prompt é SEMPRE decidido pelo servidor, nunca pelo
+        // cliente. StoreAiRunRequest aceita um campo `system_prompt` no
+        // payload (histórico: pensado para uso futuro/depuração) — sem este
+        // descarte, um POST direto à API (fora da UI, que nunca envia esse
+        // campo) conseguia substituir integralmente as instruções enviadas
+        // ao provedor de IA para QUALQUER workflow, incluindo os que não
+        // tinham prompt forçado abaixo (prompt injection via API/UI). O valor
+        // definitivo é atribuído no fim deste método pelo AiSystemPromptResolver.
+        unset($payload['system_prompt']);
+
+        // SEGURANÇA: anexos nunca vêm do cliente. eye_image_analysis reconstrói
+        // os seus a partir de exam_ids na execução (EyeImageAttachmentService);
+        // nenhum outro workflow tem anexo legítimo. Um array livre aqui virava
+        // `image_url` arbitrária (o provedor busca a URL) ou base64 ilimitado.
+        $payload['attachments'] = [];
+
+        if ($workflow === 'eye_image_analysis') {
+            $payload['exam_ids'] = $this->authorizeExamIds(
+                (array) ($payload['exam_ids'] ?? []),
+                $entityId,
+                ! empty($payload['patient_id']) ? (string) $payload['patient_id'] : null,
+            );
+            $payload['attachments']  = [];
+            $payload['_image_count'] = count($payload['exam_ids']);
+        }
+
+        if ($workflow === 'record_assist') {
+            if (empty($payload['medical_record_id'])) {
+                abort(422, __('ai.record_assist_record_required'));
+            }
+
+            // Modo por campo (`field` válido → prompt single-field) é decidido
+            // pelo AiSystemPromptResolver no fim deste método; aqui só
+            // normalizamos o campo pra ser persistido no input_summary
+            // (escalate precisa dele pra manter o mesmo modo).
+            $payload['field'] = $this->promptResolver->isKnownRecordField($payload['field'] ?? null)
+                ? (string) $payload['field']
+                : null;
+
+            $payload['expects_json'] = true;
+        }
+
+        // Assistente virtual flutuante (chat livre, qualquer tela do painel).
+        // Diferente dos outros workflows: sem medical_record_id obrigatório,
+        // sem expects_json (resposta é texto livre), e com histórico de
+        // conversa multi-turno via conversation_id (ver buildConversationHistory).
+        if ($workflow === 'assistant_chat') {
+            $payload['expects_json'] = false;
+        }
+
+        // P&L interno do EasyEye — digest estruturado (ganhando/perdendo/
+        // oportunidades/ações, cada item com o dado que fundamenta a
+        // conclusão). O `context` (resumo financeiro do período) já vem
+        // pronto do controller — o enricher só fixa o system prompt e o
+        // formato de saída; ver Manager\FinanceController.
+        if ($workflow === 'platform_finance_digest') {
+            $payload['expects_json'] = true;
+        }
+
+        // "Converse com os dados" do P&L interno — chat livre multi-turno,
+        // mesmo padrão do assistant_chat, mas contexto e prompt exclusivos
+        // do financeiro da plataforma (nunca dado clínico/paciente).
+        if ($workflow === 'platform_finance_chat') {
+            $payload['expects_json'] = false;
+        }
+
+        // Ponto ÚNICO: prompt clínico do workflow + preâmbulo de segurança,
+        // pelo AiSystemPromptResolver (mesma fonte usada por escalate e pelo
+        // job de execução). Inclui exam_assistant/report_drafting/
+        // consensus_review, que até aqui não tinham prompt forçado — na UI
+        // da tela Gerenciador de exames o campo "System prompt" era editável e
+        // ia direto ao provedor.
+        $payload['system_prompt'] = $this->promptResolver->resolve($workflow, $payload['field'] ?? null);
+
+        return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
+     */
+    private function resolveModeAndAuthorize(array $payload, bool $canConsensus): array
+    {
+        $usingConsensus = ($payload['mode'] ?? '') === AiRunMode::Consensus->value
+            || ($payload['workflow'] ?? '') === 'consensus_review';
+
+        if (($payload['workflow'] ?? '') === 'consensus_review') {
+            $payload['mode'] = AiRunMode::Consensus->value;
+            $usingConsensus  = true;
+        }
+
+        if ($usingConsensus && ! (bool) config('ai.enable_consensus', true)) {
+            abort(422, __('ai.consensus_disabled'));
+        }
+
+        if ($usingConsensus && ! $canConsensus) {
+            abort(403, __('ai.feature_consensus_unavailable'));
+        }
+
+        if (! in_array((string) $payload['mode'], $this->availableModes($canConsensus), true)) {
+            abort(422, __('ai.mode_unavailable'));
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function availableModes(bool $canConsensus): array
+    {
+        $modes = [];
+
+        foreach ($this->providerSettings->availableModes() as $mode) {
+            if ($mode === AiRunMode::Consensus && ! $canConsensus) {
+                continue;
+            }
+            $modes[] = $mode->value;
+        }
+
+        return $modes;
+    }
+
+    // BUGFIX (revisao de seguranca): visibilidade elevada para public — escalate()
+    // em AiRunsController precisa reaplicar esta mesma checagem (inclusive a
+    // restrição doctor-only do assistant_chat) sem re-enriquecer o payload
+    // inteiro do run pai (o que causaria drift de contexto/paciente).
+    public function validateFeatureByWorkflow(string $workflow, string $entityId): void
+    {
+        // escalate() chega aqui sem passar por enrich(): mesma trava.
+        $this->assertClinicalRequesterHasDoctorRecord($workflow, $entityId);
+
+        if (in_array($workflow, ['exam_assistant', 'record_assist'], true)
+            && ! $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant)) {
+            abort(403, __('ai.feature_exam_unavailable'));
+        }
+
+        if ($workflow === 'eye_image_analysis' && ! $this->featureGate->can($entityId, FeatureKey::HasAiEyeImageAnalysis)) {
+            abort(403, __('ai.feature_eye_image_unavailable'));
+        }
+
+        if (in_array($workflow, ['report_drafting', 'consensus_review'], true)
+            && ! $this->featureGate->can($entityId, FeatureKey::HasAiReportDrafting)) {
+            abort(403, __('ai.feature_report_unavailable'));
+        }
+
+        if ($workflow === 'consensus_review' && ! $this->featureGate->can($entityId, FeatureKey::HasAiConsensus)) {
+            abort(403, __('ai.feature_consensus_unavailable'));
+        }
+
+        if ($workflow === 'assistant_chat') {
+            if (! $this->featureGate->can($entityId, FeatureKey::HasAiChatAssistant)) {
+                abort(403, __('ai.feature_chat_unavailable'));
+            }
+
+            // Defesa em profundidade: approve() já é doctor-only (Gate
+            // IssueReport), mas store() sozinho não era — sem este check,
+            // secretária/admin/financeiro conseguiam criar runs de chat que
+            // reservam crédito e nunca são aprovados (ninguém com permissão
+            // pra aprovar), vazando reserva até expirar. Bloqueia na origem.
+            if (session('selected_entity_user_rule') !== ClientRule::Doctor->value) {
+                abort(403, __('ai.feature_chat_unavailable'));
+            }
+        }
+
+        // P&L interno: nunca FeatureKey (não é plano vendável a clínica) —
+        // exclusivamente Gate::SaasOwnerFinancial (admin OU dono do SaaS na
+        // própria entity SaaS). `$entityId` aqui já é a entity SaaS (o
+        // controller resolve via session('selected_entity_id') com o painel
+        // manager selecionado nela) — se um usuário de CLÍNICA de algum jeito
+        // acionar este workflow, `$entity->isSaas()` é false dentro do Gate
+        // e o authorize() já barra, mas o check explícito documenta a intenção.
+        if (in_array($workflow, self::PLATFORM_FINANCE_WORKFLOWS, true)) {
+            $entity = Entity::findOrFail($entityId);
+
+            if (! Gate::forUser(auth()->user())->allows(EntityGate::SaasOwnerFinancial->value, $entity)) {
+                abort(403, __('ai.feature_platform_finance_unavailable'));
+            }
+        }
+    }
+
+    /**
+     * Run de IA CLÍNICO (todo workflow que não é o P&L interno do SaaS) pedido
+     * por perfil médico SEM cadastro de médico ativo nesta clínica: barrado
+     * antes de criar o AiRun, reservar crédito ou chamar provedor — a resposta
+     * nunca poderia ser aprovada (Gate IssueReport, App\Support\CurrentDoctor).
+     * Admin/secretária seguem a regra de cada workflow.
+     */
+    private function assertClinicalRequesterHasDoctorRecord(string $workflow, string $entityId): void
+    {
+        if (in_array($workflow, self::PLATFORM_WORKFLOWS, true) || ! CurrentDoctor::isDoctorProfile()) {
+            return;
+        }
+
+        $user = auth()->user();
+
+        if (CurrentDoctor::activeFor($user instanceof User ? $user : null, $entityId) === null) {
+            abort(403, CurrentDoctor::missingMessage());
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function validateContextOwnership(array $payload, string $entityId): void
+    {
+        if (! empty($payload['patient_id'])) {
+            $patient = Patient::query()->findOrFail((string) $payload['patient_id']);
+            abort_if((string) $patient->entity_id !== $entityId, 403);
+        }
+
+        if (! empty($payload['medical_record_id'])) {
+            $record = MedicalRecord::query()->findOrFail((string) $payload['medical_record_id']);
+            abort_if((string) $record->entity_id !== $entityId, 403);
+
+            if (! empty($payload['patient_id'])) {
+                abort_if((string) $record->patient_id !== (string) $payload['patient_id'], 422, __('ai.record_patient_mismatch'));
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
+     */
+    private function buildContext(array $payload, string $entityId): array
+    {
+        $userContext = $this->sanitizeClientContext((array) ($payload['context'] ?? []));
+
+        $patient = ! empty($payload['patient_id'])
+            ? Patient::query()->find((string) $payload['patient_id'])
+            : null;
+
+        $record = ! empty($payload['medical_record_id'])
+            ? MedicalRecord::query()->find((string) $payload['medical_record_id'])
+            : null;
+
+        $context = $userContext;
+
+        if ($patient || $record) {
+            $serverContext = $this->contextBuilder->build($patient, $record);
+
+            // Server context tem prioridade (anonimização + minimização).
+            $context = array_merge($userContext, $serverContext, [
+                '_built_by' => 'AiMedicalContextBuilder',
+            ]);
+        }
+
+        $workflow = (string) ($payload['workflow'] ?? '');
+
+        // Laudo conjunto: a IA recebe só as imagens — sem isto não sabe que
+        // uma é retinografia e outra OCT, nem de que olho/data. Montado no
+        // servidor (nunca do cliente), na ordem dos anexos.
+        if ($workflow === 'eye_image_analysis' && ! empty($payload['exam_ids'])) {
+            $context['selected_exams'] = $this->selectedExamsContext((array) $payload['exam_ids']);
+        }
+
+        if (in_array($workflow, self::CHAT_WORKFLOWS, true) && ! empty($payload['conversation_id'])) {
+            $history = $this->buildConversationHistory((string) $payload['conversation_id'], $entityId, $workflow);
+
+            if ($history !== []) {
+                $context['conversation_history'] = $history;
+            }
+        }
+
+        return $context;
+    }
+
+    /**
+     * @param list<string> $examIds já autorizados (tenant + paciente)
+     *
+     * @return list<array{image: int, exam_type: ?string, eye: string, exam_date: ?string}>
+     */
+    private function selectedExamsContext(array $examIds): array
+    {
+        $exams = PatientExam::query()->with('examType')->whereIn('id', $examIds)->get()->keyBy('id');
+
+        return collect($examIds)
+            ->map(fn (string $id) => $exams->get($id))
+            ->filter()
+            ->values()
+            ->map(fn (PatientExam $exam, int $i) => [
+                'image'     => $i + 1,
+                'exam_type' => $exam->examType?->name,
+                'eye'       => match ((int) $exam->laterality) {
+                    1       => 'OD',
+                    2       => 'OS',
+                    default => 'OU',
+                },
+                'exam_date' => ($exam->exam_performed_at ?? $exam->created_at)?->toDateString(),
+            ])
+            ->all();
+    }
+
+    /**
+     * Remove do contexto vindo do cliente as chaves que o servidor reserva:
+     * `conversation_history` (senão o cliente forja turnos "assistant" — um
+     * canal de manipulação além do user_prompt) e qualquer chave iniciada em
+     * `_` (marcadores internos, ex.: _built_by). O resto segue — vai pro
+     * provedor dentro de <clinic_data>, tratado como dado.
+     *
+     * @param array<string, mixed> $userContext
+     *
+     * @return array<string, mixed>
+     */
+    private function sanitizeClientContext(array $userContext): array
+    {
+        return array_filter(
+            $userContext,
+            static fn ($value, $key) => is_string($key)
+                && $key !== 'conversation_history'
+                && ! str_starts_with($key, '_'),
+            ARRAY_FILTER_USE_BOTH,
+        );
+    }
+
+    /**
+     * Últimos turnos da mesma conversa (assistant_chat OU platform_finance_chat)
+     * para dar memória multi-turno ao assistente. Escopo estrito: mesma
+     * entity + mesmo solicitante + mesmo workflow — nunca mistura o histórico
+     * do chat clínico com o do chat financeiro (mesmo se algum dia colidissem
+     * conversation_id por acaso), e nunca vaza conversa de outro
+     * médico/admin pelo conversation_id (UUID gerado no cliente, sem
+     * controle de posse próprio).
+     *
+     * @return list<array{role: string, content: string}>
+     */
+    private function buildConversationHistory(string $conversationId, string $entityId, string $workflow): array
+    {
+        $runs = AiRun::query()
+            ->where('entity_id', $entityId)
+            ->where('conversation_id', $conversationId)
+            ->where('requested_by', (string) auth()->id())
+            ->where('workflow', $workflow)
+            ->whereIn('status', [AiRunStatus::Approved->value, AiRunStatus::WaitingApproval->value])
+            // `id` como desempate: mensagens do chat podem cair no mesmo
+            // segundo de created_at (respostas rápidas em sequência) — HasUuids
+            // gera UUID ordenado (v7-like), então id desc é cronologicamente
+            // estável mesmo quando created_at colide.
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(6)
+            ->get(['input_summary', 'final_output'])
+            ->reverse();
+
+        $history = [];
+
+        foreach ($runs as $run) {
+            $userPrompt = (string) ($run->input_summary['user_prompt'] ?? '');
+
+            if ($userPrompt !== '') {
+                $history[] = ['role' => 'user', 'content' => $userPrompt];
+            }
+
+            if (! empty($run->final_output)) {
+                $history[] = ['role' => 'assistant', 'content' => (string) $run->final_output];
+            }
+        }
+
+        return $history;
+    }
+
+    /**
+     * @param array<int, mixed> $examIds
+     *
+     * @return list<string>
+     */
+    private function authorizeExamIds(array $examIds, string $entityId, ?string $patientId = null): array
+    {
+        $examIds = array_values(array_unique(array_filter(array_map('strval', $examIds))));
+
+        if ($examIds === []) {
+            abort(422, __('ai.eye_image_exams_required'));
+        }
+
+        // Defesa em profundidade: StoreAiRunRequest já trava exam_ids em
+        // config('ai.eye_image.max_images', 4) antes de chegar aqui, mas
+        // este método é chamado por qualquer caller de enrich() — nunca
+        // confiar só na validação de um FormRequest específico pra um
+        // whereIn() que toca dado de paciente (mesmo racional do max:50
+        // aplicado em ExamManagerActionsController/ExamManagerReportController
+        // na revisão de segurança 09/09/2026).
+        abort_if(count($examIds) > 50, 422);
+
+        $ownedPatients = PatientExam::query()
+            ->whereIn('patient_exams.id', $examIds)
+            ->whereHas('patient', fn ($q) => $q->where('entity_id', $entityId))
+            ->pluck('patient_id', 'patient_exams.id');
+
+        abort_if($ownedPatients->count() !== count($examIds), 403);
+
+        // Análise conjunta é sempre de UM paciente: exame de outro paciente
+        // da mesma clínica misturaria dados clínicos de pessoas diferentes no
+        // mesmo laudo (LGPD). Com patient_id no payload, tem que ser ele.
+        $patients = $ownedPatients->map(fn ($id) => (string) $id)->unique();
+        abort_if(
+            $patients->count() > 1 || ($patientId !== null && $patients->first() !== $patientId),
+            422,
+            __('ai.eye_image_one_patient'),
+        );
+
+        // Ordem da seleção do médico (o whereIn não garante ordem).
+        $owned = $examIds;
+
+        // Imagem desabilitada (menu de contexto do Gerenciador de exames)
+        // nunca entra numa análise de IA nova — 422 de regra de negócio, DE
+        // PROPÓSITO separado do 403 de posse acima (mesmo racional de
+        // ExamManagerReportController::assertExamsActive()).
+        $hasInactive = PatientExam::query()
+            ->whereIn('id', $owned)
+            ->where('active', false)
+            ->exists();
+
+        abort_if($hasInactive, 422, __('ai.eye_image_exam_inactive'));
+
+        return $owned;
+    }
+}

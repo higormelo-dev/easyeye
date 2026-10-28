@@ -1,7 +1,8 @@
 <?php
 
-return [
+use App\Models\{EntityUserIntegrator, PatientAccount, User};
 
+return [
     /*
     |--------------------------------------------------------------------------
     | Authentication Defaults
@@ -44,6 +45,13 @@ return [
             'driver'   => 'sanctum',
             'provider' => 'integrators',
         ],
+        // Portal do Paciente — guard e provider PRÓPRIOS (tabela patient_accounts),
+        // nunca o guard "web"/model User de staff. Mesmo princípio de isolamento
+        // já usado pelo guard "integrator" acima.
+        'patient' => [
+            'driver'   => 'session',
+            'provider' => 'patients',
+        ],
     ],
 
     /*
@@ -66,11 +74,15 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model'  => env('AUTH_MODEL', App\Models\User::class),
+            'model'  => env('AUTH_MODEL', User::class),
         ],
         'integrators' => [
             'driver' => 'eloquent',
-            'model'  => App\Models\EntityUserIntegrator::class,
+            'model'  => EntityUserIntegrator::class,
+        ],
+        'patients' => [
+            'driver' => 'eloquent',
+            'model'  => PatientAccount::class,
         ],
 
         // 'users' => [
@@ -105,6 +117,14 @@ return [
             'expire'   => 60,
             'throttle' => 60,
         ],
+        // Portal do Paciente — tabela PRÓPRIA (nunca password_reset_tokens de
+        // staff). Expiração mais curta (30min) que a de staff (60min).
+        'patients' => [
+            'provider' => 'patients',
+            'table'    => 'patient_account_password_reset_tokens',
+            'expire'   => 30,
+            'throttle' => 60,
+        ],
     ],
 
     /*
@@ -119,5 +139,4 @@ return [
     */
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
-
 ];

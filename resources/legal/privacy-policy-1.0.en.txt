@@ -1,0 +1,139 @@
+This Privacy Policy explains how EasyEye processes personal data on the website, in the business relationship, and on the ophthalmology clinic management platform. It applies to visitors, clinic representatives, professionals, users, patients, and their guardians, depending on the service used.
+
+Here you will find what information may be processed, for what purposes, with whom it may be shared, and how to exercise your rights. Reading this policy does not constitute a general authorization for the use of data, nor does it replace specific consents, where required.
+
+1. Who we are and what our responsibility is
+
+EasyEye offers tools for scheduling, electronic medical records, ophthalmic exams and images, clinical documents, financial management, and patient access to the information made available by the clinic.
+
+Party responsible for EasyEye: {{controller_identity}}.
+
+In the business relationship, in the management of customer accounts, and in its own support and security operations, the party responsible for EasyEye acts as controller: it determines the purpose and conditions of this processing.
+
+With respect to patient data entered by clinics and professionals, EasyEye acts as processor, processing the information on behalf of the controller responsible for the patient's care and in accordance with its instructions and the contract. The clinic or professional determines the patient care purpose, the necessary records, their team's permissions, and the applicable legal basis. Each processing agent retains the responsibilities that the law assigns to it.
+
+For requests regarding medical records, exams, correction of patient care records, or the care provided, contact the responsible clinic or professional. The channel indicated at the end of this policy can also provide guidance on where to direct the request and support its handling.
+
+2. What data we process and where it comes from
+
+The information varies according to the modules used and may be provided directly by you, by authorized representatives, by the clinic, or by integrations it has enabled.
+
+- Contact and business relationship: name, email, phone number, position or role, field of activity, affiliation with the clinic, and the content of messages sent for contact, demonstration, or support.
+- Registration and access: identification and contact data of users and professionals, affiliation with the organization, professional registration, protected credentials, permissions, and authentication information.
+- Patients and guardians: name, identification documents, date of birth, contact details and address, identification of the guardian, and health insurance plan information necessary for care.
+- Health and care: clinical history, anamnesis, diagnoses, prescriptions, exam results, medical reports, ophthalmic images, attached documents, and other information recorded by the professional. Health data is sensitive personal data.
+- Administrative and financial management: appointments, procedures, billing data, payments, invoices, and health insurance plan billing information, including TISS forms and files, depending on the features used.
+- Usage and security: IP address, date and time of access, browser, device, authentication logs, operations performed, and technical logs necessary for the service to function and for investigating failures.
+- Artificial intelligence features: requests, clinical context, texts, images, or attachments selected in the workflow, generated responses, and usage and review logs, when these features are used.
+
+Imports from spreadsheets, APIs, and equipment may include data from other systems used by the clinic. Whoever performs the import must verify the origin, necessity, and legitimacy of the information. Avoid sending medical records, exams, or patient data through the website's sales form.
+
+3. What we use the data for
+
+- Respond to inquiries, present the solution, and handle the demonstrations, proposals, and contracting requested.
+- Create and manage accounts, authenticate users, recover access, and apply permissions by clinic and profile.
+- Provide the contracted features, including scheduling, medical records, exams, documents, the patient portal, and administrative routines.
+- Process charges and support billing and the integrations authorized by the clinic.
+- Provide support, investigate errors, maintain the service, and prevent unauthorized access, fraud, and other abusive uses.
+- Send service-related communications and, when enabled by the clinic, reminders, confirmations, and other care-related messages.
+- Comply with legal obligations, respond to requests from competent authorities, and exercise rights in administrative or judicial proceedings.
+
+Promotional communications, when sent, must respect the appropriate legal basis and allow the recipient to request that they stop. Clinical data does not become available for advertising merely through the use of the platform.
+
+4. Which legal bases apply
+
+For ordinary personal data, processing may be based on measures requested prior to contracting, performance of the contract, legal or regulatory obligations, the regular exercise of rights, or consent, depending on each purpose. Legitimate interest may support security and relationship operations when there is necessity, a legitimate expectation, and an assessment of the data subject's rights.
+
+For health data, the specific legal grounds set out in Article 11 of the LGPD (Brazilian General Data Protection Law, Law No. 13,709/2018) apply. Depending on the operation, the following may be relevant: protection of health in procedures performed by health professionals or health services, compliance with legal obligations, the regular exercise of rights, or specific and prominent consent. The clinic must identify the appropriate ground for the processing it determines; legitimate interest alone does not authorize the processing of sensitive data.
+
+When required, consent must indicate the purpose and may be revoked. Revocation does not invalidate prior lawful operations nor override retention obligations provided for by law. Acknowledging this policy does not replace authorization for advertising, use of image, research, or other purposes that depend on a specific expression of consent.
+
+5. With whom data may be shared
+
+Access and sharing must be limited to the information necessary for the corresponding operation:
+
+- The clinic's team and authorized professionals, according to the affiliations, profiles, and permissions defined in the system.
+- Infrastructure, storage, email delivery, error monitoring, and support vendors necessary to provide the service.
+- Payment and billing service providers and health insurance plan operators, when the feature or the requested operation requires this data.
+- Messaging services, external systems, and integrators enabled by the clinic, according to the purpose of the integration.
+- Artificial intelligence providers, under the conditions described in the next section.
+- Authorities or other recipients when there is a legal obligation, a valid order, or a need for the regular exercise of rights, within the applicable limits.
+
+Vendors that process data on our behalf must act in accordance with the contracted purposes and data protection obligations. Services that act as independent controllers may also have their own policies. Information about the recipients of a specific processing operation may be requested through the privacy channel.
+
+This policy does not authorize the sale of registration records or medical records, nor the sharing of health data for advertising. Exports and sharing carried out by the clinic must respect professional confidentiality and the patient's rights.
+
+6. Artificial intelligence and professional review
+
+When an AI feature is triggered, the content necessary for the task may be transmitted to external providers to generate, review, or consolidate a response. Available integrations include OpenAI, Anthropic, and Google Gemini; the providers actually used depend on the configuration and the feature triggered.
+
+These operations may involve clinical texts, exam images, and attachments. There are filters to reduce the exposure of certain identifiers in texts, but they are not equivalent to full anonymization and do not guarantee the removal of data present in images or documents. The clinic and the professional must select only the necessary content and verify the legal basis for sending it.
+
+Responses serve as support and require evaluation by the responsible professional before being used in patient care. This policy does not grant authorization to use medical records to train models for their own purposes or for purposes unrelated to the requested service. The vendors' processing terms and any international transfers must be considered when contracting and using each feature.
+
+7. Cookies and third-party resources
+
+We use cookies and storage technologies necessary to maintain sessions, authenticate access, protect forms, and preserve interface preferences. You can remove or block them through your browser, but this may prevent login or impair features.
+
+The website loads fonts from Google Fonts. When fetching these files, the browser establishes a connection with this vendor and may transmit the IP address and technical information about the request. When you open links to external services, such as WhatsApp, you also begin interacting with the respective vendor and its privacy rules.
+
+The use of necessary cookies does not represent agreement to advertising tracking. If non-essential technologies that depend on consent are adopted, their purpose and the way to choose or revoke authorization must be presented before they are activated.
+
+8. Storage and international transfers
+
+Data is stored on the infrastructure used to operate the service. Depending on the vendors and the integrations triggered, processing or storage may take place outside Brazil, including in infrastructure, communication, and AI services.
+
+When there is an international transfer, it must comply with the grounds and safeguards provided for in the LGPD and in the regulations of the ANPD (Brazilian National Data Protection Authority), such as appropriate contractual clauses or another valid mechanism for the operation. The use of a foreign vendor does not waive these requirements. You may request information about the destinations, purpose, and safeguards applicable to the processing of your data.
+
+9. How long we retain data
+
+The period depends on the purpose, the contractual relationship, and the obligations of each processing agent. Contact and support data are retained for as long as necessary for service and the relationship, and for the additional period justified by legal obligations or the exercise of rights. Financial, security, and access records follow the requirements applicable to their category.
+
+Medical records and patient care documents are subject to specific retention and confidentiality rules. Terminating the subscription or a deletion request does not mean that the clinical history is automatically erased. The clinic must assess its obligations and direct the export, retention, or deletion, with EasyEye's support within the scope of its role.
+
+Once the purpose has ended and there is no basis for retention, the data must be deleted or anonymized, also taking into account technical copies and the applicable retention cycles. If a request cannot be fully met, the responsible party will provide the justification and the relevant limits.
+
+10. How we protect information
+
+The platform provides authentication, access controls by organization and profile, operation logs, and credential protection mechanisms. Two-factor authentication is available in the flows that support it. Access must be limited to authorized persons and to the information necessary for their activities.
+
+Technical and administrative measures need to keep pace with the risks and the operation of the service. No system is immune to incidents. If an incident occurs, it is up to the responsible processing agents to assess the impacts, take the necessary measures, and make the notifications required by law, including to the ANPD and to data subjects when applicable. As processor, EasyEye must support the controller in this response.
+
+Keep your credentials confidential, use the available protection features, and notify support if you identify suspicious access. The clinic must review its team's permissions and revoke access that is no longer necessary.
+
+11. Children's and adolescents' data
+
+The commercial website is intended for professionals and clinic representatives. The platform may process data of child and adolescent patients in the context of health care, always observing their best interests and the appropriate legal basis.
+
+The clinic is responsible for verifying legal representation when necessary and for providing understandable information to the guardians and to the patient, according to the patient's age and capacity for understanding. When the legal basis used requires the guardian's consent, such consent must be specific and prominent. Access requests must also respect confidentiality and the rules applicable to care.
+
+12. Your rights and how to exercise them
+
+Within the limits and conditions of the law, you may request:
+
+- Confirmation of the existence of processing and access to your data.
+- Correction of incomplete, inaccurate, or outdated information.
+- Anonymization, blocking, or deletion of unnecessary, excessive, or irregularly processed information.
+- Portability, in accordance with regulations and subject to the protection of commercial and industrial secrets.
+- Information about sharing and about the possibility of refusing consent and the consequences of doing so.
+- Revocation of consent and deletion of the data processed on that basis, subject to the legal grounds for retention.
+- Objection to processing carried out in noncompliance with the LGPD in the situations provided for by law.
+- Review of decisions made solely on the basis of automated processing that affect your interests, when applicable, and information about their criteria and procedures, subject to legal limits.
+
+Requests are free of charge. We may request proportionate information to confirm your identity or representation and to locate the records, to avoid disclosing them to unauthorized third parties. Do not send passwords or complete medical records in your first message.
+
+Requests concerning care and the records kept by the clinic must be directed to the responsible controller. When received by EasyEye in its capacity as processor, they will be forwarded or handled with the clinic's support, in accordance with legitimate instructions and applicable obligations. Requests about the direct relationship with EasyEye will be handled by our team.
+
+The legal deadlines applicable to each request will be observed. For confirmation and access, the LGPD provides for an immediate simplified response or a complete statement within 15 days, except where specific applicable rules provide otherwise. Any impediments will be justified. You may also file a petition with the ANPD and turn to the competent bodies for the defense of your rights.
+
+13. Privacy channel
+
+For questions, requests, or reports related to personal data, write to {{privacy_email}} with the subject “Privacidade — EasyEye”. Provide your name, a way to reach you, and an objective description of the request; if it involves care, identify the clinic to facilitate routing.
+
+Phone and WhatsApp for guidance: {{privacy_phone}}. To preserve confidentiality, avoid sending clinical data through this channel without guidance on the appropriate way to share it.
+
+This channel receives requests and directs them to the person responsible for data protection or to the controlling clinic, as the case may be. Information about the controller and the contact details of the Data Protection Officer (encarregado), when applicable, may also be requested through this channel.
+
+14. Updates to this policy
+
+This policy may be updated to reflect changes in the service, in processing operations, or in legislation. The version and effective date are shown on this page. Material changes will be communicated through the appropriate channels; when a new purpose requires consent, it must be requested specifically. Mere continued use does not replace that consent.

@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Manager;
+
+use App\Http\Controllers\Controller;
+use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator, IntegratorQueueHealth, IntegratorQueueHealthHistory};
+use App\Services\IntegratorHealthMinimizer;
+use Inertia\{Inertia, Response as InertiaResponse};
+
+/**
+ * "O que tá acontecendo agora" (+ tendência recente) na fila local do
+ * integrador (Manager SaaS) — dono do SaaS/suporte conferem pendentes/
+ * falhas/bloqueados/enviados de uma clínica ANTES de precisar acessar a
+ * máquina remotamente.
+ *
+ * Read-only, e não é "ao vivo": é o último retrato que o próprio integrador
+ * sincronizou (ver docs no repositório do integrator, módulo de sync de
+ * queue-health) — a tela sempre mostra "sincronizado há Xmin" pra deixar
+ * claro que não é uma consulta em tempo real à máquina da clínica.
+ *
+ * `history` mostra só os últimos `HISTORY_LIMIT` pontos (não os 7 dias
+ * inteiros retidos no banco — ver migration de
+ * `integrator_queue_health_history`): a tela é "o que aconteceu
+ * recentemente", não um gráfico de uma semana inteira.
+ *
+ * Rotas: /panel/manager/entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/queue-health
+ */
+class EntityIntegratorQueueHealthController extends Controller
+{
+    private const HISTORY_LIMIT = 50;
+
+    public function index(string $entityId, string $userIntegrator, string $integrator): InertiaResponse
+    {
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+        $integratorModel = EntityIntegrator::query()
+            ->withTrashed()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
+            ->findOrFail($integrator);
+
+        $health = IntegratorQueueHealth::query()
+            ->where('integrator_id', $integratorModel->id)
+            ->first();
+
+        $history = IntegratorQueueHealthHistory::query()
+            ->where('integrator_id', $integratorModel->id)
+            ->orderByDesc('synced_at')
+            ->limit(self::HISTORY_LIMIT)
+            ->get();
+
+        $remoteIds      = collect($health?->operational['devices'] ?? [])->pluck('remote_equipment_id')->filter()->unique()->take(100);
+        $equipmentNames = EntityIntegratorEquipment::query()->where('integrator_id', $integratorModel->id)
+            ->whereIn('id', $remoteIds)->get(['id', 'code', 'name'])->keyBy('id');
+
+        return Inertia::render('Panel/Manager/EntityIntegratorQueueHealth/Index', [
+            'entity' => [
+                'id'   => $entity->id,
+                'code' => $entity->code,
+                'name' => $entity->name,
+            ],
+            'userIntegrator' => [
+                'id'   => $userIntegratorModel->id,
+                'code' => $userIntegratorModel->code,
+                'name' => $userIntegratorModel->name,
+            ],
+            'integrator' => [
+                'id'   => $integratorModel->id,
+                'code' => $integratorModel->code,
+                'name' => $integratorModel->name,
+            ],
+            'equipmentNames' => $equipmentNames,
+            'health'         => $health === null ? null : [
+                'pending_count'       => $health->pending_count,
+                'failed_count'        => $health->failed_count,
+                'blocked_count'       => $health->blocked_count,
+                'sent_last_24h_count' => $health->sent_last_24h_count,
+                'problems'            => app(IntegratorHealthMinimizer::class)->problems($health->problems ?? []),
+                'operational'         => $health->operational,
+                'synced_at'           => $health->synced_at->toIso8601String(),
+            ],
+            'history' => $history->map(fn (IntegratorQueueHealthHistory $point) => [
+                'pending_count'       => $point->pending_count,
+                'failed_count'        => $point->failed_count,
+                'blocked_count'       => $point->blocked_count,
+                'sent_last_24h_count' => $point->sent_last_24h_count,
+                'synced_at'           => $point->synced_at->toIso8601String(),
+            ]),
+        ]);
+    }
+}

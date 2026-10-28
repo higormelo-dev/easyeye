@@ -1,0 +1,396 @@
+<script setup>
+import { useImportProgress } from '@/composables/useImportProgress';
+import { ref, computed, watch } from 'vue';
+import { useForm, router, Link, usePage } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+
+/**
+ * Importador CSV de médicos (mirror de Patients/Import.vue):
+ *  1. Upload do arquivo → backend gera preview (cabeçalho + 5 linhas) sem
+ *     enfileirar o job. `preview_id` vem no flash.
+ *  2. Usuário revisa preview e clica "Confirmar" → dispara o job.
+ *  3. Polling do `status` endpoint (2s) até `is_done`.
+ *
+ * Padrão job-tries=1 + dedupe de e-mail/CPF/CRM/especialidade/cor/código de
+ * importação preservado no backend (DoctorImportService).
+ */
+const props = defineProps({
+    breadcrumbs: { type: Array, default: () => [] },
+    imports: { type: Array, default: () => [] },
+    pending_import: { type: Object, default: null },
+    preview_id: { type: String, default: null },
+    plan_status: { type: Object, default: () => ({}) },
+    urls: { type: Object, required: true },
+    t: { type: Object, default: () => ({}) },
+});
+
+const page = usePage();
+
+// ── Upload ──────────────────────────────────────────────────────────────────
+const uploadForm = useForm({ file: null });
+const fileInput = ref(null);
+
+function onFileChange(e) {
+    uploadForm.file = e.target.files[0];
+}
+
+function submitUpload() {
+    if (!uploadForm.file) return;
+    uploadForm.post(props.urls.store, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            uploadForm.reset();
+            if (fileInput.value) fileInput.value.value = '';
+        },
+    });
+}
+
+// ── Preview / confirm ───────────────────────────────────────────────────────
+const previewImport = computed(() => {
+    if (!props.preview_id) return null;
+    return props.imports.find((i) => i.id === props.preview_id);
+});
+
+function csrf() {
+    return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+}
+
+// Confirmação padrão via SweetAlert2 (já usado no resto do painel — ver
+// Layouts/AppLayout.vue e ExamManager/Index.vue), com fallback pro confirm()
+// nativo do browser se o script não tiver carregado por algum motivo.
+async function confirmDialog({
+    icon = 'warning',
+    title,
+    text,
+    confirmButtonText,
+    cancelButtonText = 'Voltar',
+    confirmButtonColor,
+}) {
+    if (window.Swal) {
+        const result = await window.Swal.fire({
+            icon,
+            title,
+            text,
+            showCancelButton: true,
+            confirmButtonText,
+            cancelButtonText,
+            confirmButtonColor,
+        });
+
+        return result.isConfirmed;
+    }
+
+    return window.confirm(text ?? title);
+}
+
+async function confirmImport(item) {
+    const ok = await confirmDialog({
+        icon: 'question',
+        title: 'Confirmar importação?',
+        text: `Iniciar a importação de "${item.original_name}"?`,
+        confirmButtonText: 'Confirmar e importar',
+        cancelButtonText: 'Cancelar',
+    });
+    if (!ok) return;
+
+    await fetch(item.urls.confirm, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+    });
+    router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
+}
+
+async function cancelImport(item) {
+    const ok = await confirmDialog({
+        title: 'Cancelar e remover importação?',
+        text: `O arquivo "${item.original_name}" será descartado.`,
+        confirmButtonText: 'Cancelar e remover',
+        confirmButtonColor: '#dc3545',
+    });
+    if (!ok) return;
+
+    await fetch(item.urls.cancel, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+    });
+    router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
+}
+
+// Cancela um import já confirmado (na fila ou processando). O backend não
+// apaga o registro nesse caso — só sinaliza; o job em execução para sozinho
+// no próximo checkpoint, preservando as linhas já importadas.
+async function cancelProcessingImport(item) {
+    const ok = await confirmDialog({
+        title: 'Cancelar esta importação?',
+        text: 'As linhas já processadas não serão desfeitas, mas o restante do arquivo não será importado.',
+        confirmButtonText: 'Cancelar importação',
+        confirmButtonColor: '#dc3545',
+    });
+    if (!ok) return;
+
+    await fetch(item.urls.cancel, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+    });
+    router.reload({ only: ['imports', 'pending_import', 'preview_id'] });
+}
+
+// ── Progresso em tempo real (WebSocket/Reverb — sem polling HTTP) ────────────
+// Eventos import.progress do canal privado da importação (ver
+// composables/useImportProgress.js). Ao assinar/reconectar, relê as props uma
+// vez pra não perder o que aconteceu antes da conexão.
+const liveImport = ref(props.pending_import);
+const { realtimeConnected } = useImportProgress(liveImport, {
+    onDone: () => router.reload({ only: ['imports', 'pending_import'] }),
+    onResync: () => router.reload({ only: ['pending_import'] }),
+});
+
+// Mantém o estado vivo em sincronia com a prop (enviar/confirmar/cancelar
+// atualizam pending_import via reload parcial — o componente não remonta).
+watch(
+    () => props.pending_import,
+    (value) => {
+        liveImport.value = value;
+    },
+);
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const statusBadgeClass = (color) => `badge bg-${color} fs-11 fw-medium`;
+
+const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.file);
+</script>
+
+<template>
+    <AppLayout title="Importar médicos" :breadcrumbs="breadcrumbs">
+        <div class="container-fluid py-3" data-ee-density="default">
+            <PageHeader
+                title="Importação em massa de médicos"
+                subtitle="Upload CSV — geração de preview antes da importação efetiva."
+            >
+                <template #actions>
+                    <a :href="urls.template" class="btn btn-outline-secondary">
+                        <i class="ti ti-download me-1"></i>Modelo CSV
+                    </a>
+                    <Link :href="urls.doctors" class="btn btn-outline-secondary">
+                        <i class="ti ti-arrow-left me-1"></i>Médicos
+                    </Link>
+                </template>
+            </PageHeader>
+
+            <!-- Limite do plano -->
+            <div v-if="plan_status?.max" class="alert alert-info small d-flex align-items-start mb-3">
+                <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                <div>
+                    Seu plano permite até <strong>{{ plan_status.max }}</strong> médicos. Utilizados:
+                    <strong>{{ plan_status.used }}</strong
+                    >. Disponíveis: <strong>{{ plan_status.available ?? '—' }}</strong
+                    >.
+                </div>
+            </div>
+
+            <!-- Flash de erro -->
+            <div v-if="flashError" class="alert alert-danger alert-dismissible fade show mb-3">
+                <i class="ti ti-alert-triangle me-1"></i>{{ flashError }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <!-- Polling do import em processamento -->
+            <div v-if="liveImport && !liveImport.is_done" class="alert alert-info">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <strong>Importação em andamento — {{ liveImport.original_name }}</strong>
+                    <span :class="`badge bg-${liveImport.status_color} ms-2`">{{ liveImport.status_label }}</span>
+                    <button
+                        type="button"
+                        class="btn btn-outline-danger ms-auto"
+                        @click="cancelProcessingImport(liveImport)"
+                    >
+                        <i class="ti ti-ban me-1"></i>Cancelar importação
+                    </button>
+                </div>
+
+                <div class="progress mb-2" style="height: 8px">
+                    <div
+                        class="progress-bar bg-info progress-bar-striped progress-bar-animated"
+                        :style="`width: ${liveImport.progress}%`"
+                    ></div>
+                </div>
+
+                <div class="small text-muted">
+                    {{ liveImport.processed_rows }} de {{ liveImport.total_rows }} processados —
+                    <strong class="text-success">{{ liveImport.imported_rows }}</strong> importados,
+                    <strong class="text-warning">{{ liveImport.skipped_rows }}</strong> ignorados,
+                    <strong class="text-danger">{{ liveImport.error_rows }}</strong> erros
+                </div>
+                <small v-if="!realtimeConnected" class="d-block text-muted mt-1">
+                    <i class="ti ti-plug-connected-x me-1"></i>{{ page.props.t_ui?.realtime_offline }}
+                </small>
+            </div>
+
+            <!-- Preview pendente (antes de confirmar) -->
+            <div v-if="previewImport" class="card mb-3 border-warning">
+                <div class="card-header bg-warning-subtle">
+                    <h6 class="mb-0 fw-semibold">
+                        <i class="ti ti-eye me-1"></i>
+                        Pré-visualização — {{ previewImport.original_name }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Revise as primeiras linhas do arquivo. Confirme para iniciar a importação ou cancele para
+                        descartar.
+                    </p>
+
+                    <div v-if="previewImport.preview?.mapped_columns?.length" class="table-responsive mb-3">
+                        <table class="table table-sm table-bordered small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th v-for="col in previewImport.preview.mapped_columns" :key="col.field">
+                                        {{ col.label }}
+                                        <span v-if="col.required" class="text-danger">*</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(row, ri) in previewImport.preview.sample_rows ?? []" :key="ri">
+                                    <td v-for="col in previewImport.preview.mapped_columns" :key="col.field">
+                                        {{ row[col.label] ?? '' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div
+                        v-if="previewImport.preview?.unmapped_columns?.length"
+                        class="alert alert-secondary small py-2 mb-3"
+                    >
+                        <i class="ti ti-info-circle me-1"></i>
+                        Colunas do arquivo não reconhecidas (serão ignoradas):
+                        <strong>{{ previewImport.preview.unmapped_columns.join(', ') }}</strong>
+                    </div>
+
+                    <div
+                        v-if="previewImport.preview?.missing_required?.length"
+                        class="alert alert-danger small py-2 mb-3"
+                    >
+                        <i class="ti ti-alert-triangle me-1"></i>
+                        Colunas obrigatórias ausentes:
+                        <strong>{{ previewImport.preview.missing_required.join(', ') }}</strong>
+                        <div class="mt-1 text-muted">
+                            Confira se a <strong>primeira linha</strong> do arquivo tem os nomes das colunas (ex.:
+                            "nome", "cpf", "crm") e não já os dados de um médico. Baixe o
+                            <a :href="urls.template">Modelo CSV</a> pra comparar o formato esperado.
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-outline-danger" @click="cancelImport(previewImport)">
+                            <i class="ti ti-x me-1"></i>Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary"
+                            :disabled="previewImport.preview?.can_proceed === false"
+                            @click="confirmImport(previewImport)"
+                        >
+                            <i class="ti ti-check me-1"></i>Confirmar e importar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload novo -->
+            <div v-if="!liveImport || liveImport.is_done" class="card mb-3">
+                <div class="card-body">
+                    <h6 class="fw-semibold mb-3"><i class="ti ti-upload me-1"></i>Novo arquivo CSV</h6>
+                    <form @submit.prevent="submitUpload">
+                        <label class="form-label small"
+                            >Arquivo (.csv, máx 20MB) <span class="text-danger">*</span></label
+                        >
+                        <div class="d-flex flex-column flex-sm-row gap-2">
+                            <input
+                                ref="fileInput"
+                                type="file"
+                                accept=".csv,text/csv"
+                                class="form-control"
+                                :class="{ 'is-invalid': uploadForm.errors.file }"
+                                required
+                                @change="onFileChange"
+                            />
+                            <button
+                                type="submit"
+                                class="btn btn-primary text-nowrap"
+                                :disabled="!uploadForm.file || uploadForm.processing"
+                            >
+                                <span v-if="uploadForm.processing" class="spinner-border spinner-border-sm me-1"></span>
+                                <i v-else class="ti ti-upload me-1"></i>
+                                Enviar
+                            </button>
+                        </div>
+                        <div v-if="uploadForm.errors.file" class="invalid-feedback d-block">
+                            {{ uploadForm.errors.file }}
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            Separador: ponto-e-vírgula (;). Encoding UTF-8. Colunas: nome, apelido, cpf, crm,
+                            crm_especialidade, cor, email (obrigatórias) — cbo, telefone, celular, whatsapp,
+                            observacoes, codigo_importacao (opcionais). Veja o
+                            <a :href="urls.template">modelo</a>.
+                        </small>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Histórico -->
+            <div class="card">
+                <div class="card-header bg-transparent">
+                    <h6 class="mb-0 fw-semibold"><i class="ti ti-history me-1"></i>Histórico de importações</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Arquivo</th>
+                                <th>Usuário</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end">Linhas</th>
+                                <th class="text-end">Importadas</th>
+                                <th class="text-end">Erros</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="imports.length === 0">
+                                <td colspan="8" class="text-center py-4 text-muted">Sem importações ainda.</td>
+                            </tr>
+                            <tr v-for="item in imports" :key="item.id">
+                                <td class="small text-muted">{{ item.created_at }}</td>
+                                <td>{{ item.original_name }}</td>
+                                <td class="text-muted small">{{ item.user_name }}</td>
+                                <td class="text-center">
+                                    <span :class="statusBadgeClass(item.status_color)">{{ item.status_label }}</span>
+                                </td>
+                                <td class="text-end">{{ item.total_rows }}</td>
+                                <td class="text-end text-success">{{ item.imported_rows }}</td>
+                                <td class="text-end text-danger">{{ item.error_rows }}</td>
+                                <td class="text-end">
+                                    <a
+                                        v-if="item.has_errors_file && item.urls.errors"
+                                        :href="item.urls.errors"
+                                        class="btn btn-outline-secondary"
+                                        title="Baixar erros"
+                                    >
+                                        <i class="ti ti-download"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </AppLayout>
+</template>

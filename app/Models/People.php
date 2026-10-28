@@ -3,14 +3,19 @@
 namespace App\Models;
 
 use App\Presenters\PeoplePresenter;
+use App\Traits\{Auditable, HasAuditColumns};
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\Relations\{HasMany, HasOne};
 use Illuminate\Notifications\Notifiable;
 use Laracasts\Presenter\PresentableTrait;
 
 class People extends Model
 {
+    use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
     use Notifiable;
@@ -18,6 +23,8 @@ class People extends Model
     use SoftDeletes;
 
     protected $primaryKey = 'id';
+
+    protected $presenter = PeoplePresenter::class;
 
     /**
      * The attributes that are mass assignable.
@@ -33,6 +40,7 @@ class People extends Model
         'email',
         'mother_name',
         'father_name',
+        'occupation',
         'national_registry',
         'state_registry',
         'state_registry_agency',
@@ -52,7 +60,40 @@ class People extends Model
         'photo',
     ];
 
-    protected $presenter = PeoplePresenter::class;
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected array $uppercaseFields = [
+        'full_name',
+        'nickname',
+        'mother_name',
+        'father_name',
+        'occupation',
+        'national_registry',
+        'state_registry',
+        'state_registry_agency',
+        'state_registry_initial',
+        'address',
+        'number',
+        'complement',
+        'district',
+        'city',
+        'state',
+        'country',
+    ];
+
+    /**
+     * The attributes that should contain only numbers.
+     *
+     * @var list<string>
+     */
+    protected array $numericOnlyFields = [
+        'national_registration',
+        'telephone',
+        'cellphone',
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -71,7 +112,7 @@ class People extends Model
     }
 
     /**
-     * Gender of people
+     * Gender of people.
      *
      * 0 => 'FEMININO',
      * 1 => 'MASCULINO',
@@ -82,7 +123,27 @@ class People extends Model
     ];
 
     /**
-     * Merital status of people
+     * Idade calculada do birth_date. null quando birth_date ausente.
+     */
+    public function getAgeAttribute(): ?int
+    {
+        return $this->birth_date ? Carbon::parse($this->birth_date)->age : null;
+    }
+
+    /**
+     * Label do gênero (FEMININO/MASCULINO) ou null quando ausente/desconhecido.
+     */
+    public function getGenderLabelAttribute(): ?string
+    {
+        if ($this->gender === null) {
+            return null;
+        }
+
+        return self::$genders[(int) $this->gender] ?? null;
+    }
+
+    /**
+     * Merital status of people.
      *
      * 1 => 'Solteiro(a)',
      * 2 => 'Casado(a)',
@@ -105,7 +166,7 @@ class People extends Model
     ];
 
     /**
-     * States of Brazil
+     * States of Brazil.
      *
      * 1 => 'Solteiro(a)',
      * 2 => 'Casado(a)',
@@ -145,4 +206,41 @@ class People extends Model
         'SE' => 'Sergipe',
         'TO' => 'Tocantins',
     ];
+
+    /**
+     * Cadastros de paciente desta pessoa em cada clínica (Patient.person_id).
+     * Sem escopo de entity aqui — People não usa BelongsToEntity, então isto
+     * retorna as linhas de TODAS as clínicas onde a pessoa já foi atendida.
+     * Usado pelo Portal do Paciente (Fase 1) para listar "Minhas Clínicas".
+     */
+    public function patients(): HasMany
+    {
+        return $this->hasMany(Patient::class, 'person_id');
+    }
+
+    /** Conta de acesso ao Portal do Paciente (1:1) — ver PatientAccount. */
+    public function patientAccount(): HasOne
+    {
+        return $this->hasOne(PatientAccount::class, 'person_id');
+    }
+
+    /**
+     * Override setAttribute to automatically uppercase specified fields.
+     */
+    public function setAttribute($key, $value): mixed
+    {
+        if (is_string($value) && in_array($key, $this->uppercaseFields, true)) {
+            $value = mb_convert_case($value, MB_CASE_UPPER, 'UTF-8');
+        }
+
+        return parent::setAttribute($key, $value);
+    }
+
+    /**
+     * Remove all non-numeric characters from a string.
+     */
+    private function onlyNumbers(string $value): string
+    {
+        return preg_replace('/\D/', '', $value);
+    }
 }

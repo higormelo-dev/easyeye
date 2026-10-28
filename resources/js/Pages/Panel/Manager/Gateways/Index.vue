@@ -1,0 +1,185 @@
+<script setup>
+import { ref } from 'vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import PageHeader from '@/Components/Panel/PageHeader.vue';
+import GatewayCard from './GatewayCard.vue';
+import GatewayCredentialsModal from './GatewayCredentialsModal.vue';
+import GatewayPriorityModal from './GatewayPriorityModal.vue';
+import GatewayChangeDefaultModal from './GatewayChangeDefaultModal.vue';
+
+const props = defineProps({
+    gateways: { type: Array, default: () => [] },
+    defaultGateway: { type: Object, default: null },
+    t: { type: Object, default: () => ({}) },
+});
+
+const breadcrumbs = [{ label: props.t.breadcrumb ?? 'Gateways de Pagamento' }];
+
+// ── Credentials modal ─────────────────────────────────────────────────────────
+const credOpen = ref(false);
+const credGateway = ref(null);
+
+function openCredentials(g) {
+    credGateway.value = g;
+    credOpen.value = true;
+}
+function closeCredentials() {
+    credOpen.value = false;
+    credGateway.value = null;
+}
+
+// ── Priority modal ────────────────────────────────────────────────────────────
+const prioOpen = ref(false);
+const prioGateway = ref(null);
+
+function openPriority(g) {
+    prioGateway.value = g;
+    prioOpen.value = true;
+}
+function closePriority() {
+    prioOpen.value = false;
+    prioGateway.value = null;
+}
+
+// ── Change default modal ──────────────────────────────────────────────────────
+const defaultOpen = ref(false);
+</script>
+
+<template>
+    <AppLayout :title="t.title" :breadcrumbs="breadcrumbs">
+        <div class="container-fluid py-3">
+            <PageHeader :title="t.title" :total="gateways.length" />
+            <!-- Page subtitle -->
+            <p class="text-muted small mb-4" v-html="t.subtitle"></p>
+
+            <!-- ── Default gateway banner ──────────────────────────────────────── -->
+            <div v-if="defaultGateway" class="alert gw-default-banner d-flex align-items-center gap-3 py-3 mb-4">
+                <div
+                    class="flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle gw-gold-circle"
+                    style="width: 42px; height: 42px"
+                >
+                    <i class="ti ti-star fs-20 gw-gold-circle-icon"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="fw-bold mb-0" style="color: var(--heading-color)">{{ t.default_banner_title }}</div>
+                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                        <span class="fw-semibold" style="color: var(--heading-color)">{{ defaultGateway.name }}</span>
+                        <span class="badge text-uppercase gw-gold-badge" style="font-size: 0.7rem">{{
+                            defaultGateway.code
+                        }}</span>
+                        <span class="text-muted small">{{ t.default_banner_subtitle }}</span>
+                    </div>
+                </div>
+                <div class="flex-shrink-0">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="defaultOpen = true">
+                        <i class="ti ti-switch-horizontal me-1"></i>{{ t.default_banner_change }}
+                    </button>
+                </div>
+            </div>
+
+            <div
+                v-else
+                class="alert alert-danger d-flex align-items-center gap-3 py-3 mb-4"
+                style="border-radius: 10px"
+            >
+                <i class="ti ti-alert-octagon fs-22 flex-shrink-0"></i>
+                <div class="flex-grow-1">
+                    <strong>{{ t.no_default_title }}</strong>
+                    <span class="ms-1 small">{{ t.no_default_subtitle }}</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger flex-shrink-0" @click="defaultOpen = true">
+                    <i class="ti ti-star me-1"></i>{{ t.no_default_action }}
+                </button>
+            </div>
+
+            <!-- ── Context card: gateways do dono do SaaS (cobram as clínicas) ───── -->
+            <div class="card border-primary border-opacity-50 mb-4" data-test="gateways-context">
+                <div class="card-body py-3">
+                    <div class="d-flex gap-3 align-items-start">
+                        <div
+                            class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0 bg-primary bg-opacity-10"
+                            style="width: 38px; height: 38px"
+                        >
+                            <i class="ti ti-building-store text-primary fs-18"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="fw-semibold mb-1 small">{{ t.ctx_saas_title }}</p>
+                            <p class="text-muted mb-2" style="font-size: 0.8rem" v-html="t.ctx_saas_desc"></p>
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="badge badge-soft-primary" style="font-size: 0.72rem">{{
+                                    t.ctx_saas_badge
+                                }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Gateway cards grid ──────────────────────────────────────────── -->
+            <div class="row g-3">
+                <div v-for="gateway in gateways" :key="gateway.id" class="col-md-6 col-xl-4">
+                    <GatewayCard
+                        :gateway="gateway"
+                        :t="t"
+                        @open-credentials="openCredentials"
+                        @open-priority="openPriority"
+                        @open-set-default="defaultOpen = true"
+                    />
+                </div>
+
+                <!-- Empty state -->
+                <div v-if="gateways.length === 0" class="col-12">
+                    <div class="text-center py-5 text-muted">
+                        <i class="ti ti-credit-card-off fs-40 d-block mb-2 opacity-40"></i>
+                        <p class="small mb-0">{{ t.empty_state ?? 'Nenhum gateway cadastrado.' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Modals ──────────────────────────────────────────────────────────── -->
+        <GatewayChangeDefaultModal
+            :open="defaultOpen"
+            :gateways="gateways"
+            :default-gateway="defaultGateway"
+            :t="t"
+            @close="defaultOpen = false"
+        />
+
+        <GatewayCredentialsModal :open="credOpen" :gateway="credGateway" :t="t" @close="closeCredentials" />
+
+        <GatewayPriorityModal :open="prioOpen" :gateway="prioGateway" :t="t" @close="closePriority" />
+    </AppLayout>
+</template>
+
+<style scoped>
+.gw-default-banner {
+    background: var(--warning-transparent);
+    border: 1.5px solid var(--warning);
+    border-radius: 10px;
+}
+.gw-gold-circle {
+    background: #fdd835;
+}
+.gw-gold-circle-icon {
+    color: #5d4037;
+}
+.gw-gold-badge {
+    background: #fdd835;
+    color: #5d4037;
+}
+
+:root[data-bs-theme='dark'] .gw-default-banner {
+    border-color: #d1a936;
+}
+:root[data-bs-theme='dark'] .gw-gold-circle {
+    background: #a3821f;
+}
+:root[data-bs-theme='dark'] .gw-gold-circle-icon {
+    color: #fff6df;
+}
+:root[data-bs-theme='dark'] .gw-gold-badge {
+    background: #a3821f;
+    color: #fff6df;
+}
+</style>

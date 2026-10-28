@@ -1,0 +1,117 @@
+//
+//  _tour.scss — tour guiado do painel (driver.js, popoverClass "ee-tour").
+//
+//  O CSS do driver.js é carregado só ao abrir o tour; aqui ficam as cores e
+//  a tipografia do painel. Os tokens do Bootstrap (--bs-body-bg etc.) já
+//  mudam com data-bs-theme, então claro e escuro saem do mesmo código.
+//  Seletores com duas classes vencem os do driver.css em qualquer ordem.
+//
+
+.driver-popover.ee-tour {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.18);
+    font-family: inherit;
+    max-width: 340px;
+    padding: 1rem 1.125rem;
+
+    .driver-popover-title {
+        color: var(--bs-emphasis-color);
+        font-size: 1rem;
+        font-weight: 600;
+        padding-right: 1.5rem;
+    }
+
+    .driver-popover-description {
+        color: var(--bs-secondary-color);
+        font-size: 0.875rem;
+    }
+
+    .driver-popover-progress-text {
+        color: var(--bs-secondary-color);
+        font-size: 0.75rem;
+    }
+
+    .driver-popover-close-btn {
+        color: var(--bs-secondary-color);
+
+        &:hover,
+        &:focus-visible {
+            color: var(--bs-emphasis-color);
+        }
+    }
+
+    .driver-popover-footer-btn {
+        background-color: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        color: var(--bs-body-color);
+        font-family: inherit;
+        font-size: 0.8125rem;
+        padding: 0.3rem 0.75rem;
+        text-shadow: none;
+
+        &:hover {
+            background-color: var(--bs-tertiary-bg);
+        }
+    }
+
+    .driver-popover-next-btn {
+        background-color: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+
+        &:hover {
+            background-color: var(--primary);
+            filter: brightness(0.92);
+        }
+    }
+
+    // Anel de foco com box-shadow: o reset do tema zera o outline de todo
+    // botão com !important (components/_reboot.scss).
+    .driver-popover-footer-btn,
+    .driver-popover-close-btn {
+        &:focus-visible {
+            box-shadow: 0 0 0 2px var(--bs-body-bg), 0 0 0 4px var(--primary);
+        }
+    }
+
+    // Seta na cor do balão (o driver.css usa branco fixo).
+    .driver-popover-arrow-side-left {
+        border-left-color: var(--bs-body-bg);
+    }
+
+    .driver-popover-arrow-side-right {
+        border-right-color: var(--bs-body-bg);
+    }
+
+    .driver-popover-arrow-side-top {
+        border-top-color: var(--bs-body-bg);
+    }
+
+    .driver-popover-arrow-side-bottom {
+        border-bottom-color: var(--bs-body-bg);
+    }
+}
+
+// Alvo rolado para a tela pelo tour (o driver.js usa scrollIntoView e manda
+// para o topo o que é mais alto que a tela) fica abaixo do cabeçalho fixo.
+[data-tour] {
+    scroll-margin-top: calc(var(--topbar-height, 55px) + 1rem);
+}
+
+// Contorno no elemento destacado: no modo escuro o recorte do overlay quase
+// não se distingue do fundo. Botões ficam sem (o reset zera o outline deles).
+.driver-active .driver-active-element {
+    outline: 2px solid var(--primary);
+    outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .driver-fade .driver-overlay,
+    .driver-fade .driver-popover {
+        animation: none;
+    }
+}

@@ -2,12 +2,23 @@
 
 namespace App\Http\Requests;
 
-use App\Models\{Patient};
+use App\Http\Requests\ClinicalSafety\{PatientAllergyRequest, PatientMedicationRequest};
+use App\Models\{CovenantPlan, Patient};
+use App\Rules\ActiveCovenant;
+use App\Services\PatientDuplicateFinder;
+use App\Support\BrazilianFormat;
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+use Illuminate\Validation\{Rule, Validator};
+use Illuminate\Validation\Rules\Unique;
 
 class PatientRequest extends FormRequest
 {
+    /** Cache do paciente em edição (várias regras consultam). */
+    private ?Patient $currentPatient = null;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -19,31 +30,56 @@ class PatientRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'covenant_id' => [
                 'required_without:type_method',
                 'uuid',
-                'exists:covenants,id',
+                Rule::exists('covenants', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+                // Vínculo novo só com convênio ativo; o que o paciente já tem
+                // passa mesmo inativado (reabrir e salvar não pode travar).
+                new ActiveCovenant($this->currentPatient()?->covenant_id),
             ],
-            'skin_id'     => 'nullable|uuid|exists:skins,id',
-            'iris_id'     => 'nullable|uuid|exists:irises,id',
-            'card_number' => 'nullable|string|max:255',
-
-            'full_name' => [
+            'skin_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('skin_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'iris_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('iris_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'card_number'      => 'nullable|string|max:255',
+            'covenant_plan_id' => ['nullable', 'uuid', $this->covenantPlanRule()],
+            // Nome NÃO é mais único: homônimo legítimo existe. Duplicado
+            // (nome + nascimento) e homônimo (pede confirm_homonym) saem do
+            // PatientDuplicateFinder, em after().
+            'name' => [
                 'required_without:type_method',
                 'string',
                 'max:255',
-                Rule::unique('people', 'full_name')
-                    ->ignore($this->getIgnoredPersonId(), 'id')
-                    ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
-                    }),
             ],
-            'nickname' => [
+            'confirm_homonym' => ['nullable', 'boolean'],
+            'nickname'        => [
                 'nullable',
                 'string',
                 'max:255',
@@ -54,7 +90,7 @@ class PatientRequest extends FormRequest
             ],
             'gender' => [
                 'required_without:type_method',
-                Rule::in([1, 2]),
+                Rule::in([0, 1]),
             ],
             'marital_status' => [
                 'required_without:type_method',
@@ -64,12 +100,12 @@ class PatientRequest extends FormRequest
                 'required_without:type_method',
                 'string',
                 'max:255',
-                'email:rfc,dns',
-                Rule::unique('people', 'email')
-                    ->ignore($this->getIgnoredPersonId(), 'id')
-                    ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
-                    }),
+                // Checagem de MX/DNS só em produção: em development/testing o
+                // lookup trava domínios de teste (.test, fixtures do Cypress/
+                // Pest) e adiciona latência/flakiness de rede à validação.
+                // RFC continua valendo em todos os ambientes.
+                app()->environment('production') ? 'email:rfc,dns' : 'email:rfc',
+                $this->uniqueInClinic('email'),
             ],
             'mother_name' => [
                 'nullable',
@@ -81,14 +117,16 @@ class PatientRequest extends FormRequest
                 'string',
                 'max:255',
             ],
+            // Profissão (opcional). Maiúsculas pelo People, como os nomes.
+            'occupation' => [
+                'nullable',
+                'string',
+                'max:120',
+            ],
             'national_registry' => [
                 'required_without:type_method',
                 'string',
-                Rule::unique('people', 'national_registry')
-                    ->ignore($this->getIgnoredPersonId(), 'id')
-                    ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
-                    }),
+                $this->uniqueInClinic('national_registry'),
             ],
             'state_registry' => [
                 'nullable',
@@ -124,6 +162,14 @@ class PatientRequest extends FormRequest
             ],
             'whatsapp' => [
                 'required_without:type_method',
+                'boolean',
+            ],
+            // Autorização de lembretes de retorno por WhatsApp (LGPD, ADR 0002 item 9). Ausente/nulo = não mexe;
+            // verdadeiro registra o consentimento, falso revoga o vigente. É um ATO: o formulário só o envia quando a
+            // pessoa mudou a caixa (nunca o valor carregado a cada salvamento).
+            'care_reminders_consent' => [
+                'sometimes',
+                'nullable',
                 'boolean',
             ],
             'zipcode' => [
@@ -167,6 +213,76 @@ class PatientRequest extends FormRequest
                 'max:255',
             ],
         ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        // Paciente NOVO (Fase 2 / A1-A2): alergias, "nega alergias" e
+        // medicações informadas já no cadastro (aba Clínico) — gravadas como
+        // informadas pelo paciente. Na edição, a aba grava cada item na hora
+        // (PatientClinicalSafetyController); aqui são ignorados.
+        if ($this->isMethod('POST')) {
+            $allergy    = collect(PatientAllergyRequest::fieldRules('allergies.*.'))->except('allergies.*.status')->all();
+            $medication = PatientMedicationRequest::fieldRules('medications.*.');
+
+            $rules = [
+                ...$rules,
+                'allergies' => ['nullable', 'array', 'max:20'],
+                ...$allergy,
+                'allergies_denied' => ['nullable', 'boolean'],
+                'medications'      => ['nullable', 'array', 'max:30'],
+                ...$medication,
+            ];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Duplicado × homônimo na clínica (App\Services\PatientDuplicateFinder):
+     *  - mesmo nome + mesmo nascimento → erro em `name` com o(s) código(s);
+     *  - mesmo nome, nascimento diferente/vazio → erro em `confirm_homonym`
+     *    até a tela reenviar com confirm_homonym=1 ("é outra pessoa").
+     * Edição que não muda nome nem nascimento não reabre a checagem.
+     *
+     * @return list<callable>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if ($validator->errors()->hasAny(['name', 'birth_date']) || ! $this->filled('name')) {
+                return;
+            }
+
+            $current = $this->currentPatient()?->loadMissing('person');
+
+            if ($current?->person && ! PatientDuplicateFinder::identityChanged(
+                $current->person->full_name,
+                $current->person->birth_date,
+                (string) $this->input('name'),
+                $this->input('birth_date'),
+            )) {
+                return;
+            }
+
+            $found = app(PatientDuplicateFinder::class)->find(
+                (string) session()->get('selected_entity_id'),
+                (string) $this->input('name'),
+                $this->input('birth_date'),
+                $current?->person_id,
+            );
+
+            if ($found['duplicates'] !== []) {
+                $validator->errors()->add('name', __('validation.custom.patient.duplicate', ['codes' => implode(', ', $found['duplicates'])]));
+
+                return;
+            }
+
+            if ($found['homonyms'] !== [] && ! $this->boolean('confirm_homonym')) {
+                $validator->errors()->add('confirm_homonym', __('validation.custom.patient.homonym', ['codes' => implode(', ', $found['homonyms'])]));
+            }
+        }];
     }
 
     /**
@@ -177,31 +293,166 @@ class PatientRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'covenant_id.required_without' => trans('validation.custom.generic.required'),
-            'full_name'                    => trans('validation.custom.generic.required'),
-            'birth_date'                   => trans('validation.custom.generic.required'),
-            'gender'                       => trans('validation.custom.generic.required'),
-            'marital_status'               => trans('validation.custom.generic.required'),
-            'email'                        => trans('validation.custom.generic.required'),
-            'national_registry'            => trans('validation.custom.generic.required'),
-            'cellphone'                    => trans('validation.custom.generic.required'),
-            'whatsapp'                     => trans('validation.custom.generic.required'),
+            'covenant_id.required_without'       => __('validation.custom.generic.required'),
+            'full_name.required_without'         => __('validation.custom.generic.required'),
+            'birth_date.required_without'        => __('validation.custom.generic.required'),
+            'gender.required_without'            => __('validation.custom.generic.required'),
+            'marital_status.required_without'    => __('validation.custom.generic.required'),
+            'email.required_without'             => __('validation.custom.generic.required'),
+            'national_registry.required_without' => __('validation.custom.generic.required'),
+            'cellphone.required_without'         => __('validation.custom.generic.required'),
+            'whatsapp.required_without'          => __('validation.custom.generic.required'),
         ];
+    }
+
+    /**
+     * Único entre os pacientes (não excluídos) DESTA clínica. O mesmo paciente
+     * pode ter cadastro em outras clínicas — cada uma com o SEU People —, então
+     * a regra nunca olha cadastros de outra clínica (e o erro não revela que o
+     * CPF/nome/e-mail existe em outro lugar).
+     */
+    private function uniqueInClinic(string $column): Unique
+    {
+        $entityId = (string) session()->get('selected_entity_id');
+
+        return Rule::unique('people', $column)
+            ->ignore($this->getIgnoredPersonId(), 'id')
+            ->where(fn ($query) => $query
+                ->whereNull('deleted_at')
+                ->whereIn('id', fn ($patients) => $patients
+                    ->select('person_id')
+                    ->from('patients')
+                    ->where('entity_id', $entityId)
+                    ->whereNull('deleted_at')));
     }
 
     private function getIgnoredPersonId()
     {
-        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $patientId = $this->route('patient');
+        return $this->currentPatient()?->person_id;
+    }
 
-            $patient = Patient::query()
-                ->with('person')
-                ->where('patients.id', $patientId)
-                ->first();
-
-            return $patient && $patient->person ? $patient->person->id : null;
+    /** Paciente em edição (PUT/PATCH); null no cadastro. */
+    private function currentPatient(): ?Patient
+    {
+        if (! $this->isMethod('PUT') && ! $this->isMethod('PATCH')) {
+            return null;
         }
 
-        return null;
+        return $this->currentPatient ??= Patient::query()->where('id', $this->route('patient'))->first();
+    }
+
+    /**
+     * Plano: visível para a clínica (global ou dela), do MESMO convênio e
+     * disponível. O plano que o paciente já tem passa mesmo que tenha sido
+     * cancelado na ANS/desativado — reabrir e salvar o cadastro não pode
+     * travar por causa dele.
+     */
+    private function covenantPlanRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if (blank($value) || ! Str::isUuid((string) $value)) {
+                return; // vazio = sem plano; formato inválido já cai na regra uuid
+            }
+
+            $current  = $this->currentPatient();
+            $entityId = (string) session()->get('selected_entity_id');
+            $covenant = $this->input('covenant_id') ?: $current?->covenant_id;
+
+            $plan = CovenantPlan::withoutGlobalScopes()
+                ->whereKey($value)
+                ->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId))
+                ->first();
+
+            if (! $plan) {
+                $fail(__('covenant_plans.invalid'));
+
+                return;
+            }
+
+            if ((string) $plan->covenant_id !== (string) $covenant) {
+                $fail(__('covenant_plans.wrong_covenant'));
+
+                return;
+            }
+
+            $unchanged = $current !== null && (string) $current->covenant_plan_id === (string) $value;
+
+            if (! $unchanged && ($plan->deleted_at !== null || ! $plan->active)) {
+                $fail(__('covenant_plans.unavailable'));
+            }
+        };
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        $merge = [];
+
+        if ($this->has('name')) {
+            $merge['name'] = mb_strtoupper($this->input('name'));
+        }
+
+        if ($this->has('nickname')) {
+            $merge['nickname'] = mb_strtoupper($this->input('nickname'));
+        }
+
+        if ($this->has('mother_name')) {
+            $merge['mother_name'] = mb_strtoupper($this->input('mother_name'));
+        }
+
+        if ($this->has('father_name')) {
+            $merge['father_name'] = mb_strtoupper($this->input('father_name'));
+        }
+
+        // CPF chega mascarado (v-mask 'cpf'); grava só dígitos. Null (campo
+        // limpo → ConvertEmptyStringsToNull) segue null — preg_replace(null) é
+        // deprecated e virava '' silenciosamente.
+        if ($this->has('national_registry') && $this->input('national_registry') !== null) {
+            $merge['national_registry'] = preg_replace('/\D/', '', (string) $this->input('national_registry')) ?: null;
+        }
+
+        // Telefones chegam mascarados (v-mask 'phone'): grava só dígitos, sem DDI 55.
+        foreach (['telephone', 'cellphone'] as $field) {
+            if ($this->has($field) && $this->input($field) !== null) {
+                $merge[$field] = BrazilianFormat::canonicalPhone((string) $this->input($field));
+            }
+        }
+
+        if ($this->has('zipcode') && $this->input('zipcode') !== null) {
+            $merge['zipcode'] = preg_replace('/\D/', '', (string) $this->input('zipcode'));
+        }
+
+        foreach (['whatsapp', 'active', 'care_reminders_consent'] as $booleanField) {
+            if ($this->has($booleanField)) {
+                $merge[$booleanField] = $this->normalizeBoolean($this->input($booleanField));
+            }
+        }
+
+        if (! empty($merge)) {
+            $this->merge($merge);
+        }
+    }
+
+    private function normalizeBoolean(mixed $value): mixed
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) && in_array($value, [0, 1], true)) {
+            return (bool) $value;
+        }
+
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        return match (mb_strtolower(trim($value))) {
+            '1', 'true', 'on', 'yes' => true,
+            '0', 'false', 'off', 'no' => false,
+            default => $value,
+        };
     }
 }

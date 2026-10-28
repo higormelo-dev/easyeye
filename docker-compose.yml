@@ -1,72 +1,253 @@
+name: easyeye
+
+# PostgreSQL e Redis rodam no Ubuntu host, não no Docker.
+# Os containers acessam o host via "host.docker.internal" (mapeado por extra_hosts abaixo).
+#
+# Configure o .env com:
+#   DB_HOST=host.docker.internal
+#   DB_PORT=5432
+#   REDIS_HOST=host.docker.internal
+#   REDIS_PORT=6379
+#
+# Para usar serviços em container no futuro, descomente os blocos
+# marcados com [DOCKER-DB] e [DOCKER-REDIS] e adicione de volta
+# os depends_on correspondentes nos serviços app e worker.
+
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile
+  args:
+    APP_USER: ${APP_USER:-easyeye}
+    UID: ${UID:-1000}
+    GID: ${GID:-1000}
+
 services:
-  medicare_app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  app:
+    build: *app-build
+    container_name: easyeye_app
     restart: unless-stopped
     working_dir: /var/www/html/app
     volumes:
       - ./:/var/www/html/app
-    depends_on:
-      - medicare_redis
-      - medicare_nginx
+      # Dentro do container o Laravel sempre lê .env.docker (host.docker.internal),
+      # independente do symlink .env do host (que aponta para .env.local).
+      - ./.env.docker:/var/www/html/app/.env:ro
+    environment:
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION_DOCKER:-database}
+      # Habilita php artisan migrate --force automático no entrypoint
+      RUN_MIGRATIONS: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - medicare-network
+      - easyeye-network
     healthcheck:
-      test: curl --fail medicare_app:8080/health || exit 1
-      interval: 5s
+      test: ["CMD-SHELL", "nc -z -w1 127.0.0.1 9000 || exit 1"]
+      interval: 10s
       retries: 5
-      start_period: 20s
-      timeout: 10s
+      start_period: 30s
+      timeout: 5s
 
-  medicare_nginx:
-    image: nginx:alpine
+  worker:
+    build: *app-build
+    container_name: easyeye_worker
     restart: unless-stopped
-    ports:
-      - "8080:80"
+    working_dir: /var/www/html/app
     volumes:
       - ./:/var/www/html/app
-      - ./.docker/nginx/:/etc/nginx/conf.d/
+      # Mesmo .env.docker do serviço app (ver comentário acima).
+      - ./.env.docker:/var/www/html/app/.env:ro
+      - ./.docker/supervisor/supervisord.conf:/etc/supervisor/supervisord.conf:ro
+      - ./.docker/supervisor/easyeye-worker.conf:/etc/supervisor/conf.d/easyeye-worker.conf:ro
+    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+    environment:
+      APP_USER: ${APP_USER:-easyeye}
+      # Conexão do fast. O bulk segue a mesma conexão: o entrypoint mapeia redis -> redis-bulk e database -> database
+      # (SUPERVISOR_BULK_CONNECTION). Redis fica fora do compose (externo, host.docker.internal).
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION_DOCKER:-database}
+      SUPERVISOR_WORKER_USER: ${APP_USER:-easyeye}
+      SUPERVISOR_QUEUE_CONNECTION: ${QUEUE_CONNECTION_DOCKER:-database}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - medicare-network
+      - easyeye-network
+    healthcheck:
+      test: ["CMD-SHELL", "supervisorctl -c /etc/supervisor/supervisord.conf status all"]
+      interval: 15s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
 
-  medicare_queue:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  # Servidor WebSocket (Laravel Reverb) — progresso das importações em tempo
+  # real. O nginx expõe /app (WebSocket) e /apps (API de broadcast) na mesma
+  # porta do app. Escala horizontal: REVERB_SCALING_ENABLED=true + Redis.
+  reverb:
+    build: *app-build
+    container_name: easyeye_reverb
     restart: unless-stopped
-    working_dir: /var/www
-    command: "php artisan queue:work --tries=3"
+    working_dir: /var/www/html/app
     volumes:
-      - .:/var/www
-    depends_on:
-      - medicare_redis
-      - medicare_app
+      - ./:/var/www/html/app
+      - ./.env.docker:/var/www/html/app/.env:ro
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - medicare-network
+      - easyeye-network
     healthcheck:
-      test: curl --fail medicare_queue:8080/health || exit 1
-      interval: 5s
+      test: ["CMD-SHELL", "nc -z -w1 127.0.0.1 8080 || exit 1"]
+      interval: 10s
       retries: 5
-      start_period: 20s
-      timeout: 10s
+      start_period: 15s
+      timeout: 5s
 
-  medicare_redis:
-    image: redis:latest
-    restart: always
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: easyeye_nginx
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
     ports:
-      - "6379:6379"
-    networks:
-      - medicare-network
+      - "${APP_PORT:-8085}:80"
     volumes:
-      - ./.docker/redis/data:/var/lib/redis/data
+      - ./:/var/www/html/app
+      - ./.docker/nginx/laravel.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - easyeye-network
+
+  # [DOCKER-DB] Descomente para rodar PostgreSQL em container
+  # db:
+  #   image: postgres:17-alpine
+  #   container_name: easyeye_db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: ${POSTGRES_DB:-easyeye}
+  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "${POSTGRES_HOST_PORT:-5432}:5432"
+  #   networks:
+  #     - easyeye-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-easyeye}"]
+  #     interval: 10s
+  #     retries: 5
+  #     start_period: 20s
+  #     timeout: 5s
+
+  # [DOCKER-REDIS] Redis em container — isolado da instalação do host.
+#   redis:
+#     image: redis:7-alpine
+#     container_name: easyeye_redis
+#     restart: unless-stopped
+#     command: ["redis-server", "--appendonly", "yes"]
+#     ports:
+#       - "${REDIS_HOST_PORT:-6380}:6379"
+#     volumes:
+#       - redis_data:/data
+#     networks:
+#       - easyeye-network
+#     healthcheck:
+#       test: ["CMD", "redis-cli", "ping"]
+#       interval: 10s
+#       retries: 5
+#       start_period: 20s
+#       timeout: 5s
+
+  # Vite dev server com HMR.
+  # Browser acessa http://localhost:5173 via port mapping do Docker.
+  # server.host=0.0.0.0 e hmr.host=localhost estão em vite.config.js.
+  # CHOKIDAR_USEPOLLING=1: força polling porque inotify não propaga em bind mounts Docker/Linux.
+  #
+  # `user: UID:GID` (default 1000:1000) faz o container escrever `public/hot` e
+  # outros arquivos com a MESMA permissão do host. Sem isso, o container roda
+  # como root e Laravel/host não conseguem ler/sobrescrever os arquivos gerados,
+  # causando o sintoma "assets sempre antigos" (queda no fallback de build/).
+  #
+  # `rm -f public/hot` antes do `npm run dev` garante que um hot-file stale de
+  # uma execução anterior (com endpoint errado) não confunda o Laravel.
+  node:
+    image: node:22-alpine
+    container_name: easyeye_node
+    restart: unless-stopped
+    working_dir: /var/www/html/app
+    volumes:
+      - ./:/var/www/html/app
+      # Volume separado para node_modules evita conflito entre host e container
+      - node_modules:/var/www/html/app/node_modules
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    environment:
+      CHOKIDAR_USEPOLLING: "1"
+      CHOKIDAR_INTERVAL: "300"
+      # WATCHPACK_POLLING cobre o caso (raro) do webpack interno do Vite
+      # cair em fallback chokidar antes da config aplicar.
+      WATCHPACK_POLLING: "true"
+      # HOME=/tmp dá ao container node um local writable para cache do npm
+      # quando o container roda como UID não-root sem home configurado.
+      HOME: /tmp
+      # NPM ignora avisos de funding/audit em dev — output mais limpo, falhas reais visíveis.
+      NPM_CONFIG_FUND: "false"
+      NPM_CONFIG_AUDIT: "false"
+    command: >
+      sh -c "
+        chown ${UID:-1000}:${GID:-1000} node_modules &&
+        echo '[node] Instalando dependências...' &&
+        npm install --no-audit --no-fund --loglevel=warn &&
+        echo '[node] Limpando public/hot stale...' &&
+        rm -f public/hot &&
+        echo '[node] Iniciando Vite dev server...' &&
+        exec npm run dev
+      "
+    # Roda como root para poder fazer chown no volume nomeado.
+    # npm install e Vite rodam como root dentro do container, mas os
+    # arquivos no bind mount do host mantêm a permissão do host.
+    # O volume nomeado (node_modules) é isolado e não afeta o host.
+    user: "0:0"
+    networks:
+      - easyeye-network
+    # Healthcheck monitora a presença do public/hot — sinal claro de que o
+    # Vite escreveu o endpoint e o Laravel passará a servir assets em dev.
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
-      interval: 5s
+      test: ["CMD-SHELL", "test -f public/hot"]
+      interval: 10s
+      retries: 12
+      start_period: 90s
+      timeout: 3s
+
+  # SSR (Server-Side Rendering) — pré-renderiza páginas Vue/Inertia para SEO.
+  # O container app (PHP) envia requests HTTP para http://ssr:13714.
+  # Quando este serviço não está rodando, o Inertia faz fallback silencioso para CSR.
+  ssr:
+    image: node:22-alpine
+    container_name: easyeye_ssr
+    restart: unless-stopped
+    working_dir: /var/www/html/app
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./:/var/www/html/app
+      - node_modules:/var/www/html/app/node_modules
+    environment:
+      HOME: /tmp
+    command: sh -c "node bootstrap/ssr/ssr.js"
+    networks:
+      - easyeye-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:13714/health || exit 1"]
+      interval: 15s
       retries: 5
-      start_period: 20s
-      timeout: 10s
+      start_period: 10s
+      timeout: 5s
 
 networks:
-  medicare-network:
+  easyeye-network:
     driver: bridge
+
+volumes:
+  # node_modules em volume nomeado: evita conflito entre binários do host e do container
+  node_modules:
+  # redis_data:
+  # Descomente junto com o bloco [DOCKER-DB] acima
+  # postgres_data:

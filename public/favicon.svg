@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="EasyEye">
+  <rect width="64" height="64" rx="12" fill="#35a9e1"/>
+  <!-- Eye outline -->
+  <path d="M10 32 C 18 18, 46 18, 54 32 C 46 46, 18 46, 10 32 Z"
+        fill="#ffffff" stroke="#1f6a8b" stroke-width="2"/>
+  <!-- Iris -->
+  <circle cx="32" cy="32" r="10" fill="#258dc0"/>
+  <!-- Pupil -->
+  <circle cx="32" cy="32" r="5" fill="#0d2a3a"/>
+  <!-- Highlight -->
+  <circle cx="35" cy="29" r="2" fill="#ffffff"/>
+</svg>

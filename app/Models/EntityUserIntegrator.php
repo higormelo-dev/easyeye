@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
+use Illuminate\Database\Eloquent\{Relations\BelongsTo, Relations\HasMany, SoftDeletes};
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-class EntityUserIntegrator extends Model
+class EntityUserIntegrator extends Authenticatable
 {
+    use Auditable;
     use HasApiTokens;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;
@@ -41,7 +45,7 @@ class EntityUserIntegrator extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {

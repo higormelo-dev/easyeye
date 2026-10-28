@@ -1,37 +1,191 @@
 <?php
 
-use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
+use App\Exceptions\LockedMedicalRecordException;
+use App\Http\Middleware\{
+    ApiAuthenticateWithIntegrator,
+    ApiCheckPlanAccess,
     ApiCheckTokenExpiration,
+    ApiIdempotency,
+    ApiTokenPreCheck,
+    CheckFeature,
     CheckJsonResponse,
+    CheckSubscription,
+    CheckoutContentSecurityPolicy,
+    ClinicalReviewHeaders,
+    EnsureApiDocsAccess,
+    EnsureBillingContact,
+    EnsureClinicalReviewSession,
+    EnsureEntityPermission,
+    EnsureEntityRole,
     EnsureEntitySelected,
-    ParseMultipartFormData};
+    EnsureIsPartner,
+    EnsurePatientAuthenticated,
+    EnsurePhoneVerified,
+    EnsureSaasAdmin,
+    EnsureSaasRole,
+    EnsureTokenScope,
+    EnsureTwoFactor,
+    EnsureUserBelongsToEntity,
+    HandleImpersonation,
+    HandleInertiaRequests,
+    LogAdminAccess,
+    ParseMultipartFormData,
+    PatientPortalReadOnly,
+    RequireTermsAcceptance,
+    SetLocale
+};
+use App\Http\Middleware\BindTenantContext;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Sentry\Laravel\Integration;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\{HttpException, MethodNotAllowedHttpException, NotFoundHttpException};
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
+        channels: __DIR__ . '/../routes/channels.php',
         web: __DIR__ . '/../routes/web.php',
         api: __DIR__ . '/../routes/api.php',
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // ─────────────────────────────────────────────────────────────────
+        // SaaS atrás de proxy reverso (SaveInCloud, Cloudflare, balancer
+        // do hosting). Sem isso o Laravel ignora X-Forwarded-* e gera URLs
+        // com `Host: _` (server_name catch-all do Nginx) ou esquema `http://`
+        // mesmo o cliente acessando via HTTPS.
+        //
+        // - at: '*'  — confiar em qualquer IP que se apresente como proxy.
+        //              É a opção pragmática em hosting compartilhado onde o
+        //              IP do load balancer pode mudar. Mitigamos o risco de
+        //              Host Header Injection com trustHosts() abaixo.
+        // - headers  — habilita todos os X-Forwarded-* relevantes para que
+        //              URL::generator use Host/Port/Proto do cliente real.
+        // ─────────────────────────────────────────────────────────────────
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                   | Request::HEADER_X_FORWARDED_HOST
+                   | Request::HEADER_X_FORWARDED_PORT
+                   | Request::HEADER_X_FORWARDED_PROTO
+                   | Request::HEADER_X_FORWARDED_AWS_ELB,
+        );
+
+        // ─────────────────────────────────────────────────────────────────
+        // Allowlist de hosts — defesa contra Host Header Injection.
+        //
+        // Sem isso, com `trustProxies('*')` qualquer cliente poderia enviar
+        // `X-Forwarded-Host: site-malicioso.com` e o Laravel geraria links
+        // (e-mails de pacientes, reset de senha, redirects) apontando para
+        // o domínio do atacante. Em LGPD isso caracteriza incidente
+        // reportável à ANPD.
+        //
+        // O middleware só age fora do ambiente `local`, então o dev local
+        // (APP_URL=http://localhost:8085) não é afetado.
+        // ─────────────────────────────────────────────────────────────────
+        $middleware->trustHosts(at: [
+            'easyeye.app',
+            'teste.easyeye.app',
+        ], subdomains: true);
+
+        // Pedal USB do Gerenciador de Imagens (Fase 5 / 7a) guarda o caractere
+        // de espaço (' ') como valor LEGÍTIMO de tecla (eye_images_pedal_shortcuts.
+        // {capture_key,advance_key}) — sem esta exceção, TrimStrings reduziria
+        // ' ' a '' (achado via teste real) e SÓ ENTÃO ConvertEmptyStringsToNull
+        // decretaria null; como ele só mexe em '' literal (nunca ' '), bastou
+        // tirar o TrimStrings do caminho — nada a fazer no outro middleware,
+        // que não tem exceção por campo (só skip da request inteira).
+        $middleware->trimStrings(except: [
+            'eye_images_pedal_shortcuts.capture_key',
+            'eye_images_pedal_shortcuts.advance_key',
+        ]);
+
         $middleware->alias([
-            'entity.selected'      => EnsureEntitySelected::class,
-            'auth_with_integrator' => ApiAuthenticateWithIntegrator::class,
-            'token.expiration'     => ApiCheckTokenExpiration::class,
+            'clinical-review.headers' => ClinicalReviewHeaders::class,
+            'review.session'          => EnsureClinicalReviewSession::class,
+            'tenant.bind'             => BindTenantContext::class,
+            'entity.selected'         => EnsureEntitySelected::class,
+            'entity.member'           => EnsureUserBelongsToEntity::class,
+            'entity.role'             => EnsureEntityRole::class,
+            'permission'              => EnsureEntityPermission::class,
+            'check.subscription'      => CheckSubscription::class,
+            'feature'                 => CheckFeature::class,
+            'auth_with_integrator'    => ApiAuthenticateWithIntegrator::class,
+            'token.precheck'          => ApiTokenPreCheck::class,
+            'token.expiration'        => ApiCheckTokenExpiration::class,
+            'token.scope'             => EnsureTokenScope::class,
+            'idempotency'             => ApiIdempotency::class,
+            'api.plan'                => ApiCheckPlanAccess::class,
+            'terms.accepted'          => RequireTermsAcceptance::class,
+            'partner'                 => EnsureIsPartner::class,
+            'patient.auth'            => EnsurePatientAuthenticated::class,
+            'patient.read-only'       => PatientPortalReadOnly::class,
+            'saas.admin'              => EnsureSaasAdmin::class,
+            'saas.role'               => EnsureSaasRole::class,
+            'phone.verified'          => EnsurePhoneVerified::class,
+            'admin.audit'             => LogAdminAccess::class,
+            '2fa'                     => EnsureTwoFactor::class,
+            'docs.access'             => EnsureApiDocsAccess::class,
+            'billing.contact'         => EnsureBillingContact::class,
+            'checkout.csp'            => CheckoutContentSecurityPolicy::class,
+        ]);
+
+        // Adiciona o SetLocale, HandleImpersonation e HandleInertiaRequests ao grupo web
+        $middleware->web(append: [
+            SetLocale::class,
+            HandleImpersonation::class,
+            HandleInertiaRequests::class,
         ]);
 
         $middleware->api([
             CheckJsonResponse::class,
             ParseMultipartFormData::class,
         ]);
+
+        // Garante que token.precheck rode ANTES de auth:sanctum,
+        // que tem prioridade via AuthenticatesRequests.
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, ApiTokenPreCheck::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        if (app()->environment('testing') || app()->environment('production')) {
+            Integration::handles($exceptions);
+        }
+
+        // Token/cartão criptografado do checkout e as credenciais da Focus NFe (Manager → Nota fiscal) nunca voltam para a sessão
+        // (a sessão não é cifrada em todos os drivers e a validação falha com redirect + input flashed).
+        $exceptions->dontFlash(['card_token', 'token', 'master_token', 'webhook_secret']);
+
+        // Link do Revisor Clínico adulterado ou com a assinatura vencida: a MESMA página
+        // genérica de qualquer outro problema do link (id, token, prazo, revogação) — a
+        // resposta nunca diz qual deles foi (ADR 0002).
+        $exceptions->render(function (InvalidSignatureException $e, $request) {
+            if ($request->routeIs('clinical-review.open')) {
+                return redirect()->route('clinical-review.unavailable');
+            }
+        });
+
+        // Prontuário assinado (Signable / GuardedBySignedRecord): ação sobre o
+        // prontuário ou seus documentos que o caller não tratou vira 403
+        // traduzido — nunca 500.
+        $exceptions->render(function (LockedMedicalRecordException $e, $request) {
+            $message = $e->getMessage() !== '' ? $e->getMessage() : __('actions.medical_records.documentation_locked');
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], HttpResponse::HTTP_FORBIDDEN);
+            }
+
+            return back()->with('error', $message);
+        });
+
         $exceptions->render(function (AuthenticationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
@@ -53,7 +207,104 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->render(function (\Throwable $e, $request) {
+        $exceptions->render(function (ValidationException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                if ($e->response !== null) {
+                    return $e->response;
+                }
+
+                return response()->json([
+                    'message' => __('validation.custom.validation_invalid.default_message'),
+                    'errors'  => $e->errors(),
+                ], HttpResponse::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        });
+
+        $exceptions->render(function (MethodNotAllowedHttpException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => __('http-statuses.405'),
+                ], HttpResponse::HTTP_METHOD_NOT_ALLOWED);
+            }
+        });
+
+        $exceptions->render(function (HttpException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                // Preserva headers do erro (ex.: Retry-After e X-RateLimit-* do
+                // ThrottleRequestsException no 429) — sem o 3º argumento o cliente
+                // não saberia quando re-tentar.
+                return response()->json([
+                    'message' => $e->getMessage() ?: __('http-statuses.' . $e->getStatusCode(), [], null) ?? 'Error',
+                ], $e->getStatusCode(), $e->getHeaders());
+            }
+
+            // Inertia requests: redireciona de volta com flash de erro em vez de
+            // retornar HTML puro, que seria exibido como modal overlay no frontend.
+            if ($request->hasHeader('X-Inertia')) {
+                // Sessão expirada (CSRF → 419) num save: o redirect seria seguido
+                // pelo XHR até o login e trocaria a página, descartando o que foi
+                // digitado (ex.: prontuário). Resposta não-Inertia aparece no
+                // diálogo do Inertia e a tela continua montada com os dados.
+                if ($e->getStatusCode() === 419) {
+                    // O Revisor Clínico não tem conta: "entre novamente" não faz sentido para ele.
+                    $message = $request->routeIs('clinical-review.*')
+                        ? __('clinical_review.public.errors.session_expired')
+                        : __('auth.session_expired_unsaved');
+
+                    return response(
+                        '<p style="font-family: system-ui, sans-serif; padding: 1.5rem; font-size: 1rem;">'
+                        . e($message) . '</p>',
+                        419,
+                    );
+                }
+
+                $message = $e->getMessage() ?: __('http-statuses.' . $e->getStatusCode(), [], null) ?? 'Error';
+
+                return redirect()->back()->with('error', $message);
+            }
+        });
+
+        // ── Páginas de erro com o visual do sistema (navegação full-page) ──
+        // Digitar URL/atualizar a página num erro HTTP mostrava o Blade cru do
+        // Laravel ("403 | PROIBIDO"). Agora renderiza a página Inertia `Error`
+        // no shell do painel (panel-app) quando a rota é /panel/*, mantendo:
+        //  - JSON/API nos handlers acima;
+        //  - navegação SPA (X-Inertia) no redirect-back com flash;
+        //  - página de debug nos 500/503 quando APP_DEBUG=true.
+        $exceptions->respond(function (HttpResponse $response, Throwable $e, Request $request) {
+            $status = $response->getStatusCode();
+
+            if (
+                ! in_array($status, [401, 403, 404, 419, 429, 500, 503], true)
+                || $response->headers->has('X-Error-Page')
+                || $request->is('api/*')
+                || $request->expectsJson()
+                || $request->hasHeader('X-Inertia')
+                || (config('app.debug') && in_array($status, [500, 503], true))
+            ) {
+                return $response;
+            }
+
+            try {
+                if ($request->is('panel/*')) {
+                    // 404 fora de rota não passa pelo HandleInertiaRequests —
+                    // força o shell do painel para manter o visual do sistema.
+                    Inertia::setRootView('panel-app');
+                }
+
+                return Inertia::render('Error', ['status' => $status])
+                    ->toResponse($request)
+                    ->setStatusCode($status);
+            } catch (Throwable) {
+                return $response; // nunca piorar um erro
+            }
+        });
+
+        // Resposta pronta (ex.: limite do cadastro com mensagem própria —
+        // RateLimiter ->response()): devolve como veio, sem virar 500 abaixo.
+        $exceptions->render(fn (HttpResponseException $e) => $e->getResponse());
+
+        $exceptions->render(function (Throwable $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 $messages = [
                     'message' => __('http-statuses.500'),

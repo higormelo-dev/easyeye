@@ -1,0 +1,228 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\EntityGate;
+use App\Exceptions\LockedMedicalRecordException;
+use App\Models\{Entity, MedicalRecord, Patient};
+use App\Services\ClinicalSafety\PatientClinicalSafetyService;
+use App\Support\ContactLensUse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\{DB, Gate};
+
+/**
+ * Encapsula a lógica de negócio do prontuário médico.
+ * Controllers delegam para este service — nunca contêm lógica de domínio.
+ */
+class MedicalRecordService
+{
+    public function __construct(private readonly PatientClinicalSafetyService $clinicalSafety)
+    {
+    }
+
+    /**
+     * Cria um novo prontuário e persiste no banco.
+     */
+    public function store(array $data, Patient $patient): MedicalRecord
+    {
+        Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail(session('selected_entity_id')));
+
+        return MedicalRecord::create(
+            array_merge(
+                $this->normalize($data),
+                // Retrato das alergias e medicações ativas no momento da
+                // consulta (Fase 2 / A2) — sempre do servidor.
+                $this->clinicalSafety->snapshot($patient),
+                ['patient_id' => $patient->id],
+            ),
+        );
+    }
+
+    /**
+     * Atualiza um prontuário existente — lança exceção se estiver assinado/bloqueado.
+     *
+     * A gravação é feita numa instância FRESCA e travada, que é a devolvida;
+     * $record NÃO é atualizado em memória. Quem precisa dos valores salvos
+     * (ex.: um schedule_id novo) usa o retorno, nunca o $record que passou.
+     *
+     * @throws LockedMedicalRecordException
+     */
+    public function update(MedicalRecord $record, array $data): MedicalRecord
+    {
+        $patient  = Patient::query()->withoutGlobalScopes()->findOrFail($record->patient_id);
+        $snapshot = $this->clinicalSafety->snapshot($patient);
+
+        // Retrato refeito a cada salvar: o prontuário reflete o que estava
+        // ativo quando o médico salvou/finalizou a consulta (Fase 2 / A2).
+        return $this->whileUnlocked($record, function (MedicalRecord $locked) use ($data, $snapshot) {
+            $locked->update(array_merge($this->normalize($data), $snapshot));
+
+            return $locked;
+        });
+    }
+
+    /**
+     * Soft deleta o prontuário — não é possível deletar prontuário assinado.
+     *
+     * @throws LockedMedicalRecordException
+     */
+    public function delete(MedicalRecord $record): void
+    {
+        $this->whileUnlocked($record, function (MedicalRecord $locked) {
+            $locked->delete();
+        });
+    }
+
+    /**
+     * Roda $change com o prontuário travado no banco (FOR UPDATE) e só se
+     * ainda NÃO estiver assinado — a trait Signable (hooks updating/
+     * deleting) só confere is_locked em memória, na instância que o
+     * controller resolveu no início da requisição; uma instância antiga
+     * (is_locked=false em memória) passava pelo guard mesmo com o registro
+     * já assinado por outra conexão nesse meio-tempo. Travar a linha aqui
+     * serializa editar/excluir contra assinar no banco, não só em memória
+     * (achado via auditoria de encerramento, EE-04). $change recebe a
+     * linha FRESCA e travada, nunca $record (que pode estar desatualizado).
+     *
+     * @template T
+     *
+     * @param callable(MedicalRecord): T $change
+     *
+     * @return T
+     *
+     * @throws LockedMedicalRecordException
+     */
+    private function whileUnlocked(MedicalRecord $record, callable $change): mixed
+    {
+        return DB::transaction(function () use ($record, $change) {
+            $locked = MedicalRecord::query()->whereKey($record->getKey())->lockForUpdate()->first();
+
+            if ($locked === null || $locked->is_locked) {
+                throw new LockedMedicalRecordException();
+            }
+
+            return $change($locked);
+        });
+    }
+
+    /**
+     * Restaura um prontuário soft-deletado.
+     */
+    public function restore(string $id): MedicalRecord
+    {
+        $record = MedicalRecord::withTrashed()->findOrFail($id);
+        $record->restore();
+
+        return $record;
+    }
+
+    /**
+     * Calcula a esfera estática a partir da esfera dinâmica e da adição.
+     *
+     * Fórmula optométrica: Esf. Estática = Esf. Dinâmica + Adição
+     *
+     * @param float|null $addition Valor de adição (ex: +2.00)
+     *
+     * @return array{
+     *   right: float|null,
+     *   left: float|null,
+     *   static_spherical_right: float|null,
+     *   static_spherical_left: float|null
+     * }
+     */
+    public function calculatePresbyopia(?float $dynamicRight, ?float $dynamicLeft, ?float $addition): array
+    {
+        $right = $dynamicRight !== null && $addition !== null
+            ? round($dynamicRight + $addition, 2)
+            : null;
+
+        $left = $dynamicLeft !== null && $addition !== null
+            ? round($dynamicLeft + $addition, 2)
+            : null;
+
+        return [
+            'right'                  => $right,
+            'left'                   => $left,
+            'static_spherical_right' => $right,
+            'static_spherical_left'  => $left,
+        ];
+    }
+
+    /**
+     * Normaliza os dados do request antes de persistir:
+     *   - Strings vazias → null para campos FK e numéricos
+     *   - Converte booleanos (checkboxes HTML enviam '1' ou estarão ausentes)
+     */
+    private function normalize(array $data): array
+    {
+        $nullableIds = [
+            'doctor_id', 'visual_acuity_type_id', 'near_point_convergence_id',
+            'cover_test_type_id', 'color_vision_type_id',
+            'visual_acuity_without_correction_right_id', 'visual_acuity_without_correction_left_id',
+            'visual_acuity_with_correction_right_id', 'visual_acuity_with_correction_left_id',
+            'addition_type_id', 'lens_away_id', 'lens_near_id', 'schedule_id',
+        ];
+
+        $nullableNumerics = [
+            'tonometer_right', 'tonometer_left',
+            'pachymetry_right', 'pachymetry_left',
+            'dynamic_spherical_right', 'dynamic_spherical_left',
+            'dynamic_cylindrical_right', 'dynamic_cylindrical_left',
+            'dynamic_axis_right', 'dynamic_axis_left',
+            'static_spherical_right', 'static_spherical_left',
+            'static_cylindrical_right', 'static_cylindrical_left',
+            'static_axis_right', 'static_axis_left',
+            'follow_up_days',
+        ];
+
+        $booleans = [
+            'diabetic', 'diabetic_family',
+            'hypertensive', 'hypertensive_family',
+            'glaucomatous', 'glaucomatous_family',
+        ];
+
+        // Uso de lente de contato (anamnese): só as chaves conhecidas; "não
+        // usa" descarta o resto; nada preenchido vira null.
+        if (array_key_exists('contact_lens_use', $data)) {
+            $data['contact_lens_use'] = ContactLensUse::normalize(is_array($data['contact_lens_use']) ? $data['contact_lens_use'] : null);
+        }
+
+        // Cálculo de lentes de contato: grava só o que o SERVIDOR calcula a
+        // partir das entradas (resultado vindo do navegador é ignorado).
+        if (array_key_exists('contact_lens_calculation', $data)) {
+            $data['contact_lens_calculation'] = app(ContactLensCalculator::class)
+                ->calculate(is_array($data['contact_lens_calculation']) ? $data['contact_lens_calculation'] : null);
+        }
+
+        foreach ($nullableIds as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = blank($data[$field]) ? null : $data[$field];
+            }
+        }
+
+        // Multi-características de lente: limpa o array e SINCRONIZA o single
+        // legado com o primeiro item — consumidores antigos (relations
+        // lensAway/lensNear) continuam funcionando.
+        foreach (['lens_away' => 'lens_away_ids', 'lens_near' => 'lens_near_ids'] as $legacy => $multi) {
+            if (array_key_exists($multi, $data)) {
+                $ids                   = array_values(array_unique(array_filter((array) $data[$multi])));
+                $data[$multi]          = $ids ?: null;
+                $data[$legacy . '_id'] = $ids[0] ?? null;
+            }
+        }
+
+        foreach ($nullableNumerics as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = blank($data[$field]) ? null : $data[$field];
+            }
+        }
+
+        foreach ($booleans as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = filter_var($data[$field] ?? false, FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        return $data;
+    }
+}

@@ -14,7 +14,7 @@ class DoctorResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $data = [
             'type'       => 'doctor',
             'id'         => $this->id,
             'attributes' => [
@@ -23,6 +23,7 @@ class DoctorResource extends JsonResource
                 'code'             => $this->code,
                 'record'           => $this->record,
                 'record_specialty' => $this->record_specialty,
+                'cbo_code'         => $this->cbo_code,
                 'color'            => $this->color,
                 'observation'      => $this->observation,
                 'partner'          => (bool) $this->partner,
@@ -30,10 +31,15 @@ class DoctorResource extends JsonResource
                 'created_at'       => $this->created_at,
                 'updated_at'       => $this->updated_at,
             ],
-            'relationships' => [
-                'entityUser' => $this->entityUser->toArray(),
-                'person'     => $this->person->toArray(),
-            ],
         ];
+
+        if (! $request->routeIs('*.index')) {
+            $data['relationships'] = [
+                'entityUser' => $this->entityUser->toArray() ?? (object) [],
+                'person'     => $this->person->toArray() ?? (object) [],
+            ];
+        }
+
+        return $data;
     }
 }

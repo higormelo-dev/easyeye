@@ -7708,29 +7708,43 @@ class CovenantsSeeder extends Seeder
         ];
 
         foreach ($items as $item) {
-            Covenant::query()->updateOrCreate(
+            Covenant::query()->firstOrCreate(
                 [
                     'ans_registry' => (string) $item['registro_ans'],
                 ],
                 [
                     'color'             => $this->randomHexColor(),
                     'national_registry' => (string) $item['cnpj'],
-                    'ans_registry'      => (string) $item['registro_ans'],
                     'name'              => (string) mb_convert_case(
-                        ($item['nome_fantasia'] ?? $item['razao_social']),
+                        $this->displayName($item),
                         MB_CASE_TITLE,
-                        'UTF-8'
+                        'UTF-8',
                     ),
                     'company_name' => (string) mb_convert_case(
                         $item['razao_social'],
                         MB_CASE_TITLE,
-                        'UTF-8'
+                        'UTF-8',
                     ),
                     'table'  => true,
                     'active' => true,
-                ]
+                ],
             );
         }
+    }
+
+    /**
+     * Na base aberta da ANS, "sem nome fantasia" vem como placeholder de
+     * asteriscos ("******") em vez de vazio — `??` não cai no fallback e o
+     * convênio ficava listado como "******". Trata vazio/asteriscos como
+     * ausente e usa a razão social.
+     */
+    private function displayName(array $item): string
+    {
+        $fantasia = trim((string) ($item['nome_fantasia'] ?? ''));
+
+        return ($fantasia === '' || preg_match('/^\*+$/', $fantasia) === 1)
+            ? (string) $item['razao_social']
+            : $fantasia;
     }
 
     /**

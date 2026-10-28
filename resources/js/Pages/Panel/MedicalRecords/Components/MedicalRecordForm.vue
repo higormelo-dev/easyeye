@@ -1,0 +1,5377 @@
+<script setup>
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import { latestRequest, isAbortError } from '@/Support/latestRequest.js';
+import { useEscapeToClose } from '@/Support/useEscapeToClose.js';
+import { useForm, router, usePage } from '@inertiajs/vue3';
+import { validatePayload } from '@/utils/formRulesValidator.js';
+import PdfPreviewModal from './PdfPreviewModal.vue';
+import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import AcuitySelect from '@/Pages/Panel/MedicalRecords/Components/AcuitySelect.vue';
+import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
+import MedicalRecordImagingModal from './MedicalRecordImagingModal.vue';
+import MedicalRecordProceduresModal from './MedicalRecordProceduresModal.vue';
+import ContactLensCalculatorModal from './ContactLensCalculatorModal.vue';
+import { contactLensSummary, isLegacyContactLens, omitUnchangedContactLens } from './contactLens.js';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard.js';
+import { useRecordAutosave } from '@/composables/useRecordAutosave.js';
+import { useAttendanceClock, formatDuration } from '@/composables/useAttendanceClock.js';
+import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
+import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
+import ClinicalAlertBanner from '@/Components/Panel/ClinicalSafety/ClinicalAlertBanner.vue';
+import FollowUpSuggestion from '@/Components/Panel/Recall/FollowUpSuggestion.vue';
+import ClinicalSafetyModal from '@/Components/Panel/ClinicalSafety/ClinicalSafetyModal.vue';
+import AllergyOverrideModal from '@/Components/Panel/ClinicalSafety/AllergyOverrideModal.vue';
+import { useClinicalSafety } from '@/composables/useClinicalSafety.js';
+import {
+    itemConflicts,
+    textConflicts,
+    reconcileItems,
+    clinicalTexts,
+    tc,
+    matchLabel,
+} from '@/Support/clinicalSafety.js';
+import { recordColumnOrder } from './recordLayout.js';
+import CertificateModal from '@/Components/Panel/Documents/CertificateModal.vue';
+import ProcedureRequestModal from '@/Components/Panel/Documents/ProcedureRequestModal.vue';
+import DocumentDateField from '@/Components/Panel/Documents/DocumentDateField.vue';
+import PersonalTemplatesBar from '@/Components/Panel/Documents/PersonalTemplatesBar.vue';
+import { documentTexts, td, documentDatePayload } from '@/Support/clinicalDocuments.js';
+
+/**
+ * MedicalRecordForm — Port fiel de _form.blade.php (1744 LOC) +
+ * medicalRecordForm.js Alpine (1489 LOC) para Vue 3 + Inertia.
+ *
+ * Compliance:
+ *   - CFM Res. 2.227/2018: registro bloqueado após assinatura (isLocked)
+ *   - LGPD Art. 37: trilha de acesso registrada pelo controller via LogsDataAccess
+ *   - Versionable: backend grava snapshot antes de update
+ *   - Auditable: backend grava audit_logs para toda CUD
+ */
+const props = defineProps({
+    patient: { type: Object, required: true },
+    medicalrecord: { type: Object, default: null },
+    doctors: { type: Array, default: () => [] },
+    currentDoctorId: { type: String, default: null },
+    canChooseDoctor: { type: Boolean, default: false },
+    isDoctor: { type: Boolean, default: false },
+    isEdit: { type: Boolean, default: false },
+    // Fluxo Agenda ↔ Prontuário ({ id, situation, update_url } | null) — ver
+    // ScheduleFlowGuard.vue. Aqui habilita Finalizar/Dilatar/Exame na barra.
+    scheduleFlow: { type: Object, default: null },
+    catalogs: { type: Object, required: true },
+    urls: { type: Object, required: true },
+    storage: {
+        type: Object,
+        default: () => ({
+            used_bytes: 0,
+            limit_bytes: 0,
+            limit_gb: 0,
+            is_unlimited: false,
+            percent: 0,
+            remaining_bytes: null,
+            max_file_size_bytes: 10485760,
+            max_files_per_batch: 10,
+            accept: '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx',
+            accept_mimes: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'],
+        }),
+    },
+    ai: { type: Object, default: () => ({ enabled: false }) },
+    // Autosave: rascunho do autor mais novo que o prontuário ({ updated_at,
+    // updated_at_label } | null) — a tela oferece recuperar.
+    draft: { type: Object, default: null },
+    // Segurança clínica (Fase 2 / A1-A4): alergias, "nega alergias",
+    // medicações em uso, alertas de risco e termos da checagem do
+    // receituário. null = perfil sem acesso a Pacientes.
+    clinicalSafety: { type: Object, default: null },
+    // Sugestão do campo "Retorno" (Fase 6): { suggestions, max_days, t } | null — só o médico, só com protocolo em uso.
+    followUp: { type: Object, default: null },
+    // Uso de LC da última consulta ({ value, date } | null) — pré-preenche o novo.
+    contactLensUsePrevious: { type: Object, default: null },
+    // Estado compartilhado com a página (alerta móvel acima das colunas).
+    safetyStore: { type: Object, default: null },
+    t: { type: Object, default: () => ({}) },
+});
+
+const r = props.medicalrecord;
+const isLocked = computed(() => Boolean(r?.is_locked));
+// ASSINADO (signed_at + hash), não só travado: é o que libera o envio do laudo
+// ao médico solicitante (imutável — achado via revisão adversarial Codex).
+const isSigned = computed(() => Boolean(r?.is_signed));
+
+// Andamento do atendimento (Salvar ≠ Finalizar): só pra médico, com
+// agendamento vinculado, prontuário editável e situação NÃO terminal —
+// reabrir um atendimento já Atendido/Faltou/Cancelado não oferece
+// "Finalizar" de novo (espelha App\Enums\ScheduleSituation::isTerminal).
+// Salvar existe sempre.
+const TERMINAL_SITUATIONS = [7, 8, 9];
+const flowActive = computed(() =>
+    Boolean(
+        props.scheduleFlow &&
+        props.isDoctor &&
+        !isLocked.value &&
+        !TERMINAL_SITUATIONS.includes(Number(props.scheduleFlow.situation)),
+    ),
+);
+
+// Atalhos para catálogos
+const visualAcuityTypes = computed(() => props.catalogs.visual_acuity_types ?? []);
+const colorVisionTypes = computed(() => props.catalogs.color_vision_types ?? []);
+const coverTestTypes = computed(() => props.catalogs.cover_test_types ?? []);
+const nearPointTypes = computed(() => props.catalogs.near_point_types ?? []);
+const additionTypes = computed(() => props.catalogs.addition_types ?? []);
+const lenses = computed(() => props.catalogs.lenses ?? []);
+const examReports = computed(() => props.catalogs.exam_reports ?? []);
+const documentationTemplates = computed(() => normalizeDocTemplates(props.catalogs.available_templates ?? []));
+
+// Uso de LC (anamnese): forma fixa para os campos da tela; o servidor
+// normaliza (nada preenchido → null; "não usa" descarta o resto).
+function contactLensUseForm(value) {
+    const v = value && typeof value === 'object' ? value : {};
+    return {
+        uses: typeof v.uses === 'boolean' ? v.uses : null,
+        type: v.type ?? '',
+        wear: v.wear ?? '',
+        hours_per_day: v.hours_per_day ?? '',
+        replacement: v.replacement ?? '',
+        sleeps_with: typeof v.sleeps_with === 'boolean' ? v.sleeps_with : null,
+        complaints: v.complaints ?? '',
+    };
+}
+const contactLensUsePrefilled = Boolean(!r && props.contactLensUsePrevious?.value);
+const CL_TYPES = ['soft', 'rgp', 'scleral', 'ortho_k', 'cosmetic', 'therapeutic'];
+const CL_WEAR = ['daily_wear', 'extended_wear'];
+const CL_REPLACEMENTS = ['daily', 'biweekly', 'monthly', 'quarterly', 'yearly'];
+
+// ──────────────────────────────────────────────────────────────────────────
+// Form principal (Inertia useForm)
+// ──────────────────────────────────────────────────────────────────────────
+const form = useForm({
+    doctor_id: r?.doctor_id ?? props.currentDoctorId ?? '',
+
+    // Anamnese
+    main_complaint: r?.main_complaint ?? '',
+    hda: r?.hda ?? '',
+    diabetic: r?.diabetic ?? false,
+    diabetic_family: r?.diabetic_family ?? false,
+    hypertensive: r?.hypertensive ?? false,
+    hypertensive_family: r?.hypertensive_family ?? false,
+    glaucomatous: r?.glaucomatous ?? false,
+    glaucomatous_family: r?.glaucomatous_family ?? false,
+    others_history: r?.others_history ?? '',
+    ocular_surgical_history: r?.ocular_surgical_history ?? '',
+    medications_in_use: r?.medications_in_use ?? '',
+
+    // Selects clínicos
+    visual_acuity_type_id: r?.visual_acuity_type_id ?? '',
+    visual_acuity_without_correction_right_id: r?.visual_acuity_without_correction_right_id ?? '',
+    visual_acuity_without_correction_left_id: r?.visual_acuity_without_correction_left_id ?? '',
+    visual_acuity_with_correction_right_id: r?.visual_acuity_with_correction_right_id ?? '',
+    visual_acuity_with_correction_left_id: r?.visual_acuity_with_correction_left_id ?? '',
+    near_point_convergence_id: r?.near_point_convergence_id ?? '',
+    cover_test_type_id: r?.cover_test_type_id ?? '',
+    color_vision_type_id: r?.color_vision_type_id ?? '',
+    addition_type_id: r?.addition_type_id ?? '',
+    // Multi-características de lente (Multifocal + Antirreflexo...) — array;
+    // fallback: registro antigo com single vira array de 1.
+    lens_away_ids: r?.lens_away_ids ?? (r?.lens_away_id ? [r.lens_away_id] : []),
+    lens_near_ids: r?.lens_near_ids ?? (r?.lens_near_id ? [r.lens_near_id] : []),
+
+    // Refração dinâmica
+    dynamic_spherical_right: r?.dynamic_spherical_right ?? '0.00',
+    dynamic_spherical_left: r?.dynamic_spherical_left ?? '0.00',
+    dynamic_cylindrical_right: r?.dynamic_cylindrical_right ?? '0.00',
+    dynamic_cylindrical_left: r?.dynamic_cylindrical_left ?? '0.00',
+    dynamic_axis_right: r?.dynamic_axis_right ?? '',
+    dynamic_axis_left: r?.dynamic_axis_left ?? '',
+
+    // Refração estática
+    static_spherical_right: r?.static_spherical_right ?? '0.00',
+    static_spherical_left: r?.static_spherical_left ?? '0.00',
+    static_cylindrical_right: r?.static_cylindrical_right ?? '0.00',
+    static_cylindrical_left: r?.static_cylindrical_left ?? '0.00',
+    static_axis_right: r?.static_axis_right ?? '',
+    static_axis_left: r?.static_axis_left ?? '',
+
+    // Exame físico
+    ocular_motility: r?.ocular_motility ?? '',
+    tonometer_right: r?.tonometer_right ?? '',
+    tonometer_left: r?.tonometer_left ?? '',
+    tonometer_time: r?.tonometer_time ?? '',
+    pachymetry_right: r?.pachymetry_right ?? '',
+    pachymetry_left: r?.pachymetry_left ?? '',
+    gonioscopy_right: r?.gonioscopy_right ?? '',
+    gonioscopy_left: r?.gonioscopy_left ?? '',
+
+    // Achados
+    biomicroscopy_right: r?.biomicroscopy_right ?? props.t?.biomicroscopy_ph ?? '',
+    biomicroscopy_left: r?.biomicroscopy_left ?? props.t?.biomicroscopy_ph ?? '',
+    fundoscopy_right: r?.fundoscopy_right ?? props.t?.fundoscopy_ph ?? '',
+    fundoscopy_left: r?.fundoscopy_left ?? props.t?.fundoscopy_ph ?? '',
+    observation_general: r?.observation_general ?? '',
+    observation_of_lenses: r?.observation_of_lenses ?? '',
+    // Cálculo de lentes de contato vinculado à consulta (entradas +
+    // resultados; o servidor recalcula ao salvar). null = sem cálculo.
+    contact_lens_calculation: r?.contact_lens_calculation ?? null,
+    // Uso de lente de contato na anamnese (Fase 2 / A3) — novo atendimento
+    // começa com o da última consulta (o médico confere).
+    contact_lens_use: contactLensUseForm(r ? r.contact_lens_use : props.contactLensUsePrevious?.value),
+
+    // Diagnóstico & conduta
+    diagnosis_cids: r?.diagnosis_cids ?? [],
+    clinical_conduct: r?.clinical_conduct ?? '',
+    follow_up_days: r?.follow_up_days ?? '',
+
+    // Vínculo opcional com agenda (edit: hidratado do registro; create:
+    // ?schedule_id= no mount)
+    schedule_id: r?.schedule_id ?? '',
+
+    // Intenções de fluxo (não persistidas — ver redirectAfterSave):
+    //   flow_action: save | finish | dilate | exam
+    //   post_save_action: ação da barra a abrir após o 1º save (create → edit)
+    flow_action: null,
+    post_save_action: null,
+});
+
+// Trocar pra "Não"/"Não informado" só escondia os campos de detalhe (v-if
+// uses === true) — o que tinha vindo pré-preenchido ou foi digitado antes de
+// voltar atrás continuava no form e ia no payload. O servidor via detalhe
+// preenchido com uses=null e normalizava de volta pra "usa" (3ª revisão
+// Codex, P2). Sem "Sim", os detalhes não têm sentido: limpa.
+watch(
+    () => form.contact_lens_use.uses,
+    (uses) => {
+        if (uses === true) return;
+        const blank = contactLensUseForm({});
+        delete blank.uses;
+        Object.assign(form.contact_lens_use, blank);
+    },
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// UI state (não-form)
+// ──────────────────────────────────────────────────────────────────────────
+
+// F9 — Validação
+const validationRules = ref({});
+const clientErrors = ref({});
+const hasClientErrors = ref(false);
+
+// Toggle "outros antecedentes"
+const showOthersHistory = ref(Boolean(r?.others_history));
+const othersHistoryInput = ref(null);
+
+// Tonometria
+const tonometryPdfSrc = ref('');
+const tonometryStampedTime = ref(
+    r?.tonometer_time ? r.tonometer_time.slice(0, 5) : new Date().toTimeString().slice(0, 5),
+);
+
+// Presbiopia
+const presbyopiaAddition = ref(0);
+const presbyopiaObsForm = reactive({ content: '' });
+
+// ──────────────────────────────────────────────────────────────────────────
+// Prontuário personalizado por médico (3 modos: padrão EasyEye / meu modelo /
+// texto livre). Preferência persiste no bag UserPreference (chave
+// medical_record_layout) via PATCH panel.preferences.update — por USUÁRIO,
+// não por clínica: o modelo de atendimento é estilo pessoal do médico.
+//
+// IMPORTANTE (integridade): personalização só muda EXIBIÇÃO. Seções ocultas
+// usam display:none (nunca v-if) — o estado do useForm continua inteiro e o
+// submit envia TODOS os campos, então dados já preenchidos num prontuário
+// antigo nunca são perdidos por causa do layout do médico atual.
+// ──────────────────────────────────────────────────────────────────────────
+// `labelKeys`: rótulos do modal "Meu prontuário" vêm das traduções da tela
+// (`label` só como reserva). A/V sem correção, A/V com correção e Tonometria
+// ficam lado a lado na esquerda quando cabem (30/09/2026) — equilibra as
+// colunas sem vão em branco; a chave 'av_sem_tono' é a antiga (a Tonometria
+// virou seção própria e entra logo depois de A/V com correção).
+const SECTION_DEFS = [
+    {
+        key: 'cromatica_ppc_cover',
+        col: 'left',
+        labelKeys: ['chromatic_vision', 'near_point', 'cover_test'],
+        label: 'Vis. cromática / PPC / Cover test',
+    },
+    { key: 'av_sem_tono', col: 'left', labelKeys: ['av_without'], label: 'A/V sem correção' },
+    { key: 'av_com', col: 'left', labelKeys: ['av_with'], label: 'A/V com correção' },
+    { key: 'tonometria', col: 'left', labelKeys: ['tonometry'], label: 'Tonometria' },
+    { key: 'dinamica', col: 'left', labelKeys: ['dynamic'], label: 'Dinâmica' },
+    { key: 'estatica', col: 'left', labelKeys: ['static'], label: 'Estática' },
+    { key: 'adicao', col: 'right', labelKeys: ['addition', 'lens_away', 'lens_near'], label: 'Adição / Longe / Perto' },
+    { key: 'biomicroscopia', col: 'right', labelKeys: ['biomicroscopy'], label: 'Biomicroscopia' },
+    { key: 'fundoscopia', col: 'right', labelKeys: ['fundoscopy'], label: 'Fundoscopia' },
+    { key: 'obs_geral', col: 'right', labelKeys: ['general_obs'], label: 'Observação geral' },
+];
+
+// Snapshot local da preferência (Inertia shared props não re-hidratam após
+// PATCH via axios — mantemos o espelho atualizado aqui).
+const persistedLayout = ref(usePage().props.auth?.user?.preferences?.medical_record_layout ?? null);
+
+const recordMode = ref(persistedLayout.value?.default_mode ?? 'default'); // default | custom | free
+const isCustomMode = computed(() => recordMode.value === 'custom');
+const isFreeMode = computed(() => recordMode.value === 'free');
+
+function seedLayout() {
+    const saved = persistedLayout.value?.custom ?? null;
+    // Seções que faltam no modelo salvo (novas ou que mudaram de coluna)
+    // entram na posição padrão da coluna — nunca somem silenciosamente.
+    const buildColumn = (col) =>
+        recordColumnOrder(
+            SECTION_DEFS.filter((s) => s.col === col).map((s) => s.key),
+            saved?.[col],
+        );
+    return {
+        left: buildColumn('left'),
+        right: buildColumn('right'),
+        hidden: (saved?.hidden ?? []).filter((k) => SECTION_DEFS.some((s) => s.key === k)),
+    };
+}
+const sectionLayout = reactive(seedLayout());
+
+function sectionStyle(key) {
+    if (isFreeMode.value) return {}; // colunas inteiras já somem no modo livre
+    if (!isCustomMode.value) return {}; // modo padrão EasyEye: layout intacto
+    const def = SECTION_DEFS.find((s) => s.key === key);
+    const order = sectionLayout[def.col].indexOf(key);
+    const style = { order: order >= 0 ? order : 99 };
+    if (sectionLayout.hidden.includes(key)) style.display = 'none';
+    return style;
+}
+
+function moveSection(col, key, dir) {
+    const arr = sectionLayout[col];
+    const i = arr.indexOf(key);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+}
+
+function toggleSection(key) {
+    const i = sectionLayout.hidden.indexOf(key);
+    if (i >= 0) sectionLayout.hidden.splice(i, 1);
+    else sectionLayout.hidden.push(key);
+}
+
+function sectionLabel(key) {
+    const def = SECTION_DEFS.find((s) => s.key === key);
+    if (!def) return key;
+
+    return (
+        def.labelKeys
+            .map((k) => tt(k))
+            .filter(Boolean)
+            .join(' / ') || def.label
+    );
+}
+
+const showLayoutModal = ref(false);
+const layoutSaving = ref(false);
+const layoutSavedFlash = ref('');
+
+// ── Modelo pessoal de TEXTO LIVRE (preferences.free_text_template) ─────────
+// Texto salvo pelo médico (ex.: esqueleto HDA:/AP:/AV:/BIO:/FO:/HD:/CD:) que
+// pré-preenche a caixa quando ele entra no modo livre com a caixa vazia.
+const freeTextTemplate = ref(usePage().props.auth?.user?.preferences?.free_text_template ?? '');
+const freeTemplateSaving = ref(false);
+const freeTemplateSavedFlash = ref(false);
+
+async function saveFreeTextTemplate() {
+    const content = (form.observation_general || '').trim();
+    if (!content || freeTemplateSaving.value) return;
+    freeTemplateSaving.value = true;
+    try {
+        const { data } = await window.axios.patch(route('panel.preferences.update'), {
+            free_text_template: content,
+        });
+        freeTextTemplate.value = data.data?.free_text_template ?? content;
+        freeTemplateSavedFlash.value = true;
+        setTimeout(() => {
+            freeTemplateSavedFlash.value = false;
+        }, 2500);
+    } catch (e) {
+        console.error('Failed to persist free text template:', e);
+    } finally {
+        freeTemplateSaving.value = false;
+    }
+}
+
+function applyFreeTextTemplate() {
+    if (!freeTextTemplate.value) return;
+    const current = (form.observation_general || '').trim();
+    if (
+        current &&
+        !window.confirm(tt('free_template_overwrite', 'A caixa já tem conteúdo. Substituir pelo seu modelo?'))
+    )
+        return;
+    form.observation_general = freeTextTemplate.value;
+}
+
+// Entrou no modo livre com a caixa vazia → abre já com o modelo do médico.
+watch(isFreeMode, (free) => {
+    if (free && !(form.observation_general || '').trim() && freeTextTemplate.value) {
+        form.observation_general = freeTextTemplate.value;
+    }
+});
+
+async function persistPreference(patch) {
+    layoutSaving.value = true;
+    try {
+        const payload = {
+            default_mode: patch.default_mode ?? persistedLayout.value?.default_mode ?? 'default',
+        };
+        const custom = patch.custom ?? persistedLayout.value?.custom ?? null;
+        if (custom) payload.custom = custom;
+
+        const { data } = await window.axios.patch(route('panel.preferences.update'), {
+            medical_record_layout: payload,
+        });
+        persistedLayout.value = data.data?.medical_record_layout ?? payload;
+        return true;
+    } catch (e) {
+        console.error('Failed to persist medical record layout:', e);
+        return false;
+    } finally {
+        layoutSaving.value = false;
+    }
+}
+
+async function saveMyLayout() {
+    const ok = await persistPreference({
+        custom: {
+            left: [...sectionLayout.left],
+            right: [...sectionLayout.right],
+            hidden: [...sectionLayout.hidden],
+        },
+    });
+    if (ok) {
+        layoutSavedFlash.value = tt('layout_saved', 'Modelo salvo!');
+        setTimeout(() => {
+            layoutSavedFlash.value = '';
+        }, 2500);
+    }
+}
+
+const isCurrentModeDefault = computed(() => (persistedLayout.value?.default_mode ?? 'default') === recordMode.value);
+
+async function saveDefaultMode() {
+    const ok = await persistPreference({ default_mode: recordMode.value });
+    if (ok) {
+        layoutSavedFlash.value = tt('default_mode_saved', 'Definido como seu padrão!');
+        setTimeout(() => {
+            layoutSavedFlash.value = '';
+        }, 2500);
+    }
+}
+
+// Evoluções clínicas (texto livre, append-only) — histórico por PACIENTE,
+// atravessa prontuários. Carregado sob demanda ao abrir o modal.
+const showEvolutionModal = ref(false);
+const evolutions = ref([]);
+const evolutionsLoaded = ref(false);
+const evolutionText = ref('');
+const evolutionBusy = ref(false);
+
+// Procedimento estruturado (Fase 3 gap-fill) — estado interno inteiro vive
+// em MedicalRecordProceduresModal.vue, aqui só o toggle de visibilidade.
+const showProceduresModal = ref(false);
+
+async function openEvolutionModal() {
+    showEvolutionModal.value = true;
+    if (evolutionsLoaded.value || !props.urls.evolutions_index) return;
+    try {
+        const res = await fetch(props.urls.evolutions_index, {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        if (res.ok) {
+            evolutions.value = (await res.json()).data ?? [];
+            evolutionsLoaded.value = true;
+        }
+    } catch (e) {
+        console.error('Failed to load evolutions:', e);
+    }
+}
+
+async function saveEvolution() {
+    const content = evolutionText.value.trim();
+    if (!content || evolutionBusy.value || !props.urls.evolutions_store) return;
+    evolutionBusy.value = true;
+    try {
+        const res = await fetch(props.urls.evolutions_store, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({ content }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.message ?? tt('evolution_save_error', 'Não foi possível registrar a evolução.'));
+            return;
+        }
+        evolutions.value.unshift(await res.json());
+        evolutionText.value = '';
+    } catch (e) {
+        console.error('Evolution save error:', e);
+    } finally {
+        evolutionBusy.value = false;
+    }
+}
+
+// Documentações
+const documentations = ref(r?.documentations ?? []);
+// Mantém a lista sincronizada após reload parcial (ex.: novo laudo de IA aprovado).
+watch(
+    () => props.medicalrecord?.documentations,
+    (v) => {
+        if (Array.isArray(v)) documentations.value = v;
+    },
+);
+
+// ── Assistente de IA ────────────────────────────────────────────────────────
+// isDoctor = perfil médico COM cadastro ativo (servidor): sem cadastro, a IA
+// não aparece — o laudo nunca poderia ser aprovado (Gate IssueReport).
+const aiEnabled = computed(() => Boolean(props.ai?.enabled) && props.isEdit && props.isDoctor);
+const aiPanelOpen = ref(false);
+const aiContext = computed(() => ({
+    workflow_default: props.ai?.default_workflow ?? 'record_assist',
+    patient_id: props.patient?.id ?? null,
+    medical_record_id: r?.id ?? null,
+    can_insert: !isLocked.value,
+}));
+
+function openAiPanel() {
+    aiPanelOpen.value = true;
+}
+
+// Insere uma sugestão da IA num campo do prontuário (texto), com confirmação
+// quando o campo já tem conteúdo. Nunca substitui sem o médico decidir.
+function applyAiSuggestion({ field, value }) {
+    if (isLocked.value || !value) return;
+    const target = field === 'observations' ? 'observation_general' : 'clinical_conduct';
+    const current = (form[target] || '').trim();
+    if (
+        current &&
+        !window.confirm(tt('ai_insert_confirm', 'O campo já tem conteúdo. Anexar a sugestão da IA ao final?'))
+    ) {
+        return;
+    }
+    form[target] = current ? `${current}\n${value}` : value;
+}
+
+// Após aprovar um laudo de IA, recarrega o prontuário para puxar a nova
+// documentação (recarga parcial: o que está sendo digitado continua no form).
+function onAiApproved() {
+    bypass(() => router.reload({ only: ['medicalrecord'], preserveScroll: true }));
+}
+const docForm = reactive({
+    report_setting_content_id: '',
+    title: '',
+    content: '',
+    exam_type: '',
+    exam_subtype: '',
+    exam_label: '',
+    // Data alternativa e modelo pessoal usado (Fase 2 / B3).
+    document_date: '',
+    template_id: '',
+});
+// Opção do seletor: id do modelo da clínica ou `tpl:<id>` (modelo pessoal).
+const docSelection = ref('');
+// Último conteúdo vindo da prévia — se o médico não editou, trocar a data
+// refaz a prévia (as datas do texto acompanham).
+let docPreviewHtml = '';
+const docContentEdited = computed(() => Boolean(docForm.content) && docForm.content !== docPreviewHtml);
+const docTemplates = ref(documentationTemplates.value);
+// Itens do catálogo (medicine_id/princípio ativo) do modelo PESSOAL de
+// receita selecionado — "Salvar como modelo" a partir daqui carrega o
+// mesmo vínculo (3ª revisão Codex, P1): o texto final nunca tem "colírio"
+// escrito, só o nome comercial, e sem o catálogo a checagem de alergia
+// por conservante não reconhecia. Zera a cada troca de seleção.
+const docTemplateItems = ref([]);
+const docSaving = ref(false);
+const quickActionBusy = ref(false);
+
+// F5 — Medicamentos
+// ──────────────────────────────────────────────────────────────────────────
+// Segurança clínica (Fase 2): alergias/medicações do PACIENTE (gravadas na
+// hora), checagem de alergia no receituário e "seguir com motivo".
+// ──────────────────────────────────────────────────────────────────────────
+const safety = props.safetyStore ?? useClinicalSafety(props.patient.id, props.clinicalSafety);
+const clinicalT = clinicalTexts();
+const ctt = (path, fallback = '') => tc(clinicalT, path, fallback);
+const showSafetyModal = ref(false);
+const allergyCheck = computed(() => safety.summary?.check ?? null);
+const activeMedications = computed(() => (safety.summary?.medications ?? []).filter((m) => m.status === 'active'));
+
+// Modal "alergia na receita": promessa resolvida com o motivo (ou null).
+const allergyOverride = reactive({ open: false, conflicts: [], resolve: null });
+function askAllergyOverride(conflicts) {
+    return new Promise((resolve) => {
+        allergyOverride.conflicts = conflicts;
+        allergyOverride.resolve = resolve;
+        allergyOverride.open = true;
+    });
+}
+function resolveAllergyOverride(reason) {
+    allergyOverride.open = false;
+    const resolve = allergyOverride.resolve;
+    allergyOverride.resolve = null;
+    resolve?.(reason);
+}
+const joinReasons = (...reasons) =>
+    [...new Set(reasons.flat().filter((r) => typeof r === 'string' && r.trim()))].join(' | ').slice(0, 1000);
+
+const prescription = ref([]);
+const medicineLists = ref('');
+const medSearchQuery = ref('');
+const medSearchResults = ref([]);
+const medSearchOpen = ref(false);
+const medSearchLoading = ref(false);
+const maxMedicines = 5;
+// Busca inteligente + posologia: abas Recentes | Favoritos | Buscar, seleção
+// com sugestão de posologia editável (minha posologia > genérica da base) e
+// presets por médico. Ver MedicationPresetsController.
+const medTab = ref('search'); // search | recents | favorites
+const medPresets = ref({ recents: [], favorites: [] });
+const selectedMed = ref(null);
+// Alergia que bate com o item selecionado: motivo obrigatório para adicionar.
+const selectedOverrideReason = ref('');
+const acknowledgedAllergies = ref(new Map()); // allergy_id → motivo
+const selectedConflicts = computed(() =>
+    selectedMed.value ? itemConflicts(selectedMed.value, allergyCheck.value) : [],
+);
+const selectedNeedsReason = computed(
+    () =>
+        selectedConflicts.value.some((c) => !acknowledgedAllergies.value.has(c.allergy_id)) &&
+        selectedOverrideReason.value.trim().length < 5,
+);
+const posologyDraft = ref('');
+const posologySaving = ref(false);
+const posologySavedFlash = ref(false);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Documentos do atendimento (Fase 2 / Bloco B): data alternativa (faixa do
+// servidor), atestados oftalmológicos, pedido de exames com kits por
+// convênio e modelos pessoais. Config e textos vêm da página (MedicalRecordsController).
+// ──────────────────────────────────────────────────────────────────────────
+const documentsConfig = computed(() => usePage().props.documents ?? {});
+const dateConfig = computed(() => documentsConfig.value.date ?? {});
+const docT = documentTexts();
+const dtt = (path, fallback = '') => td(docT, path, fallback);
+
+// F6 — Pedido de exames (ProcedureRequestModal: kits, catálogo, CID, data)
+const procedureRequest = reactive({ open: false, busy: false, errors: {} });
+const procedureModal = ref(null);
+
+// F7 — Atestados (CertificateModal: comparecimento, médico, acompanhante, aptidão visual)
+const certificate = reactive({ open: false, kind: 'attendance', busy: false, errors: {}, acuityUnsaved: false });
+
+// Data alternativa e modelo pessoal do receituário (Fase 2 / B3)
+const medDocumentDate = ref('');
+const medTemplateId = ref('');
+
+// F8 — Catarata
+const cataractForm = reactive({
+    eye: 'right',
+    template: 'pre_operatorio',
+    date_surgery: '',
+    hour_surgery: '',
+    document_date: '',
+});
+
+// Anexos — gerenciados pelo MedicalRecordFileUploadModal
+const uploadedFiles = ref(r?.files ?? []);
+const showUploadModal = ref(false);
+const storageState = ref({ ...props.storage });
+
+// PDF preview
+const pdfPreviewUrl = ref('');
+const pdfPreviewTitle = ref('');
+const showPdfPreview = ref(false);
+
+// Modais Bootstrap genéricos (controlados por ref booleano)
+const showDocumentationsModal = ref(false);
+const showDocModal = ref(false);
+const showMedicationModal = ref(false);
+const showCataractModal = ref(false);
+const showExamHubModal = ref(false);
+const showImagingModal = ref(false);
+const showTonometryModal = ref(false);
+const showPresbyopiaObsModal = ref(false);
+const showContactLensCalc = ref(false);
+
+// CID-10 search state
+const cidQuery = ref('');
+const cidResults = ref([]);
+const cidOpen = ref(false);
+const cidSearching = ref(false);
+const cidActiveIndex = ref(-1);
+const selectedCids = ref(Array.isArray(r?.diagnosis_cids) ? [...r.diagnosis_cids] : []);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Lifecycle
+// ──────────────────────────────────────────────────────────────────────────
+onMounted(async () => {
+    await fetchValidationRules();
+
+    // schedule_id via querystring — vínculo com a Agenda, não edição do
+    // médico: entra também no "estado salvo" (não dispara o aviso de saída).
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get('schedule_id');
+    if (sid) {
+        form.defaults('schedule_id', sid);
+        savedSnapshot.schedule_id = sid;
+        form.schedule_id = sid;
+    }
+
+    runPostSaveAction();
+
+    // Disponibiliza este prontuário como contexto OPCIONAL do Assistente
+    // Virtual flutuante (AiFloatingAssistant, montado no AppLayout) — ainda
+    // exige o médico ativar o toggle "Usar contexto desta tela" no widget
+    // pra qualquer dado ser enviado. Exemplo do pedido de produto: "dentro
+    // do prontuário: monte uma evolução com essas informações".
+    if (r?.id) {
+        setAiContext({
+            patient_id: props.patient.id,
+            medical_record_id: r.id,
+            label: `Prontuário — ${props.patient.full_name ?? props.patient.code ?? ''}`,
+        });
+    }
+});
+
+onBeforeUnmount(clearAiContext);
+
+watch(tonometryStampedTime, (v) => {
+    form.tonometer_time = v;
+});
+
+watch(showOthersHistory, async (v) => {
+    if (v) {
+        await nextTick();
+        othersHistoryInput.value?.focus();
+    }
+});
+
+watch(
+    selectedCids,
+    (v) => {
+        form.diagnosis_cids = v;
+    },
+    { deep: true },
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────────────
+const i18n = computed(() => props.t ?? {});
+
+function tt(key, fallback = '') {
+    return i18n.value?.[key] ?? fallback;
+}
+
+function normalizeDocTemplates(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== 'object') return [];
+    return Object.entries(payload).map(([id, group]) => ({
+        report_setting_id: group.report_setting_id ?? id,
+        report_setting_title: group.report_setting_title ?? group.title ?? '',
+        contents: Array.isArray(group.contents) ? group.contents : [],
+    }));
+}
+
+function csrf() {
+    return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// F9 — Validação
+// ──────────────────────────────────────────────────────────────────────────
+async function fetchValidationRules() {
+    if (!props.urls.validation_rules) return;
+    try {
+        const res = await fetch(props.urls.validation_rules, {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        validationRules.value = data?.rules ?? {};
+    } catch (e) {
+        console.warn('[F9] failed to load validation rules:', e);
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Submit (com validação F9 client-side antes)
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Eixo refrativo é exibido como "0º" — precisa limpar antes de validar como número. */
+const AXIS_FIELDS = ['dynamic_axis_right', 'dynamic_axis_left', 'static_axis_right', 'static_axis_left'];
+
+/**
+ * F9 — Validação client-side antes do submit (paridade com Alpine
+ * `validateBeforeSubmit`). Espelha `prepareForValidation` do FormRequest:
+ * limpa sufixos de unidade nos eixos refrativos. Em caso de falha, mostra
+ * `hasClientErrors` no topo e cancela o submit.
+ *
+ * @returns {boolean} true se passou (ou se regras ainda não chegaram)
+ */
+function validateBeforeSubmit() {
+    if (!validationRules.value || Object.keys(validationRules.value).length === 0) {
+        return true; // rules ainda não chegaram → confia no servidor
+    }
+
+    // Monta payload a partir do form (useForm já tem todos os campos)
+    const payload = { ...form.data() };
+    for (const field of AXIS_FIELDS) {
+        if (typeof payload[field] === 'string') {
+            payload[field] = payload[field].replace(/[^\d-]/g, '');
+        }
+    }
+
+    const i = i18n.value;
+    const labels = {
+        doctor_id: i.field_doctor ?? 'Médico',
+        main_complaint: i.field_complaint ?? 'Queixa principal',
+        pachymetry_right: i.field_pachymetry_od ?? 'Paquimetria OD',
+        pachymetry_left: i.field_pachymetry_oe ?? 'Paquimetria OE',
+        follow_up_days: i.field_follow_up ?? 'Dias de retorno',
+    };
+
+    const result = validatePayload(payload, validationRules.value, labels);
+
+    if (!result.valid) {
+        clientErrors.value = result.errors;
+        hasClientErrors.value = true;
+        nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+        return false;
+    }
+
+    clientErrors.value = {};
+    hasClientErrors.value = false;
+    return true;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Alterações não salvas: sair por link/menu, Voltar do navegador ou
+// recarregar/fechar a aba pergunta antes de descartar. Conta o form inteiro
+// (inclusive o cálculo de lentes de contato) e os rascunhos fora do form que
+// continuam ao fechar o modal: evolução não registrada, receita e solicitação
+// de procedimentos alteradas desde a última emissão. Salvar/Finalizar/
+// Dilatar/Exame passam direto (bypass).
+// ──────────────────────────────────────────────────────────────────────────
+
+// Último conteúdo emitido (receita/solicitação ficam no modal depois de
+// emitidas, pra reemitir) — só o que mudou depois disso é rascunho.
+const issuedDrafts = reactive({ medication: '' });
+const changedSince = (text, issued) => {
+    const value = (text || '').trim();
+    return value !== '' && value !== issued;
+};
+const hasPendingDrafts = () =>
+    evolutionText.value.trim() !== '' ||
+    changedSince(medicineLists.value, issuedDrafts.medication) ||
+    Boolean(procedureModal.value?.hasDraft());
+
+// O que o servidor tem: dados enviados no último save bem-sucedido (ou os do
+// carregamento). Intenção de fluxo (flow_action/post_save_action) nunca é dado.
+const snapshotOf = (data) => JSON.parse(JSON.stringify({ ...data, flow_action: null, post_save_action: null }));
+let savedSnapshot = snapshotOf(form.data());
+
+function markSaved(snapshot) {
+    savedSnapshot = snapshot;
+    // Chamar defaults() no onSuccess impede o useForm de marcar como salvo o
+    // form ATUAL — o que foi digitado durante o envio continua pendente.
+    form.defaults(snapshot);
+    form.isDirty = JSON.stringify(snapshotOf(form.data())) !== JSON.stringify(snapshot);
+    // Salvou: o servidor apagou o rascunho desta tela.
+    autosave.markSaved();
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Autosave — rascunho do autor no servidor (nunca no navegador), a cada ~30 s
+// com mudança e ao ocultar a aba. Só os campos do prontuário (médico,
+// agendamento e intenções de fluxo vêm da tela). Prontuário assinado ou quem
+// não pode salvar: desligado. Ao abrir, oferece recuperar o rascunho mais
+// novo que o prontuário (props.draft).
+// ──────────────────────────────────────────────────────────────────────────
+const DRAFT_EXCLUDED = ['doctor_id', 'schedule_id', 'flow_action', 'post_save_action'];
+const draftShape = (data) =>
+    Object.fromEntries(Object.entries(snapshotOf(data)).filter(([key]) => !DRAFT_EXCLUDED.includes(key)));
+
+const autosaveEnabled = computed(() => Boolean(props.urls.draft) && props.isDoctor && !isLocked.value);
+
+const autosave = useRecordAutosave({
+    url: () => props.urls.draft ?? null,
+    enabled: () => autosaveEnabled.value,
+    payload: () => draftShape(form.data()),
+    saved: () => draftShape(savedSnapshot),
+    context: () => (r?.id ? { medical_record_id: r.id } : form.schedule_id ? { schedule_id: form.schedule_id } : {}),
+});
+
+const autosaveLabel = computed(() => {
+    switch (autosave.status.value) {
+        case 'saving':
+            return tt('draft_saving', 'Salvando rascunho…');
+        case 'saved':
+            return tt('draft_saved_at', 'Rascunho salvo às :time').replace(':time', autosave.savedAtLabel.value);
+        case 'error':
+            return tt('draft_failed', 'Rascunho não salvo agora — nova tentativa em instantes.');
+        default:
+            return '';
+    }
+});
+
+const draftOffer = ref(autosaveEnabled.value ? props.draft : null);
+const draftBusy = ref(false);
+
+function applyDraft(payload) {
+    const current = form.data();
+    Object.entries(payload ?? {}).forEach(([key, value]) => {
+        if (key in current && !DRAFT_EXCLUDED.includes(key)) form[key] = value;
+    });
+    if (Array.isArray(payload?.diagnosis_cids)) selectedCids.value = [...payload.diagnosis_cids];
+    if (payload?.others_history) showOthersHistory.value = true;
+}
+
+async function recoverDraft() {
+    if (draftBusy.value) return;
+    draftBusy.value = true;
+    const payload = await autosave.recover();
+    draftBusy.value = false;
+    draftOffer.value = null;
+    if (!payload) return;
+    applyDraft(payload);
+    window.showSuccessToast?.(tt('draft_recovered', 'Rascunho recuperado. Confira e clique em Salvar.'));
+}
+
+async function discardDraft() {
+    if (draftBusy.value) return;
+    draftBusy.value = true;
+    await autosave.discard();
+    draftBusy.value = false;
+    draftOffer.value = null;
+    window.showSuccessToast?.(tt('draft_discarded', 'Rascunho descartado.'));
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// "Finalizar consulta" sempre confirma num modal com o que vai acontecer
+// (salvar, Atendido na Agenda — ou a trava de caixa —, volta pra Agenda,
+// rascunhos fora do form descartados, duração do atendimento). Vale para o
+// botão da barra e para o "Finalizar" do guard de saída (os dois passam por
+// submit('finish')).
+// ──────────────────────────────────────────────────────────────────────────
+const showFinishModal = ref(false);
+const finishHasDrafts = ref(false);
+const finishConfirmButton = ref(null);
+const finishClock = useAttendanceClock({
+    startedAt: () => props.scheduleFlow?.started_at ?? null,
+    finishedAt: () => null,
+    running: () => false,
+});
+const finishDuration = computed(() =>
+    formatDuration(finishClock.elapsedMs.value, {
+        minutes: tt('timer_minutes', ':m min'),
+        hours: tt('timer_hours', ':h h :m min'),
+        underMinute: tt('timer_under_minute', 'menos de 1 min'),
+    }),
+);
+const finishPatientName = computed(
+    () => props.scheduleFlow?.patient_name || props.patient?.full_name || props.patient?.code || '',
+);
+
+function requestFinish() {
+    finishHasDrafts.value = hasPendingDrafts();
+    finishClock.refresh();
+    showFinishModal.value = true;
+    nextTick(() => finishConfirmButton.value?.focus());
+}
+
+function confirmFinish() {
+    showFinishModal.value = false;
+    submit('finish', { confirmed: true });
+}
+
+// Fluxos que levam pra Agenda (saem do prontuário) — ver redirectAfterSave.
+const LEAVING_FLOW_ACTIONS = ['finish', 'dilate', 'exam'];
+
+const { bypass } = useUnsavedChangesGuard({
+    isDirty: () => form.isDirty || hasPendingDrafts(),
+    message: () =>
+        tt('unsaved_leave_confirm', 'Há alterações neste prontuário que ainda não foram salvas. Sair e descartá-las?'),
+});
+
+/**
+ * Salva o prontuário. `flowAction` (opcional) diz o que acontece com o
+ * paciente em seguida — save (mantém a consulta aberta, volta pro edit) |
+ * finish (Atendido) | dilate (Dilatando) | exam (Em exame); os três últimos
+ * voltam pra Agenda. Chamado pelo @submit do form (evento) ou pelos botões.
+ * `afterSave` (opcional): o que fazer depois de salvo, no lugar da pergunta
+ * de destino — usado pelo "Continuar atendimento" (saveAndLeave).
+ */
+function submit(flowAction = null, { afterSave = null, confirmed = false } = {}) {
+    // Sem request não há onFinish: desarma a intenção da barra pra um
+    // "Salvar" posterior não emitir um documento que o médico não pediu.
+    if (isLocked.value || !validateBeforeSubmit()) {
+        form.post_save_action = null;
+        return;
+    }
+
+    const normalizedFlowAction = typeof flowAction === 'string' ? flowAction : null;
+
+    // Finalizar: primeiro o modal de confirmação (ele já avisa dos rascunhos).
+    if (normalizedFlowAction === 'finish' && !confirmed) {
+        requestFinish();
+        return;
+    }
+
+    // Finalizar/Dilatar/Exame (vão pra Agenda) e "Continuar atendimento"
+    // saem do prontuário: rascunho fora do form (evolução, receita,
+    // solicitação — outros registros, com botão próprio) se perderia. O
+    // "Salvar" simples fica na tela e mantém os rascunhos.
+    const leavesScreen = Boolean(afterSave) || LEAVING_FLOW_ACTIONS.includes(normalizedFlowAction);
+    if (
+        leavesScreen &&
+        !confirmed &&
+        hasPendingDrafts() &&
+        !window.confirm(
+            tt(
+                'drafts_leave_confirm',
+                'Há texto ainda não registrado (evolução, receita ou solicitação de procedimentos) — ele será descartado ao sair do prontuário. Continuar?',
+            ),
+        )
+    ) {
+        form.post_save_action = null;
+        return;
+    }
+
+    form.flow_action = normalizedFlowAction;
+    const sent = snapshotOf(form.data());
+
+    // Só o clique isolado em "Salvar" (edit, sem flow_action nem ação da
+    // barra pendente) pergunta o destino — Dilatar/Exame/Finalizar já
+    // decidem sozinhos (Agenda), e o save-then-open-modal da barra de
+    // documentos (withRecord) não deve interromper o médico com um prompt.
+    const shouldPromptDestination =
+        !afterSave && props.isEdit && normalizedFlowAction === null && !form.post_save_action;
+
+    const url = props.isEdit ? props.urls.update : props.urls.store;
+    const method = props.isEdit ? 'put' : 'post';
+    // Edição: cálculo de lentes não alterado não volta ao servidor (valor
+    // legado não pode travar o save do prontuário inteiro). Compara com o
+    // registro ATUAL: depois de um save a tela não remonta (preserveState),
+    // e remover o cálculo salvo precisa chegar ao servidor.
+    form.transform((data) =>
+        props.isEdit ? omitUnchangedContactLens(data, props.medicalrecord?.contact_lens_calculation) : data,
+    );
+    bypass(() =>
+        form[method](url, {
+            preserveScroll: true,
+            onSuccess: () => {
+                markSaved(sent);
+                if (afterSave) afterSave();
+                else if (shouldPromptDestination) promptSaveDestination();
+            },
+            onError: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+            onFinish: () => {
+                form.flow_action = null;
+                form.post_save_action = null;
+            },
+        }),
+    );
+}
+
+/**
+ * "Continuar atendimento" (ScheduleFlowGuard): sai mantendo a consulta em
+ * andamento, mas grava antes o que foi digitado — como Finalizar/Dilatar/
+ * Exame. Sem alteração no form, só sai (o aviso ainda cobre a evolução não
+ * registrada).
+ */
+function saveAndLeave(url) {
+    if (!form.isDirty) {
+        router.visit(url);
+        return;
+    }
+
+    submit('save', { afterSave: () => bypass(() => router.visit(url)) });
+}
+
+/**
+ * Pós-"Salvar" simples: prontuário fica salvo e ABERTO no edit (comportamento
+ * de sempre) — pergunta se o médico quer continuar aqui, ir pra Agenda ou
+ * ver a lista de prontuários do paciente. Cartões no mesmo estilo do modal
+ * de saída do ScheduleFlowGuard (ícone + rótulo + explicação), não o
+ * genérico de 3 botões cinza do SweetAlert — mais fácil de escanear rápido
+ * no meio da consulta. Fechar/Esc = continuar (padrão já é ficar na tela).
+ */
+const showSaveDestinationModal = ref(false);
+
+const saveDestinationOptions = computed(() => [
+    {
+        action: 'continue',
+        label: tt('save_prompt_continue', 'Continuar no prontuário'),
+        hint: tt('save_prompt_continue_hint', 'Fica nesta tela — o atendimento segue em andamento.'),
+        icon: 'fas fa-notes-medical',
+        btn: 'btn-primary',
+    },
+    {
+        action: 'agenda',
+        label: tt('save_prompt_agenda', 'Ir para a Agenda'),
+        hint: tt(
+            'save_prompt_agenda_hint',
+            'Salvo — a consulta continua em andamento, você segue pro próximo paciente.',
+        ),
+        icon: 'fas fa-calendar-alt',
+        btn: 'btn-outline-primary',
+    },
+    {
+        action: 'list',
+        label: tt('save_prompt_list', 'Ver prontuários do paciente'),
+        hint: tt('save_prompt_list_hint', 'Histórico completo de atendimentos deste paciente.'),
+        icon: 'fas fa-folder-open',
+        btn: 'btn-outline-secondary',
+    },
+]);
+
+function promptSaveDestination() {
+    showSaveDestinationModal.value = true;
+}
+
+function chooseSaveDestination(action) {
+    showSaveDestinationModal.value = false;
+    if (action === 'agenda') router.visit(props.urls.schedules);
+    else if (action === 'list') router.visit(props.urls.list);
+    // 'continue' (ou Esc/fora/X): fica no prontuário — nada a fazer.
+}
+
+useEscapeToClose(
+    () => showSaveDestinationModal.value,
+    () => chooseSaveDestination('continue'),
+);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Ações da barra inferior ANTES do 1º save (create): receita/atestado/laudo
+// precisam do prontuário persistido (documentos são filhos do registro), mas
+// o médico não deve "salvar primeiro" na mão — o clique salva e o edit
+// reabre com a ação escolhida (?action=), sem passar pela Agenda.
+// ──────────────────────────────────────────────────────────────────────────
+const POST_SAVE_ACTIONS = {
+    medication: () => openMedicationPrescription(),
+    procedures: () => openProcedureSolicitation(),
+    pterygium: () => issueQuickAction('pterygium-prescription', {}, { preview: true }),
+    cataract: () => openCataractPrescription(),
+    test_eye: () => issueQuickAction('test-eye', {}, { preview: true }),
+    retinal_mapping: () => issueQuickAction('retinal-mapping', {}, { preview: true }),
+    attendance_certificate: () => openCertificate('attendance'),
+    medical_certificate: () => openCertificate('medical'),
+    companion_certificate: () => openCertificate('companion'),
+    visual_fitness_certificate: () => openCertificate('visual'),
+    medical_declaration: () => issueMedicalDeclaration(),
+    exam_hub: () => {
+        showExamHubModal.value = true;
+    },
+    documentations: () => openDocumentationsModal(),
+    upload: () => openUploadModal(),
+};
+
+function withRecord(actionKey) {
+    const run = POST_SAVE_ACTIONS[actionKey];
+    if (!run) return;
+
+    if (props.isEdit) {
+        run();
+        return;
+    }
+
+    form.post_save_action = actionKey;
+    submit('save');
+}
+
+// Edit reaberto após o 1º save com uma ação da barra pendente: o backend
+// devolve a chave via flash de sessão (props.flash.post_save_action) — one-shot,
+// não fica na URL (um link/F5 nunca reemite um documento).
+function runPostSaveAction() {
+    if (!props.isEdit || isLocked.value) return;
+    const key = usePage().props.flash?.post_save_action;
+    if (!key || !POST_SAVE_ACTIONS[key]) return;
+
+    nextTick(() => POST_SAVE_ACTIONS[key]());
+}
+
+// Guard de saída ("←") reaproveita o mesmo submit — Finalizar/Dilatar/Exame
+// salvam o que foi digitado antes de transitar (nunca perde texto).
+defineExpose({
+    submitFlow: (action) => submit(action),
+    saveAndLeave,
+    // "Revisar alergias e medicações" do alerta móvel da página.
+    openSafetyReview: () => {
+        showSafetyModal.value = true;
+    },
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Lens auto-format
+// ──────────────────────────────────────────────────────────────────────────
+async function formatLens(kind, field) {
+    if (!props.urls.lens_format) return;
+    const value = form[field];
+    if (value === '' || value == null) return;
+    // Só formata o que o médico digitou: passar pelo campo com o valor salvo
+    // (ex.: eixo "90" → "90º") não pode virar "alteração não salva".
+    if (value === savedSnapshot[field]) return;
+    try {
+        const res = await fetch(props.urls.lens_format, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrf(),
+                Accept: 'application/json',
+            },
+            body: JSON.stringify({ kind, value: String(value) }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.value === 'string') form[field] = data.value;
+    } catch (e) {
+        console.error('Lens format error:', e);
+    }
+}
+
+const LENS_ORDER = [
+    'dynamic_spherical_right',
+    'dynamic_cylindrical_right',
+    'dynamic_axis_right',
+    'dynamic_spherical_left',
+    'dynamic_cylindrical_left',
+    'dynamic_axis_left',
+    'static_spherical_right',
+    'static_cylindrical_right',
+    'static_axis_right',
+    'static_spherical_left',
+    'static_cylindrical_left',
+    'static_axis_left',
+];
+
+function focusNextLensField(currentName) {
+    const idx = LENS_ORDER.indexOf(currentName);
+    if (idx === -1 || idx + 1 >= LENS_ORDER.length) return;
+    const next = document.querySelector(`[name="${LENS_ORDER[idx + 1]}"]`);
+    if (next) {
+        next.focus();
+        if (typeof next.select === 'function') next.select();
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Tonometria
+// ──────────────────────────────────────────────────────────────────────────
+function stampTonometryTime(force = false) {
+    if (!force && (!form.tonometer_right || !form.tonometer_left)) return;
+    if (!tonometryStampedTime.value) {
+        tonometryStampedTime.value = new Date().toTimeString().slice(0, 5);
+    }
+    form.tonometer_time = tonometryStampedTime.value;
+}
+
+async function printTonometry() {
+    const doctorIdVal = form.doctor_id || '';
+    if (!doctorIdVal) {
+        alert(tt('doctor_required_for_print', 'Selecione o médico responsável antes de imprimir.'));
+        return;
+    }
+    if (!tonometryStampedTime.value) stampTonometryTime(true);
+    const time = (tonometryStampedTime.value || new Date().toTimeString().slice(0, 8)).slice(0, 5);
+
+    if (props.urls.store_tonometry) {
+        try {
+            const res = await fetch(props.urls.store_tonometry, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+                body: JSON.stringify({
+                    od: form.tonometer_right,
+                    oe: form.tonometer_left,
+                    time,
+                    doctor_id: doctorIdVal,
+                }),
+            });
+            if (res.ok) {
+                const doc = await res.json();
+                documentations.value.unshift(doc);
+                tonometryPdfSrc.value = doc.pdf_url;
+                showTonometryModal.value = true;
+                return;
+            }
+        } catch (e) {
+            console.error('Tonometry save error:', e);
+        }
+    }
+    const params = new URLSearchParams({
+        time,
+        od: form.tonometer_right ?? '',
+        oe: form.tonometer_left ?? '',
+        doctor_id: doctorIdVal,
+    });
+    tonometryPdfSrc.value = `${props.urls.tonometry_pdf}?${params.toString()}`;
+    showTonometryModal.value = true;
+}
+
+function closeTonometry() {
+    showTonometryModal.value = false;
+    tonometryPdfSrc.value = '';
+}
+
+useEscapeToClose(() => showTonometryModal.value, closeTonometry);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Presbiopia
+// ──────────────────────────────────────────────────────────────────────────
+function openPresbyopiaCalc() {
+    presbyopiaObsForm.content = form.observation_of_lenses ?? '';
+    showPresbyopiaObsModal.value = true;
+}
+
+async function confirmPresbyopiaCalc() {
+    form.observation_of_lenses = presbyopiaObsForm.content;
+    showPresbyopiaObsModal.value = false;
+    await calcPresbyopia();
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Lentes de contato (saiu do Gerenciador de exames): o modal devolve
+// entradas + resultados; grava junto com a consulta ao salvar. O resumo
+// mostra a potência de LC SUGERIDA por olho (v2); cálculo da versão 1 segue
+// no formato antigo, marcado como "versão anterior".
+// ──────────────────────────────────────────────────────────────────────────
+const { locale } = useLocaleFormat();
+const contactLensRows = computed(() => contactLensSummary(form.contact_lens_calculation, i18n.value, locale.value));
+const contactLensTitle = computed(() =>
+    isLegacyContactLens(form.contact_lens_calculation)
+        ? `${tt('contact_lens_title', 'Cálculo de lentes de contato')} (${tt('contact_lens_legacy', 'versão anterior')})`
+        : tt('contact_lens_title', 'Cálculo de lentes de contato'),
+);
+
+function applyContactLens(calculation) {
+    form.contact_lens_calculation = calculation;
+}
+
+function removeContactLens() {
+    form.contact_lens_calculation = null;
+}
+
+async function calcPresbyopia() {
+    if (!props.urls.calc_presbyopia) return;
+    try {
+        const res = await fetch(props.urls.calc_presbyopia, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({
+                dynamic_spherical_right: form.dynamic_spherical_right,
+                dynamic_spherical_left: form.dynamic_spherical_left,
+                addition: presbyopiaAddition.value,
+            }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        form.static_spherical_right = String(data.static_spherical_right ?? data.right ?? 0);
+        form.static_spherical_left = String(data.static_spherical_left ?? data.left ?? 0);
+    } catch (e) {
+        console.error('Presbyopia calc error:', e);
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// PDF preview
+// ──────────────────────────────────────────────────────────────────────────
+function openPdfPreview(url, title = '') {
+    if (!url) return;
+    pdfPreviewUrl.value = url;
+    pdfPreviewTitle.value = title;
+    showPdfPreview.value = true;
+}
+
+function closePdfPreview() {
+    showPdfPreview.value = false;
+    pdfPreviewUrl.value = '';
+    pdfPreviewTitle.value = '';
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Quick Action
+// ──────────────────────────────────────────────────────────────────────────
+function buildQuickActionUrl(action) {
+    return props.urls.quick_action_template?.replace('__ACTION__', action) ?? '';
+}
+
+async function issueQuickAction(
+    action,
+    payload = {},
+    { openPdf = true, preview = false, onValidationError = null } = {},
+) {
+    const url = buildQuickActionUrl(action);
+    if (!url || quickActionBusy.value) return;
+    const doctorIdVal = form.doctor_id || '';
+    if (!doctorIdVal) {
+        alert(tt('doctor_required_for_issue', 'Selecione o médico responsável antes de emitir.'));
+        return;
+    }
+    quickActionBusy.value = true;
+    try {
+        let body = { ...payload };
+        let res = await postQuickAction(url, body);
+        // Receita que bate com alergia ativa (Fase 2 / A4): o servidor manda
+        // os conflitos; seguir exige motivo — uma nova tentativa com ele.
+        if (res.status === 422) {
+            const err = await res.json().catch(() => ({}));
+            if (!Array.isArray(err.allergy_conflicts) || !err.allergy_conflicts.length) {
+                // Modais com campos (atestados, pedido) mostram o erro no campo.
+                if (onValidationError) onValidationError(err);
+                else alert(err.message ?? 'Não foi possível emitir o documento.');
+                return;
+            }
+            const reason = await askAllergyOverride(err.allergy_conflicts);
+            if (!reason) return;
+            body = { ...body, allergy_override_reason: joinReasons(body.allergy_override_reason, reason) };
+            res = await postQuickAction(url, body);
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            if (res.status === 422 && onValidationError) onValidationError(err);
+            else alert(err.message ?? 'Não foi possível emitir o documento.');
+            return;
+        }
+        const doc = await res.json();
+        documentations.value.unshift(doc);
+        if (preview && doc.pdf_url) openPdfPreview(doc.pdf_url, doc.title || '');
+        else if (openPdf && doc.pdf_url) window.open(doc.pdf_url, '_blank', 'noopener');
+        return doc;
+    } catch (e) {
+        console.error('Quick action error:', e);
+    } finally {
+        quickActionBusy.value = false;
+    }
+}
+
+function postQuickAction(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+        body: JSON.stringify(body),
+    });
+}
+
+function issueLensPrescription(mode) {
+    if (!['dynamic', 'static', 'presbyopia_dynamic', 'presbyopia'].includes(mode)) return;
+    return issueQuickAction('lens-prescription', { mode }, { preview: true });
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// F4 — Documentações / Exam Hub
+// ──────────────────────────────────────────────────────────────────────────
+function openDocumentationsModal() {
+    showDocumentationsModal.value = true;
+}
+
+// Envio/reenvio ao médico solicitante (laudo do Gerenciador de exames,
+// Fase 5) — usa sempre o e-mail já gravado na emissão (sem campo de correção
+// aqui, mesma regra de ExamManagerReportModal.vue). Esta lista é a ÚNICA tela
+// onde um laudo JÁ EMITIDO reaparece depois do modal de emissão fechar — e,
+// agora, é também onde o PRIMEIRO envio acontece: o laudo nasce num prontuário
+// ainda editável e só sai da clínica quando o prontuário é assinado
+// (imutável; achado via revisão adversarial Codex). Antes da assinatura o
+// botão fica desabilitado (o servidor recusa de qualquer jeito); depois,
+// "Reenviar" também renova o link de 7 dias (achado via revisão Codex).
+const resendingDocId = ref(null);
+
+function docSendTitle(doc) {
+    if (!isSigned.value) return tt('doc_send_locked_hint', 'Disponível depois que o prontuário for assinado.');
+
+    return doc.requesting_doctor_sent_at
+        ? tt('doc_resend_to_doctor', 'Reenviar ao médico solicitante')
+        : tt('doc_send_to_doctor', 'Enviar ao médico solicitante');
+}
+
+async function resendDocToRequestingDoctor(doc) {
+    if (!doc.requesting_doctor_email || !isSigned.value || resendingDocId.value === doc.id) return;
+    const firstSend = !doc.requesting_doctor_sent_at;
+    resendingDocId.value = doc.id;
+    try {
+        const { data } = await window.axios.post(route('panel.exam-manager.reports.resend', doc.id));
+        doc.requesting_doctor_sent_at = data.requesting_doctor_sent_at;
+        window.showSuccessToast?.(
+            firstSend
+                ? tt('doc_sent_ok', 'Laudo enviado ao médico solicitante.')
+                : tt('doc_resent', 'Laudo reenviado ao médico solicitante.'),
+        );
+    } catch (e) {
+        window.showErrorToast?.(
+            e?.response?.data?.message ?? tt('doc_resend_failed', 'Não foi possível reenviar o laudo.'),
+        );
+    } finally {
+        resendingDocId.value = null;
+    }
+}
+
+async function openNewDoc() {
+    resetDocForm();
+    await loadDocTemplates();
+    showDocModal.value = true;
+}
+
+/**
+ * Declaração médica em branco — placeholder {{CONTEUDO_LIVRE}} resolvido
+ * como vazio pelo service. Médico preenche manuscrito ou edita via PDF.
+ * Paridade com Alpine `issueMedicalDeclaration`.
+ */
+function issueMedicalDeclaration() {
+    return issueQuickAction('medical-declaration', { content: '' }, { preview: true });
+}
+
+function resetDocForm() {
+    docForm.report_setting_content_id = '';
+    docForm.title = '';
+    docForm.content = '';
+    docForm.exam_type = '';
+    docForm.exam_subtype = '';
+    docForm.exam_label = '';
+    docForm.document_date = '';
+    docForm.template_id = '';
+    docSelection.value = '';
+    docPreviewHtml = '';
+    docTemplateItems.value = [];
+}
+
+async function loadDocTemplates() {
+    if (!props.urls.templates) return;
+    try {
+        const res = await fetch(props.urls.templates, {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        if (res.ok) docTemplates.value = normalizeDocTemplates(await res.json());
+    } catch (e) {
+        console.error('Failed to load templates:', e);
+    }
+}
+
+// Seletor do editor: modelo da clínica OU modelo pessoal (`tpl:` — vem do
+// mesmo endpoint, grupo "Meus modelos"); o pessoal guarda o modelo-base.
+function onDocSelection() {
+    const value = docSelection.value;
+    const option = docTemplates.value.flatMap((g) => g.contents || []).find((c) => String(c.id) === String(value));
+    docForm.template_id = option?.personal ? option.template_id : '';
+    docForm.report_setting_content_id = option?.personal ? option.base_id : value;
+    if (option?.personal) docForm.title = option.label;
+    docTemplateItems.value = Array.isArray(option?.items) ? option.items : [];
+    previewTemplate();
+}
+
+watch(
+    () => docForm.document_date,
+    () => {
+        if (showDocModal.value && docForm.report_setting_content_id && !docForm.exam_type && !docContentEdited.value)
+            previewTemplate();
+    },
+);
+
+// Prontuário de origem + data do documento: o servidor devolve os dados do
+// paciente às variáveis antes de gravar o modelo pessoal (LGPD).
+const docTemplateContext = computed(() => ({
+    ...(props.medicalrecord?.id ? { medical_record_id: props.medicalrecord.id } : {}),
+    ...documentDatePayload(docForm.document_date, dateConfig.value.today),
+}));
+const recordTemplateContext = computed(() =>
+    props.medicalrecord?.id ? { medical_record_id: props.medicalrecord.id } : {},
+);
+
+function buildDocTemplate() {
+    if (!docForm.report_setting_content_id || !(docForm.content || '').trim()) return null;
+    return {
+        body: docForm.content,
+        report_setting_content_id: docForm.report_setting_content_id,
+        // Só leva os itens se o texto não foi editado depois da prévia —
+        // texto alterado não garante que ainda é aquele remédio; afirmar um
+        // vínculo errado com o catálogo seria pior que nenhum.
+        ...(!docContentEdited.value && docTemplateItems.value.length
+            ? { payload: { items: docTemplateItems.value } }
+            : {}),
+    };
+}
+
+// Só a última prévia vale: trocar de modelo/data com a anterior pendente
+// não deixa o texto do modelo antigo (ou de outra data) cair no editor.
+const previewReq = latestRequest();
+
+async function previewTemplate() {
+    if (!docForm.report_setting_content_id || !props.urls.template_preview) return;
+    const req = previewReq.begin();
+    try {
+        const res = await fetch(props.urls.template_preview, {
+            method: 'POST',
+            signal: req.signal,
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({
+                report_setting_content_id: docForm.report_setting_content_id,
+                ...(docForm.template_id ? { template_id: docForm.template_id } : {}),
+                ...documentDatePayload(docForm.document_date, dateConfig.value.today),
+            }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (!req.current()) return;
+            docForm.content = data.content ?? '';
+            docPreviewHtml = docForm.content;
+            const tpl = docTemplates.value
+                .flatMap((g) => g.contents || [])
+                .find((c) => c.id === docForm.report_setting_content_id);
+            if (tpl && !docForm.title) docForm.title = tpl.label;
+        }
+    } catch (e) {
+        if (!isAbortError(e)) console.error('Template preview error:', e);
+    }
+}
+
+async function saveDoc() {
+    if (docSaving.value) return;
+    if (docForm.exam_type) return saveExamReport();
+    if (!props.urls.store_doc) return;
+    docSaving.value = true;
+    try {
+        const { document_date: documentDate, template_id: templateId, ...fields } = docForm;
+        const send = (extra = {}) =>
+            fetch(props.urls.store_doc, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+                body: JSON.stringify({
+                    ...fields,
+                    ...documentDatePayload(documentDate, dateConfig.value.today),
+                    ...(templateId ? { template_id: templateId } : {}),
+                    ...extra,
+                }),
+            });
+        let res = await send();
+        // Modelo do tipo receita que bate com alergia ativa (Fase 2 / A4):
+        // seguir exige motivo — nova tentativa com ele.
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const conflicts = res.status === 422 && Array.isArray(err.allergy_conflicts) ? err.allergy_conflicts : [];
+            if (!conflicts.length) {
+                alert(err.message ?? 'Erro ao salvar documentação.');
+                return;
+            }
+            const reason = await askAllergyOverride(conflicts);
+            if (!reason) return;
+            res = await send({ allergy_override_reason: reason });
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.message ?? 'Erro ao salvar documentação.');
+            return;
+        }
+        const doc = await res.json();
+        documentations.value.unshift(doc);
+        showDocModal.value = false;
+        resetDocForm();
+    } catch (e) {
+        console.error('Save documentation error:', e);
+    } finally {
+        docSaving.value = false;
+    }
+}
+
+async function saveExamReport() {
+    const url = buildQuickActionUrl('exam-report');
+    if (!url) return;
+    docSaving.value = true;
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({
+                exam_type: docForm.exam_type,
+                subtype: docForm.exam_subtype || null,
+                content: docForm.content,
+                title: docForm.title,
+            }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.message ?? 'Erro ao emitir o laudo.');
+            return;
+        }
+        const doc = await res.json();
+        documentations.value.unshift(doc);
+        showDocModal.value = false;
+        resetDocForm();
+        if (doc.pdf_url) openPdfPreview(doc.pdf_url, doc.title || '');
+    } catch (e) {
+        console.error('Save exam report error:', e);
+    } finally {
+        docSaving.value = false;
+    }
+}
+
+async function openExamFromHub(examType, subtype = null) {
+    showExamHubModal.value = false;
+    await nextTick();
+    await openExam(examType, subtype);
+}
+
+async function openExam(examType, subtype = null) {
+    if (!examType || !props.urls.exam_template_template) return;
+    let url = props.urls.exam_template_template.replace('__EXAM__', encodeURIComponent(examType));
+    if (subtype) url += (url.includes('?') ? '&' : '?') + `subtype=${encodeURIComponent(subtype)}`;
+    try {
+        const res = await fetch(url, { headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() } });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.message ?? 'Não foi possível carregar o template do exame.');
+            return;
+        }
+        const data = await res.json();
+        resetDocForm();
+        docForm.exam_type = data.exam_type;
+        docForm.exam_subtype = data.subtype || '';
+        docForm.exam_label = data.label || '';
+        docForm.title = data.title || data.label || '';
+        docForm.content = data.html || '';
+        showDocModal.value = true;
+    } catch (e) {
+        console.error('Open exam template error:', e);
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// F5 — Medicamentos
+// ──────────────────────────────────────────────────────────────────────────
+function openMedicationPrescription() {
+    showMedicationModal.value = true;
+    selectedMed.value = null;
+    posologyDraft.value = '';
+    medTab.value = 'search';
+    medDocumentDate.value = '';
+    loadMedPresets();
+}
+
+// Modelo pessoal do receituário (Fase 2 / B3): texto + itens estruturados
+// (a checagem de alergia volta a valer sobre eles).
+function buildMedicationTemplate() {
+    const body = (medicineLists.value || '').trim();
+    if (!body) return null;
+    return {
+        body,
+        payload: {
+            items: prescription.value.map((item) => ({
+                medicine_id: item.id ?? null,
+                name: item.name ?? null,
+                active_ingredient: item.active_ingredient ?? null,
+            })),
+        },
+    };
+}
+
+function applyMedicationTemplate(template) {
+    medicineLists.value = template.body ?? '';
+    prescription.value = (template.payload?.items ?? []).map((item) => ({
+        id: item.medicine_id ?? null,
+        name: item.name,
+        active_ingredient: item.active_ingredient ?? null,
+    }));
+    acknowledgedAllergies.value = new Map();
+    cancelSelection();
+}
+
+async function loadMedPresets() {
+    if (!props.urls.medication_presets) return;
+    try {
+        const res = await fetch(props.urls.medication_presets, { headers: { Accept: 'application/json' } });
+        if (res.ok) medPresets.value = await res.json();
+    } catch {
+        /**/
+    }
+}
+
+// Posologia genérica da base (sugestão default quando o médico não tem a dele)
+function genericPosology(item) {
+    const usage =
+        [item.dosage, item.frequency].filter(Boolean).join(' ') + (item.duration ? ` por ${item.duration}` : '');
+    const lines = [];
+    if (usage.trim()) lines.push(usage.trim());
+    if (item.instructions) lines.push(`Obs: ${item.instructions}`);
+    return lines.join('\n');
+}
+
+// Fluxo: buscar/aba → SELECIONAR → sugerir posologia (editável) → confirmar.
+// Nada entra na receita sem passar pelo draft editável.
+function selectMedicine(item) {
+    if (!item?.id) return;
+    selectedMed.value = item;
+    posologyDraft.value = item.my_posology || genericPosology(item);
+    posologySavedFlash.value = false;
+    medSearchOpen.value = false;
+    selectedOverrideReason.value = '';
+}
+
+function cancelSelection() {
+    selectedMed.value = null;
+    posologyDraft.value = '';
+    selectedOverrideReason.value = '';
+}
+
+async function confirmAddMedicine() {
+    const item = selectedMed.value;
+    if (!item) return;
+    if (prescription.value.length >= maxMedicines) return;
+    // Alergia: só entra com motivo (fica registrado na emissão).
+    if (selectedNeedsReason.value) return;
+    for (const c of selectedConflicts.value) {
+        if (!acknowledgedAllergies.value.has(c.allergy_id))
+            acknowledgedAllergies.value.set(c.allergy_id, selectedOverrideReason.value.trim());
+    }
+    if (prescription.value.some((m) => m.id === item.id)) {
+        cancelSelection();
+        return;
+    }
+
+    if (props.urls.medication_format) {
+        try {
+            const res = await fetch(props.urls.medication_format, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+                body: JSON.stringify({ medicine_id: item.id, posology: posologyDraft.value }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                medicineLists.value += data.line ?? '';
+            }
+        } catch (e) {
+            console.error('Format line error:', e);
+        }
+    }
+
+    prescription.value.push(item);
+    medSearchQuery.value = '';
+    medSearchResults.value = [];
+    cancelSelection();
+
+    // Contadores das abas Recentes/Favoritos — falha não bloqueia a receita.
+    if (props.urls.medication_presets_use) {
+        fetch(props.urls.medication_presets_use, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({ medicine_id: item.id }),
+        })
+            .then(() => loadMedPresets())
+            .catch(() => {});
+    }
+}
+
+async function saveMyPosology() {
+    const item = selectedMed.value;
+    if (!item || !props.urls.medication_presets_posology) return;
+    posologySaving.value = true;
+    try {
+        const res = await fetch(props.urls.medication_presets_posology, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({ medicine_id: item.id, posology: posologyDraft.value }),
+        });
+        if (res.ok) {
+            item.my_posology = posologyDraft.value.trim() || null;
+            posologySavedFlash.value = true;
+            setTimeout(() => {
+                posologySavedFlash.value = false;
+            }, 2500);
+            loadMedPresets();
+        }
+    } finally {
+        posologySaving.value = false;
+    }
+}
+
+async function toggleMedFavorite(item) {
+    if (!item?.id || !props.urls.medication_presets_favorite) return;
+    const target = !item.is_favorite;
+    item.is_favorite = target; // otimista
+    try {
+        await fetch(props.urls.medication_presets_favorite, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({ medicine_id: item.id, favorite: target }),
+        });
+        loadMedPresets();
+    } catch {
+        item.is_favorite = !target;
+    }
+}
+
+// Catálogo global (~20 mil apresentações CMED/Anvisa): espera o médico
+// parar de digitar e cancela a busca anterior — resposta atrasada de "pr"
+// nunca sobrescreve a de "pred".
+let medSearchTimer = null;
+let medSearchAbort = null;
+
+function searchMedicines() {
+    clearTimeout(medSearchTimer);
+    medSearchTimer = setTimeout(runMedicineSearch, 250);
+}
+
+async function runMedicineSearch() {
+    const q = (medSearchQuery.value || '').trim();
+    medSearchAbort?.abort();
+    if (q.length < 2 || !props.urls.medicine_search) {
+        medSearchResults.value = [];
+        medSearchOpen.value = false;
+        medSearchLoading.value = false;
+        return;
+    }
+    medSearchLoading.value = true;
+    const controller = new AbortController();
+    medSearchAbort = controller;
+    try {
+        const res = await fetch(`${props.urls.medicine_search}?q=${encodeURIComponent(q)}`, {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+            signal: controller.signal,
+        });
+        if (!res.ok) {
+            medSearchResults.value = [];
+            medSearchOpen.value = false;
+            return;
+        }
+        medSearchResults.value = await res.json();
+        medSearchOpen.value = medSearchResults.value.length > 0;
+    } catch (e) {
+        if (e?.name === 'AbortError') return;
+        console.error('Medicine search error:', e);
+        medSearchResults.value = [];
+        medSearchOpen.value = false;
+    } finally {
+        if (medSearchAbort === controller) medSearchLoading.value = false;
+    }
+}
+
+onBeforeUnmount(() => {
+    clearTimeout(medSearchTimer);
+    medSearchAbort?.abort();
+});
+
+// Linha secundária do resultado: genérico · apresentação · laboratório ·
+// tipo (genérico/similar/novo) — diferencia apresentações do mesmo nome.
+function medicineDetail(item) {
+    return [item.active_ingredient, item.presentation_detail, item.laboratory, item.category]
+        .filter(Boolean)
+        .join(' · ');
+}
+
+function removeMedicine(idx) {
+    if (idx >= 0 && idx < prescription.value.length) prescription.value.splice(idx, 1);
+}
+
+function clearMedicines() {
+    medTemplateId.value = '';
+    prescription.value = [];
+    acknowledgedAllergies.value = new Map();
+    medicineLists.value = '';
+    medSearchQuery.value = '';
+    medSearchResults.value = [];
+    medSearchOpen.value = false;
+    cancelSelection();
+}
+
+async function submitMedicationPrescription() {
+    const content = (medicineLists.value || '').trim();
+    if (!content) return;
+
+    // Texto pode ter sido editado depois de aplicar o modelo/escolher o item
+    // (tirou ou trocou um remédio) — reconcilia antes de checar e enviar,
+    // senão o item removido continuava pedindo motivo aqui E sendo recusado
+    // de novo pelo servidor (14ª revisão Codex, P2).
+    const reconciled = reconcileItems(prescription.value, content, allergyCheck.value?.stopwords ?? []);
+
+    // Itens estruturados (catálogo/nome livre) vão junto: o servidor refaz a
+    // checagem de alergia pelo princípio ativo E pelo texto (Fase 2 / A4).
+    const items = reconciled.map((item) => ({
+        medicine_id: item.id ?? null,
+        name: item.name ?? null,
+        active_ingredient: item.active_ingredient ?? null,
+    }));
+
+    // Alergia que aparece só no texto livre (ou ainda sem motivo): pergunta antes.
+    const conflicts = [
+        ...reconciled.flatMap((item) => itemConflicts(item, allergyCheck.value)),
+        ...textConflicts(content, allergyCheck.value),
+    ];
+    const pending = conflicts.filter((c) => !acknowledgedAllergies.value.has(c.allergy_id));
+    if (pending.length) {
+        const reason = await askAllergyOverride(pending);
+        if (!reason) return;
+        pending.forEach((c) => acknowledgedAllergies.value.set(c.allergy_id, reason));
+    }
+
+    const reason = joinReasons([...acknowledgedAllergies.value.values()]);
+    // Data alternativa e modelo usado seguem também no reenvio com motivo.
+    const payload = {
+        content,
+        items,
+        ...(reason ? { allergy_override_reason: reason } : {}),
+        ...documentDatePayload(medDocumentDate.value, dateConfig.value.today),
+        ...(medTemplateId.value ? { template_id: medTemplateId.value } : {}),
+    };
+
+    showMedicationModal.value = false;
+    // Emitida: deixa de ser rascunho (o texto fica no modal pra reemitir).
+    if (await issueQuickAction('medication-prescription', payload, { preview: true })) {
+        issuedDrafts.medication = content;
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// F6 — Pedido de exames (Fase 2 / B2): kits por convênio, itens do catálogo
+// ou avulsos, caráter, indicação, CIDs e data — ProcedureRequestModal.
+// ──────────────────────────────────────────────────────────────────────────
+function openProcedureSolicitation() {
+    procedureRequest.errors = {};
+    procedureRequest.open = true;
+}
+
+async function submitProcedureRequest(payload) {
+    procedureRequest.busy = true;
+    procedureRequest.errors = {};
+    try {
+        const doc = await issueQuickAction('procedure-request', payload, {
+            preview: true,
+            onValidationError: (err) => {
+                procedureRequest.errors = err.errors ?? { items: [err.message ?? ''] };
+            },
+        });
+        if (doc) {
+            procedureModal.value?.markIssued();
+            procedureRequest.open = false;
+        }
+    } finally {
+        procedureRequest.busy = false;
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// F7 — Atestados (Fase 2 / B1): comparecimento (horário/período,
+// dilatação), médico (CID só com autorização), acompanhante e aptidão
+// visual (AV do prontuário salvo) — CertificateModal.
+// ──────────────────────────────────────────────────────────────────────────
+const CERTIFICATE_ACTIONS = {
+    attendance: 'attendance-certificate',
+    medical: 'medical-certificate',
+    companion: 'companion-certificate',
+    visual: 'visual-fitness-certificate',
+};
+
+function openCertificate(kind) {
+    certificate.kind = kind;
+    certificate.errors = {};
+    certificate.acuityUnsaved = kind === 'visual' && isAcuityUnsaved();
+    certificate.open = true;
+}
+
+async function submitCertificate(payload) {
+    certificate.busy = true;
+    certificate.errors = {};
+    try {
+        const doc = await issueQuickAction(CERTIFICATE_ACTIONS[certificate.kind], payload, {
+            preview: true,
+            onValidationError: (err) => {
+                certificate.errors = err.errors ?? { document_date: [err.message ?? ''] };
+            },
+        });
+        if (doc) certificate.open = false;
+    } finally {
+        certificate.busy = false;
+    }
+}
+
+// Aptidão visual: a AV que vai no atestado é a SALVA no prontuário (o
+// servidor lê de lá) — a tela mostra a do formulário e avisa se mudou.
+const ACUITY_FIELDS = {
+    without: ['visual_acuity_without_correction_right_id', 'visual_acuity_without_correction_left_id'],
+    with: ['visual_acuity_with_correction_right_id', 'visual_acuity_with_correction_left_id'],
+};
+const acuityName = (id) => visualAcuityTypes.value.find((v) => String(v.id) === String(id))?.name ?? '';
+const acuityLabels = computed(() => ({
+    without: { right: acuityName(form[ACUITY_FIELDS.without[0]]), left: acuityName(form[ACUITY_FIELDS.without[1]]) },
+    with: { right: acuityName(form[ACUITY_FIELDS.with[0]]), left: acuityName(form[ACUITY_FIELDS.with[1]]) },
+}));
+// savedSnapshot não é reativo: medido ao abrir o modal (o form fica atrás dele).
+const isAcuityUnsaved = () =>
+    [...ACUITY_FIELDS.without, ...ACUITY_FIELDS.with].some((f) => (form[f] || '') !== (savedSnapshot[f] || ''));
+
+// ──────────────────────────────────────────────────────────────────────────
+// F8 — Catarata
+// ──────────────────────────────────────────────────────────────────────────
+function openCataractPrescription() {
+    cataractForm.eye = 'right';
+    cataractForm.template = 'pre_operatorio';
+    cataractForm.date_surgery = '';
+    cataractForm.hour_surgery = '';
+    cataractForm.document_date = '';
+    showCataractModal.value = true;
+}
+
+function formatCataractDate(event) {
+    const digits = (event.target.value || '').replace(/\D/g, '').slice(0, 8);
+    let formatted = digits;
+    if (digits.length > 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    else if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    cataractForm.date_surgery = formatted;
+}
+
+function submitCataractPrescription() {
+    if (!cataractForm.eye) return;
+    const payload = {
+        eye: cataractForm.eye,
+        template: cataractForm.template || 'pre_operatorio',
+        date_surgery: (cataractForm.date_surgery || '').trim(),
+        hour_surgery: (cataractForm.hour_surgery || '').trim(),
+        ...documentDatePayload(cataractForm.document_date, dateConfig.value.today),
+    };
+    showCataractModal.value = false;
+    issueQuickAction('cataract-prescription', payload, { preview: true });
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// CID-10 picker
+// ──────────────────────────────────────────────────────────────────────────
+async function searchCid10() {
+    const q = (cidQuery.value || '').trim();
+    if (q.length < 2 || !props.urls.cid10_search) {
+        cidResults.value = [];
+        cidOpen.value = false;
+        return;
+    }
+    cidSearching.value = true;
+    try {
+        const res = await fetch(`${props.urls.cid10_search}?q=${encodeURIComponent(q)}`, {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        if (!res.ok) {
+            cidResults.value = [];
+            cidOpen.value = false;
+            return;
+        }
+        const list = await res.json();
+        cidResults.value = list.filter((c) => !selectedCids.value.some((s) => s.code === c.code));
+        cidOpen.value = cidResults.value.length > 0;
+        cidActiveIndex.value = -1;
+    } catch (e) {
+        console.error('CID-10 search error:', e);
+    } finally {
+        cidSearching.value = false;
+    }
+}
+
+function selectCid(item) {
+    if (!selectedCids.value.some((s) => s.code === item.code)) {
+        selectedCids.value.push({ code: item.code, description: item.description });
+    }
+    cidQuery.value = '';
+    cidResults.value = [];
+    cidOpen.value = false;
+}
+
+function removeCid(code) {
+    selectedCids.value = selectedCids.value.filter((s) => s.code !== code);
+}
+
+function selectActiveCid() {
+    if (cidActiveIndex.value >= 0 && cidActiveIndex.value < cidResults.value.length) {
+        selectCid(cidResults.value[cidActiveIndex.value]);
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Anexos — delegados ao MedicalRecordFileUploadModal
+// ──────────────────────────────────────────────────────────────────────────
+function openUploadModal() {
+    if (!props.isEdit || !props.urls.store_file) return;
+    showUploadModal.value = true;
+}
+
+function onFileUploaded(file) {
+    // Empilha cada arquivo retornado pelo backend conforme conclui o upload.
+    if (file?.id && !uploadedFiles.value.some((f) => f.id === file.id)) {
+        uploadedFiles.value.push(file);
+    }
+}
+
+function onStorageUpdated(state) {
+    storageState.value = { ...storageState.value, ...state };
+}
+
+const serializedCids = computed(() => JSON.stringify(selectedCids.value));
+</script>
+
+<template>
+    <form class="pmr-form" enctype="multipart/form-data" novalidate @submit.prevent="submit">
+        <!-- Assistente de IA -->
+        <div v-if="aiEnabled" class="d-flex justify-content-end align-items-center gap-2 px-3 pt-2">
+            <button
+                type="button"
+                class="btn btn-sm btn-info text-white d-inline-flex align-items-center gap-1"
+                @click="openAiPanel"
+            >
+                <i class="ti ti-robot"></i>{{ ai?.assistant?.title ?? 'Assistente de IA' }}
+            </button>
+        </div>
+
+        <AiAssistantPanel
+            v-if="aiEnabled"
+            :open="aiPanelOpen"
+            :ai="ai"
+            :context="aiContext"
+            @close="aiPanelOpen = false"
+            @inserted="applyAiSuggestion"
+            @approved="onAiApproved"
+        />
+
+        <!-- Segurança clínica (Fase 2): alergias + alertas de risco das
+             medicações em uso, sempre visível no topo do atendimento. -->
+        <div
+            v-if="safety.summary"
+            class="px-3 pt-2"
+            :class="{ 'd-none d-lg-block': safetyStore }"
+            data-testid="pmr-safety-header"
+        >
+            <ClinicalAlertBanner :summary="safety.summary" :reviewable="isDoctor" @review="showSafetyModal = true" />
+        </div>
+
+        <!-- F9 erros client -->
+        <div v-if="hasClientErrors" class="alert alert-danger m-3 mb-0" role="alert">
+            <h6 class="alert-heading mb-1">
+                <i class="fas fa-exclamation-triangle me-1"></i>{{ tt('client_errors_title', 'Erros de validação') }}
+            </h6>
+            <ul class="mb-0 small ps-3">
+                <template v-for="(msgs, field) in clientErrors" :key="field">
+                    <li v-for="(m, i) in msgs" :key="`${field}-${i}`">{{ m }}</li>
+                </template>
+            </ul>
+        </div>
+
+        <!-- Erros Inertia (server) -->
+        <div v-if="Object.keys(form.errors).length" class="alert alert-danger m-3 mb-0" role="alert">
+            <h6 class="alert-heading mb-1">
+                <i class="fas fa-exclamation-triangle me-1"></i>{{ tt('server_errors_title', 'Erros do servidor') }}
+            </h6>
+            <ul class="mb-0 small ps-3">
+                <li v-for="(msg, field) in form.errors" :key="field">{{ msg }}</li>
+            </ul>
+        </div>
+
+        <!-- Banner info CREATE -->
+        <div v-if="!isEdit" class="alert alert-info d-flex align-items-start gap-2 m-3 mb-0" role="alert">
+            <i class="fas fa-info-circle mt-1 flex-shrink-0"></i>
+            <span class="small">
+                {{ tt('create_hint_before', 'Preencha pelo menos a') }}
+                <strong>{{ tt('complaint', 'Queixa principal') }}</strong>
+                {{ tt('create_hint_middle', 'e clique em') }}
+                <strong>{{ tt('flow_save', 'Salvar') }}</strong>
+                {{ tt('create_hint_after', 'para começar a editar o prontuário.') }}
+            </span>
+        </div>
+
+        <!-- Autosave: rascunho não salvo mais novo que o prontuário -->
+        <div
+            v-if="draftOffer"
+            class="alert alert-warning d-flex flex-wrap align-items-center gap-2 m-3 mb-0"
+            role="alert"
+            data-testid="pmr-draft-offer"
+        >
+            <i class="fas fa-file-pen flex-shrink-0" aria-hidden="true"></i>
+            <div class="flex-grow-1 small">
+                <strong class="d-block">{{ tt('draft_found_title', 'Rascunho não salvo') }}</strong>
+                {{
+                    tt(
+                        'draft_found_text',
+                        'Há um rascunho deste atendimento de :date, mais recente que o prontuário salvo.',
+                    ).replace(':date', draftOffer.updated_at_label ?? '')
+                }}
+            </div>
+            <div class="d-flex gap-2">
+                <button
+                    type="button"
+                    class="btn btn-sm btn-warning"
+                    :disabled="draftBusy"
+                    data-testid="pmr-draft-recover"
+                    @click="recoverDraft"
+                >
+                    <i class="fas fa-rotate-left me-1" aria-hidden="true"></i
+                    >{{ tt('draft_recover', 'Recuperar rascunho') }}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    :disabled="draftBusy"
+                    data-testid="pmr-draft-discard"
+                    @click="discardDraft"
+                >
+                    {{ tt('draft_discard', 'Descartar') }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Médico (select se admin ou sem currentDoctor) -->
+        <input v-if="!canChooseDoctor && currentDoctorId" type="hidden" name="doctor_id" :value="form.doctor_id" />
+        <div v-else class="pmr-section px-3 pt-2">
+            <div class="row g-2">
+                <div class="col-12 col-md-4 col-lg-3">
+                    <label class="pmr-label">{{ tt('doctor', 'Médico') }}</label>
+                    <SearchSelect
+                        v-model="form.doctor_id"
+                        :options="doctors"
+                        :placeholder="tt('select', 'Selecione')"
+                        :invalid="Boolean(form.errors.doctor_id)"
+                        :disabled="isLocked"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Modelo de prontuário (padrão / meu modelo / texto livre) — só médico -->
+        <div v-if="isDoctor" class="px-3 pt-2 d-flex align-items-center gap-2 flex-wrap pmr-mode-bar">
+            <div class="btn-group btn-group-sm" role="group">
+                <button
+                    type="button"
+                    class="btn"
+                    :class="recordMode === 'default' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="recordMode = 'default'"
+                >
+                    <i class="fas fa-eye me-1"></i>{{ tt('mode_default', 'Padrão EasyEye') }}
+                </button>
+                <button
+                    type="button"
+                    class="btn"
+                    :class="recordMode === 'custom' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="recordMode = 'custom'"
+                >
+                    <i class="fas fa-user-pen me-1"></i>{{ tt('mode_custom', 'Meu prontuário') }}
+                </button>
+                <button
+                    type="button"
+                    class="btn"
+                    :class="recordMode === 'free' ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="recordMode = 'free'"
+                >
+                    <i class="fas fa-align-left me-1"></i>{{ tt('mode_free', 'Texto livre') }}
+                </button>
+            </div>
+
+            <button
+                v-if="isCustomMode"
+                type="button"
+                class="btn btn-outline-primary btn-sm"
+                @click="showLayoutModal = true"
+            >
+                <i class="fas fa-sliders me-1"></i>{{ tt('customize', 'Personalizar') }}
+            </button>
+
+            <button
+                type="button"
+                class="btn btn-link btn-sm p-0 text-decoration-none"
+                :disabled="isCurrentModeDefault || layoutSaving"
+                :title="tt('default_mode_hint', 'Novos atendimentos abrirão neste formato')"
+                @click="saveDefaultMode"
+            >
+                <i :class="isCurrentModeDefault ? 'fas fa-star text-warning' : 'far fa-star'" class="me-1"></i>
+                {{
+                    isCurrentModeDefault
+                        ? tt('is_default_mode', 'Seu padrão')
+                        : tt('set_default_mode', 'Definir como meu padrão')
+                }}
+            </button>
+
+            <span v-if="layoutSavedFlash" class="badge bg-success-subtle text-success">{{ layoutSavedFlash }}</span>
+        </div>
+
+        <!-- Queixa + Switches clínicos — some no TEXTO LIVRE (ticket
+             "simplificar texto livre": só a caixa; queixa vira opcional no
+             backend quando a evolução livre está preenchida). v-show, não
+             v-if: valores preenchidos continuam no submit. -->
+        <div v-show="!isFreeMode" class="pmr-section pmr-top-strip px-3 pt-2 pb-0 bg-white">
+            <div class="row g-2 align-items-start">
+                <div class="col-12 col-xl-8">
+                    <label class="pmr-label">{{ tt('complaint', 'Queixa principal') }}</label>
+                    <textarea
+                        v-model="form.main_complaint"
+                        name="main_complaint"
+                        rows="4"
+                        class="form-control form-control-sm"
+                        :class="{ 'is-invalid': form.errors.main_complaint }"
+                        :placeholder="tt('complaint_ph', 'Descreva a queixa principal...')"
+                        :disabled="isLocked"
+                    ></textarea>
+                </div>
+
+                <div class="col-12 col-xl-4 pmr-risk-wrap">
+                    <!--
+                        Título sem legenda: cores continuam Vermelho (danger, paciente TEM)
+                        e Amarelo (warning, histórico familiar), mas a identificação
+                        já aparece nos próprios switches (labels "Próprio"/"Familiar"),
+                        então a legenda ao lado do título ficava redundante.
+                    -->
+                    <div class="d-flex align-items-baseline flex-wrap gap-2 mb-1">
+                        <label class="pmr-label mb-0">{{ tt('clinical_history', 'Antecedentes clínicos') }}</label>
+                    </div>
+
+                    <div class="row g-1 pmr-risk-grid">
+                        <template v-for="flag in ['diabetic', 'hypertensive', 'glaucomatous']" :key="flag">
+                            <div class="col-4 pmr-risk-item">
+                                <label class="pmr-label text-center d-block pmr-risk-title">
+                                    {{ tt(flag, flag.charAt(0).toUpperCase() + flag.slice(1)) }}
+                                </label>
+
+                                <div class="pmr-risk-switches">
+                                    <!-- Próprio: vermelho quando ativo (paciente tem a condição) -->
+                                    <div
+                                        class="form-check form-switch pmr-risk-switch pmr-risk-self mb-0"
+                                        :class="{ 'pmr-risk-switch--on': form[flag] }"
+                                    >
+                                        <input
+                                            :id="`risk-${flag}-self`"
+                                            v-model="form[flag]"
+                                            type="checkbox"
+                                            class="form-check-input"
+                                            role="switch"
+                                            :name="flag"
+                                            :value="1"
+                                            :disabled="isLocked"
+                                        />
+                                        <label
+                                            class="form-check-label pmr-risk-switch-label"
+                                            :for="`risk-${flag}-self`"
+                                        >
+                                            {{ tt('self', 'Próprio') }}
+                                        </label>
+                                    </div>
+
+                                    <!-- Familiar: amarelo quando ativo (histórico hereditário) -->
+                                    <div
+                                        class="form-check form-switch pmr-risk-switch pmr-risk-family mb-0"
+                                        :class="{ 'pmr-risk-switch--on': form[`${flag}_family`] }"
+                                    >
+                                        <input
+                                            :id="`risk-${flag}-family`"
+                                            v-model="form[`${flag}_family`]"
+                                            type="checkbox"
+                                            class="form-check-input"
+                                            role="switch"
+                                            :name="`${flag}_family`"
+                                            :value="1"
+                                            :disabled="isLocked"
+                                        />
+                                        <label
+                                            class="form-check-label pmr-risk-switch-label"
+                                            :for="`risk-${flag}-family`"
+                                        >
+                                            {{ tt('family', 'Familiar') }}
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Botão "+ Outros" aparece apenas sob o glaucomatous (último flag) -->
+                                <div v-if="flag === 'glaucomatous'" class="text-center mt-1">
+                                    <button
+                                        type="button"
+                                        class="btn btn-link p-0 pmr-toggle-label text-decoration-none"
+                                        style="font-size: 0.68rem"
+                                        @click="showOthersHistory = !showOthersHistory"
+                                    >
+                                        <i v-if="!showOthersHistory" class="fas fa-plus-circle fa-xs me-1"></i>
+                                        <i v-else class="fas fa-minus-circle fa-xs me-1"></i>
+                                        {{ tt('others', 'Outros') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <div v-show="showOthersHistory" class="row g-2 mt-1">
+                <div class="col-12">
+                    <input
+                        ref="othersHistoryInput"
+                        v-model="form.others_history"
+                        type="text"
+                        name="others_history"
+                        class="form-control form-control-sm"
+                        :placeholder="tt('others_history_ph', 'Outros antecedentes clínicos')"
+                        :disabled="isLocked"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Modo texto livre: uma área única de evolução, gravada no campo
+             ESTRUTURADO observation_general do prontuário (integridade: dado
+             continua no lugar certo independente do modelo usado). v-show nas
+             colunas (não v-if): campos preenchidos continuam no submit. -->
+        <div v-if="isFreeMode" class="px-3 pt-1 pb-2">
+            <label class="pmr-label">{{ tt('free_text_label', 'Evolução / atendimento (texto livre)') }}</label>
+            <textarea
+                v-model="form.observation_general"
+                rows="16"
+                class="form-control form-control-sm"
+                :placeholder="tt('free_text_ph', 'Descreva livremente o atendimento...')"
+                :disabled="isLocked"
+            ></textarea>
+            <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                <!-- Modelo pessoal: salva o texto atual como esqueleto pros
+                     próximos atendimentos (ex.: HDA:/AP:/AV:/BIO:/FO:/HD:/CD:) -->
+                <button
+                    type="button"
+                    class="btn btn-link btn-sm p-0 text-decoration-none"
+                    :disabled="freeTemplateSaving || isLocked || !(form.observation_general || '').trim()"
+                    @click="saveFreeTextTemplate"
+                >
+                    <i class="fas fa-bookmark me-1"></i
+                    >{{ tt('free_template_save', 'Salvar como meu modelo de texto livre') }}
+                </button>
+                <button
+                    v-if="freeTextTemplate"
+                    type="button"
+                    class="btn btn-link btn-sm p-0 text-decoration-none"
+                    :disabled="isLocked"
+                    @click="applyFreeTextTemplate"
+                >
+                    <i class="fas fa-file-import me-1"></i>{{ tt('free_template_apply', 'Usar meu modelo') }}
+                </button>
+                <span v-if="freeTemplateSavedFlash" class="badge bg-success-subtle text-success">{{
+                    tt('free_template_saved', 'Modelo salvo!')
+                }}</span>
+                <small class="text-muted ms-auto">
+                    <i class="fas fa-database me-1"></i
+                    >{{
+                        tt(
+                            'free_text_hint',
+                            'Gravado no campo "Observações" do prontuário — os dados continuam estruturados no histórico do paciente.',
+                        )
+                    }}
+                </small>
+            </div>
+        </div>
+
+        <!-- Duas colunas principais -->
+        <div v-show="!isFreeMode" class="row g-2 px-3 pt-1 pb-1 pmr-main-columns">
+            <!-- COLUNA ESQUERDA -->
+            <div class="col-12 col-xl-6 pe-xl-2">
+                <div class="pmr-main-panel pmr-main-panel--flow">
+                    <!-- Vis. cromática / PPC / Cover test -->
+                    <div class="pmr-section mb-1" :style="sectionStyle('cromatica_ppc_cover')">
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <label class="pmr-label">{{ tt('chromatic_vision', 'Vis. cromática') }}</label>
+                                <SearchSelect
+                                    v-model="form.color_vision_type_id"
+                                    :options="colorVisionTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="col-4">
+                                <label class="pmr-label">{{ tt('near_point', 'PPC') }}</label>
+                                <SearchSelect
+                                    v-model="form.near_point_convergence_id"
+                                    :options="nearPointTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="col-4">
+                                <label class="pmr-label">{{ tt('cover_test', 'Cover test') }}</label>
+                                <SearchSelect
+                                    v-model="form.cover_test_type_id"
+                                    :options="coverTestTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Acuidade visual e tonometria em blocos "inline": dividem a
+                         linha quando cabem (A/V sem | A/V com | Tonometria) e o que
+                         sobra sozinho numa linha ocupa a largura toda — sem vão em
+                         branco no meio. Só posição; os campos são os de sempre. -->
+                    <div
+                        class="pmr-section pmr-section--inline mb-1"
+                        :style="sectionStyle('av_sem_tono')"
+                        data-section="av_sem_tono"
+                    >
+                        <label class="pmr-label">{{ tt('av_without', 'A/V sem correção') }}</label>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
+                                <span class="input-group-text pmr-eye-badge">OD</span>
+                                <AcuitySelect
+                                    v-model="form.visual_acuity_without_correction_right_id"
+                                    :options="visualAcuityTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
+                                <span class="input-group-text pmr-eye-badge">OE</span>
+                                <AcuitySelect
+                                    v-model="form.visual_acuity_without_correction_left_id"
+                                    :options="visualAcuityTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="pmr-section pmr-section--inline mb-1"
+                        :style="sectionStyle('av_com')"
+                        data-section="av_com"
+                    >
+                        <label class="pmr-label">{{ tt('av_with', 'A/V com correção') }}</label>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
+                                <span class="input-group-text pmr-eye-badge">OD</span>
+                                <AcuitySelect
+                                    v-model="form.visual_acuity_with_correction_right_id"
+                                    :options="visualAcuityTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
+                                <span class="input-group-text pmr-eye-badge">OE</span>
+                                <AcuitySelect
+                                    v-model="form.visual_acuity_with_correction_left_id"
+                                    :options="visualAcuityTypes"
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="pmr-section pmr-section--inline pmr-section--tonometry mb-1"
+                        :style="sectionStyle('tonometria')"
+                        data-section="tonometria"
+                    >
+                        <label class="pmr-label">{{ tt('tonometry', 'Tonometria') }}</label>
+                        <div class="d-flex gap-1 align-items-center flex-wrap">
+                            <div class="input-group input-group-sm flex-nowrap pmr-tono-eye">
+                                <span class="input-group-text pmr-eye-badge">OD</span>
+                                <input
+                                    v-model="form.tonometer_right"
+                                    type="number"
+                                    name="tonometer_right"
+                                    step="0.5"
+                                    min="0"
+                                    class="form-control form-control-sm text-center"
+                                    placeholder="00"
+                                    :disabled="isLocked"
+                                    style="min-width: 0"
+                                    @click="$event.target.select()"
+                                />
+                            </div>
+                            <div class="input-group input-group-sm flex-nowrap pmr-tono-eye">
+                                <span class="input-group-text pmr-eye-badge">OE</span>
+                                <input
+                                    v-model="form.tonometer_left"
+                                    type="number"
+                                    name="tonometer_left"
+                                    step="0.5"
+                                    min="0"
+                                    class="form-control form-control-sm text-center"
+                                    placeholder="00"
+                                    :disabled="isLocked"
+                                    style="min-width: 0"
+                                    @click="$event.target.select()"
+                                />
+                            </div>
+                            <!-- Hora + impressão quebram juntas: estreito, fica OD/OE
+                                 numa linha e hora/impressão na de baixo. Os campos
+                                 crescem até ocupar a largura do bloco. -->
+                            <div class="d-flex gap-1 align-items-center flex-nowrap pmr-tono-time">
+                                <input
+                                    v-model="tonometryStampedTime"
+                                    type="time"
+                                    step="600"
+                                    class="form-control form-control-sm"
+                                    :disabled="isLocked"
+                                />
+                                <input type="hidden" name="tonometer_time" :value="tonometryStampedTime" />
+                                <!--
+                                    Impressão do laudo de tonometria: salva via storeTonometry no backend
+                                    (exige IssueReport — CFM 2.227/2018). Só médico pode emitir o laudo.
+                                -->
+                                <button
+                                    v-if="isDoctor"
+                                    type="button"
+                                    class="btn btn-pink btn-sm flex-shrink-0"
+                                    :title="tt('print_tonometry', 'Imprimir tonometria')"
+                                    @click="printTonometry"
+                                >
+                                    <i class="fas fa-print"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dinâmica -->
+                    <div class="pmr-section mb-1" :style="sectionStyle('dinamica')">
+                        <label class="pmr-label">{{ tt('dynamic', 'Dinâmica') }}</label>
+                        <table class="pmr-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 36px"></th>
+                                    <th>{{ tt('spherical', 'Esf.') }}</th>
+                                    <th>{{ tt('cylindrical', 'Cil.') }}</th>
+                                    <th>{{ tt('axis', 'Eixo') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="pmr-od">OD</td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_spherical_right"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="dynamic_spherical_right"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('spherical', 'dynamic_spherical_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('spherical', 'dynamic_spherical_right').then(() =>
+                                                    focusNextLensField('dynamic_spherical_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_cylindrical_right"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="dynamic_cylindrical_right"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('cylindrical', 'dynamic_cylindrical_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('cylindrical', 'dynamic_cylindrical_right').then(() =>
+                                                    focusNextLensField('dynamic_cylindrical_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_axis_right"
+                                            type="text"
+                                            inputmode="numeric"
+                                            name="dynamic_axis_right"
+                                            placeholder="0º"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('axis', 'dynamic_axis_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('axis', 'dynamic_axis_right').then(() =>
+                                                    focusNextLensField('dynamic_axis_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="pmr-od">OE</td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_spherical_left"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="dynamic_spherical_left"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('spherical', 'dynamic_spherical_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('spherical', 'dynamic_spherical_left').then(() =>
+                                                    focusNextLensField('dynamic_spherical_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_cylindrical_left"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="dynamic_cylindrical_left"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('cylindrical', 'dynamic_cylindrical_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('cylindrical', 'dynamic_cylindrical_left').then(() =>
+                                                    focusNextLensField('dynamic_cylindrical_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.dynamic_axis_left"
+                                            type="text"
+                                            inputmode="numeric"
+                                            name="dynamic_axis_left"
+                                            placeholder="0º"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('axis', 'dynamic_axis_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('axis', 'dynamic_axis_left').then(() =>
+                                                    focusNextLensField('dynamic_axis_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Estática -->
+                    <div class="pmr-section mb-1" :style="sectionStyle('estatica')">
+                        <label class="pmr-label">{{ tt('static', 'Estática') }}</label>
+                        <table class="pmr-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 36px"></th>
+                                    <th>{{ tt('spherical', 'Esf.') }}</th>
+                                    <th>{{ tt('cylindrical', 'Cil.') }}</th>
+                                    <th>{{ tt('axis', 'Eixo') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="pmr-od">OD</td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_spherical_right"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="static_spherical_right"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('spherical', 'static_spherical_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('spherical', 'static_spherical_right').then(() =>
+                                                    focusNextLensField('static_spherical_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_cylindrical_right"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="static_cylindrical_right"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('cylindrical', 'static_cylindrical_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('cylindrical', 'static_cylindrical_right').then(() =>
+                                                    focusNextLensField('static_cylindrical_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_axis_right"
+                                            type="text"
+                                            inputmode="numeric"
+                                            name="static_axis_right"
+                                            placeholder="0º"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('axis', 'static_axis_right')"
+                                            @keydown.enter.prevent="
+                                                formatLens('axis', 'static_axis_right').then(() =>
+                                                    focusNextLensField('static_axis_right'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="pmr-od">OE</td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_spherical_left"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="static_spherical_left"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('spherical', 'static_spherical_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('spherical', 'static_spherical_left').then(() =>
+                                                    focusNextLensField('static_spherical_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_cylindrical_left"
+                                            type="text"
+                                            inputmode="decimal"
+                                            name="static_cylindrical_left"
+                                            placeholder="0.00"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('cylindrical', 'static_cylindrical_left')"
+                                            @keydown.enter.prevent="
+                                                formatLens('cylindrical', 'static_cylindrical_left').then(() =>
+                                                    focusNextLensField('static_cylindrical_left'),
+                                                )
+                                            "
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            v-model="form.static_axis_left"
+                                            type="text"
+                                            inputmode="numeric"
+                                            name="static_axis_left"
+                                            placeholder="0º"
+                                            :disabled="isLocked"
+                                            @click="$event.target.select()"
+                                            @blur="formatLens('axis', 'static_axis_left')"
+                                        />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUNA DIREITA -->
+            <div class="col-12 col-xl-6 ps-xl-2">
+                <div class="pmr-main-panel" :class="{ 'd-flex flex-column': isCustomMode }">
+                    <!-- Adição / Longe / Perto + Calc -->
+                    <div class="pmr-section mb-1" :style="sectionStyle('adicao')">
+                        <!-- Adição, Longe, Perto e botões numa linha só quando cabem (a
+                             linha quebra só em telas estreitas). -->
+                        <div class="row g-2 align-items-start">
+                            <div class="pmr-lens-field pmr-lens-field--short">
+                                <label class="pmr-label">{{ tt('addition', 'Adição') }}</label>
+                                <SearchSelect
+                                    v-model="form.addition_type_id"
+                                    :options="additionTypes"
+                                    :placeholder="tt('select', 'Selecione')"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="pmr-lens-field">
+                                <label class="pmr-label">{{ tt('lens_away', 'Longe') }}</label>
+                                <!-- Multi (Multifocal + Antirreflexo...): numa linha
+                                     só, com a quantidade; desmarca no dropdown. -->
+                                <SearchSelect
+                                    v-model="form.lens_away_ids"
+                                    :options="lenses"
+                                    multiple
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="pmr-lens-field">
+                                <label class="pmr-label">{{ tt('lens_near', 'Perto') }}</label>
+                                <SearchSelect
+                                    v-model="form.lens_near_ids"
+                                    :options="lenses"
+                                    multiple
+                                    :placeholder="'—'"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="col-auto">
+                                <!-- Espaço do rótulo: botões na altura dos campos. -->
+                                <span class="pmr-label d-inline-block invisible" aria-hidden="true">&nbsp;</span>
+                                <div class="d-flex gap-1 align-items-center">
+                                    <!-- Campo "Add." saiu daqui (ticket "Add. → OBS."):
+                                         a adição da presbiopia agora é informada DENTRO
+                                         do modal da calculadora (lápis), único lugar que
+                                         a consome. O espaço vira o OBS. livre abaixo. -->
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        :disabled="isLocked"
+                                        :title="tt('calc', 'Calcular presbiopia')"
+                                        @click="openPresbyopiaCalc"
+                                    >
+                                        <i class="fas fa-pencil-alt"></i>
+                                    </button>
+                                    <!-- Cálculo de lentes de contato (saiu do Gerenciador
+                                         de Imagens): só médico, como antes. Assinado:
+                                         abre só para consultar o que foi gravado. -->
+                                    <button
+                                        v-if="isDoctor"
+                                        type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        data-contact-lens-open
+                                        :disabled="isLocked && !contactLensRows.length"
+                                        :title="tt('contact_lens_title', 'Cálculo de lentes de contato')"
+                                        :aria-label="tt('contact_lens_title', 'Cálculo de lentes de contato')"
+                                        @click="showContactLensCalc = true"
+                                    >
+                                        <i class="fas fa-calculator" aria-hidden="true"></i>
+                                    </button>
+                                    <!--
+                                        Receituário de óculos: exclusivo para médicos (CFM Res. 2.227/2018).
+                                        Admin/secretária da clínica não pode emitir receituário — só visualizar.
+                                    -->
+                                    <div v-if="isEdit && isDoctor" class="btn-group" role="group">
+                                        <button
+                                            type="button"
+                                            class="btn btn-pink btn-sm dropdown-toggle"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false"
+                                            :disabled="quickActionBusy || isLocked"
+                                            :title="tt('lens_prescription', 'Receituário de óculos')"
+                                        >
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="issueLensPrescription('dynamic')"
+                                                >
+                                                    Dinâmica
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="issueLensPrescription('static')"
+                                                >
+                                                    Estática
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="issueLensPrescription('presbyopia_dynamic')"
+                                                >
+                                                    Presb. dinâmica
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    @click="issueLensPrescription('presbyopia')"
+                                                >
+                                                    Presbiopia
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Obs. da prescrição de lentes — MOVIDO do bloco
+                                 HDA (era "Observação de lentes" duplicando o
+                                 registro longe da prescrição). Mesmo campo/
+                                 dado: observation_of_lenses. -->
+                            <div class="col-12">
+                                <label class="pmr-label">{{ tt('lenses_obs_short', 'OBS.') }}</label>
+                                <textarea
+                                    v-model="form.observation_of_lenses"
+                                    name="observation_of_lenses"
+                                    rows="1"
+                                    class="form-control form-control-sm"
+                                    :disabled="isLocked"
+                                    :placeholder="
+                                        tt('lenses_obs_ph', 'Uso contínuo, orientações, preferência de lente…')
+                                    "
+                                ></textarea>
+                            </div>
+                            <!-- Cálculo de lentes de contato vinculado a esta consulta. -->
+                            <div v-if="contactLensRows.length" class="col-12" data-contact-lens-summary>
+                                <span class="pmr-label d-block">{{ contactLensTitle }}</span>
+                                <ul class="list-unstyled small mb-0">
+                                    <li v-for="row in contactLensRows" :key="row.key">
+                                        <span class="text-muted">{{ `${row.label}: ` }}</span>
+                                        <span :class="{ 'fw-semibold': row.key === 'suggested' }">{{ row.value }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Biomicroscopia -->
+                    <div class="pmr-section mb-1" :style="sectionStyle('biomicroscopia')">
+                        <label class="pmr-label">{{ tt('biomicroscopy', 'Biomicroscopia') }}</label>
+                        <div class="d-flex gap-1 mb-1">
+                            <span class="pmr-eye-inline">OD</span>
+                            <input
+                                v-model="form.biomicroscopy_right"
+                                type="text"
+                                name="biomicroscopy_right"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                @click="$event.target.select()"
+                            />
+                        </div>
+                        <div class="d-flex gap-1">
+                            <span class="pmr-eye-inline">OE</span>
+                            <input
+                                v-model="form.biomicroscopy_left"
+                                type="text"
+                                name="biomicroscopy_left"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                @click="$event.target.select()"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Fundoscopia -->
+                    <div class="pmr-section mb-1" :style="sectionStyle('fundoscopia')">
+                        <label class="pmr-label">{{ tt('fundoscopy', 'Fundoscopia') }}</label>
+                        <div class="d-flex gap-1 mb-1">
+                            <span class="pmr-eye-inline">OD</span>
+                            <input
+                                v-model="form.fundoscopy_right"
+                                type="text"
+                                name="fundoscopy_right"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                @click="$event.target.select()"
+                            />
+                        </div>
+                        <div class="d-flex gap-1">
+                            <span class="pmr-eye-inline">OE</span>
+                            <input
+                                v-model="form.fundoscopy_left"
+                                type="text"
+                                name="fundoscopy_left"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                @click="$event.target.select()"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Observação geral -->
+                    <div class="pmr-section mb-1" :style="sectionStyle('obs_geral')">
+                        <label class="pmr-label">{{ tt('general_obs', 'Observações') }}</label>
+                        <textarea
+                            v-model="form.observation_general"
+                            name="observation_general"
+                            rows="2"
+                            class="form-control form-control-sm"
+                            :disabled="isLocked"
+                        ></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção colapsável: HDA / Histórico / Diagnóstico / Conduta -->
+        <div v-show="!isFreeMode" class="px-3 pb-2">
+            <div
+                class="pmr-collapse-toggle mb-2"
+                data-bs-toggle="collapse"
+                data-bs-target="#pmr-extra-fields"
+                role="button"
+            >
+                <i class="fas fa-chevron-down me-1 pmr-collapse-icon"></i>
+                <span class="pmr-label mb-0 d-inline">{{ tt('extra_fields', 'Campos adicionais') }}</span>
+            </div>
+
+            <div id="pmr-extra-fields" class="collapse">
+                <!-- Reorganização (ticket "Organizar HDA"): mesmos campos de
+                     sempre, agrupados pelo MOMENTO da consulta — Anamnese/
+                     Histórico (antes do exame) e Conclusão (fechamento).
+                     Display-only: nenhum campo novo, nenhum dado muda. -->
+
+                <!-- ══ GRUPO 1: Anamnese / Histórico ══ -->
+                <div class="pmr-field-group mb-3">
+                    <div class="pmr-field-group-title">
+                        <i class="fas fa-comment-medical me-1"></i>{{ tt('group_anamnesis', 'Anamnese / Histórico') }}
+                        <small class="text-muted fw-normal ms-1">{{
+                            tt('group_anamnesis_hint', 'início da consulta')
+                        }}</small>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-12">
+                            <label class="pmr-label">{{ tt('hda', 'HDA') }}</label>
+                            <textarea
+                                v-model="form.hda"
+                                name="hda"
+                                rows="2"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                :placeholder="tt('hda_ph', 'História da doença atual')"
+                            ></textarea>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{
+                                tt('ocular_surgical_history', 'Histórico cirúrgico ocular')
+                            }}</label>
+                            <textarea
+                                v-model="form.ocular_surgical_history"
+                                name="ocular_surgical_history"
+                                rows="2"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                            ></textarea>
+                        </div>
+                        <div class="col-12 col-md-6" data-testid="pmr-medications">
+                            <!-- Lista estruturada do PACIENTE (Fase 2 / A2): vale para
+                                 as próximas consultas; o prontuário grava um retrato
+                                 dela ao salvar. O texto livre fica como observação. -->
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="pmr-label mb-0">{{ tt('medications_in_use', 'Medicações em uso') }}</span>
+                                <button
+                                    v-if="safety.summary && isDoctor"
+                                    type="button"
+                                    class="btn btn-link btn-sm p-0 ms-auto"
+                                    data-testid="pmr-medications-edit"
+                                    @click="showSafetyModal = true"
+                                >
+                                    <i class="ti ti-pencil me-1" aria-hidden="true"></i
+                                    >{{ ctt('medications.manage', 'Editar lista') }}
+                                </button>
+                            </div>
+                            <ul v-if="activeMedications.length" class="list-unstyled small mb-1 pmr-med-list">
+                                <li v-for="m in activeMedications" :key="m.id">
+                                    <i class="ti ti-pill me-1 text-primary" aria-hidden="true"></i
+                                    ><strong>{{ m.name }}</strong>
+                                    <span v-if="m.posology" class="text-muted"> — {{ m.posology }}</span>
+                                    <span
+                                        v-if="!m.confirmed"
+                                        class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1"
+                                        >{{ ctt('snapshot.unconfirmed', 'informada') }}</span
+                                    >
+                                </li>
+                            </ul>
+                            <p v-else-if="safety.summary" class="small text-muted mb-1">
+                                {{ ctt('medications.empty', 'Nenhuma medicação na lista.') }}
+                            </p>
+                            <label class="pmr-label small text-muted fw-normal" for="pmr-medications-free">{{
+                                ctt(
+                                    'medications.free_text',
+                                    'Observações sobre medicações (texto livre desta consulta)',
+                                )
+                            }}</label>
+                            <textarea
+                                id="pmr-medications-free"
+                                v-model="form.medications_in_use"
+                                name="medications_in_use"
+                                rows="2"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Uso de lente de contato (Fase 2 / A3) — por consulta,
+                         pré-preenchido com o da última consulta. -->
+                    <fieldset class="pmr-cl-use border rounded px-2 pb-2 mb-2" data-testid="pmr-contact-lens-use">
+                        <legend class="pmr-label float-none w-auto px-1 mb-0">
+                            {{ tt('contact_lens_use', 'Uso de lente de contato') }}
+                        </legend>
+                        <small v-if="contactLensUsePrefilled" class="d-block text-info-emphasis mb-1">
+                            <i class="ti ti-history me-1" aria-hidden="true"></i
+                            >{{
+                                tt(
+                                    'contact_lens_use_prefilled',
+                                    'Pré-preenchido da consulta de :date — confira com o paciente.',
+                                ).replace(':date', contactLensUsePrevious?.date ?? '')
+                            }}
+                        </small>
+                        <div
+                            class="d-flex flex-wrap gap-3 align-items-center"
+                            role="radiogroup"
+                            :aria-label="tt('contact_lens_use_question', 'Usa lente de contato?')"
+                        >
+                            <span class="small">{{ tt('contact_lens_use_question', 'Usa lente de contato?') }}</span>
+                            <label class="form-check form-check-inline small mb-0">
+                                <input
+                                    v-model="form.contact_lens_use.uses"
+                                    class="form-check-input"
+                                    type="radio"
+                                    name="cl_use_uses"
+                                    :value="true"
+                                    :disabled="isLocked"
+                                    data-testid="cl-use-yes"
+                                />{{ tt('contact_lens_use_yes', 'Sim') }}
+                            </label>
+                            <label class="form-check form-check-inline small mb-0">
+                                <input
+                                    v-model="form.contact_lens_use.uses"
+                                    class="form-check-input"
+                                    type="radio"
+                                    name="cl_use_uses"
+                                    :value="false"
+                                    :disabled="isLocked"
+                                    data-testid="cl-use-no"
+                                />{{ tt('contact_lens_use_no', 'Não') }}
+                            </label>
+                            <label class="form-check form-check-inline small mb-0">
+                                <input
+                                    v-model="form.contact_lens_use.uses"
+                                    class="form-check-input"
+                                    type="radio"
+                                    name="cl_use_uses"
+                                    :value="null"
+                                    :disabled="isLocked"
+                                    data-testid="cl-use-unknown"
+                                />{{ tt('contact_lens_use_unknown', 'Não informado') }}
+                            </label>
+                        </div>
+                        <div v-if="form.contact_lens_use.uses === true" class="row g-2 mt-1">
+                            <div class="col-6 col-md-4">
+                                <label class="pmr-label" for="cl-use-type">{{
+                                    tt('contact_lens_use_type', 'Tipo')
+                                }}</label>
+                                <select
+                                    id="cl-use-type"
+                                    v-model="form.contact_lens_use.type"
+                                    class="form-select form-select-sm"
+                                    :disabled="isLocked"
+                                >
+                                    <option value="">—</option>
+                                    <option v-for="v in CL_TYPES" :key="v" :value="v">
+                                        {{ tt(`contact_lens_use_type_${v}`, v) }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="pmr-label" for="cl-use-wear">{{
+                                    tt('contact_lens_use_wear', 'Regime')
+                                }}</label>
+                                <select
+                                    id="cl-use-wear"
+                                    v-model="form.contact_lens_use.wear"
+                                    class="form-select form-select-sm"
+                                    :disabled="isLocked"
+                                >
+                                    <option value="">—</option>
+                                    <option v-for="v in CL_WEAR" :key="v" :value="v">
+                                        {{ tt(`contact_lens_use_wear_${v}`, v) }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="pmr-label" for="cl-use-hours">{{
+                                    tt('contact_lens_use_hours', 'Horas por dia')
+                                }}</label>
+                                <input
+                                    id="cl-use-hours"
+                                    v-model="form.contact_lens_use.hours_per_day"
+                                    type="number"
+                                    min="0"
+                                    max="24"
+                                    step="1"
+                                    class="form-control form-control-sm"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="pmr-label" for="cl-use-repl">{{
+                                    tt('contact_lens_use_replacement', 'Descarte')
+                                }}</label>
+                                <select
+                                    id="cl-use-repl"
+                                    v-model="form.contact_lens_use.replacement"
+                                    class="form-select form-select-sm"
+                                    :disabled="isLocked"
+                                >
+                                    <option value="">—</option>
+                                    <option v-for="v in CL_REPLACEMENTS" :key="v" :value="v">
+                                        {{ tt(`contact_lens_use_replacement_${v}`, v) }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-8">
+                                <span class="pmr-label d-block">{{
+                                    tt('contact_lens_use_sleeps', 'Dorme com a lente')
+                                }}</span>
+                                <label class="form-check form-check-inline small mb-0">
+                                    <input
+                                        v-model="form.contact_lens_use.sleeps_with"
+                                        class="form-check-input"
+                                        type="radio"
+                                        name="cl_use_sleeps"
+                                        :value="true"
+                                        :disabled="isLocked"
+                                    />{{ tt('contact_lens_use_yes', 'Sim') }}
+                                </label>
+                                <label class="form-check form-check-inline small mb-0">
+                                    <input
+                                        v-model="form.contact_lens_use.sleeps_with"
+                                        class="form-check-input"
+                                        type="radio"
+                                        name="cl_use_sleeps"
+                                        :value="false"
+                                        :disabled="isLocked"
+                                    />{{ tt('contact_lens_use_no', 'Não') }}
+                                </label>
+                            </div>
+                            <div class="col-12">
+                                <label class="pmr-label" for="cl-use-complaints">{{
+                                    tt('contact_lens_use_complaints', 'Queixas com a lente')
+                                }}</label>
+                                <input
+                                    id="cl-use-complaints"
+                                    v-model="form.contact_lens_use.complaints"
+                                    type="text"
+                                    maxlength="1000"
+                                    class="form-control form-control-sm"
+                                    :placeholder="tt('contact_lens_use_complaints_ph', 'Ex.: ardor, olho vermelho')"
+                                    :disabled="isLocked"
+                                />
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{ tt('ocular_motility', 'Motilidade ocular') }}</label>
+                            <input
+                                v-model="form.ocular_motility"
+                                type="text"
+                                name="ocular_motility"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Paquimetria / Gonioscopia — movidos da tela principal para cá
+                     (parâmetros específicos, não precisam poluir o prontuário base) -->
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{ tt('pachymetry', 'Paquimetria') }}</label>
+                            <div class="d-flex gap-1">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text pmr-eye-badge">OD</span>
+                                    <input
+                                        v-model="form.pachymetry_right"
+                                        type="number"
+                                        name="pachymetry_right"
+                                        step="1"
+                                        min="0"
+                                        class="form-control form-control-sm text-center"
+                                        placeholder="μm"
+                                        :disabled="isLocked"
+                                    />
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text pmr-eye-badge">OE</span>
+                                    <input
+                                        v-model="form.pachymetry_left"
+                                        type="number"
+                                        name="pachymetry_left"
+                                        step="1"
+                                        min="0"
+                                        class="form-control form-control-sm text-center"
+                                        placeholder="μm"
+                                        :disabled="isLocked"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="pmr-label">{{ tt('gonioscopy', 'Gonioscopia') }}</label>
+                            <div class="d-flex gap-1">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text pmr-eye-badge">OD</span>
+                                    <input
+                                        v-model="form.gonioscopy_right"
+                                        type="text"
+                                        name="gonioscopy_right"
+                                        class="form-control form-control-sm"
+                                        :disabled="isLocked"
+                                    />
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text pmr-eye-badge">OE</span>
+                                    <input
+                                        v-model="form.gonioscopy_left"
+                                        type="text"
+                                        name="gonioscopy_left"
+                                        class="form-control form-control-sm"
+                                        :disabled="isLocked"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- /grupo Anamnese -->
+
+                <!-- ══ GRUPO 2: Conclusão da consulta ══ -->
+                <div class="pmr-field-group">
+                    <div class="pmr-field-group-title">
+                        <i class="fas fa-flag-checkered me-1"></i>{{ tt('group_conclusion', 'Conclusão da consulta') }}
+                        <small class="text-muted fw-normal ms-1">{{
+                            tt('group_conclusion_hint', 'diagnóstico e fechamento')
+                        }}</small>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-12">
+                            <label class="pmr-label">{{ tt('cid10', 'CID-10') }}</label>
+                            <input type="hidden" name="diagnosis_cids" :value="serializedCids" />
+
+                            <div v-if="selectedCids.length > 0" class="d-flex flex-wrap gap-1 mb-1">
+                                <span
+                                    v-for="item in selectedCids"
+                                    :key="item.code"
+                                    class="badge d-inline-flex align-items-center gap-1"
+                                    style="
+                                        background: #e8f4fd;
+                                        color: #1a5c8a;
+                                        font-size: 0.8rem;
+                                        font-weight: 500;
+                                        border: 1px solid #b8d9f0;
+                                        padding: 0.3rem 0.5rem;
+                                    "
+                                >
+                                    <span class="fw-semibold">{{ item.code }}</span>
+                                    <span
+                                        class="text-secondary fw-normal"
+                                        style="
+                                            max-width: 260px;
+                                            overflow: hidden;
+                                            text-overflow: ellipsis;
+                                            white-space: nowrap;
+                                        "
+                                        >– {{ item.description }}</span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn-close btn-close-sm ms-1"
+                                        style="font-size: 0.6rem"
+                                        :disabled="isLocked"
+                                        @click="removeCid(item.code)"
+                                    ></button>
+                                </span>
+                            </div>
+
+                            <div class="position-relative">
+                                <div class="input-group input-group-sm">
+                                    <input
+                                        v-model="cidQuery"
+                                        type="text"
+                                        class="form-control form-control-sm"
+                                        autocomplete="off"
+                                        placeholder="Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…"
+                                        :disabled="isLocked"
+                                        @input="searchCid10"
+                                        @keydown.arrow-down.prevent="
+                                            cidActiveIndex = Math.min(cidActiveIndex + 1, cidResults.length - 1)
+                                        "
+                                        @keydown.arrow-up.prevent="cidActiveIndex = Math.max(cidActiveIndex - 1, 0)"
+                                        @keydown.enter.prevent="selectActiveCid"
+                                        @keydown.escape="cidOpen = false"
+                                    />
+                                    <span
+                                        v-if="cidSearching"
+                                        class="input-group-text bg-transparent border-start-0 px-2"
+                                    >
+                                        <span
+                                            class="spinner-border spinner-border-sm text-secondary"
+                                            style="width: 0.8rem; height: 0.8rem"
+                                        ></span>
+                                    </span>
+                                </div>
+                                <ul
+                                    v-if="cidOpen && cidResults.length > 0"
+                                    class="list-group shadow-sm position-absolute w-100"
+                                    style="z-index: 1055; top: 100%; max-height: 260px; overflow-y: auto"
+                                >
+                                    <li
+                                        v-for="(item, index) in cidResults"
+                                        :key="item.id"
+                                        class="list-group-item list-group-item-action py-1 px-2"
+                                        :class="{ active: index === cidActiveIndex }"
+                                        style="cursor: pointer; font-size: 0.82rem"
+                                        @mouseenter="cidActiveIndex = index"
+                                        @mousedown.prevent="selectCid(item)"
+                                    >
+                                        <span class="fw-semibold me-1">{{ item.code }}</span>
+                                        <span>– {{ item.description }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-8">
+                            <label class="pmr-label">{{ tt('clinical_conduct', 'Conduta clínica') }}</label>
+                            <textarea
+                                v-model="form.clinical_conduct"
+                                name="clinical_conduct"
+                                rows="2"
+                                class="form-control form-control-sm"
+                                :disabled="isLocked"
+                                :placeholder="tt('clinical_conduct_ph', 'Conduta clínica...')"
+                            ></textarea>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="pmr-label">{{ tt('follow_up_days', 'Retorno') }}</label>
+                            <div class="input-group input-group-sm">
+                                <input
+                                    v-model="form.follow_up_days"
+                                    type="number"
+                                    min="0"
+                                    name="follow_up_days"
+                                    class="form-control form-control-sm"
+                                    :disabled="isLocked"
+                                />
+                                <span class="input-group-text">{{ tt('days', 'dias') }}</span>
+                            </div>
+                            <FollowUpSuggestion
+                                v-if="isDoctor && followUp?.suggestions?.length"
+                                :suggestions="followUp.suggestions"
+                                :max-days="followUp.max_days"
+                                :t="followUp.t"
+                                :current="form.follow_up_days"
+                                :disabled="isLocked"
+                                @use="form.follow_up_days = $event"
+                            />
+                        </div>
+                    </div>
+                </div>
+                <!-- /grupo Conclusão -->
+            </div>
+        </div>
+
+        <!-- Bottom bar — quick actions + save -->
+        <div class="pmr-bottom-bar px-3 py-2">
+            <div class="d-flex flex-nowrap gap-1 align-items-center pmr-bottom-bar-row">
+                <!--
+                    Quick actions clínicas: exclusivas para médicos (CFM Res. 2.227/2018).
+                    Admin/Secretária da clínica não emite receituários/atestados/laudos —
+                    backend rejeita via Gate IssueReport. Esconder na UI evita o 403
+                    confuso e mantém paridade com o Blade original (@if($canSeeQuickActions)).
+                -->
+                <template v-if="isDoctor">
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Receituário de Medicamentos'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        data-testid="pmr-medication-btn"
+                        @click="withRecord('medication')"
+                    >
+                        <i class="fas fa-pills" style="font-size: 1.6rem; color: #9c27b0"></i>
+                        <span class="pmr-doc-img-btn-label visually-hidden">Medicamentos</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Solicitação de Procedimentos'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('procedures')"
+                    >
+                        <i class="fas fa-clipboard-list" style="font-size: 1.6rem; color: #3f51b5"></i>
+                        <span class="pmr-doc-img-btn-label visually-hidden">Procedimentos</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Receituário de Pterígio'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="isEdit ? issueQuickAction('pterygium-prescription') : withRecord('pterygium')"
+                    >
+                        <i class="fas fa-eye-low-vision" style="font-size: 1.6rem; color: #ff5722"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Receituário<br />Pterígio</span
+                        >
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Receituário de Catarata'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('cataract')"
+                    >
+                        <i class="fas fa-eye" style="font-size: 1.6rem; color: #00bcd4"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Receituário<br />Catarata</span
+                        >
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Teste do Olhinho'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="isEdit ? issueQuickAction('test-eye') : withRecord('test_eye')"
+                    >
+                        <i class="fas fa-baby" style="font-size: 1.6rem; color: #e91e63"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Teste do<br />Olhinho</span
+                        >
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Mapeamento de Retina'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="isEdit ? issueQuickAction('retinal-mapping') : withRecord('retinal_mapping')"
+                    >
+                        <i class="fas fa-bullseye" style="font-size: 1.6rem; color: #673ab7"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Mapeamento<br />de Retina</span
+                        >
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Atestado de Comparecimento'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('attendance_certificate')"
+                    >
+                        <i class="fas fa-user-check" style="font-size: 1.6rem; color: #4caf50"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Atestado<br />Comparecim.</span
+                        >
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        :title="
+                            isEdit
+                                ? 'Atestado Médico'
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('medical_certificate')"
+                    >
+                        <i class="fas fa-stethoscope" style="font-size: 1.6rem; color: #2196f3"></i>
+                        <span
+                            class="pmr-doc-img-btn-label visually-hidden"
+                            style="white-space: normal; line-height: 1.1"
+                            >Atestado<br />Médico</span
+                        >
+                    </button>
+                    <!-- Atestados oftalmológicos (Fase 2 / B1): acompanhante e
+                         aptidão visual (AV do prontuário). -->
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        data-testid="companion-certificate-btn"
+                        :title="
+                            isEdit
+                                ? dtt('certificates.companion_title', 'Atestado de acompanhante')
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :aria-label="dtt('certificates.companion_title', 'Atestado de acompanhante')"
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('companion_certificate')"
+                    >
+                        <i class="fas fa-user-group" style="font-size: 1.6rem; color: #009688" aria-hidden="true"></i>
+                        <span class="pmr-doc-img-btn-label visually-hidden">{{
+                            dtt('certificates.companion_title', 'Atestado de acompanhante')
+                        }}</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        data-testid="visual-fitness-certificate-btn"
+                        :title="
+                            isEdit
+                                ? dtt('certificates.visual_title', 'Atestado de aptidão visual')
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :aria-label="dtt('certificates.visual_title', 'Atestado de aptidão visual')"
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('visual_fitness_certificate')"
+                    >
+                        <i class="fas fa-glasses" style="font-size: 1.6rem; color: #3f51b5" aria-hidden="true"></i>
+                        <span class="pmr-doc-img-btn-label visually-hidden">{{
+                            dtt('certificates.visual_title', 'Atestado de aptidão visual')
+                        }}</span>
+                    </button>
+                    <!-- Declaração médica (modelo `declaracao_medica` do RELATÓRIO
+                         OFTALMOLÓGICO): sai em branco para o médico completar. -->
+                    <button
+                        type="button"
+                        class="btn pmr-doc-img-btn"
+                        data-testid="medical-declaration-btn"
+                        :title="
+                            isEdit
+                                ? tt('medical_declaration', 'Declaração médica')
+                                : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                        "
+                        :aria-label="tt('medical_declaration', 'Declaração médica')"
+                        :disabled="quickActionBusy || isLocked || form.processing"
+                        @click="withRecord('medical_declaration')"
+                    >
+                        <i
+                            class="fas fa-file-signature"
+                            style="font-size: 1.6rem; color: #795548"
+                            aria-hidden="true"
+                        ></i>
+                        <span class="pmr-doc-img-btn-label visually-hidden">{{
+                            tt('medical_declaration', 'Declaração médica')
+                        }}</span>
+                    </button>
+                </template>
+
+                <button
+                    v-if="isDoctor && examReports.length > 0"
+                    type="button"
+                    class="btn pmr-doc-img-btn"
+                    :title="
+                        isEdit
+                            ? tt('exam_hub_title', 'Laudos de Exame')
+                            : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                    "
+                    :disabled="isLocked || form.processing"
+                    @click="withRecord('exam_hub')"
+                >
+                    <i class="fas fa-microscope" style="font-size: 1.6rem; color: #03a9f3"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden" style="white-space: normal; line-height: 1.1"
+                        >Laudos<br />de Exame</span
+                    >
+                </button>
+
+                <!-- Evolução: histórico é por paciente, então abre mesmo em modo
+                     create (leitura); gravar exige prontuário salvo + médico. -->
+                <button
+                    type="button"
+                    class="btn pmr-doc-img-btn"
+                    :title="tt('evolution', 'Evolução')"
+                    @click="openEvolutionModal"
+                >
+                    <i class="fas fa-notes-medical" style="font-size: 1.6rem; color: #009688"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('evolution', 'Evolução') }}</span>
+                </button>
+
+                <!-- Procedimento estruturado (Fase 3 — estoque ↔ prontuário):
+                     histórico é por PACIENTE, então abre mesmo em modo
+                     create (leitura); solicitar/executar/cancelar exigem
+                     prontuário salvo + médico (trava dentro do modal). -->
+                <button
+                    type="button"
+                    class="btn pmr-doc-img-btn"
+                    :title="tt('procedures', 'Procedimentos')"
+                    @click="showProceduresModal = true"
+                >
+                    <i class="fas fa-syringe" style="font-size: 1.6rem; color: #7e57c2"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('procedures', 'Procedimentos') }}</span>
+                </button>
+
+                <!-- Exames de imagem do módulo Gerenciador de exames — consulta durante o
+                     atendimento; leitura por paciente, disponível já no create. -->
+                <button
+                    v-if="urls.eye_exams"
+                    type="button"
+                    class="btn pmr-doc-img-btn"
+                    :title="tt('imaging_title', 'Exames de imagem do paciente')"
+                    @click="showImagingModal = true"
+                >
+                    <i class="fas fa-x-ray" style="font-size: 1.6rem; color: #7b1fa2"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden" style="white-space: normal; line-height: 1.1"
+                        >{{ tt('imaging_exams_short', 'Exames de') }}<br />{{
+                            tt('imaging_exams_short2', 'imagem')
+                        }}</span
+                    >
+                </button>
+
+                <button
+                    type="button"
+                    class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
+                    :title="
+                        isEdit
+                            ? tt('documentations', 'Documentações')
+                            : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                    "
+                    :disabled="form.processing"
+                    @click="withRecord('documentations')"
+                >
+                    <i class="fas fa-folder-open" style="font-size: 1.6rem; color: #0288d1"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden">{{
+                        tt('documentations', 'Documentações')
+                    }}</span>
+                </button>
+
+                <!-- Anexo — abre modal com drag-drop + progresso por arquivo -->
+                <button
+                    v-if="isDoctor"
+                    type="button"
+                    class="btn pmr-doc-img-btn pmr-doc-annexo"
+                    :title="
+                        isEdit
+                            ? tt('upload_files', 'Anexar arquivos')
+                            : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')
+                    "
+                    :disabled="isLocked || form.processing"
+                    @click="withRecord('upload')"
+                >
+                    <i class="fas fa-paperclip" style="font-size: 1.6rem; color: #607d8b"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden">Anexo</span>
+                </button>
+
+                <!-- Andamento do atendimento — Salvar ≠ Finalizar:
+                       Salvar: grava e MANTÉM a consulta aberta (volta pro edit).
+                       Dilatar / Realizar exame: grava, status na Agenda vira
+                         Dilatando / Em exame, prontuário segue editável.
+                       Finalizar consulta: grava, Atendido, volta pra Agenda. -->
+                <span
+                    v-if="autosaveEnabled"
+                    class="pmr-autosave ms-auto"
+                    :class="{ 'pmr-autosave--error': autosave.status.value === 'error' }"
+                    role="status"
+                    aria-live="polite"
+                    :title="tt('draft_hint', 'Rascunho automático: só você vê, até salvar o prontuário.')"
+                    data-testid="pmr-autosave-status"
+                >
+                    <template v-if="autosaveLabel">
+                        <i
+                            class="fas me-1"
+                            :class="autosave.status.value === 'error' ? 'fa-cloud-arrow-up' : 'fa-cloud'"
+                            aria-hidden="true"
+                        ></i
+                        >{{ autosaveLabel }}
+                    </template>
+                </span>
+                <div
+                    class="pmr-flow-group"
+                    :class="{ 'ms-auto': !autosaveEnabled }"
+                    role="group"
+                    :aria-label="tt('flow_bar_label', 'Andamento do atendimento')"
+                >
+                    <button
+                        type="submit"
+                        class="btn pmr-save-btn pmr-flow-btn pmr-flow-btn--save"
+                        :disabled="form.processing || isLocked"
+                        :title="`${tt('flow_save', 'Salvar')} — ${tt('flow_save_hint', 'Salva o que já foi preenchido e mantém a consulta aberta.')}`"
+                    >
+                        <i class="fas fa-save"></i>
+                        <span class="visually-hidden">{{ tt('flow_save', 'Salvar') }}</span>
+                    </button>
+
+                    <template v-if="flowActive">
+                        <button
+                            type="button"
+                            class="btn pmr-flow-btn pmr-flow-btn--stage pmr-flow-dilate"
+                            :disabled="form.processing"
+                            :title="`${tt('flow_dilate', 'Dilatar')} — ${tt('flow_dilate_hint', 'Status vira \'Dilatando\' e o prontuário continua aberto pra quando o paciente voltar.')}`"
+                            @click="submit('dilate')"
+                        >
+                            <i class="fas fa-eye-dropper"></i>
+                            <span class="visually-hidden">{{ tt('flow_dilate', 'Dilatar') }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="btn pmr-flow-btn pmr-flow-btn--stage pmr-flow-exam"
+                            :disabled="form.processing"
+                            :title="`${tt('flow_exam', 'Realizar exame')} — ${tt('flow_exam_hint', 'Status vira \'Em exame\' e o prontuário continua aberto pra quando o paciente voltar.')}`"
+                            @click="submit('exam')"
+                        >
+                            <i class="fas fa-stethoscope"></i>
+                            <span class="visually-hidden">{{ tt('flow_exam', 'Realizar exame') }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="btn pmr-flow-btn pmr-flow-btn--finish pmr-flow-finish"
+                            :disabled="form.processing"
+                            :title="`${tt('flow_finish', 'Finalizar consulta')} — ${tt('flow_finish_hint', 'Atendimento concluído — status vira \'Atendido\'.')}`"
+                            @click="submit('finish')"
+                        >
+                            <i class="fas fa-check-double"></i>
+                            <span class="visually-hidden">{{ tt('flow_finish', 'Finalizar consulta') }}</span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de arquivos anexados (edit) -->
+        <div v-if="isEdit && uploadedFiles.length > 0" class="px-3 pb-2">
+            <div class="row g-1">
+                <div v-for="f in uploadedFiles" :key="f.id" class="col-auto">
+                    <a :href="f.show_url" target="_blank" class="pmr-file-thumb" :title="f.original_name">
+                        <img v-if="f.is_image" :src="f.show_url" :alt="f.original_name" />
+                        <i v-else class="fas fa-file-alt"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- ───────────────────────────── MODAIS ───────────────────────────── -->
+
+    <!-- Documentações: lista -->
+    <Teleport to="body">
+        <div
+            v-if="showDocumentationsModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showDocumentationsModal = false"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-folder-open me-2" style="color: #0288d1"></i
+                            >{{ tt('documentations', 'Documentações') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="showDocumentationsModal = false"></button>
+                    </div>
+                    <div class="modal-body p-2">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>{{ tt('doc_type', 'Tipo') }}</th>
+                                    <th>{{ tt('doc_title', 'Título') }}</th>
+                                    <th>{{ tt('doc_date', 'Data') }}</th>
+                                    <th class="text-end">{{ tt('doc_actions', 'Ações') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-if="documentations.length === 0">
+                                    <td colspan="4" class="text-center text-muted small py-2">
+                                        {{ tt('no_documentations', 'Nenhuma documentação registrada.') }}
+                                    </td>
+                                </tr>
+                                <tr v-for="doc in documentations" :key="doc.id">
+                                    <td>
+                                        <span class="badge bg-info-subtle text-info">{{ doc.type_label }}</span>
+                                        <span
+                                            v-if="doc.is_ai"
+                                            class="badge bg-info text-dark ms-1"
+                                            :title="doc.ai_workflow_label || 'Gerado por IA'"
+                                        >
+                                            <i class="ti ti-robot me-1"></i>IA
+                                        </span>
+                                    </td>
+                                    <td>{{ doc.title }}</td>
+                                    <td>
+                                        {{ doc.created_at }}
+                                        <span
+                                            v-if="doc.document_date"
+                                            class="d-block small text-warning-emphasis"
+                                            data-testid="doc-printed-date"
+                                            >{{
+                                                dtt('date.printed', 'Data impressa: :date').replace(
+                                                    ':date',
+                                                    doc.document_date,
+                                                )
+                                            }}</span
+                                        >
+                                    </td>
+                                    <td class="text-end">
+                                        <span
+                                            v-if="doc.requesting_doctor_email && doc.requesting_doctor_sent_at"
+                                            class="d-block small text-success-emphasis"
+                                        >
+                                            {{
+                                                tt('doc_sent_at', 'Enviado em :date').replace(
+                                                    ':date',
+                                                    doc.requesting_doctor_sent_at,
+                                                )
+                                            }}
+                                        </span>
+                                        <span
+                                            v-else-if="doc.requesting_doctor_email && !isSigned"
+                                            class="d-block small text-muted"
+                                            data-testid="doc-awaiting-signature"
+                                        >
+                                            {{
+                                                tt(
+                                                    'doc_awaiting_signature',
+                                                    'Aguardando a assinatura do prontuário para enviar',
+                                                )
+                                            }}
+                                        </span>
+                                        <button
+                                            v-if="doc.requesting_doctor_email"
+                                            type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            :disabled="!isSigned || resendingDocId === doc.id"
+                                            :title="docSendTitle(doc)"
+                                            @click="resendDocToRequestingDoctor(doc)"
+                                        >
+                                            <span
+                                                v-if="resendingDocId === doc.id"
+                                                class="spinner-border spinner-border-sm"
+                                            ></span>
+                                            <i v-else class="fas fa-paper-plane"></i>
+                                        </button>
+                                        <a
+                                            :href="doc.pdf_url"
+                                            target="_blank"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            title="PDF"
+                                        >
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="modal-footer py-2 d-flex justify-content-between">
+                        <!--
+                            "Nova documentação" cria via store (exige IssueReport). Admin/secretária
+                            só pode listar e baixar PDFs (read-only). Esconder o botão evita 403 ao clicar.
+                        -->
+                        <button
+                            v-if="isEdit && isDoctor"
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            @click="openNewDoc"
+                        >
+                            <i class="fas fa-plus me-1"></i>{{ tt('new_documentation', 'Nova documentação') }}
+                        </button>
+                        <span v-else></span>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showDocumentationsModal = false">
+                            {{ tt('close', 'Fechar') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Personalizar meu prontuário: visibilidade + ordem das seções por coluna -->
+    <Teleport to="body">
+        <div
+            v-if="showLayoutModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showLayoutModal = false"
+        >
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-sliders me-2 text-primary"></i
+                            >{{ tt('customize_title', 'Personalizar meu prontuário') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="showLayoutModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">
+                            {{
+                                tt(
+                                    'customize_hint',
+                                    'Escolha quais seções aparecem e a ordem em cada coluna. Seções ocultas não perdem dados já preenchidos — apenas saem da sua visualização.',
+                                )
+                            }}
+                        </p>
+                        <div class="row g-3">
+                            <div v-for="col in ['left', 'right']" :key="col" class="col-md-6">
+                                <div class="fw-semibold small mb-2">
+                                    {{
+                                        col === 'left'
+                                            ? tt('left_column', 'Coluna esquerda')
+                                            : tt('right_column', 'Coluna direita')
+                                    }}
+                                </div>
+                                <div
+                                    v-for="(key, index) in sectionLayout[col]"
+                                    :key="key"
+                                    class="d-flex align-items-center gap-2 border rounded px-2 py-1 mb-1"
+                                    :class="{ 'opacity-50': sectionLayout.hidden.includes(key) }"
+                                >
+                                    <input
+                                        :id="`layout-${key}`"
+                                        type="checkbox"
+                                        class="form-check-input m-0"
+                                        :checked="!sectionLayout.hidden.includes(key)"
+                                        @change="toggleSection(key)"
+                                    />
+                                    <label
+                                        :for="`layout-${key}`"
+                                        class="flex-grow-1 small mb-0"
+                                        style="cursor: pointer"
+                                    >
+                                        {{ sectionLabel(key) }}
+                                    </label>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link p-0 px-1"
+                                        :disabled="index === 0"
+                                        @click="moveSection(col, key, -1)"
+                                    >
+                                        <i class="fas fa-chevron-up"></i>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link p-0 px-1"
+                                        :disabled="index === sectionLayout[col].length - 1"
+                                        @click="moveSection(col, key, 1)"
+                                    >
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2 d-flex justify-content-between">
+                        <span v-if="layoutSavedFlash" class="badge bg-success-subtle text-success">{{
+                            layoutSavedFlash
+                        }}</span>
+                        <span v-else></span>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-secondary btn-sm" @click="showLayoutModal = false">
+                                {{ tt('close', 'Fechar') }}
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                :disabled="layoutSaving"
+                                @click="saveMyLayout"
+                            >
+                                <span v-if="layoutSaving" class="spinner-border spinner-border-sm me-1"></span>
+                                <i v-else class="fas fa-floppy-disk me-1"></i
+                                >{{ tt('save_my_layout', 'Salvar como meu modelo') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Evolução: histórico cronológico + texto livre -->
+    <Teleport to="body">
+        <div
+            v-if="showEvolutionModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showEvolutionModal = false"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-notes-medical me-2" style="color: #009688"></i
+                            >{{ tt('evolution', 'Evolução') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="showEvolutionModal = false"></button>
+                    </div>
+                    <div class="modal-body p-3">
+                        <!-- Nova evolução: só médico, com prontuário salvo e não assinado -->
+                        <div v-if="isDoctor && !isLocked" class="mb-3">
+                            <label class="pmr-label">{{ tt('evolution_new', 'Nova evolução') }}</label>
+                            <textarea
+                                v-model="evolutionText"
+                                rows="4"
+                                class="form-control form-control-sm"
+                                :placeholder="tt('evolution_ph', 'Descreva a evolução clínica do paciente...')"
+                                :disabled="evolutionBusy || !isEdit"
+                            ></textarea>
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <small v-if="!isEdit" class="text-muted">{{
+                                    tt('save_first', 'Salve primeiro o prontuário')
+                                }}</small>
+                                <span v-else></span>
+                                <button
+                                    type="button"
+                                    class="btn btn-primary btn-sm"
+                                    :disabled="!isEdit || evolutionBusy || !evolutionText.trim()"
+                                    @click="saveEvolution"
+                                >
+                                    <span v-if="evolutionBusy" class="spinner-border spinner-border-sm me-1"></span>
+                                    <i v-else class="fas fa-plus me-1"></i
+                                    >{{ tt('evolution_save', 'Registrar evolução') }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Histórico cronológico (mais recente primeiro) -->
+                        <label class="pmr-label">{{ tt('evolution_history', 'Histórico de evoluções') }}</label>
+                        <div v-if="evolutions.length === 0" class="text-center text-muted small py-3">
+                            {{ tt('no_evolutions', 'Nenhuma evolução registrada para este paciente.') }}
+                        </div>
+                        <div v-else class="d-flex flex-column gap-2">
+                            <div v-for="ev in evolutions" :key="ev.id" class="border rounded p-2 bg-light">
+                                <div class="d-flex justify-content-between flex-wrap gap-1 mb-1">
+                                    <span class="fw-semibold" style="font-size: 0.82rem; color: #00695c">
+                                        <i class="fas fa-user-md me-1"></i>{{ ev.doctor_name || '—' }}
+                                    </span>
+                                    <span class="text-muted" style="font-size: 0.78rem">
+                                        <i class="far fa-clock me-1"></i>{{ ev.created_at }}
+                                    </span>
+                                </div>
+                                <div style="font-size: 0.85rem; white-space: pre-wrap">{{ ev.content }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showEvolutionModal = false">
+                            {{ tt('close', 'Fechar') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Doc modal (TinyMCE simplificado) -->
+    <Teleport to="body">
+        <div
+            v-if="showDocModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showDocModal = false"
+        >
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-file-prescription me-2"></i
+                            >{{ tt('new_documentation', 'Nova documentação') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="showDocModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-2 mb-3">
+                            <div v-if="docForm.exam_type" class="col-12">
+                                <span class="badge bg-info-subtle text-info">
+                                    <i class="fas fa-microscope me-1"></i>{{ docForm.exam_label || docForm.exam_type }}
+                                </span>
+                            </div>
+                            <template v-if="!docForm.exam_type">
+                                <div class="col-12 col-md-6">
+                                    <label class="pmr-label">{{ tt('select_template', 'Modelo') }}</label>
+                                    <select
+                                        v-model="docSelection"
+                                        class="form-select form-select-sm"
+                                        data-testid="doc-template-select"
+                                        @change="onDocSelection"
+                                    >
+                                        <option value="">{{ tt('select', 'Selecione') }}</option>
+                                        <optgroup
+                                            v-for="group in docTemplates"
+                                            :key="group.report_setting_id"
+                                            :label="group.report_setting_title"
+                                        >
+                                            <option v-for="tpl in group.contents || []" :key="tpl.id" :value="tpl.id">
+                                                {{ tpl.label }}
+                                            </option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="pmr-label">{{ tt('doc_title', 'Título') }}</label>
+                                    <input v-model="docForm.title" type="text" class="form-control form-control-sm" />
+                                </div>
+                            </template>
+                        </div>
+                        <div class="mb-0">
+                            <label class="pmr-label">{{ tt('doc_content', 'Conteúdo') }}</label>
+                            <!-- TinyMCE rich-text editor (paridade com docModalEditor.js do legado) -->
+                            <TinyMceEditor
+                                v-if="showDocModal"
+                                :key="`doc-${docSelection || docForm.report_setting_content_id || docForm.exam_type || 'new'}`"
+                                v-model="docForm.content"
+                                :height="360"
+                                :placeholder="tt('doc_content_ph', 'Conteúdo da documentação...')"
+                            />
+                        </div>
+                        <!-- Data alternativa e "Salvar como modelo" (Fase 2 / B3) —
+                             laudos de exame ficam de fora (Fase 5). -->
+                        <div v-if="!docForm.exam_type" class="row g-2 mt-2">
+                            <div class="col-12 col-md-5">
+                                <DocumentDateField v-model="docForm.document_date" :config="dateConfig" />
+                                <small v-if="docForm.document_date && docContentEdited" class="form-text d-block">{{
+                                    dtt(
+                                        'date.text_dates_hint',
+                                        'As datas já escritas no texto não mudam sozinhas — confira o conteúdo.',
+                                    )
+                                }}</small>
+                            </div>
+                            <div
+                                v-if="urls.personal_templates && urls.personal_template_template"
+                                class="col-12 col-md-7"
+                            >
+                                <PersonalTemplatesBar
+                                    v-model="docForm.template_id"
+                                    :url="urls.personal_templates"
+                                    :item-url-template="urls.personal_template_template"
+                                    :show-select="false"
+                                    :context="docTemplateContext"
+                                    :build="buildDocTemplate"
+                                    :disabled="!docForm.report_setting_content_id"
+                                    @changed="loadDocTemplates"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showDocModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" :disabled="docSaving" @click="saveDoc">
+                            <i class="fas fa-save me-1"></i>{{ tt('save_documentation', 'Salvar documentação') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Medicamentos modal -->
+    <Teleport to="body">
+        <div
+            v-if="showMedicationModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showMedicationModal = false"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-prescription me-2" style="color: #e91e8c"></i>Receituário de Medicamentos
+                        </h6>
+                        <button type="button" class="btn-close" @click="showMedicationModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Alergias do paciente sempre à vista ao prescrever (Fase 2 / A4). -->
+                        <ClinicalAlertBanner
+                            v-if="safety.summary"
+                            :summary="safety.summary"
+                            :show-risks="false"
+                            compact
+                            class="mb-2"
+                        />
+                        <!-- Meus modelos de receita (Fase 2 / B3). -->
+                        <PersonalTemplatesBar
+                            v-if="urls.personal_templates && urls.personal_template_template"
+                            v-model="medTemplateId"
+                            kind="prescription"
+                            format="text"
+                            :context="recordTemplateContext"
+                            :url="urls.personal_templates"
+                            :item-url-template="urls.personal_template_template"
+                            :build="buildMedicationTemplate"
+                            class="mb-2 pb-2 border-bottom"
+                            @apply="applyMedicationTemplate"
+                        />
+                        <!-- Abas: Buscar | Recentes | Favoritos -->
+                        <ul class="nav nav-pills nav-sm mb-2 gap-1">
+                            <li class="nav-item">
+                                <button
+                                    type="button"
+                                    class="nav-link py-1 px-2"
+                                    style="font-size: 0.8rem"
+                                    :class="{ active: medTab === 'search' }"
+                                    @click="medTab = 'search'"
+                                >
+                                    <i class="fas fa-search me-1"></i>Buscar
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button
+                                    type="button"
+                                    class="nav-link py-1 px-2"
+                                    style="font-size: 0.8rem"
+                                    :class="{ active: medTab === 'recents' }"
+                                    @click="medTab = 'recents'"
+                                >
+                                    <i class="fas fa-clock-rotate-left me-1"></i>Recentes
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button
+                                    type="button"
+                                    class="nav-link py-1 px-2"
+                                    style="font-size: 0.8rem"
+                                    :class="{ active: medTab === 'favorites' }"
+                                    @click="medTab = 'favorites'"
+                                >
+                                    <i class="fas fa-star me-1"></i>Favoritos
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Buscar -->
+                        <div v-show="medTab === 'search'" class="position-relative mb-2">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input
+                                    v-model="medSearchQuery"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    :placeholder="t.med_search_ph ?? 'Nome comercial ou genérico (2+ letras)…'"
+                                    :disabled="prescription.length >= maxMedicines"
+                                    @input="searchMedicines"
+                                />
+                                <span v-if="medSearchLoading" class="input-group-text bg-transparent">
+                                    <span
+                                        class="spinner-border spinner-border-sm"
+                                        style="width: 0.8rem; height: 0.8rem"
+                                    ></span>
+                                </span>
+                            </div>
+                            <ul
+                                v-if="medSearchOpen && medSearchResults.length > 0"
+                                class="list-group shadow-sm position-absolute w-100"
+                                style="z-index: 1080; top: 100%; max-height: 280px; overflow-y: auto"
+                            >
+                                <li
+                                    v-for="item in medSearchResults"
+                                    :key="item.id"
+                                    class="list-group-item list-group-item-action py-1 px-2"
+                                    style="cursor: pointer; font-size: 0.82rem"
+                                    @mousedown.prevent="selectMedicine(item)"
+                                >
+                                    <i
+                                        v-if="item.is_favorite"
+                                        class="fas fa-star text-warning me-1"
+                                        style="font-size: 0.7rem"
+                                    ></i>
+                                    <span class="fw-semibold">{{ item.name }}</span>
+                                    <span v-if="item.concentration" class="fw-semibold ms-1">{{
+                                        item.concentration
+                                    }}</span>
+                                    <span v-if="item.presentation" class="text-muted ms-1"
+                                        >({{ item.presentation }})</span
+                                    >
+                                    <span
+                                        v-if="item.my_posology"
+                                        class="badge bg-primary-subtle text-primary ms-1"
+                                        style="font-size: 0.6rem"
+                                        >minha posologia</span
+                                    >
+                                    <div
+                                        v-if="medicineDetail(item)"
+                                        class="text-muted text-truncate"
+                                        style="font-size: 0.72rem"
+                                        :title="medicineDetail(item)"
+                                    >
+                                        {{ medicineDetail(item) }}
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Recentes / Favoritos -->
+                        <div v-show="medTab !== 'search'" class="mb-2">
+                            <ul
+                                v-if="(medTab === 'recents' ? medPresets.recents : medPresets.favorites).length > 0"
+                                class="list-group"
+                                style="max-height: 220px; overflow-y: auto"
+                            >
+                                <li
+                                    v-for="item in medTab === 'recents' ? medPresets.recents : medPresets.favorites"
+                                    :key="item.id"
+                                    class="list-group-item list-group-item-action d-flex align-items-center py-1 px-2"
+                                    style="cursor: pointer; font-size: 0.82rem"
+                                    @click="selectMedicine(item)"
+                                >
+                                    <span class="flex-grow-1">
+                                        <span class="fw-semibold">{{ item.name }}</span>
+                                        <span v-if="item.presentation" class="text-muted ms-1"
+                                            >({{ item.presentation }})</span
+                                        >
+                                        <span
+                                            v-if="item.my_posology"
+                                            class="badge bg-primary-subtle text-primary ms-1"
+                                            style="font-size: 0.6rem"
+                                            >minha posologia</span
+                                        >
+                                    </span>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link p-0"
+                                        :title="item.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
+                                        @click.stop="toggleMedFavorite(item)"
+                                    >
+                                        <i
+                                            class="fa-star"
+                                            :class="item.is_favorite ? 'fas text-warning' : 'far text-muted'"
+                                        ></i>
+                                    </button>
+                                </li>
+                            </ul>
+                            <p v-else class="text-muted small mb-0 py-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                {{
+                                    medTab === 'recents'
+                                        ? 'Medicamentos que você prescrever aparecem aqui.'
+                                        : 'Marque a estrela num medicamento para tê-lo sempre à mão.'
+                                }}
+                            </p>
+                        </div>
+
+                        <!-- Seleção: sugestão de posologia (editável — nada entra
+                             na receita sem confirmação do médico) -->
+                        <div v-if="selectedMed" class="border rounded p-2 mb-2 bg-light">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="fw-semibold" style="font-size: 0.85rem">
+                                    {{ selectedMed.name }}
+                                    <span v-if="selectedMed.concentration">{{ selectedMed.concentration }}</span>
+                                    <span v-if="selectedMed.presentation" class="text-muted"
+                                        >({{ selectedMed.presentation }})</span
+                                    >
+                                    <span
+                                        v-if="selectedMed.active_ingredient"
+                                        class="d-block text-muted fw-normal"
+                                        style="font-size: 0.72rem"
+                                        >{{ selectedMed.active_ingredient }}</span
+                                    >
+                                </span>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-link p-0"
+                                    :title="
+                                        selectedMed.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+                                    "
+                                    @click="toggleMedFavorite(selectedMed)"
+                                >
+                                    <i
+                                        class="fa-star"
+                                        :class="selectedMed.is_favorite ? 'fas text-warning' : 'far text-muted'"
+                                    ></i>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn-close ms-auto"
+                                    style="font-size: 0.6rem"
+                                    @click="cancelSelection"
+                                ></button>
+                            </div>
+                            <!-- Item bate com alergia ativa: alerta + motivo para seguir. -->
+                            <div
+                                v-if="selectedConflicts.length"
+                                class="pmr-rx-allergy mb-2"
+                                role="alert"
+                                data-testid="rx-item-allergy"
+                            >
+                                <strong
+                                    ><i class="ti ti-alert-triangle me-1" aria-hidden="true"></i
+                                    >{{ ctt('prescription.item_warning', 'Alergia registrada') }}:</strong
+                                >
+                                <ul class="mb-1 ps-3">
+                                    <li v-for="c in selectedConflicts" :key="`${c.allergy_id}-${c.match}`">
+                                        <strong>{{ c.substance }}</strong>
+                                        <span v-if="c.reaction">
+                                            — {{ ctt('prescription.reaction', 'Reação') }}: {{ c.reaction }}</span
+                                        >
+                                        <span v-if="c.severity_label"> ({{ c.severity_label }})</span>
+                                        · {{ matchLabel(c.match, clinicalT)
+                                        }}<span v-if="c.class">: {{ c.class }}</span>
+                                    </li>
+                                </ul>
+                                <template
+                                    v-if="selectedConflicts.some((c) => !acknowledgedAllergies.has(c.allergy_id))"
+                                >
+                                    <label class="form-label small mb-1" for="rx-item-reason">{{
+                                        ctt('prescription.item_reason', 'Motivo (obrigatório para adicionar)')
+                                    }}</label>
+                                    <input
+                                        id="rx-item-reason"
+                                        v-model="selectedOverrideReason"
+                                        type="text"
+                                        maxlength="500"
+                                        class="form-control form-control-sm"
+                                        :placeholder="ctt('prescription.reason_ph', 'Ex.: alergia descartada em teste')"
+                                        data-testid="rx-item-reason"
+                                    />
+                                </template>
+                            </div>
+                            <label class="pmr-label mb-1" style="font-size: 0.72rem">
+                                Posologia sugerida — revise e edite antes de adicionar
+                                <span
+                                    v-if="selectedMed.my_posology"
+                                    class="badge bg-primary-subtle text-primary ms-1"
+                                    style="font-size: 0.6rem"
+                                    >sua posologia salva</span
+                                >
+                            </label>
+                            <textarea
+                                v-model="posologyDraft"
+                                class="form-control form-control-sm"
+                                rows="3"
+                                placeholder="Dose, frequência, duração e orientações…"
+                            ></textarea>
+                            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="selectedConflicts.length ? 'btn-outline-danger' : 'btn-primary'"
+                                    :disabled="selectedNeedsReason"
+                                    data-testid="rx-add"
+                                    @click="confirmAddMedicine"
+                                >
+                                    <i class="fas fa-plus me-1"></i>Adicionar à receita
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    :disabled="posologySaving"
+                                    @click="saveMyPosology"
+                                >
+                                    <span v-if="posologySaving" class="spinner-border spinner-border-sm me-1"></span>
+                                    <i v-else class="fas fa-bookmark me-1"></i>Salvar como minha posologia
+                                </button>
+                                <span v-if="posologySavedFlash" class="badge bg-success-subtle text-success"
+                                    >Posologia salva!</span
+                                >
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="prescription.length >= maxMedicines"
+                            class="alert alert-warning py-1 px-2 small mb-2"
+                        >
+                            <i class="fas fa-exclamation-triangle me-1"></i>Limite de {{ maxMedicines }} medicamentos
+                            atingido.
+                        </div>
+                        <div v-if="prescription.length > 0" class="mb-2">
+                            <label class="pmr-label mb-1"
+                                >Medicamentos da receita ({{ prescription.length }}/{{ maxMedicines }})</label
+                            >
+                            <ul class="list-group">
+                                <li
+                                    v-for="(item, idx) in prescription"
+                                    :key="`${item.id}-${idx}`"
+                                    class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
+                                    style="font-size: 0.82rem"
+                                >
+                                    <span
+                                        ><span class="badge bg-secondary me-1">{{ idx + 1 }}</span
+                                        ><span class="fw-semibold">{{ item.name }}</span></span
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-link text-danger p-0"
+                                        @click="removeMedicine(idx)"
+                                    >
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        <label class="pmr-label mb-1">Conteúdo da receita</label>
+                        <textarea
+                            v-model="medicineLists"
+                            class="form-control form-control-sm"
+                            rows="10"
+                            placeholder="Linhas formatadas aparecem aqui."
+                        ></textarea>
+                        <DocumentDateField v-model="medDocumentDate" :config="dateConfig" class="mt-2" />
+                    </div>
+                    <div class="modal-footer py-2 d-flex justify-content-between">
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            :disabled="prescription.length === 0 && !medicineLists"
+                            @click="clearMedicines"
+                        >
+                            <i class="fas fa-eraser me-1"></i>Limpar
+                        </button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-secondary btn-sm" @click="showMedicationModal = false">
+                                {{ tt('cancel', 'Cancelar') }}
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                :disabled="quickActionBusy || !medicineLists.trim()"
+                                data-testid="rx-emit"
+                                @click="submitMedicationPrescription"
+                            >
+                                <i class="fas fa-print me-1"></i>Emitir Receita
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Pedido de exames (Fase 2 / B2) -->
+    <ProcedureRequestModal
+        ref="procedureModal"
+        :open="procedureRequest.open"
+        :kits-url="urls.exam_kits ?? ''"
+        :procedure-search-url="urls.procedure_search ?? ''"
+        :indication-search-url="urls.indication_search ?? ''"
+        :cid10-search-url="urls.cid10_search ?? ''"
+        :templates-url="urls.personal_templates ?? ''"
+        :template-item-url="urls.personal_template_template ?? ''"
+        :template-context="recordTemplateContext"
+        :date-config="dateConfig"
+        :limits="documentsConfig.request_limits ?? undefined"
+        :initial-cids="selectedCids"
+        :busy="procedureRequest.busy || quickActionBusy"
+        :server-errors="procedureRequest.errors"
+        @close="procedureRequest.open = false"
+        @submit="submitProcedureRequest"
+    />
+
+    <!-- Catarata modal -->
+    <Teleport to="body">
+        <div
+            v-if="showCataractModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showCataractModal = false"
+        >
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-eye me-2" style="color: #e91e8c"></i
+                            >{{ tt('cataract_title', 'Receituário de Catarata') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="showCataractModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="pmr-label mb-1">{{ tt('cataract_eye_label', 'Olho operado') }}</label>
+                        <div class="btn-group w-100 mb-3" role="group">
+                            <input
+                                id="cataractEyeRight"
+                                v-model="cataractForm.eye"
+                                type="radio"
+                                class="btn-check"
+                                value="right"
+                            />
+                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeRight">{{
+                                tt('cataract_eye_right', 'OD')
+                            }}</label>
+                            <input
+                                id="cataractEyeLeft"
+                                v-model="cataractForm.eye"
+                                type="radio"
+                                class="btn-check"
+                                value="left"
+                            />
+                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeLeft">{{
+                                tt('cataract_eye_left', 'OE')
+                            }}</label>
+                            <input
+                                id="cataractEyeBoth"
+                                v-model="cataractForm.eye"
+                                type="radio"
+                                class="btn-check"
+                                value="both"
+                            />
+                            <label class="btn btn-outline-primary btn-sm" for="cataractEyeBoth">{{
+                                tt('cataract_eye_both', 'AO')
+                            }}</label>
+                        </div>
+                        <label class="pmr-label mb-1">{{ tt('cataract_template', 'Modelo') }}</label>
+                        <SearchSelect
+                            v-model="cataractForm.template"
+                            class="mb-3"
+                            :options="[
+                                { value: 'pre_operatorio', label: tt('cataract_template_pre', 'Pré-operatório') },
+                                { value: 'pos_operatorio', label: tt('cataract_template_pos', 'Pós-operatório') },
+                                {
+                                    value: 'instrucoes_cirurgicas',
+                                    label: tt('cataract_template_inst', 'Instruções cirúrgicas'),
+                                },
+                            ]"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :clearable="false"
+                        />
+                        <div
+                            class="row g-2 mb-1"
+                            :class="{ 'opacity-75': cataractForm.template !== 'instrucoes_cirurgicas' }"
+                        >
+                            <div class="col-7">
+                                <label class="pmr-label mb-1">{{ tt('cataract_date', 'Data') }}</label>
+                                <input
+                                    v-model="cataractForm.date_surgery"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    placeholder="dd/mm/aaaa"
+                                    maxlength="10"
+                                    @input="formatCataractDate"
+                                />
+                            </div>
+                            <div class="col-5">
+                                <label class="pmr-label mb-1">{{ tt('cataract_hour', 'Hora') }}</label>
+                                <input
+                                    v-model="cataractForm.hour_surgery"
+                                    type="time"
+                                    class="form-control form-control-sm"
+                                />
+                            </div>
+                        </div>
+                        <DocumentDateField v-model="cataractForm.document_date" :config="dateConfig" class="mt-2" />
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showCataractModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            :disabled="quickActionBusy || !cataractForm.eye"
+                            @click="submitCataractPrescription"
+                        >
+                            <i class="fas fa-print me-1"></i>{{ tt('cataract_emit', 'Emitir') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Atestados (Fase 2 / B1): comparecimento, médico, acompanhante, aptidão visual -->
+    <CertificateModal
+        :open="certificate.open"
+        :kind="certificate.kind"
+        :date-config="dateConfig"
+        :arrived-at="documentsConfig.arrived_at ?? ''"
+        :dilation-hours="documentsConfig.dilation_hours ?? undefined"
+        :acuity="acuityLabels"
+        :acuity-unsaved="certificate.acuityUnsaved"
+        :cid10-search-url="urls.cid10_search ?? ''"
+        :day-extension-url="urls.day_extension_preview ?? ''"
+        :busy="certificate.busy || quickActionBusy"
+        :server-errors="certificate.errors"
+        @close="certificate.open = false"
+        @submit="submitCertificate"
+    />
+
+    <!-- Exam Hub -->
+    <Teleport to="body">
+        <div
+            v-if="showExamHubModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showExamHubModal = false"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-microscope me-2" style="color: #03a9f3"></i
+                            >{{ tt('exam_hub_title', 'Laudos de Exame') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="showExamHubModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">
+                            {{ tt('exam_hub_help', 'Selecione o exame para emitir o laudo.') }}
+                        </p>
+                        <div class="row g-2">
+                            <div v-for="exam in examReports" :key="exam.value" class="col-6 col-md-4 col-lg-3">
+                                <button
+                                    v-if="!exam.subtypes || exam.subtypes.length === 0"
+                                    type="button"
+                                    class="btn pmr-exam-card w-100 h-100"
+                                    :title="exam.label"
+                                    @click="openExamFromHub(exam.value)"
+                                >
+                                    <i :class="`fas ${exam.icon} pmr-exam-card-icon`"></i>
+                                    <span class="pmr-exam-card-label">{{ exam.label }}</span>
+                                </button>
+                                <div v-else class="dropdown w-100 h-100">
+                                    <button
+                                        type="button"
+                                        class="btn pmr-exam-card pmr-exam-card-multi w-100 h-100 dropdown-toggle"
+                                        data-bs-toggle="dropdown"
+                                        :title="exam.label"
+                                    >
+                                        <i :class="`fas ${exam.icon} pmr-exam-card-icon`"></i>
+                                        <span class="pmr-exam-card-label">{{ exam.label }}</span>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li v-for="sub in exam.subtypes" :key="sub.slug">
+                                            <button
+                                                type="button"
+                                                class="dropdown-item"
+                                                @click="openExamFromHub(exam.value, sub.slug)"
+                                            >
+                                                <i class="fas fa-angle-right me-2 text-muted small"></i>{{ sub.label }}
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showExamHubModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Tonometria PDF modal -->
+    <Teleport to="body">
+        <div
+            v-if="showTonometryModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+        >
+            <div class="modal-dialog modal-xl modal-dialog-centered" style="height: 90vh">
+                <div class="modal-content" style="height: 100%">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title mb-0">
+                            <i class="fas fa-print me-2" style="color: #e91e8c"></i
+                            >{{ tt('print_tonometry', 'Laudo de Tonômetria') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="closeTonometry"></button>
+                    </div>
+                    <div class="modal-body p-0" style="flex: 1; overflow: hidden">
+                        <iframe
+                            :src="tonometryPdfSrc"
+                            style="width: 100%; height: 100%; border: none; display: block"
+                            title="Laudo de Tonômetria"
+                        ></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Presbiopia obs modal -->
+    <Teleport to="body">
+        <div
+            v-if="showPresbyopiaObsModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5)"
+            @click.self="showPresbyopiaObsModal = false"
+        >
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-glasses me-2" style="color: #00bcd4"></i
+                            >{{ tt('lenses_obs', 'Observação de lentes') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="showPresbyopiaObsModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Adição da presbiopia — morava na barra como "Add.";
+                             agora vive aqui, junto do cálculo que a usa. -->
+                        <label class="pmr-label mb-1">{{ tt('presbyopia_addition', 'Adição (D)') }}</label>
+                        <input
+                            v-model.number="presbyopiaAddition"
+                            type="number"
+                            step="0.25"
+                            class="form-control form-control-sm mb-2"
+                            style="max-width: 140px"
+                            :placeholder="'ex.: 2.50'"
+                        />
+
+                        <label class="pmr-label mb-1">{{ tt('lenses_obs', 'Observação de lentes') }}</label>
+                        <textarea
+                            v-model="presbyopiaObsForm.content"
+                            class="form-control form-control-sm"
+                            rows="6"
+                            :placeholder="tt('presbyopia_obs_ph', 'Observações sobre as lentes...')"
+                        ></textarea>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showPresbyopiaObsModal = false">
+                            {{ tt('cancel', 'Cancelar') }}
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" @click="confirmPresbyopiaCalc">
+                            <i class="fas fa-check me-1"></i>{{ tt('close', 'Confirmar') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Cálculo de lentes de contato (resultado vai para o form; grava ao salvar) -->
+    <ContactLensCalculatorModal
+        :open="showContactLensCalc"
+        :t="i18n"
+        :model-value="form.contact_lens_calculation"
+        :record="form"
+        :readonly="isLocked"
+        @close="showContactLensCalc = false"
+        @apply="applyContactLens"
+        @remove="removeContactLens"
+    />
+
+    <!-- Segurança clínica: revisar alergias/medicações e "seguir com motivo" -->
+    <ClinicalSafetyModal
+        v-if="safety.summary"
+        :open="showSafetyModal"
+        :store="safety"
+        :search-url="urls.medicine_search ?? ''"
+        @close="showSafetyModal = false"
+    />
+    <AllergyOverrideModal
+        :open="allergyOverride.open"
+        :conflicts="allergyOverride.conflicts"
+        @confirm="resolveAllergyOverride"
+        @cancel="resolveAllergyOverride(null)"
+    />
+
+    <!-- PDF preview universal -->
+    <PdfPreviewModal v-if="showPdfPreview" :url="pdfPreviewUrl" :title="pdfPreviewTitle" @close="closePdfPreview" />
+
+    <!-- Modal de upload de anexos (drag-drop + progresso por arquivo) -->
+    <MedicalRecordImagingModal
+        v-if="urls.eye_exams"
+        :show="showImagingModal"
+        :fetch-url="urls.eye_exams"
+        :module-url="urls.eye_images_module ?? ''"
+        :t="t"
+        @close="showImagingModal = false"
+    />
+
+    <MedicalRecordProceduresModal
+        :show="showProceduresModal"
+        :urls="urls"
+        :is-doctor="isDoctor"
+        :is-locked="isLocked"
+        :t="t"
+        @close="showProceduresModal = false"
+    />
+
+    <MedicalRecordFileUploadModal
+        v-if="isEdit && urls.store_file"
+        :show="showUploadModal"
+        :store-url="urls.store_file"
+        :storage="storageState"
+        :csrf-token="csrf()"
+        @close="showUploadModal = false"
+        @uploaded="onFileUploaded"
+        @storage-updated="onStorageUpdated"
+    />
+
+    <!-- "Finalizar consulta": confirmação com o que vai acontecer. -->
+    <Teleport to="body">
+        <div
+            v-if="showFinishModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pmr-finish-title"
+            style="background: rgba(0, 0, 0, 0.5); z-index: 1085"
+            data-testid="pmr-finish-modal"
+            @click.self="showFinishModal = false"
+            @keydown.escape="showFinishModal = false"
+        >
+            <div class="modal-dialog modal-dialog-centered pmr-save-modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 id="pmr-finish-title" class="modal-title">
+                            <i class="fas fa-check-double me-2 text-success" aria-hidden="true"></i
+                            >{{
+                                tt('finish_confirm_title', 'Finalizar a consulta de :name?').replace(
+                                    ':name',
+                                    finishPatientName,
+                                )
+                            }}
+                        </h6>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            :aria-label="tt('finish_confirm_cancel', 'Voltar ao prontuário')"
+                            @click="showFinishModal = false"
+                        ></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted mb-2">{{ tt('finish_confirm_intro', 'Ao finalizar:') }}</p>
+                        <ul class="pmr-finish-list small mb-3">
+                            <li>
+                                <i class="fas fa-save text-primary" aria-hidden="true"></i
+                                >{{ tt('finish_confirm_save', 'O prontuário é salvo com o que está na tela.') }}
+                            </li>
+                            <li
+                                v-if="scheduleFlow?.cash_blocked"
+                                class="text-warning-emphasis"
+                                data-testid="pmr-finish-cash"
+                            >
+                                <i class="fas fa-cash-register" aria-hidden="true"></i
+                                >{{
+                                    tt(
+                                        'finish_confirm_cash',
+                                        'Esta clínica exige lançamento no caixa para "Atendido": sem ele, o prontuário é salvo e a consulta continua em andamento.',
+                                    )
+                                }}
+                            </li>
+                            <li v-else>
+                                <i class="fas fa-check-double text-success" aria-hidden="true"></i
+                                >{{
+                                    tt(
+                                        'finish_confirm_status',
+                                        'A consulta passa para "Atendido" na Agenda (o horário fica no histórico).',
+                                    )
+                                }}
+                            </li>
+                            <li>
+                                <i class="fas fa-calendar-alt text-primary" aria-hidden="true"></i
+                                >{{
+                                    tt(
+                                        'finish_confirm_agenda',
+                                        'Você volta para a Agenda para chamar o próximo paciente.',
+                                    )
+                                }}
+                            </li>
+                            <li>
+                                <i class="fas fa-pen-to-square text-secondary" aria-hidden="true"></i
+                                >{{ tt('finish_confirm_editable', 'O prontuário continua editável até ser assinado.') }}
+                            </li>
+                            <li v-if="finishHasDrafts" class="text-danger" data-testid="pmr-finish-drafts">
+                                <i class="fas fa-triangle-exclamation" aria-hidden="true"></i
+                                >{{
+                                    tt(
+                                        'finish_confirm_drafts',
+                                        'Texto ainda não registrado (evolução, receita ou solicitação de procedimentos) será descartado.',
+                                    )
+                                }}
+                            </li>
+                        </ul>
+                        <p class="small mb-0 fw-semibold" data-testid="pmr-finish-duration">
+                            <i class="fas fa-stopwatch me-1" aria-hidden="true"></i
+                            >{{
+                                tt('finish_confirm_duration', 'Duração do atendimento: :time').replace(
+                                    ':time',
+                                    finishDuration,
+                                )
+                            }}
+                        </p>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-light" @click="showFinishModal = false">
+                            {{ tt('finish_confirm_cancel', 'Voltar ao prontuário') }}
+                        </button>
+                        <button
+                            ref="finishConfirmButton"
+                            type="button"
+                            class="btn btn-success"
+                            data-testid="pmr-finish-confirm"
+                            @click="confirmFinish"
+                        >
+                            <i class="fas fa-check-double me-1" aria-hidden="true"></i
+                            >{{ tt('finish_confirm_ok', 'Finalizar consulta') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Destino pós-"Salvar": mesmo padrão de cartão (ícone + rótulo + hint)
+         do modal de saída do ScheduleFlowGuard — consistência visual entre
+         os dois pontos de "e agora, pra onde?" do prontuário. -->
+    <Teleport to="body">
+        <div
+            v-if="showSaveDestinationModal"
+            class="modal fade show d-block"
+            tabindex="-1"
+            style="background: rgba(0, 0, 0, 0.5); z-index: 1080"
+            @click.self="chooseSaveDestination('continue')"
+        >
+            <div class="modal-dialog modal-dialog-centered pmr-save-modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-circle-check me-2 text-success"></i
+                            >{{ tt('save_prompt_title', 'Prontuário salvo!') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="chooseSaveDestination('continue')"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">
+                            {{ tt('save_prompt_subtitle', 'O que você quer fazer agora?') }}
+                        </p>
+
+                        <div class="d-grid gap-2">
+                            <button
+                                v-for="opt in saveDestinationOptions"
+                                :key="opt.action"
+                                type="button"
+                                class="btn pmr-save-modal-option"
+                                :class="opt.btn"
+                                @click="chooseSaveDestination(opt.action)"
+                            >
+                                <span class="pmr-save-modal-option__icon"><i :class="opt.icon"></i></span>
+                                <span class="pmr-save-modal-option__text">
+                                    <span class="pmr-save-modal-option__label">{{ opt.label }}</span>
+                                    <span class="pmr-save-modal-option__hint">{{ opt.hint }}</span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+</template>
