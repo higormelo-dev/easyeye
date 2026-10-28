@@ -16,7 +16,7 @@ use App\Services\WhatsApp\{WhatsAppService, WhatsAppTemplates};
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, Request};
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\{Gate, Log};
 use Illuminate\Validation\Rule;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -547,6 +547,14 @@ class WhatsAppController extends Controller
             route('whatsapp.gupshup.webhook', $setting->webhook_token),
             (string) $setting->webhook_secret,
         );
+
+        if (! $result['ok']) {
+            Log::warning('[whatsapp:gupshup] falha ao registrar o webhook.', [
+                'app_id'     => (string) $setting->app_id,
+                'error_code' => $result['error_code'] ?? null,
+                'error'      => $result['error'] ?? null,
+            ]);
+        }
 
         $setting->forceFill([
             'subscription_id'       => $result['ok'] ? ($result['subscription_id'] ?? null) : $setting->subscription_id,
