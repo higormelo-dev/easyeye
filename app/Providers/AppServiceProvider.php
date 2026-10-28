@@ -16,7 +16,7 @@ use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerSe
 use App\Services\Billing\{GatewayRegistry, WebhookIngestionService};
 use App\Services\Schedules\ScheduleAvailabilityService;
 use App\Services\WhatsApp\Contracts\WhatsAppProvider;
-use App\Services\WhatsApp\Providers\{GupshupProvider, MockWhatsAppProvider};
+use App\Services\WhatsApp\Providers\{GupshupAuth, GupshupProvider, GupshupSelfServeProvider, MockWhatsAppProvider};
 use App\Support\Database\AccentInsensitiveSearch;
 use App\Support\TenantContext;
 use Carbon\Carbon;
@@ -50,9 +50,11 @@ class AppServiceProvider extends ServiceProvider
 
         // WhatsApp oficial: gupshup envia de verdade; mock (padrão, também
         // com WHATSAPP_DRIVER vazio) só simula — mesmo padrão do TISS.
-        $this->app->bind(WhatsAppProvider::class, fn ($app): WhatsAppProvider => config('whatsapp.driver') === 'gupshup'
-            ? $app->make(GupshupProvider::class)
-            : $app->make(MockWhatsAppProvider::class));
+        $this->app->bind(WhatsAppProvider::class, fn ($app): WhatsAppProvider => match (true) {
+            config('whatsapp.driver') !== 'gupshup'                              => $app->make(MockWhatsAppProvider::class),
+            $app->make(GupshupAuth::class)->mode() === GupshupAuth::MODE_API_KEY => $app->make(GupshupSelfServeProvider::class),
+            default                                                              => $app->make(GupshupProvider::class),
+        });
 
         // Circuit breaker dos providers LLM. Threshold/cooldown configuráveis via env.
         $this->app->singleton(AiCircuitBreakerInterface::class, function (): AiCircuitBreakerService {

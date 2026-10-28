@@ -59,14 +59,20 @@ class GupshupAuth
 
     public const MODE_PARTNER = 'partner_token';
 
+    public const MODE_API_KEY = 'api_key';
+
     private const PARTNER_TOKEN_KEY = 'whatsapp:gupshup:partner-token';
 
     public function mode(): ?string
     {
         $mode = (string) config('whatsapp.gupshup.auth_mode', '');
 
-        if ($mode === self::MODE_UNIVERSAL || $mode === self::MODE_PARTNER) {
+        if (in_array($mode, [self::MODE_UNIVERSAL, self::MODE_PARTNER, self::MODE_API_KEY], true)) {
             return $mode;
+        }
+
+        if (filled(config('whatsapp.gupshup.api_key'))) {
+            return self::MODE_API_KEY;
         }
 
         if (filled(config('whatsapp.gupshup.universal_token'))) {
@@ -86,6 +92,7 @@ class GupshupAuth
         return match ($this->mode()) {
             self::MODE_UNIVERSAL => filled(config('whatsapp.gupshup.universal_token')),
             self::MODE_PARTNER   => filled(config('whatsapp.gupshup.partner_email')) && filled(config('whatsapp.gupshup.partner_secret')),
+            self::MODE_API_KEY   => filled(config('whatsapp.gupshup.api_key')) && filled(config('whatsapp.gupshup.app_name')) && filled(config('whatsapp.gupshup.source_number')),
             default              => false,
         };
     }

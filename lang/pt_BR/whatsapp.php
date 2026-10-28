@@ -30,6 +30,7 @@ return [
         'partner_ok'          => 'Parceiro Gupshup configurado',
         'auth_universal'      => 'token universal',
         'auth_partner_token'  => 'e-mail + client secret',
+        'auth_api_key'        => 'API key da conta (self-serve)',
         'templates_title'     => 'Modelos do WhatsApp',
         'templates_hint'      => 'Prévia de cada mensagem com valores de exemplo. Os modelos precisam estar aprovados na Meta em cada número que envia, com estes nomes, variáveis e botões.',
         'template_name'       => 'Nome na Meta',
@@ -276,7 +277,7 @@ return [
         'ok'          => 'Registrado',
         'pending'     => 'Não registrado',
         'register'    => 'Registrar de novo',
-        'warn_failed' => 'Não foi possível registrar o webhook na Gupshup agora. Confira as credenciais do parceiro e use "Registrar de novo".',
+        'warn_failed' => 'Não foi possível registrar o webhook na Gupshup agora. Confira as credenciais do parceiro e use "Registrar de novo". Em conta comum (self-serve) não há registro por API: cadastre no painel da Gupshup com os dados de `php artisan whatsapp:webhook-secret`.',
     ],
 
     // Convite de retorno (Fase 6): chave da clínica e pausa global no Manager.

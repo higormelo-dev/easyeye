@@ -29,8 +29,10 @@ const m = computed(() => props.t.manager ?? {});
 
 const utDate = computed(() => (props.partner?.ut_expires_at ? date(props.partner.ut_expires_at) : ''));
 
-const authLabel = computed(() =>
-    props.partner?.auth_mode === 'universal' ? m.value.auth_universal : m.value.auth_partner_token,
+const authLabel = computed(
+    () =>
+        ({ universal: m.value.auth_universal, api_key: m.value.auth_api_key })[props.partner?.auth_mode] ??
+        m.value.auth_partner_token,
 );
 
 const healthBad = computed(() => !!props.health && (!props.health.ok || !props.health.healthy));

@@ -30,6 +30,7 @@ return [
         'partner_ok'          => 'Gupshup partner configured',
         'auth_universal'      => 'universal token',
         'auth_partner_token'  => 'e-mail + client secret',
+        'auth_api_key'        => 'account API key (self-serve)',
         'templates_title'     => 'WhatsApp templates',
         'templates_hint'      => 'Preview of each message with sample values. The templates must be approved by Meta on every sending number, with these names, variables and buttons.',
         'template_name'       => 'Name at Meta',
@@ -276,7 +277,7 @@ return [
         'ok'          => 'Registered',
         'pending'     => 'Not registered',
         'register'    => 'Register again',
-        'warn_failed' => 'The webhook could not be registered at Gupshup right now. Check the partner credentials and use "Register again".',
+        'warn_failed' => 'The webhook could not be registered at Gupshup right now. Check the partner credentials and use "Register again". Regular (self-serve) accounts have no registration API: add it in the Gupshup dashboard using the data from `php artisan whatsapp:webhook-secret`.',
     ],
 
     // Follow-up invitation (Phase 6): clinic switch and global pause in the Manager.
