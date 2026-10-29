@@ -213,6 +213,7 @@ const t = {
         pending: 'Não registrado',
         register: 'Registrar de novo',
         warn_failed: 'Falhou o registro',
+        manual_hint: 'Cadastre manualmente na Gupshup com php artisan whatsapp:webhook-secret.',
     },
     toggles: {
         active: 'Integração ativa',
@@ -842,6 +843,16 @@ describe('aba Número do EasyEye', () => {
             { active: true, register_webhook: true },
             expect.any(Object),
         );
+    });
+
+    it('conta self-serve mostra cadastro manual sem oferecer registro automático', async () => {
+        await openGlobal({ global: { ...healthyGlobal, webhook_ok: false, webhook_manual: true } });
+
+        expect(wrapper.find('[data-test="global-webhook"]').text()).toContain('Cadastre manualmente na Gupshup');
+        expect(wrapper.find('[data-test="global-register-webhook"]').exists()).toBe(false);
+        expect(status().find('[data-test="status-action-register-webhook"]').exists()).toBe(false);
+        await status().find('[data-test="global-webhook-off"] [data-test="status-action-configure"]').trigger('click');
+        expect(window.axios.patch).not.toHaveBeenCalled();
     });
 
     it('verificar app chama o teste sem telefone (saúde) e mostra o resultado', async () => {

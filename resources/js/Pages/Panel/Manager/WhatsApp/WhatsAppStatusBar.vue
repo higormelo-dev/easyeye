@@ -91,7 +91,7 @@ const problems = computed(() => {
                 tone: 'warning',
                 icon: 'ti-webhook',
                 text: ui.value.global_webhook_off,
-                action: 'register-webhook',
+                action: props.global.webhook_manual ? 'configure' : 'register-webhook',
                 test: 'global-webhook-off',
             });
         }

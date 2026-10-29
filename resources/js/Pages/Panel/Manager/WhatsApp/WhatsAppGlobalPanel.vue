@@ -259,14 +259,19 @@ defineExpose({ verify, registerWebhook, focusTest });
                 </h6>
                 <template v-if="global?.has_app">
                     <p class="text-muted small mb-2">
-                        {{ t.webhook.hint }}
+                        {{ global.webhook_manual ? t.webhook.manual_hint : t.webhook.hint }}
                         <span v-if="global.webhook_since">({{ dateTime(global.webhook_since) }})</span>
                     </p>
-                    <div v-if="webhookWarn" class="alert alert-warning py-1 small mb-2" role="alert">
+                    <div
+                        v-if="webhookWarn && !global.webhook_manual"
+                        class="alert alert-warning py-1 small mb-2"
+                        role="alert"
+                    >
                         {{ t.webhook.warn_failed }}
                     </div>
                     <code class="wag-code d-block border rounded p-2 text-break mb-2">{{ global.webhook_url }}</code>
                     <button
+                        v-if="!global.webhook_manual"
                         type="button"
                         class="btn btn-outline-secondary btn-sm"
                         :disabled="saving"

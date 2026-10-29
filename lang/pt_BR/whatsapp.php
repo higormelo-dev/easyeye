@@ -23,7 +23,7 @@ return [
         'status_via_global'   => 'Ativo (número do EasyEye)',
         'configure'           => 'Configurar',
         'global_title'        => 'Número do EasyEye (padrão)',
-        'global_hint'         => 'App da Gupshup do número do EasyEye, usado por TODAS as clínicas sem número próprio, pelo código de verificação do cadastro e pelos avisos de cobrança. Informe o App ID (portal de parceiros da Gupshup); o webhook é registrado sozinho ao salvar.',
+        'global_hint'         => 'App da Gupshup do número do EasyEye, usado por TODAS as clínicas sem número próprio, pelo código de verificação do cadastro e pelos avisos de cobrança. Informe o App ID do painel da Gupshup e siga as instruções de webhook abaixo.',
         'global_active'       => 'Número do EasyEye ativo (clínicas sem número próprio enviam por ele)',
         'mock_warning'        => 'MODO SIMULAÇÃO: nenhuma mensagem sai de verdade e o webhook não é registrado na Gupshup — tudo fica só no log. Para ativar, defina WHATSAPP_DRIVER=gupshup e as credenciais do parceiro (GUPSHUP_*) no .env do servidor e limpe o cache de config.',
         'partner_missing'     => 'Credenciais do parceiro Gupshup ausentes no .env (GUPSHUP_UNIVERSAL_TOKEN ou GUPSHUP_PARTNER_EMAIL + GUPSHUP_PARTNER_SECRET): nada será enviado.',
@@ -274,6 +274,7 @@ return [
     'webhook' => [
         'title'       => 'Webhook (respostas e status)',
         'hint'        => 'Registrado sozinho na Gupshup ao salvar o app, com um segredo que só o servidor conhece. É por ele que chegam os cliques nos botões, as respostas dos pacientes e os status de entrega/leitura.',
+        'manual_hint' => 'Na conta comum (self-serve), cadastre o webhook no painel da Gupshup com formato Meta (v3) e cabeçalho de segredo. Obtenha os dados no servidor com php artisan whatsapp:webhook-secret. Depois de salvar na Gupshup, marque o cadastro com php artisan whatsapp:webhook-secret --registered. Essa marcação não verifica a entrega dos eventos.',
         'ok'          => 'Registrado',
         'pending'     => 'Não registrado',
         'register'    => 'Registrar de novo',

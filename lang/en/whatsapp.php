@@ -23,7 +23,7 @@ return [
         'status_via_global'   => 'Active (EasyEye number)',
         'configure'           => 'Configure',
         'global_title'        => 'EasyEye number (default)',
-        'global_hint'         => 'Gupshup app of the EasyEye number, used by ALL clinics without their own number, by the sign-up verification code and by the billing notices. Enter the App ID (Gupshup partner portal); the webhook is registered automatically on save.',
+        'global_hint'         => 'Gupshup app of the EasyEye number, used by ALL clinics without their own number, by the sign-up verification code and by the billing notices. Enter the App ID from the Gupshup dashboard and follow the webhook instructions below.',
         'global_active'       => 'EasyEye number active (clinics without their own number send through it)',
         'mock_warning'        => 'SIMULATION MODE: no message is actually sent and the webhook is not registered at Gupshup — everything only goes to the log. To enable it, set WHATSAPP_DRIVER=gupshup and the partner credentials (GUPSHUP_*) in the server .env and clear the config cache.',
         'partner_missing'     => 'Gupshup partner credentials missing in .env (GUPSHUP_UNIVERSAL_TOKEN or GUPSHUP_PARTNER_EMAIL + GUPSHUP_PARTNER_SECRET): nothing will be sent.',
@@ -274,6 +274,7 @@ return [
     'webhook' => [
         'title'       => 'Webhook (replies and status)',
         'hint'        => 'Registered automatically at Gupshup when the app is saved, with a secret only the server knows. Button taps, patient replies and delivery/read status arrive through it.',
+        'manual_hint' => 'For a regular (self-serve) account, add the webhook in the Gupshup dashboard using Meta (v3) format and the secret header. Get the details on the server with php artisan whatsapp:webhook-secret. After saving at Gupshup, mark it registered with php artisan whatsapp:webhook-secret --registered. This mark does not verify event delivery.',
         'ok'          => 'Registered',
         'pending'     => 'Not registered',
         'register'    => 'Register again',

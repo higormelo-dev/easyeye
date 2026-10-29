@@ -11,7 +11,7 @@ use App\Models\Entity;
 use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppOptOut, WhatsAppSetting};
 use App\Services\Audit\AuditLogger;
 use App\Services\WhatsApp\Contracts\WhatsAppProvider;
-use App\Services\WhatsApp\Providers\GupshupAuth;
+use App\Services\WhatsApp\Providers\{GupshupAuth, GupshupSelfServeProvider};
 use App\Services\WhatsApp\{WhatsAppService, WhatsAppTemplates};
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -548,6 +548,12 @@ class WhatsAppController extends Controller
             (string) $setting->webhook_secret,
         );
 
+        // Na conta comum, esta ação não consulta nem altera a Gupshup.
+        // Preserve o cadastro manual; uma tentativa automática não o invalida.
+        if (($result['error_code'] ?? null) === 'manual_webhook') {
+            return $setting->webhook_subscribed_at !== null;
+        }
+
         if (! $result['ok']) {
             Log::warning('[whatsapp:gupshup] falha ao registrar o webhook.', [
                 'app_id'     => (string) $setting->app_id,
@@ -608,11 +614,12 @@ class WhatsAppController extends Controller
     private function appProps(WhatsAppSetting $setting): array
     {
         return [
-            'has_app'       => $setting->hasApp(),
-            'app_id'        => $setting->app_id,
-            'webhook_url'   => route('whatsapp.gupshup.webhook', $setting->webhook_token),
-            'webhook_ok'    => $setting->webhook_subscribed_at !== null,
-            'webhook_since' => $setting->webhook_subscribed_at?->toIso8601String(),
+            'has_app'        => $setting->hasApp(),
+            'app_id'         => $setting->app_id,
+            'webhook_url'    => route('whatsapp.gupshup.webhook', $setting->webhook_token),
+            'webhook_ok'     => $setting->webhook_subscribed_at !== null,
+            'webhook_manual' => $this->provider instanceof GupshupSelfServeProvider,
+            'webhook_since'  => $setting->webhook_subscribed_at?->toIso8601String(),
             // withCount('optOuts') na lista (sem N+1); conta na hora no resto.
             'opt_outs' => $setting->exists ? (int) ($setting->opt_outs_count ?? $setting->optOuts()->count()) : 0,
         ];

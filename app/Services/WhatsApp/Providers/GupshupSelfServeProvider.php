@@ -67,6 +67,18 @@ class GupshupSelfServeProvider implements WhatsAppProvider
             return $auth;
         }
 
+        // O Sandbox oferece modelos próprios, sem os templates clínicos do EasyEye.
+        // A troca é explícita e exclusiva do teste manual do manager.
+        if ($template->key === 'connection_test' && config('whatsapp.gupshup.sandbox', false)) {
+            $template = new TemplateMessage(
+                'connection_test',
+                'common_status',
+                'en_US',
+                [(string) config('app.name'), 'connection test'],
+                [],
+            );
+        }
+
         $id = $this->templateId($setting, $template->name, $template->language);
 
         if ($id === null) {

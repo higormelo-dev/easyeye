@@ -43,11 +43,14 @@ return [
         //    não tem API: é cadastrado no painel (php artisan whatsapp:webhook-secret).
         //    https://docs.gupshup.io/reference/sending-text-template
         //    Com GUPSHUP_API_KEY preenchida, este modo tem prioridade sobre os de parceiro.
-        'auth_mode'       => env('GUPSHUP_AUTH_MODE', ''),
-        'api_base_url'    => env('GUPSHUP_API_BASE_URL', 'https://api.gupshup.io'),
-        'api_key'         => env('GUPSHUP_API_KEY'),
-        'app_name'        => env('GUPSHUP_APP_NAME'),
-        'source_number'   => env('GUPSHUP_SOURCE_NUMBER'),
+        'auth_mode'     => env('GUPSHUP_AUTH_MODE', ''),
+        'api_base_url'  => env('GUPSHUP_API_BASE_URL', 'https://api.gupshup.io'),
+        'api_key'       => env('GUPSHUP_API_KEY'),
+        'app_name'      => env('GUPSHUP_APP_NAME'),
+        'source_number' => env('GUPSHUP_SOURCE_NUMBER'),
+        // Só o teste manual usa common_status (en_US), aprovado no Sandbox.
+        // Mensagens clínicas e OTP continuam exigindo seus próprios templates.
+        'sandbox'         => (bool) env('GUPSHUP_SANDBOX', false),
         'universal_token' => env('GUPSHUP_UNIVERSAL_TOKEN'),
         'partner_email'   => env('GUPSHUP_PARTNER_EMAIL'),
         'partner_secret'  => env('GUPSHUP_PARTNER_SECRET'),
