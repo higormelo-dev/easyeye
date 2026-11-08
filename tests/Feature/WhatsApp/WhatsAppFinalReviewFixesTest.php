@@ -441,9 +441,9 @@ describe('10. falhas de configuração em lista branca', function () {
         expect(frGate($user))->toBe(302);
     });
 
-    it('modelo do código fora do app (self-serve, ex.: app Sandbox): solta o gate e avisa o time', function () {
-        // Produção em 08/11/2026: modo api_key com GUPSHUP_SANDBOX=true — o app de Sandbox só tem os modelos da
-        // Gupshup, então todo código de cadastro voltaria template_not_found e a pessoa ficaria presa, sem alerta.
+    it('modelo do código fora do app (self-serve, ex.: modelo nunca criado): solta o gate e avisa o time', function () {
+        // Produção em 08/11/2026: app ativo da conta self-serve sem nenhum modelo criado — todo código de cadastro
+        // voltaria template_not_found e a pessoa ficaria presa, sem alerta.
         $global = frGlobal(['app_id' => 'global-tnf-fr']);
         $user   = User::factory()->create(['phone' => '11977776666']);
         useGupshupDriver();
