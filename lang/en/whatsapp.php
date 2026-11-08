@@ -56,6 +56,31 @@ return [
             'url' => 'Open EasyEye',
             'otp' => 'Copy code',
         ],
+        'templates_api' => [
+            'hint'           => 'State of each template at Gupshup. Missing ones can be created from here: the template goes to Meta for approval and is never recreated if it already exists.',
+            'check'          => 'Check at Gupshup',
+            'checking'       => 'Checking…',
+            'create'         => 'Create at Gupshup',
+            'creating'       => 'Sending…',
+            'create_missing' => 'Create the missing ones (:count)',
+            'confirm_one'    => 'Send template :name (:language) to Gupshup for Meta approval?',
+            'confirm_all'    => 'Send :count templates to Gupshup for Meta approval? One every 7 seconds, stopping at the first error.',
+            'progress'       => 'Sending :current of :total…',
+            'stopped'        => 'Stopped at the first error; the remaining templates were not sent.',
+            'done'           => ':count template(s) sent. Meta takes minutes to hours; check back here later.',
+            'load_failed'    => 'Could not read the templates at Gupshup.',
+            'create_failed'  => 'Could not create the template at Gupshup.',
+            'reason'         => 'Meta reason:',
+            'status'         => [
+                'APPROVED' => 'Approved',
+                'PENDING'  => 'In review',
+                'REJECTED' => 'Rejected',
+                'FAILED'   => 'Failed',
+                'PAUSED'   => 'Paused',
+                'DISABLED' => 'Disabled',
+                'MISSING'  => 'Not created',
+            ],
+        ],
         'template_params' => [
             'first_name'   => 'Patient first name',
             'clinic'       => 'Clinic name',
@@ -269,6 +294,14 @@ return [
         'sent'          => 'Test message sent.',
         'invalid_phone' => 'Invalid mobile number.',
         'failed'        => 'Error talking to Gupshup.',
+    ],
+
+    // Creating templates through the API (Manager → WhatsApp → Templates).
+    'template_api' => [
+        'only_self_serve' => 'Creating templates here only works with the standard Gupshup account (GUPSHUP_API_KEY).',
+        'busy'            => 'This template is already being sent. Wait a few seconds.',
+        'exists'          => 'This template already exists at Gupshup (:status). To redo it, delete it in the Gupshup panel.',
+        'created'         => 'Template sent to Gupshup: waiting for Meta approval.',
     ],
 
     'webhook' => [

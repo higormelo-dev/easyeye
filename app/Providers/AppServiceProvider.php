@@ -286,6 +286,11 @@ class AppServiceProvider extends ServiceProvider
             'manager-destructive',
             static fn (Request $r) => Limit::perMinute(5)->by($managerKey($r)),
         );
+        // Criação de modelos do WhatsApp por API: o painel manda 1 a cada 7 s (a Gupshup aceita 10/min).
+        RateLimiter::for(
+            'manager-whatsapp-templates',
+            static fn (Request $r) => Limit::perMinute(12)->by($managerKey($r)),
+        );
 
         // -------------------------------------------------------------------------
         // Checkout transparente da assinatura: pagamento (cartão, contratação,

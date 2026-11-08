@@ -196,7 +196,13 @@ Depois: `php artisan migrate` (apaga as credenciais da Z-API, troca os tokens de
 
 Cadastrar **exatamente** com estes nomes (são os de `config/whatsapp.php`), idioma **Portuguese (BR) — `pt_BR`**, variáveis posicionais `{{1}}`, `{{2}}`... na ordem abaixo e botões **na ordem listada** (o índice do botão é usado no envio). A Meta exige exemplo para cada variável. Nada de conteúdo promocional (vira Marketing).
 
-Conferência (só leitura, conta comum): `php artisan whatsapp:templates:status` compara estes modelos com os do app na Gupshup e mostra, por nome e idioma, `APPROVED`, `PENDING`, `REJECTED`/`FAILED` (com o motivo da Meta) ou `AUSENTE`, além do que existe no app e não é do catálogo. O cadastro continua manual, no painel da Gupshup: não há rotina que crie modelos por API.
+Conferência (só leitura, conta comum): `php artisan whatsapp:templates:status` compara estes modelos com os do app na Gupshup e mostra, por nome e idioma, `APPROVED`, `PENDING`, `REJECTED`/`FAILED` (com o motivo da Meta) ou `AUSENTE`, além do que existe no app e não é do catálogo.
+
+Criação pelo painel (conta comum): em **Manager → WhatsApp → Modelos**, cada cartão mostra o estado do modelo no app (Aprovado, Em análise, Recusado/Falhou com o motivo da Meta, ou Não criado), lido da Gupshup ao abrir a aba e no botão **Verificar na Gupshup**. O que está *Não criado* tem **Criar na Gupshup**, e **Criar os que faltam** manda um por vez, com 7 s de intervalo, parando no primeiro erro. Só o Admin do SaaS, só na conta comum, e cada envio fica na trilha (`manager.whatsapp_template.submitted`, sem chave). Faz exatamente o mesmo que o comando abaixo.
+
+Criação por linha de comando: `php artisan whatsapp:templates:submit` mostra, dos modelos que ainda não existem no app, os campos que seriam enviados; com `--send` cria de verdade (um POST por modelo; a Meta aprova depois), no máximo 10 por minuto, e **para no primeiro erro**. Comece por um: `--only=connection_test --send`, e confira com `whatsapp:templates:status`. Nunca recria nem apaga: quem já existe, em qualquer estado, é pulado; para refazer um `FAILED` ou `REJECTED`, apague no painel da Gupshup (a Meta pode segurar o nome por 30 dias, então confira o texto antes). Os textos vêm do mesmo catálogo da aba Modelos (`WhatsAppTemplateCatalog`).
+
+Limites conhecidos: **ainda não foi testado na API real**. O endpoint de criação da conta comum (`POST /wa/app/{appId}/template`) não tem página de referência na Gupshup; o formato do `example` (valores entre colchetes), dos botões e do modelo de autenticação segue a doc de parceiro. E a conta WABA precisa ter permissão para criar modelos (em 08/11 a criação pelo painel falhou com *does not have permission to create message template*): a API não contorna isso.
 
 ### 6.1 Pacientes (sempre pt_BR)
 

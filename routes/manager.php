@@ -442,6 +442,13 @@ Route::group([
     Route::post('whatsapp/global/test', [WhatsAppController::class, 'testGlobal'])
         ->middleware('throttle:manager-destructive')
         ->name('whatsapp.global.test');
+    // Modelos na Gupshup (conta comum): estado de cada um e criação por API, um por chamada.
+    Route::get('whatsapp/templates/status', [WhatsAppController::class, 'templatesStatus'])
+        ->middleware('throttle:manager-read')
+        ->name('whatsapp.templates.status');
+    Route::post('whatsapp/templates', [WhatsAppController::class, 'createTemplate'])
+        ->middleware('throttle:manager-whatsapp-templates')
+        ->name('whatsapp.templates.create');
     Route::patch('whatsapp/{entity}', [WhatsAppController::class, 'update'])
         ->middleware('throttle:manager-destructive')
         ->name('whatsapp.update');

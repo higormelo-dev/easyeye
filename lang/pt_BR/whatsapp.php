@@ -56,6 +56,31 @@ return [
             'url' => 'Abrir o EasyEye',
             'otp' => 'Copiar código',
         ],
+        'templates_api' => [
+            'hint'           => 'Estado de cada modelo na Gupshup. O que falta pode ser criado daqui: o modelo vai para a aprovação da Meta e nunca é recriado se já existir.',
+            'check'          => 'Verificar na Gupshup',
+            'checking'       => 'Verificando…',
+            'create'         => 'Criar na Gupshup',
+            'creating'       => 'Enviando…',
+            'create_missing' => 'Criar os que faltam (:count)',
+            'confirm_one'    => 'Enviar o modelo :name (:language) à Gupshup para aprovação da Meta?',
+            'confirm_all'    => 'Enviar :count modelos à Gupshup para aprovação da Meta? Vai um a cada 7 segundos e para no primeiro erro.',
+            'progress'       => 'Enviando :current de :total…',
+            'stopped'        => 'Parei no primeiro erro; os modelos seguintes não foram enviados.',
+            'done'           => ':count modelo(s) enviado(s). A Meta leva de minutos a horas; confira aqui depois.',
+            'load_failed'    => 'Não foi possível ler os modelos na Gupshup.',
+            'create_failed'  => 'Não foi possível criar o modelo na Gupshup.',
+            'reason'         => 'Motivo da Meta:',
+            'status'         => [
+                'APPROVED' => 'Aprovado',
+                'PENDING'  => 'Em análise',
+                'REJECTED' => 'Recusado',
+                'FAILED'   => 'Falhou',
+                'PAUSED'   => 'Pausado',
+                'DISABLED' => 'Desativado',
+                'MISSING'  => 'Não criado',
+            ],
+        ],
         'template_params' => [
             'first_name'   => 'Primeiro nome do paciente',
             'clinic'       => 'Nome da clínica',
@@ -269,6 +294,14 @@ return [
         'sent'          => 'Mensagem de teste enviada.',
         'invalid_phone' => 'Celular inválido.',
         'failed'        => 'Erro ao falar com a Gupshup.',
+    ],
+
+    // Criação de modelos por API (Manager → WhatsApp → Modelos).
+    'template_api' => [
+        'only_self_serve' => 'Criar modelos por aqui só funciona na conta comum da Gupshup (GUPSHUP_API_KEY).',
+        'busy'            => 'Esse modelo já está sendo enviado. Aguarde alguns segundos.',
+        'exists'          => 'Esse modelo já existe na Gupshup (:status). Para refazer, apague-o no painel da Gupshup.',
+        'created'         => 'Modelo enviado à Gupshup: aguardando a aprovação da Meta.',
     ],
 
     'webhook' => [

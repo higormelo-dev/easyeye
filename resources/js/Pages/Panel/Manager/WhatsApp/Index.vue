@@ -36,6 +36,8 @@ const props = defineProps({
     partner: { type: Object, default: () => ({ configured: false, auth_mode: null }) },
     templates: { type: Array, default: () => [] },
     templateLanguages: { type: Array, default: () => ['pt_BR'] },
+    // Conta comum da Gupshup: a aba Modelos lê o estado e cria os modelos por API.
+    templateApi: { type: Boolean, default: false },
     // Pausa global dos convites de retorno (Fase 6): { paused, impact }.
     recall: { type: Object, default: () => ({ paused: null, impact: { clinics: 0, recalls: 0 } }) },
     routes: { type: Object, required: true },
@@ -455,7 +457,14 @@ const breadcrumbs = [];
             aria-labelledby="wa-tab-templates"
             data-test="panel-templates"
         >
-            <WhatsAppTemplates :templates="templates" :enabled-languages="templateLanguages" :t="t.manager" />
+            <WhatsAppTemplates
+                :templates="templates"
+                :enabled-languages="templateLanguages"
+                :api="templateApi"
+                :active="tab === 'templates'"
+                :routes="routes"
+                :t="t.manager"
+            />
         </div>
 
         <WhatsAppClinicDrawer

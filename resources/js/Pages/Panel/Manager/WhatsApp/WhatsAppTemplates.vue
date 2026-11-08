@@ -1,16 +1,27 @@
 <script setup>
 import { computed, ref } from 'vue';
+import TemplateApiBar from './TemplateApiBar.vue';
+import { useTemplateApi } from './useTemplateApi.js';
 
 /**
  * Modelos do WhatsApp (Manager → WhatsApp): prévia de cada template no
  * visual do WhatsApp com valores de exemplo, texto no formato da Meta
  * ({{1}}, {{2}}…) para copiar no cadastro, variáveis e botões. Dados vêm de
- * WhatsAppController::templateCatalog() (config + lang, pt_BR e en).
+ * WhatsAppTemplateCatalog (config + lang, pt_BR e en).
+ *
+ * Na conta comum da Gupshup (`api`), mostra o estado de cada modelo no app (aprovado, em análise,
+ * recusado com o motivo da Meta, ou não criado) e cria os que faltam por API, um por chamada:
+ * "Criar os que faltam" encadeia com intervalo (a Gupshup aceita 10 por minuto) e para no primeiro erro.
  */
 const props = defineProps({
     templates: { type: Array, default: () => [] },
     // Idiomas liberados para envio (WHATSAPP_TEMPLATE_LANGUAGES).
     enabledLanguages: { type: Array, default: () => ['pt_BR'] },
+    // Conta comum da Gupshup: dá para ler o estado dos modelos e criá-los por API.
+    api: { type: Boolean, default: false },
+    // Aba Modelos visível: o estado na Gupshup é lido na primeira vez que ela abre.
+    active: { type: Boolean, default: false },
+    routes: { type: Object, default: () => ({}) },
     t: { type: Object, required: true },
 });
 
@@ -52,10 +63,27 @@ async function copy(value, id) {
         // Navegador sem permissão de área de transferência: o texto continua visível para copiar à mão.
     }
 }
+
+const {
+    apiText,
+    loading,
+    sending,
+    progress,
+    notice,
+    busy,
+    missing,
+    canCreate,
+    statusOf,
+    statusClass,
+    statusLabel,
+    loadStatus,
+    createSingle,
+    createMissing,
+} = useTemplateApi(props, language, languageOff);
 </script>
 
 <template>
-    <div class="card" data-test="wa-templates">
+    <div class="card" data-test="wa-templates" data-ee-density="default">
         <div class="card-header bg-transparent d-flex flex-wrap align-items-center gap-2">
             <div class="flex-grow-1 min-w-0">
                 <h5 class="mb-0 fw-semibold">
@@ -63,7 +91,7 @@ async function copy(value, id) {
                 </h5>
                 <p class="small text-muted mb-0">{{ t.templates_hint }}</p>
             </div>
-            <div class="btn-group btn-group-sm" role="group" :aria-label="t.template_preview_language">
+            <div class="btn-group" role="group" :aria-label="t.template_preview_language">
                 <button
                     v-for="lang in LANGUAGES"
                     :key="lang"
@@ -71,6 +99,7 @@ async function copy(value, id) {
                     class="btn"
                     :class="language === lang ? 'btn-primary' : 'btn-outline-primary'"
                     :aria-pressed="language === lang"
+                    :disabled="busy"
                     :data-test="`wa-lang-${lang}`"
                     @click="language = lang"
                 >
@@ -80,6 +109,19 @@ async function copy(value, id) {
         </div>
 
         <div class="card-body">
+            <TemplateApiBar
+                v-if="api"
+                :text="apiText"
+                :loading="loading"
+                :busy="busy"
+                :can-create="canCreate"
+                :missing-count="missing.length"
+                :progress="progress"
+                :notice="notice"
+                @check="loadStatus"
+                @create-missing="createMissing"
+            />
+
             <div v-if="languageOff" class="alert alert-warning small py-2" data-test="wa-lang-off">
                 <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ t.template_language_off }}
             </div>
@@ -111,7 +153,7 @@ async function copy(value, id) {
                             </div>
                             <button
                                 type="button"
-                                class="btn btn-sm btn-light"
+                                class="btn btn-light btn-icon"
                                 :title="copied === `${tpl.key}:name` ? t.template_copied : t.template_copy_name"
                                 :aria-label="t.template_copy_name"
                                 @click="copy(tpl.name, `${tpl.key}:name`)"
@@ -122,6 +164,22 @@ async function copy(value, id) {
                                 ></i>
                             </button>
                         </header>
+
+                        <div
+                            v-if="api && statusOf(tpl)"
+                            class="d-flex flex-wrap align-items-center gap-2"
+                            data-test="wa-status"
+                        >
+                            <span
+                                class="badge rounded fs-12 fw-medium"
+                                :class="statusClass(statusOf(tpl).status)"
+                                :data-status="statusOf(tpl).status"
+                                >{{ statusLabel(statusOf(tpl).status) }}</span
+                            >
+                            <span v-if="statusOf(tpl).reason" class="small text-danger" data-test="wa-reason"
+                                >{{ apiText.reason }} {{ statusOf(tpl).reason }}</span
+                            >
+                        </div>
 
                         <!-- Prévia no visual do WhatsApp -->
                         <div class="wa-chat rounded-3 p-2">
@@ -157,22 +215,35 @@ async function copy(value, id) {
                             <p v-else class="text-muted mb-0">{{ t.template_no_variables }}</p>
                         </div>
 
-                        <button
-                            v-if="tpl.category !== 'AUTHENTICATION'"
-                            type="button"
-                            class="btn btn-sm btn-outline-secondary mt-auto align-self-start d-inline-flex align-items-center gap-1"
-                            data-test="wa-copy-meta"
-                            @click="copy(text(tpl).meta, `${tpl.key}:meta`)"
-                        >
-                            <i
-                                :class="[
-                                    'ti',
-                                    copied === `${tpl.key}:meta` ? 'ti-check text-success' : 'ti-clipboard-text',
-                                ]"
-                                aria-hidden="true"
-                            ></i>
-                            {{ copied === `${tpl.key}:meta` ? t.template_copied : t.template_copy_meta }}
-                        </button>
+                        <div class="mt-auto d-flex flex-wrap gap-2">
+                            <button
+                                v-if="tpl.category !== 'AUTHENTICATION'"
+                                type="button"
+                                class="btn btn-outline-secondary d-inline-flex align-items-center gap-1"
+                                data-test="wa-copy-meta"
+                                @click="copy(text(tpl).meta, `${tpl.key}:meta`)"
+                            >
+                                <i
+                                    :class="[
+                                        'ti',
+                                        copied === `${tpl.key}:meta` ? 'ti-check text-success' : 'ti-clipboard-text',
+                                    ]"
+                                    aria-hidden="true"
+                                ></i>
+                                {{ copied === `${tpl.key}:meta` ? t.template_copied : t.template_copy_meta }}
+                            </button>
+                            <button
+                                v-if="api && statusOf(tpl)?.status === 'MISSING'"
+                                type="button"
+                                class="btn btn-outline-primary d-inline-flex align-items-center gap-1"
+                                data-test="wa-create"
+                                :disabled="!canCreate"
+                                @click="createSingle(tpl)"
+                            >
+                                <i class="ti ti-cloud-upload" aria-hidden="true"></i>
+                                {{ sending === `${tpl.key}|${language}` ? apiText.creating : apiText.create }}
+                            </button>
+                        </div>
                     </article>
                 </div>
             </section>

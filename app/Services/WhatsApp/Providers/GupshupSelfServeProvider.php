@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\WhatsApp\Providers;
 
 use App\Models\WhatsApp\WhatsAppSetting;
+use App\Services\Auth\PhoneVerificationService;
 use App\Services\WhatsApp\Contracts\WhatsAppProvider;
 use App\Services\WhatsApp\TemplateMessage;
 use Illuminate\Http\Client\{ConnectionException, PendingRequest};
@@ -25,6 +26,10 @@ use Illuminate\Support\Facades\{Cache, Http};
  *    https://docs.gupshup.io/reference/session-text-message
  *  - Templates do app (id ↔ nome+idioma): GET /wa/app/{appId}/template
  *    https://docs.gupshup.io/reference/get-all-templates-for-an-app
+ *  - Criar modelo: POST /wa/app/{appId}/template (form; campos em templateForm())
+ *    https://docs.gupshup.io/docs/template-button-list — não há página de referência da conta comum;
+ *    os campos de botões e de autenticação seguem a doc de parceiro
+ *    https://partner-docs.gupshup.io/reference/post_partner-app-appid-templates
  *  - Webhook: sem API — cadastrado no painel (Webhooks, formato Meta v3, cabeçalho de
  *    segredo): ver `php artisan whatsapp:webhook-secret`.
  *
@@ -267,6 +272,91 @@ class GupshupSelfServeProvider implements WhatsAppProvider
         }
 
         return ['ok' => true, 'templates' => $result];
+    }
+
+    /**
+     * Campos do POST que cria um modelo do catálogo (WhatsAppTemplateCatalog) em um idioma.
+     * Formato conforme a doc da Gupshup (conferida em 08/11/2026; ainda sem teste na API real):
+     *  - example: o corpo com cada variável trocada pelo exemplo, entre colchetes;
+     *  - buttons: JSON — QUICK_REPLY {text}; URL {text, url com {{1}}, example[]}; OTP {otp_type};
+     *  - AUTHENTICATION: só a 1ª frase padrão no corpo (a recomendação de segurança e a validade vão em
+     *    addSecurityRecommendation e codeExpirationMinutes) e sem rodapé.
+     *
+     * @param array<string, mixed> $entry linha de WhatsAppTemplateCatalog::entries()
+     *
+     * @return array<string, string>
+     */
+    public function templateForm(array $entry, string $locale): array
+    {
+        $text   = $entry['texts'][$locale];
+        $auth   = $entry['category'] === 'AUTHENTICATION';
+        $base   = rtrim((string) config('app.url'), '/');
+        $values = [];
+
+        foreach ($text['params'] as $param) {
+            $values[$param['placeholder']] = '[' . $param['example'] . ']';
+        }
+
+        $content = $auth ? explode('. ', $text['meta'], 2)[0] . '.' : $text['meta'];
+
+        $form = [
+            'elementName'                 => $entry['name'],
+            'languageCode'                => $locale,
+            'category'                    => $entry['category'],
+            'templateType'                => 'TEXT',
+            'vertical'                    => ['patients' => 'Atendimento', 'saas' => 'Assinatura', 'registration' => 'Cadastro'][$entry['group']] ?? 'EasyEye',
+            'content'                     => $content,
+            'example'                     => strtr($content, $values),
+            'enableSample'                => 'true',
+            'allowTemplateCategoryChange' => 'false',
+        ];
+
+        if ($auth) {
+            $form['addSecurityRecommendation'] = 'true';
+            $form['codeExpirationMinutes']     = (string) PhoneVerificationService::CODE_TTL_MINUTES;
+        } elseif (filled($text['footer'])) {
+            $form['footer'] = $text['footer'];
+        }
+
+        $buttons = array_map(fn (array $button) => match ($button['type']) {
+            'quick_reply' => ['type' => 'QUICK_REPLY', 'text' => $button['label']],
+            'url'         => ['type' => 'URL', 'text' => $button['label'], 'url' => $base . '/{{1}}', 'example' => [$base . '/panel/my-subscription']],
+            'otp'         => ['type' => 'OTP', 'otp_type' => 'COPY_CODE', 'text' => $button['label']],
+        }, $text['buttons']);
+
+        if ($buttons !== []) {
+            $form['buttons'] = json_encode($buttons, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
+        return $form;
+    }
+
+    /**
+     * Cria o modelo na Gupshup (POST /wa/app/{appId}/template): ele vai para a aprovação da Meta e
+     * nasce PENDING. A Gupshup limita a 10 chamadas por minuto. Sem retry: timeout depois de enviar
+     * deixa o estado desconhecido (o modelo pode ter sido criado).
+     *
+     * @param array<string, string> $form campos de templateForm()
+     *
+     * @return array{ok: bool, id?: string, status?: string, error?: string, error_code?: string, retryable?: bool}
+     */
+    public function createTemplate(WhatsAppSetting $setting, array $form): array
+    {
+        if (! ($auth = $this->authorize($setting))['ok']) {
+            return $auth;
+        }
+
+        try {
+            $response = $this->client()->asForm()->post('/wa/app/' . rawurlencode((string) $setting->app_id) . '/template', $form);
+        } catch (ConnectionException) {
+            return ['ok' => false, 'error' => 'Sem resposta da Gupshup: o modelo pode ter sido criado. Confira com whatsapp:templates:status antes de repetir.', 'error_code' => 'unknown_delivery', 'retryable' => false];
+        }
+
+        if (! $response->successful() || data_get($response->json(), 'status') === 'error') {
+            return GupshupProvider::failure($response);
+        }
+
+        return ['ok' => true, 'id' => (string) data_get($response->json(), 'template.id', ''), 'status' => (string) data_get($response->json(), 'template.status', 'PENDING')];
     }
 
     /**

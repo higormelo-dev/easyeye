@@ -12,11 +12,11 @@ use App\Models\WhatsApp\{WhatsAppMessage, WhatsAppOptOut, WhatsAppSetting};
 use App\Services\Audit\AuditLogger;
 use App\Services\WhatsApp\Contracts\WhatsAppProvider;
 use App\Services\WhatsApp\Providers\{GupshupAuth, GupshupSelfServeProvider};
-use App\Services\WhatsApp\{WhatsAppService, WhatsAppTemplates};
+use App\Services\WhatsApp\{WhatsAppService, WhatsAppTemplateCatalog, WhatsAppTemplates};
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, Request};
-use Illuminate\Support\Facades\{Gate, Log};
+use Illuminate\Support\Facades\{Cache, Gate, Log};
 use Illuminate\Validation\Rule;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -52,7 +52,7 @@ class WhatsAppController extends Controller
     ) {
     }
 
-    public function index(Request $request, GupshupAuth $auth): InertiaResponse
+    public function index(Request $request, GupshupAuth $auth, WhatsAppTemplateCatalog $catalog): InertiaResponse
     {
         $this->authorizeSaasEntity();
 
@@ -92,20 +92,24 @@ class WhatsAppController extends Controller
                 'active' => $global->active,
                 ...$this->appProps($global),
             ] : null,
-            'templates'         => fn () => $this->templateCatalog(),
+            'templates'         => fn () => $catalog->entries(),
             'templateLanguages' => array_values((array) config('whatsapp.template_languages', ['pt_BR'])),
+            // Conta comum da Gupshup: dá para ler o estado dos modelos e criá-los por API.
+            'templateApi' => $this->provider instanceof GupshupSelfServeProvider,
             // Pausa global dos convites de retorno (kill-switch do 1º nível) e o que ela atinge.
             'recall' => fn () => [
                 'paused' => $this->killSwitch->state(),
                 'impact' => $this->killSwitch->impact(),
             ],
             'routes' => [
-                'update'        => route('manager.whatsapp.update', ['entity' => '__ID__']),
-                'test'          => route('manager.whatsapp.test', ['entity' => '__ID__']),
-                'global_update' => route('manager.whatsapp.global.update'),
-                'global_test'   => route('manager.whatsapp.global.test'),
-                'recall_pause'  => route('manager.whatsapp.recall.pause'),
-                'recall_resume' => route('manager.whatsapp.recall.resume'),
+                'update'           => route('manager.whatsapp.update', ['entity' => '__ID__']),
+                'test'             => route('manager.whatsapp.test', ['entity' => '__ID__']),
+                'global_update'    => route('manager.whatsapp.global.update'),
+                'global_test'      => route('manager.whatsapp.global.test'),
+                'recall_pause'     => route('manager.whatsapp.recall.pause'),
+                'recall_resume'    => route('manager.whatsapp.recall.resume'),
+                'templates_status' => route('manager.whatsapp.templates.status'),
+                'templates_create' => route('manager.whatsapp.templates.create'),
             ],
             't' => trans('whatsapp'),
         ]);
@@ -474,6 +478,94 @@ class WhatsAppController extends Controller
         return $this->runTest($request, WhatsAppSetting::globalSetting());
     }
 
+    /** Estado de cada modelo do app na Gupshup (APPROVED, PENDING, FAILED...), só leitura. */
+    public function templatesStatus(): JsonResponse
+    {
+        $this->authorizeSaasEntity();
+
+        $api = $this->selfServeApi();
+
+        if ($api instanceof JsonResponse) {
+            return $api;
+        }
+
+        $result = $api[0]->templateStatuses($api[1]);
+
+        return $result['ok']
+            ? response()->json(['ok' => true, 'templates' => $result['templates']])
+            : response()->json(['ok' => false, 'error' => $result['error'] ?? __('whatsapp.connection.failed')], 422);
+    }
+
+    /**
+     * Cria UM modelo do catálogo na Gupshup (vai para a aprovação da Meta). Um por chamada: o painel
+     * encadeia os que faltam, com intervalo, e para no primeiro erro. Nunca recria quem já existe.
+     */
+    public function createTemplate(Request $request, WhatsAppTemplateCatalog $catalog): JsonResponse
+    {
+        $this->authorizeSaasEntity();
+
+        $data = $request->validate([
+            'key'      => ['required', 'string', Rule::in(array_keys((array) config('whatsapp.templates')))],
+            'language' => ['required', 'string', Rule::in((array) config('whatsapp.template_languages', ['pt_BR']))],
+        ]);
+
+        $api = $this->selfServeApi();
+
+        if ($api instanceof JsonResponse) {
+            return $api;
+        }
+
+        [$provider, $setting] = $api;
+
+        $entry = collect($catalog->entries([$data['language']]))->firstWhere('key', $data['key']);
+        $id    = $entry['name'] . '|' . $data['language'];
+
+        // Clique duplo ou dois admins: só uma criação do mesmo modelo por vez.
+        $lock = Cache::lock('whatsapp:template-create:' . $id, 30);
+
+        if (! $lock->get()) {
+            return response()->json(['ok' => false, 'error' => __('whatsapp.template_api.busy')], 409);
+        }
+
+        try {
+            $statuses = $provider->templateStatuses($setting);
+
+            if (! $statuses['ok']) {
+                return response()->json(['ok' => false, 'error' => $statuses['error'] ?? __('whatsapp.connection.failed')], 422);
+            }
+
+            if ($existing = $statuses['templates'][$id] ?? null) {
+                return response()->json(['ok' => false, 'status' => $existing['status'], 'error' => __('whatsapp.template_api.exists', ['status' => $existing['status']])], 409);
+            }
+
+            $created = $provider->createTemplate($setting, $provider->templateForm($entry, $data['language']));
+        } finally {
+            $lock->release();
+        }
+
+        $this->audit->recordAdminAction(
+            event: 'manager.whatsapp_template.submitted',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: WhatsAppSetting::class,
+            auditableId: (string) $setting->id,
+            reason: 'Modelo do WhatsApp enviado à Gupshup pelo SaaS',
+            // Só o que foi pedido e o resultado — nada de chave.
+            newValues: [
+                'template'   => $entry['name'],
+                'language'   => $data['language'],
+                'ok'         => $created['ok'],
+                'status'     => $created['status'] ?? null,
+                'error_code' => $created['error_code'] ?? null,
+            ],
+            request: $request,
+        );
+
+        return $created['ok']
+            ? response()->json(['ok' => true, 'status' => $created['status'], 'message' => __('whatsapp.template_api.created')])
+            : response()->json(['ok' => false, 'error' => $created['error'] ?? __('whatsapp.connection.failed')], 422);
+    }
+
     // ──────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────
@@ -568,6 +660,26 @@ class WhatsAppController extends Controller
         ])->save();
 
         return $result['ok'];
+    }
+
+    /**
+     * O que a leitura e a criação de modelos por API exigem: conta comum da Gupshup e app global cadastrado.
+     *
+     * @return array{0: GupshupSelfServeProvider, 1: WhatsAppSetting}|JsonResponse
+     */
+    private function selfServeApi(): array|JsonResponse
+    {
+        if (! $this->provider instanceof GupshupSelfServeProvider) {
+            return response()->json(['ok' => false, 'error' => __('whatsapp.template_api.only_self_serve')], 422);
+        }
+
+        $setting = WhatsAppSetting::globalSetting();
+
+        if (! $setting || ! $setting->hasApp()) {
+            return response()->json(['ok' => false, 'error' => __('whatsapp.no_app')], 422);
+        }
+
+        return [$this->provider, $setting];
     }
 
     private function runTest(Request $request, ?WhatsAppSetting $stored): JsonResponse
@@ -690,94 +802,5 @@ class WhatsAppController extends Controller
             'confirmations_sent' => 0, 'confirmations_answered' => 0, 'surveys_sent' => 0, 'surveys_answered' => 0,
             'recall_sent'        => 0, 'recall_answered' => 0, 'survey_average' => 0.0, 'delivered' => 0, 'read' => 0, 'failed' => 0,
         ];
-    }
-
-    /**
-     * Modelos do WhatsApp para a tela (prévia, texto para a Meta, variáveis e
-     * botões) em pt_BR e en. Fonte única: config/whatsapp.php (nome, ordem
-     * das variáveis, botões, rodapé) + lang/{pt_BR,en}/whatsapp.php
-     * (templates.* — o mesmo texto do histórico das mensagens).
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function templateCatalog(): array
-    {
-        $locales = ['pt_BR', 'en'];
-
-        return collect((array) config('whatsapp.templates'))
-            ->map(function (array $template, string $key) use ($locales) {
-                $params  = array_values((array) ($template['body'] ?? []));
-                $buttons = array_values((array) ($template['buttons'] ?? []));
-                $texts   = [];
-
-                foreach ($locales as $locale) {
-                    [$body, $footer, $labels] = $this->splitTemplateText((string) __("whatsapp.templates.{$key}", [], $locale), (bool) ($template['footer'] ?? false));
-                    $examples                 = (array) __('whatsapp.manager.template_examples', [], $locale);
-
-                    $meta    = $body;
-                    $preview = $body;
-
-                    foreach ($params as $i => $param) {
-                        $meta    = str_replace(":{$param}", '{{' . ($i + 1) . '}}', $meta);
-                        $preview = str_replace(":{$param}", (string) ($examples[$param] ?? $param), $preview);
-                    }
-
-                    $texts[$locale] = [
-                        'meta'    => $meta,
-                        'preview' => $preview,
-                        'footer'  => $footer,
-                        'buttons' => collect($buttons)->values()->map(fn (array $button, int $i) => [
-                            'type'  => $button['type'],
-                            'label' => match ($button['type']) {
-                                'url'   => (string) __('whatsapp.manager.template_buttons.url', [], $locale),
-                                'otp'   => (string) __('whatsapp.manager.template_buttons.otp', [], $locale),
-                                default => (string) ($labels[$i] ?? $button['action'] ?? ''),
-                            },
-                        ])->all(),
-                        'params' => collect($params)->values()->map(fn (string $param, int $i) => [
-                            'placeholder' => '{{' . ($i + 1) . '}}',
-                            'key'         => $param,
-                            'label'       => (string) __("whatsapp.manager.template_params.{$param}", [], $locale),
-                            'example'     => (string) ($examples[$param] ?? ''),
-                        ])->all(),
-                    ];
-                }
-
-                return [
-                    'key'      => $key,
-                    'name'     => $template['name'],
-                    'category' => $template['category'] ?? 'UTILITY',
-                    'group'    => match (true) {
-                        str_starts_with($key, 'saas_')                                 => 'saas',
-                        in_array($key, ['verification_code', 'connection_test'], true) => 'registration',
-                        default                                                        => 'patients',
-                    },
-                    'texts' => $texts,
-                ];
-            })
-            ->values()
-            ->all();
-    }
-
-    /**
-     * Texto do histórico → [corpo, rodapé, rótulos dos botões]. Linha final
-     * "[Confirmar] [Cancelar]" = botões; com rodapé, a linha antes deles é o
-     * rodapé ("responda SAIR").
-     *
-     * @return array{0: string, 1: ?string, 2: list<string>}
-     */
-    private function splitTemplateText(string $text, bool $hasFooter): array
-    {
-        $lines  = explode("\n", trim($text));
-        $labels = [];
-
-        if ($lines !== [] && str_starts_with(trim((string) end($lines)), '[')) {
-            preg_match_all('/\[([^\]]+)\]/u', (string) array_pop($lines), $matches);
-            $labels = $matches[1];
-        }
-
-        $footer = $hasFooter && count($lines) > 1 ? trim((string) array_pop($lines)) : null;
-
-        return [trim(implode("\n", $lines)), $footer, $labels];
     }
 }
