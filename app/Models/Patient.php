@@ -9,7 +9,7 @@ use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes, SoftDeletingScope};
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
 use Laracasts\Presenter\PresentableTrait;
@@ -98,7 +98,7 @@ class Patient extends Model
      *
      * @param Builder<static> $query
      */
-    protected function performInsert(Builder $query)
+    protected function performInsert(Builder $query): bool
     {
         $generatesCode = blank($this->code);
 
@@ -130,7 +130,7 @@ class Patient extends Model
     {
         static::lockCodeNumbering($entityId);
 
-        $last = static::withoutGlobalScopes()
+        $last = static::query()->withoutGlobalScopes()
             ->where('entity_id', $entityId)
             ->where('code', 'like', self::CODE_PREFIX . '-' . str_repeat('_', self::CODE_DIGITS))
             ->orderByDesc('code')
@@ -223,7 +223,7 @@ class Patient extends Model
      */
     public function mergedInto(): BelongsTo
     {
-        return $this->belongsTo(self::class, 'merged_into_id')->withTrashed();
+        return $this->belongsTo(self::class, 'merged_into_id')->withoutGlobalScope(SoftDeletingScope::class);
     }
 
     public function covenant(): BelongsTo
@@ -237,7 +237,7 @@ class Patient extends Model
      */
     public function covenantPlan(): BelongsTo
     {
-        return $this->belongsTo(CovenantPlan::class, 'covenant_plan_id')->withTrashed();
+        return $this->belongsTo(CovenantPlan::class, 'covenant_plan_id')->withoutGlobalScope(SoftDeletingScope::class);
     }
 
     public function skinType(): BelongsTo
