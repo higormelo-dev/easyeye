@@ -196,6 +196,8 @@ Depois: `php artisan migrate` (apaga as credenciais da Z-API, troca os tokens de
 
 Cadastrar **exatamente** com estes nomes (são os de `config/whatsapp.php`), idioma **Portuguese (BR) — `pt_BR`**, variáveis posicionais `{{1}}`, `{{2}}`... na ordem abaixo e botões **na ordem listada** (o índice do botão é usado no envio). A Meta exige exemplo para cada variável. Nada de conteúdo promocional (vira Marketing).
 
+Conferência (só leitura, conta comum): `php artisan whatsapp:templates:status` compara estes modelos com os do app na Gupshup e mostra, por nome e idioma, `APPROVED`, `PENDING`, `REJECTED`/`FAILED` (com o motivo da Meta) ou `AUSENTE`, além do que existe no app e não é do catálogo. O cadastro continua manual, no painel da Gupshup: não há rotina que crie modelos por API.
+
 ### 6.1 Pacientes (sempre pt_BR)
 
 **`easyeye_confirmacao_consulta`** — Utilidade

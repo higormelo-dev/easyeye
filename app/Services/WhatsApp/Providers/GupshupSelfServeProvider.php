@@ -230,6 +230,46 @@ class GupshupSelfServeProvider implements WhatsAppProvider
     }
 
     /**
+     * Todos os modelos do app, em qualquer estado (APPROVED, PENDING, REJECTED, FAILED...) e
+     * sem cache: serve para conferir o que falta ou foi recusado e por quê
+     * (`php artisan whatsapp:templates:status`). Só leitura. Nome+idioma repetido guarda o
+     * melhor estado: um FAILED antigo não esconde o APPROVED.
+     *
+     * @return array{ok: bool, templates?: array<string, array{status: string, reason: string}>, error?: string, error_code?: string}
+     */
+    public function templateStatuses(WhatsAppSetting $setting): array
+    {
+        $rank   = ['APPROVED' => 2, 'PENDING' => 1];
+        $result = [];
+
+        // shortcut: no máximo 20 páginas de 100 modelos; o catálogo tem 18. Mais que isso, subir o teto.
+        for ($page = 0; $page < 20; $page++) {
+            $response = $this->get($setting, ['pageNo' => $page, 'pageSize' => 100]);
+
+            if (! $response['ok']) {
+                return $response;
+            }
+
+            $batch = (array) data_get($response['body'], 'templates', []);
+
+            foreach ($batch as $template) {
+                $key    = ($template['elementName'] ?? '') . '|' . ($template['languageCode'] ?? '');
+                $status = (string) ($template['status'] ?? '?');
+
+                if (! isset($result[$key]) || ($rank[$status] ?? 0) > ($rank[$result[$key]['status']] ?? 0)) {
+                    $result[$key] = ['status' => $status, 'reason' => (string) ($template['reason'] ?? '')];
+                }
+            }
+
+            if (count($batch) < 100) {
+                break;
+            }
+        }
+
+        return ['ok' => true, 'templates' => $result];
+    }
+
+    /**
      * @param array<string, scalar> $query
      *
      * @return array{ok: bool, body?: array<string, mixed>, error?: string, error_code?: string, retryable?: bool}
