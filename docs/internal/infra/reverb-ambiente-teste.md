@@ -322,6 +322,11 @@ provedor configurado.
 
 ## 3. Checklist de deploy
 
+Use `scripts/deploy-saveincloud.sh` (runbook em
+`docs/internal/runbooks/deploy-saveincloud.md`): ele atualiza pelo git e roda
+este checklist, com `optimize` no lugar de `config:cache && route:cache`
+(o nó tem cache de eventos). Os passos abaixo são o equivalente manual.
+
 Depois de atualizar o código (`git pull` em `/var/www/webroot/ROOT`):
 
 ```bash
@@ -419,6 +424,8 @@ limpo em reinício do nó — os da seção acima ficam junto dos originais.)
    `/var/www/webroot/ROOT` mostra `https://usuario:ghp_…@github.com/...`).
    Qualquer pessoa com acesso ao nó lê o token. Revogar o token no GitHub e
    trocar por *deploy key* SSH somente leitura ou credential helper.
+   O repositório é público: `scripts/deploy-saveincloud.sh` tira a credencial
+   da URL quando o repositório abre sem ela (falta revogar o token).
 2. **Redis** escuta em `0.0.0.0` com `protected-mode no`, protegido só por
    senha. Confirmar no painel que a porta 6379 não está aberta para a
    internet (somente rede interna do ambiente).
@@ -427,6 +434,7 @@ limpo em reinício do nó — os da seção acima ficam junto dos originais.)
    `teste.easyeye.app` neste ambiente.
 4. Arquivos soltos não rastreados na raiz do app (`11.12.0` e `build`) —
    provavelmente resto de comando digitado errado; avaliar e remover.
+   `scripts/deploy-saveincloud.sh` lista esses arquivos a cada deploy.
 5. **Allowlist de hosts desligada neste ambiente.** O middleware
    `TrustHosts` do Laravel não age quando `APP_ENV=testing` (o framework
    trata esse nome como "rodando testes"). Com `trustProxies(at: '*')` e o

@@ -16,6 +16,8 @@
 !/public/site/images/how-it-works.png
 !/public/site/images/*.webp
 /storage/*.key
+# Backups do scripts/deploy-saveincloud.sh no nó (cópias manuais que o git recusaria sobrescrever)
+/.easyeye-deploy-backups/
 /storage/pail
 /vendor
 .env

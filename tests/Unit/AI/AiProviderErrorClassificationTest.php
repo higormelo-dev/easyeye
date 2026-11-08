@@ -53,6 +53,7 @@ describe('classificação', function () {
         $e = providerError(AiProvider::OpenAI, 429, ['error' => ['code' => 'insufficient_quota', 'type' => 'insufficient_quota', 'message' => 'You exceeded your current quota, please check your plan and billing details.']], ['retry-after' => '20']);
 
         expect($e->category)->toBe(E::CATEGORY_QUOTA)
+            ->and($e->accountWide)->toBeTrue() // código estruturado: vale para a conta toda
             ->and($e->retryAfterSeconds)->toBeNull()
             ->and($e->isRetryable())->toBeFalse()
             ->and($e->needsHumanAction())->toBeTrue()
@@ -66,15 +67,22 @@ describe('classificação', function () {
             ->and($e->isRetryable())->toBeFalse();
     });
 
-    it('OpenAI 401 invalid_api_key: chave recusada', function () {
-        expect(providerError(AiProvider::OpenAI, 401, ['error' => ['code' => 'invalid_api_key', 'message' => 'Incorrect API key provided.']])->category)
-            ->toBe(E::CATEGORY_AUTH);
+    it('OpenAI 401 invalid_api_key: chave recusada, da conta toda; 403 sem código: chave, mas não da conta', function () {
+        $key       = providerError(AiProvider::OpenAI, 401, ['error' => ['code' => 'invalid_api_key', 'message' => 'Incorrect API key provided.']]);
+        $forbidden = providerError(AiProvider::OpenAI, 403, ['error' => ['message' => 'Forbidden.']]);
+
+        expect($key->category)->toBe(E::CATEGORY_AUTH)
+            ->and($key->accountWide)->toBeTrue()
+            ->and($forbidden->category)->toBe(E::CATEGORY_AUTH)
+            ->and($forbidden->accountWide)->toBeFalse();
     });
 
     it('Anthropic sem saldo vem como 400 invalid_request_error: é falta de crédito', function () {
         $e = providerError(AiProvider::Anthropic, 400, ['type' => 'error', 'error' => ['type' => 'invalid_request_error', 'message' => 'Your credit balance is too low to access the Anthropic API.']]);
 
-        expect($e->category)->toBe(E::CATEGORY_QUOTA);
+        // Só o texto diz "sem saldo": a categoria é a mesma, mas não suspende as outras clínicas.
+        expect($e->category)->toBe(E::CATEGORY_QUOTA)
+            ->and($e->accountWide)->toBeFalse();
     });
 
     it('Anthropic 429 rate_limit_error com retry-after em segundos; 529 overloaded_error é passageiro', function () {
@@ -97,12 +105,15 @@ describe('classificação', function () {
 
         expect($minute->category)->toBe(E::CATEGORY_RATE_LIMIT)
             ->and($minute->retryAfterSeconds)->toBe(34.0)
-            ->and($day->category)->toBe(E::CATEGORY_QUOTA);
+            ->and($day->category)->toBe(E::CATEGORY_QUOTA)
+            ->and($day->accountWide)->toBeTrue(); // QuotaFailure estruturado
     });
 
-    it('Gemini 400 "API key not valid": chave recusada', function () {
-        expect(providerError(AiProvider::Gemini, 400, ['error' => ['code' => 400, 'status' => 'INVALID_ARGUMENT', 'message' => 'API key not valid. Please pass a valid API key.']])->category)
-            ->toBe(E::CATEGORY_AUTH);
+    it('Gemini 400 "API key not valid": chave recusada, inferida do texto (não da conta)', function () {
+        $e = providerError(AiProvider::Gemini, 400, ['error' => ['code' => 400, 'status' => 'INVALID_ARGUMENT', 'message' => 'API key not valid. Please pass a valid API key.']]);
+
+        expect($e->category)->toBe(E::CATEGORY_AUTH)
+            ->and($e->accountWide)->toBeFalse();
     });
 
     it('5xx é passageiro; demais 4xx são erro do pedido', function () {

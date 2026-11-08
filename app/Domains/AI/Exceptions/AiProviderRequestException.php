@@ -51,6 +51,9 @@ final class AiProviderRequestException extends RuntimeException
     /**
      * @param int    $httpStatus        0 = não houve requisição (circuito aberto)
      * @param ?float $retryAfterSeconds espera pedida pelo provedor (headers ou texto), quando informada
+     * @param bool   $accountWide       quota/auth vieram de sinal ESTRUTURADO do provedor (código do erro, 401):
+     *                                  vale para a conta toda. False = inferido do texto da mensagem (ou 403 sem
+     *                                  código), que pode ecoar conteúdo do pedido — não derruba as outras clínicas.
      */
     public function __construct(
         string $message,
@@ -59,6 +62,7 @@ final class AiProviderRequestException extends RuntimeException
         public readonly ?string $errorCode,
         public readonly string $category,
         public readonly ?float $retryAfterSeconds = null,
+        public readonly bool $accountWide = true,
     ) {
         parent::__construct($message);
     }
@@ -72,12 +76,12 @@ final class AiProviderRequestException extends RuntimeException
         $type   = self::scalar(data_get($json, 'error.type') ?? data_get($json, 'error.status') ?? data_get($json, 'type'));
         $raw    = (string) (self::scalar(data_get($json, 'error.message') ?? data_get($json, 'message')) ?? '');
 
-        $category   = self::categorize($status, [$code, $type], $raw, $json);
-        $retryAfter = in_array($category, [self::CATEGORY_RATE_LIMIT, self::CATEGORY_OVERLOADED], true)
+        [$category, $accountWide] = self::categorize($status, [$code, $type], $raw, $json);
+        $retryAfter               = in_array($category, [self::CATEGORY_RATE_LIMIT, self::CATEGORY_OVERLOADED], true)
             ? self::retryAfter($response, $raw, $json)
             : null;
 
-        return new self($message, $provider, $status, $code ?? $type, $category, $retryAfter);
+        return new self($message, $provider, $status, $code ?? $type, $category, $retryAfter, $accountWide);
     }
 
     /**
@@ -127,24 +131,35 @@ final class AiProviderRequestException extends RuntimeException
     }
 
     /**
+     * Categoria e se ela vale para a conta toda. Falta de crédito e chave
+     * recusada só contam como da conta com sinal estruturado (código do erro,
+     * cota diária do Gemini, 401); pelo texto da mensagem (Anthropic sem
+     * saldo responde só "credit balance is too low", Gemini "API key not
+     * valid") ou por um 403 sem código, a categoria é a mesma, mas não é
+     * account-wide: um texto do provedor que ecoe o pedido de uma clínica não
+     * pode suspender a IA de todas.
+     *
      * @param list<?string>        $codes error.code e error.type/status
      * @param array<string, mixed> $json
+     *
+     * @return array{0: string, 1: bool}
      */
-    private static function categorize(int $status, array $codes, string $raw, array $json): string
+    private static function categorize(int $status, array $codes, string $raw, array $json): array
     {
         $codes = array_map('strtolower', array_filter($codes, fn (?string $c) => $c !== null && $c !== ''));
         $text  = strtolower($raw);
         $has   = fn (array $list): bool => array_intersect($codes, $list) !== [];
 
         return match (true) {
-            // Anthropic sem saldo responde 400 invalid_request_error; Gemini sem cota do dia, 429 RESOURCE_EXHAUSTED por dia.
-            $has(self::QUOTA_CODES) || str_contains($text, 'credit balance is too low') || ($status === 429 && self::geminiDailyQuota($json))                    => self::CATEGORY_QUOTA,
-            $status === 401 || $status === 403 || $has(self::AUTH_CODES) || str_contains($text, 'api key not valid') || str_contains($text, 'incorrect api key') => self::CATEGORY_AUTH,
+            $has(self::QUOTA_CODES) || ($status === 429 && self::geminiDailyQuota($json))                           => [self::CATEGORY_QUOTA, true],
+            str_contains($text, 'credit balance is too low')                                                        => [self::CATEGORY_QUOTA, false],
+            $status === 401 || $has(self::AUTH_CODES)                                                               => [self::CATEGORY_AUTH, true],
+            $status === 403 || str_contains($text, 'api key not valid') || str_contains($text, 'incorrect api key') => [self::CATEGORY_AUTH, false],
             // OpenAI: pedido maior que o TPM do modelo vem como 429 rate_limit_exceeded.
-            $status === 413 || str_contains($text, 'request too large')                     => self::CATEGORY_TOO_LARGE,
-            $status === 429 || $has(self::RATE_LIMIT_CODES)                                 => self::CATEGORY_RATE_LIMIT,
-            $status >= 500 || $status === 408 || in_array('overloaded_error', $codes, true) => self::CATEGORY_OVERLOADED,
-            default                                                                         => self::CATEGORY_REQUEST,
+            $status === 413 || str_contains($text, 'request too large')                     => [self::CATEGORY_TOO_LARGE, true],
+            $status === 429 || $has(self::RATE_LIMIT_CODES)                                 => [self::CATEGORY_RATE_LIMIT, true],
+            $status >= 500 || $status === 408 || in_array('overloaded_error', $codes, true) => [self::CATEGORY_OVERLOADED, true],
+            default                                                                         => [self::CATEGORY_REQUEST, true],
         };
     }
 

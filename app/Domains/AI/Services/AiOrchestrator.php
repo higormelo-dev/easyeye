@@ -254,10 +254,14 @@ class AiOrchestrator
         $trigger = $this->classifyFailure($e);
 
         if ($e instanceof AiProviderRequestException && $e->httpStatus > 0 && $e->needsHumanAction()) {
-            $this->circuitBreaker->trip($provider, $trigger, (int) config('ai.circuit_breaker.human_action_cooldown_seconds', 900));
             AiOperationalAlerts::critical($e->category, $provider, ['http_status' => $e->httpStatus, 'error_code' => $e->errorCode]);
 
-            return;
+            // Só sinal estruturado (código, 401) abre para todos; o inferido do texto conta no limiar da entity.
+            if ($e->accountWide) {
+                $this->circuitBreaker->trip($provider, $trigger, (int) config('ai.circuit_breaker.human_action_cooldown_seconds', 900));
+
+                return;
+            }
         }
 
         if ($e instanceof AiProviderRequestException
